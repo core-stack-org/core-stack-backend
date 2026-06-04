@@ -32,14 +32,14 @@
                 </td>
 
                 <td>
-                    {{ item.largest_caste|default:t.common.na }}
+                    {{ item.largest_caste_label|default:t.common.na }}
                 </td>
 
                 <td>
                     {% if item.largest_caste|lower == "single caste group" %}
-                        {{ item.smallest_caste|default:t.common.na }}
+                        {{ item.smallest_caste_label|default:t.common.na }}
                     {% elif item.largest_caste|lower == "mixed caste group" %}
-                        {{ item.settlement_status|default:t.common.na }}
+                        {{ item.settlement_status_label|default:t.common.na }}
                     {% else %}
                         {{ t.common.na }}
                     {% endif %}
@@ -48,22 +48,22 @@
                 <td>
                     <table class="nested-table">
                         <tr>
-                            <td><strong>SC</strong></td>
+                            <td><strong>{{ t.section_c_socio_economic.sc }}</strong></td>
                             <td>{{ item.data_settlement.count_sc|default:t.common.na }}</td>
                         </tr>
 
                         <tr>
-                            <td><strong>ST</strong></td>
+                            <td><strong>{{ t.section_c_socio_economic.st }}</strong></td>
                             <td>{{ item.data_settlement.count_st|default:t.common.na }}</td>
                         </tr>
 
                         <tr>
-                            <td><strong>OBC</strong></td>
+                            <td><strong>{{ t.section_c_socio_economic.obc }}</strong></td>
                             <td>{{ item.data_settlement.count_obc|default:t.common.na }}</td>
                         </tr>
 
                         <tr>
-                            <td><strong>General</strong></td>
+                            <td><strong>{{ t.section_c_socio_economic.gen }}</strong></td>
                             <td>{{ item.data_settlement.count_general|default:t.common.na }}</td>
                         </tr>
                     </table>

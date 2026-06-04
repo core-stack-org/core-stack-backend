@@ -1,0 +1,2441 @@
+{
+  "select_one_water_structure": {
+    "farm pond": {
+      "English": "Farm pond",
+      "Hindi": "खेत तालाब",
+      "Gujarati": "ખેત તળાવ",
+      "Kannada": "ಕೃಷಿ ಹೊಂಡ",
+      "Odia": "କୃଷି ପୋଖରୀ (ଫାର୍ମ ପଣ୍ଡ)"
+    },
+    "community pond": {
+      "English": "Community Pond",
+      "Hindi": "सामुदायिक तालाब",
+      "Gujarati": "સામુદાયિક તળાવ",
+      "Kannada": "ಸಮುದಾಯ ಕೊಳ",
+      "Odia": "ଗୋଷ୍ଠୀ ପୋଖରୀ"
+    },
+    "large water body": {
+      "English": "Large water body",
+      "Hindi": "विशाल जल श्रोत",
+      "Gujarati": "વિશાળ પાણીનો સ્ત્રોત",
+      "Kannada": "ದೊಡ್ಡ ಜಲರಾಶಿ",
+      "Odia": "ବୃହତ ଜଳାଶୟ"
+    },
+    "canal": {
+      "English": "Canal",
+      "Hindi": "नहर",
+      "Gujarati": "ચેનલ",
+      "Kannada": "ಕಾಲುವೆ",
+      "Odia": "କେନାଲ"
+    },
+    "check dam": {
+      "English": "Check dam",
+      "Hindi": "चेक डैम",
+      "Gujarati": "ચેક ડેમ",
+      "Kannada": "ಚೆಕ್ ಡ್ಯಾಂ",
+      "Odia": "ଚେକ ଡ୍ୟାମ"
+    },
+    "percolation tank": {
+      "English": "Percolation tank",
+      "Hindi": "परकोलेशन टैंक",
+      "Gujarati": "પરકોલેશન ટાંકી",
+      "Kannada": "ಪರ್ಕೋಲೇಷನ್ ಟ್ಯಾಂಕ್",
+      "Odia": "ଭୂତଳ ଜଳ ପୋଖରୀ (ପର୍କୋଲେସନ ଟ୍ୟାଙ୍କ)"
+    },
+    "earthen gully plug": {
+      "English": "Earthen gully plug",
+      "Hindi": "अर्थन गली प्लग",
+      "Gujarati": "માટીનું ગલી પ્લગ",
+      "Kannada": "ಮಣ್ಣಿನ ಗಲ್ಲಿ ಪ್ಲಗ್",
+      "Odia": "ସରୁ ନାଳରେ ମାଟି ବନ୍ଧ (ଗଲି ପ୍ଳଗ)"
+    },
+    "drainage/soakage channels": {
+      "English": "Drainage/soakage channels",
+      "Hindi": "नाली /सोख्ता नाली",
+      "Gujarati": "ડ્રેઇન/સોક ડ્રેઇન",
+      "Kannada": "ಒಳಚರಂಡಿ/ಸೋಕೇಜ್ ಚಾನಲ್‌ಗಳು",
+      "Odia": "ଜଳ ନିଷ୍କାସନ ଚ୍ୟାନେଲ"
+    },
+    "recharge pits": {
+      "English": "Recharge pits",
+      "Hindi": "रिचार्ज पिट्स",
+      "Gujarati": "રિચાર્જ ખાડાઓ",
+      "Kannada": "ರೀಚಾರ್ಜ್ ಹೊಂಡಗಳು",
+      "Odia": "ରିଚାର୍ଜ ପିଟ"
+    },
+    "soakage pits": {
+      "English": "Soakage pits",
+      "Hindi": "सोख्ता गड्ढे",
+      "Gujarati": "ખાડો",
+      "Kannada": "ಸೋಕೇಜ್ ಹೊಂಡಗಳು",
+      "Odia": "ସୋକ ପିଟ"
+    },
+    "trench cum bund network": {
+      "English": "Trench cum bund network",
+      "Hindi": "ट्रेंच /बाँध",
+      "Gujarati": "ખાઈ/બંધ",
+      "Kannada": "ಟ್ರೆಂಚ್ ಕಮ್ ಬಂಡ್ ನೆಟ್ವರ್ಕ್",
+      "Odia": "ଟ୍ରେଞ୍ଚ ସହିତ ହୁଡ଼ା"
+    },
+    "continuous contour trenches (cct)": {
+      "English": "Continuous contour trenches (CCT)",
+      "Hindi": "कन्टिन्यूवस कंटूर ट्रेंच (CCT )",
+      "Gujarati": "સતત કોન્ટૂર ટ્રેન્ચ (CCT)",
+      "Kannada": "ನಿರಂತರ ಬಾಹ್ಯರೇಖೆ ಕಂದಕಗಳು (CCT)",
+      "Odia": "ନିରନ୍ତର ସମୋଚ୍ଚ ଖାଇ (CCT)"
+    },
+    "staggered contour trenches(sct)": {
+      "English": "Staggered Contour trenches (SCT)",
+      "Hindi": "स्टैगर्ड कंटूर ट्रेंच (SCT )",
+      "Gujarati": "સ્ટેગર્ડ કોન્ટૂર ટ્રેન્ચ (SCT)",
+      "Kannada": "ದಿಗ್ಭ್ರಮೆಗೊಂಡ ಬಾಹ್ಯರೇಖೆ ಕಂದಕಗಳು (SCT)",
+      "Odia": "ଖଣ୍ଡିତ ସମୋଚ୍ଚ ଖାଇ (SCT)"
+    },
+    "water absorption trenches(wat)": {
+      "English": "Water absorption trenches (WAT)",
+      "Hindi": "वॉटर ऑब्जॉप्सन ट्रेंच (WAT)",
+      "Gujarati": "વોટર ઓબ્સ્ક્યુરેશન ટ્રેન્ચ (WAT)",
+      "Kannada": "ನೀರಿನ ಹೀರಿಕೊಳ್ಳುವ ಕಂದಕಗಳು (WAT)",
+      "Odia": "ଜଳ ଶୋଷଣ ଖାଇ (WAP)"
+    },
+    "loose boulder structure": {
+      "English": "Loose boulder structure",
+      "Hindi": "लूज़ बोल्डर स्ट्रक्चर",
+      "Gujarati": "છૂટા પથ્થરના માળખાં",
+      "Kannada": "ಸಡಿಲವಾದ ಬಂಡೆಯ ರಚನೆ",
+      "Odia": "ଢିଲା ପଥର ବନ୍ଧ"
+    },
+    "rock fill dam": {
+      "English": "Rock fill dam",
+      "Hindi": "रॉक फिल बांध",
+      "Gujarati": "રોકફિલ ડેમ",
+      "Kannada": "ಬಂಡೆ ತುಂಬುವ ಅಣೆಕಟ್ಟು",
+      "Odia": "ପଥର ପୂର୍ଣ୍ଣ ବନ୍ଧ"
+    },
+    "stone bunding": {
+      "English": "Stone bunding",
+      "Hindi": "पत्थर बाँधना",
+      "Gujarati": "પથ્થર બંધન",
+      "Kannada": "ಕಲ್ಲು ಕಟ್ಟುವುದು",
+      "Odia": "ପଥର ହୁଡ଼ା"
+    },
+    "diversion drains": {
+      "English": "Diversion drains",
+      "Hindi": "डायवर्जन नालियाँ",
+      "Gujarati": "ડાયવર્ઝન ડ્રેઇન",
+      "Kannada": "ಡೈವರ್ಶನ್ ಡ್ರೈನ್ಗಳು",
+      "Odia": "ଜଳବୁଲାଣି ନାଳ (Diversion Drain)"
+    },
+    "bunding:contour bunds/ graded bunds": {
+      "English": "Bunding:Contour bunds/ graded bunds",
+      "Hindi": "मेड़बंदी: समोच्च बाँध/श्रेणीबद्ध बाँध",
+      "Gujarati": "બંધન: કોન્ટૂર બંધ/ગ્રેડેડ બંધ",
+      "Kannada": "ಕಟ್ಟುವಿಕೆ: ಬಾಹ್ಯರೇಖೆ ಬಂಡ್‌ಗಳು/ ಶ್ರೇಣೀಕೃತ ಬಂಡ್‌ಗಳು",
+      "Odia": "ହୁଡ଼ା (କଣ୍ଟୁର ବଣ୍ଡ ବା ଗ୍ରେଡେଡ଼ ବଣ୍ଡ)"
+    },
+    "farm bund": {
+      "English": "Farm bund",
+      "Hindi": "खेत का मेड़",
+      "Gujarati": "ખેતરની સીમા",
+      "Kannada": "ಫಾರ್ಮ್ ಬಂಡ್",
+      "Odia": "ଚାଷ ଜମିରେ ହୁଡ଼ା"
+    },
+    "5% model structure": {
+      "English": "5% model structure",
+      "Hindi": "5% मॉडल स्ट्रक्चर",
+      "Gujarati": "૫% મોડેલ સ્ટ્રક્ચર",
+      "Kannada": "5% ಮಾದರಿ ರಚನೆ",
+      "Odia": "୫% ମଡେଲ"
+    },
+    "30-40 model structure": {
+      "English": "30-40 model structure",
+      "Hindi": "30-40 मॉडल स्ट्रक्चर",
+      "Gujarati": "૩૦-૪૦ મોડેલ સ્ટ્રક્ચર્સ",
+      "Kannada": "30-40 ಮಾದರಿ ರಚನೆ",
+      "Odia": "୩୦ - ୪୦ ମଡେଲ"
+    }
+  },
+  "select_one_manages": {
+    "water user association": {
+      "English": "Water user association",
+      "Hindi": "जल उपयोगकर्ता संघ",
+      "Gujarati": "પાણી વપરાશકારોનું સંગઠન",
+      "Kannada": "ನೀರು ಬಳಕೆದಾರರ ಸಂಘ",
+      "Odia": "ଜଳ ବ୍ୟବହାରକାରୀ ସଙ୍ଘ"
+    },
+    "neighboring farmers": {
+      "English": "Neighboring farmers",
+      "Hindi": "पड़ोसी किसान",
+      "Gujarati": "પડોશી ખેડૂતો",
+      "Kannada": "ಅಕ್ಕಪಕ್ಕದ ರೈತರು",
+      "Odia": "ଆଖପାଖରେ ଥିବା କୃଷକମାନେ"
+    },
+    "pani panchayats": {
+      "English": "Pani Panchayats",
+      "Hindi": "पानी पंचायतें",
+      "Gujarati": "પાણી પંચાયતો",
+      "Kannada": "ಪಾನಿ ಪಂಚಾಯತಿಗಳು",
+      "Odia": "ପାଣି ପଞ୍ଚାୟତ"
+    },
+    "village institutions": {
+      "English": "Village Institutions",
+      "Hindi": "ग्राम संस्थाएं",
+      "Gujarati": "ગ્રામીણ સંસ્થાઓ",
+      "Kannada": "ಗ್ರಾಮ ಸಂಸ್ಥೆಗಳು",
+      "Odia": "ଗ୍ରାମ ସଂଗଠନ"
+    },
+    "nobody": {
+      "English": "Nobody",
+      "Hindi": "कोई नहीं",
+      "Gujarati": "કોઈ નહીં",
+      "Kannada": "ಯಾರೂ ಇಲ್ಲ",
+      "Odia": "କେହି ନୁହେଁ"
+    },
+    "don’t know": {
+      "English": "Don’t know",
+      "Hindi": "पता नहीं",
+      "Gujarati": "ખબર નથી",
+      "Kannada": "ಗೊತ್ತಿಲ್ಲ",
+      "Odia": "ଜଣା ନାହିଁ"
+    },
+    "other": {
+      "English": "Other",
+      "Hindi": "अन्य",
+      "Gujarati": "અન્ય",
+      "Kannada": "ಇತರೆ",
+      "Odia": "ଅନ୍ୟାନ୍ୟ"
+    }
+  },
+  "select_one_owns": {
+    "community": {
+      "English": "Community",
+      "Hindi": "सार्वजनिक",
+      "Gujarati": "જાહેર",
+      "Kannada": "ಸಾರ್ವಜನಿಕ",
+      "Odia": "ଜନସାଧାରଣ"
+    },
+    "private": {
+      "English": "Private",
+      "Hindi": "निजी",
+      "Gujarati": "વ્યક્તિગત",
+      "Kannada": "ಖಾಸಗಿ",
+      "Odia": "ବ୍ୟକ୍ତିଗତ"
+    },
+    "shared among families": {
+      "English": "Shared among families",
+      "Hindi": "परिवारों के बीच साझा किया हुआ",
+      "Gujarati": "પરિવારો વચ્ચે વહેંચાયેલું",
+      "Kannada": "ಕುಟುಂಬಗಳ ನಡುವೆ ಹಂಚಿಕೊಂಡಿದ್ದಾರೆ",
+      "Odia": "ସମସ୍ତ ପରିବାର ଏଠାରୁ ପାଣି ନିଅନ୍ତି"
+    },
+    "don’t know": {
+      "English": "Don’t know",
+      "Hindi": "पता नहीं",
+      "Gujarati": "ખબર નથી",
+      "Kannada": "ಗೊತ್ತಿಲ್ಲ",
+      "Odia": "ଜଣା ନାହିଁ"
+    },
+    "any other": {
+      "English": "Any other",
+      "Hindi": "कोई और",
+      "Gujarati": "બીજું કોઈ",
+      "Kannada": "ಬೇರೆ ಯಾವುದಾದರೂ",
+      "Odia": "ଅନ୍ୟାନ୍ୟ"
+    }
+  },
+  "select_multiple_caste_use": {
+    "gc": {
+      "English": "GC",
+      "Hindi": "सामान्य वर्ग",
+      "Gujarati": "સામાન્ય શ્રેણી",
+      "Kannada": "ಜಿಸಿ",
+      "Odia": "ସାଧାରଣ"
+    },
+    "sc": {
+      "English": "SC",
+      "Hindi": "अनुसूचित जाति वर्ग",
+      "Gujarati": "અનુસૂચિત જાતિ શ્રેણી",
+      "Kannada": "SC",
+      "Odia": "ଅନୁସୂଚିତ ଜାତି"
+    },
+    "st": {
+      "English": "ST",
+      "Hindi": "अनुसूचित जनजाति वर्ग",
+      "Gujarati": "અનુસૂચિત જનજાતિ શ્રેણી",
+      "Kannada": "ST",
+      "Odia": "ଅନୁସୂଚିତ ଜନଜାତି"
+    },
+    "obc": {
+      "English": "OBC",
+      "Hindi": "अन्य पिछड़ा वर्ग",
+      "Gujarati": "અન્ય પછાત વર્ગો",
+      "Kannada": "ಒಬಿಸಿ",
+      "Odia": "ଅନ୍ୟାନ୍ୟ ପଛୁଆ ବର୍ଗ"
+    }
+  },
+  "select_multiple_uses_structure": {
+    "irrigation": {
+      "English": "Irrigation",
+      "Hindi": "सिंचाई",
+      "Gujarati": "સિંચાઈ",
+      "Kannada": "ನೀರಾವರಿ",
+      "Odia": "ଜଳସେଚନ"
+    },
+    "domestic_use": {
+      "English": "Domestic use",
+      "Hindi": "घरेलू उपयोग",
+      "Gujarati": "ઘરગથ્થુ ઉપયોગ",
+      "Kannada": "ದೇಶೀಯ ಬಳಕೆ",
+      "Odia": "ଘରୋଇ ବ୍ୟବହାର"
+    },
+    "livestock": {
+      "English": "Livestock",
+      "Hindi": "पशु",
+      "Gujarati": "પ્રાણી",
+      "Kannada": "ಜಾನುವಾರು",
+      "Odia": "ପଶୁପକ୍ଷୀ ପାଳନ"
+    },
+    "storage": {
+      "English": "Storage",
+      "Hindi": "भंडारण",
+      "Gujarati": "સંગ્રહ",
+      "Kannada": "ಸಂಗ್ರಹಣೆ",
+      "Odia": "ଗଛିତ କରି ରଖିବା ନିମନ୍ତେ"
+    },
+    "aquaculture": {
+      "English": "Aquaculture",
+      "Hindi": "जलीय जीवों का पालन",
+      "Gujarati": "જળચર પશુપાલન",
+      "Kannada": "ಜಲಚರ ಸಾಕಣೆ",
+      "Odia": "ଜଳଜୀବ ପାଳନ (ଆକ୍ୱାକଲଚର)"
+    },
+    "drinking_water": {
+      "English": "Drinking water",
+      "Hindi": "पीने का पानी",
+      "Gujarati": "પીવાનું પાણી",
+      "Kannada": "ಕುಡಿಯುವ ನೀರು",
+      "Odia": "ପାନୀୟ ଜଳ"
+    },
+    "industrial_use": {
+      "English": "Industrial use",
+      "Hindi": "औद्योगिक उपयोग",
+      "Gujarati": "ઔદ્યોગિક ઉપયોગ",
+      "Kannada": "ಕೈಗಾರಿಕಾ ಬಳಕೆ",
+      "Odia": "ଶିଳ୍ପ ନିମନ୍ତେ"
+    },
+    "recharge_of_groundwater": {
+      "English": "Recharge of groundwater",
+      "Hindi": "भूजल का रिचार्ज",
+      "Gujarati": "ભૂગર્ભજળ રિચાર્જ",
+      "Kannada": "ಅಂತರ್ಜಲ ಮರುಪೂರಣ",
+      "Odia": "ଭୂତଳ ଜଳର ରିଚାର୍ଜ ପାଇଁ"
+    },
+    "no_use": {
+      "English": "No use",
+      "Hindi": "किसी काम का नही",
+      "Gujarati": "કોઈ કામનું નથી",
+      "Kannada": "ಉಪಯೋಗವಿಲ್ಲ",
+      "Odia": "କୌଣସି ବ୍ୟବହାର ନାହିଁ"
+    }
+  },
+  "select_one_scheme": {
+    "mgnrega": {
+      "English": "MGNREGA",
+      "Hindi": "मनरेगा",
+      "Gujarati": "મનરેગા",
+      "Kannada": "MGNREGA",
+      "Odia": "ମହାତ୍ମା ଗାନ୍ଧୀ ନରେଗା"
+    },
+    "pm-kusum": {
+      "English": "PM-KUSUM",
+      "Hindi": "पीएम-कुसुम",
+      "Gujarati": "પીએમ-કુસુમ",
+      "Kannada": "PM-ಕುಸುಮ್",
+      "Odia": "ପି.ଏମ.- କୁସୁମ"
+    },
+    "pmgsy": {
+      "English": "PMGSY",
+      "Hindi": "पीएमजीएसवाई",
+      "Gujarati": "પીએમજીએસવાય",
+      "Kannada": "ಪಿಎಂಜಿಎಸ್‌ವೈ",
+      "Odia": "ପ୍ରଧାନମନ୍ତ୍ରୀ ଗ୍ରାମ ସଡକ ଯୋଜନା"
+    },
+    "nrlm": {
+      "English": "NRLM",
+      "Hindi": "एनआरएलएम",
+      "Gujarati": "એનઆરએલએમ",
+      "Kannada": "NRLM",
+      "Odia": "ଜାତୀୟ ଗ୍ରାମୀଣ ଜୀବିକା ମିଶନ"
+    },
+    "self funded": {
+      "English": "Self funded",
+      "Hindi": "खुद का खर्च",
+      "Gujarati": "પોતાના ખર્ચ",
+      "Kannada": "ಸ್ವಯಂ ನಿಧಿ",
+      "Odia": "ନିଜସ୍ୱ ପାଣ୍ଠି"
+    },
+    "don't know": {
+      "English": "Don't know",
+      "Hindi": "पता नहीं",
+      "Gujarati": "ખબર નથી",
+      "Kannada": "ಗೊತ್ತಿಲ್ಲ",
+      "Odia": "ଜଣା ନାହିଁ"
+    }
+  },
+  "select_one_maintenance": {
+    "yes": {
+      "English": "Yes",
+      "Hindi": "हाँ",
+      "Gujarati": "હા",
+      "Kannada": "ಹೌದು",
+      "Odia": "ହଁ"
+    },
+    "no": {
+      "English": "No",
+      "Hindi": "नहीं",
+      "Gujarati": "ના",
+      "Kannada": "ಸಂ",
+      "Odia": "ନାହିଁ"
+    }
+  },
+  "Repair_of_farm_ponds": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "repairing_cracks_or_damage_in_embankments": {
+      "English": "Repairing cracks or damage in embankments",
+      "Hindi": "तटबंधों में दरारों या टूट - फूट की मरम्मत",
+      "Gujarati": "પાળાઓમાં તિરાડો અથવા તૂટનું સમારકામ",
+      "Kannada": "ಒಡ್ಡುಗಳಲ್ಲಿ ಬಿರುಕುಗಳು ಅಥವಾ ಹಾನಿಯನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "ଚାରିପାଖରେ ଥିବା ବନ୍ଧରେ ଥିବା ଫାଟ ବା କ୍ଷତିର ମରାମତି"
+    },
+    "controlling_seepage_or_leaks_in_the_pond_bed": {
+      "English": "Controlling seepage or leaks in the pond bed",
+      "Hindi": "तालाब तल में रिसाव या लीक को नियंत्रित करना",
+      "Gujarati": "તળાવના તળિયામાં લીકેજ અથવા સિપેજનું નિયંત્રણ",
+      "Kannada": "ಕೊಳದ ಹಾಸಿಗೆಯಲ್ಲಿ ಸೋರಿಕೆ ಅಥವಾ ಸೋರಿಕೆಯನ್ನು ನಿಯಂತ್ರಿಸುವುದು",
+      "Odia": "ମାଟି ତଳକୁ ଝରିଯାଉଥିବା ପାଣିକୁ ନିୟନ୍ତ୍ରଣ କରିବା"
+    },
+    "erosion_control_on_embankments": {
+      "English": "Erosion control on embankments",
+      "Hindi": "तटबंधों पर कटाव नियंत्रण",
+      "Gujarati": "પાળા પર ધોવાણ નિયંત્રણ",
+      "Kannada": "ಒಡ್ಡುಗಳ ಮೇಲೆ ಸವೆತ ನಿಯಂತ್ರಣ",
+      "Odia": "ଚାରିପାଖର ବନ୍ଧରେ ମାଟିର କ୍ଷୟକୁ ନିୟନ୍ତ୍ରଣ କରିବା"
+    },
+    "addressing_excessive_aquatic_vegetation_growth": {
+      "English": "Addressing excessive aquatic vegetation growth",
+      "Hindi": "अधिक जलीय पौधों की वृद्धि को रोकना",
+      "Gujarati": "પાણીના છોડના વધારાના વિકાસને અટકાવવો",
+      "Kannada": "ಅತಿಯಾದ ಜಲವಾಸಿ ಸಸ್ಯವರ್ಗದ ಬೆಳವಣಿಗೆಯನ್ನು ಪರಿಹರಿಸುವುದು",
+      "Odia": "ଜଳଜ ଉଦ୍ଭିଦର ଅତ୍ୟଧିକ ବୃଦ୍ଧିକୁ ରୋକିବା"
+    }
+  },
+  "select_one_soil_fp": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_fp": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_canal": {
+    "stabilizing_canal_bank_to_prevent_erosion": {
+      "English": "Stabilizing canal bank to prevent erosion",
+      "Hindi": "कटाव को रोकने के लिए नहर के किनारों को स्थिर करना",
+      "Gujarati": "ધોવાણ અટકાવવા માટે નહેરના કિનારાઓને સ્થિર કરવા",
+      "Kannada": "ಸವೆತವನ್ನು ತಡೆಗಟ್ಟಲು ಕಾಲುವೆ ದಂಡೆಯನ್ನು ಸ್ಥಿರಗೊಳಿಸುವುದು",
+      "Odia": "ମୃତ୍ତିକା କ୍ଷୟକୁ ରୋକିବା ପାଇଁ କେନାଲ ବନ୍ଧ ମରାମତି"
+    },
+    "lining_repairs": {
+      "English": "Lining repairs",
+      "Hindi": "परत की मरम्मत",
+      "Gujarati": "સ્તરનું સમારકામ",
+      "Kannada": "ಲೈನಿಂಗ್ ರಿಪೇರಿ",
+      "Odia": "ମାଟି ତଳକୁ ପାଣି ଝରି ନଯିବା ପାଇଁ ମରାମତି"
+    },
+    "desilting": {
+      "English": "Desilting",
+      "Hindi": "डिस्लिटिंग",
+      "Gujarati": "ડીસોલ્ટિંગ",
+      "Kannada": "ಡಿಸಿಲ್ಟಿಂಗ್",
+      "Odia": "ଡିସିଲ୍ଟିଂ"
+    },
+    "structural_repairs": {
+      "English": "Structural Repairs",
+      "Hindi": "ढांचे की मरम्मत",
+      "Gujarati": "માળખાનું સમારકામ",
+      "Kannada": "ರಚನಾತ್ಮಕ ದುರಸ್ತಿ",
+      "Odia": "ଷ୍ଟ୍ରକଚରର ମରାମତି"
+    }
+  },
+  "select_one_soil_canal": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_canal": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_community_pond": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "shoreline_erosion_control": {
+      "English": "Shoreline erosion control",
+      "Hindi": "तटरेखा कटाव नियंत्रण",
+      "Gujarati": "દરિયા કિનારાના ધોવાણ નિયંત્રણ",
+      "Kannada": "ತೀರದ ಸವೆತ ನಿಯಂತ್ರಣ",
+      "Odia": "କୂଳରେ ହେଉଥିବା ମୃତ୍ତିକା କ୍ଷୟର ନିୟନ୍ତ୍ରଣ"
+    },
+    "repairing_cracks_or_damage_in_embankments": {
+      "English": "Repairing cracks or damage in embankments",
+      "Hindi": "तटबंधों में दरारों या टूट की मरम्मत",
+      "Gujarati": "પાળાઓમાં તિરાડો અથવા તૂટનું સમારકામ",
+      "Kannada": "ಒಡ್ಡುಗಳಲ್ಲಿ ಬಿರುಕುಗಳು ಅಥವಾ ಹಾನಿಯನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "ବନ୍ଧରେ ହୋଇଥିବା ଫାଟ ବା କ୍ଷତିର ମରାମତି"
+    },
+    "controlling_excessive_aquatic_vegetation_growth": {
+      "English": "Controlling excessive aquatic vegetation growth",
+      "Hindi": "अधिक जलीय पौधों की वृद्धि को रोकना",
+      "Gujarati": "પાણીના છોડના વધારાના વિકાસને અટકાવવો",
+      "Kannada": "ಅತಿಯಾದ ಜಲಸಸ್ಯಗಳ ಬೆಳವಣಿಗೆಯನ್ನು ನಿಯಂತ್ರಿಸುವುದು",
+      "Odia": "ଜଳଜ ଉଦ୍ଭିଦର ଅତ୍ୟଧିକ ବୃଦ୍ଧିର ନିୟନ୍ତ୍ରଣ"
+    },
+    "repair_or_cleaning_of_inlet_outlet_structures": {
+      "English": "Repair or cleaning of inlet/outlet structures",
+      "Hindi": "इनलेट/आउटलेट स्ट्रक्चर की मरम्मत या सफाई",
+      "Gujarati": "ઇનલેટ/આઉટલેટ સ્ટ્રક્ચરનું સમારકામ અથવા સફાઈ કરો",
+      "Kannada": "ಒಳಹರಿವು/ಔಟ್ಲೆಟ್ ರಚನೆಗಳ ದುರಸ್ತಿ ಅಥವಾ ಸ್ವಚ್ಛಗೊಳಿಸುವಿಕೆ",
+      "Odia": "ଜଳ ଆଗମନ ଓ ନିଷ୍କାସନ ନିମନ୍ତେ ହୋଇଥିବା ଷ୍ଟ୍ରକଚରର ସଫେଇ ବା ମରାମତି"
+    }
+  },
+  "select_one_soil_cp": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_cp": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_check_dam": {
+    "erosion_on_the_check_dam": {
+      "English": "Erosion on the check dam",
+      "Hindi": "चेक डैम पर कटाव",
+      "Gujarati": "ચેક ડેમ પર ધોવાણ",
+      "Kannada": "ಚೆಕ್ ಡ್ಯಾಂ ಮೇಲೆ ಸವೆತ",
+      "Odia": "ମୃତ୍ତିକା କ୍ଷୟକୁ ରୋକିବା"
+    },
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "structural_damage_on_the_check_dam": {
+      "English": "Structural damage on the check dam",
+      "Hindi": "चेक डैम के स्क्रेक्चर का नुकसान",
+      "Gujarati": "ચેકડેમના સ્કારિફિકેશનને કારણે નુકસાન",
+      "Kannada": "ಚೆಕ್ ಡ್ಯಾಂ ಮೇಲೆ ರಚನೆ ಹಾನಿ",
+      "Odia": "ଷ୍ଟ୍ରକଚରର ମରାମତି"
+    }
+  },
+  "select_one_soil_cd": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_cd": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_percolation_tank": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "breach_in_embankments": {
+      "English": "Breach in embankments",
+      "Hindi": "तटबंधों का टूटना",
+      "Gujarati": "બંધનો ભંગ",
+      "Kannada": "ಒಡ್ಡುಗಳಲ್ಲಿ ಬಿರುಕು",
+      "Odia": "ବନ୍ଧରେ ଥିବା ଫାଟ"
+    },
+    "erosion_on_tank_bund_or_inlet_outlet": {
+      "English": "Erosion on tank bund or inlet/outlet",
+      "Hindi": "टैंक बांध या इनलेट/आउटलेट पर कटाव",
+      "Gujarati": "ટાંકી ડેમ અથવા ઇનલેટ/આઉટલેટ પર ધોવાણ",
+      "Kannada": "ಟ್ಯಾಂಕ್ ಬಂಡ್ ಅಥವಾ ಒಳಹರಿವು/ಔಟ್ಲೆಟ್ ಮೇಲೆ ಸವೆತ",
+      "Odia": "ବନ୍ଧ କିମ୍ବା ଜଳ ଆଗମନ ଓ ନିଷ୍କାସନ ପଥରେ ମୃତ୍ତିକା କ୍ଷୟ"
+    },
+    "vegetation_growth_blocking_water_entry": {
+      "English": "Vegetation growth blocking water entry",
+      "Hindi": "पौधों की वृद्धि से पानी का बहाव रुक रहा है",
+      "Gujarati": "છોડનો વિકાસ પાણીના પ્રવાહને અવરોધે છે",
+      "Kannada": "ನೀರಿನ ಪ್ರವೇಶವನ್ನು ತಡೆಯುವ ಸಸ್ಯಗಳ ಬೆಳವಣಿಗೆ",
+      "Odia": "ଉଦ୍ଭିଦ ବୃଦ୍ଧି ଦ୍ୱାରା ଜଳର ଆଗମନ ଅବରୋଧ"
+    },
+    "damage_to_spillway_or_outlet_structure": {
+      "English": "Damage to spillway or outlet structure",
+      "Hindi": "स्पिलवे या आउटलेट स्ट्रक्चर को नुकसान",
+      "Gujarati": "સ્પીલવે અથવા આઉટલેટ સ્ટ્રક્ચરને નુકસાન",
+      "Kannada": "ಸ್ಪಿಲ್ವೇ ಅಥವಾ ಔಟ್ಲೆಟ್ ರಚನೆಗೆ ಹಾನಿ",
+      "Odia": "ଜଳ ନିର୍ଗମନ ବା ନିଷ୍କାସନ ଷ୍ଟ୍ରକଚରର କ୍ଷତି"
+    }
+  },
+  "select_one_soil_pt": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_pt": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_trench_cum_bund_network": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "water_leakage_in_bund_due_to_breach_structural_damage": {
+      "English": "Water leakage in bund due to breach structural damage",
+      "Hindi": "क्षतिग्रस्त बांध के कारण पानी का रिसाव",
+      "Gujarati": "ક્ષતિગ્રસ્ત બંધને કારણે પાણીનું લીકેજ",
+      "Kannada": "ಉಲ್ಲಂಘನೆಯ ರಚನಾತ್ಮಕ ಹಾನಿಯಿಂದಾಗಿ ಬಂಡ್‌ನಲ್ಲಿ ನೀರು ಸೋರಿಕೆಯಾಗಿದೆ",
+      "Odia": null
+    },
+    "erosion_on_bund": {
+      "English": "Erosion on bund",
+      "Hindi": "बांध का कटाव",
+      "Gujarati": "બંધ ધોવાણ",
+      "Kannada": "ಬದುವಿನ ಸವೆತ(ಗೆಣಿಮಿ) ಸವೆತ",
+      "Odia": "ବାଣ୍ଡ ଉପରେ କ୍ଷୟ"
+    }
+  },
+  "select_one_soil_trench": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_trench": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_large_water_body": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "shoreline_erosion_control": {
+      "English": "Shoreline erosion control",
+      "Hindi": "किनारे का कटाव रोकना",
+      "Gujarati": "બેંક ધોવાણ અટકાવવું",
+      "Kannada": "ತೀರದ ಸವೆತ ನಿಯಂತ್ರಣ",
+      "Odia": "କୂଳରେ ହେଉଥିବା ମୃତ୍ତିକା କ୍ଷୟର ନିୟନ୍ତ୍ରଣ"
+    },
+    "dam_repairs": {
+      "English": "Dam Repairs",
+      "Hindi": "बांध की मरम्मत",
+      "Gujarati": "બંધનું સમારકામ",
+      "Kannada": "ಅಣೆಕಟ್ಟು ದುರಸ್ತಿ",
+      "Odia": "ବନ୍ଧର ମରାମତି"
+    },
+    "controlling_excessive_growth_of_aquatic_vegetation": {
+      "English": "Controlling excessive growth of aquatic vegetation/",
+      "Hindi": "जलीय पौधों की वृद्धि को नियंत्रित करना",
+      "Gujarati": "જળચર છોડના વિકાસને નિયંત્રિત કરવું",
+      "Kannada": "ಜಲಚರಗಳ ಅತಿಯಾದ ಬೆಳವಣಿಗೆಯನ್ನು ನಿಯಂತ್ರಿಸುವುದು/",
+      "Odia": "ଜଳଜ ଉଦ୍ଭିଦର ଅତ୍ୟଧିକ ବୃଦ୍ଧିକୁ ରୋକିବା"
+    }
+  },
+  "select_one_soil_lwb": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_lwb": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_earthen_gully_plug": {
+    "breaches_in_the_earthen_structure": {
+      "English": "Breaches in the earthen structure",
+      "Hindi": "मिट्टी के स्ट्रक्चर में दरारें",
+      "Gujarati": "માટીના માળખામાં તિરાડો",
+      "Kannada": "ಮಣ್ಣಿನ ರಚನೆಯಲ್ಲಿ ಉಲ್ಲಂಘನೆ",
+      "Odia": "ମାଟିରେ ହୋଇଥିବା ଷ୍ଟ୍ରକଚରରେ ଫାଟ"
+    },
+    "erosion_at_the_base_or_sides": {
+      "English": "Erosion at the base or sides",
+      "Hindi": "आधार या किनारों पर कटाव",
+      "Gujarati": "પાયા અથવા ધાર પર ધોવાણ",
+      "Kannada": "ತಳದಲ್ಲಿ ಅಥವಾ ಬದಿಗಳಲ್ಲಿ ಸವೆತ",
+      "Odia": "ପାର୍ଶ୍ଵ କିମ୍ବା ତଳେ ମୃତ୍ତିକା କ୍ଷୟ"
+    },
+    "loss_of_compactness_in_the_soil_structure": {
+      "English": "Loss of compactness in the soil structure",
+      "Hindi": "मिट्टी के स्ट्रक्चर में सघनता की कमी",
+      "Gujarati": "જમીનની રચનામાં કોમ્પેક્ટનેસનો અભાવ",
+      "Kannada": "ಮಣ್ಣಿನ ರಚನೆಯಲ್ಲಿ ಸಾಂದ್ರತೆಯ ನಷ್ಟ",
+      "Odia": "ମାଟି ଢିଲା ହୋଇଯିବା"
+    },
+    "vegetation_growth_on_the_plug": {
+      "English": "Vegetation growth on the plug",
+      "Hindi": "प्लग पर पौधों की वृद्धि",
+      "Gujarati": "પ્લગ પર છોડનો વિકાસ",
+      "Kannada": "ಪ್ಲಗ್ನಲ್ಲಿ ಸಸ್ಯವರ್ಗದ ಬೆಳವಣಿಗೆ",
+      "Odia": "ଘାସ ଓ ଗଛ ଇତ୍ୟାଦି ବୃଦ୍ଧି କରି ବନ୍ଧକୁ ସୁଦୃଢ କରିବା"
+    }
+  },
+  "Repair_of_loose_boulder_structure": {
+    "dislodged_boulders": {
+      "English": "Dislodged boulders",
+      "Hindi": "उखड़े हुए पत्थर",
+      "Gujarati": "ઉખડી ગયેલા પથ્થરો",
+      "Kannada": "ಕಳಚಿದ ಬಂಡೆಗಳು",
+      "Odia": "ବିଚ୍ଛିନ୍ନ_ବୋଲ୍ଡରଗୁଡ଼ିକ"
+    },
+    "grouting": {
+      "English": "Grouting",
+      "Hindi": "दरारों",
+      "Gujarati": "તિરાડો",
+      "Kannada": "ಗ್ರೌಟಿಂಗ್",
+      "Odia": "ଘୁଞ୍ଚିବା"
+    },
+    "erosion_around_boulder_structure": {
+      "English": "Erosion around boulder structure",
+      "Hindi": "बोल्डर के आस-पास कटाव",
+      "Gujarati": "પથ્થરની આસપાસ ધોવાણ",
+      "Kannada": "ಬಂಡೆಯ ರಚನೆಯ ಸುತ್ತ ಸವೆತ",
+      "Odia": "କ୍ଷୟ_ଚାରପାଖ_ବୋଲ୍ଡର_ସଂରଚନା"
+    }
+  },
+  "Repair_of_drainage_soakage_channels": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "erosion_along_the_channel_sides": {
+      "English": "Erosion along the channel sides",
+      "Hindi": "चैनल के किनारों पर कटाव",
+      "Gujarati": "ચેનલના કિનારા પર ધોવાણ",
+      "Kannada": "ಚಾನಲ್ ಬದಿಗಳಲ್ಲಿ ಸವೆತ",
+      "Odia": "ପାର୍ଶ୍ବରୁ ମୃତ୍ତିକା କ୍ଷୟ"
+    },
+    "collapsed_sections_of_the_channel": {
+      "English": "Collapsed sections of the channel",
+      "Hindi": "नहर के हिस्सों का ढह जाना",
+      "Gujarati": "નહેરના ભાગોનું પતન",
+      "Kannada": "ಚಾನಲ್‌ನ ಕುಗ್ಗಿದ ವಿಭಾಗಗಳು",
+      "Odia": "ଚ୍ୟାନେଲର କିଛି ଅଂଶ ଭୁଶୁଡିବା"
+    },
+    "vegetation_overgrowth_reducing_flow_efficiency": {
+      "English": "Vegetation overgrowth reducing flow efficiency",
+      "Hindi": "पौधों की अधिक वृद्धि से बहाव कम हो रही है",
+      "Gujarati": "છોડની વધુ પડતી વૃદ્ધિ પ્રવાહ ઘટાડી રહી છે",
+      "Kannada": "ಸಸ್ಯವರ್ಗದ ಬೆಳವಣಿಗೆಯು ಹರಿವಿನ ದಕ್ಷತೆಯನ್ನು ಕಡಿಮೆ ಮಾಡುತ್ತದೆ",
+      "Odia": "ଉଦ୍ଭିଦ ବୃଦ୍ଧି ଯୋଗୁଁ ଜଳ ପ୍ରବାହର ଗତି କମିଯିବା"
+    }
+  },
+  "select_one_soil_ds": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_ds": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_recharge_pits": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "cracks_or_damages_in_the_lining": {
+      "English": "Cracks or damages in the lining",
+      "Hindi": "परत में दरारें या टूट - फूट",
+      "Gujarati": "કોટિંગમાં તિરાડો કે તૂટ",
+      "Kannada": "ಕೋಟಿಂಗಮಾಂ ತಿರಾಡೋ ಕೆ ಟೂಟ್",
+      "Odia": "ଏହାର ଦୁଇ ପାର୍ଶ୍ବରେ ଫାଟ କିମ୍ବା କ୍ଷତି ହେବା"
+    },
+    "blockages_in_filters_or_gravel_layers": {
+      "English": "Blockages in filters or gravel layers",
+      "Hindi": "फिल्टर या कंकड़ वाले परतों में रुकावटें",
+      "Gujarati": "ફિલ્ટર અથવા કાંકરીના સ્તરોમાં અવરોધો",
+      "Kannada": "ಫಿಲ್ಟರ್",
+      "Odia": "ଅଳିଆ ଆବର୍ଜନା ଇତ୍ୟାଦି ଜମି ମାଟି ତଳକୁ ପାଣି ଯିବାରେ ଅସୁବିଧା"
+    },
+    "vegetation_or_debris_obstructing_the_pit": {
+      "English": "Vegetation or debris obstructing the pit",
+      "Hindi": "पौधे या मलबा गड्ढे में पानी जाने से रोकते हैं",
+      "Gujarati": "ખાડામાં પાણી પ્રવેશતા અટકાવતા છોડ અથવા કાટમાળ",
+      "Kannada": "ಖಾದಮಾಂ ಪಾಣಿ ಪ್ರವೇಶತಾ ಅಟಕಾವತಾ ಛೋಡ ಅಥ ಕಾಟಮಾಳ್",
+      "Odia": "ଉଦ୍ଭିଦ କିମ୍ବା ଅଳିଆ ଆବର୍ଜନା ଦ୍ୱାରା ଅବରୋଧ"
+    }
+  },
+  "select_one_soil_rp": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_rp": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_soakage_pits": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "damage_to_pit_walls_or_filters": {
+      "English": "Damage to pit walls or filters",
+      "Hindi": "गड्ढे की दीवारों या फिल्टरों को नुकसान",
+      "Gujarati": "ખાડાની દિવાલો અથવા ફિલ્ટર્સને નુકસાન",
+      "Kannada": "ಪಿಟ್ ಗೋಡೆಗಳು ಅಥವಾ ಫಿಲ್ಟರ್ಗಳಿಗೆ ಹಾನಿ",
+      "Odia": "ଏହାର ଦୁଇ ପାର୍ଶ୍ଵ କିମ୍ବା ତଳେ ଦିଆଯାଇଥିବା ଛୋଟ ପଥର ଇତ୍ୟାଦି କ୍ଷତିଗ୍ରସ୍ତ ହେବା"
+    },
+    "vegetation_obstructing_flow_into_the_pit": {
+      "English": "Vegetation obstructing flow into the pit",
+      "Hindi": "पौधे गड्ढे में पानी के बहाव को रोक रहे हैं",
+      "Gujarati": "છોડ ખાડામાં પાણીના પ્રવાહને અવરોધી રહ્યા છે",
+      "Kannada": "ಸಸ್ಯವರ್ಗವು ಹಳ್ಳಕ್ಕೆ ಹರಿಯುವುದನ್ನು ತಡೆಯುತ್ತದೆ",
+      "Odia": "ଉଦ୍ଭିଦ ଯୋଗୁଁ ପିଟକୁ ଜଳ ଆସିବାରେ ଅସୁବିଧା"
+    },
+    "water_pooling_due_to_improper_drainage": {
+      "English": "Water pooling due to improper drainage",
+      "Hindi": "गलत पानी निकासी के वजह से जल जमाव",
+      "Gujarati": "અયોગ્ય ડ્રેનેજને કારણે પાણી ભરાવા",
+      "Kannada": "ಅಸಮರ್ಪಕ ಒಳಚರಂಡಿಯಿಂದಾಗಿ ನೀರಿನ ಸಂಗ್ರಹಣೆ",
+      "Odia": "ଅନୁପଯୁକ୍ତ ଜଳ ନିଷ୍କାସନ ଯୋଗୁଁ ପାଣି ଜମିବା"
+    }
+  },
+  "select_one_soil_sp": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_sp": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_Continuous_contour_trenches": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "erosion_of_trench_edges": {
+      "English": "Erosion of trench edges",
+      "Hindi": "खाई के किनारों का घिस जाना",
+      "Gujarati": "ખાઈની કિનારીઓનું ધોવાણ",
+      "Kannada": "ಕಾಲುವೆಯ ಅಂಚುಗಳ ಸವೆತ",
+      "Odia": "ପାର୍ଶ୍ଵ କ୍ଷତିଗ୍ରସ୍ତ ହୋଇ ମୃତ୍ତିକା କ୍ଷୟ ହେବା"
+    },
+    "vegetation_growth_obstructing_water_infiltration": {
+      "English": "Vegetation growth obstructing water infiltration",
+      "Hindi": "पौधों की वृद्धि पानी को प्रवेश करने से रोकती है",
+      "Gujarati": "છોડનો વિકાસ પાણીને પ્રવેશતા અટકાવે છે",
+      "Kannada": "ಸಸ್ಯಗಳ ಬೆಳವಣಿಗೆಯು ನೀರಿನ ಒಳಹರಿವು ತಡೆಯುತ್ತದೆ",
+      "Odia": "ଉଦ୍ଭିଦ ଯୋଗୁଁ ଭିତରକୁ ଜଳ ଆସିବାରେ ଅସୁବିଧା"
+    }
+  },
+  "select_one_soil_cct": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_cct": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_Staggered_contour_trenches": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "erosion_of_trench_edges_or_sides": {
+      "English": "Erosion of trench edges or sides",
+      "Hindi": "खाई का ऊपरी किनारा या अन्य किनारों का घिस जाना",
+      "Gujarati": "ખાઈની ટોચ અથવા અન્ય ધારનો ઘસારો",
+      "Kannada": "ಕಾಲುವೆಯ ಅಂಚುಗಳ ಮತ್ತು ಬದುಗಳ ಸವೆತ",
+      "Odia": "ପାର୍ଶ୍ଵ କ୍ଷତିଗ୍ରସ୍ତ ହୋଇ ମୃତ୍ତିକା କ୍ଷୟ ହେବା"
+    },
+    "poor_alignment_reducing_effectiveness": {
+      "English": "Poor alignment reducing effectiveness",
+      "Hindi": "खराब अलाइमेंट से असर कम हो रही है",
+      "Gujarati": "નબળી ગોઠવણી અસરકારકતા ઘટાડી રહી છે",
+      "Kannada": "ಕಳಪೆ ಜೋಡಣೆ ಪರಿಣಾಮಕಾರಿತ್ವವನ್ನು ಕಡಿಮೆ ಮಾಡುತ್ತದೆ",
+      "Odia": "ନିର୍ମାଣଗତ ତ୍ରୁଟିକୁ ସଜାଡ଼ିବା"
+    }
+  },
+  "select_one_soil_sct": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_sct": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_Water_absorption_trenches": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "erosion_along_trench_edges": {
+      "English": "Erosion along trench edges",
+      "Hindi": "खाई के सभी किनारों पर कटाव",
+      "Gujarati": "ખાડાની બધી બાજુ ધોવાણ",
+      "Kannada": "ಕಾಲುವೆಯ  ಅಂಚುಗಳ ಸವೆತ",
+      "Odia": "ପାର୍ଶ୍ଵ କ୍ଷତିଗ୍ରସ୍ତ ହୋଇ ମୃତ୍ତିକା କ୍ଷୟ ହେବା"
+    },
+    "vegetation_obstructing_flow_into_the_trench": {
+      "English": "Vegetation obstructing flow into the trench",
+      "Hindi": "पौधे खाई में जल के बहाव को रोक रहे हैं",
+      "Gujarati": "છોડ ખાડામાં પાણીના પ્રવાહને અવરોધી રહ્યા છે",
+      "Kannada": "ಕಾಲುವೆಯ  ನೀರನ್ನು ಹರಿಯುವಿಕೆಯನ್ನು ತಡೆಯುತ್ತದ್ದೆ.",
+      "Odia": "ଉଦ୍ଭିଦ ଯୋଗୁଁ ଟ୍ରେଞ୍ଚ ଭିତରକୁ ଜଳ ଯିବାରେ ଅସୁବିଧା"
+    }
+  },
+  "select_one_soil_wct": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_wct": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_rock_fill_dam": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಕೆಸರು ಸಂಗ್ರಹಣೆಯು ನೀರಿನ ಸಂಗ್ರಹವನ್ನು ಕಡಿಮೆ ಮಾಡುತ್ತದೆ",
+      "Odia": "ପଙ୍କ ଇତ୍ୟାଦି ଜମି ଗଛିତ ଜଳର ପରିମାଣ କମିବା"
+    },
+    "dislodged_or_loose_rocks": {
+      "English": "Dislodged or loose rocks",
+      "Hindi": "उखड़ी हुई या ढीली चट्टानें",
+      "Gujarati": "છૂટા અથવા છૂટા ખડકો",
+      "Kannada": "ಕಳಚಿದ ಅಥವಾ ಸಡಿಲವಾದ ಬಂಡೆಗಳು",
+      "Odia": "ପଥରଗୁଡିକ ଵିଚ୍ଛିନ୍ନ ହୋଇଯିବା"
+    },
+    "erosion_around_or_under_the_dam_structure": {
+      "English": "Erosion around or under the dam structure",
+      "Hindi": "बांध स्ट्रक्चर के आसपास या नीचे कटाव",
+      "Gujarati": "બંધના માળખાની આસપાસ અથવા નીચે ધોવાણ",
+      "Kannada": "ಅಣೆಕಟ್ಟು ರಚನೆಯ ಸುತ್ತಲೂ ಅಥವಾ ಅಡಿಯಲ್ಲಿ ಸವೆತ",
+      "Odia": "ଷ୍ଟ୍ରକଚରରେ ହେଉଥିବା ମୃତ୍ତିକା କ୍ଷୟ"
+    }
+  },
+  "select_one_soil_rfd": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_rfd": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_stone_bunding": {
+    "dislodged_stones_reducing_structure_stability": {
+      "English": "Dislodged stones reducing structure stability",
+      "Hindi": "उखड़े हुए पत्थरों से स्ट्रक्चर की मजबूती कम हो रही है",
+      "Gujarati": "છૂટા પડી ગયેલા પથ્થરો માળખાની મજબૂતાઈ ઘટાડી રહ્યા છે.",
+      "Kannada": "ಡಿಸ್ಲೊಡೆಡ್ ಕಲ್ಲುಗಳು ರಚನೆಯ ಸ್ಥಿರತೆಯನ್ನು ಕಡಿಮೆ ಮಾಡುತ್ತದೆ",
+      "Odia": "ପଥର ଗୁଡିକ ଖସି ଅଲଗା ହୋଇ ହୁଡ଼ାକୁ ଦୁର୍ବଳ କରିବା"
+    },
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಕಟ್ಟೆಯ ಹಿಂದೆ ಕೆಸರು ನಿರ್ಮಾಣವಾಗಿದೆ",
+      "Odia": "ହୁଡ଼ା ପଛରେ ପଙ୍କ ଇତ୍ୟାଦି ଜମିବା"
+    },
+    "erosion_along_the_bund_edges": {
+      "English": "Erosion along the bund edges",
+      "Hindi": "बांध के सभी किनारों पर कटाव",
+      "Gujarati": "બંધની બધી બાજુ ધોવાણ",
+      "Kannada": "ಬಂಡ್ ಅಂಚುಗಳ ಉದ್ದಕ್ಕೂ ಸವೆತ",
+      "Odia": "ହୁଡ଼ାର ଧାର କ୍ଷତିଗ୍ରସ୍ତ ହୋଇ ମୃତ୍ତିକା କ୍ଷୟ ହେବା"
+    }
+  },
+  "select_one_soil_sb": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_sb": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_diversion_drains": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे_सिटलिंग",
+      "Gujarati": "ગિવ_સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "erosion_along_the_drain_edges": {
+      "English": "Erosion along the drain edges",
+      "Hindi": "नाले के किनारों पर कटाव",
+      "Gujarati": "નદી કિનારે ધોવાણ",
+      "Kannada": "ಚರಂಡಿ ಅಂಚುಗಳ ಉದ್ದಕ್ಕೂ ಸವೆತ",
+      "Odia": "ନାଳର ଧାରରେ ମୃତ୍ତିକା କ୍ଷୟ"
+    },
+    "collapsed_or_damaged_drain_sections": {
+      "English": "Collapsed or damaged drain sections",
+      "Hindi": "ढहे या टूटे नाली के भाग",
+      "Gujarati": "ગટરના ભંગાણવાળા અથવા તૂટેલા ભાગો",
+      "Kannada": "ಕುಸಿದ ಅಥವಾ ಹಾನಿಗೊಳಗಾದ ಚರಂಡಿ ವಿಭಾಗಗಳು",
+      "Odia": "ନିଷ୍କାସନ ବ୍ୟବସ୍ଥା କ୍ଷତିଗ୍ରସ୍ତ ହେବା"
+    }
+  },
+  "select_one_soil_dd": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_dd": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_bunding": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "cracks_breaches_or_damage_to_the_bund_structure": {
+      "English": "Cracks, breaches, or damage to the bund structure",
+      "Hindi": "बांध स्ट्रक्चर में दरारें, टूट-फूट या अन्य खराबी",
+      "Gujarati": "બંધના માળખામાં તિરાડો, તૂટ અથવા અન્ય ખામીઓ",
+      "Kannada": "ಬಂಡ್ ರಚನೆಗೆ ಬಿರುಕುಗಳು, ಉಲ್ಲಂಘನೆಗಳು ಅಥವಾ ಹಾನಿ",
+      "Odia": "ହୁଡାରେ ଥିବା ଫାଟ ଇତ୍ୟାଦି ବନ୍ଦ କରିବା"
+    },
+    "erosion_along_bund_edges_slopes_or_base": {
+      "English": "Erosion along bund edges, slopes, or base",
+      "Hindi": "बांध के किनारों, ढलानों या आधार पर कटाव",
+      "Gujarati": "બંધના કાંઠા, ઢોળાવ અથવા પાયા પર ધોવાણ",
+      "Kannada": "ಬಂಡ್ ಅಂಚುಗಳು, ಇಳಿಜಾರುಗಳು ಅಥವಾ ಬೇಸ್ ಉದ್ದಕ್ಕೂ ಸವೆತ",
+      "Odia": "ବନ୍ଧର ପାର୍ଶ୍ଵ, ଧାର ଓ ତଳୁ ମୃତ୍ତିକା କ୍ଷୟ ହେବା"
+    },
+    "improper_alignment_or_grading_disrupting_water_distribution": {
+      "English": "Improper alignment or grading disrupting water distribution",
+      "Hindi": "गलत अलाइमेंट या ग्रेडिंग से पानी वितरण में रूकावट होता है",
+      "Gujarati": "અયોગ્ય ગોઠવણી અથવા ગ્રેડિંગ પાણી વિતરણમાં અવરોધ પેદા કરી શકે છે.",
+      "Kannada": "ಅನುಚಿತ ಜೋಡಣೆ ಅಥವಾ ಗ್ರೇಡಿಂಗ್ ನೀರಿನ ವಿತರಣೆಯನ್ನು ಅಡ್ಡಿಪಡಿಸುತ್ತದೆ",
+      "Odia": "ନିର୍ମାଣଗତ ତ୍ରୁଟି ଯୋଗୁଁ ଠିକ ଭାବରେ ଜଳ ପ୍ରବାହ ନ ହେବା"
+    },
+    "vegetative_growth_weakening_bund_stability": {
+      "English": "Vegetative growth weakening bund stability",
+      "Hindi": "पौधों की वृद्धि से बांध की मजबूती कमजोर हो रही है",
+      "Gujarati": "છોડનો વિકાસ બંધની મજબૂતાઈને નબળી બનાવી રહ્યો છે",
+      "Kannada": "ಸಸ್ಯಕ ಬೆಳವಣಿಗೆಯು ಬಂಡ್ ಸ್ಥಿರತೆಯನ್ನು ದುರ್ಬಲಗೊಳಿಸುತ್ತದೆ",
+      "Odia": "ଉଦ୍ଭିଦ ଇତ୍ୟାଦିର ବୃଦ୍ଧି ଯୋଗୁଁ ବନ୍ଧ ଦୁର୍ବଳ ହେବା"
+    },
+    "weakening_of_the_structure_due_to_seepage_or_heavy_rainfall": {
+      "English": "Weakening of the structure due to seepage or heavy rainfall",
+      "Hindi": "रिसाव या भारी वर्षा के कारण स्ट्रक्चर का कमजोर होना",
+      "Gujarati": "લીકેજ અથવા ભારે વરસાદને કારણે માળખાનું નબળું પડવું",
+      "Kannada": "ಸೋರುವಿಕೆ ಅಥವಾ ಭಾರೀ ಮಳೆಯಿಂದಾಗಿ ರಚನೆಯ ದುರ್ಬಲಗೊಳ್ಳುವಿಕೆ",
+      "Odia": "ପ୍ରବଳ ବୃଷ୍ଟିପାତ କିମ୍ବା ପାଣି ମାଟି ତଳକୁ ଝରିଯିବା ଯୋଗୁଁ ହୁଡ଼ାଟି ଦୁର୍ବଳ ହେବା"
+    }
+  },
+  "select_one_soil_bunding": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_bunding": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_farm_bund": {
+    "repairing_cracks_or_breaches_in_the_bund": {
+      "English": "Repairing cracks or breaches in the bund",
+      "Hindi": "बांध में दरारों या टूट - फूट की मरम्मत करना",
+      "Gujarati": "બંધોમાં તિરાડો કે તૂટવાનું સમારકામ",
+      "Kannada": "ಬಂಡ್‌ನಲ್ಲಿ ಬಿರುಕುಗಳು ಅಥವಾ ಉಲ್ಲಂಘನೆಗಳನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "ହୁଡାରେ ଥିବା ଫାଟର ମରାମତି"
+    },
+    "strengthening_bund_structure_with_additional_soil_or_materials": {
+      "English": "Strengthening bund structure with additional soil or materials",
+      "Hindi": "अतिरिक्त मिट्टी या समान से बांध स्ट्रक्चर को मजबूत करना",
+      "Gujarati": "વધારાની માટી અથવા સામગ્રીનો ઉપયોગ કરીને બંધના માળખાને મજબૂત બનાવવું",
+      "Kannada": "ಹೆಚ್ಚುವರಿ ಮಣ್ಣು ಅಥವಾ ವಸ್ತುಗಳೊಂದಿಗೆ ಬಂಡ್ ರಚನೆಯನ್ನು ಬಲಪಡಿಸುವುದು",
+      "Odia": "ଅଧିକ ମାଟି କିମ୍ବା ଅନ୍ୟ ସାମଗ୍ରୀ ଦେଇ ହୁଡ଼ାକୁ ଶକ୍ତ କରିବା"
+    },
+    "leveling_and_reshaping_the_bund_for_better_water_retention": {
+      "English": "Leveling and reshaping the bund for better water retention",
+      "Hindi": "पानी को टिकाए रखने के लिए बांध को समतल करना और उसका आकार बदलना",
+      "Gujarati": "પાણી જાળવી રાખવા માટે બંધનું સ્તરીકરણ અને આકાર બદલવો",
+      "Kannada": "ಉತ್ತಮ ನೀರಿನ ಧಾರಣಕ್ಕಾಗಿ ಬಂಡ್ ಅನ್ನು ನೆಲಸಮಗೊಳಿಸುವುದು ಮತ್ತು ಮರುರೂಪಿಸುವುದು",
+      "Odia": "ଜଳକୁ ଉତ୍ତମ ଭାବରେ ଧରି ରଖିବା ନିମନ୍ତେ ହୁଡ଼ାକୁ ସମତଳ କରିବା ବା ନୂତନ ଆକାର ଦେବା"
+    },
+    "vegetative_stabilization_to_prevent_erosion": {
+      "English": "Vegetative stabilization to prevent erosion",
+      "Hindi": "कटाव को रोकने के लिए पौधों को उगने से रोकना",
+      "Gujarati": "ધોવાણ અટકાવવા માટે વનસ્પતિને વધતી અટકાવવી",
+      "Kannada": "ಸವೆತವನ್ನು ತಡೆಯಲು ಸಸಿಗಳನ್ನು ಬೆಳೆಸಬೇಕು.",
+      "Odia": "ଘାସ, ଗଛ ଇତ୍ୟାଦି ଲଗାଇ ହୁଡ଼ାରୁ ମୃତ୍ତିକା କ୍ଷୟକୁ ରୋକିବା"
+    }
+  },
+  "Repair_of_model5_structure": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "breaches_or_leaks_in_the_embankment": {
+      "English": "Breaches or leaks in the embankment",
+      "Hindi": "तटबंध में दरारें या रिसाव",
+      "Gujarati": "પાળામાં તિરાડો અથવા લીકેજ",
+      "Kannada": "ಒಡ್ಡುಗಳಲ್ಲಿ ಬಿರುಕುಗಳು ಅಥವಾ ಸೋರಿಕೆಗಳು",
+      "Odia": "ଷ୍ଟ୍ରକଚରର ବନ୍ଧ କିମ୍ବା ବାଡ଼ରେ ଫାଟ"
+    },
+    "erosion_on_sides_or_base": {
+      "English": "Erosion on sides or base",
+      "Hindi": "किनारों या आधार पर कटाव",
+      "Gujarati": "ધાર અથવા પાયા પર ધોવાણ",
+      "Kannada": "ಬದಿಗಳಲ್ಲಿ ಅಥವಾ ತಳದಲ್ಲಿ ಸವೆತ",
+      "Odia": "ପାର୍ଶ୍ଵ କିମ୍ବା ତଳେ ମୃତ୍ତିକା କ୍ଷୟ"
+    }
+  },
+  "select_one_soil_model5": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_model5": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "Repair_of_30_40_model_structure": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "दे सिटलिंग",
+      "Gujarati": "ડી સિટલિંગ",
+      "Kannada": "ಡಿ_ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି-ସିଟଲିଂ"
+    },
+    "breaches_in_bunding_or_structure_walls": {
+      "English": "Breaches in bunding or structure walls",
+      "Hindi": "बाँध या स्ट्रक्चर की दीवारों में दरारें",
+      "Gujarati": "ડેમ અથવા માળખાની દિવાલોમાં તિરાડો",
+      "Kannada": "ಬಂಡಿಂಗ್ ಅಥವಾ ರಚನೆಯ ಗೋಡೆಗಳಲ್ಲಿ ಉಲ್ಲಂಘನೆ",
+      "Odia": "ଷ୍ଟ୍ରକଚରର ବନ୍ଧ କିମ୍ବା ବାଡ଼ରେ ଫାଟ"
+    },
+    "erosion_along_trenches_or_bunds": {
+      "English": "Erosion along trenches or bunds",
+      "Hindi": "खाइयों या बांधों के किनारों पर कटाव",
+      "Gujarati": "ખાડા કે બંધના કિનારે ધોવાણ",
+      "Kannada": "ಕಾಲುವೆಯ ಉದ್ದಕ್ಕು ಸವೇತ",
+      "Odia": "ଖାଇ କିମ୍ବା ବନ୍ଧରେ ମୃତ୍ତିକା କ୍ଷୟ"
+    }
+  },
+  "select_one_soil_model30": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ପାଣିପାଗ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକି"
+    }
+  },
+  "Select_one_silt_model30": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "ନିମ୍ନ"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଉଚ୍ଚ"
+    }
+  },
+  "select_one_visible_water_structure": {
+    "yes_visible": {
+      "English": "Yes, visible on map",
+      "Hindi": "हाँ, मानचित्र पर दिखाई दे रहा है",
+      "Gujarati": "હા, નકશા પર દૃશ્યમાન છે",
+      "Kannada": "ಹೌದು, ನಕ್ಷೆಯಲ್ಲಿ ಗೋಚರಿಸುತ್ತದೆ",
+      "Odia": "ହଁ, ମ୍ୟାପରେ ଦେଖାଯାଉଥିଲା"
+    },
+    "no_making_it": {
+      "English": "No, I am marking it myself",
+      "Hindi": "नहीं, मैं इसे स्वयं चिह्नित कर रहा हूँ",
+      "Gujarati": "ના, હું તેને જાતે ચિહ્નિત કરી રહ્યો છું.",
+      "Kannada": "ಇಲ್ಲ, ನಾನೇ ಅದನ್ನು ಗುರುತಿಸುತ್ತಿದ್ದೇನೆ",
+      "Odia": "ନାହିଁ, ମ୍ୟାପରେ ମୁଁ ନିଜେ ଚିହ୍ନିତ କରୁଛି"
+    }
+  }
+}

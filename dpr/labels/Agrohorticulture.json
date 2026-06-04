@@ -1,0 +1,374 @@
+{
+  "select_one_y_n": {
+    "yes": {
+      "English": "Yes",
+      "Hindi": "हाँ",
+      "Kannada": "ಹೌದು",
+      "Gujarati": "હા",
+      "Odia": "ହଁ"
+    },
+    "no": {
+      "English": "No",
+      "Hindi": "नहीं",
+      "Kannada": "ಇಲ್ಲ",
+      "Gujarati": "ના",
+      "Odia": "ନା"
+    }
+  },
+  "demand_type_plantations": {
+    "community_demand": {
+      "English": "Community Demand",
+      "Hindi": "सामुदायिक मांग",
+      "Kannada": "ಸಮುದಾಯದ ಬೇಡಿಕೆ",
+      "Gujarati": "સમુદાય માંગ",
+      "Odia": "ସମ୍ପ୍ରଦାୟ ଦାବି"
+    },
+    "cluster_demand": {
+      "English": "Cluster Demand",
+      "Hindi": "क्लस्टर मांग",
+      "Kannada": "ಕ್ಲಸ್ಟರ್ ಬೇಡಿಕೆ",
+      "Gujarati": "ક્લસ્ટર માંગ",
+      "Odia": "କ୍ଲଷ୍ଟର ଚାହିଦା"
+    },
+    "individual_demand": {
+      "English": "Individual Demand",
+      "Hindi": "व्यक्तिगत मांग",
+      "Kannada": "ವೈಯಕ್ತಿಕ ಬೇಡಿಕೆ",
+      "Gujarati": "વ્યક્તિગત માંગ",
+      "Odia": "ବ୍ୟକ୍ତିଗତ ଚାହିଦା"
+    }
+  },
+  "gender": {
+    "male": {
+      "English": "Male",
+      "Hindi": "पुरुष",
+      "Kannada": "ಗಂಡು",
+      "Gujarati": "પુરુષ",
+      "Odia": "ପୁରୁଷ"
+    },
+    "female": {
+      "English": "Female",
+      "Hindi": "महिला",
+      "Kannada": "ಹೆಣ್ಣು",
+      "Gujarati": "સ્ત્રી",
+      "Odia": "ମହିଳା"
+    }
+  },
+  "select_multiple_species": {
+    "mango": {
+      "English": "Mango",
+      "Hindi": "आम",
+      "Kannada": "ಮಾವು",
+      "Gujarati": "કેરી",
+      "Odia": "ଆମ୍ବ"
+    },
+    "guava": {
+      "English": "Guava",
+      "Hindi": "अमरूद",
+      "Kannada": "ಪೇರಲ",
+      "Gujarati": "જામફળ",
+      "Odia": "ଗୁଆଭା"
+    },
+    "banana": {
+      "English": "Banana",
+      "Hindi": "केला",
+      "Kannada": "ಬಾಳೆಹಣ್ಣು",
+      "Gujarati": "કેળા",
+      "Odia": "କଦଳୀ"
+    },
+    "subabul": {
+      "English": "Subabul",
+      "Hindi": "Subabul",
+      "Kannada": "ಸುಬಾಬುಲ್",
+      "Gujarati": "સુબાબુલ",
+      "Odia": "ସୁବାବୁଲ"
+    },
+    "bamboo": {
+      "English": "Bamboo",
+      "Hindi": "बांस",
+      "Kannada": "ಬಿದಿರು",
+      "Gujarati": "વાંસ",
+      "Odia": "ବାଉଁଶ"
+    },
+    "moringa": {
+      "English": "Moringa",
+      "Hindi": "मोरिंगा",
+      "Kannada": "ಮೊರಿಂಗಾ",
+      "Gujarati": "મોરિંગા",
+      "Odia": "ମୋରିଙ୍ଗା"
+    },
+    "neem": {
+      "English": "Neem",
+      "Hindi": "नीम",
+      "Kannada": "ಬೇವು",
+      "Gujarati": "લીમડો",
+      "Odia": "ନିମ"
+    },
+    "teak": {
+      "English": "Teak",
+      "Hindi": "टीक",
+      "Kannada": "ತೇಗ",
+      "Gujarati": "સાગ",
+      "Odia": "ସାଗୁଆନ୍"
+    },
+    "cashew": {
+      "English": "Cashew",
+      "Hindi": "कश्यु",
+      "Kannada": "ಗೋಡಂಬಿ",
+      "Gujarati": "કાજુ",
+      "Odia": "କାଜୁ"
+    },
+    "mahua": {
+      "English": "Mahua",
+      "Hindi": "महुआ",
+      "Kannada": "ಮಹುವಾ",
+      "Gujarati": "મહુઆ",
+      "Odia": "ମହୁଆ"
+    },
+    "tamarind": {
+      "English": "Tamarind",
+      "Hindi": "इमली",
+      "Kannada": "ಹುಣಸೆಹಣ್ಣು",
+      "Gujarati": "આમલી",
+      "Odia": "ତେନ୍ତୁଳି"
+    }
+  },
+  "land_type": {
+    "upland": {
+      "English": "Upland",
+      "Hindi": "अपलैंड",
+      "Kannada": "ಅಪ್ಲ್ಯಾಂಡ್",
+      "Gujarati": "અપલેન્ડ",
+      "Odia": "ଉପଭୂମି"
+    },
+    "midland": {
+      "English": "Midland",
+      "Hindi": "समुद्र से दूर",
+      "Kannada": "ಮಿಡ್‌ಲ್ಯಾಂಡ್",
+      "Gujarati": "મિડલેન્ડ",
+      "Odia": "ମିଡଲ୍ୟାଣ୍ଡ"
+    },
+    "lowland": {
+      "English": "Lowland",
+      "Hindi": "समतल नीचा भूमि",
+      "Kannada": "ತಗ್ಗು ಪ್ರದೇಶ",
+      "Gujarati": "નીચાણવાળી જમીન",
+      "Odia": "ତଳଭୂମି"
+    }
+  },
+  "land_ownership": {
+    "own_land": {
+      "English": "Own land",
+      "Hindi": "अपने देश",
+      "Kannada": "ಸ್ವಂತ ಭೂಮಿ",
+      "Gujarati": "પોતાની જમીન",
+      "Odia": "ନିଜସ୍ୱ ଜମି"
+    },
+    "leased_land": {
+      "English": "Leased land",
+      "Hindi": "पट्टे पर दी गई भूमि",
+      "Kannada": "ಗುತ್ತಿಗೆ ಪಡೆದ ಭೂಮಿ",
+      "Gujarati": "ભાડાપટ્ટે આપેલી જમીન",
+      "Odia": "ଲିଜ୍ ଦିଆ ଜମି"
+    },
+    "community_land": {
+      "English": "Community land",
+      "Hindi": "सामुदायिक भूमि",
+      "Kannada": "ಸಮುದಾಯ ಭೂಮಿ",
+      "Gujarati": "સમુદાયની જમીન",
+      "Odia": "ସମ୍ପ୍ରଦାୟ ଜମି"
+    },
+    "forest_land": {
+      "English": "Forest land",
+      "Hindi": "वन भूमि",
+      "Kannada": "ಅರಣ್ಯ ಭೂಮಿ",
+      "Gujarati": "વન જમીન",
+      "Odia": "ଜଙ୍ଗଲ ଜମି"
+    },
+    "joint_ownership": {
+      "English": "Joint ownership",
+      "Hindi": "संयुक्त स्वामित्व",
+      "Kannada": "ಜಂಟಿ ಮಾಲೀಕತ್ವ",
+      "Gujarati": "સંયુક્ત માલિકી",
+      "Odia": "ମିଳିତ ମାଲିକାନା"
+    }
+  },
+  "current_land_use": {
+    "crop": {
+      "English": "Crop",
+      "Hindi": "काटना",
+      "Kannada": "ಬೆಳೆ",
+      "Gujarati": "પાક",
+      "Odia": "କାଟନ୍ତୁ"
+    },
+    "fallow": {
+      "English": "Fallow",
+      "Hindi": "परती",
+      "Kannada": "ಪಾಳುಭೂಮಿ",
+      "Gujarati": "પડતર",
+      "Odia": "ପଡ଼ିଆ"
+    },
+    "grazing": {
+      "English": "Grazing",
+      "Hindi": "चराई",
+      "Kannada": "ಮೇಯಿಸುವಿಕೆ",
+      "Gujarati": "ચરાઈ",
+      "Odia": "ଚରିବା"
+    },
+    "homestead": {
+      "English": "Homestead",
+      "Hindi": "रियासत",
+      "Kannada": "ಹೋಮ್‌ಸ್ಟೆಡ್",
+      "Gujarati": "હોમસ્ટેડ",
+      "Odia": "ହୋମଷ୍ଟେଡ୍"
+    }
+  },
+  "soil_type": {
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीले",
+      "Kannada": "ಸ್ಯಾಂಡಿ",
+      "Gujarati": "રેતાળ",
+      "Odia": "ବାଲିଆ"
+    },
+    "loam": {
+      "English": "Loam",
+      "Hindi": "चिकनी बलुई मिट्टी",
+      "Kannada": "ಲೋಮ್",
+      "Gujarati": "લોમ",
+      "Odia": "ଲୁମ୍"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Kannada": "ಕೆಂಪು",
+      "Gujarati": "લાલ",
+      "Odia": "ଲାଲ"
+    },
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Kannada": "ಕಪ್ಪು",
+      "Gujarati": "કાળો",
+      "Odia": "କଳା"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टान का",
+      "Kannada": "ರಾಕಿ",
+      "Gujarati": "રોકી",
+      "Odia": "ରକ୍କା"
+    }
+  },
+  "water_availability": {
+    "seasonal": {
+      "English": "Seasonal",
+      "Hindi": "मौसमी",
+      "Kannada": "ಕಾಲೋಚಿತ",
+      "Gujarati": "મોસમી",
+      "Odia": "ଋତୁକାଳୀନ"
+    },
+    "12 months": {
+      "English": "12 Months",
+      "Hindi": "12 महीने",
+      "Kannada": "12 ತಿಂಗಳುಗಳು",
+      "Gujarati": "૧૨ મહિના",
+      "Odia": "12 ମାସ"
+    },
+    "no water available": {
+      "English": "No water available",
+      "Hindi": "पानी उपलब्ध नहीं है",
+      "Kannada": "ನೀರು ಲಭ್ಯವಿಲ್ಲ.",
+      "Gujarati": "પાણી ઉપલબ્ધ નથી",
+      "Odia": "ପାଣି ଉପଲବ୍ଧ ନାହିଁ"
+    }
+  },
+  "agro_model": {
+    "boundary_plantation": {
+      "English": "Boundary plantation",
+      "Hindi": "सीमा वृक्षारोपण",
+      "Kannada": "ಗಡಿ ತೋಟ",
+      "Gujarati": "સીમા વાવેતર",
+      "Odia": "ସୀମାରେଖା ବୃକ୍ଷରୋପଣ"
+    },
+    "orchard_development": {
+      "English": "Orchard development",
+      "Hindi": "बाग विकास",
+      "Kannada": "ಹಣ್ಣಿನ ತೋಟ ಅಭಿವೃದ್ಧಿ",
+      "Gujarati": "બગીચાનો વિકાસ",
+      "Odia": "ଉଦ୍ୟାନ ଉନ୍ନୟନ"
+    },
+    "block_plantation": {
+      "English": "Block plantation",
+      "Hindi": "ब्लॉक वृक्षारोपण",
+      "Kannada": "ಬ್ಲಾಕ್ ಪ್ಲಾಂಟೇಶನ್",
+      "Gujarati": "બ્લોક પ્લાન્ટેશન",
+      "Odia": "ବ୍ଲକ ପ୍ଲାଣ୍ଟେସନ୍"
+    },
+    "silvi_pasture": {
+      "English": "Silvi-pasture",
+      "Hindi": "सिल्वी-पशुपालन",
+      "Kannada": "ಸಿಲ್ವಿ-ಹುಲ್ಲುಗಾವಲು",
+      "Gujarati": "સિલ્વી-ચરાણ",
+      "Odia": "ସିଲଭି-ଚାରଣ"
+    },
+    "homestead_plantation": {
+      "English": "Homestead plantation",
+      "Hindi": "होमस्टेड प्लांटेशन",
+      "Kannada": "ಹೋಮ್‌ಸ್ಟೆಡ್ ತೋಟ",
+      "Gujarati": "ઘરવખરીનું વાવેતર",
+      "Odia": "ଘରବାଡ଼ି ରୋପଣ"
+    }
+  },
+  "departments_converged": {
+    "forest": {
+      "English": "Forest Department",
+      "Hindi": "वन मंडल",
+      "Kannada": "ಅರಣ್ಯ ಇಲಾಖೆ",
+      "Gujarati": "વન વિભાગ",
+      "Odia": "ବନ ବିଭାଗ"
+    },
+    "agri": {
+      "English": "Agriculture Department",
+      "Hindi": "कृषि विभाग",
+      "Kannada": "ಕೃಷಿ ಇಲಾಖೆ",
+      "Gujarati": "કૃષિ વિભાગ",
+      "Odia": "କୃଷି ବିଭାଗ"
+    },
+    "horticulture": {
+      "English": "Horticulture Department",
+      "Hindi": "बागवानी विभाग",
+      "Kannada": "ತೋಟಗಾರಿಕೆ ಇಲಾಖೆ",
+      "Gujarati": "બાગાયત વિભાગ",
+      "Odia": "ଉଦ୍ୟାନ ବିଭାଗ"
+    },
+    "mgnrega": {
+      "English": "MGNREGA",
+      "Hindi": "एमजीएनआरईजीए",
+      "Kannada": "ಎಂಜಿಎನ್‌ಆರ್‌ಇಜಿಎ",
+      "Gujarati": "મનરેગા",
+      "Odia": "ମନରେଗା"
+    },
+    "tribal_welfare": {
+      "English": "Tribal Welfare Department",
+      "Hindi": "जनजातीय कल्याण विभाग",
+      "Kannada": "ಬುಡಕಟ್ಟು ಕಲ್ಯಾಣ ಇಲಾಖೆ",
+      "Gujarati": "આદિજાતિ કલ્યાણ વિભાગ",
+      "Odia": "ଆଦିବାସୀ କଲ୍ୟାଣ ବିଭାଗ"
+    },
+    "panchayati_raj": {
+      "English": "Panchayati Raj Department",
+      "Hindi": "पंचायती राज विभाग",
+      "Kannada": "ಪಂಚಾಯತ್ ರಾಜ್ ಇಲಾಖೆ",
+      "Gujarati": "પંચાયતી રાજ વિભાગ",
+      "Odia": "ପଞ୍ଚାୟତିରାଜ ବିଭାଗ"
+    },
+    "nrlm": {
+      "English": "NRLM",
+      "Hindi": "एनआरएलएम",
+      "Kannada": "ಎನ್ಆರ್ಎಲ್ಎಂ",
+      "Gujarati": "એનઆરએલએમ",
+      "Odia": "ଏନଆରଏଲଏମ"
+    }
+  }
+}

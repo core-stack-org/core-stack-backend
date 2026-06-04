@@ -11,11 +11,15 @@ from .gen_dpr import (
 )
 from .utils import to_utf8
 from collections import defaultdict
-from shapely.geometry import Point
 from dpr.utils import ensure_str, get_waterbody_repair_activities
-from .templatetags.custom_filters import format_text
 from .mapping import populate_maintenance_from_waterbody
-from .services import get_maintenance_data, get_nrm_works_data, get_livelihood_data
+from .services import get_nrm_works_data
+from .service.form_download_service import (
+    load_form_labels,
+    translate_choice,
+    translate_multiple_choices,
+)
+from dpr.models import GW_maintenance, ODK_livelihood, ODK_agrohorticulture
 
 
 def get_section_b_data(plan, total_settlements, mws_fortnight):
@@ -64,9 +68,55 @@ def get_section_b_data(plan, total_settlements, mws_fortnight):
     )
 
 
-def get_section_c_data(plan):
+def get_section_c_data(plan, language):
     settlement_data = get_data_for_settlement(plan.id)
+    labels = load_form_labels("Add_Settlements_form _V1.0.1")
+    for settlement in settlement_data:
 
+        settlement.largest_caste_label = translate_choice(
+            labels,
+            "select_one_type",
+            settlement.largest_caste,
+            language,
+        )
+
+        if settlement.largest_caste.lower() == "single caste group":
+
+            settlement.smallest_caste_label = translate_choice(
+                labels,
+                "caste_group_single",
+                settlement.smallest_caste,
+                language,
+            )
+
+        elif settlement.largest_caste.lower() == "mixed caste group":
+
+            settlement.settlement_status_label = translate_multiple_choices(
+                labels,
+                "caste_group_single",
+                settlement.settlement_status,
+                language,
+            )
+        settlement.nrega_past_work_label = translate_multiple_choices(
+            labels,
+            "work_demands",
+            settlement.nrega_past_work,
+            language,
+        )
+
+        settlement.nrega_demand_label = translate_choice(
+            labels,
+            "select_one_demands",
+            clean_odk_value(settlement.nrega_demand),
+            language,
+        )
+
+        settlement.nrega_issues_label = translate_multiple_choices(
+            labels,
+            "select_multiple_issues",
+            settlement.nrega_issues,
+            language,
+        )
     return {
         "socio_eco": settlement_data,
         "mgnrega": settlement_data,
@@ -75,7 +125,7 @@ def get_section_c_data(plan):
     }
 
 
-def get_section_d_data(plan, settlement_mws_ids, mws_gdf):
+def get_section_d_data(plan, settlement_mws_ids, mws_gdf, language):
 
     unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
 
@@ -91,12 +141,19 @@ def get_section_d_data(plan, settlement_mws_ids, mws_gdf):
         mws_gdf,
     )
 
+    well_labels = load_form_labels("Add_well_form_V1.0.1")
+    water_body_labels = load_form_labels("Add_Waterbodies_Form_V1.0.3")
+
     return {
         "mws": get_mws_table_data(unique_mws_ids, mws_gdf),
         "well_summary": get_well_summary_data(all_wells_with_mws),
-        "wells": get_detailed_well_data(all_wells_with_mws),
-        "water_summary": get_waterbody_summary_data(all_waterbodies_with_mws),
-        "water_structures": get_detailed_waterbody_data(all_waterbodies_with_mws),
+        "wells": get_detailed_well_data(all_wells_with_mws, well_labels, language),
+        "water_summary": get_waterbody_summary_data(
+            all_waterbodies_with_mws, water_body_labels, language
+        ),
+        "water_structures": get_detailed_waterbody_data(
+            all_waterbodies_with_mws, water_body_labels, language
+        ),
     }
 
 
@@ -108,7 +165,7 @@ def get_mws_table_data(unique_mws_ids, mws_gdf):
 
         matching_feature = mws_gdf[mws_gdf["uid"] == mws_id]
 
-        centroid = "NA"
+        centroid = None
 
         if not matching_feature.empty:
             c = matching_feature.geometry.centroid.iloc[0]
@@ -152,7 +209,7 @@ def get_well_summary_data(all_wells_with_mws):
     return rows
 
 
-def get_detailed_well_data(all_wells_with_mws):
+def get_detailed_well_data(all_wells_with_mws, labels, language):
 
     rows = []
 
@@ -166,7 +223,7 @@ def get_detailed_well_data(all_wells_with_mws):
 
     for well, mws_id in all_wells_with_mws_sorted:
 
-        well_usage = "NA"
+        well_usage = None
 
         if well.data_well and "Well_usage" in well.data_well:
 
@@ -180,9 +237,14 @@ def get_detailed_well_data(all_wells_with_mws):
                 well_usage = f"Other: {other}"
 
             elif used:
-                well_usage = used
+                well_usage = translate_choice(
+                    labels,
+                    "select_one_well_used",
+                    used,
+                    language,
+                )
 
-        repair_activities = "NA"
+        repair_activities = None
 
         if well.data_well and "Well_usage" in well.data_well:
 
@@ -196,25 +258,52 @@ def get_detailed_well_data(all_wells_with_mws):
                 repair_activities = f"Other: {repairs_other}"
 
             elif repairs:
-                repair_activities = repairs.replace(
-                    "_",
-                    " ",
-                )
+                repair_activities = repairs.replace
 
         rows.append(
             {
                 "mws_id": mws_id,
                 "settlement": well.beneficiary_settlement,
-                "well_type": well.data_well.get("select_one_well_type") or "NA",
-                "owner": well.owner,
-                "beneficiary_name": well.data_well.get("Beneficiary_name") or "NA",
-                "father_name": well.data_well.get("ben_father") or "NA",
-                "water_availability": well.data_well.get("select_one_year") or "NA",
+                "well_type": translate_choice(
+                    labels,
+                    "select_one_well_type",
+                    well.data_well.get("select_one_well_type"),
+                    language,
+                ),
+                "owner": translate_choice(
+                    labels,
+                    "select_one_owns",
+                    well.owner,
+                    language,
+                ),
+                "beneficiary_name": well.data_well.get("Beneficiary_name") or None,
+                "father_name": well.data_well.get("ben_father") or None,
+                "water_availability": translate_choice(
+                    labels,
+                    "select_one_year",
+                    well.data_well.get("select_one_year"),
+                    language,
+                ),
                 "households_benefitted": well.households_benefitted,
-                "caste_uses": well.caste_uses,
+                "caste_uses": translate_multiple_choices(
+                    labels,
+                    "select_multiple_caste_use",
+                    well.caste_uses,
+                    language,
+                ),
                 "well_usage": well_usage,
-                "need_maintenance": well.need_maintenance,
-                "repair_activities": repair_activities,
+                "need_maintenance": translate_choice(
+                    labels,
+                    "is_maintenance_required",
+                    well.need_maintenance,
+                    language,
+                ),
+                "repair_activities": translate_multiple_choices(
+                    labels,
+                    "repairs_type",
+                    repairs,
+                    language,
+                ),
                 "latitude": well.latitude,
                 "longitude": well.longitude,
             }
@@ -223,9 +312,7 @@ def get_detailed_well_data(all_wells_with_mws):
     return rows
 
 
-def get_waterbody_summary_data(
-    all_waterbodies_with_mws,
-):
+def get_waterbody_summary_data(all_waterbodies_with_mws, water_body_labels, language):
 
     waterbody_count = defaultdict(int)
 
@@ -257,7 +344,12 @@ def get_waterbody_summary_data(
         rows.append(
             {
                 "settlement": settlement,
-                "structure_type": structure_type,
+                "structure_type": translate_choice(
+                    water_body_labels,
+                    "select_one_water_structure",
+                    structure_type,
+                    language,
+                ),
                 "count": waterbody_count[(settlement, structure_type)],
                 "households": households_count[(settlement, structure_type)],
             }
@@ -266,9 +358,7 @@ def get_waterbody_summary_data(
     return rows
 
 
-def get_detailed_waterbody_data(
-    all_waterbodies_with_mws,
-):
+def get_detailed_waterbody_data(all_waterbodies_with_mws, waterbody_labels, language):
 
     rows = []
 
@@ -280,38 +370,82 @@ def get_detailed_waterbody_data(
         key=lambda x: sort_key(x[0].beneficiary_settlement),
     ):
 
-        who_manages = waterbody.who_manages or "NA"
+        who_manages = waterbody.who_manages or None
 
-        if who_manages.lower() == "other":
-            who_manages = "Other: " + (waterbody.specify_other_manager or "")
+        if who_manages:
 
-        structure_type = waterbody.water_structure_type or "NA"
+            if who_manages.lower() == "other":
+                who_manages = "Other: " + (waterbody.specify_other_manager or "")
 
-        if structure_type.lower() == "other":
-            structure_type = "Other: " + (waterbody.water_structure_other or "")
+            else:
+                who_manages = translate_choice(
+                    waterbody_labels,
+                    "select_one_manages",
+                    who_manages.lower(),
+                    language,
+                )
 
+        structure_type = waterbody.water_structure_type or None
+        structure_type_eng = structure_type
+
+        if structure_type:
+
+            if structure_type.lower() == "other":
+                structure_type = "Other: " + (waterbody.water_structure_other or "")
+                structure_type_eng = structure_type
+
+            else:
+                structure_type = translate_choice(
+                    waterbody_labels,
+                    "select_one_water_structure",
+                    structure_type,
+                    language,
+                )
         repair_activities = get_waterbody_repair_activities(
             waterbody.data_waterbody,
-            structure_type,
+            structure_type_eng,
         )
-
+        repair_label_key = REPAIR_LABEL_MAPPING.get(waterbody.water_structure_type)
         rows.append(
             {
                 "mws_id": mws_id,
                 "settlement": waterbody.beneficiary_settlement,
-                "owner": waterbody.owner,
+                "owner": translate_choice(
+                    waterbody_labels,
+                    "select_one_owns",
+                    waterbody.owner,
+                    language,
+                ),
                 "beneficiary_name": waterbody.data_waterbody.get("Beneficiary_name")
-                or "NA",
-                "father_name": waterbody.data_waterbody.get("ben_father") or "NA",
+                or None,
+                "father_name": waterbody.data_waterbody.get("ben_father") or None,
                 "who_manages": who_manages,
-                "caste_uses": waterbody.caste_who_uses,
+                "caste_uses": translate_multiple_choices(
+                    waterbody_labels,
+                    "select_multiple_caste_use",
+                    waterbody.caste_who_uses,
+                    language,
+                ),
                 "households_benefitted": waterbody.household_benefitted,
                 "structure_type": structure_type,
-                "usage": format_text(
-                    waterbody.data_waterbody.get("select_multiple_uses_structure")
+                "usage": translate_multiple_choices(
+                    waterbody_labels,
+                    "select_multiple_uses_structure",
+                    waterbody.data_waterbody.get("select_multiple_uses_structure"),
+                    language,
                 ),
-                "need_maintenance": waterbody.need_maintenance,
-                "repair_activities": repair_activities,
+                "need_maintenance": translate_choice(
+                    waterbody_labels,
+                    "select_one_maintenance",
+                    waterbody.need_maintenance,
+                    language,
+                ),
+                "repair_activities": translate_multiple_choices(
+                    waterbody_labels,
+                    repair_label_key,
+                    repair_activities,
+                    language,
+                ),
                 "latitude": waterbody.latitude,
                 "longitude": waterbody.longitude,
             }
@@ -320,19 +454,57 @@ def get_detailed_waterbody_data(
     return rows
 
 
-def get_section_e_data(plan):
+def get_section_e_data(plan, language):
     populate_maintenance_from_waterbody(plan)
+    gw_data = get_maintenance_data(plan.id, "gw")
+    gw_label = load_form_labels(
+        "Propose_Maintenance_on_Existing_Water_Recharge_Structures_V1.1.1"
+    )
+    for row in gw_data:
 
-    asset_types = [
-        "Water Recharge Structures",
-        "Irrigation Structures",
-        "Surface Water Structures",
-        "Remote Sensed Surface Water Structures",
-    ]
+        original_structure_type = row.get("structure_type")
+
+        row["demand_type"] = translate_choice(
+            gw_label,
+            "demand_type",
+            row["demand_type"],
+            language,
+        )
+
+        repair_group = REPAIR_ACTIVITY_MAPPING.get(
+            str(original_structure_type).strip().lower()
+        )
+
+        if repair_group and row.get("repair_activities"):
+            translated_repairs = []
+
+            repairs = row["repair_activities"]
+
+            # Handle string values
+            if isinstance(repairs, str):
+                repairs = [r.strip() for r in repairs.split(",") if r.strip()]
+
+            for repair in repairs:
+                translated_repairs.append(
+                    translate_choice(
+                        gw_label,
+                        repair_group,
+                        clean_odk_value(repair),
+                        language,
+                    )
+                )
+
+            row["repair_activities"] = ", ".join(translated_repairs)
+
+        row["structure_type"] = translate_choice(
+            gw_label,
+            "select_one_recharge_structure",
+            original_structure_type,
+            language,
+        )
 
     return {
-        "asset_types": asset_types,
-        "gw": get_maintenance_data(plan.id, "gw"),
+        "gw": gw_data,
         "agri": get_maintenance_data(plan.id, "agri"),
         "swb": get_maintenance_data(plan.id, "swb"),
         "swb_rs": get_maintenance_data(plan.id, "swb_rs"),
@@ -343,20 +515,410 @@ def get_section_f_data(plan):
     return {"works": get_nrm_works_data(plan.id)}
 
 
-def get_section_g_data(plan):
+def get_section_g_data(plan, language):
     all_livelihood = get_livelihood_data(plan.id)
+    agro_labels = load_form_labels("Agrohorticulture")
+    livelihood_labels = load_form_labels("NRM Livelihood Form")
 
     livestock_fisheries = [
         r for r in all_livelihood if r["livelihood_work"] in ("Livestock", "Fisheries")
     ]
+    for row in livestock_fisheries:
+        livelihood_work = row.get("livelihood_work")
+
+        if livelihood_work == "Livestock":
+            row["demand_type"] = translate_choice(
+                livelihood_labels,
+                "livestock_demand",
+                row.get("demand_type"),
+                language,
+            )
+
+            row["work_demand"] = translate_choice(
+                livelihood_labels,
+                "demands_promoting_livestock",
+                row.get("work_demand"),
+                language,
+            )
+
+        elif livelihood_work == "Fisheries":
+            row["demand_type"] = translate_choice(
+                livelihood_labels,
+                "demand_type_fisheries",
+                row.get("demand_type"),
+                language,
+            )
+
+            row["work_demand"] = translate_choice(
+                livelihood_labels,
+                "select_one_promoting_fisheries",
+                row.get("work_demand"),
+                language,
+            )
 
     plantations_etc = [
         r
         for r in all_livelihood
         if r["livelihood_work"] not in ("Livestock", "Fisheries")
     ]
+    for row in plantations_etc:
+        livelihood_work = row.get("livelihood_work")
 
+        if livelihood_work == "Plantations":
+
+            row["demand_type"] = translate_choice(
+                agro_labels,
+                "demand_type_plantations",
+                row.get("demand_type"),
+                language,
+            )
+
+            species = row.get("work_demand")
+
+            if species:
+                translated_species = []
+
+                for item in species.split():
+                    translated_species.append(
+                        translate_choice(
+                            agro_labels,
+                            "select_multiple_species",
+                            item.strip().lower(),
+                            language,
+                        )
+                    )
+
+                row["work_demand"] = ", ".join(translated_species)
+
+        elif livelihood_work == "Kitchen Garden":
+
+            row["demand_type"] = translate_choice(
+                livelihood_labels,
+                "demand_type_kitchen_garden",
+                row.get("demand_type"),
+                language,
+            )
+    for row in livestock_fisheries:
+        row["livelihood_work"] = translate_livelihood_work(
+            row["livelihood_work"],
+            language,
+        )
+
+    for row in plantations_etc:
+        row["livelihood_work"] = translate_livelihood_work(
+            row["livelihood_work"],
+            language,
+        )
     return {
         "livestock_fisheries": livestock_fisheries,
         "plantations": plantations_etc,
     }
+
+
+def clean_odk_value(value):
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    if value.upper() == "NA":
+        return None
+
+    return value
+
+
+REPAIR_LABEL_MAPPING = {
+    "Community Pond": "Repair_of_community_pond",
+    "Large water body": "Repair_of_large_water_body",
+    "Farm Pond": "Repair_of_farm_ponds",
+    "Canal": "Repair_of_canal",
+    "Check Dam": "Repair_of_check_dam",
+    "Percolation Tank": "Repair_of_percolation_tank",
+    "Farm bund": "Repair_of_farm_bund",
+    "Percolation tank": "Repair_of_percolation_tank",
+    "Earthen gully plug": "Repair_of_earthen_gully_plug",
+    "Drainage/soakage channels": "Repair_of_drainage_soakage_channels",
+    "Recharge pits": "Repair_of_recharge_pits",
+    "Soakage pits": "Repair_of_soakage_pits",
+    "Trench cum bund network": "Repair_of_trench_cum_bund_network",
+    "Continuous contour trenches (CCT)": "Repair_of_Continuous_contour_trenches",
+    "Staggered Contour trenches (SCT)": "Repair_of_Staggered_contour_trenches",
+    "Water absorption trenches (WAT)": "Repair_of_Water_absorption_trenches",
+    "Loose boulder structure": "Repair_of_loose_boulder_structure",
+    "Rock fill dam": "Repair_of_rock_fill_dam",
+    "Stone bunding": "Repair_of_stone_bunding",
+    "Diversion drains": "Repair_of_diversion_drains",
+    "Bunding:Contour bunds/ graded bunds": "Repair_of_bunding",
+    "5% model structure": "Repair_of_model5_structure",
+    "30-40 model structure": "Repair_of_30_40_model_structure",
+}
+
+REPAIR_ACTIVITY_MAPPING = {
+    "check dam": "select_one_check_dam",
+    "percolation tank": "select_one_percolation_tank",
+    "earthen gully plug": "select_one_earthen_gully_plug",
+    "drainage/soakage channels": "select_one_drainage_soakage_channels",
+    "recharge pits": "select_one_recharge_pits",
+    "sokage pits": "select_one_sokage_pits",
+    "trench cum bund network": "select_one_trench_cum_bund_network",
+    "continuous contour trenches (cct)": "select_one_continuous_contour_trenches",
+    "staggered contour trenches(sct)": "select_one_staggered_contour_trenches",
+    "water absorption trenches(wat)": "select_one_water_absorption_trenches",
+    "loose boulder structure": "select_one_loose_boulder_structure",
+    "rock fill dam": "select_one_rock_fill_dam",
+    "stone bunding": "select_one_stone_bunding",
+    "diversion drains": "select_one_diversion_drains",
+    "bunding:contour bunds/ graded bunds": "select_one_bunding",
+    "5% model structure": "select_one_model5_structure",
+    "30-40 model structure": "select_one_model30_40_structure",
+}
+
+
+def get_maintenance_data(plan_id, maintenance_type):
+    pid = str(plan_id)
+    result = []
+
+    if maintenance_type == "gw":
+        for m in GW_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
+            d = m.data_gw_maintenance or {}
+            structure_type = d.get("select_one_recharge_structure") or None
+            repair = _resolve_repair_activity(
+                d,
+                structure_type,
+                RECHARGE_STRUCTURE_MAPPING,
+            )
+            result.append(
+                {
+                    "id": m.gw_maintenance_id,
+                    "demand_type": d.get("demand_type"),
+                    "beneficiary_settlement": d.get("beneficiary_settlement"),
+                    "beneficiary_name": d.get("Beneficiary_Name"),
+                    "gender": d.get("select_gender"),
+                    "beneficiary_father_name": d.get("ben_father"),
+                    "structure_type": structure_type,
+                    "repair_activities": repair,
+                    "latitude": m.latitude,
+                    "longitude": m.longitude,
+                }
+            )
+
+    return result
+
+
+def _resolve_repair_activity(
+    data, structure_type, mapping, fallback_key="select_one_activities"
+):
+    repair_activities = None
+
+    structure_key = str(structure_type).strip().lower()
+
+    repair_key = mapping.get(structure_key)
+
+    if repair_key:
+        repair_activities = data.get(repair_key)
+
+        if repair_activities == "other":
+            repair_activities = data.get(f"{repair_key}_other")
+
+    if not repair_activities:
+        repair_activities = data.get(fallback_key)
+
+    return repair_activities
+
+
+RECHARGE_STRUCTURE_MAPPING = {
+    "Check dam": "select_one_check_dam",
+    "Percolation tank": "select_one_percolation_tank",
+    "Earthen gully plug": "select_one_earthen_gully_plug",
+    "Drainage/soakage channels": "select_one_drainage_soakage_channels",
+    "Recharge pits": "select_one_recharge_pits",
+    "Sokage pits": "select_one_sokage_pits",
+    "Trench cum bund network": "select_one_trench_cum_bund_network",
+    "Continuous contour trenches (CCT)": "select_one_continuous_contour_trenches",
+    "Staggered Contour trenches(SCT)": "select_one_staggered_contour_trenches",
+    "Water absorption trenches(WAT)": "select_one_water_absorption_trenches",
+    "Loose boulder structure": "select_one_loose_boulder_structure",
+    "Rock fill dam": "select_one_rock_fill_dam",
+    "Stone bunding": "select_one_stone_bunding",
+    "Diversion drains": "select_one_diversion_drains",
+    "Bunding:Contour bunds/ graded bunds": "select_one_bunding",
+    "5% model structure": "select_one_model5_structure",
+    "30-40 model structure": "select_one_model30_40_structure",
+}
+
+
+def get_livelihood_data(plan_id):
+    pid = str(plan_id)
+    result = []
+
+    for record in (
+        ODK_livelihood.objects.filter(plan_id=pid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
+        dl = record.data_livelihood or {}
+
+        livestock_group = dl.get("Livestock") or {}
+        fisheries_group = dl.get("fisheries") or {}
+        plantation_group = dl.get("plantations") or {}
+        kitchen_garden_group = dl.get("kitchen_gardens") or {}
+
+        is_livestock = (
+            ensure_str(livestock_group.get("is_demand_livestock", "")).lower() == "yes"
+            or ensure_str(dl.get("select_one_demand_promoting_livestock", "")).lower()
+            == "yes"
+        )
+        if is_livestock:
+            demands = ensure_str(livestock_group.get("demands_promoting_livestock"))
+            if demands and demands.lower() == "other":
+                demands = livestock_group.get("demands_promoting_livestock_other")
+            if not demands:
+                demands = ensure_str(dl.get("select_one_promoting_livestock"))
+                if demands and demands.lower() == "other":
+                    demands = dl.get("select_one_promoting_livestock_other")
+            result.append(
+                {
+                    "livelihood_work": "Livestock",
+                    "demand_type": livestock_group.get("livestock_demand"),
+                    "work_demand": demands,
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or livestock_group.get("ben_livestock"),
+                    "gender": livestock_group.get("gender_livestock"),
+                    "beneficiary_father_name": livestock_group.get(
+                        "ben_father_livestock"
+                    ),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
+
+        is_fisheries = (
+            ensure_str(fisheries_group.get("is_demand_fisheris", "")).lower() == "yes"
+            or ensure_str(dl.get("select_one_demand_promoting_fisheries", "")).lower()
+            == "yes"
+        )
+        if is_fisheries:
+            demands = ensure_str(fisheries_group.get("select_one_promoting_fisheries"))
+            if demands and demands.lower() == "other":
+                demands = fisheries_group.get("select_one_promoting_fisheries_other")
+            if not demands:
+                demands = ensure_str(dl.get("select_one_promoting_fisheries"))
+                if demands and demands.lower() == "other":
+                    demands = dl.get("select_one_promoting_fisheries_other")
+            result.append(
+                {
+                    "livelihood_work": "Fisheries",
+                    "demand_type": fisheries_group.get("demand_type_fisheries"),
+                    "work_demand": demands,
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or fisheries_group.get("ben_fisheries"),
+                    "gender": fisheries_group.get("gender_fisheries"),
+                    "beneficiary_father_name": fisheries_group.get(
+                        "ben_father_fisheries"
+                    ),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
+
+        is_plantation = (
+            ensure_str(dl.get("select_one_demand_plantation", "")).lower() == "yes"
+            or ensure_str(plantation_group.get("select_plantation_demands", "")).lower()
+            == "yes"
+        )
+        if is_plantation:
+            result.append(
+                {
+                    "livelihood_work": "Plantations",
+                    "demand_type": plantation_group.get("demand_type_plantations"),
+                    "work_demand": dl.get("Plantation")
+                    or plantation_group.get("crop_name"),
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or plantation_group.get("ben_plantation"),
+                    "gender": plantation_group.get("gender"),
+                    "beneficiary_father_name": plantation_group.get("ben_father"),
+                    "total_acres": dl.get("Plantation_crop")
+                    or plantation_group.get("crop_area"),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
+
+        is_kitchen_garden = (
+            ensure_str(dl.get("indi_assets", "")).lower() == "yes"
+            or ensure_str(kitchen_garden_group.get("assets_kg", "")).lower() == "yes"
+        )
+        if is_kitchen_garden:
+            result.append(
+                {
+                    "livelihood_work": "Kitchen Garden",
+                    "demand_type": kitchen_garden_group.get(
+                        "demand_type_kitchen_garden"
+                    ),
+                    "work_demand": dl.get("Plantation"),
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or kitchen_garden_group.get("ben_kitchen_gardens"),
+                    "gender": kitchen_garden_group.get("gender_kitchen_gardens"),
+                    "beneficiary_father_name": kitchen_garden_group.get(
+                        "ben_father_kitchen_gardens"
+                    ),
+                    "total_acres": dl.get("area_didi_badi")
+                    or kitchen_garden_group.get("area_kg"),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
+
+    for agrohorti in (
+        ODK_agrohorticulture.objects.filter(plan_id=pid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
+        data = agrohorti.data_agohorticulture or {}
+        species_parts = filter(
+            None,
+            [
+                data.get("select_multiple_species"),
+                data.get("select_multiple_species_other"),
+            ],
+        )
+        species = " ".join(species_parts) or None
+        result.append(
+            {
+                "livelihood_work": "Plantations",
+                "demand_type": data.get("demand_type_plantations"),
+                "work_demand": species,
+                "beneficiary_settlement": data.get("beneficiary_settlement"),
+                "beneficiary_name": data.get("beneficiary_name"),
+                "gender": data.get("gender"),
+                "beneficiary_father_name": data.get("ben_father"),
+                "total_acres": data.get("crop_area"),
+                "latitude": agrohorti.latitude,
+                "longitude": agrohorti.longitude,
+            }
+        )
+
+    return result
+
+
+def translate_livelihood_work(value, language):
+    translations = {
+        "hi": {
+            "Livestock": "पशुपालन",
+            "Fisheries": "मत्स्य पालन",
+            "Plantations": "पौधारोपण",
+            "Kitchen Garden": "रसोई बाड़ी",
+        },
+        "od": {
+            "Livestock": "ପଶୁପାଳନ",
+            "Fisheries": "ମତ୍ସ୍ୟଚାଷ",
+            "Plantations": "ବୃକ୍ଷରୋପଣ",
+            "Kitchen Garden": "ରୋଷେଇ ବଗିଚା",
+        },
+    }
+
+    return translations.get(language, {}).get(value, value)

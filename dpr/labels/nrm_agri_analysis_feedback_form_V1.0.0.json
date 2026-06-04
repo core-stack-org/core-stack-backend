@@ -1,0 +1,436 @@
+{
+  "select_one_crop_pixel": {
+    "yes": {
+      "English": "Yes",
+      "Hindi": "हाँ",
+      "Kannada": "ಹೌದು",
+      "Odia": "ହଁ"
+    },
+    "no": {
+      "English": "No",
+      "Hindi": "नहीं",
+      "Kannada": "ಇಲ್ಲ",
+      "Odia": "ନା"
+    }
+  },
+  "select_one_land_pixel": {
+    "forest land": {
+      "English": "Forest Land",
+      "Hindi": "वन भूमि",
+      "Kannada": "ಅರಣ್ಯ ಭೂಮಿ",
+      "Odia": "ଜଙ୍ଗଲ ଜମି"
+    },
+    "barren land": {
+      "English": "Barren Land",
+      "Hindi": "बंजर भूमि",
+      "Kannada": "ಬಂಜರು ಭೂಮಿ",
+      "Odia": "ଅନୁର୍ବର ଭୂମି"
+    },
+    "grassland/pasture": {
+      "English": "Grassland/Pasture",
+      "Hindi": "घास का मैदान/चरागाह",
+      "Kannada": "ಹುಲ್ಲುಗಾವಲು/ಹುಲ್ಲುಗಾವಲು",
+      "Odia": "ତୃଣଭୂମି/ଚରାଭୂମି"
+    },
+    "wetland": {
+      "English": "Wetland",
+      "Hindi": "नमीयुक्त भूमि / आर्द्रभूमि",
+      "Kannada": "ಜೌಗು ಪ್ರದೇಶ",
+      "Odia": "ଆର୍ଦ୍ର ଭୂମି"
+    },
+    "protected area (national park/reserve)": {
+      "English": "Protected Area (National Park/Reserve)",
+      "Hindi": "संरक्षित क्षेत्र (राष्ट्रीय उद्यान/रिजर्व)",
+      "Kannada": "ಸಂರಕ್ಷಿತ ಪ್ರದೇಶ (ರಾಷ್ಟ್ರೀಯ ಉದ್ಯಾನವನ/ಅಭಯಾರಣ್ಯ)",
+      "Odia": "ସଂରକ୍ଷିତ ଅଞ୍ଚଳ (ଜାତୀୟ ଉଦ୍ୟାନ/ସଂରକ୍ଷିତ)"
+    },
+    "mining area": {
+      "English": "Mining Area",
+      "Hindi": "खनन क्षेत्र",
+      "Kannada": "ಗಣಿಗಾರಿಕೆ ಪ್ರದೇಶ",
+      "Odia": "ଖଣି ଅଞ୍ଚଳ"
+    },
+    "commercial land": {
+      "English": "Commercial Land",
+      "Hindi": "व्यावसायिक भूमि",
+      "Kannada": "ವಾಣಿಜ್ಯ ಭೂಮಿ",
+      "Odia": "ବାଣିଜ୍ୟିକ ଜମି"
+    },
+    "floodplain": {
+      "English": "Floodplain",
+      "Hindi": "बाढ़ का मैदान",
+      "Kannada": "ಪ್ರವಾಹ ಪ್ರದೇಶ",
+      "Odia": "ବନ୍ୟା ସମତଳ"
+    },
+    "scrubland": {
+      "English": "Scrubland",
+      "Hindi": "झाड़ीदार भूमि",
+      "Kannada": "ಸ್ಕ್ರಬ್‌ಲ್ಯಾಂಡ್",
+      "Odia": "ସ୍କ୍ରବଲ୍ୟାଣ୍ଡ"
+    },
+    "coastal/marine area": {
+      "English": "Coastal/Marine Area",
+      "Hindi": "तटीय/समुद्री क्षेत्र",
+      "Kannada": "ಕರಾವಳಿ/ಸಮುದ್ರ ಪ್ರದೇಶ",
+      "Odia": "ଉପକୂଳ/ସାମୁଦ୍ରିକ ଅଞ୍ଚଳ"
+    }
+  },
+  "select_multiple_kharif_crop": {
+    "paddy": {
+      "English": "Paddy",
+      "Hindi": "धान",
+      "Kannada": "ಭತ್ತ",
+      "Odia": "ଧାନ"
+    },
+    "millets": {
+      "English": "Millets",
+      "Hindi": "मोटे अनाज / श्री अन्न",
+      "Kannada": "ಧಾನ್ಯಗಳು",
+      "Odia": "ବାଜରା"
+    },
+    "pulses": {
+      "English": "Pulses",
+      "Hindi": "दालें",
+      "Kannada": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+      "Odia": "ଡାଲି"
+    },
+    "vegetables": {
+      "English": "Vegetables",
+      "Hindi": "सब्ज़ियाँ",
+      "Kannada": "ತರಕಾರಿಗಳು",
+      "Odia": "ପନିପରିବା"
+    },
+    "fruits": {
+      "English": "Fruits",
+      "Hindi": "फल",
+      "Kannada": "ಹಣ್ಣುಗಳು",
+      "Odia": "ଫଳ"
+    },
+    "oil_seeds": {
+      "English": "Oil seeds",
+      "Hindi": "तिलहन",
+      "Kannada": "ಎಣ್ಣೆ ಬೀಜಗಳು",
+      "Odia": "ତୈଳବୀଜ"
+    },
+    "fodder_crop": {
+      "English": "Fodder crop",
+      "Hindi": "चारा फसल",
+      "Kannada": "ಮೇವಿನ ಬೆಳೆ",
+      "Odia": "ଚାରା ଫସଲ"
+    },
+    "fallow": {
+      "English": "Fallow",
+      "Hindi": "परती",
+      "Kannada": "ಪಾಳುಭೂಮಿ",
+      "Odia": "ପଡ଼ିଆ"
+    }
+  },
+  "select_multiple_rabi_crop": {
+    "paddy": {
+      "English": "Paddy",
+      "Hindi": "धान",
+      "Kannada": "ಭತ್ತ",
+      "Odia": "ଧାନ"
+    },
+    "millets": {
+      "English": "Millets",
+      "Hindi": "मोटे अनाज / श्री अन्न",
+      "Kannada": "ಧಾನ್ಯಗಳು",
+      "Odia": "ବାଜରା"
+    },
+    "pulses": {
+      "English": "Pulses",
+      "Hindi": "दालें",
+      "Kannada": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+      "Odia": "ଡାଲି"
+    },
+    "vegetables": {
+      "English": "Vegetables",
+      "Hindi": "सब्ज़ियाँ",
+      "Kannada": "ತರಕಾರಿಗಳು",
+      "Odia": "ପନିପରିବା"
+    },
+    "fruits": {
+      "English": "Fruits",
+      "Hindi": "फल",
+      "Kannada": "ಹಣ್ಣುಗಳು",
+      "Odia": "ଫଳ"
+    },
+    "oil_seeds": {
+      "English": "Oil seeds",
+      "Hindi": "तिलहन",
+      "Kannada": "ಎಣ್ಣೆ ಬೀಜಗಳು",
+      "Odia": "ତୈଳବୀଜ"
+    },
+    "fodder_crop": {
+      "English": "Fodder crop",
+      "Hindi": "चारा फसल",
+      "Kannada": "ಮೇವಿನ ಬೆಳೆ",
+      "Odia": "ଚାରା ଫସଲ"
+    },
+    "fallow": {
+      "English": "Fallow",
+      "Hindi": "परती",
+      "Kannada": "ಪಾಳುಭೂಮಿ",
+      "Odia": "ପଡ଼ିଆ"
+    }
+  },
+  "select_multiple_zaid_crop": {
+    "paddy": {
+      "English": "Paddy",
+      "Hindi": "धान",
+      "Kannada": "ಭತ್ತ",
+      "Odia": "ଧାନ"
+    },
+    "millets": {
+      "English": "Millets",
+      "Hindi": "मोटे अनाज / श्री अन्न",
+      "Kannada": "ಧಾನ್ಯಗಳು",
+      "Odia": "ବାଜରା"
+    },
+    "pulses": {
+      "English": "Pulses",
+      "Hindi": "दालें",
+      "Kannada": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+      "Odia": "ଡାଲି"
+    },
+    "vegetables": {
+      "English": "Vegetables",
+      "Hindi": "सब्ज़ियाँ",
+      "Kannada": "ತರಕಾರಿಗಳು",
+      "Odia": "ପନିପରିବା"
+    },
+    "fruits": {
+      "English": "Fruits",
+      "Hindi": "फल",
+      "Kannada": "ಹಣ್ಣುಗಳು",
+      "Odia": "ଫଳ"
+    },
+    "oil_seeds": {
+      "English": "Oil seeds",
+      "Hindi": "तिलहन",
+      "Kannada": "ಎಣ್ಣೆ ಬೀಜಗಳು",
+      "Odia": "ତୈଳବୀଜ"
+    },
+    "fodder_crop": {
+      "English": "Fodder crop",
+      "Hindi": "चारा फसल",
+      "Kannada": "ಮೇವಿನ ಬೆಳೆ",
+      "Odia": "ଚାରା ଫସଲ"
+    },
+    "fallow": {
+      "English": "Fallow",
+      "Hindi": "परती",
+      "Kannada": "ಪಾಳುಭೂಮಿ",
+      "Odia": "ପଡ଼ିଆ"
+    }
+  },
+  "select_one_cropping_cycles": {
+    "single": {
+      "English": "Single",
+      "Hindi": "एक",
+      "Kannada": "ಏಕ",
+      "Odia": "ସିଙ୍ଗଲ୍"
+    },
+    "double": {
+      "English": "Double",
+      "Hindi": "दो",
+      "Kannada": "ಡಬಲ್",
+      "Odia": "ଡବଲ୍"
+    },
+    "triple": {
+      "English": "Triple",
+      "Hindi": "तीन",
+      "Kannada": "ಟ್ರಿಪಲ್",
+      "Odia": "ଟ୍ରିପଲ୍"
+    }
+  },
+  "select_one_farm_land_primarily": {
+    "rainfed": {
+      "English": "Rainfed",
+      "Hindi": "वर्षा आधारित",
+      "Kannada": "ಮಳೆಯಾಶ್ರಿತ",
+      "Odia": "ବର୍ଷା ଉପରେ ନିର୍ଭରଶୀଳ"
+    },
+    "irrigated": {
+      "English": "Irrigated",
+      "Hindi": "सिंचाई आधारित",
+      "Kannada": "ನೀರಾವರಿ",
+      "Odia": "ଜଳସେଚନ"
+    }
+  },
+  "select_one_fertilizer": {
+    "organic": {
+      "English": "Organic",
+      "Hindi": "जैविक",
+      "Kannada": "ಸಾವಯವ",
+      "Odia": "ଜୈବିକ"
+    },
+    "chemical": {
+      "English": "Chemical",
+      "Hindi": "रासायनिक",
+      "Kannada": "ರಾಸಾಯನಿಕ",
+      "Odia": "ରାସାୟନିକ"
+    },
+    "both": {
+      "English": "Both",
+      "Hindi": "दोनों",
+      "Kannada": "ಎರಡೂ",
+      "Odia": "ଉଭୟ"
+    }
+  },
+  "select_one_yield_changes": {
+    "yield has increased": {
+      "English": "Yield has increased",
+      "Hindi": "उपज बढ़ गई है",
+      "Kannada": "ಇಳುವರಿ ಹೆಚ್ಚಾಗಿದೆ",
+      "Odia": "ଅମଳ ବୃଦ୍ଧି ପାଇଛି"
+    },
+    "yield has decreased": {
+      "English": "Yield has decreased",
+      "Hindi": "उपज कम हो गई है",
+      "Kannada": "ಇಳುವರಿ ಕಡಿಮೆಯಾಗಿದೆ",
+      "Odia": "ଅମଳ ହ୍ରାସ ପାଇଛି"
+    },
+    "no change": {
+      "English": "No change",
+      "Hindi": "कोई बदलाव नहीं",
+      "Kannada": "ಯಾವುದೇ ಬದಲಾವಣೆ ಇಲ್ಲ",
+      "Odia": "କୌଣସି ପରିବର୍ତ୍ତନ ନାହିଁ"
+    }
+  },
+  "select_one_cropping_patterns_changes": {
+    "yes, switched to drought-resistant crops": {
+      "English": "Yes, switched to drought-resistant crops",
+      "Hindi": "हां, सूखा प्रतिरोधी फसलों की ओर रुख किया गया है।",
+      "Kannada": "ಹೌದು, ಬರ ನಿರೋಧಕ ಬೆಳೆಗಳಿಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ.",
+      "Odia": "ହଁ, ମରୁଡ଼ି ପ୍ରତିରୋଧୀ ଫସଲକୁ ପରିବର୍ତ୍ତନ କରାଯାଇଛି।"
+    },
+    "yes, switched to high-yield crops": {
+      "English": "Yes, switched to high-yield crops",
+      "Hindi": "हाँ, अधिक उपज वाली फसलों की ओर रुख किया",
+      "Kannada": "ಹೌದು, ಹೆಚ್ಚಿನ ಇಳುವರಿ ನೀಡುವ ಬೆಳೆಗಳಿಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ",
+      "Odia": "ହଁ, ଉଚ୍ଚ-ଅମଳକ୍ଷମ ଫସଲକୁ ପରିବର୍ତ୍ତନ କରାଯାଇଛି"
+    },
+    "yes, switched to cash crops": {
+      "English": "Yes, switched to cash crops",
+      "Hindi": "हां, नकदी फसलों की ओर रुख किया",
+      "Kannada": "ಹೌದು, ವಾಣಿಜ್ಯ ಬೆಳೆಗಳಿಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ",
+      "Odia": "ହଁ, ନଗଦ ଫସଲକୁ ପରିବର୍ତ୍ତନ କରାଯାଇଛି"
+    },
+    "yes, diversified crops (growing a wider variety)": {
+      "English": "Yes, diversified crops (growing a wider variety)",
+      "Hindi": "हाँ, विविध फसलें (कई तरह के फसलें उगाना)",
+      "Kannada": "ಹೌದು, ವೈವಿಧ್ಯಮಯ ಬೆಳೆಗಳು (ವಿಶಾಲವಾದ ವೈವಿಧ್ಯವನ್ನು ಬೆಳೆಯುವುದು)",
+      "Odia": "ହଁ, ବିବିଧ ଫସଲ (ବିସ୍ତୃତ ପ୍ରକାରର ଫସଲ ଚାଷ କରିବା)"
+    },
+    "no, cropping patterns have remained the same": {
+      "English": "No, cropping patterns have remained the same",
+      "Hindi": "नहीं, फसल पैटर्न वही बना हुआ है",
+      "Kannada": "ಇಲ್ಲ, ಕ್ರಾಪಿಂಗ್ ಮಾದರಿಗಳು ಹಾಗೆಯೇ ಉಳಿದಿವೆ",
+      "Odia": "ନା, କ୍ରପ୍ ପଦ୍ଧତି ସମାନ ରହିଛି"
+    }
+  },
+  "poor_rainfall_years": {
+    "2017": {
+      "English": "2017",
+      "Hindi": "2017",
+      "Kannada": "2017",
+      "Odia": "୨୦୧୭"
+    },
+    "2018": {
+      "English": "2018",
+      "Hindi": "2018",
+      "Kannada": "2018",
+      "Odia": "୨୦୧୮"
+    },
+    "2019": {
+      "English": "2019",
+      "Hindi": "2019",
+      "Kannada": "2019",
+      "Odia": "୨୦୧୯"
+    },
+    "2020": {
+      "English": "2020",
+      "Hindi": "2020",
+      "Kannada": "2020",
+      "Odia": "୨୦୨୦"
+    },
+    "2021": {
+      "English": "2021",
+      "Hindi": "2021",
+      "Kannada": "2021",
+      "Odia": "୨୦୨୧"
+    },
+    "2022": {
+      "English": "2022",
+      "Hindi": "2022",
+      "Kannada": "2022",
+      "Odia": "୨୦୨୨"
+    },
+    "2023": {
+      "English": "2023",
+      "Hindi": "2023",
+      "Kannada": "2023",
+      "Odia": "୨୦୨୩"
+    }
+  },
+  "select_one_week_drought": {
+    "less than 2 weeks": {
+      "English": "Less than 2 weeks",
+      "Hindi": "2 सप्ताह से कम",
+      "Kannada": "2 ವಾರಗಳಿಗಿಂತ ಕಡಿಮೆ",
+      "Odia": "୨ ସପ୍ତାହରୁ କମ୍"
+    },
+    "2-4 weeks": {
+      "English": "2-4 weeks",
+      "Hindi": "2-4 सप्ताह",
+      "Kannada": "2-4 ವಾರಗಳು",
+      "Odia": "୨-୪ ସପ୍ତାହ"
+    },
+    "4-6 weeks": {
+      "English": "4-6 weeks",
+      "Hindi": "4-6 सप्ताह",
+      "Kannada": "೪-೬ ವಾರಗಳು",
+      "Odia": "୪-୬ ସପ୍ତାହ"
+    },
+    "6-8 weeks": {
+      "English": "6-8 weeks",
+      "Hindi": "6-8 सप्ताह",
+      "Kannada": "6-8 ವಾರಗಳು",
+      "Odia": "୬-୮ ସପ୍ତାହ"
+    },
+    "more than 8 weeks": {
+      "English": "More than 8 weeks",
+      "Hindi": "8 सप्ताह से अधिक",
+      "Kannada": "8 ವಾರಗಳಿಗಿಂತ ಹೆಚ್ಚು",
+      "Odia": "8 ସପ୍ତାହରୁ ଅଧିକ"
+    }
+  },
+  "select_one_crop_production_failed": {
+    "less than 10%": {
+      "English": "Less than 10%",
+      "Hindi": "10% से कम",
+      "Kannada": "10% ಕ್ಕಿಂತ ಕಡಿಮೆ",
+      "Odia": "୧୦% ରୁ କମ୍"
+    },
+    "10-30%": {
+      "English": "10-30%",
+      "Hindi": "10-30%",
+      "Kannada": "10-30%",
+      "Odia": "୧୦-୩୦%"
+    },
+    "30-50%": {
+      "English": "30-50%",
+      "Hindi": "30-50%",
+      "Kannada": "30-50%",
+      "Odia": "୩୦-୫୦%"
+    },
+    "more than 50%": {
+      "English": "More than 50%",
+      "Hindi": "50 से अधिक%",
+      "Kannada": "50% ಕ್ಕಿಂತ ಹೆಚ್ಚು",
+      "Odia": "୫୦% ରୁ ଅଧିକ"
+    }
+  }
+}

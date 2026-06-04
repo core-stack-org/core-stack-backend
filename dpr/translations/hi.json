@@ -1,7 +1,7 @@
 {
   "common": {
     "dpr_title": "विस्तृत परियोजना रिपोर्ट",
-    "na": "NA"
+    "na": "अनुपयुक्त"
   },
 
   "section_a": {
@@ -23,6 +23,8 @@
     "state": "राज्य",
     "number_of_settlements": "गाँव में बस्तियों की संख्या",
     "intersecting_mws": "अंतरवर्ती लघु जलाशय आईडी",
+    "intersecting_mws_inner_settlement": "बस्ती",
+    "intersecting_mws_inner_mws": "सूक्ष्म जलसंभर पहचान संख्या",
     "latitude_and_longitude": "गाँव का अक्षांश और देशांतर"
   },
 
@@ -34,7 +36,11 @@
     "settlement_type": "बस्ती का प्रकार",
     "caste_group": "जाति समूह",
     "total_households": "कुल परिवार",
-    "marginal_farmer": "कुल सीमांत किसान (<2 एकड़)"
+    "marginal_farmer": "कुल सीमांत किसान (<2 एकड़)",
+    "sc": "अनुसूचित जाति",
+    "st": "अनुसूचित जनजाति",
+    "obc": "अन्य पिछड़ा वर्ग",
+    "gen": "सामान्य वर्ग"
   },
 
   "section_c_mgnrega": {
@@ -44,7 +50,9 @@
     "work_days_previous_year": "पिछले वर्ष के कुल कार्य दिवस",
     "demand_made_in_previous_year": "पिछले वर्ष की गई कार्य मांगें",
     "involved_in_village_planing": "क्या आप ग्राम स्तर की योजना प्रक्रिया में शामिल थे?",
-    "issues": "समस्याएँ"
+    "issues": "समस्याएँ",
+    "applied": "आवेदन ",
+    "having": "युक्त"
   },
 
   "section_c_crop": {
@@ -77,7 +85,7 @@
   },
 
   "section_d_mws_info": {
-    "mws_id": "सूक्ष्म जलग्रहण आईडी",
+    "mws_id": "सूक्ष्म जलग्रहण पहचान संख्या",
     "lat_lon": "अक्षांश एवं देशांतर (केंद्र बिंदु)"
   },
 
@@ -90,7 +98,7 @@
 
   "section_d_detail_well": {
     "title": "कुओं एवं उनकी मरम्मत आवश्यकताओं की विस्तृत जानकारी",
-    "mws_id": "एमडब्ल्यूएस आईडी",
+    "mws_id": "सूक्ष्म जलसंभर पहचान संख्या",
     "beneficiary_settlement": "लाभार्थी बस्ती का नाम",
     "well_type": "कुएँ का प्रकार",
     "well_owner": "कुएँ का स्वामी",
@@ -154,7 +162,12 @@
 
     "repair_activities": "मरम्मत गतिविधियाँ",
     "latitude": "अक्षांश",
-    "longitude": "देशांतर"
+    "longitude": "देशांतर",
+
+    "recharge_structure_asset":"जल पुनर्भरण संरचनाओं",
+    "irrigation_structure_asset": "सिंचाई संरचनाओं",
+    "water_structure_asset":"सतही जल संरचनाओं",
+    "rs_water_structure_asset":"रिमोट सेंस्ड सतही जल संरचनाओं"
   },
 
   "section_f": {

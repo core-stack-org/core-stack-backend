@@ -1,4 +1,4 @@
-{% load custom_filters %}
+
 <div class="section">
 
     <h2>
@@ -20,29 +20,29 @@
             <tr>
 
                 <td>
-                    {{ item.settlement_name|format_text|default:t.common.na }}
+                    {{ item.settlement_name|default:t.common.na }}
                 </td>
 
                 <td>
-                    {{ item.goats|format_text|default:t.common.na }}
-
-                </td>
-
-                <td>
-                    {{ item.sheep|format_text|default:t.common.na }}
+                    {{ item.goats|default:t.common.na }}
 
                 </td>
 
                 <td>
-                    {{ item.cattle|format_text |default:t.common.na }}
+                    {{ item.sheep|default:t.common.na }}
+
                 </td>
 
                 <td>
-                    {{ item.piggery|format_text |default:t.common.na}}
+                    {{ item.cattle |default:t.common.na }}
                 </td>
 
                 <td>
-                    {{ item.poultry|format_text |default:t.common.na }}
+                    {{ item.piggery |default:t.common.na}}
+                </td>
+
+                <td>
+                    {{ item.poultry |default:t.common.na }}
                 </td>
 
             </tr>

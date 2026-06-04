@@ -1,4 +1,3 @@
-{% load custom_filters %}
 <h3>{{ t.section_e.water_recharge_structures }}</h3>
 
 <table>
@@ -31,7 +30,7 @@
 
             <td>{{ item.structure_type|default:t.common.na }}</td>
 
-            <td>{{ item.repair_activities|format_text }}</td>
+            <td>{{ item.repair_activities|default:t.common.na}}</td>
 
             <td>{{ item.latitude }}</td>
 

@@ -1,0 +1,522 @@
+{
+  "demand_type": {
+    "community_demand": {
+      "English": "Community Demand",
+      "Hindi": "सामुदायिक मांग",
+      "Gujarati": "સમુદાય માંગ",
+      "Kannada": "ಸಮುದಾಯದ ಬೇಡಿಕೆ",
+      "Odia": "ସମ୍ପ୍ରଦାୟ ଦାବି"
+    },
+    "individual_demand": {
+      "English": "Individual Demand",
+      "Hindi": "व्यक्तिगत मांग",
+      "Gujarati": "વ્યક્તિગત માંગ",
+      "Kannada": "ವೈಯಕ್ತಿಕ ಬೇಡಿಕೆ",
+      "Odia": "ବ୍ୟକ୍ତିଗତ ଚାହିଦା"
+    }
+  },
+  "select_one_irrigation_structure": {
+    "farm pond": {
+      "English": "Farm pond",
+      "Hindi": "खेत का तालाब",
+      "Gujarati": "ખેતરનું તળાવ",
+      "Kannada": "ಕೃಷಿ ಹೊಂಡ",
+      "Odia": "ଚାଷ ପୋଖରୀ"
+    },
+    "community pond": {
+      "English": "Community Pond",
+      "Hindi": "सामुदायिक तालाब",
+      "Gujarati": "કોમ્યુનિટી પોન્ડ",
+      "Kannada": "ಸಮುದಾಯ ಕೊಳ",
+      "Odia": "ସମ୍ପ୍ରଦାୟ ପୋଖରୀ"
+    },
+    "well": {
+      "English": "Well",
+      "Hindi": "कुँआ",
+      "Gujarati": "કૂવો",
+      "Kannada": "ಸರಿ",
+      "Odia": "କୂପ"
+    },
+    "canal": {
+      "English": "Canal",
+      "Hindi": "नहर",
+      "Gujarati": "ચેનલ",
+      "Kannada": "ಕಾಲುವೆ",
+      "Odia": "କେନାଲ"
+    },
+    "farm bund": {
+      "English": "Farm bund",
+      "Hindi": "खेत का मेड़",
+      "Gujarati": "ખેતરનો બાંધ",
+      "Kannada": "ಕೃಷಿ ಕಟ್ಟೆ",
+      "Odia": "ଫାର୍ମ ବନ୍ଧ"
+    }
+  },
+  "select_one_farm_pond": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "डी सिटलिंग",
+      "Gujarati": "ડી સિટલીંગ",
+      "Kannada": "ಡಿ ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି ସିଟଲିଂ"
+    },
+    "repairing_cracks_or_damage_in_embankments": {
+      "English": "Repairing cracks or damage in embankments",
+      "Hindi": "तटबंधों में दरारों या नुक़सान की मरम्मत",
+      "Gujarati": "પાળાઓમાં તિરાડો અથવા નુકસાનનું સમારકામ",
+      "Kannada": "ಒಡ್ಡುಗಳಲ್ಲಿನ ಬಿರುಕುಗಳು ಅಥವಾ ಹಾನಿಯನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "ବନ୍ଧରେ ଫାଟ କିମ୍ବା କ୍ଷତି ମରାମତି"
+    },
+    "controlling_seepage_or_leaks_in_the_pond_bed": {
+      "English": "Controlling seepage or leaks in the pond bed",
+      "Hindi": "तालाब तल में रिसाव या लीक को नियंत्रित करना",
+      "Gujarati": "તળાવના તળિયામાં પાણીના ઝમણ અથવા લીકેજનું નિયંત્રણ",
+      "Kannada": "ಕೊಳದ ತಳದಲ್ಲಿ ನೀರು ಸೋರುವಿಕೆ ಅಥವಾ ಸೋರಿಕೆಯನ್ನು ನಿಯಂತ್ರಿಸುವುದು.",
+      "Odia": "ପୋଖରୀ ତଳିରେ ଜଳ ସ୍ରୋତ କିମ୍ବା ଲିକ୍ ନିୟନ୍ତ୍ରଣ କରିବା"
+    },
+    "erosion_control_on_embankments": {
+      "English": "Erosion control on embankments",
+      "Hindi": "तटबंधों पर कटाव नियंत्रण",
+      "Gujarati": "પાળા પર ધોવાણ નિયંત્રણ",
+      "Kannada": "ಒಡ್ಡುಗಳ ಮೇಲಿನ ಸವೆತ ನಿಯಂತ್ರಣ",
+      "Odia": "ବନ୍ଧ ଉପରେ କ୍ଷୟ ନିୟନ୍ତ୍ରଣ"
+    },
+    "addressing_excessive_aquatic_vegetation_growth": {
+      "English": "Addressing excessive aquatic vegetation growth",
+      "Hindi": "अधिक जलीय पौधों की वृद्धि को रोकना",
+      "Gujarati": "અતિશય જળચર વનસ્પતિ વૃદ્ધિને સંબોધિત કરવી",
+      "Kannada": "ಅತಿಯಾದ ಜಲಸಸ್ಯಗಳ ಬೆಳವಣಿಗೆಯನ್ನು ತಡೆಗಟ್ಟುವುದು",
+      "Odia": "ଅତ୍ୟଧିକ ଜଳଚର ଉଦ୍ଭିଦ ବୃଦ୍ଧିକୁ ସମାଧାନ କରିବା"
+    }
+  },
+  "select_one_soil_fp": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ଜଳପ୍ରବାହ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକ୍କା"
+    }
+  },
+  "Select_one_silt_fp": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "କମ୍"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ ଧରଣର"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଅଧିକ"
+    }
+  },
+  "select_one_community_pond": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "डी सिटलिंग",
+      "Gujarati": "ડી સિટલીંગ",
+      "Kannada": "ಡಿ ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି ସିଟଲିଂ"
+    },
+    "shoreline_erosion_control": {
+      "English": "Shoreline erosion control",
+      "Hindi": "किनारे का कटाव रोकना",
+      "Gujarati": "દરિયાકાંઠાના ધોવાણ નિયંત્રણ",
+      "Kannada": "ತೀರದ ಸವೆತ ನಿಯಂತ್ರಣ",
+      "Odia": "କୂଳ କ୍ଷୟ ନିୟନ୍ତ୍ରଣ"
+    },
+    "repairing_cracks_or_damage_in_embankments": {
+      "English": "Repairing cracks or damage in embankments",
+      "Hindi": "तटबंधों में दरारों या टूट की मरम्मत",
+      "Gujarati": "પાળાઓમાં તિરાડો અથવા નુકસાનનું સમારકામ",
+      "Kannada": "ಒಡ್ಡುಗಳಲ್ಲಿನ ಬಿರುಕುಗಳು ಅಥವಾ ಹಾನಿಯನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "ବନ୍ଧରେ ଫାଟ କିମ୍ବା କ୍ଷତି ମରାମତି"
+    },
+    "controlling_excessive_aquatic_vegetation_growth": {
+      "English": "Controlling excessive aquatic vegetation growth",
+      "Hindi": "अधिक जलीय पौधों की वृद्धि को रोकना",
+      "Gujarati": "અતિશય જળચર વનસ્પતિ વૃદ્ધિને નિયંત્રિત કરવી",
+      "Kannada": "ಅತಿಯಾದ ಜಲಸಸ್ಯಗಳ ಬೆಳವಣಿಗೆಯನ್ನು ನಿಯಂತ್ರಿಸುವುದು",
+      "Odia": "ଅତ୍ୟଧିକ ଜଳୀୟ ଉଦ୍ଭିଦ ବୃଦ୍ଧିକୁ ନିୟନ୍ତ୍ରଣ କରିବା"
+    },
+    "repair_or_cleaning_of_inlet_outlet_structures": {
+      "English": "Repair or cleaning of inlet/outlet structures",
+      "Hindi": "इनलेट/आउटलेट स्ट्रक्चर की मरम्मत या सफाई",
+      "Gujarati": "ઇનલેટ/આઉટલેટ સ્ટ્રક્ચર્સનું સમારકામ અથવા સફાઈ",
+      "Kannada": "ಒಳಹರಿವು/ಹೊರಹರಿವಿನ ರಚನೆಗಳ ದುರಸ್ತಿ ಅಥವಾ ಶುಚಿಗೊಳಿಸುವಿಕೆ",
+      "Odia": "ପ୍ରବେଶ/ନିର୍ବାହୀ ଢାଞ୍ଚାର ମରାମତି କିମ୍ବା ସଫା କରିବା"
+    }
+  },
+  "select_one_soil_cp": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ଜଳପ୍ରବାହ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକ୍କା"
+    }
+  },
+  "Select_one_silt_cp": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "କମ୍"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ ଧରଣର"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଅଧିକ"
+    }
+  },
+  "select_one_well": {
+    "de_sitling": {
+      "English": "De sitling",
+      "Hindi": "डी सिटलिंग",
+      "Gujarati": "ડી સિટલીંગ",
+      "Kannada": "ಡಿ ಸಿಟ್ಲಿಂಗ್",
+      "Odia": "ଡି ସିଟଲିଂ"
+    },
+    "repairing_cracks_or_damage_to_well_walls": {
+      "English": "Repairing cracks or damage to well walls",
+      "Hindi": "कुंए के दीवारों के दरारों या टूट-फूट की मरम्मती करना",
+      "Gujarati": "કૂવાની દિવાલોમાં તિરાડો અથવા નુકસાનનું સમારકામ",
+      "Kannada": "ಬಾವಿ ಗೋಡೆಗಳಿಗೆ ಆಗಿರುವ ಬಿರುಕುಗಳು ಅಥವಾ ಹಾನಿಯನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "କୂଅ କାନ୍ଥରେ ଫାଟ କିମ୍ବା କ୍ଷତି ମରାମତି"
+    },
+    "deepening_the_well_to_enhance_water_availability": {
+      "English": "Deepening the well to enhance water availability",
+      "Hindi": "पानी के स्तर को बढ़ाने के लिए कुंए को गहरा करना",
+      "Gujarati": "પાણીની ઉપલબ્ધતા વધારવા માટે કૂવા ઊંડા કરવા",
+      "Kannada": "ನೀರಿನ ಲಭ್ಯತೆಯನ್ನು ಹೆಚ್ಚಿಸಲು ಬಾವಿಯನ್ನು ಆಳಗೊಳಿಸುವುದು",
+      "Odia": "ଜଳ ଉପଲବ୍ଧତା ବୃଦ୍ଧି କରିବା ପାଇଁ କୂପକୁ ଗଭୀର କରିବା"
+    },
+    "repair_or_replacement_of_well_cover_or_structure": {
+      "English": "Repair or replacement of well cover or structure",
+      "Hindi": "कुंए के ढ़क्कन या स्ट्रक्चर को बदलना या मरम्मत करना",
+      "Gujarati": "કૂવાના ઢાંકણ અથવા માળખાનું સમારકામ અથવા ફેરબદલ",
+      "Kannada": "ಬಾವಿಯ ಮುಚ್ಚಳ ಅಥವಾ ರಚನೆಯ ದುರಸ್ತಿ ಅಥವಾ ಬದಲಿ",
+      "Odia": "କୂଅ ଘୋଡ଼ଣ କିମ୍ବା ଗଠନର ମରାମତି କିମ୍ବା ପରିବର୍ତ୍ତନ"
+    },
+    "installing_or_repairing_pumping_mechanisms": {
+      "English": "Installing or repairing pumping mechanisms",
+      "Hindi": "पम्पिंग मशीन को लगाना या मरम्मत करना",
+      "Gujarati": "પમ્પિંગ મિકેનિઝમ્સ ઇન્સ્ટોલ અથવા રિપેર કરવા",
+      "Kannada": "ಪಂಪಿಂಗ್ ಕಾರ್ಯವಿಧಾನಗಳನ್ನು ಸ್ಥಾಪಿಸುವುದು ಅಥವಾ ದುರಸ್ತಿ ಮಾಡುವುದು",
+      "Odia": "ପମ୍ପିଂ ଯନ୍ତ୍ରପାତି ସ୍ଥାପନ କିମ୍ବା ମରାମତି କରିବା"
+    }
+  },
+  "select_one_soil_well": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ଜଳପ୍ରବାହ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକ୍କା"
+    }
+  },
+  "Select_one_silt_well": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "କମ୍"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ ଧରଣର"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଅଧିକ"
+    }
+  },
+  "select_one_canal": {
+    "stabilizing_canal_banks_to_prevent_erosion": {
+      "English": "Stabilizing canal banks to prevent erosion",
+      "Hindi": "कटाव को रोकने के लिए नहर के किनारों को मज़बूत करना",
+      "Gujarati": "ધોવાણ અટકાવવા માટે નહેરના કિનારાઓને સ્થિર કરવા",
+      "Kannada": "ಸವೆತವನ್ನು ತಡೆಗಟ್ಟಲು ಕಾಲುವೆ ದಂಡೆಗಳನ್ನು ಸ್ಥಿರಗೊಳಿಸುವುದು.",
+      "Odia": "କ୍ଷୟ ରୋକିବା ପାଇଁ କେନାଲ କୂଳକୁ ସ୍ଥିର କରିବା"
+    },
+    "lining_repairs": {
+      "English": "Lining Repairs",
+      "Hindi": "परत की मरम्मत",
+      "Gujarati": "અસ્તર સમારકામ",
+      "Kannada": "ಲೈನಿಂಗ್ ದುರಸ್ತಿಗಳು",
+      "Odia": "ଲାଇନିଂ ମରାମତି"
+    },
+    "desiliting": {
+      "English": "Desiliting",
+      "Hindi": "डी सिटलिंग",
+      "Gujarati": "ડિસીલીટીંગ",
+      "Kannada": "ಡಿಸೈಲೈಟಿಂಗ್",
+      "Odia": "ଡିସାଇଲିଟିଂ"
+    },
+    "structural_repairs": {
+      "English": "Structural repairs",
+      "Hindi": "स्ट्रक्चर की मरम्मत",
+      "Gujarati": "માળખાકીય સમારકામ",
+      "Kannada": "ರಚನಾತ್ಮಕ ದುರಸ್ತಿಗಳು",
+      "Odia": "ଗଠନମୂଳକ ମରାମତି"
+    }
+  },
+  "select_one_soil_canal": {
+    "black": {
+      "English": "Black",
+      "Hindi": "काला",
+      "Gujarati": "કાળો",
+      "Kannada": "ಕಪ್ಪು",
+      "Odia": "କଳା"
+    },
+    "red": {
+      "English": "Red",
+      "Hindi": "लाल",
+      "Gujarati": "લાલ",
+      "Kannada": "ಕೆಂಪು",
+      "Odia": "ଲାଲ"
+    },
+    "laterite": {
+      "English": "Laterite",
+      "Hindi": "लैटेराइट",
+      "Gujarati": "લેટરાઇટ",
+      "Kannada": "ಲ್ಯಾಟರೈಟ್",
+      "Odia": "ଲାଟେରାଇଟ୍"
+    },
+    "alluvial": {
+      "English": "Alluvial",
+      "Hindi": "जलोढ़",
+      "Gujarati": "એલુવિયલ",
+      "Kannada": "ಮೆಕ್ಕಲು",
+      "Odia": "ଜଳପ୍ରବାହ"
+    },
+    "sandy": {
+      "English": "Sandy",
+      "Hindi": "रेतीला",
+      "Gujarati": "રેતાળ",
+      "Kannada": "ಮರಳು",
+      "Odia": "ବାଲିଆ"
+    },
+    "clay": {
+      "English": "Clay",
+      "Hindi": "मिट्टी",
+      "Gujarati": "માટી",
+      "Kannada": "ಜೇಡಿಮಣ್ಣು",
+      "Odia": "ମାଟି"
+    },
+    "rocky": {
+      "English": "Rocky",
+      "Hindi": "चट्टानी",
+      "Gujarati": "રોકી",
+      "Kannada": "ರಾಕಿ",
+      "Odia": "ରକ୍କା"
+    }
+  },
+  "Select_one_silt_canal": {
+    "low": {
+      "English": "Low",
+      "Hindi": "कम",
+      "Gujarati": "નીચું",
+      "Kannada": "ಕಡಿಮೆ",
+      "Odia": "କମ୍"
+    },
+    "moderate": {
+      "English": "Moderate",
+      "Hindi": "मध्यम",
+      "Gujarati": "મધ્યમ",
+      "Kannada": "ಮಧ್ಯಮ",
+      "Odia": "ମଧ୍ୟମ ଧରଣର"
+    },
+    "high": {
+      "English": "High",
+      "Hindi": "ज़्यादा",
+      "Gujarati": "ઉચ્ચ",
+      "Kannada": "ಹೆಚ್ಚು",
+      "Odia": "ଅଧିକ"
+    }
+  },
+  "select_one_farm_bund": {
+    "repairing_cracks_or_breaches_in_the_bund": {
+      "English": "Repairing cracks or breaches in the bund",
+      "Hindi": "बांध में दरारों या टूट - फूट की मरम्मत करना",
+      "Gujarati": "બંધમાં તિરાડો અથવા ગાબડાઓનું સમારકામ",
+      "Kannada": "ಏರಿನಲ್ಲಿರುವ ಬಿರುಕುಗಳು ಅಥವಾ ಬಿರುಕುಗಳನ್ನು ಸರಿಪಡಿಸುವುದು",
+      "Odia": "ବନ୍ଧରେ ଥିବା ଫାଟ କିମ୍ବା ଫାଟ ମରାମତି କରିବା"
+    },
+    "strengthening_bund_structure_with_additional_soil_or_materials": {
+      "English": "Strengthening bund structure with additional soil or materials",
+      "Hindi": "अतिरिक्त मिट्टी या समान से बांध स्ट्रक्चर को मजबूत करना",
+      "Gujarati": "વધારાની માટી અથવા સામગ્રીનો ઉપયોગ કરીને બંધનું માળખું મજબૂત બનાવવું",
+      "Kannada": "ಹೆಚ್ಚುವರಿ ಮಣ್ಣು ಅಥವಾ ಸಾಮಗ್ರಿಗಳಿಂದ ಕಟ್ಟೆ ರಚನೆಯನ್ನು ಬಲಪಡಿಸುವುದು.",
+      "Odia": "ଅତିରିକ୍ତ ମାଟି କିମ୍ବା ସାମଗ୍ରୀ ସାହାଯ୍ୟରେ ବନ୍ଧ ଗଠନକୁ ସୁଦୃଢ଼ ​​କରିବା"
+    },
+    "leveling_and_reshaping_the_bund_for_better_water_retention": {
+      "English": "Leveling and reshaping the bund for better water retention",
+      "Hindi": "पानी को टिकाए रखने के लिए बांध को समतल करना और उसका आकार बदलना",
+      "Gujarati": "પાણીની સારી જાળવણી માટે બંધને સમતળ અને ફરીથી આકાર આપવો",
+      "Kannada": "ಉತ್ತಮ ನೀರಿನ ಧಾರಣಕ್ಕಾಗಿ ಏರಿಯನ್ನು ಸಮತಟ್ಟು ಮಾಡುವುದು ಮತ್ತು ಮರುರೂಪಿಸುವುದು.",
+      "Odia": "ଭଲ ଜଳଧାରଣ ପାଇଁ ବନ୍ଧକୁ ସମତଳ କରିବା ଏବଂ ପୁନଃଆକାର ଦେବା"
+    },
+    "vegetative_stabilization_to_prevent_erosion": {
+      "English": "Vegetative stabilization to prevent erosion",
+      "Hindi": "कटाव को रोकने के लिए पौधों को उगने से रोकना",
+      "Gujarati": "ધોવાણ અટકાવવા માટે વનસ્પતિ સ્થિરીકરણ",
+      "Kannada": "ಸವೆತವನ್ನು ತಡೆಗಟ್ಟಲು ಸಸ್ಯಕ ಸ್ಥಿರೀಕರಣ",
+      "Odia": "କ୍ଷୟ ରୋକିବା ପାଇଁ ଉଦ୍ଭିଦ ସ୍ଥିରୀକରଣ"
+    }
+  }
+}

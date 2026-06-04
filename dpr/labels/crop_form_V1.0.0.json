@@ -1,0 +1,374 @@
+{
+  "Uncropped_barren_land": {
+    "yes": {
+      "English": "Yes",
+      "Hindi": "हाँ",
+      "Gujarati": "હા",
+      "Kannada": "ಹೌದು",
+      "Odia": "ହଁ"
+    },
+    "no": {
+      "English": "No",
+      "Hindi": "नहीं",
+      "Gujarati": "ના",
+      "Kannada": "ಸಂಖ್ಯೆ",
+      "Odia": "ନା"
+    }
+  },
+  "select_multiple_widgets": {
+    "rainfall": {
+      "English": "Rainfall",
+      "Hindi": "वर्षा",
+      "Gujarati": "વરસાદ",
+      "Kannada": "ಮಳೆ",
+      "Odia": "ବର୍ଷା"
+    },
+    "well": {
+      "English": "Well",
+      "Hindi": "कुआँ",
+      "Gujarati": "કૂવો",
+      "Kannada": "ಸರಿ",
+      "Odia": "କୂପ"
+    },
+    "borewell": {
+      "English": "Borewell",
+      "Hindi": "बोरवेल",
+      "Gujarati": "બોરવેલ",
+      "Kannada": "ಬೋರ್ವೆಲ್",
+      "Odia": "ବୋରୱେଲ୍"
+    },
+    "canal": {
+      "English": "Canal",
+      "Hindi": "नहर",
+      "Gujarati": "ચેનલ",
+      "Kannada": "ಕಾಲುವೆ",
+      "Odia": "କେନାଲ"
+    },
+    "pond": {
+      "English": "Pond",
+      "Hindi": "तालाब",
+      "Gujarati": "તળાવ",
+      "Kannada": "ಕೊಳ",
+      "Odia": "ପୋଖରୀ"
+    },
+    "don’t_know": {
+      "English": "Don’t know",
+      "Hindi": "नहीं पता",
+      "Gujarati": "ખબર નથી",
+      "Kannada": "ಗೊತ್ತಿಲ್ಲ",
+      "Odia": "ଜାଣିନାହିଁ"
+    }
+  },
+  "select_one_classified": {
+    "upland": {
+      "English": "Upland",
+      "Hindi": "ऊपरी भूमि",
+      "Gujarati": "અપલેન્ડ",
+      "Kannada": "ಎತ್ತರದ ಭೂಮಿ",
+      "Odia": "ଉପଭୂମି"
+    },
+    "midland": {
+      "English": "Midland",
+      "Hindi": "मध्यभूमि",
+      "Gujarati": "મિડલેન્ડ",
+      "Kannada": "ಂಧ್ಯದದ ಭೂಮಿ",
+      "Odia": "ମିଡଲ୍ୟାଣ୍ଡ"
+    },
+    "lowland": {
+      "English": "Lowland",
+      "Hindi": "निचली भूमि",
+      "Gujarati": "નીચાણવાળી જમીન",
+      "Kannada": "ಕೇಳಗಿನ ಭೂಮಿ",
+      "Odia": "ତଳଭୂମି"
+    }
+  },
+  "select_one_practice": {
+    "kharif": {
+      "English": "Kharif",
+      "Hindi": "खरीफ",
+      "Gujarati": "ખરીફ",
+      "Kannada": "ಖರೀಫ್",
+      "Odia": "ଖରିଫ"
+    },
+    "rabi": {
+      "English": "Rabi",
+      "Hindi": "रबी",
+      "Gujarati": "રબી",
+      "Kannada": "ರಬೀ",
+      "Odia": "ରବି"
+    },
+    "zaid": {
+      "English": "Zaid",
+      "Hindi": "ज़ैद",
+      "Gujarati": "ઝૈદ",
+      "Kannada": "ಜೈದ್",
+      "Odia": "ଜାଇଦ୍"
+    }
+  },
+  "select_multiple_cropping_kharif": {
+    "paddy": {
+      "English": "Paddy",
+      "Hindi": "धान",
+      "Gujarati": "ડાંગર",
+      "Kannada": "ಭತ್ತ",
+      "Odia": "ଧାନ"
+    },
+    "millets": {
+      "English": "Millets",
+      "Hindi": "मोटे अनाज / श्री अन्न",
+      "Gujarati": "બાજરી",
+      "Kannada": "ಧಾನ್ಯಗಳು",
+      "Odia": "ବାଜରା"
+    },
+    "pulses": {
+      "English": "Pulses",
+      "Hindi": "दालें",
+      "Gujarati": "કઠોળ",
+      "Kannada": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+      "Odia": "ଡାଲି"
+    },
+    "vegetables": {
+      "English": "Vegetables",
+      "Hindi": "सब्जियां",
+      "Gujarati": "શાકભાજી",
+      "Kannada": "ತರಕಾರಿಗಳು",
+      "Odia": "ପନିପରିବା"
+    },
+    "fruits": {
+      "English": "Fruits",
+      "Hindi": "फल",
+      "Gujarati": "ફળો",
+      "Kannada": "ಹಣ್ಣುಗಳು",
+      "Odia": "ଫଳ"
+    },
+    "oil_seeds": {
+      "English": "Oil Seeds",
+      "Hindi": "तिलहन",
+      "Gujarati": "તેલીબિયાં",
+      "Kannada": "ಎಣ್ಣೆ ಬೀಜಗಳು",
+      "Odia": "ତୈଳ ବୀଜ"
+    },
+    "fodder_crop": {
+      "English": "Fodder crop",
+      "Hindi": "चारा फसल",
+      "Gujarati": "ઘાસચારો પાક",
+      "Kannada": "ಮೇವಿನ ಬೆಳೆ",
+      "Odia": "ଚାରା ଫସଲ"
+    }
+  },
+  "select_multiple_cropping_Rabi": {
+    "paddy": {
+      "English": "Paddy",
+      "Hindi": "धान",
+      "Gujarati": "ડાંગર",
+      "Kannada": "ಭತ್ತ",
+      "Odia": "ଧାନ"
+    },
+    "millets": {
+      "English": "Millets",
+      "Hindi": "मोटे अनाज / श्री अन्न",
+      "Gujarati": "બાજરી",
+      "Kannada": "ಧಾನ್ಯಗಳು",
+      "Odia": "ବାଜରା"
+    },
+    "pulses": {
+      "English": "Pulses",
+      "Hindi": "दालें",
+      "Gujarati": "કઠોળ",
+      "Kannada": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+      "Odia": "ଡାଲି"
+    },
+    "vegetables": {
+      "English": "Vegetables",
+      "Hindi": "सब्जियां",
+      "Gujarati": "શાકભાજી",
+      "Kannada": "ತರಕಾರಿಗಳು",
+      "Odia": "ପନିପରିବା"
+    },
+    "fruits": {
+      "English": "Fruits",
+      "Hindi": "फल",
+      "Gujarati": "ફળો",
+      "Kannada": "ಹಣ್ಣುಗಳು",
+      "Odia": "ଫଳ"
+    },
+    "oil_seeds": {
+      "English": "Oil Seeds",
+      "Hindi": "तिलहन",
+      "Gujarati": "તેલીબિયાં",
+      "Kannada": "ಎಣ್ಣೆ ಬೀಜಗಳು",
+      "Odia": "ତୈଳ ବୀଜ"
+    },
+    "fodder_crop": {
+      "English": "Fodder crop",
+      "Hindi": "चारा फसल",
+      "Gujarati": "ઘાસચારો પાક",
+      "Kannada": "ಮೇವಿನ ಬೆಳೆ",
+      "Odia": "ଚାରା ଫସଲ"
+    }
+  },
+  "select_multiple_cropping_Zaid": {
+    "paddy": {
+      "English": "Paddy",
+      "Hindi": "धान",
+      "Gujarati": "ડાંગર",
+      "Kannada": "ಭತ್ತ",
+      "Odia": "ଧାନ"
+    },
+    "millets": {
+      "English": "Millets",
+      "Hindi": "मोटे अनाज / श्री अन्न",
+      "Gujarati": "બાજરી",
+      "Kannada": "ಧಾನ್ಯಗಳು",
+      "Odia": "ବାଜରା"
+    },
+    "pulses": {
+      "English": "Pulses",
+      "Hindi": "दालें",
+      "Gujarati": "કઠોળ",
+      "Kannada": "ದ್ವಿದಳ ಧಾನ್ಯಗಳು",
+      "Odia": "ଡାଲି"
+    },
+    "vegetables": {
+      "English": "Vegetables",
+      "Hindi": "सब्जियां",
+      "Gujarati": "શાકભાજી",
+      "Kannada": "ಶಾಕ್ಭಾಜಿ",
+      "Odia": "ପନିପରିବା"
+    },
+    "fruits": {
+      "English": "Fruits",
+      "Hindi": "फल",
+      "Gujarati": "ફળો",
+      "Kannada": "ಹಣ್ಣುಗಳು",
+      "Odia": "ଫଳ"
+    },
+    "oil_seeds": {
+      "English": "Oil Seeds",
+      "Hindi": "तिलहन",
+      "Gujarati": "તેલીબિયાં",
+      "Kannada": "ಎಣ್ಣೆ ಬೀಜಗಳು",
+      "Odia": "ତୈଳ ବୀଜ"
+    },
+    "fodder_crop": {
+      "English": "Fodder crop",
+      "Hindi": "चारा फसल",
+      "Gujarati": "ઘાસચારો પાક",
+      "Kannada": "ಮೇವಿನ ಬೆಳೆ",
+      "Odia": "ଚାରା ଫସଲ"
+    }
+  },
+  "select_one_productivity": {
+    "increased": {
+      "English": "Increased",
+      "Hindi": "बढ़ा हुआ",
+      "Gujarati": "વધારો થયો",
+      "Kannada": "ಹೆಚ್ಚಾಗಿದೆ",
+      "Odia": "ବୃଦ୍ଧି ପାଇଛି"
+    },
+    "decreased": {
+      "English": "Decreased",
+      "Hindi": "घटा हुआ",
+      "Gujarati": "ઘટાડો થયો",
+      "Kannada": "ಕಡಿಮೆಯಾಗಿದೆ",
+      "Odia": "ହ୍ରାସ ପାଇଛି"
+    },
+    "remain same": {
+      "English": "Remain Same",
+      "Hindi": "बचा हुआ",
+      "Gujarati": "એ જ રહો",
+      "Kannada": "ಹಾಗೆಯೇ ಇರಿ",
+      "Odia": "ସମାନ ରୁହନ୍ତୁ"
+    }
+  },
+  "soil_degraded": {
+    "yes": {
+      "English": "Yes",
+      "Hindi": "हाँ",
+      "Gujarati": "હા",
+      "Kannada": "ಹೌದು",
+      "Odia": "ହଁ"
+    },
+    "no": {
+      "English": "No",
+      "Hindi": "नहीं",
+      "Gujarati": "ના",
+      "Kannada": "ಸಂಖ್ಯೆ",
+      "Odia": "ନା"
+    }
+  },
+  "select_one_reason_degradation": {
+    "overuse_of_fertilizers": {
+      "English": "Overuse of fertilizers",
+      "Hindi": "उर्वरकों का अत्यधिक उपयोग",
+      "Gujarati": "ખાતરોનો વધુ પડતો ઉપયોગ",
+      "Kannada": "ರಸಗೊಬ್ಬರಗಳ ಅತಿಯಾದ ಬಳಕೆ",
+      "Odia": "ସାରର ଅତ୍ୟଧିକ ବ୍ୟବହାର"
+    },
+    "heavy_rains_causing_erosion": {
+      "English": "Heavy rains causing erosion",
+      "Hindi": "भारी बारिश के कारण कटाव",
+      "Gujarati": "ભારે વરસાદને કારણે ધોવાણ",
+      "Kannada": "ಭಾರೀ ಮಳೆಯಿಂದಾಗಿ ಭೂಸವೆತ",
+      "Odia": "ପ୍ରବଳ ବର୍ଷା ଯୋଗୁଁ କ୍ଷୟ ହେଉଛି"
+    },
+    "deforestation": {
+      "English": "Deforestation",
+      "Hindi": "वनों की कटाई",
+      "Gujarati": "વનનાબૂદી",
+      "Kannada": "ಅರಣ್ಯನಾಶ",
+      "Odia": "ଜଙ୍ଗଲ କଟା"
+    },
+    "overgrazing": {
+      "English": "Overgrazing",
+      "Hindi": "अत्यधिक चराई",
+      "Gujarati": "અતિશય ચરાઈ",
+      "Kannada": "ಅತಿಯಾಗಿ ಮೇಯಿಸುವುದು",
+      "Odia": "ଅଧିକ ଚରାଇବା"
+    },
+    "urbanization": {
+      "English": "Urbanization",
+      "Hindi": "शहरीकरण",
+      "Gujarati": "શહેરીકરણ",
+      "Kannada": "ನಗರೀಕರಣ",
+      "Odia": "ସହରୀକରଣ"
+    }
+  },
+  "select_one_reason_degradation_1": {
+    "overuse_of_fertilizers": {
+      "English": "Overuse of fertilizers",
+      "Hindi": "उर्वरकों का अत्यधिक उपयोग",
+      "Gujarati": "ખાતરોનો વધુ પડતો ઉપયોગ",
+      "Kannada": "ರಸಗೊಬ್ಬರಗಳ ಅತಿಯಾದ ಬಳಕೆ",
+      "Odia": "ସାରର ଅତ୍ୟଧିକ ବ୍ୟବହାର"
+    },
+    "heavy_rains_causing_erosion": {
+      "English": "Heavy rains causing erosion",
+      "Hindi": "भारी बारिश के कारण कटाव",
+      "Gujarati": "ભારે વરસાદને કારણે ધોવાણ",
+      "Kannada": "ಭಾರೀ ಮಳೆಯಿಂದಾಗಿ ಭೂಸವೆತ",
+      "Odia": "ପ୍ରବଳ ବର୍ଷା ଯୋଗୁଁ କ୍ଷୟ ହେଉଛି"
+    },
+    "deforestation": {
+      "English": "Deforestation",
+      "Hindi": "वनों की कटाई",
+      "Gujarati": "વનનાબૂદી",
+      "Kannada": "ಅರಣ್ಯನಾಶ",
+      "Odia": "ଜଙ୍ଗଲ କଟା"
+    },
+    "overgrazing": {
+      "English": "Overgrazing",
+      "Hindi": "अत्यधिक चराई",
+      "Gujarati": "અતિશય ચરાઈ",
+      "Kannada": "ಅತಿಯಾಗಿ ಮೇಯಿಸುವುದು",
+      "Odia": "ଅଧିକ ଚରାଇବା"
+    },
+    "urbanization": {
+      "English": "Urbanization",
+      "Hindi": "शहरीकरण",
+      "Gujarati": "શહેરીકરણ",
+      "Kannada": "ನಗರೀಕರಣ",
+      "Odia": "ସହରୀକରଣ"
+    }
+  }
+}

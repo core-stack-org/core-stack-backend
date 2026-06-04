@@ -36,7 +36,11 @@
     "settlement_type": "Settlement Type",
     "caste_group": "Caste Group",
     "total_households": "Total Households",
-    "marginal_farmer": "Total marginal farmers (<2 acres)"
+    "marginal_farmer": "Total marginal farmers (<2 acres)",
+    "sc": "SC",
+    "st": "ST",
+    "obc": "OBC",
+    "gen": "Genral"
   },
 
   "section_c_mgnrega": {
@@ -46,7 +50,9 @@
     "work_days_previous_year": "Total work days in previous year",
     "demand_made_in_previous_year": "Work demands made in Previous year",
     "involved_in_village_planing": "Were you involved in the village level planning?",
-    "issues": "Issues"
+    "issues": "Issues",
+    "applied": "Applied",
+    "having": "Having"
   },
 
   "section_c_crop": {
@@ -156,7 +162,12 @@
 
     "repair_activities": "Repair Activities",
     "latitude": "Latitude",
-    "longitude": "Longitude"
+    "longitude": "Longitude",
+
+    "recharge_structure_asset":"Water Recharge Structures",
+    "irrigation_structure_asset":"Irrigation Structures",
+    "water_structure_asset":"Surface Water Structures",
+    "rs_water_structure_asset":"Remote Sensed Surface Water Structures"
   },
 
   "section_f": {

@@ -9,11 +9,18 @@
     </thead>
 
     <tbody>
-        {% for asset in section_e.asset_types %}
         <tr>
-            <td>{{ asset }}</td>
+            <td>{{ t.section_e.recharge_structure_asset }}</td>
         </tr>
-        {% endfor %}
+        <tr>
+            <td>{{ t.section_e.irrigation_structure_asset }}</td>
+        </tr>
+        <tr>
+            <td>{{ t.section_e.water_structure_asset }}</td>
+        </tr>
+        <tr>
+            <td>{{ t.section_e.rs_water_structure_asset }}</td>
+        </tr>
     </tbody>
 
 </table>

@@ -32,15 +32,11 @@ def generate_dpr_html(plan, language="en"):
     section_b_data, settlement_mws_ids, mws_gdf = get_section_b_data(
         plan, total_settlements, mws_fortnight
     )
-    section_c_data = get_section_c_data(plan)
-    section_d_data = get_section_d_data(
-        plan,
-        settlement_mws_ids,
-        mws_gdf,
-    )
-    section_e_data = get_section_e_data(plan)
+    section_c_data = get_section_c_data(plan, language)
+    section_d_data = get_section_d_data(plan, settlement_mws_ids, mws_gdf, language)
+    section_e_data = get_section_e_data(plan, language)
     section_f_data = get_section_f_data(plan)
-    section_g_data = get_section_g_data(plan)
+    section_g_data = get_section_g_data(plan, language)
     html = render_to_string(
         "dpr/base.html",
         {

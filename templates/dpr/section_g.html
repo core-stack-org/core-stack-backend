@@ -1,4 +1,3 @@
-{% load custom_filters %}
 
 <div class="section">
 
@@ -32,7 +31,7 @@
 
                 <td>{{ item.demand_type|default:t.common.na }}</td>
 
-                <td>{{ item.work_demand|default:t.common.na|format_text }}</td>
+                <td>{{ item.work_demand|default:t.common.na }}</td>
 
                 <td>{{ item.beneficiary_settlement|default:t.common.na }}</td>
 
@@ -94,7 +93,7 @@
 
                 <td>{{ item.beneficiary_father_name|default:t.common.na }}</td>
 
-                <td>{{ item.work_demand|default:t.common.na|format_text }}</td>
+                <td>{{ item.work_demand|default:t.common.na }}</td>
 
                 <td>{{ item.total_acres|default:t.common.na }}</td>
 
