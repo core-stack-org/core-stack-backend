@@ -25,7 +25,7 @@ from typing import Any
 import pyogrio
 from django.conf import settings
 
-from computing.utils import fix_invalid_geometry_in_gdf, push_shape_to_geoserver
+from computing.utils import fix_invalid_geometry_in_gdf, push_shape_to_geoserver, save_layer_info_to_db, update_layer_sync_status
 from nrm_app.celery import app
 from computing.config_loader import (
     PAN_INDIA_ANTYODAYA_2020,
