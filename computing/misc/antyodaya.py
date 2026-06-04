@@ -195,7 +195,7 @@ def generate_antyodaya_layer_task(
     resolved_district = _canonical_asset_name(district)
     resolved_block = _canonical_asset_name(block)
     try:
-        gdf = _read_clip(resolved_state, resolved_distrantyodaya20ict, resolved_block)
+        gdf = _read_clip(resolved_state, resolved_district, resolved_block)
     except ValueError:
         resolved_state, resolved_district, resolved_block = _resolve_location(
             state, district, block
