@@ -2252,7 +2252,7 @@ def generate_antyodaya(request):
         overwrite = request.data.get("overwrite", False)
         generate_antyodaya_layer_task.apply_async(
             args=[state, district, block, sync_to_geoserver, overwrite],
-            queue="nrm",
+            queue="nrm1",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
