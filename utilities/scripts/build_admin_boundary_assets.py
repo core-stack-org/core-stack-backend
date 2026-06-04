@@ -15,6 +15,26 @@ Default convenience run:
 This builds ``data/admin-boundary/cs_admin_sanitised.gpkg`` if needed, then
 creates ``data/livestock/livestock.gpkg`` from
 ``data/livestock/livestock_pan_india.csv``.
+
+Selective livestock output with only admin identity columns and livestock
+counts:
+
+    python utilities/scripts/build_admin_boundary_assets.py livestock \
+      --overwrite \
+      --no-match-status \
+      --keep-output-columns state_name,district_name,TEHSIL,pc11_village_id,NAME,pc11_state_id,pc11_district_id,pc11_subdistrict_id,cattle_male,cattle_female,cattle_total,buffalo_male,buffalo_female,buffalo_total,sheep_male,sheep_female,sheep_total,goat_male,goat_female,goat_total,pig_male,pig_female,pig_total
+
+python utilities/scripts/build_admin_boundary_assets.py livestock \
+  --overwrite \
+  --admin-gpkg data/admin-boundary/cs_admin_sanitised.gpkg \
+  --output data/livestock/livestock.gpkg \
+  --output-layer livestock \
+  --no-match-status \
+  --keep-output-columns state_name,district_name,TEHSIL,pc11_village_id,NAME,pc11_state_id,pc11_district_id,pc11_subdistrict_id,cattle_male,cattle_female,cattle_total,buffalo_male,buffalo_female,buffalo_total,sheep_male,sheep_female,sheep_total,goat_male,goat_female,goat_total,pig_male,pig_female,pig_total
+
+
+The generic join command accepts the same ``--keep-output-columns`` and
+``--rename-output-columns old=new,old2=new2`` options.
 """
 
 from __future__ import annotations
@@ -105,6 +125,12 @@ ID_COLUMNS = {
     "pc11_district_id",
     "pc11_subdistrict_id",
 }
+JOIN_OUTPUT_INTEGER_COLUMNS = [
+    "pc11_village_id",
+    "pc11_state_id",
+    "pc11_district_id",
+    "pc11_subdistrict_id",
+]
 
 DEFAULT_DIAGNOSTIC_COLUMNS = ["No_HH", "TOT_P", "TOT_M", "TOT_F"]
 GEOJSON_GEOMETRY_COLUMN = "wkb_geometry"
@@ -1934,6 +1960,63 @@ def parse_csv_list(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def parse_rename_map(value: str | None) -> dict[str, str]:
+    if not value:
+        return {}
+    rename_map: dict[str, str] = {}
+    for item in value.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        if "=" in item:
+            source, target = item.split("=", 1)
+        elif ":" in item:
+            source, target = item.split(":", 1)
+        else:
+            raise SystemExit(
+                "Invalid rename mapping. Use `old=new` pairs separated by commas."
+            )
+        source = source.strip()
+        target = target.strip()
+        if not source or not target:
+            raise SystemExit(
+                "Invalid rename mapping. Use non-empty `old=new` pairs separated by commas."
+            )
+        rename_map[source] = target
+    return rename_map
+
+
+def project_and_rename_output(
+    gdf: Any,
+    *,
+    keep_columns: Sequence[str],
+    rename_map: dict[str, str],
+) -> Any:
+    geometry_column = gdf.geometry.name
+    if keep_columns:
+        missing = [column for column in keep_columns if column not in gdf.columns]
+        if missing:
+            raise SystemExit(
+                "Requested output column(s) not found after join: "
+                + ", ".join(missing)
+            )
+        ordered_columns = [column for column in keep_columns if column != geometry_column]
+        ordered_columns.append(geometry_column)
+        gdf = gdf.loc[:, ordered_columns]
+
+    extra_renames = [column for column in rename_map if column not in gdf.columns]
+    if extra_renames:
+        raise SystemExit(
+            "Requested rename source column(s) not found after projection: "
+            + ", ".join(extra_renames)
+        )
+    if rename_map:
+        gdf = gdf.rename(columns=rename_map)
+        if geometry_column in rename_map:
+            gdf = gdf.set_geometry(rename_map[geometry_column])
+    return gdf
+
+
 def resolve_join_columns(
     dataframe: Any,
     *,
@@ -2077,6 +2160,9 @@ def build_join_table(
 
 
 def coerce_join_output_columns(gdf: Any, join_table: JoinTable) -> Any:
+    for column in JOIN_OUTPUT_INTEGER_COLUMNS:
+        if column in gdf.columns:
+            gdf[column] = pd.to_numeric(gdf[column], errors="coerce").astype("Int64")
     for column in join_table.output_columns:
         if column in join_table.numeric_columns:
             numeric = pd.to_numeric(gdf[column], errors="coerce")
@@ -2116,6 +2202,8 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
     admin_columns = [str(field) for field in info.get("fields", [])]
     if args.left_key not in admin_columns:
         raise SystemExit(f"Left join key `{args.left_key}` not found in {admin_gpkg}:{args.admin_layer}")
+    keep_output_columns = parse_csv_list(args.keep_output_columns)
+    rename_output_columns = parse_rename_map(args.rename_output_columns)
 
     print(f"[join] loading property table {source_path}", flush=True)
     join_table = build_join_table(
@@ -2162,6 +2250,11 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
         if not args.no_match_status:
             gdf[args.match_status_column] = matched.astype("boolean")
         gdf = coerce_join_output_columns(gdf, join_table)
+        gdf = project_and_rename_output(
+            gdf,
+            keep_columns=keep_output_columns,
+            rename_map=rename_output_columns,
+        )
 
         pyogrio.write_dataframe(
             gdf,
@@ -2177,7 +2270,18 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
         if rows_written == len(gdf) or rows_written % (args.chunk_size * 2) == 0:
             print(f"[join] wrote {rows_written:,}/{total_features:,} joined features", flush=True)
 
-    ensure_gpkg_indexes(output_gpkg, args.output_layer, [[args.left_key], ["state_name", "district_name", "TEHSIL"]])
+    final_left_key = rename_output_columns.get(args.left_key, args.left_key)
+    final_location_columns = [
+        rename_output_columns.get(column, column)
+        for column in ["state_name", "district_name", "TEHSIL"]
+    ]
+    index_columns = []
+    final_fields = set(pyogrio.read_info(output_gpkg, layer=args.output_layer).get("fields", []))
+    if final_left_key in final_fields:
+        index_columns.append([final_left_key])
+    if all(column in final_fields for column in final_location_columns):
+        index_columns.append(final_location_columns)
+    ensure_gpkg_indexes(output_gpkg, args.output_layer, index_columns)
     summary = {
         "admin_gpkg": admin_gpkg.as_posix(),
         "admin_layer": args.admin_layer,
@@ -2188,6 +2292,9 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
         "right_key": args.right_key,
         "selected_columns": join_table.selected_columns,
         "output_columns": join_table.output_columns,
+        "keep_output_columns": keep_output_columns,
+        "rename_output_columns": rename_output_columns,
+        "final_output_columns": list(pyogrio.read_info(output_gpkg, layer=args.output_layer).get("fields", [])),
         "source_rows": join_table.source_rows,
         "source_rows_with_key": join_table.source_rows_with_key,
         "source_unique_keys": len(join_table.records_by_key),
@@ -2253,6 +2360,8 @@ def run_livestock(args: argparse.Namespace) -> dict[str, Any]:
         chunk_size=args.join_chunk_size,
         no_match_status=args.no_match_status,
         match_status_column=args.match_status_column,
+        keep_output_columns=args.keep_output_columns,
+        rename_output_columns=args.rename_output_columns,
     )
     return join_properties_to_admin(join_args)
 
@@ -2301,6 +2410,14 @@ def add_join_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--chunk-size", type=int, default=DEFAULT_GPKG_CHUNK_SIZE)
     parser.add_argument("--no-match-status", action="store_true")
     parser.add_argument("--match-status-column", default="property_join_matched")
+    parser.add_argument(
+        "--keep-output-columns",
+        help="Comma-separated final attribute columns to keep. Geometry is always retained.",
+    )
+    parser.add_argument(
+        "--rename-output-columns",
+        help="Comma-separated `old=new` final output column renames applied after projection.",
+    )
 
 
 def add_livestock_args(parser: argparse.ArgumentParser) -> None:
@@ -2335,6 +2452,14 @@ def add_livestock_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--keep-work-db", action="store_true", help="Keep the temporary admin sanitisation work database")
     parser.add_argument("--no-match-status", action="store_true")
     parser.add_argument("--match-status-column", default="livestock_join_matched")
+    parser.add_argument(
+        "--keep-output-columns",
+        help="Comma-separated final livestock output columns to keep. Geometry is always retained.",
+    )
+    parser.add_argument(
+        "--rename-output-columns",
+        help="Comma-separated `old=new` final livestock output column renames applied after projection.",
+    )
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
