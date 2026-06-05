@@ -1,55 +1,55 @@
+import copy
 import logging
 import os
 
-import geopandas as gpd
 import fiona
-import copy
+import geopandas as gpd
 import requests
 
 logger = logging.getLogger(__name__)
 
-from computing.models import Layer, Dataset
-from geoadmin.models import (
-    TehsilSOI,
-    DistrictSOI,
-    StateSOI,
-    State_Disritct_Block_Properties,
-)
-from projects.models import Project
-from utilities.gee_utils import (
-    ee_initialize,
-    sync_vector_to_gcs,
-    check_task_status,
-    get_geojson_from_gcs,
-    is_gee_asset_exists,
-    valid_gee_text,
-    get_gee_asset_path,
-    get_gee_dir_path,
-    is_asset_public,
-)
-from utilities.geoserver_utils import Geoserver
-import shutil
-from utilities.constants import (
-    ADMIN_BOUNDARY_OUTPUT_DIR,
-    SHAPEFILE_DIR,
-    GEE_HELPER_PATH,
-    GEE_ASSET_PATH,
-    GEE_PATHS,
-)
-import ee
 import json
+import logging
+import shutil
+import zipfile
+from datetime import datetime, timedelta
+
+import ee
+import requests
+from django.conf import settings
 from shapely.geometry import shape
 from shapely.validation import explain_validity
-import zipfile
-from django.conf import settings
 
-from datetime import datetime, timedelta
-from django.conf import settings
-import logging
-import requests
+from computing.base_layer_setup import with_base_layers
+from computing.models import Dataset, Layer
+from geoadmin.models import (
+    DistrictSOI,
+    State_Disritct_Block_Properties,
+    StateSOI,
+    TehsilSOI,
+)
+from projects.models import Project
+from utilities.constants import (
+    ADMIN_BOUNDARY_OUTPUT_DIR,
+    GEE_ASSET_PATH,
+    GEE_HELPER_PATH,
+    GEE_PATHS,
+    SHAPEFILE_DIR,
+)
+from utilities.gee_utils import (
+    check_task_status,
+    ee_initialize,
+    get_gee_asset_path,
+    get_gee_dir_path,
+    get_geojson_from_gcs,
+    is_asset_public,
+    is_gee_asset_exists,
+    sync_vector_to_gcs,
+    valid_gee_text,
+)
+from utilities.geoserver_utils import Geoserver
 
 logger = logging.getLogger(__name__)
-
 
 
 def generate_shape_files(path):
@@ -105,6 +105,7 @@ def push_shape_to_geoserver(
     return response
 
 
+@with_base_layers("admin_boundary")
 def kml_to_geojson(state_name, district_name, block_name, kml_path):
     fiona.drvsupport.supported_drivers["kml"] = (
         "rw"  # enable KML support which is disabled by default
@@ -643,14 +644,20 @@ def _sync_layer_to_prod_db(payload: dict):
             )
             return None
         layer_id = response.json().get("layer_id")
-        logger.info("Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id)
+        logger.info(
+            "Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id
+        )
         return layer_id
     except requests.RequestException as e:
-        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+        logger.error(
+            "Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e
+        )
         return None
 
 
-def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
+def _update_layer_sync_remote(
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+):
     prod_url = _get_prod_backend_url()
     if not prod_url or layer_id is None:
         return
@@ -678,7 +685,9 @@ def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_ge
         else:
             logger.info("Layer sync status updated on prod DB for id=%s.", layer_id)
     except requests.RequestException as e:
-        logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
+        logger.error(
+            "Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e
+        )
 
 
 def get_existing_end_year(dataset_name, layer_name):
@@ -796,7 +805,9 @@ def clean_geometry(geom):
     # 3. Buffer polygons smaller than 1 pixel (< 900 m²)
     area = geom.area()
     geom = ee.Algorithms.If(
-        area.lt(900), geom.buffer(15), geom  # ensure raster pixel center is captured
+        area.lt(900),
+        geom.buffer(15),
+        geom,  # ensure raster pixel center is captured
     )
 
     return ee.Geometry(geom)
@@ -961,8 +972,6 @@ def generate_swb_layer_with_max_so_catchment(
     return roi.map(compute_for_feature)
 
 
-
-
 def save_layer_info_to_db(
     state,
     district,
@@ -978,24 +987,27 @@ def save_layer_info_to_db(
     is_override=False,
 ):
     if _get_prod_backend_url():
-        layer_id = _sync_layer_to_prod_db({
-            "state": state,
-            "district": district,
-            "block": block,
-            "layer_name": layer_name,
-            "asset_id": asset_id,
-            "dataset_name": dataset_name,
-            "sync_to_geoserver": sync_to_geoserver,
-            "layer_version": layer_version,
-            "algorithm": algorithm,
-            "algorithm_version": algorithm_version,
-            "misc": misc,
-            "is_override": is_override,
-        })
+        layer_id = _sync_layer_to_prod_db(
+            {
+                "state": state,
+                "district": district,
+                "block": block,
+                "layer_name": layer_name,
+                "asset_id": asset_id,
+                "dataset_name": dataset_name,
+                "sync_to_geoserver": sync_to_geoserver,
+                "layer_version": layer_version,
+                "algorithm": algorithm,
+                "algorithm_version": algorithm_version,
+                "misc": misc,
+                "is_override": is_override,
+            }
+        )
         if layer_id is not None:
             return layer_id
         logger.warning(
-            "Prod DB sync failed for layer %s — falling back to local DB write.", layer_name
+            "Prod DB sync failed for layer %s — falling back to local DB write.",
+            layer_name,
         )
 
     print("inside the save_layer_info_to_db function")
@@ -1131,4 +1143,3 @@ def update_layer_sync_status(
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
-

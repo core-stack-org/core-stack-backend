@@ -185,6 +185,36 @@ def _save_subset(subset_gdf, output_path, driver):
         subset_gdf.to_file(output_path, driver=driver)
 
 
+def _clip_microwatersheds_to_tehsil(candidates_gdf, tehsil_geom):
+    clipped_gdf = candidates_gdf.copy()
+    clipped_gdf["geometry"] = clipped_gdf.geometry.intersection(tehsil_geom)
+    clipped_gdf = _validate_geometry(clipped_gdf, fix_invalid=False)
+
+    if clipped_gdf.empty:
+        return clipped_gdf
+
+    # Polygon-on-polygon intersection can still produce line/point results for
+    # features that only touch the tehsil boundary. Keep only polygonal output.
+    polygonal_mask = clipped_gdf.geometry.geom_type.isin(["Polygon", "MultiPolygon"])
+    clipped_gdf = clipped_gdf[polygonal_mask].copy()
+
+    return clipped_gdf
+
+
+def _select_microwatersheds_for_tehsil(candidates_gdf, tehsil_geom, clip_to_tehsil):
+    """
+    Match GEE `FeatureCollection.filterBounds(...)` by default:
+    keep full microwatershed features whose geometry intersects the tehsil.
+    Optional clipping is exposed only for workflows that explicitly need it.
+    """
+    selected_gdf = candidates_gdf[candidates_gdf.intersects(tehsil_geom)].copy()
+
+    if not clip_to_tehsil or selected_gdf.empty:
+        return selected_gdf
+
+    return _clip_microwatersheds_to_tehsil(selected_gdf, tehsil_geom)
+
+
 def generate_tehsil_watershed_copies(
     microwatershed_path=DEFAULT_MICROWATERSHED_PATH,
     tehsil_path=DEFAULT_TEHSIL_PATH,
@@ -193,10 +223,18 @@ def generate_tehsil_watershed_copies(
     overwrite=False,
     include_empty=False,
     fix_invalid_mws=False,
+    clip_to_tehsil=False,
     state=None,
     district=None,
     tehsil=None,
 ):
+    """
+    Generate per-tehsil MWS layers.
+
+    Default behavior mirrors the current GEE pipeline in `computing/mws/mws.py`,
+    where `filterBounds(admin_boundary.geometry())` selects full intersecting
+    microwatershed features without clipping them to the admin boundary.
+    """
     if output_format not in OUTPUT_FORMATS:
         raise ValueError(
             f"Unsupported format: {output_format}. Supported: {sorted(OUTPUT_FORMATS)}"
@@ -254,7 +292,11 @@ def generate_tehsil_watershed_copies(
             intersection_gdf = microwatersheds.iloc[0:0].copy()
         else:
             candidates = microwatersheds.iloc[list(candidate_ids)]
-            intersection_gdf = candidates[candidates.intersects(tehsil_geom)].copy()
+            intersection_gdf = _select_microwatersheds_for_tehsil(
+                candidates,
+                tehsil_geom,
+                clip_to_tehsil=clip_to_tehsil,
+            )
 
         feature_count = len(intersection_gdf)
         state_dir = valid_gee_text(str(state_name).strip().lower()) or "unknown_state"
@@ -372,6 +414,14 @@ def _build_parser():
         action="store_true",
         help="Fix invalid microwatershed geometries (slower, use only if needed)",
     )
+    parser.add_argument(
+        "--clip-to-tehsil",
+        action="store_true",
+        help=(
+            "Clip exported microwatershed geometries to the tehsil boundary "
+            "instead of matching GEE filterBounds behavior"
+        ),
+    )
     parser.add_argument("--state", help="Optional state filter")
     parser.add_argument("--district", help="Optional district filter")
     parser.add_argument("--tehsil", help="Optional tehsil filter")
@@ -388,6 +438,7 @@ if __name__ == "__main__":
         overwrite=args.overwrite,
         include_empty=args.include_empty,
         fix_invalid_mws=args.fix_invalid_mws,
+        clip_to_tehsil=args.clip_to_tehsil,
         state=args.state,
         district=args.district,
         tehsil=args.tehsil,

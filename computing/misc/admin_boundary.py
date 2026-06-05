@@ -8,6 +8,7 @@ from computing.utils import (
     generate_shape_files,
     push_shape_to_geoserver,
 )
+from computing.base_layer_setup import with_base_layers
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -28,6 +29,7 @@ from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
+@with_base_layers("soi_tehsil", "admin_boundary")
 def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
     """
     It will generate Admin boundary of given location as tehsil levels
@@ -106,6 +108,7 @@ def create_shp_files(collection, state_dir, district, block, layer_id):
     return path
 
 
+@with_base_layers("soi_tehsil", "admin_boundary")
 def clip_block_from_admin_boundary(state, district, block):
     census_2011 = None
     try:

@@ -62,6 +62,10 @@ AQUIFER_VECTOR_PATH: Path = PROJECT_ROOT / _find_input(
     "data/base_layers/Aquifer_vector.geojson"
 )["path"]
 
+SWB_VECTOR_PATH: Path = PROJECT_ROOT / _find_input(
+    "data/base_layers/pan_india_waterbodies.geojson"
+)["path"]
+
 SOI_TEHSIL_PATH: Path = PROJECT_ROOT / _find_input(
     "data/admin-boundary/input/soi_tehsil.geojson"
 )["path"]
@@ -96,3 +100,6 @@ LULC_V3_OUTPUT_DIR: Path = _abs(_output_entry("lulc", 1)["path"])
 LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _abs(_output_entry("lulc_x_terrain", 0)["path"])
 LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _abs(_output_entry("lulc_x_terrain", 1)["path"])
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _abs(_output_entry("misc", 0)["path"])
+SWB_VECTOR_OUTPUT_DIR: Path = _abs(
+    _output_entry("surface_water_bodies", 0)["path"]
+)
