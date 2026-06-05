@@ -162,9 +162,17 @@ def _parse_zoi_request_dates(request):
     return start_date, end_date
 
 
-def _task_started_response(message, task=None, asset_id=None, asset_ids=None):
+def _task_started_response(
+    message,
+    task=None,
+    asset_id=None,
+    asset_ids=None,
+    *,
+    stac_spec=None,
+    completed=False,
+):
     payload = {
-        "status": "initiated",
+        "status": "completed" if completed else "initiated",
         "Success": message,
         "message": message,
     }
@@ -177,7 +185,67 @@ def _task_started_response(message, task=None, asset_id=None, asset_ids=None):
         payload["asset_ids"] = asset_ids
     elif isinstance(asset_id, list):
         payload["asset_ids"] = asset_id
+    if stac_spec is not None:
+        payload["stac_spec"] = stac_spec
     return Response(payload, status=status.HTTP_200_OK)
+
+
+def _ensure_layer_stac_spec(
+    *,
+    state,
+    district,
+    block,
+    layer_name,
+    layer_type,
+    start_year="",
+    end_year="",
+):
+    """Read STAC JSON for a layer; generate inline when missing (sync API path)."""
+    stac_spec = _collect_generated_stac_specs(
+        state=state,
+        district=district,
+        block=block,
+        layer_name=layer_name,
+        layer_type=layer_type,
+        start_year=start_year,
+        end_year=end_year,
+    )
+    if stac_spec.get("items"):
+        stac_spec["stac_status"] = "available"
+        return stac_spec
+
+    task_kwargs = {
+        "layer_type": layer_type,
+        "state": state,
+        "district": district,
+        "block": block,
+        "layer_name": layer_name,
+        "start_year": str(start_year or ""),
+        "end_year": str(end_year or ""),
+        "upload_to_s3": bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
+        "overwrite_metadata": bool(getattr(settings, "STAC_OVERWRITE_METADATA", True)),
+    }
+    task_result = generate_stac_collection_task.apply(kwargs=task_kwargs)
+    if task_result.failed():
+        stac_spec["stac_status"] = "generation_failed"
+        stac_spec["stac_error"] = str(task_result.result)
+        return stac_spec
+    if not task_result.result:
+        stac_spec["stac_status"] = "generation_failed"
+        stac_spec["stac_error"] = "STAC collection generation returned False"
+        return stac_spec
+
+    stac_spec = _collect_generated_stac_specs(
+        state=state,
+        district=district,
+        block=block,
+        layer_name=layer_name,
+        layer_type=layer_type,
+        start_year=start_year,
+        end_year=end_year,
+    )
+    stac_spec["stac_status"] = "available" if stac_spec.get("items") else "not_generated_yet"
+    return stac_spec
 
 
 @api_security_check(allowed_methods="POST")
@@ -737,9 +805,19 @@ def generate_drought_layer(request):
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
     try:
-        state = request.data.get("state")
-        district = request.data.get("district")
-        block = request.data.get("block")
+        state = _get_request_value(request.data, "state", "State", "STATE")
+        district = _get_request_value(
+            request.data, "district", "District", "DISTRICT"
+        )
+        block = _get_request_value(
+            request.data,
+            "block",
+            "Block",
+            "BLOCK",
+            "tehsil",
+            "Tehsil",
+            "TEHSIL",
+        )
         gee_account_id = request.data.get("gee_account_id")
         task = generate_terrain_clusters.apply_async(
             args=[state, district, block, gee_account_id], queue="nrm"
@@ -750,8 +828,24 @@ def generate_terrain_descriptor(request):
             block,
             _tehsil_suffix(district, block) + "_terrain_clusters",
         )
+        sync_mode = is_sync_layer_generation_request(request)
+        stac_spec = None
+        if sync_mode and all([state, district, block]):
+            stac_spec = _ensure_layer_stac_spec(
+                state=state,
+                district=district,
+                block=block,
+                layer_name="dist_block_cluster",
+                layer_type="vector",
+            )
         return _task_started_response(
-            "generate_terrain_descriptor task initiated", task=task, asset_id=asset_id
+            "generate_terrain_descriptor completed"
+            if sync_mode
+            else "generate_terrain_descriptor task initiated",
+            task=task,
+            asset_id=asset_id,
+            stac_spec=stac_spec,
+            completed=sync_mode,
         )
     except Exception as e:
         return layer_api_error_response("generate_terrain_descriptor", e, request=request)
