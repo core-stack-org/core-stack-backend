@@ -11,11 +11,11 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     load_precomputed_watersheds,
+    push_local_vector_to_geoserver,
     resolve_lulc_raster_paths,
     write_vector_output,
 )
 from computing.utils import (
-    push_shape_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
@@ -124,9 +124,10 @@ def run_lulc_vector_local(
     logger.info("Saved local LULC vector: %s", asset_id)
 
     geoserver_ok = False
+    geoserver_response = None
     if push_to_geoserver:
-        geoserver_response = push_shape_to_geoserver(
-            os.path.splitext(asset_id)[0],
+        geoserver_response = push_local_vector_to_geoserver(
+            path=os.path.splitext(asset_id)[0],
             workspace=GEOSERVER_WORKSPACE,
             layer_name=layer_name,
             file_type="gpkg",
@@ -156,6 +157,7 @@ def run_lulc_vector_local(
                 "end_year": end_year,
                 "is_generated_locally": True,
                 "geoserver_available": geoserver_ok,
+                "geoserver_sync_response": geoserver_response,
             },
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,

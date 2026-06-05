@@ -169,6 +169,7 @@ def build_output_vector_path(
     district,
     block,
     output_base_dir,
+    custom_subdir="custom",
     block_fallback="unknown_block",
 ):
     output_dir = _build_output_dir(
@@ -176,6 +177,7 @@ def build_output_vector_path(
         state=state,
         district=district,
         block=block,
+        custom_subdir=custom_subdir,
         block_fallback=block_fallback,
     )
     return output_dir / f"{layer_name}.gpkg"
@@ -337,10 +339,20 @@ def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"
     _log = logging.getLogger(__name__)
 
     local_geo = Geoserver()
-    response = _push_vector_to_geoserver_instance(local_geo, path, layer_name, workspace, file_type)
-    _log.info("Pushed vector %s to local GeoServer.", layer_name)
+    local_response = _push_vector_to_geoserver_instance(
+        local_geo, path, layer_name, workspace, file_type
+    )
+    local_ok = isinstance(local_response, dict) and local_response.get("status_code") in (
+        200,
+        201,
+    )
+    _log.info(
+        "Pushed vector %s to local GeoServer (ok=%s).", layer_name, local_ok
+    )
 
     prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
+    prod_response = None
+    prod_ok = None
     if prod_url:
         try:
             prod_geo = Geoserver(
@@ -348,12 +360,37 @@ def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"
                 username=settings.PROD_GEOSERVER_USERNAME,
                 password=settings.PROD_GEOSERVER_PASSWORD,
             )
-            _push_vector_to_geoserver_instance(prod_geo, path, layer_name, workspace, file_type)
-            _log.info("Pushed vector %s to prod GeoServer (%s).", layer_name, prod_url)
+            prod_response = _push_vector_to_geoserver_instance(
+                prod_geo, path, layer_name, workspace, file_type
+            )
+            prod_ok = isinstance(prod_response, dict) and prod_response.get(
+                "status_code"
+            ) in (200, 201)
+            _log.info(
+                "Pushed vector %s to prod GeoServer (%s) (ok=%s).",
+                layer_name,
+                prod_url,
+                prod_ok,
+            )
         except Exception as e:
+            prod_ok = False
+            prod_response = {"error": str(e)}
             _log.error("Failed to push vector %s to prod GeoServer: %s", layer_name, e)
 
-    return response
+    overall_ok = local_ok and (prod_ok if prod_ok is not None else True)
+    failure_status = None
+    if isinstance(prod_response, dict):
+        failure_status = prod_response.get("status_code")
+    if failure_status is None and isinstance(local_response, dict):
+        failure_status = local_response.get("status_code")
+
+    return {
+        "status_code": 201 if overall_ok else (failure_status or 500),
+        "local_ok": local_ok,
+        "prod_ok": prod_ok,
+        "local_response": local_response,
+        "prod_response": prod_response,
+    }
 
 
 def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):

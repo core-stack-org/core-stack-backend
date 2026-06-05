@@ -1,6 +1,3 @@
-from nrm_app.celery import app
-from utilities.gee_utils import valid_gee_text
-
 from computing.config_loader import LULC_V3_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     LULC_BASE_DIR,
@@ -13,7 +10,11 @@ from computing.local_compute_helper import (
     resolve_lulc_raster_paths,
 )
 from computing.models import Dataset
+from computing.STAC_specs import generate_STAC_layerwise
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from nrm_app.celery import app
+from utilities.gee_utils import valid_gee_text
+
 GEOSERVER_WORKSPACE = "LULC_v3"
 GEOSERVER_STYLE = "lulc_level_3_style"
 LOCAL_ALGORITHM = "local_lulc_v3_clip"
@@ -51,10 +52,7 @@ def _resolve_roi(state, district, block, roi_path, precomputed_roi_dir):
 
 def _resolve_filename_prefix(district, block, asset_suffix):
     if district and block:
-        return (
-            f"{_slug(district, 'unknown_district')}_"
-            f"{_slug(block, 'unknown_block')}"
-        )
+        return f"{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
     if asset_suffix is None or not str(asset_suffix).strip():
         raise ValueError(
             "For non state/district/block runs, `asset_suffix` must be provided."
@@ -63,10 +61,7 @@ def _resolve_filename_prefix(district, block, asset_suffix):
 
 
 def _build_output_stub(filename_prefix, start_year):
-    return (
-        f"{filename_prefix}_{start_year}-07-01_"
-        f"{start_year + 1}-06-30_LULCmap_10m"
-    )
+    return f"{filename_prefix}_{start_year}-07-01_{start_year + 1}-06-30_LULCmap_10m"
 
 
 def _build_layer_name(start_year, end_year, filename_prefix):
@@ -74,11 +69,12 @@ def _build_layer_name(start_year, end_year, filename_prefix):
 
 
 def _resolve_dataset_name():
-    return "LULC_v3" if Dataset.objects.filter(name="LULC_v3").exists() else "LULC_level_3"
+    return (
+        "LULC_v3" if Dataset.objects.filter(name="LULC_v3").exists() else "LULC_level_3"
+    )
 
 
 def _sync_lulc_stac(layer_id, state, district, block, start_year):
-    from computing.STAC_specs import generate_STAC_layerwise
 
     layer_stac_generated = generate_STAC_layerwise.generate_raster_stac(
         state=state,
