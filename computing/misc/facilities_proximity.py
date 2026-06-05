@@ -4,16 +4,6 @@ Facilities Proximity Layer Generator
 Filters village facilities data from GEE by tehsil boundary and exports to GEE asset + GeoServer.
 Uses admin boundary clipping (spatial filtering) for fast server-side processing.
 
-Usage:
-    python -c "
-        import os
-        os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'nrm_app.settings')
-        import django
-        django.setup()
-        from computing.misc.facilities_proximity import generate_facilities_proximity
-        generate_facilities_proximity('Odisha', 'Koraput', 'Jaypur', gee_account_id=1)
-    "
-
 GEE Asset: projects/corestack-datasets/assets/datasets/pan_india_facilities
 """
 
@@ -65,9 +55,22 @@ def _dissolve_admin_boundary(admin_boundary):
     Merge repeated admin rows with the same village properties into one geometry.
 
     This preserves full village shapes while preventing split polygon parts from
-    producing repeated output rows with identical attributes.
+    producing repeated output rows with identical attributes. Includes a schema
+    validation check to discard malformed village rows missing expected properties.
     """
-    admin_export_fc = admin_boundary.select(
+    # Filter out any feature that does not contain ALL required source fields
+    def filter_complete_schemas(feature):
+        props = feature.propertyNames()
+        has_all_fields = ee.List(ADMIN_BOUNDARY_SOURCE_FIELDS).map(
+            lambda field: props.contains(field)
+        ).reduce(ee.Reducer.min()) 
+        return feature.set('has_complete_schema', has_all_fields)
+
+    filtered_admin = admin_boundary.map(filter_complete_schemas).filter(
+        ee.Filter.eq('has_complete_schema', 1)
+    )
+
+    admin_export_fc = filtered_admin.select(
         ADMIN_BOUNDARY_SOURCE_FIELDS,
         ADMIN_BOUNDARY_EXPORT_FIELDS,
     )
@@ -142,14 +145,6 @@ def _build_facilities_output_fc(admin_boundary, facilities_fc):
 def generate_facilities_proximity(state, district, block, gee_account_id):
     """
     Generate facilities proximity layer for a tehsil/block.
-
-    Steps:
-        1. Initialize GEE
-        2. Create Output Asset ID
-        3. Filter facilities by admin boundary (spatial clipping)
-        4. Export as GEE asset
-        5. Make asset public and Register in database
-        6. Sync to GeoServer
 
     Args:
         state: State name (e.g., "Odisha")
