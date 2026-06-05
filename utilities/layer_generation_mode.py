@@ -34,12 +34,36 @@ def _read_json(path):
         return json.load(f)
 
 
-def _collect_stac_for_request(request):
-    if request is None or not hasattr(request, "data"):
+def _get_request_value(data, *keys):
+    """Read first non-empty value from request body (supports aliases and form lists)."""
+    if data is None:
         return None
-    state = request.data.get("state")
-    district = request.data.get("district")
-    block = request.data.get("block")
+    for key in keys:
+        val = data.get(key)
+        if val is None:
+            continue
+        if isinstance(val, (list, tuple)):
+            val = val[0] if val else None
+        if val is not None and str(val).strip() != "":
+            return str(val).strip()
+    return None
+
+
+def read_location_from_request(request):
+    """Resolve state/district/block from common request-body key aliases."""
+    if request is None or not hasattr(request, "data"):
+        return None, None, None
+    data = request.data
+    state = _get_request_value(data, "state", "State", "STATE")
+    district = _get_request_value(data, "district", "District", "DISTRICT")
+    block = _get_request_value(
+        data, "block", "Block", "BLOCK", "tehsil", "Tehsil", "TEHSIL"
+    )
+    return state, district, block
+
+
+def _collect_stac_for_request(request):
+    state, district, block = read_location_from_request(request)
     if not all([state, district, block]):
         return None
 
@@ -212,7 +236,7 @@ def sync_layer_generation_if_enabled(view_func):
 
         try:
             payload = getattr(response, "data", None)
-            if isinstance(payload, dict):
+            if isinstance(payload, dict) and "stac_spec" not in payload:
                 stac_spec = _collect_stac_for_request(request)
                 if stac_spec is not None:
                     # Always return existing/generated STAC JSON for this block,
