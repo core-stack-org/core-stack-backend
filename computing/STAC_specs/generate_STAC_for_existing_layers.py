@@ -130,7 +130,7 @@ def generate_stac_spec():
         },
         "terrain_vector": {
             "dataset_name": "Terrain Vector",
-            "layer_name": "dist_block_cluster",
+            "layer_name": "terrain_vector",
         },
         "change_in_well_depth_vector": {
             "dataset_name": "Hydrology",

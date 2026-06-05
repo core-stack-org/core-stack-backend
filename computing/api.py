@@ -835,7 +835,7 @@ def generate_terrain_descriptor(request):
                 state=state,
                 district=district,
                 block=block,
-                layer_name="dist_block_cluster",
+                layer_name="terrain_vector",
                 layer_type="vector",
             )
         return _task_started_response(
