@@ -102,6 +102,7 @@ from .STAC_specs.stac_collection import generate_stac_collection_task
 from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
 from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 from utilities.layer_generation_mode import (
+    format_stac_for_api_response,
     sync_layer_generation_if_enabled,
     is_sync_layer_generation_request,
 )
@@ -193,7 +194,9 @@ def _task_started_response(
     elif isinstance(asset_id, list):
         payload["asset_ids"] = asset_id
     if stac_spec is not None:
-        payload["stac_spec"] = stac_spec
+        stac = format_stac_for_api_response(stac_spec)
+        if stac is not None:
+            payload["stac"] = stac
     return Response(payload, status=status.HTTP_200_OK)
 
 
@@ -2101,10 +2104,11 @@ def generate_stac_collection(request):
                 start_year=start_year,
                 end_year=end_year,
             )
+            stac = format_stac_for_api_response(stac_spec)
             return Response(
                 {
                     "Success": "STAC collection generation completed",
-                    "stac_spec": stac_spec,
+                    "stac": stac,
                 },
                 status=status.HTTP_200_OK,
             )
