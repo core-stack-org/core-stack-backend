@@ -8,7 +8,13 @@ import cupy as cp
 import numpy as np
 from ..downloads import rainfall
 from .. import config as cfg
-from ..lulc_mapping import lulc_cache_key_for_timestamp, map_lulc_to_dynamic_world
+from ..lulc_mapping import (
+    lulc_cache_key_for_timestamp,
+    map_lulc_to_dynamic_world,
+    nodata_lulc_value_for_source,
+)
+
+ANTECEDENT_DAYS = 5
 
 class Runoff(GenericAlgorithm):
     """
@@ -19,7 +25,13 @@ class Runoff(GenericAlgorithm):
 
     def load_sr_inputs(self):
         soil = cp.asarray(self.tif_handler.load_with_padding(cfg.SOIL_PATH))
-        raw_lulc = cp.asarray(self.tif_handler.load_with_padding(cfg.LULC_PATH))
+        source = getattr(cfg, "LULC_SOURCE", "dynamicworld")
+        raw_lulc = cp.asarray(
+            self.tif_handler.load_with_padding(
+                cfg.LULC_PATH,
+                fill_value=nodata_lulc_value_for_source(source),
+            )
+        )
         slope = cp.asarray(self.tif_handler.load_with_padding(cfg.DEMFILE_PATH))
         return soil, raw_lulc, slope
 
@@ -43,7 +55,7 @@ class Runoff(GenericAlgorithm):
     def main(self):
         # pathlib.Path(cfg.RUNOFFS_FOLDER).mkdir(parents=True, exist_ok=True)
 
-        images = []
+        antecedent_images = []
         P5_sum = None
         previous_Runoff = None
         soil, raw_lulc, slope = self.load_sr_inputs()
@@ -56,32 +68,17 @@ class Runoff(GenericAlgorithm):
 
             np.nan_to_num(img, copy=False)
 
-            images.append(img)
+            if len(antecedent_images) == ANTECEDENT_DAYS:
+                if P5_sum is None:
+                    P5_sum = cp.sum(cp.stack([cp.asarray(i) for i in antecedent_images]), axis=0)
+                    # self.logger.info("4. Initial antecedent sum creation")
 
-            if index == 4:
-                P5_sum = cp.sum(cp.stack([cp.asarray(i) for i in images[:5]]), axis=0)
-                # self.logger.info(f"4. Initial sum creation")
-            elif index >= 5:
-                new_img = cp.asarray(images[-1])
-                # assert check_physical_range(new_img, "new_img", min_val=0.0)
-                old_img = cp.asarray(images[0])
-                # assert check_physical_range(old_img, "old_img", min_val=0.0)
-                P5_sum = P5_sum - old_img + new_img
-                old_img = cp.asarray(images[-3])
-                # assert check_physical_range(old_img, "old_img (for P_sum)", min_val=0.0)
-                # self.logger.info(f"4. Updated sums")
-                del old_img, new_img
-                old_img = images.pop(0)
-                del old_img
-                # self.logger.info(f"5. Pop and delete oldest image")
-
-            if index >= 4:
                 # if previous_Runoff is not None:
                 #     P_sum += previous_Runoff
                 #     P5_sum += previous_Runoff
                     # self.logger.info("6. Add previous runoff")
 
-                P_sum = cp.asarray(images[-1])
+                P_sum = cp.asarray(img)
                 sr_key = self.sr_cache_key(file['timestamp'])
                 if sr_key != current_sr_key:
                     if sr1 is not None:
@@ -131,14 +128,19 @@ class Runoff(GenericAlgorithm):
                 # self.logger.info("10. write runoff simulation result")
                 # runoff_rasters.append(R.get())
                 self.tif_handler.save_geozarr_time(R.get(), file['timestamp'], cfg.RUNOFFS_FOLDER, "runoff")
+                old_img = cp.asarray(antecedent_images.pop(0))
+                P5_sum = P5_sum - old_img + P_sum
+                antecedent_images.append(img)
+                del old_img, P_sum
                 yield (img, R, file['timestamp'])
 
             else:
+                antecedent_images.append(img)
                 yield (img, None, file['timestamp'])
 
         if sr1 is not None:
             del sr1, sr2, sr3
-        del soil, raw_lulc, slope
+        del soil, raw_lulc, slope, antecedent_images, P5_sum
         self.logger.info("Done runoff sim")
         # return runoff_rasters
 
@@ -474,7 +476,7 @@ class LegacyCodes:
         cond1_full = condP & condAMC & condQ_pos
 
         condP = (P >= Ia2)
-        condAMC = (P5 >= 0) & (P5 > 35)   # Corresponds to the second check in GEE ternary
+        condAMC = (P5 > 35) & (P5 <= 52.5)
         condQ_pos = (Q2 >= 0)
         cond2_full = condP & condAMC & condQ_pos
 
@@ -486,8 +488,7 @@ class LegacyCodes:
         del condP, condAMC, condQ_pos
         del Ia1, Ia2, Ia3
 
-        # Antecedent Moisture Conditions based on P5 thresholds from GEE expression
-        # Note: P5>=0 check is included in the GEE expression, so we replicate it.
+        # Antecedent Moisture Conditions based on documented P5 thresholds.
 
         # Runoff non-negativity conditions (Q must be >= 0) from GEE expression
 

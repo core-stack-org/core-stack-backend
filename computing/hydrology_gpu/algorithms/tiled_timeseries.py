@@ -14,7 +14,7 @@ from tqdm import tqdm
 from .. import config as cfg
 from ..downloads import rainfall
 from . import GenericAlgorithm
-from .runoff import Runoff, LegacyCodes
+from .runoff import ANTECEDENT_DAYS, Runoff, LegacyCodes
 
 
 def per_watershed_sum_count(mws, raster):
@@ -141,7 +141,7 @@ class TiledTimeSeries(GenericAlgorithm):
         current_sr_key = None
         sr1 = sr2 = sr3 = None
 
-        images = []
+        antecedent_images = []
         p5_sum = None
         rainfall_iter = rainfall.LoadTile_from_database(tile_handler)
 
@@ -150,20 +150,13 @@ class TiledTimeSeries(GenericAlgorithm):
             np.nan_to_num(img, copy=False)
             self.add_to_series(tile_series_data1, watershed_cp, img, file["timestamp"])
 
-            images.append(img)
-            if index == 4:
-                p5_sum = cp.zeros_like(cp.asarray(images[0], dtype=cp.float32))
-                for previous_img in images[:5]:
-                    p5_sum = p5_sum + cp.asarray(previous_img, dtype=cp.float32)
-            elif index >= 5:
-                new_img = cp.asarray(images[-1], dtype=cp.float32)
-                old_img = cp.asarray(images[0], dtype=cp.float32)
-                p5_sum = p5_sum - old_img + new_img
-                images.pop(0)
-                del new_img, old_img
+            if len(antecedent_images) == ANTECEDENT_DAYS:
+                if p5_sum is None:
+                    p5_sum = cp.zeros_like(cp.asarray(antecedent_images[0], dtype=cp.float32))
+                    for previous_img in antecedent_images:
+                        p5_sum = p5_sum + cp.asarray(previous_img, dtype=cp.float32)
 
-            if index >= 4:
-                p_sum = cp.asarray(images[-1], dtype=cp.float32)
+                p_sum = cp.asarray(img, dtype=cp.float32)
                 sr_key = runoff_algo.sr_cache_key(file["timestamp"])
                 if sr_key != current_sr_key:
                     if sr1 is not None:
@@ -181,12 +174,17 @@ class TiledTimeSeries(GenericAlgorithm):
                 m3_cp = LegacyCodes.compute_M(sr3, p5_sum)
                 runoff = LegacyCodes.calculate_runoff_cupy(p_sum, p5_sum, m1_cp, m2_cp, m3_cp, sr1, sr2, sr3)
                 self.add_to_series(tile_series_data2, watershed_cp, runoff, file["timestamp"])
-                del p_sum, m1_cp, m2_cp, m3_cp, runoff
+                old_img = cp.asarray(antecedent_images.pop(0), dtype=cp.float32)
+                p5_sum = p5_sum - old_img + p_sum
+                antecedent_images.append(img)
+                del p_sum, m1_cp, m2_cp, m3_cp, runoff, old_img
+            else:
+                antecedent_images.append(img)
 
         self.write_tile_series(tile_index, tile_series_data1, tile_series_data2)
         if sr1 is not None:
             del sr1, sr2, sr3
-        del watershed_cp, soil, raw_lulc, slope, rainfall_iter, images, p5_sum, tile_series_data1, tile_series_data2
+        del watershed_cp, soil, raw_lulc, slope, rainfall_iter, antecedent_images, p5_sum, tile_series_data1, tile_series_data2
         cp.get_default_memory_pool().free_all_blocks()
         gc.collect()
 

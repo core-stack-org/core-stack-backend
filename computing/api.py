@@ -31,6 +31,7 @@ from .misc.ndvi_time_series import ndvi_timeseries
 from .misc.restoration_opportunity import generate_restoration_opportunity
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
+from .mws.et_download import et_download as et_download_task
 from .mws.runoff_gpu import generate_runoff_gpu as generate_runoff_gpu_task
 from .utils import (
     Geoserver,
@@ -373,6 +374,45 @@ def generate_runoff_gpu(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_runoff_gpu api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def et_download(request):
+    print("Inside et_download")
+    try:
+        compute = _get_compute_mode(request)
+        if compute != "local":
+            raise ValueError("et_download currently supports compute='local' only")
+
+        pan_india = request.data.get(
+            "pan_india",
+            request.data.get("pan-india", request.data.get("panIndia", False)),
+        )
+        task = et_download_task.apply_async(
+            kwargs={
+                "pan_india": pan_india,
+                "start_date": request.data.get("start_date"),
+                "end_date": request.data.get("end_date"),
+                "start_year": request.data.get("start_year"),
+                "end_year": request.data.get("end_year"),
+                "overwrite": request.data.get("overwrite", False),
+            },
+            queue="nrm",
+        )
+        return Response(
+            {
+                "Success": "et_download task initiated",
+                "task_id": task.id,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except ValueError as e:
+        print("Invalid request in et_download api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in et_download api :: ", e)
         return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

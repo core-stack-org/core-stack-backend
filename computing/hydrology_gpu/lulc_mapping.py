@@ -76,6 +76,13 @@ def lulc_cache_key_for_timestamp(source: str, timestamp) -> str:
     return season_from_month(month_from_timestamp(timestamp))
 
 
+def nodata_lulc_value_for_source(source: str) -> int:
+    source = normalize_lulc_source(source)
+    if source == LULC_SOURCE_DYNAMICWORLD:
+        return DW_SHRUB_AND_SCRUB
+    return INDIASAT_BACKGROUND
+
+
 def map_lulc_to_dynamic_world(raw_lulc: cp.ndarray, source: str, timestamp) -> cp.ndarray:
     source = normalize_lulc_source(source)
     if source == LULC_SOURCE_DYNAMICWORLD:
@@ -86,7 +93,8 @@ def map_lulc_to_dynamic_world(raw_lulc: cp.ndarray, source: str, timestamp) -> c
 
 
 def map_indiasatv3_to_dynamic_world(raw_lulc: cp.ndarray, season: str) -> cp.ndarray:
-    mapped = cp.full(raw_lulc.shape, DW_WATER, dtype=cp.uint8)
+    # Background/unknown classes stay shrub/scrub instead of becoming water.
+    mapped = cp.full(raw_lulc.shape, DW_SHRUB_AND_SCRUB, dtype=cp.uint8)
 
     mapped = cp.where(raw_lulc == INDIASAT_BUILT_UP, DW_BUILT, mapped)
     mapped = cp.where(raw_lulc == INDIASAT_TREE_FORESTS, DW_TREES, mapped)

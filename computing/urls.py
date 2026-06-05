@@ -21,6 +21,7 @@ urlpatterns = [
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
     path("runoff_gpu/", api.generate_runoff_gpu, name="runoff_gpu"),
+    path("et_download/", api.et_download, name="et_download"),
     path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
