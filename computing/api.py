@@ -278,7 +278,23 @@ def generate_admin_boundary(request):
             args=[state, district, block, gee_account_id], queue="nrm"
         )
         asset_id = layer_assets.admin_boundary_asset_id(state, district, block)
-        return _task_started_response("Successfully initiated", task=task, asset_id=asset_id)
+        sync_mode = is_sync_layer_generation_request(request)
+        stac_spec = None
+        if sync_mode and all([state, district, block]):
+            stac_spec = _ensure_layer_stac_spec(
+                state=state,
+                district=district,
+                block=block,
+                layer_name="admin_boundaries_vector",
+                layer_type="vector",
+            )
+        return _task_started_response(
+            "Successfully completed" if sync_mode else "Successfully initiated",
+            task=task,
+            asset_id=asset_id,
+            stac_spec=stac_spec,
+            completed=sync_mode,
+        )
     except Exception as e:
         return layer_api_error_response("generate_admin_boundary", e, request=request)
 
