@@ -49,6 +49,24 @@ def _get_request_value(data, *keys):
     return None
 
 
+def format_stac_for_api_response(stac_payload):
+    """Return only STAC Feature item(s) for the API ``stac`` field."""
+    if not stac_payload:
+        return None
+    if isinstance(stac_payload, dict) and stac_payload.get("type") == "Feature":
+        return stac_payload
+    if isinstance(stac_payload, list):
+        return stac_payload
+    if not isinstance(stac_payload, dict):
+        return None
+    items = stac_payload.get("items") or []
+    if len(items) == 1:
+        return items[0]
+    if len(items) > 1:
+        return items
+    return None
+
+
 def read_location_from_request(request):
     """Resolve state/district/block from common request-body key aliases."""
     if request is None or not hasattr(request, "data"):
@@ -236,13 +254,12 @@ def sync_layer_generation_if_enabled(view_func):
 
         try:
             payload = getattr(response, "data", None)
-            if isinstance(payload, dict) and "stac_spec" not in payload:
+            if isinstance(payload, dict) and "stac" not in payload:
                 stac_spec = _collect_stac_for_request(request)
-                if stac_spec is not None:
-                    # Always return existing/generated STAC JSON for this block,
-                    # even when is_stac_specs_generated was already True and
-                    # the signal skipped re-generation.
-                    payload["stac_spec"] = stac_spec
+                stac = format_stac_for_api_response(stac_spec)
+                if stac is not None:
+                    payload["stac"] = stac
+                payload.pop("stac_spec", None)
         except Exception:
             logger.exception("Failed to enrich sync response with STAC specs")
 
