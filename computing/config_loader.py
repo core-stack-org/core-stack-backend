@@ -46,6 +46,10 @@ TERRAIN_RASTER_PATH: Path = PROJECT_ROOT / _find_input(
     "data/base_layers/slope/slope_india_30m_merged.tif"
 )["path"]
 
+SOIL_RASTER_PATH: Path = PROJECT_ROOT / _find_input(
+    "data/base_layers/soil/hysogs_india_250m_4326.tif"
+)["path"]
+
 AEZ_VECTOR_PATH: Path = PROJECT_ROOT / _find_input(
     "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
 )["path"]

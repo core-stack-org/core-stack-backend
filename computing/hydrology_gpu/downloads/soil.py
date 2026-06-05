@@ -1,4 +1,3 @@
-from argparse import ArgumentParser
 from .. import config as cfg
 import xarray
 from . import GenericDownloader, ee

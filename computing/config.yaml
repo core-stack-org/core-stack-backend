@@ -31,6 +31,10 @@ base_layers:
           source: manual
           note: Pan-India slope raster used for slope/terrain classification
 
+        - path: data/base_layers/soil/hysogs_india_250m_4326.tif
+          source: manual
+          note: Pan-India hydrologic soil group raster for runoff calculation
+
         - path: data/base_layers/AEZs/Agro_Ecological_Regions.shp
           source: manual
           note: Agro-Ecological Zone boundaries for AEZ-based cluster lookup

@@ -5,7 +5,6 @@ import pathlib
 import shutil
 import threading
 import time
-from argparse import ArgumentParser
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from threading import Lock

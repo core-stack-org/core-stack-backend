@@ -2,7 +2,6 @@ import os
 import shutil
 from pathlib import Path
 from logging import Logger
-from argparse import ArgumentParser
 from dataclasses import dataclass
 import ee
 import geedim
@@ -16,7 +15,27 @@ from pydrive2.drive import GoogleDrive
 from .. import utils
 from ..utils import GeoTIFFHandler
 
-ee.Initialize(project=cfg.GEE_PROJECT_NAME)
+
+def _initialize_earth_engine():
+    project = getattr(cfg, "GEE_PROJECT_NAME", "")
+    try:
+        if project:
+            ee.Initialize(project=project)
+        else:
+            ee.Initialize()
+        return
+    except Exception:
+        pass
+
+    try:
+        from utilities.gee_utils import ee_initialize_safe
+
+        ee_initialize_safe()
+    except Exception as exc:
+        print(f"Skipping Earth Engine initialization: {exc}")
+
+
+_initialize_earth_engine()
 
 class GenericDownloader:
     # Singleton pattern

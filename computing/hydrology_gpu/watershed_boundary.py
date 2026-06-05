@@ -6,10 +6,11 @@ import geopandas as gpd
 import pandas as pd
 from shapely.geometry import GeometryCollection, MultiPolygon, Polygon
 
+from computing.config_loader import PRECOMPUTED_TEHSIL_WATERSHED_DIR, PROJECT_ROOT
 
-DEFAULT_WATERSHED_ROOT = Path("/media/disk3/raman/code/core-stack-backend/data/base_layers/tehsil_watersheds")
-DEFAULT_BOUNDARY_OUTPUT_ROOT = Path("./tifs/tehsil_watersheds")
-DEFAULT_PAN_INDIA_DOWNLOAD_BOUNDARY = Path("./data/base_layers/PanIndia_Boundaries/india_state_outer_no_islands.geojson")
+DEFAULT_WATERSHED_ROOT = PRECOMPUTED_TEHSIL_WATERSHED_DIR
+DEFAULT_BOUNDARY_OUTPUT_ROOT = PROJECT_ROOT / "data" / "hydrology_gpu" / "boundaries"
+DEFAULT_PAN_INDIA_DOWNLOAD_BOUNDARY = PROJECT_ROOT / "data" / "base_layers" / "PanIndia_Boundaries" / "india_state_outer_no_islands.geojson"
 PAN_INDIA_SLUG = "pan_india"
 
 

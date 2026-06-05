@@ -6,15 +6,20 @@ from types import SimpleNamespace
 
 from nrm_app.celery import app
 
-from computing.config_loader import PROJECT_ROOT, PRECOMPUTED_TEHSIL_WATERSHED_DIR
+from computing.config_loader import (
+    LULC_BASE_DIR,
+    PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    PROJECT_ROOT,
+    SOIL_RASTER_PATH,
+    TERRAIN_RASTER_PATH,
+)
 from utilities.gee_utils import valid_gee_text
 
 
 DATA_ROOT = PROJECT_ROOT / "data"
 HYDROLOGY_OUTPUT_ROOT = DATA_ROOT / "hydrology_gpu"
-LULC_BASE_DIR = DATA_ROOT / "base_layers" / "lulc"
-DEFAULT_LOCAL_DEM_PATH = DATA_ROOT / "base_layers" / "slope" / "slope_india_30m_merged.tif"
-DEFAULT_LOCAL_SOIL_PATH = DATA_ROOT / "base_layers" / "soil" / "hysogs_india_250m_4326.tif"
+DEFAULT_LOCAL_DEM_PATH = TERRAIN_RASTER_PATH
+DEFAULT_LOCAL_SOIL_PATH = SOIL_RASTER_PATH
 PAN_INDIA_DEFAULT_TILE_SIZE = 11264
 STATE_DEFAULT_TILE_SIZE = 4096
 

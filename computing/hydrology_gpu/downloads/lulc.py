@@ -1,4 +1,3 @@
-from argparse import ArgumentParser
 import geemap
 import xarray
 from .. import config as cfg
