@@ -81,6 +81,7 @@ def terrain_raster(
         task_id_list = check_task_status([task_id])
         print("terrain_raster task_id_list", task_id_list)
 
+    layer_id = None
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)

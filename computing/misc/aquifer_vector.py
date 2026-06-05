@@ -13,6 +13,7 @@ from utilities.constants import AQUIFER_DATASET_PATH
 from computing.utils import (
     sync_fc_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
 )
 @app.task(bind=True)
@@ -300,7 +301,7 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
 
         fc = ee.FeatureCollection(asset_id)
         res = sync_fc_to_geoserver(fc, state, description, "aquifer")
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True

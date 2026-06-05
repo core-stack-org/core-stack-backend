@@ -12,6 +12,8 @@ parameters and to call STAC generation synchronously.
 from __future__ import annotations
 
 import logging
+import os
+from types import SimpleNamespace
 
 from django.conf import settings
 from django.db.models.signals import post_save
@@ -43,6 +45,89 @@ def _format_geoserver_name(template: str, layer: Layer) -> str:
         return ""
 
 
+def _pick_mapping_candidate(candidates, layer: Layer):
+    layer_name = (layer.layer_name or "").strip()
+    if not layer_name:
+        return None
+
+    matches = [
+        c
+        for c in candidates
+        if _format_geoserver_name(c.geoserver_layer_name, layer) == layer_name
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        return None
+
+    log.info(
+        "STAC auto-trigger: %d ambiguous LayerMapping matches for layer id=%s; picking first",
+        len(matches),
+        layer.id,
+    )
+    return matches[0]
+
+
+def _resolve_mapping_from_csv(layer: Layer):
+    """Fallback when LayerMapping rows are missing from the DB."""
+    try:
+        import pandas as pd
+        from computing.STAC_specs import constants
+        from computing.STAC_specs.stac_collection import STACConfig
+    except Exception as exc:  # noqa: BLE001
+        log.warning("STAC CSV fallback unavailable: %s", exc)
+        return None
+
+    config = STACConfig()
+    csv_path = config.layer_map_csv
+    try:
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+        else:
+            df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("STAC CSV fallback failed to load mappings: %s", exc)
+        return None
+
+    dataset_name = (layer.dataset.name or "").strip()
+    if not dataset_name:
+        return None
+
+    candidates = df[df["db_dataset_name"] == dataset_name]
+    if candidates.empty:
+        candidates = df
+
+    rows = []
+    layer_name = (layer.layer_name or "").strip()
+    for _, row in candidates.iterrows():
+        template = str(row.get("geoserver_layer_name", "") or "")
+        formatted = _format_geoserver_name(template, layer) if template else ""
+        if formatted == layer_name:
+            rows.append(row)
+
+    if not rows:
+        log.warning(
+            "STAC CSV fallback: no match for layer id=%s dataset=%s name=%s",
+            layer.id,
+            dataset_name,
+            layer_name,
+        )
+        return None
+
+    if len(rows) > 1:
+        log.info(
+            "STAC CSV fallback: %d ambiguous matches for layer id=%s; picking first",
+            len(rows),
+            layer.id,
+        )
+
+    row = rows[0]
+    return SimpleNamespace(
+        layer_type=str(row.get("layer_type", "") or ""),
+        layer_name=str(row.get("layer_name", "") or ""),
+    )
+
+
 def _resolve_mapping(layer: Layer) -> LayerMapping | None:
     """Return the best matching LayerMapping for a saved Layer.
 
@@ -63,41 +148,27 @@ def _resolve_mapping(layer: Layer) -> LayerMapping | None:
         LayerMapping.objects.filter(db_dataset_name=dataset_name, auto_stac=True)
     )
     if not candidates:
-        # Fallback: some environments have dataset naming drift between Layer and
-        # LayerMapping. In that case, try resolving from any auto_stac mapping
-        # by matching the fully formatted geoserver layer name.
         candidates = list(LayerMapping.objects.filter(auto_stac=True))
         if not candidates:
-            return None
+            return _resolve_mapping_from_csv(layer)
+        mapping = _pick_mapping_candidate(candidates, layer)
+        if mapping is None:
+            return _resolve_mapping_from_csv(layer)
+        return mapping
+
     if len(candidates) == 1:
         return candidates[0]
 
-    layer_name = (layer.layer_name or "").strip()
-    if not layer_name:
-        return None
-
-    matches = [
-        c
-        for c in candidates
-        if _format_geoserver_name(c.geoserver_layer_name, layer) == layer_name
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    if not matches:
+    mapping = _pick_mapping_candidate(candidates, layer)
+    if mapping is None:
         log.warning(
             "STAC auto-trigger: no LayerMapping match for layer id=%s dataset=%s name=%s",
             layer.id,
             dataset_name,
-            layer_name,
+            layer.layer_name,
         )
-        return None
-
-    log.info(
-        "STAC auto-trigger: %d ambiguous LayerMapping matches for layer id=%s; picking first",
-        len(matches),
-        layer.id,
-    )
-    return matches[0]
+        return _resolve_mapping_from_csv(layer)
+    return mapping
 
 
 @receiver(post_save, sender=Layer, dispatch_uid="computing.signals.trigger_stac_on_geoserver_sync")
@@ -109,7 +180,6 @@ def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
     if mapping is None:
         return
 
-    # Lazy import: avoids importing Celery / stac_collection at app-loading time.
     from computing.STAC_specs.stac_collection import generate_stac_collection_task
 
     misc = instance.misc or {}
@@ -122,6 +192,7 @@ def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
         start_year=str(misc.get("start_year", "") or ""),
         end_year=str(misc.get("end_year", "") or ""),
         upload_to_s3=bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
+        overwrite_metadata=bool(getattr(settings, "STAC_OVERWRITE_METADATA", True)),
         layer_id=instance.id,
     )
 

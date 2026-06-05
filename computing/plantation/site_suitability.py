@@ -214,7 +214,7 @@ def sync_suitability_to_geoserver(asset_id, shp_folder, layer_name, layer_id):
             workspace="plantation",
         )
         logger.info("Suitability vector synced to geoserver: %s", res)
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
     except Exception as e:
