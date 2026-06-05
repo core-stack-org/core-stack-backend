@@ -2,6 +2,7 @@ import ee
 from nrm_app.celery import app
 from computing.utils import (
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
 )
 from projects.models import Project
@@ -226,7 +227,7 @@ def vectorize_fabdem(mws_fc, raster_asset_id, state, district, block):
             state, fc_geojson, description, "digital_elevation_model"
         )
 
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_at_geoserver = True
 

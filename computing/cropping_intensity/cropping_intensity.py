@@ -3,6 +3,7 @@ from computing.utils import (
     sync_layer_to_geoserver,
     sync_fc_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     get_existing_end_year,
     get_layer_object,
@@ -365,9 +366,7 @@ def save_to_db_and_sync_to_geoserver(
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "crop_intensity")
     print(res)
     layer_at_geoserver = False
-    if (
-        res["status_code"] == 201 and layer_id
-    ):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
+    if (geoserver_sync_succeeded(res) and layer_id):  # TODO currently saving info to DB for block level layers only, make changes to accommodate all
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
         layer_at_geoserver = True

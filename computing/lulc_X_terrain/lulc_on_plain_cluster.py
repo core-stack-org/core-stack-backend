@@ -1,26 +1,25 @@
 import ee
-
+from nrm_app.celery import app
 from computing.utils import (
+    sync_layer_to_geoserver,
+    save_layer_info_to_db,
+    geoserver_sync_succeeded,
+    update_layer_sync_status,
     create_chunk,
     merge_chunks,
-    save_layer_info_to_db,
-    sync_layer_to_geoserver,
-    update_layer_sync_status,
 )
-from nrm_app.celery import app
-from utilities.constants import AEZ, GEE_ASSET_PATH
 from utilities.gee_utils import (
-    check_task_status,
     ee_initialize,
-    export_vector_asset_to_gee,
-    get_gee_asset_path,
-    get_gee_dir_path,
-    is_gee_asset_exists,
-    make_asset_public,
+    check_task_status,
     valid_gee_text,
+    get_gee_asset_path,
+    is_gee_asset_exists,
+    export_vector_asset_to_gee,
+    make_asset_public,
+    get_gee_dir_path,
 )
-
-from .utils import aez_lulcXterrain_cluster_centroids, calculate_area, process_mws
+from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
+from utilities.constants import AEZ, GEE_HELPER_PATH
 
 
 @app.task(bind=True)
@@ -33,7 +32,7 @@ def lulc_on_plain_cluster(
         valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
-        + "_lulcXplains_clusters"
+        + "_lulcXplains_clusters_bk02_june"
     )
     asset_id = get_gee_asset_path(state, district, block) + asset_description
 
@@ -89,6 +88,7 @@ def lulc_on_plain_cluster(
         chunk_size = 50
         rois, descs = create_chunk(mwsheds, asset_description, chunk_size)
 
+
         tasks = []
         temp_assets = []
         for roi, desc in zip(rois, descs):
@@ -97,22 +97,26 @@ def lulc_on_plain_cluster(
                 ee.Filter.neq("terrain_cluster", 2)
             )
 
+
             result_chunk = process_feature_collection(
                 plain_chunk, study_area_landforms, study_area_lulc, plain_centroids
             )
-
-            chunk_asset_id = (
-                get_gee_dir_path([state, district, block], GEE_ASSET_PATH) + desc
-            )
+            
+            chunk_asset_id = get_gee_dir_path([state, district, block], GEE_HELPER_PATH) + desc
             temp_assets.append(chunk_asset_id)
 
-            task = export_vector_asset_to_gee(result_chunk, desc, chunk_asset_id)
+
+            task = export_vector_asset_to_gee(
+                result_chunk, desc, chunk_asset_id
+            )
             if task:
                 tasks.append(task)
+
 
         print("Started all chunk tasks")
         task_id_list = check_task_status(tasks)
         print("All chunk tasks completed:", task_id_list)
+
 
         # Merge all chunks into one feature collection
         print("Starting merge task")
@@ -121,12 +125,12 @@ def lulc_on_plain_cluster(
             [state, district, block],
             asset_description,
             chunk_size,
-            chunk_asset_path=GEE_ASSET_PATH,
             merge_asset_id=asset_id,
         )
         if final_task_id:
             final_task_status = check_task_status([final_task_id])
             print("Final merge task completed:", final_task_status)
+
 
         # Clean up temporary assets
         for chunk_id in temp_assets:
@@ -136,6 +140,7 @@ def lulc_on_plain_cluster(
                     print(f"Deleted temp asset {chunk_id}")
                 except Exception as e:
                     print(f"Failed to delete {chunk_id}: {e}")
+
 
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
@@ -165,7 +170,7 @@ def lulc_on_plain_cluster(
             "terrain_lulc",
         )
         print(res)
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True

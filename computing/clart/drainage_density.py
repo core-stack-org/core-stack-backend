@@ -25,13 +25,10 @@ def drainage_density(self, state, district, block):
     """
     It will generate drainage density of given location(tehsil level)
     """
-    asset_id = (
-        get_gee_asset_path(state, district, block)
-        + "drainage_density_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+    layer_name = (
+        f"drainage_density_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )
+    asset_id = get_gee_asset_path(state, district, block) + layer_name
 
     if not is_gee_asset_exists(asset_id):
         input_path = generate_vector(state, district, block)
@@ -58,21 +55,25 @@ def drainage_density(self, state, district, block):
 
         task_list = check_task_status([task_id])
         print("drainage_density task list ", task_list)
-        if is_gee_asset_exists(asset_id):
-            save_layer_info_to_db(
-                state,
-                district,
-                block,
-                layer_name=f"drainage_density_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
-                asset_id=asset_id,
-                dataset_name="Drainage Density",
-            )
-            print("saved drainage density info at the gee level...")
-            make_asset_public(asset_id)
         if input_path:
             path = input_path.split("/")[:-1]
             path = os.path.join(*path)
             shutil.rmtree(path)
+
+    layer_saved = False
+    if is_gee_asset_exists(asset_id):
+        save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Drainage Density",
+        )
+        print("saved drainage density info at the gee level...")
+        make_asset_public(asset_id)
+        layer_saved = True
+    return layer_saved
 
 
 def generate_vector(state, district, block):

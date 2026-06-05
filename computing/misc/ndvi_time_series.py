@@ -12,12 +12,13 @@ from computing.utils import (
     get_layer_object,
     save_layer_info_to_db,
     sync_layer_to_geoserver,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     sync_fc_to_geoserver,
     create_chunk,
     merge_chunks,
 )
-from utilities.constants import GEE_PATHS, PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
+from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -172,7 +173,7 @@ def ndvi_timeseries(
             )
             print(res)
 
-            if res["status_code"] == 201 and layer_id:
+            if geoserver_sync_succeeded(res) and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("sync to geoserver flag is updated")
 
@@ -384,20 +385,17 @@ def _generate_ndvi(
     task_id = None
     if not is_gee_asset_exists(ndvi_asset_id):
 
-        # lulc = ee.Image(
-        #     get_gee_dir_path(
-        #         asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        #     )
-        #     + asset_suffix
-        #     + "_"
-        #     + str(f_start_date.year)
-        #     + "-07-01_"
-        #     + str(f_start_date.year + 1)
-        #     + "-06-30_LULCmap_10m"
-        # )
         lulc = ee.Image(
-            f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{f_start_date.year}_{str(f_start_date.year + 1)}"
-        ).clip(roi.geometry())
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + asset_suffix
+            + "_"
+            + str(f_start_date.year)
+            + "-07-01_"
+            + str(f_start_date.year + 1)
+            + "-06-30_LULCmap_10m"
+        )
         crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
         tree_mask = lulc.eq(6)
         shrub_mask = lulc.eq(12)

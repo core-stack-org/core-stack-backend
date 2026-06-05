@@ -2,6 +2,7 @@ import ee
 from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
 )
 from utilities.gee_utils import (
@@ -233,7 +234,7 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
     )
     print(res)
 
-    if res["status_code"] == 201 and layer_id:
+    if geoserver_sync_succeeded(res) and layer_id:
 
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag updated")
