@@ -27,13 +27,37 @@ def generate_terrain_clusters(self, state, district, block, gee_account_id):
         + valid_gee_text(block.lower())
         + "_terrain_clusters"
     )
+    layer_name = (
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_cluster"
+    )
 
     asset_id = get_gee_asset_path(state, district, block) + asset_name
-    layer_id = None
-    if not is_gee_asset_exists(asset_id):
-        layer_id = compute_on_gee(state, district, block, asset_id, asset_name)
 
-    layer_at_geoserver = sync_to_geoserver(state, district, block, asset_id, layer_id)
+    if not is_gee_asset_exists(asset_id):
+        compute_on_gee(state, district, block, asset_id, asset_name)
+
+    layer_id = None
+    layer_at_geoserver = False
+
+    if is_gee_asset_exists(asset_id):
+        make_asset_public(asset_id)
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name="Terrain Vector",
+            algorithm="FABDEM",
+            algorithm_version="2.0",
+        )
+        layer_at_geoserver = sync_to_geoserver(
+            state, district, block, asset_id, layer_id, layer_name
+        )
+
     return layer_at_geoserver
 
 
@@ -367,32 +391,14 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
     task = export_vector_asset_to_gee(fc, asset_name, asset_id)
     check_task_status([task])
 
-    layer_id = None
-    if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_cluster",
-            asset_id=asset_id,
-            dataset_name="Terrain Vector",
-            algorithm="FABDEM",
-            algorithm_version="2.0",
-        )
-        make_asset_public(asset_id)
-    return layer_id
 
-
-def sync_to_geoserver(state, district, block, asset_id, layer_id):
+def sync_to_geoserver(state, district, block, asset_id, layer_id, layer_name):
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
         state,
         fc,
-        valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_cluster",
+        layer_name,
         "terrain",
     )
     print(res)
