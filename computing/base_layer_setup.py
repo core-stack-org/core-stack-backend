@@ -1,23 +1,37 @@
 import logging
 import subprocess
+from functools import wraps
 from pathlib import Path
 
 import requests
-from utilities.constants import GEOSERVER_BASE
 
 from computing.config_loader import (
     ADMIN_BOUNDARY_INPUT_DIR,
     ADMIN_BOUNDARY_OUTPUT_DIR,
-    GDRIVE_ADMIN_BOUNDARY_FILE_ID as _GDRIVE_ADMIN_BOUNDARY_FILE_ID,
-    GDRIVE_MICROWATERSHED_FILE_ID as _GDRIVE_MICROWATERSHED_FILE_ID,
-    LULC_BASE_DIR as LULC_DIR,
-    LULC_GDRIVE_FILES as _LULC_GDRIVE_FILES,
     MICROWATERSHED_PATH,
-    PRECOMPUTED_TEHSIL_WATERSHED_DIR as TEHSIL_WATERSHEDS_DIR,
     PROJECT_ROOT,
     SOI_TEHSIL_PATH,
     VILLAGE_BOUNDARIES_DIR,
 )
+from computing.config_loader import (
+    GDRIVE_ADMIN_BOUNDARY_FILE_ID as _GDRIVE_ADMIN_BOUNDARY_FILE_ID,
+)
+from computing.config_loader import (
+    GDRIVE_MICROWATERSHED_FILE_ID as _GDRIVE_MICROWATERSHED_FILE_ID,
+)
+from computing.config_loader import (
+    LULC_BASE_DIR as LULC_DIR,
+)
+from computing.config_loader import (
+    LULC_GDRIVE_FILES as _LULC_GDRIVE_FILES,
+)
+from computing.config_loader import (
+    PRECOMPUTED_TEHSIL_WATERSHED_DIR as TEHSIL_WATERSHEDS_DIR,
+)
+from computing.terrain_descriptor.store_watersheds_for_tehsils import (
+    generate_tehsil_watershed_copies,
+)
+from utilities.constants import GEOSERVER_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +165,9 @@ def ensure_microwatershed():
     Fill in _GDRIVE_MICROWATERSHED_FILE_ID above once the Drive link is available.
     """
     if MICROWATERSHED_PATH.exists():
-        logger.info("Microwatershed file already exists at %s, skipping.", MICROWATERSHED_PATH)
+        logger.info(
+            "Microwatershed file already exists at %s, skipping.", MICROWATERSHED_PATH
+        )
         return
 
     if not _GDRIVE_MICROWATERSHED_FILE_ID:
@@ -163,7 +179,9 @@ def ensure_microwatershed():
         return
 
     MICROWATERSHED_PATH.parent.mkdir(parents=True, exist_ok=True)
-    logger.info("Downloading Microwatershed_v2_with_details.geojson from Google Drive...")
+    logger.info(
+        "Downloading Microwatershed_v2_with_details.geojson from Google Drive..."
+    )
     try:
         subprocess.run(
             ["gdown", _GDRIVE_MICROWATERSHED_FILE_ID, "-O", str(MICROWATERSHED_PATH)],
@@ -185,27 +203,28 @@ def ensure_tehsil_watersheds():
     Both source files (SOI tehsil + microwatershed) must exist first.
     """
     if _is_dir_populated(TEHSIL_WATERSHEDS_DIR):
-        logger.info("Tehsil watershed files already present at %s, skipping.", TEHSIL_WATERSHEDS_DIR)
+        logger.info(
+            "Tehsil watershed files already present at %s, skipping.",
+            TEHSIL_WATERSHEDS_DIR,
+        )
         return
 
     if not SOI_TEHSIL_PATH.exists():
         logger.warning(
-            "Cannot generate tehsil watersheds: SOI tehsil file missing at %s.", SOI_TEHSIL_PATH
+            "Cannot generate tehsil watersheds: SOI tehsil file missing at %s.",
+            SOI_TEHSIL_PATH,
         )
         return
 
     if not MICROWATERSHED_PATH.exists():
         logger.warning(
-            "Cannot generate tehsil watersheds: microwatershed file missing at %s.", MICROWATERSHED_PATH
+            "Cannot generate tehsil watersheds: microwatershed file missing at %s.",
+            MICROWATERSHED_PATH,
         )
         return
 
     TEHSIL_WATERSHEDS_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Generating tehsil watershed files (this may take a while)...")
-
-    from computing.terrain_descriptor.store_watersheds_for_tehsils import (
-        generate_tehsil_watershed_copies,
-    )
 
     generate_tehsil_watershed_copies(
         microwatershed_path=str(MICROWATERSHED_PATH),
@@ -213,6 +232,7 @@ def ensure_tehsil_watersheds():
         output_dir=str(TEHSIL_WATERSHEDS_DIR),
         output_format="gpkg",
         overwrite=False,
+        clip_to_tehsil=False,
     )
     logger.info("Tehsil watershed files ready at %s", TEHSIL_WATERSHEDS_DIR)
 
@@ -225,10 +245,43 @@ def ensure_village_boundaries_dir():
     VILLAGE_BOUNDARIES_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def setup_base_layers():
-    ensure_soi_tehsil()
-    ensure_admin_boundary_data()
-    # ensure_lulc_rasters()
-    # ensure_microwatershed()
-    # ensure_tehsil_watersheds()
-    ensure_village_boundaries_dir()
+_BASE_LAYER_ENSURERS = {
+    "soi_tehsil": ensure_soi_tehsil,
+    "admin_boundary": ensure_admin_boundary_data,
+    "lulc_rasters": ensure_lulc_rasters,
+    "microwatershed": ensure_microwatershed,
+    "tehsil_watersheds": ensure_tehsil_watersheds,
+    "village_boundaries": ensure_village_boundaries_dir,
+}
+
+DEFAULT_BASE_LAYERS = (
+    "soi_tehsil",
+    "admin_boundary",
+    "village_boundaries",
+)
+
+
+def setup_base_layers(*layers):
+    selected_layers = layers or DEFAULT_BASE_LAYERS
+    for layer in selected_layers:
+        try:
+            ensure_layer = _BASE_LAYER_ENSURERS[layer]
+        except KeyError as exc:
+            available_layers = ", ".join(sorted(_BASE_LAYER_ENSURERS))
+            raise ValueError(
+                f"Unknown base layer '{layer}'. Available layers: {available_layers}"
+            ) from exc
+
+        ensure_layer()
+
+
+def with_base_layers(*layers):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            setup_base_layers(*layers)
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

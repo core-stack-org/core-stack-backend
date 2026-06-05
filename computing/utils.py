@@ -3,9 +3,8 @@ import json
 import logging
 import os
 import shutil
+import time
 import zipfile
-from django.conf import settings
-
 from datetime import datetime, timedelta
 
 import ee
@@ -13,9 +12,11 @@ import fiona
 import geopandas as gpd
 import requests
 from django.conf import settings
+from django.core.mail import EmailMessage
 from shapely.geometry import shape
 from shapely.validation import explain_validity
 
+from computing.base_layer_setup import with_base_layers
 from computing.models import Dataset, Layer
 from geoadmin.models import (
     DistrictSOI,
@@ -102,6 +103,7 @@ def push_shape_to_geoserver(
     return response
 
 
+@with_base_layers("admin_boundary")
 def kml_to_geojson(state_name, district_name, block_name, kml_path):
     fiona.drvsupport.supported_drivers["kml"] = (
         "rw"  # enable KML support which is disabled by default
@@ -640,14 +642,20 @@ def _sync_layer_to_prod_db(payload: dict):
             )
             return None
         layer_id = response.json().get("layer_id")
-        logger.info("Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id)
+        logger.info(
+            "Layer %s synced to prod DB (id=%s).", payload.get("layer_name"), layer_id
+        )
         return layer_id
     except requests.RequestException as e:
-        logger.error("Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e)
+        logger.error(
+            "Failed to sync layer %s to prod DB: %s", payload.get("layer_name"), e
+        )
         return None
 
 
-def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_generated=None):
+def _update_layer_sync_remote(
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+):
     prod_url = _get_prod_backend_url()
     if not prod_url or layer_id is None:
         return
@@ -675,7 +683,9 @@ def _update_layer_sync_remote(layer_id, sync_to_geoserver=None, is_stac_specs_ge
         else:
             logger.info("Layer sync status updated on prod DB for id=%s.", layer_id)
     except requests.RequestException as e:
-        logger.error("Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e)
+        logger.error(
+            "Failed to update layer sync status on prod DB for id=%s: %s", layer_id, e
+        )
 
 
 
@@ -903,24 +913,27 @@ def save_layer_info_to_db(
     is_override=False,
 ):
     if _get_prod_backend_url():
-        layer_id = _sync_layer_to_prod_db({
-            "state": state,
-            "district": district,
-            "block": block,
-            "layer_name": layer_name,
-            "asset_id": asset_id,
-            "dataset_name": dataset_name,
-            "sync_to_geoserver": sync_to_geoserver,
-            "layer_version": layer_version,
-            "algorithm": algorithm,
-            "algorithm_version": algorithm_version,
-            "misc": misc,
-            "is_override": is_override,
-        })
+        layer_id = _sync_layer_to_prod_db(
+            {
+                "state": state,
+                "district": district,
+                "block": block,
+                "layer_name": layer_name,
+                "asset_id": asset_id,
+                "dataset_name": dataset_name,
+                "sync_to_geoserver": sync_to_geoserver,
+                "layer_version": layer_version,
+                "algorithm": algorithm,
+                "algorithm_version": algorithm_version,
+                "misc": misc,
+                "is_override": is_override,
+            }
+        )
         if layer_id is not None:
             return layer_id
         logger.warning(
-            "Prod DB sync failed for layer %s — falling back to local DB write.", layer_name
+            "Prod DB sync failed for layer %s — falling back to local DB write.",
+            layer_name,
         )
 
     print("inside the save_layer_info_to_db function")
