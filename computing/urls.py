@@ -222,6 +222,21 @@ urlpatterns = [
         name="stac_item",
     ),
     path("sync_layer_remote/", api.sync_layer_remote, name="sync_layer_remote"),
-    path("update_layer_sync_remote/", api.update_layer_sync_remote, name="update_layer_sync_remote"),
+    path(
+        "update_layer_sync_remote/",
+        api.update_layer_sync_remote,
+        name="update_layer_sync_remote",
+    ),
     path("missing_layers/", api.missing_layers, name="missing_layer"),
+    path("spei/", api.generate_spei, name="spei"),
+    path(
+        "drought_resilience_resistance/",
+        api.drought_resilience_resistance,
+        name="drought_resilience_resistance",
+    ),
+    path(
+        "rainfall_resilience_resistance/",
+        api.rainfall_resilience_resistance,
+        name="rainfall_resilience_resistance",
+    ),
 ]

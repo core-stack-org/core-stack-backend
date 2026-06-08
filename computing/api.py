@@ -7,9 +7,13 @@ from django.core.files.storage import FileSystemStorage
 from rest_framework import status
 from rest_framework.decorators import (
     api_view,
+   
     authentication_classes,
+   
     parser_classes,
+   
     permission_classes,
+   
     schema,
 )
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -27,6 +31,11 @@ from computing.change_detection.change_detection_vector import (
 )
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
+)
+from .spei.spei import (
+    generate_spei_pipeline,
+    run_drought_resistance_resilience,
+    run_rainfall_resistance_resilience,
 )
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from computing.misc.drainage_lines import clip_drainage_lines
@@ -134,6 +143,12 @@ from .utils import (
 )
 from .views import check_missing_layers, get_layers_of_workspace, layer_status
 from .zoi_layers.zoi import generate_zoi
+from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid import generate_mws_centroid_data
+from .misc.facilities_proximity import generate_facilities_proximity_task
+from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
+from django.conf import settings
+
 
 
 @api_security_check(allowed_methods="POST")
@@ -2062,4 +2077,75 @@ def missing_layers(request):
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_layers_for_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_spei(request):
+    print("Inside generate_spei API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        overwrite = request.data.get("overwrite") or False
+
+        generate_spei_pipeline.apply_async(
+            args=[aez, start_year, end_year, gee_account_id, overwrite], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_spei task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_spei api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def drought_resilience_resistance(request):
+    print("Inside drought_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_drought_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {
+                "Success": "Successfully drought_resilience_resistance generate_spei task"
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in drought_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def rainfall_resilience_resistance(request):
+    print("Inside rainfall_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_rainfall_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {
+                "Success": "Successfully rainfall_resilience_resistance generate_spei task"
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in rainfall_resilience_resistance api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

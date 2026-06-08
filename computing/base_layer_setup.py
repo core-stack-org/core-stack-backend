@@ -4,6 +4,8 @@ from functools import wraps
 from pathlib import Path
 
 import requests
+from pathlib import Path
+from utilities.constants import GEOSERVER_BASE
 
 from computing.config_loader import (
     ADMIN_BOUNDARY_INPUT_DIR,
