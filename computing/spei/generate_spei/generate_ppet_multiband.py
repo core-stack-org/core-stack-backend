@@ -1,14 +1,3 @@
-# =============================================================================
-# SPEI Pipeline - Step 1 (Local P-PET)
-#
-# Uses GeoTIFFs downloaded by download_chirps_local.py instead of reading:
-#   ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
-#   ee.ImageCollection("MODIS/061/MOD16A2GF").select("PET")
-#
-# Output: one local multiband GeoTIFF with one P-PET band per month.
-# Band names follow the original script: y{year}_m{month}, e.g. y2015_m06.
-# =============================================================================
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -92,24 +81,35 @@ def reproject_modis_to_chirps_grid(
         )
 
 
-def main(
-    aez: str = None,
+def ppet_multiband(
+    aez=None,
     start: int = 2004,
     end: int = 2023,
 ) -> Path:
+    """
+    SPEI Pipeline - Step 1 (Local P-PET)
+
+    Uses GeoTIFFs downloaded by download_chirps_local.py instead of reading:
+      ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+      ee.ImageCollection("MODIS/061/MOD16A2GF").select("PET")
+
+    Output: one local multiband GeoTIFF with one P-PET band per month.
+    Band names follow the original script: y{year}_m{month}, e.g. y2015_m06.
+
+    """
     data_root = Path("data/drought_inputs")
-    chirps_dir = data_root / aez / "monthly" / "chirps"
-    modis_dir = data_root / aez / "monthly" / "modis_pet"
+    chirps_dir = data_root / str(aez) / "monthly" / "chirps"
+    modis_dir = data_root / str(aez) / "monthly" / "modis_pet"
 
     # input_root = Path("data/drought_inputs")
-    output_dir = Path("data/drought_inputs") / aez / "monthly"
-    output = output_dir / f"P_PET_{aez}_monthly_multiband.tif"
+    output_dir = Path("data/drought_inputs") / str(aez) / "monthly"
+    output = output_dir / f"P_PET_AEZ_{str(aez)}_monthly_multiband.tif"
     OUTPUT_NODATA = -9999.0
 
     output_file = (
         Path(output)
         if output
-        else data_root / aez / f"P_PET_{aez}_monthly_multiband.tif"
+        else data_root / str(aez) / f"P_PET_{str(aez)}_monthly_multiband.tif"
     )
     output_file.parent.mkdir(parents=True, exist_ok=True)
 

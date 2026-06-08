@@ -2,7 +2,13 @@ import json
 import os
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
-from rest_framework.decorators import api_view, authentication_classes, parser_classes, permission_classes, schema
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    parser_classes,
+    permission_classes,
+    schema,
+)
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
@@ -13,6 +19,11 @@ from computing.change_detection.change_detection_vector import (
 )
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
+)
+from .spei.spei import (
+    generate_spei_pipeline,
+    run_drought_resistance_resilience,
+    run_rainfall_resistance_resilience,
 )
 from .utils import (
     save_layer_info_to_db,
@@ -126,7 +137,6 @@ from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from django.conf import settings
-
 
 
 @api_security_check(allowed_methods="POST")
@@ -1938,7 +1948,9 @@ def update_layer_sync_remote(request):
         d = request.data
         layer_id = d.get("layer_id")
         if layer_id is None:
-            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         result = update_layer_sync_status(
             layer_id=layer_id,
@@ -1968,7 +1980,9 @@ def update_layer_sync_remote(request):
         d = request.data
         layer_id = d.get("layer_id")
         if layer_id is None:
-            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         result = update_layer_sync_status(
             layer_id=layer_id,
@@ -2009,12 +2023,16 @@ def sync_layer_remote(request):
         )
         if layer_id is None:
             return Response(
-                {"error": "Failed to save layer — check state/district/block exist on this server."},
+                {
+                    "error": "Failed to save layer — check state/district/block exist on this server."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
     except KeyError as e:
-        return Response({"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -2028,4 +2046,75 @@ def missing_layers(request):
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_layers_for_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_spei(request):
+    print("Inside generate_spei API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        overwrite = request.data.get("overwrite") or False
+
+        generate_spei_pipeline.apply_async(
+            args=[aez, start_year, end_year, gee_account_id, overwrite], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_spei task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_spei api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def drought_resilience_resistance(request):
+    print("Inside drought_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_drought_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {
+                "Success": "Successfully drought_resilience_resistance generate_spei task"
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in drought_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def rainfall_resilience_resistance(request):
+    print("Inside rainfall_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_rainfall_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {
+                "Success": "Successfully rainfall_resilience_resistance generate_spei task"
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in rainfall_resilience_resistance api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
