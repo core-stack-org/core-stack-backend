@@ -11,18 +11,19 @@ from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 
 from dpr.utils import transform_name
+from moderation.utils.update_csdb import sync_form_type
 from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC, TMP_LOCATION
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.constants import (
     ODK_SYNC_URL_AGRI_FEEDBACK,
     ODK_SYNC_URL_AGRI_MAINTENANCE,
+    ODK_SYNC_URL_AGROHORTICULTURE,
     ODK_SYNC_URL_CROP,
     ODK_SYNC_URL_GW_FEEDBACK,
     ODK_SYNC_URL_GW_MAINTENANCE,
     ODK_SYNC_URL_IRRIGATION_STRUCTURE,
     ODK_SYNC_URL_LIVELIHOOD,
-    ODK_SYNC_URL_AGROHORTICULTURE,
     ODK_SYNC_URL_RECHARGE_STRUCTURE,
     ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
     ODK_SYNC_URL_SETTLEMENT,
@@ -32,15 +33,12 @@ from utilities.constants import (
     ODK_SYNC_URL_WELL,
 )
 
-from moderation.utils.update_csdb import sync_form_type
-
 logger = logging.getLogger(__name__)
 
 from .build_layer import build_layer
 from .models import ODKSyncLog, Plan
 from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_db_data
-
 
 _COMMON_REQUIRED_FIELDS: Tuple[str, ...] = (
     "layer_name",
@@ -101,9 +99,7 @@ def add_plan(request):
 
 
 # MARK: Build Layer Helpers (shared by /add_resources and /add_works)
-def _extract_payload(
-    request, kind: str
-) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+def _extract_payload(request, kind: str) -> Tuple[Optional[Dict[str, Any]], List[str]]:
     """Pull and normalize the request payload. Returns (payload, missing_fields)."""
     type_field = _LAYER_KIND_CONFIG[kind]["type_field"]
     required = (*_COMMON_REQUIRED_FIELDS, type_field)
@@ -545,7 +541,7 @@ def _validate_sync_request(
             "propose_maintenance_ws_swb",
             "propose_maintenance_irrigation_st",
             "livelihood",
-            "agrohorticulture"
+            "agrohorticulture",
         ]
         if work_type not in valid_work_types:
             return Response(
