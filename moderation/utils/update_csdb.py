@@ -1,14 +1,20 @@
+import logging
+from datetime import timezone as dt_tz
+
 import requests
-from nrm_app.settings import ODK_USERNAME, ODK_PASSWORD
-from .utils import *
-from .get_submissions import get_edited_updated_all_submissions
-from .form_mapping import corestack
-from utilities.constants import ODK_BASE_URL, project_id
+
 from moderation.models import SyncMetadata
+from nrm_app.settings import ODK_PASSWORD, ODK_USERNAME
+from utilities.constants import ODK_BASE_URL, project_id
+
+from .form_mapping import corestack
+from .get_submissions import get_edited_updated_all_submissions
+from .utils import *
+
+_sync_logger = logging.getLogger(__name__)
 
 
 def get_dynamic_filter_query():
-    from datetime import timezone as dt_tz
 
     metadata = SyncMetadata.get_odk_sync_metadata()
     filter_date = metadata.get_filter_date()
@@ -237,6 +243,71 @@ def resync_agrohorticulture(agrohorticulture_submissions):
         sync_edited_updated_agrohorticulture(agrohorticulture_submission)
         count += 1
     print(f"{count} agrohorticulture submissions synced")
+
+
+_FORM_SYNC_CONFIG = {
+    # Resources
+    "settlement":       ("Settlement Form",                                           resync_settlement),
+    "well":             ("Well Form",                                                 resync_well),
+    "waterbody":        ("water body form",                                           resync_waterbody),
+    "cropping":         ("cropping pattern form",                                     resync_cropping),
+    # New works
+    "plan_gw":          ("new recharge structure form",                               resync_gw),
+    "plan_agri":        ("new irrigation form",                                       resync_agri),
+    "livelihood":       ("livelihood form",                                           resync_livelihood),
+    # Maintenance works
+    "main_swb":         ("propose maintenance on water structure form",               resync_swb_maintenance),
+    "main_gw":          ("propose maintenance on existing water recharge form",      resync_gw_maintenance),
+    "main_swb_rs":      ("propose maintenance of remotely sensed water structure form", resync_swb_rs_maintenance),
+    "main_agri":        ("propose maintenance on existing irrigation form",          resync_agri_maintenance),
+    # Other works
+    "agrohorticulture": ("Agrohorticulture",                                          resync_agrohorticulture),
+}
+
+
+def sync_form_type(resource_type: str) -> bool:
+    """
+    Incremental sync for a single ODK form type to DB, using the same
+    last_synced_at cursor as the full sync. Does not advance the cursor —
+    that is reserved for the full resync_db_odk() run.
+    """
+    config = _FORM_SYNC_CONFIG.get(resource_type)
+    if not config:
+        _sync_logger.warning(f"sync_form_type: unknown resource_type '{resource_type}'")
+        return False
+    form_key, resync_fn = config
+    _sync_logger.info(
+        f"sync_form_type: starting incremental sync for resource_type='{resource_type}' "
+        f"form='{form_key}'"
+    )
+    try:
+        filter_query = get_dynamic_filter_query()
+        _sync_logger.info(f"sync_form_type: using filter_query='{filter_query}'")
+        client = get_edited_updated_all_submissions(
+            username=ODK_USERNAME,
+            password=ODK_PASSWORD,
+            base_url=ODK_BASE_URL,
+        )
+        submissions = client.get_edited_updated_submissions(
+            project_id=project_id,
+            form_id=corestack[form_key],
+            filter_query=filter_query,
+        )
+        _sync_logger.info(
+            f"sync_form_type: fetched {len(submissions)} submission(s) from ODK "
+            f"for resource_type='{resource_type}'"
+        )
+        resync_fn(submissions)
+        _sync_logger.info(
+            f"sync_form_type: completed sync for resource_type='{resource_type}'"
+        )
+        return True
+    except Exception as e:
+        _sync_logger.error(
+            f"sync_form_type: failed for resource_type='{resource_type}': {e}",
+            exc_info=True,
+        )
+        return False
 
 
 def resync_db_odk():
