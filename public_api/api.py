@@ -17,8 +17,8 @@ from .views import (
     get_mws_json_from_kyl_indicator,
     get_tehsil_json,
     generate_mws_report_url,
-    get_mws_geometries_data,
-    get_village_geometries_data,
+    get_mws_geometry,
+    get_village_geometries,
 )
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
@@ -31,8 +31,18 @@ from .swagger_schemas import (
     kyl_indicators_schema,
     generate_active_locations_schema,
     get_mws_data_schema,
-    get_village_geometries_schema,
-    get_mws_geometries_schema,
+    get_mws_data_v2_schema,
+    mws_geometries_schema,
+    village_geometries_schema,
+    admin_by_latlon_schema_v2,
+    mws_by_latlon_schema_v2,
+    tehsil_data_schema_v2,
+    kyl_indicators_schema_v2,
+    generated_layer_urls_schema_v2,
+    mws_report_urls_schema_v2,
+    mws_geometries_schema_v2,
+    village_geometries_schema_v2,
+    generate_active_locations_schema_v2,
 )
 from geoadmin.utils import (
     transform_data,
@@ -364,7 +374,7 @@ def get_mws_data(request):
         )
 
 
-@swagger_auto_schema(**get_mws_data_schema)
+@swagger_auto_schema(**get_mws_data_v2_schema)
 @api_security_check(auth_type="API_key")
 def get_mws_data_v2(request):
     """
@@ -817,67 +827,58 @@ def generate_active_locations(request):
         )
 
 
-@swagger_auto_schema(**get_mws_geometries_schema)
+# Thin v2 wrappers so Swagger/ReDoc lists each /api/v2/ route separately.
+
+
+@swagger_auto_schema(**admin_by_latlon_schema_v2)
 @api_security_check(auth_type="API_key")
-def get_mws_geometries(request):
-    print("Inside get MWS geometries")
-    try:
-        state = valid_gee_text(request.query_params.get("state", "").lower())
-        district = valid_gee_text(request.query_params.get("district", "").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
-
-        if not all([state, district, tehsil]):
-            return Response(
-                {"error": "All parameters (state, district, tehsil) are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        # Get geometry data
-        success, result = get_mws_geometries_data(state, district, tehsil)
-        if not success:
-            return Response(
-                {"error": result},  # result contains error message
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Return geometry
-        return Response(result, status=status.HTTP_200_OK)
-
-    except Exception as e:
-        return Response(
-            {"error": f"Internal server error: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+def get_admin_details_by_lat_lon_v2(request):
+    return get_admin_details_by_lat_lon(request)
 
 
-@swagger_auto_schema(**get_village_geometries_schema)
+@swagger_auto_schema(**mws_by_latlon_schema_v2)
 @api_security_check(auth_type="API_key")
-def get_village_geometries(request):
-    print("Inside get Village geometries")
-    try:
-        state = valid_gee_text(request.query_params.get("state", "").lower())
-        district = valid_gee_text(request.query_params.get("district", "").lower())
-        tehsil = valid_gee_text(request.query_params.get("tehsil", "").lower())
+def get_mws_by_lat_lon_v2(request):
+    return get_mws_by_lat_lon(request)
 
-        if not all([state, district, tehsil]):
-            return Response(
-                {"error": "All parameters (state, district, tehsil) are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
-        # Get geometry data
-        success, result = get_village_geometries_data(state, district, tehsil)
+@swagger_auto_schema(**tehsil_data_schema_v2)
+@api_security_check(auth_type="API_key")
+def generate_tehsil_data_v2(request):
+    return generate_tehsil_data(request)
 
-        if not success:
-            return Response(
-                {"error": result},  # result contains error message
-                status=status.HTTP_404_NOT_FOUND,
-            )
 
-        # Return geometry
-        return Response(result, status=status.HTTP_200_OK)
+@swagger_auto_schema(**kyl_indicators_schema_v2)
+@api_security_check(auth_type="API_key")
+def get_mws_json_by_kyl_indicator_v2(request):
+    return get_mws_json_by_kyl_indicator(request)
 
-    except Exception as e:
-        return Response(
-            {"error": f"Internal server error: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
+
+@swagger_auto_schema(**generated_layer_urls_schema_v2)
+@api_security_check(auth_type="API_key")
+def get_generated_layer_urls_v2(request):
+    return get_generated_layer_urls(request)
+
+
+@swagger_auto_schema(**mws_report_urls_schema_v2)
+@api_security_check(auth_type="API_key")
+def get_mws_report_urls_v2(request):
+    return get_mws_report_urls(request)
+
+
+@swagger_auto_schema(**mws_geometries_schema_v2)
+@api_security_check(auth_type="API_key")
+def get_mws_geometries_v2(request):
+    return get_mws_geometries(request)
+
+
+@swagger_auto_schema(**village_geometries_schema_v2)
+@api_security_check(auth_type="API_key")
+def get_village_geometries_api_v2(request):
+    return get_village_geometries_api(request)
+
+
+@swagger_auto_schema(**generate_active_locations_schema_v2)
+@api_security_check(auth_type="API_key")
+def generate_active_locations_v2(request):
+    return generate_active_locations(request)
