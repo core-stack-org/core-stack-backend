@@ -18,6 +18,7 @@ from nrm_app.celery import app
 from nrm_app.settings import (
     BASE_DIR,
     GEOSERVER_PASSWORD,
+    GEOSERVER_URL,
     GEOSERVER_USERNAME,
     S3_ACCESS_KEY,
     S3_SECRET_KEY,
@@ -1153,8 +1154,11 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
 class STACCollectionGenerator:
     def __init__(self, config=None):
         self.config = config or STACConfig()
+        geoserver_base_url = (GEOSERVER_URL or "").strip().rstrip("/")
+        if not geoserver_base_url:
+            geoserver_base_url = self.config.geoserver_base_url
         self.geoserver = GeoServerClient(
-            self.config.geoserver_base_url,
+            geoserver_base_url,
             username=GEOSERVER_USERNAME,
             password=GEOSERVER_PASSWORD,
         )
