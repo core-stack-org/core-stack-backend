@@ -1,4 +1,5 @@
 import logging
+import requests
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -97,6 +98,19 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
         )
 
 
+def verify_recaptcha(token):
+    response = requests.post(
+        "https://www.google.com/recaptcha/api/siteverify",
+        data={
+            "secret": settings.RECAPTCHA_SECRET_KEY,
+            "response": token,
+        },
+    )
+
+    result = response.json()
+
+    return result.get("success", False)
+
 class LoginView(TokenObtainPairView):
     """
     API endpoint for user login.
@@ -106,17 +120,32 @@ class LoginView(TokenObtainPairView):
     schema = None
 
     def post(self, request, *args, **kwargs):
+
+        
         # Call parent class method to validate credentials and get tokens
-        response = super().post(request, *args, **kwargs)
+            captcha_token = request.data.get("captcha")
 
-        token = response.data.get("access")
-        jwt_auth = JWTAuthentication()
-        validated_token = jwt_auth.get_validated_token(token)
-        user = jwt_auth.get_user(validated_token)
+            if not captcha_token:
+                return Response(
+                    {"message": "Captcha is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        response.data["user"] = UserSerializer(user).data
+            if not verify_recaptcha(captcha_token):
+                return Response(
+                    {"message": "Invalid captcha"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            response = super().post(request, *args, **kwargs)
 
-        return response
+            token = response.data.get("access")
+            jwt_auth = JWTAuthentication()
+            validated_token = jwt_auth.get_validated_token(token)
+            user = jwt_auth.get_user(validated_token)
+
+            response.data["user"] = UserSerializer(user).data
+
+            return response
 
 
 class LogoutView(generics.GenericAPIView):

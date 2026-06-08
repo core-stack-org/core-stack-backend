@@ -418,6 +418,7 @@ PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 FERNET_KEY = env("FERNET_KEY")
 
 API_KEY = env("API_KEY", default="")
+RECAPTCHA_SECRET_KEY = env("RECAPTCHA_SECRET_KEY", default="")
 
 
 lulc_years = [
@@ -433,3 +434,4 @@ water_classes = [2, 3, 4]
 
 GEE_STORAGE_PROJECT = env("GEE_STORAGE_PROJECT")
 GEE_STORAGE_PROJECT_HELPER = env("GEE_STORAGE_PROJECT_HELPER")
+
