@@ -181,8 +181,7 @@ def get_section_c_data(plan, language):
 
 
 def get_section_d_data(plan, settlement_mws_ids, mws_gdf, language):
-
-    unique_mws_ids = sorted(set([mws_id for _, mws_id in settlement_mws_ids]))
+    unique_mws_ids = sorted({item["mws_id"] for item in settlement_mws_ids})
 
     all_wells_with_mws = get_all_wells_with_mws(
         plan,
