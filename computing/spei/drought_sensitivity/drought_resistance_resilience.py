@@ -1,34 +1,37 @@
 import ee
 
 from utilities.constants import AEZ
-from utilities.gee_utils import export_raster_asset_to_gee, ee_initialize
+from utilities.gee_utils import (
+    export_raster_asset_to_gee,
+    ee_initialize,
+    is_gee_asset_exists,
+)
 
 
-# /**
-#  * Forest Sensitivity Analysis Pipeline — Script 2
-#  * Drought Resistance & Resilience
-#  *
-#  * For each forest pixel, computes mean resistance and resilience
-#  * across all drought years (SPEI-12 < threshold).
-#  *
-#  * Resistance  = Yn_bar / |Ye - Yn_bar|
-#  * Resilience  = |Ye - Yn_bar| / |Y(e+1) - Yn_bar|
-#  *
-#  * Where:
-#  *   Yn_bar = mean NDVI across non-drought years (baseline)
-#  *   Ye     = NDVI during drought year
-#  *   Y(e+1) = NDVI the year after drought
-#  *
-#  * Requires:
-#  *   - Forest mask asset from Script 1
-#  *   - SPEI-12 assets from spei-drought-analysis-pipeline
-#  */
-#
-# # CONFIGURATION :=
 def generate_drought_resistance(
     aez, start_year=2004, end_year=2022, gee_account_id=None
 ):
-    ee_initialize(7)
+    """
+    Forest Sensitivity Analysis Pipeline — Script 2
+    Drought Resistance & Resilience
+
+    For each forest pixel, computes mean resistance and resilience
+    across all drought years (SPEI-12 < threshold).
+
+    Resistance  = Yn_bar / |Ye - Yn_bar|
+    Resilience  = |Ye - Yn_bar| / |Y(e+1) - Yn_bar|
+
+    Where:
+      Yn_bar = mean NDVI across non-drought years (baseline)
+      Ye     = NDVI during drought year
+      Y(e+1) = NDVI the year after drought
+
+    Requires:
+      - Forest mask asset from Script 1
+      - SPEI-12 assets from spei-drought-analysis-pipeline
+    """
+
+    ee_initialize(gee_account_id)
 
     TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_Period_{str(2003)}_{str(end_year)}"
     OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
@@ -36,7 +39,9 @@ def generate_drought_resistance(
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
 
-    STATE_NAME = "Madhya Pradesh"
+    if is_gee_asset_exists(OUTPUT_ASSET_ID):
+        return None
+
     DROUGHT_THRESHOLD = -1.0  # SPEI-12 below this = drought year
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
@@ -54,9 +59,6 @@ def generate_drought_resistance(
     spei12_raw = ee.Image(SPEI12_ASSET)
     spei12_bandnames = []
 
-    # for (yn = 2004 yn <= 2023 yn++) {
-    #   spei12_bandnames.push('y' + yn)
-    # }
     for yn in range(2004, 2024):
         spei12_bandnames.append("y" + str(yn))
 
@@ -64,13 +66,6 @@ def generate_drought_resistance(
 
     # Build per-year SPEI collection
     speiImages = []
-    # for (y = START_YEAR y <= END_YEAR y++) {
-    #   speiImages.push(
-    #     spei12_named.select('y' + y)
-    #       .rename('spei')
-    #       .set('year', y)
-    #   )
-    # }
 
     for y in range(start_year, end_year + 1):
         speiImages.append(
@@ -85,7 +80,7 @@ def generate_drought_resistance(
         mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
         return image.updateMask(mask)
 
-    def getAnnualNDVI(year):
+    def get_annual_ndvi(year):
         start = ee.Date.fromYMD(year, 1, 1)
         end = ee.Date.fromYMD(year, 12, 31)
 
@@ -115,7 +110,7 @@ def generate_drought_resistance(
 
     # Load NDVI for START_YEAR to END_YEAR+1 (need next year for resilience)
     ndviYears = ee.List.sequence(start_year, end_year + 1)
-    ndviCol = ee.ImageCollection(ndviYears.map(getAnnualNDVI))
+    ndviCol = ee.ImageCollection(ndviYears.map(get_annual_ndvi))
 
     # BASELINE NDVI (Yn_bar) :=
     # Mean NDVI across non-drought years only
@@ -123,7 +118,7 @@ def generate_drought_resistance(
 
     analysisYears = ee.List.sequence(start_year, end_year)
 
-    def ndviNonDroughtFunc(y):
+    def ndvi_non_drought_func(y):
         year = ee.Number(y)
         ndvi = ndviCol.filter(ee.Filter.eq("year", year)).first()
         spei = (
@@ -136,13 +131,13 @@ def generate_drought_resistance(
         isNonDrought = spei.gte(DROUGHT_THRESHOLD)
         return ndvi.updateMask(isNonDrought).set("year", year)
 
-    ndviNonDrought = ee.ImageCollection(analysisYears.map(ndviNonDroughtFunc))
+    ndviNonDrought = ee.ImageCollection(analysisYears.map(ndvi_non_drought_func))
 
     Yn_bar = ndviNonDrought.mean().rename("ndvi_baseline")
 
     # RESISTANCE & RESILIENCE :=
 
-    def metricsColFunc(y):
+    def metrics_col_func(y):
         year = ee.Number(y)
 
         ndviYe = ndviCol.filter(ee.Filter.eq("year", year)).first()
@@ -167,7 +162,7 @@ def generate_drought_resistance(
 
         return ee.Image.cat([resistance, resilience]).updateMask(mask).set("year", year)
 
-    metricsCol = ee.ImageCollection(analysisYears.map(metricsColFunc))
+    metricsCol = ee.ImageCollection(analysisYears.map(metrics_col_func))
 
     # AGGREGATE & EXPORT :=
 
@@ -178,6 +173,8 @@ def generate_drought_resistance(
         meanResilience.rename("resilience")
     )
 
-    export_raster_asset_to_gee(
+    task_id = export_raster_asset_to_gee(
         finalOutput, OUTPUT_DESC, OUTPUT_ASSET_ID, scale=30, region=aoi
     )
+
+    return task_id

@@ -247,4 +247,15 @@ urlpatterns = [
     path(
         "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
     ),
+    path("spei/", api.generate_spei, name="spei"),
+    path(
+        "drought_resilience_resistance/",
+        api.drought_resilience_resistance,
+        name="drought_resilience_resistance",
+    ),
+    path(
+        "rainfall_resilience_resistance/",
+        api.rainfall_resilience_resistance,
+        name="rainfall_resilience_resistance",
+    ),
 ]

@@ -1,8 +1,14 @@
 import ee
 from utilities.constants import AEZ
-from utilities.gee_utils import export_raster_asset_to_gee, ee_initialize
+from utilities.gee_utils import (
+    export_raster_asset_to_gee,
+    ee_initialize,
+    is_gee_asset_exists,
+)
 
-"""
+
+def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_id=None):
+    """
     Forest Sensitivity Analysis Pipeline — Script 1
     Hybrid 30m Annual Tree Cover Mask + Contiguous Forest Period
 
@@ -12,21 +18,22 @@ from utilities.gee_utils import export_raster_asset_to_gee, ee_initialize
     Sources:
       1. GLC-FCS30D (2003–2022)
       2. . Dynamic World (2015–present)
-      3. IndiaSat LULC (2017–2024), Core-stack.
+      3. IndiaSat LULC (2017–present), Core-stack.
 
     Union logic: majority vote among active datasets per year.
       GLC-FCS30D: 2003–2022 (classes 51–92)
       Dynamic World: 2015–present (class 1 = Trees)
-      IndiaSat LULC: 2017–2024 (class 6 = Trees)
+      IndiaSat LULC: 2017–present (class 6 = Trees)
 
     Temporal correction: ±2 year window as used in other places too by the team.
-"""
+    """
 
-
-def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_id=None):
-    ee_initialize(7)
+    ee_initialize(gee_account_id)
 
     TEMPORAL_WINDOW = 2
+
+    start_year = 2003
+    LULC_START_YEAR = 2017
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
 
@@ -34,6 +41,9 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_i
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
+
+    if is_gee_asset_exists(OUTPUT_ASSET_ID):
+        return None, OUTPUT_ASSET_ID
 
     # DATASET PREPARATION :=
     # --- GLC-FCS30D ---
@@ -46,7 +56,7 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_i
 
     # --- IndiaSat LULC ---
     indiaSatList = []
-    for year in range(2017, end_year + 1):
+    for year in range(LULC_START_YEAR, end_year + 1):
         indiaSatList.append(
             ee.Image(
                 f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}_{year+1}"
@@ -167,4 +177,4 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_i
         finalOutput, OUTPUT_DESC, OUTPUT_ASSET_ID, scale=30, region=aoi
     )
 
-    return task_id
+    return task_id, OUTPUT_ASSET_ID

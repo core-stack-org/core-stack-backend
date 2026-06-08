@@ -4,16 +4,12 @@ import subprocess
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-R_SCRIPT = BASE_DIR / "drought" / "drought_spei.R"
+R_SCRIPT = BASE_DIR / "generate_spei" / "compute_spei.R"
 
 
-def run_spei_pipeline(aez=None):
+def run_spei(aez=None, start_year=None, end_year=None):
     print(aez)
-    command = [
-        "Rscript",
-        str(R_SCRIPT),
-        aez,
-    ]
+    command = ["Rscript", str(R_SCRIPT), str(aez), str(start_year), str(end_year)]
 
     print("COMMAND:", command)
 
