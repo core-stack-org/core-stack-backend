@@ -460,6 +460,117 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
     return {"Mws_report_url": report_url}, None
 
 
+def get_mws_geometry(state, district, tehsil, mws_id):
+    """
+    Fetch GeoJSON geometry for a single MWS uid from the generated MWS layer.
+    """
+    ee_initialize(GEE_HELPER_ACCOUNT_ID)
+    asset_path = get_gee_asset_path(state, district, tehsil)
+    mws_asset_id = asset_path + f"filtered_mws_{district}_{tehsil}_uid"
+
+    if not is_gee_asset_exists(mws_asset_id):
+        return None, Response(
+            {"error": "Mws Layer not found for the given location."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        mws_fc = ee.FeatureCollection(mws_asset_id)
+        matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
+        feature_info = (
+            matching_feature.getInfo() if matching_feature is not None else None
+        )
+        if feature_info is None:
+            return None, Response(
+                {"error": "Data not found for the given mws_id"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return (
+            {
+                "uid": mws_id,
+                "state": state,
+                "district": district,
+                "tehsil": tehsil,
+                "geometry": feature_info.get("geometry"),
+            },
+            None,
+        )
+    except Exception as e:
+        return None, Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def get_village_geometries(state, district, tehsil, village_id=None):
+    """
+    Fetch village geometries from panchayat boundaries layer for a block.
+    """
+    try:
+        layer_name = f"{district}_{tehsil}"
+        village_gdf = gpd.read_file(get_url("panchayat_boundaries", layer_name))
+        if village_gdf.empty:
+            return None, Response(
+                {"error": "No village boundaries found for the given location."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        columns = list(village_gdf.columns)
+        col_lookup = {str(c).strip().lower(): c for c in columns}
+
+        id_candidates = [
+            "vill_id",
+            "villid",
+            "village_id",
+            "villageid",
+            "id",
+        ]
+        name_candidates = [
+            "vill_name",
+            "village_name",
+            "village",
+            "name",
+        ]
+
+        id_col = next((col_lookup[k] for k in id_candidates if k in col_lookup), None)
+        name_col = next(
+            (col_lookup[k] for k in name_candidates if k in col_lookup), None
+        )
+
+        if id_col is None or name_col is None or "geometry" not in village_gdf.columns:
+            return None, Response(
+                {"error": "Village boundary layer schema is missing required fields."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if village_id is not None:
+            village_gdf = village_gdf[
+                village_gdf[id_col].astype(str) == str(village_id)
+            ]
+            if village_gdf.empty:
+                return None, Response(
+                    {"error": "Village not found for the given village_id."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        rows = []
+        for _, row in village_gdf.iterrows():
+            rows.append(
+                {
+                    "village_id": str(row.get(id_col))
+                    if row.get(id_col) is not None
+                    else None,
+                    "village_name": row.get(name_col),
+                    "state": state,
+                    "district": district,
+                    "tehsil": tehsil,
+                    "geometry": row.get("geometry").__geo_interface__
+                    if row.get("geometry") is not None
+                    else None,
+                }
+            )
+        return rows, None
+    except Exception as e:
+        return None, Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 def get_mws_geometries_data(state, district, tehsil):
     try:
         base_url = f"{GEOSERVER_URL}/mws/ows"
