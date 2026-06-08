@@ -43,6 +43,11 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .cropping_intensity.cropping_intesity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
+from .spei.spei import (
+    generate_spei_pipeline,
+    run_drought_resistance_resilience,
+    run_rainfall_resistance_resilience,
+)
 from .drought.drought import calculate_drought
 from .drought.drought_causality import drought_causality
 from .local_compute_helper import (
@@ -164,7 +169,6 @@ from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
-
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
@@ -2152,6 +2156,29 @@ def generate_fabdem_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+def generate_spei(request):
+    print("Inside generate_spei API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        overwrite = request.data.get("overwrite") or False
+
+        generate_spei_pipeline.apply_async(
+            args=[aez, start_year, end_year, gee_account_id, overwrite], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_spei task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_spei api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
 def generate_canal_vector(request):
     print("Inside generate canal vector layer API.")
     try:
@@ -2169,4 +2196,52 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def drought_resilience_resistance(request):
+    print("Inside drought_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_drought_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {
+                "Success": "Successfully drought_resilience_resistance generate_spei task"
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in drought_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def rainfall_resilience_resistance(request):
+    print("Inside rainfall_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_rainfall_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {
+                "Success": "Successfully rainfall_resilience_resistance generate_spei task"
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in rainfall_resilience_resistance api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -1,50 +1,50 @@
 import ee
 
 from utilities.constants import AEZ
-from utilities.gee_utils import export_raster_asset_to_gee, ee_initialize
+from utilities.gee_utils import (
+    export_raster_asset_to_gee,
+    ee_initialize,
+    is_gee_asset_exists,
+)
 
 
 def rainfall_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
-    # /**
-    #  * Forest Sensitivity Analysis Pipeline — Script 3a
-    #  * Heavy Rainfall Index Export
-    #  *
-    #  * Computes two quantities per pixel per year and exports as a single
-    #  * multiband asset — one band per year for each quantity:
-    #  *
-    #  *   Hm_{year}     = annual sum of precipitation on heavy days
-    #  *   zScore_{year} = z-score of Hm relative to the full period mean/stddev
-    #  *
-    #  * Heavy day definition: daily precipitation > long-term 95th percentile (CHIRPS)
-    #  * Z-score computed across all years in the period.
-    #  *
-    #  * Output asset bands:
-    #  *   Hm_2004, Hm_2005, ..., Hm_2023      (19 bands)
-    #  *   zScore_2004, ..., zScore_2023        (19 bands)
-    #  *   Total: 38 bands
-    #  *
-    #  * This asset is the direct input to Script 3b, analogous to how
-    #  * SPEI assets are the input to Script 2 (drought).
-    #  *
-    #  * Requires: nothing — only public datasets (CHIRPS)
-    #  */
-    #
-    # #===========================================================================
-    # #                          1. CONFIGURATION
-    # #===========================================================================
-    ee_initialize(7)
+    """
+    Forest Sensitivity Analysis Pipeline — Script 3a
+    Heavy Rainfall Index Export
+
+    Computes two quantities per pixel per year and exports as a single
+    multiband asset — one band per year for each quantity:
+
+      Hm_{year}     = annual sum of precipitation on heavy days
+      zScore_{year} = z-score of Hm relative to the full period mean/stddev
+
+    Heavy day definition: daily precipitation > long-term 95th percentile (CHIRPS)
+    Z-score computed across all years in the period.
+
+    Output asset bands:
+      Hm_2004, Hm_2005, ..., Hm_2023      (19 bands)
+      zScore_2004, ..., zScore_2023        (19 bands)
+      Total: 38 bands
+
+    This asset is the direct input to Script 3b, analogous to how
+    SPEI assets are the input to Script 2 (drought).
+
+    Requires: nothing — only public datasets (CHIRPS)
+    """
+
+    ee_initialize(gee_account_id)
     OUTPUT_DESC = f"Rain_Index_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
 
-    # ===========================================================================
-    #                          2. AOI
-    # ===========================================================================
+    if is_gee_asset_exists(OUTPUT_ASSET_ID):
+        return None
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
     # ===========================================================================
-    #                    3. HEAVY RAINFALL INDEX (Hm)
+    #                    HEAVY RAINFALL INDEX (Hm)
     # ===========================================================================
 
     chirps = (
@@ -83,7 +83,7 @@ def rainfall_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     annualHm = ee.ImageCollection(years.map(annualHmFunc))
 
     # ===========================================================================
-    #                    4. Z-SCORE ACROSS ALL YEARS
+    #                    Z-SCORE ACROSS ALL YEARS
     # ===========================================================================
 
     hmMean = annualHm.mean().rename("Hm_mean")
@@ -98,7 +98,7 @@ def rainfall_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     annualZScore = ee.ImageCollection(years.map(annualZScoreFunc))
 
     # ===========================================================================
-    #                    5. STACK INTO SINGLE MULTIBAND IMAGE
+    #                    STACK INTO SINGLE MULTIBAND IMAGE
     # ===========================================================================
 
     # Build one image with 38 named bands:
@@ -122,6 +122,8 @@ def rainfall_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     output_image = ee.Image(years.iterate(add_bands_for_year, empty_image))
     output_image = output_image.select(output_image.bandNames().remove("constant"))
 
-    export_raster_asset_to_gee(
+    task_id = export_raster_asset_to_gee(
         output_image.clip(aoi), OUTPUT_DESC, OUTPUT_ASSET_ID, scale=5566, region=aoi
     )
+
+    return task_id

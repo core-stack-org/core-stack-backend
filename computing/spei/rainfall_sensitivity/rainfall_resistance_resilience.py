@@ -1,28 +1,31 @@
 import ee
 
 from utilities.constants import AEZ
-from utilities.gee_utils import export_raster_asset_to_gee, ee_initialize
+from utilities.gee_utils import (
+    export_raster_asset_to_gee,
+    ee_initialize,
+    is_gee_asset_exists,
+)
 
 
-def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None):
-    # /**
-    #  * Forest Sensitivity Analysis Pipeline — Script 3b
-    #  * Heavy Rainfall Resistance & Resilience
-    #  *
-    #  * Signed resistance (both +ve and -ve events):
-    #  *   Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
-    #  *
-    #  * Resilience computed ONLY when Ye < Yn_bar (negative effect years):
-    #  *   Resilience = |Ye - Yn_bar| / |Ye+1 - Yn_bar| × sign(Ye+1 - Yn_bar)
-    #  *
-    #  * Requires:
-    #  *   - Forest mask asset (Script 1)
-    #  *   - Rainfall index asset (Script 3a)
-    #  */
-    #
-    # # Configuration :=
-    #
-    ee_initialize(7)
+def generate_rainfall_resilience(
+    aez, start_year=2004, end_year=2022, gee_account_id=None
+):
+    """
+    Forest Sensitivity Analysis Pipeline — Script 3b
+    Heavy Rainfall Resistance & Resilience
+
+    Signed resistance (both +ve and -ve events):
+      Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
+
+    Resilience computed ONLY when Ye < Yn_bar (negative effect years):
+      Resilience = |Ye - Yn_bar| / |Ye+1 - Yn_bar| × sign(Ye+1 - Yn_bar)
+
+    Requires:
+      - Forest mask asset (Script 1)
+      - Rainfall index asset (Script 3a)
+    """
+    ee_initialize(gee_account_id)
     TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_Period_{str(2003)}_{str(end_year)}"
     RAIN_INDEX_ASSET = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Rain_Index_AEZ_{aez}"
@@ -32,6 +35,9 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
+
+    if is_gee_asset_exists(OUTPUT_ASSET_ID):
+        return None
 
     Z_THRESHOLD = 1.0
 
@@ -64,12 +70,12 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
     zScoreCol = ee.ImageCollection(zScoreCol_list)
 
     # LANDSAT NDVI :=
-    def maskClouds(image):
+    def mask_clouds(image):
         qa = image.select("QA_PIXEL")
         mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
         return image.updateMask(mask)
 
-    def getAnnualNDVI(year):
+    def get_annual_ndvi(year):
         start = ee.Date.fromYMD(year, 1, 1)
         end = ee.Date.fromYMD(year, 12, 31)
 
@@ -78,7 +84,7 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
             .merge(ee.ImageCollection("LANDSAT/LC09/C02/T1_L2"))
             .filterDate(start, end)
             .filterBounds(aoi)
-            .map(maskClouds)
+            .map(mask_clouds)
             .map(
                 lambda img: img.normalizedDifference(["SR_B5", "SR_B4"]).rename("ndvi")
             )
@@ -89,7 +95,7 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
             .merge(ee.ImageCollection("LANDSAT/LE07/C02/T1_L2"))
             .filterDate(start, end)
             .filterBounds(aoi)
-            .map(maskClouds)
+            .map(mask_clouds)
             .map(
                 lambda img: img.normalizedDifference(["SR_B4", "SR_B3"]).rename("ndvi")
             )
@@ -98,7 +104,7 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
         return l89.merge(l57).median().set("year", year).rename("ndvi")
 
     ndviCol = ee.ImageCollection(
-        ee.List.sequence(start_year, end_year + 1).map(getAnnualNDVI)
+        ee.List.sequence(start_year, end_year + 1).map(get_annual_ndvi)
     )
 
     # BASELINE NDVI (Yn_bar) :=
@@ -135,7 +141,7 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
     Yn_bar = ndviNonDrought.mean().rename("ndvi_baseline")
     # SIGNED RESISTANCE & RESILIENCE :=
 
-    def metricsColFunc(y):
+    def metrics_col_func(y):
         year = ee.Number(y)
 
         ndviYe = ee.Image(ndviCol.filter(ee.Filter.eq("year", year)).first())
@@ -183,7 +189,7 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
 
         return ee.Image.cat([resistance, resilience]).set("year", year)
 
-    metricsCol = ee.ImageCollection(analysisYears.map(metricsColFunc))
+    metricsCol = ee.ImageCollection(analysisYears.map(metrics_col_func))
 
     # AGGREGATE & EXPORT :=
 
@@ -197,3 +203,5 @@ def rainfall_resilience(aez, start_year=2004, end_year=2022, gee_account_id=None
     task_id = export_raster_asset_to_gee(
         finalOutput, OUTPUT_DESC, OUTPUT_ASSET_ID, scale=30, region=aoi
     )
+
+    return task_id

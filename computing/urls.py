@@ -192,11 +192,6 @@ urlpatterns = [
         name="generate_antyodaya",
     ),
     path(
-        "generate_livestocks/",
-        api.generate_livestocks,
-        name="generate_livestocks",
-    ),
-    path(
         "generate_stac_collection/",
         api.generate_stac_collection,
         name="generate_stac_collection",
@@ -252,25 +247,15 @@ urlpatterns = [
     path(
         "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
     ),
-    path("missing_excel/", api.missing_excel, name="missing_excel"),
+    path("spei/", api.generate_spei, name="spei"),
     path(
-        "generate_tree_in_grassland/",
-        api.generate_tree_in_grassland,
-        name="generate_tree_in_grassland",
+        "drought_resilience_resistance/",
+        api.drought_resilience_resistance,
+        name="drought_resilience_resistance",
     ),
     path(
-        "forest_fringe_degradation/",
-        api.forest_fringe_degradation,
-        name="forest_fringe_degradation",
-    ),
-    path(
-        "generate_forest_fire/",
-        api.generate_forest_fire,
-        name="generate_forest_fire",
-    ),
-    path(
-        "generate_et_downscale/",
-        api.et_downscale,
-        name="et_downscale",
+        "rainfall_resilience_resistance/",
+        api.rainfall_resilience_resistance,
+        name="rainfall_resilience_resistance",
     ),
 ]

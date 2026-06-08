@@ -23,39 +23,11 @@ import ee
 import requests
 
 from utilities.constants import AEZ
-from utilities.gee_utils import ee_initialize
 
 CHIRPS_COLLECTION = "UCSB-CHG/CHIRPS/DAILY"
 MODIS_PET_COLLECTION = "MODIS/061/MOD16A2GF"
 DEFAULT_PROJECT = "ee-corestackdev"
 DATASET_CHOICES = ("chirps", "modis_pet", "both")
-
-
-def initialize_earth_engine(project: str) -> None:
-    # Uses the repo's shared Earth Engine initialization helper.
-    # If auth/project errors happen, debug utilities.gee_utils.ee_initialize first.
-    ee_initialize()
-    print("Earth Engine initialized.")
-
-
-# def get_aoi(aoi_type: str, state_name: str) -> ee.FeatureCollection:
-#     # GAUL level1 contains Indian state boundaries. For pan-India, keep all
-#     # Indian state features and use their combined geometry downstream.
-#     # admin = ee.FeatureCollection("FAO/GAUL/2015/level1").filter(
-#     #     ee.Filter.eq("ADM0_NAME", "India")
-#     # )
-#     # admin = ee.FeatureCollection(
-#     #     "projects/ext-datasets/assets/datasets/State_pan_india"
-#     # )
-#
-#     admin = ee.FeatureCollection(AEZ)
-#
-#     if aoi_type == "india":
-#         admin = admin.filter(ee.Filter.neq("Name", "Andaman & Nicobar")).filter(
-#             ee.Filter.neq("Name", "Lakshadweep")
-#         )
-#         return admin.union()
-#     return admin.filter(ee.Filter.eq("Name", state_name))
 
 
 def date_range(
@@ -279,6 +251,7 @@ def download_dataset_images(
     # aoi_label = "India" if aez == "india" else state
     # safe_aoi = aoi_label.replace(" ", "_")
     name = dataset_label(dataset)
+    print(output_dir, aez, frequency, dataset)
     dataset_output_dir = Path(output_dir) / str(aez) / frequency / dataset
 
     collection, region, _, labeled_dates = build_dataset_image(
@@ -362,7 +335,6 @@ def download_data_locally(
     start_date: str = "2004-01-01",
     end_date: str = "2023-12-31",
     frequency: str = "monthly",
-    project: str = DEFAULT_PROJECT,
     output_dir: str = "data/drought_inputs",
     sleep: float = 0.2,
     max_workers: int = 4,
@@ -372,7 +344,6 @@ def download_data_locally(
     # separate CHIRPS and MODIS PET time-step GeoTIFFs.
     selected_datasets = datasets or ["both"]
     # validate_inputs(aez, selected_datasets, frequency)
-    initialize_earth_engine(project)
 
     expanded_datasets = expand_datasets(selected_datasets)
     for dataset in expanded_datasets:
@@ -392,4 +363,4 @@ def download_data_locally(
             max_workers=max_workers,
         )
 
-    print("Done.")
+    print("Done downloading data.")
