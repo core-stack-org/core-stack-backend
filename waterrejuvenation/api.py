@@ -20,7 +20,12 @@ from utilities.openmeteo_format import (
 )
 from utilities.renderers import round_floats
 from utilities.auth_check_decorator import api_security_check
-from .swagger_schemas import waterbodies_by_admin_schema, waterbodies_by_uuid
+from .swagger_schemas import (
+    waterbodies_by_admin_schema,
+    waterbodies_by_admin_schema_v2,
+    waterbodies_by_uuid,
+    waterbodies_by_uuid_schema_v2,
+)
 from .utils import get_merged_waterbodies_with_zoi
 
 try:
@@ -29,12 +34,17 @@ except Exception:
     MongoClient = None
 from nrm_app.settings import MEDIA_ROOT
 from .models import WaterbodiesDesiltingLog
-from .swagger_schemas import waterbodies_by_admin_schema, waterbodies_by_uuid
+from .swagger_schemas import (
+    waterbodies_by_admin_schema,
+    waterbodies_by_admin_schema_v2,
+    waterbodies_by_uuid,
+    waterbodies_by_uuid_schema_v2,
+)
 from .utils import get_merged_waterbodies_with_zoi
 
 from utilities.auth_check_decorator import api_security_check
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, schema
 import io
 import pandas as pd
 from django.http import HttpResponse
@@ -300,7 +310,7 @@ def get_waterbodies_by_uid(request):
         )
 
 
-@swagger_auto_schema(**waterbodies_by_admin_schema)
+@swagger_auto_schema(**waterbodies_by_admin_schema_v2)
 @api_security_check(auth_type="API_key")
 def get_waterbodies_by_admin_and_uid_v2(request):
     try:
@@ -314,7 +324,7 @@ def get_waterbodies_by_admin_and_uid_v2(request):
         )
 
 
-@swagger_auto_schema(**waterbodies_by_uuid)
+@swagger_auto_schema(**waterbodies_by_uuid_schema_v2)
 @api_security_check(auth_type="API_key")
 def get_waterbodies_by_uid_v2(request):
     try:

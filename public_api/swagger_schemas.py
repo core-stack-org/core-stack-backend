@@ -103,6 +103,44 @@ def error_example(message, details=None):
         payload["details"] = details
     return payload
 
+
+V2_MWS_FORTNIGHT_DESCRIPTION = """
+**``/api/v2/get_mws_data/`` only** — ``data`` uses Open-Meteo-style **fortnight** arrays (~15-day steps):
+
+```json
+{
+  "metadata": { "mws_id": "12_208104" },
+  "fortnight": {
+    "time": ["2024-01-01", "2024-01-15"],
+    "et": [2.5, 3.1],
+    "runoff": [1.3, 0.8],
+    "precipitation": [10.2, 5.4]
+  },
+  "fortnight_units": {
+    "time": "iso8601",
+    "time_step": "15_days",
+    "et": "mm",
+    "runoff": "mm",
+    "precipitation": "mm"
+  }
+}
+```
+
+Query ``regenerate=true`` bypasses MongoDB cache. ``/api/v1/get_mws_data/`` returns legacy ``data.time_series`` rows instead.
+"""
+
+
+def v2_schema_from(base_schema, operation_id, path_suffix):
+    schema = dict(base_schema)
+    schema["operation_id"] = operation_id
+    schema["tags"] = ["Dataset APIs v2"]
+    base_desc = (schema.get("operation_description") or "").strip()
+    schema["operation_description"] = (
+        f"{base_desc}\n\n**Path:** ``GET /api/v2/{path_suffix}``"
+    )
+    return schema
+
+
 # ============= API SCHEMAS =============
 
 # Admin Details by Lat Lon Schema
@@ -113,7 +151,7 @@ admin_by_latlon_schema = {
     "operation_description": """
     Retrieve admin details for the provided coordinates.
 
-    Returns a flat payload under ``data``:
+    ``data`` contains:
     - ``admin_details`` with ``State``, ``District``, ``Tehsil``
     - ``admin_field_hints`` with field semantics
     """,
@@ -168,7 +206,7 @@ mws_by_latlon_schema = {
     "operation_description": """
     Retrieve MWS ID and admin details for the provided coordinates.
 
-    Returns a flat payload under ``data``:
+    ``data`` contains:
     - ``mws_details`` with ``uid``, ``State``, ``District``, ``Tehsil``
     - ``mws_field_hints`` with field semantics
     """,
@@ -209,22 +247,20 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS time series data (ET, runoff, precipitation) for a given state, district, tehsil, and MWS ID.
-    Values are aggregated on **15-day (~fortnight) steps** from GeoServer — not hourly data.
+    Retrieve MWS time series (ET, runoff, precipitation) for state, district, tehsil, and ``mws_id``.
 
-    **Normalized response (v1 ``/api/v1/get_mws_data`` and envelope):** arrays under ``fortnight``
-    with ``fortnight_units.time_step`` = ``15_days``. Each ``date`` is the period start (ISO).
+    **``/api/v1/get_mws_data/``** — ``data`` contains legacy ``time_series`` rows:
 
-    **Raw upstream shape (GeoServer-style):**
-    ```
+    ```json
     {
-        "mws_id": "12_208104",
-        "time_series": [
-            {"date": "2024-01-01", "et": 2.5, "runoff": 1.3, "precipitation": 10.2},
-            {"date": "2024-01-15", "et": 3.1, "runoff": 0.8, "precipitation": 5.4}
-        ]
+      "mws_id": "12_208104",
+      "time_series": [
+        {"date": "2024-01-01", "et": 2.5, "runoff": 1.3, "precipitation": 10.2}
+      ]
     }
     ```
+
+    For Open-Meteo-style fortnight arrays use **``/api/v2/get_mws_data/``** (see *Get MWS Time Series Data (v2 fortnight format)*).
     """,
     "manual_parameters": [
         state_param,
@@ -287,6 +323,84 @@ get_mws_data_schema = {
 }
 
 
+get_mws_data_v2_schema = {
+    "method": "get",
+    "operation_id": "get_mws_data_v2",
+    "operation_summary": "Get MWS Time Series Data (v2 fortnight format)",
+    "operation_description": """
+    Retrieve MWS hydrology time series in **Open-Meteo-style fortnight arrays** (~15-day steps from GeoServer).
+
+    **``GET /api/v2/get_mws_data/``** only.
+    """
+    + "\n\n"
+    + V2_MWS_FORTNIGHT_DESCRIPTION.strip(),
+    "manual_parameters": [
+        state_param,
+        district_param,
+        tehsil_param,
+        mws_id_param,
+        openapi.Parameter(
+            "regenerate",
+            openapi.IN_QUERY,
+            description="Set true/1/yes to bypass MongoDB cache and refresh from GeoServer",
+            type=openapi.TYPE_STRING,
+            required=False,
+        ),
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - fortnight-aligned MWS time series in v2 envelope",
+            examples={
+                "application/json": success_example(
+                    {
+                        "metadata": {"mws_id": "12_208104"},
+                        "fortnight": {
+                            "time": ["2024-01-01", "2024-01-15"],
+                            "et": [2.5, 3.1],
+                            "runoff": [1.3, 0.8],
+                            "precipitation": [10.2, 5.4],
+                        },
+                        "fortnight_units": {
+                            "time": "iso8601",
+                            "time_step": "15_days",
+                            "et": "mm",
+                            "runoff": "mm",
+                            "precipitation": "mm",
+                        },
+                    }
+                )
+            },
+        ),
+        400: openapi.Response(
+            description="Bad Request - Missing required parameters or invalid format",
+            examples={
+                "application/json": error_example(
+                    "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                )
+            },
+        ),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(
+            description="Not Found - MWS ID not found",
+            examples={
+                "application/json": error_example("Data not found for the given mws_id")
+            },
+        ),
+        500: openapi.Response(
+            description="Internal Server Error",
+            examples={
+                "application/json": error_example(
+                    "Internal server error while fetching MWS data",
+                    details="Error message details",
+                )
+            },
+        ),
+    },
+    "tags": ["Dataset APIs v2"],
+}
+
+
 # Tehsil Data Schema
 tehsil_data_schema = {
     "method": "get",
@@ -294,21 +408,8 @@ tehsil_data_schema = {
     "operation_summary": "Get Tehsil Data",
     "operation_description": """
     Retrieve tehsil-level JSON data for a given state, district, and tehsil.
-    
-    **Response dataset details:**
-    ```
-        [
-           "aquifer_vector": [
-                {
-                    "uid": "MWS_id",
-                    "area_in_ha": "Area for the mws",
-                    "aquifer_class": "Class for the aquifer",
-                    "principle_aq_alluvium_percent": "Total percentage area under aquifer class",
-                    "principle_aq_banded gneissic complex_percent": "Total percentage area under aquifer class"
-                }
-              ]  
-        ]
-    ```
+
+    ``data`` contains sheet keys (e.g. ``aquifer_vector``) with tabular rows per MWS.
     """,
     "manual_parameters": [
         state_param,
@@ -355,10 +456,9 @@ kyl_indicators_schema = {
     "operation_description": """
     Retrieve **flat tabular KYL indicators** for a given MWS (not time series).
 
-    Success payload shape (inside the standard envelope ``data``):
-
-    - ``indicators``: single object when one row matches ``mws_id``, or an array when multiple rows match.
-    - ``indicator_units``: map from field name to unit (``mm``, ``ha``, ``ratio``, ``count``, ``code``, etc.).
+    ``data`` contains:
+    - ``indicators``: object or array for the requested ``mws_id``
+    - ``indicator_units``: field name → unit (``mm``, ``ha``, ``ratio``, ``count``, ``code``, …)
     """,
     "manual_parameters": [
         state_param,
@@ -409,10 +509,9 @@ generated_layer_urls_schema = {
     "operation_description": """
     Retrieve generated GeoServer layer URLs for a given state, district, and tehsil.
 
-    Not time-series data. Success ``data`` contains:
-
-    - ``layers``: array of flat objects (``layer_name``, ``layer_type``, ``layer_url``, …).
-    - ``layer_field_units``: map describing each field (URLs, asset ids, version labels).
+    ``data`` contains:
+    - ``layers``: array of flat objects (``layer_name``, ``layer_type``, ``layer_url``, …)
+    - ``layer_field_units``: map describing each field
     """,
     "manual_parameters": [
         state_param,
@@ -469,10 +568,7 @@ mws_report_urls_schema = {
     "operation_description": """
     Retrieve MWS report URL for a given state, district, tehsil, and mws_id.
 
-    Not time-series data. Success ``data`` contains:
-
-    - ``report``: object with ``Mws_report_url``.
-    - ``report_field_hints``: field semantics.
+    ``data`` contains ``report`` (with ``Mws_report_url``) and ``report_field_hints``.
     """,
     "manual_parameters": [
         state_param,
@@ -516,12 +612,9 @@ mws_geometries_schema = {
     "operation_id": "get_mws_geometries",
     "operation_summary": "Get MWS Geometry",
     "operation_description": """
-    Retrieve GeoJSON geometry for a given state, district, tehsil, and mws_id.
+    Retrieve GeoJSON geometry for a single ``mws_id``.
 
-    Not time-series data. Success ``data`` contains:
-
-    - ``mws_geometry``: object with ``uid``, location fields, and ``geometry``.
-    - ``mws_geometry_field_hints``: field semantics.
+    ``data`` contains ``mws_geometry`` (uid, location fields, geometry) and ``mws_geometry_field_hints``.
     """,
     "manual_parameters": [
         state_param,
@@ -575,13 +668,10 @@ village_geometries_schema = {
     "operation_id": "get_village_geometries",
     "operation_summary": "Get Village Geometries",
     "operation_description": """
-    Retrieve village boundary geometries for a given state, district, and tehsil.
-    Optionally filter to one village using ``village_id``.
+    Retrieve village boundary geometries for state, district, tehsil.
+    Optionally filter with ``village_id``.
 
-    Not time-series data. Success ``data`` contains:
-
-    - ``villages``: array of village objects with geometry.
-    - ``village_field_hints``: field semantics.
+    ``data`` contains ``villages`` (array with geometry) and ``village_field_hints``.
     """,
     "manual_parameters": [
         state_param,
@@ -636,12 +726,9 @@ generate_active_locations_schema = {
     "operation_id": "generate_active_locations",
     "operation_summary": "Get Active Locations",
     "operation_description": """
-    Return the **hierarchical list of activated states → districts → blocks/tehsils** (not time-series).
+    Return the hierarchical list of activated states → districts → blocks/tehsils.
 
-    Success ``data`` contains:
-
-    - ``locations``: array of state objects, each with ``district`` → ``blocks`` (see live response).
-    - ``location_field_hints``: what each repeated key means (ids, labels, nesting).
+    ``data`` contains ``locations`` and ``location_field_hints``.
     """,
     "manual_parameters": [
         authorization_param,
@@ -942,3 +1029,51 @@ get_village_geometries_schema = {
     },
     "tags": ["Dataset APIs"],
 }
+
+# ============= V2 API SCHEMAS (distinct operation_id for Swagger/ReDoc) =============
+
+admin_by_latlon_schema_v2 = v2_schema_from(
+    admin_by_latlon_schema,
+    "get_admin_details_by_latlon_v2",
+    "get_admin_details_by_latlon/",
+)
+mws_by_latlon_schema_v2 = v2_schema_from(
+    mws_by_latlon_schema,
+    "get_mwsid_by_latlon_v2",
+    "get_mwsid_by_latlon/",
+)
+tehsil_data_schema_v2 = v2_schema_from(
+    tehsil_data_schema,
+    "get_tehsil_data_v2",
+    "get_tehsil_data/",
+)
+kyl_indicators_schema_v2 = v2_schema_from(
+    kyl_indicators_schema,
+    "get_mws_kyl_indicators_v2",
+    "get_mws_kyl_indicators/",
+)
+generated_layer_urls_schema_v2 = v2_schema_from(
+    generated_layer_urls_schema,
+    "get_generated_layer_urls_v2",
+    "get_generated_layer_urls/",
+)
+mws_report_urls_schema_v2 = v2_schema_from(
+    mws_report_urls_schema,
+    "get_mws_report_urls_v2",
+    "get_mws_report/",
+)
+mws_geometries_schema_v2 = v2_schema_from(
+    mws_geometries_schema,
+    "get_mws_geometries_v2",
+    "get_mws_geometries/",
+)
+village_geometries_schema_v2 = v2_schema_from(
+    village_geometries_schema,
+    "get_village_geometries_v2",
+    "get_village_geometries/",
+)
+generate_active_locations_schema_v2 = v2_schema_from(
+    generate_active_locations_schema,
+    "get_active_locations_v2",
+    "get_active_locations/",
+)
