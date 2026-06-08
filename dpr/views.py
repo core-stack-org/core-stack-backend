@@ -13,12 +13,10 @@ from .get_dpr_sectionwise_data import (
     get_section_f_data,
     get_section_g_data,
 )
-from django.http import HttpResponse
-from .gen_dpr import get_plan_details
+from .service.form_download_service import sync_odk_forms
 
 
 def generate_dpr_html(plan, language="en"):
-    print(f"{language=}")
     translations = load_translations(language)
     total_settlements = get_settlement_count_for_plan(plan.id)
     mws_fortnight = get_vector_layer_geoserver(
@@ -35,7 +33,7 @@ def generate_dpr_html(plan, language="en"):
     section_c_data = get_section_c_data(plan, language)
     section_d_data = get_section_d_data(plan, settlement_mws_ids, mws_gdf, language)
     section_e_data = get_section_e_data(plan, language)
-    section_f_data = get_section_f_data(plan)
+    section_f_data = get_section_f_data(plan, language)
     section_g_data = get_section_g_data(plan, language)
     html = render_to_string(
         "dpr/base.html",
@@ -56,21 +54,9 @@ def generate_dpr_html(plan, language="en"):
 
 
 def generate_dpr_pdf(plan, language="en"):
-    print(f"{language=}")
-
+    sync_odk_forms()
     html = generate_dpr_html(plan, language)
 
-    pdf = HTML(string=html, base_url="http://localhost:8000").write_pdf()
+    pdf = HTML(string=html).write_pdf()
 
     return pdf
-
-
-def sample_dpr_html(request):
-    plan = get_plan_details(1336)
-
-    html = generate_dpr_html(
-        plan=plan,
-        language="hi",
-    )
-
-    return HttpResponse(html)

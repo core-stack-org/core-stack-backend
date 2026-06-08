@@ -30,7 +30,7 @@
 
             <td>{{ item.structure_type|default:t.common.na }}</td>
 
-            <td>{{ item.repair_activities }}</td>
+            <td>{{ item.repair_activities | default:t.common.na}}</td>
 
             <td>{{ item.latitude }}</td>
 

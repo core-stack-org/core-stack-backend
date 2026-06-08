@@ -2,11 +2,10 @@ import json
 from pathlib import Path
 from django.conf import settings
 
-TRANSLATION_DIR = Path(settings.BASE_DIR) / "dpr" / "translations"
+TRANSLATION_DIR = Path(settings.BASE_DIR) / "data" / "dpr" / "translations"
 
 
 def load_translations(language="en"):
-    print(f"{language=}")
 
     file_path = TRANSLATION_DIR / f"{language}.json"
 

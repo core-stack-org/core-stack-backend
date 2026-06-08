@@ -25,8 +25,8 @@ def sync_odk_forms():
     token = fetch_bearer_token(ODK_USERNAME, ODK_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
-    forms_dir = Path(settings.BASE_DIR) / "dpr" / "forms"
-    label_dirs = Path(settings.BASE_DIR) / "dpr" / "labels"
+    forms_dir = Path(settings.BASE_DIR) / "data" / "dpr" / "forms"
+    label_dirs = Path(settings.BASE_DIR) / "data" / "dpr" / "labels"
     versions_file = Path(settings.BASE_DIR) / "data" / "odk" / "form_version.json"
 
     forms_dir.mkdir(parents=True, exist_ok=True)
