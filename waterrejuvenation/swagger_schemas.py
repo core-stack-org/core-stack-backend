@@ -248,3 +248,26 @@ waterbodies_by_uuid = {
     },
     "tags": ["Waterbodies API"],
 }
+
+
+def v2_waterbodies_schema_from(base_schema, operation_id, path_suffix):
+    schema = dict(base_schema)
+    schema["operation_id"] = operation_id
+    schema["tags"] = ["Waterbodies API v2"]
+    base_desc = (schema.get("operation_description") or "").strip()
+    schema["operation_description"] = (
+        f"{base_desc}\n\n**Path:** ``GET /api/v2/{path_suffix}``"
+    )
+    return schema
+
+
+waterbodies_by_admin_schema_v2 = v2_waterbodies_schema_from(
+    waterbodies_by_admin_schema,
+    "get_waterbodies_by_admin_and_uid_v2",
+    "get_waterbodies_data_by_admin/",
+)
+waterbodies_by_uuid_schema_v2 = v2_waterbodies_schema_from(
+    waterbodies_by_uuid,
+    "get_waterbodies_by_uid_v2",
+    "get_waterbody_data/",
+)

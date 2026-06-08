@@ -32,10 +32,4 @@ urlpatterns = [
         api.generate_active_locations,
         name="get_active_locations",
     ),
-    path("get_mws_geometries/", api.get_mws_geometries, name="get-mws-geometries"),
-    path(
-        "get_village_geometries/",
-        api.get_village_geometries,
-        name="get-village-geometries",
-    ),
 ]
