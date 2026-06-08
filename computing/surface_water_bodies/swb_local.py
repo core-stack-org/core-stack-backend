@@ -1,6 +1,7 @@
-import os
+import logging
 from pathlib import Path
 
+import ee
 import geopandas as gpd
 
 from computing.config_loader import (
@@ -11,19 +12,31 @@ from computing.config_loader import (
 from computing.local_compute_helper import (
     build_output_vector_path,
     load_precomputed_roi,
-    push_local_vector_to_geoserver,
     read_validated_vector_file,
     write_vector_output,
 )
 from computing.surface_water_bodies.clip_swb_local import _clip_gdf, _to_geom
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
-from utilities.gee_utils import valid_gee_text
+from utilities.constants import GEE_PATHS
+from utilities.gee_utils import (
+    check_task_status,
+    create_gee_dir,
+    ee_initialize,
+    export_vector_asset_to_gee,
+    gdf_to_ee_fc,
+    get_gee_dir_path,
+    is_gee_asset_exists,
+    make_asset_public,
+    valid_gee_text,
+)
 
-GEOSERVER_WORKSPACE = "swb"
 LOCAL_ALGORITHM = "local_surface_water_bodies_clip"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
 DATASET_NAME = "Surface Water Bodies"
+logger = logging.getLogger(__name__)
+SQM_PER_HECTARE = 10000.0
+GEE_EXPORT_CHUNK_SIZE = 1000
 
 
 def _slug(value, fallback):
@@ -34,11 +47,20 @@ def _slug(value, fallback):
 
 def _resolve_source_path(vector_path):
     src = Path(vector_path).expanduser().resolve()
-    if not src.exists():
-        raise FileNotFoundError(f"Surface water bodies source not found: {src}")
+    candidates = [
+        src.parent / "pan_india_waterbodies_with_mws.fgb",
+        src.with_suffix(".fgb"),
+        src,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            logger.info("Using SWB source path: %s", candidate)
+            return str(candidate)
 
-    prepared = src.with_suffix(".fgb")
-    return str(prepared if prepared.exists() else src)
+    raise FileNotFoundError(
+        "Surface water bodies source not found. Checked: "
+        + ", ".join(str(candidate) for candidate in candidates)
+    )
 
 
 def _resolve_roi_gdf(state, district, block, roi=None, roi_path=None):
@@ -76,7 +98,162 @@ def _resolve_asset_suffix(state, district, block, asset_suffix):
 
 
 def _layer_name(asset_suffix):
-    return f"surface_waterbodies_{asset_suffix}"
+    return f"surface_waterbodies_{asset_suffix}_local"
+
+
+def _gee_description(asset_suffix):
+    return f"swb2_{asset_suffix}_local"
+
+
+def _resolve_asset_folder_list(state, district, block):
+    if state and district and block:
+        return [state, district, block]
+    return None
+
+
+def _resolve_gee_asset_id(state, district, block, asset_suffix, app_type):
+    asset_folder_list = _resolve_asset_folder_list(state, district, block)
+    if not asset_folder_list:
+        raise ValueError(
+            "Local SWB GEE export requires state, district, and block so the asset can be saved alongside the existing swb2 assets."
+        )
+
+    description = _gee_description(asset_suffix)
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + description
+    )
+    if "projects//" in asset_id:
+        raise ValueError(
+            "Invalid GEE asset path resolved. "
+            f"asset_id={asset_id}. "
+            "Check GEE_STORAGE_PROJECT / GEE_PATHS configuration."
+        )
+    return description, asset_id, asset_folder_list
+
+
+def _prepare_gdf_for_gee(gdf):
+    prepared = gdf.copy()
+    if prepared.crs is None:
+        prepared = prepared.set_crs("EPSG:4326")
+    elif prepared.crs.to_epsg() != 4326:
+        prepared = prepared.to_crs("EPSG:4326")
+
+    for column in prepared.columns:
+        if column == "geometry":
+            continue
+        prepared[column] = prepared[column].where(prepared[column].notna(), None)
+    return prepared
+
+
+def _convert_area_columns_to_hectares(gdf):
+    converted = gdf.copy()
+    converted_columns = {}
+
+    for column in list(converted.columns):
+        if column == "geometry":
+            continue
+
+        target_column = None
+        if column == "total_area_m2":
+            target_column = "total_area"
+        elif column.startswith("area_"):
+            target_column = column
+
+        if target_column is None:
+            continue
+
+        converted[target_column] = converted[column] / SQM_PER_HECTARE
+        if target_column != column:
+            converted.drop(columns=[column], inplace=True)
+        converted_columns[column] = "converted_in_place_to_hectares"
+
+    return converted, converted_columns
+
+
+def _union_geometry(gdf):
+    try:
+        return gdf.union_all()
+    except AttributeError:
+        return gdf.geometry.unary_union
+
+
+def _chunk_asset_id(base_asset_id, index):
+    return f"{base_asset_id}_chunk_{index:04d}"
+
+
+def _chunk_description(base_description, index):
+    return f"{base_description}_chunk_{index:04d}"
+
+
+def _export_gdf_to_gee_in_chunks(gdf, base_description, base_asset_id):
+    chunk_asset_ids = []
+    task_ids = []
+
+    for index, start in enumerate(range(0, len(gdf), GEE_EXPORT_CHUNK_SIZE)):
+        chunk = gdf.iloc[start : start + GEE_EXPORT_CHUNK_SIZE].copy()
+        chunk_description = _chunk_description(base_description, index)
+        chunk_asset_id = _chunk_asset_id(base_asset_id, index)
+        logger.info(
+            "Starting chunked SWB export: chunk_index=%s start=%s end=%s chunk_size=%s chunk_asset_id=%s",
+            index,
+            start,
+            start + len(chunk),
+            len(chunk),
+            chunk_asset_id,
+        )
+        chunk_fc = gdf_to_ee_fc(_prepare_gdf_for_gee(chunk))
+        task_id = export_vector_asset_to_gee(
+            chunk_fc,
+            chunk_description,
+            chunk_asset_id,
+        )
+        if not task_id:
+            raise RuntimeError(
+                f"Failed to start chunk export for {chunk_asset_id}"
+            )
+        chunk_asset_ids.append(chunk_asset_id)
+        task_ids.append(task_id)
+
+    check_task_status(task_ids)
+    logger.info(
+        "Completed all chunk exports for base_asset_id=%s chunk_count=%s",
+        base_asset_id,
+        len(chunk_asset_ids),
+    )
+
+    merged_fc = ee.FeatureCollection(
+        [ee.FeatureCollection(chunk_asset_id) for chunk_asset_id in chunk_asset_ids]
+    ).flatten()
+    merge_task_id = export_vector_asset_to_gee(merged_fc, base_description, base_asset_id)
+    if not merge_task_id:
+        raise RuntimeError(f"Failed to start merged export for {base_asset_id}")
+    logger.info(
+        "Started merged SWB export from chunks: task_id=%s gee_asset_id=%s",
+        merge_task_id,
+        base_asset_id,
+    )
+    check_task_status([merge_task_id])
+    logger.info("Completed merged SWB export: gee_asset_id=%s", base_asset_id)
+
+    if not is_gee_asset_exists(base_asset_id):
+        raise RuntimeError(
+            f"Merged SWB asset was not created after chunk merge: {base_asset_id}"
+        )
+
+    for chunk_asset_id in chunk_asset_ids:
+        try:
+            if is_gee_asset_exists(chunk_asset_id):
+                ee.data.deleteAsset(chunk_asset_id)
+                logger.info("Deleted temporary SWB chunk asset: %s", chunk_asset_id)
+        except Exception as exc:
+            logger.warning(
+                "Failed to delete temporary SWB chunk asset %s: %s",
+                chunk_asset_id,
+                exc,
+            )
 
 
 def run_swb_local(
@@ -87,8 +264,10 @@ def run_swb_local(
     roi_path=None,
     asset_suffix=None,
     swb_path=SWB_VECTOR_PATH,
-    push_to_geoserver=True,
+    push_to_geoserver=False,
     sync_layer_metadata=True,
+    gee_account_id=None,
+    app_type="MWS",
 ):
     state = str(state).strip().lower() if state else None
     district = str(district).strip().lower() if district else None
@@ -101,12 +280,53 @@ def run_swb_local(
         roi=roi,
         roi_path=roi_path,
     )
-    roi_geometry = roi_gdf.union_all()
+    logger.info(
+        "Starting local SWB generation: state=%s district=%s block=%s asset_suffix=%s app_type=%s",
+        state,
+        district,
+        block,
+        asset_suffix,
+        app_type,
+    )
+    logger.info("Resolved ROI rows=%s crs=%s", len(roi_gdf), roi_gdf.crs)
+    roi_geometry = _union_geometry(roi_gdf)
     if roi_geometry.is_empty:
         raise ValueError("ROI geometry is empty after validation.")
 
     asset_suffix = _resolve_asset_suffix(state, district, block, asset_suffix)
     layer_name = _layer_name(asset_suffix)
+    gee_description, gee_asset_id, asset_folder_list = _resolve_gee_asset_id(
+        state=state,
+        district=district,
+        block=block,
+        asset_suffix=asset_suffix,
+        app_type=app_type,
+    )
+    logger.info(
+        "Resolved local SWB names: layer_name=%s gee_description=%s gee_asset_id=%s asset_folder_list=%s",
+        layer_name,
+        gee_description,
+        gee_asset_id,
+        asset_folder_list,
+    )
+
+    if is_gee_asset_exists(gee_asset_id):
+        logger.info("GEE asset already exists, reusing: %s", gee_asset_id)
+        if sync_layer_metadata:
+            save_layer_info_to_db(
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name,
+                asset_id=gee_asset_id,
+                dataset_name=DATASET_NAME,
+                misc={"is_generated_locally": True, "source_stage": "swb2_local"},
+                algorithm=LOCAL_ALGORITHM,
+                algorithm_version=LOCAL_ALGORITHM_VERSION,
+            )
+        make_asset_public(gee_asset_id)
+        return True
+
     output_path = build_output_vector_path(
         layer_name=layer_name,
         state=state,
@@ -116,54 +336,113 @@ def run_swb_local(
         custom_subdir=asset_suffix,
         block_fallback="unknown_block",
     )
+    logger.info("Local SWB output path: %s", output_path)
 
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
         raise ValueError("No surface water body features intersect the provided ROI.")
+    clipped_gdf, converted_area_columns = _convert_area_columns_to_hectares(clipped_gdf)
+    logger.info(
+        "Clipped SWB features: count=%s columns=%s",
+        len(clipped_gdf),
+        list(clipped_gdf.columns),
+    )
+    logger.info(
+        "Converted SWB area columns from square meters to hectares: %s",
+        converted_area_columns,
+    )
 
-    asset_id = write_vector_output(
+    local_asset_path = write_vector_output(
         gdf=clipped_gdf,
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local SWB vector: {asset_id}")
+    logger.info("Saved local SWB vector to disk: %s", local_asset_path)
 
-    geoserver_ok = False
-    if push_to_geoserver:
-        geoserver_response = push_local_vector_to_geoserver(
-            path=os.path.splitext(asset_id)[0],
-            layer_name=layer_name,
-            workspace=GEOSERVER_WORKSPACE,
-            file_type="gpkg",
+    _ = push_to_geoserver
+    ee_initialize(gee_account_id)
+    logger.info(
+        "Initialized Earth Engine for local SWB export: gee_account_id=%s",
+        gee_account_id,
+    )
+    create_gee_dir(asset_folder_list, GEE_PATHS[app_type]["GEE_ASSET_PATH"])
+    logger.info(
+        "Ensured GEE directory exists under base path=%s for folders=%s",
+        GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        asset_folder_list,
+    )
+    ee_fc = gdf_to_ee_fc(_prepare_gdf_for_gee(clipped_gdf))
+    logger.info("Prepared EE FeatureCollection for export: gee_asset_id=%s", gee_asset_id)
+    task_id = None
+    try:
+        task_id = export_vector_asset_to_gee(ee_fc, gee_description, gee_asset_id)
+    except Exception as exc:
+        logger.warning(
+            "Inline GEE export raised an exception for asset_id=%s: %s",
+            gee_asset_id,
+            exc,
         )
-        geoserver_ok = (
-            isinstance(geoserver_response, dict)
-            and geoserver_response.get("status_code") in (200, 201)
+
+    if task_id:
+        logger.info(
+            "Started GEE export task: task_id=%s gee_description=%s gee_asset_id=%s",
+            task_id,
+            gee_description,
+            gee_asset_id,
         )
-        print(f"GeoServer response for {layer_name}: {geoserver_response}")
+        check_task_status([task_id])
+        logger.info(
+            "Completed GEE export task: task_id=%s gee_asset_id=%s",
+            task_id,
+            gee_asset_id,
+        )
+    else:
+        logger.info(
+            "Inline GEE export could not be started for asset_id=%s. Falling back to chunked FeatureCollection export.",
+            gee_asset_id,
+        )
+        _export_gdf_to_gee_in_chunks(
+            gdf=clipped_gdf,
+            base_description=gee_description,
+            base_asset_id=gee_asset_id,
+        )
+        logger.info(
+            "Triggered chunked SWB GEE export fallback: gee_asset_id=%s chunk_size=%s",
+            gee_asset_id,
+            GEE_EXPORT_CHUNK_SIZE,
+        )
+
+    if not is_gee_asset_exists(gee_asset_id):
+        raise RuntimeError(f"GEE asset was not created: {gee_asset_id}")
+    make_asset_public(gee_asset_id)
+    logger.info("Marked GEE asset public: %s", gee_asset_id)
 
     layer_id = None
-    is_admin_run = bool(state and district and block)
-    if sync_layer_metadata and is_admin_run:
+    if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,
             block=block,
             layer_name=layer_name,
-            asset_id=asset_id,
+            asset_id=gee_asset_id,
             dataset_name=DATASET_NAME,
             misc={
                 "is_generated_locally": True,
                 "feature_count": int(len(clipped_gdf)),
-                "geoserver_available": geoserver_ok,
+                "local_vector_path": local_asset_path,
+                "source_stage": "swb2_local",
             },
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
-        if layer_id and geoserver_ok:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        logger.info(
+            "Saved local SWB layer metadata: layer_id=%s gee_asset_id=%s layer_name=%s",
+            layer_id,
+            gee_asset_id,
+            layer_name,
+        )
 
-    return geoserver_ok if push_to_geoserver else True
+    return True
 
 
 def _generate_swb_local_task(
@@ -178,7 +457,7 @@ def _generate_swb_local_task(
     gee_account_id=None,
     app_type="MWS",
 ):
-    _ = start_year, end_year, gee_account_id, app_type
+    _ = start_year, end_year
     return run_swb_local(
         state=state,
         district=district,
@@ -186,8 +465,10 @@ def _generate_swb_local_task(
         roi=roi,
         roi_path=roi_path,
         asset_suffix=asset_suffix,
-        push_to_geoserver=True,
+        push_to_geoserver=False,
         sync_layer_metadata=True,
+        gee_account_id=gee_account_id,
+        app_type=app_type,
     )
 
 

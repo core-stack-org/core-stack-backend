@@ -1,7 +1,10 @@
 import json
 import os
+
 import requests
-from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
+from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+from rest_framework import status
 from rest_framework.decorators import (
     api_view,
     authentication_classes,
@@ -9,23 +12,47 @@ from rest_framework.decorators import (
     permission_classes,
     schema,
 )
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
 
+from computing.change_detection.change_detection import (
+    get_change_detection as get_change_detection_gee_task,
+)
+from computing.change_detection.change_detection_local import (
+    get_change_detection as get_change_detection_local_task,
+)
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection as vectorise_change_detection_gee_task,
 )
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
-from .utils import (
-    save_layer_info_to_db,
-    update_layer_sync_status,
+from computing.layer_dependency.layer_generation_in_order import layer_generate_map
+from computing.misc.drainage_lines import clip_drainage_lines
+from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
+from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
+from utilities.auth_check_decorator import api_security_check
+from utilities.constants import KML_PATH
+from utilities.gee_utils import check_gee_task_status, download_gee_layer
+
+from .clart.clart import generate_clart_layer
+from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
+from .crop_grid.crop_grid import create_crop_grids
+from .cropping_intensity.cropping_intensity import generate_cropping_intensity
+from .cropping_intensity.cropping_intesity_local import (
+    generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
-from django.conf import settings
-from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
+from .drought.drought import calculate_drought
+from .drought.drought_causality import drought_causality
+from .local_compute_helper import (
+    get_compute_mode as _get_compute_mode,
+)
+from .local_compute_helper import (
+    select_compute_task as _select_compute_task,
+)
+from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
+from .lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local_task
 from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
 from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
@@ -33,31 +60,51 @@ from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
 from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
 from .lulc.v4.lulc_v4 import generate_lulc_v4
+from .lulc_X_terrain.lulc_on_plain_cluster import (
+    lulc_on_plain_cluster as lulc_on_plain_cluster_gee_task,
+)
+from .lulc_X_terrain.lulc_on_plain_cluster_local import (
+    lulc_on_plain_cluster_local as lulc_on_plain_cluster_local_task,
+)
+from .lulc_X_terrain.lulc_on_slope_cluster import (
+    lulc_on_slope_cluster as lulc_on_slope_cluster_gee_task,
+)
+from .lulc_X_terrain.lulc_on_slope_cluster_local import (
+    lulc_on_slope_cluster_local as lulc_on_slope_cluster_local_task,
+)
+from .misc.admin_boundary import generate_tehsil_shape_file_data
+from .misc.agroecological_space import generate_agroecological_data
+from .misc.aquifer_vector import (
+    generate_aquifer_vector as generate_aquifer_vector_gee_task,
+)
+from .misc.aquifer_vector_local import (
+    generate_aquifer_vector as generate_aquifer_vector_local_task,
+)
+from .misc.catchment_area import generate_catchment_area_singleflow
+from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
+from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.factory_csr import generate_factory_csr_data
+from .misc.green_credit import generate_green_credit_data
+from .misc.lcw_conflict import generate_lcw_conflict_data
+from .misc.mining_data import generate_mining_data
+from .misc.naturaldepression import generate_natural_depression_data
 from .misc.ndvi_time_series import ndvi_timeseries
+from .misc.nrega import clip_nrega_district_block
 from .misc.restoration_opportunity import generate_restoration_opportunity
+from .misc.slope_percentage import generate_slope_percentage_data
+from .misc.soge_vector import generate_soge_vector
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
-from .utils import (
-    Geoserver,
-    kml_to_shp,
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
-from .local_compute_helper import (
-    get_compute_mode as _get_compute_mode,
-    select_compute_task as _select_compute_task,
-)
-from utilities.gee_utils import download_gee_layer, check_gee_task_status
-from django.core.files.storage import FileSystemStorage
-from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
-from .cropping_intensity.cropping_intensity import generate_cropping_intensity
-from .cropping_intensity.cropping_intesity_local import (
-    generate_cropping_intensity as generate_cropping_intensity_local_task,
-)
+from .mws.mws_centroid import generate_mws_centroid_data
+from .mws.mws_connectivity import generate_mws_connectivity_data
+from .plantation.site_suitability import site_suitability
+from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
+from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
-from .surface_water_bodies.swb_local import generate_swb_layer as generate_swb_local_task
-from .drought.drought import calculate_drought
+from .surface_water_bodies.swb_local import (
+    generate_swb_layer as generate_swb_local_task,
+)
 from .terrain_descriptor.terrain_clusters import (
     generate_terrain_clusters as generate_terrain_clusters_gee_task,
 )
@@ -73,41 +120,17 @@ from .terrain_descriptor.terrain_raster_fabdem import (
 from .terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as generate_terrain_raster_clip_local_task,
 )
-from computing.misc.drainage_lines import clip_drainage_lines
-from .lulc_X_terrain.lulc_on_slope_cluster import (
-    lulc_on_slope_cluster as lulc_on_slope_cluster_gee_task,
-)
-from .lulc_X_terrain.lulc_on_slope_cluster_local import (
-    lulc_on_slope_cluster_local as lulc_on_slope_cluster_local_task,
-)
-from .lulc_X_terrain.lulc_on_plain_cluster import (
-    lulc_on_plain_cluster as lulc_on_plain_cluster_gee_task,
-)
-from .lulc_X_terrain.lulc_on_plain_cluster_local import (
-    lulc_on_plain_cluster_local as lulc_on_plain_cluster_local_task,
-)
-from .clart.clart import generate_clart_layer
-from .misc.admin_boundary import generate_tehsil_shape_file_data
-from .misc.nrega import clip_nrega_district_block
-from computing.change_detection.change_detection import (
-    get_change_detection as get_change_detection_gee_task,
-)
-from computing.change_detection.change_detection_local import (
-    get_change_detection as get_change_detection_local_task,
-)
-from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
-from .lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local_task
-from .crop_grid.crop_grid import create_crop_grids
-from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.canopy_height import tree_health_ch_raster
-from .tree_health.overall_change import tree_health_overall_change_raster
-from .drought.drought_causality import drought_causality
-from .tree_health.overall_change_vector import tree_health_overall_change_vector
 from .tree_health.canopy_height_vector import tree_health_ch_vector
+from .tree_health.ccd import tree_health_ccd_raster
 from .tree_health.ccd_vector import tree_health_ccd_vector
-from .plantation.site_suitability import site_suitability
-from .misc.aquifer_vector import (
-    generate_aquifer_vector as generate_aquifer_vector_gee_task,
+from .tree_health.overall_change import tree_health_overall_change_raster
+from .tree_health.overall_change_vector import tree_health_overall_change_vector
+from .utils import (
+    Geoserver,
+    kml_to_shp,
+    save_layer_info_to_db,
+    update_layer_sync_status,
 )
 from .misc.aquifer_vector_local import (
     generate_aquifer_vector as generate_aquifer_vector_local_task,
@@ -118,6 +141,7 @@ from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import (
+    check_missing_layers,
     layer_status,
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
@@ -886,6 +910,7 @@ def change_detection_vector(request):
             vectorise_change_detection_gee_task,
             vectorise_change_detection_local_task,
         )
+        print("What is task? ", task)
         task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -1219,7 +1244,7 @@ def fes_clart_upload_layer(request):
 
         # Save file to temp location
         file_extension = os.path.splitext(uploaded_file.name)[1]
-        filename = f'{district.strip().replace(" ", "_")}_{block.strip().replace(" ", "_")}_clart_fes{file_extension}'
+        filename = f"{district.strip().replace(' ', '_')}_{block.strip().replace(' ', '_')}_clart_fes{file_extension}"
 
         temp_upload_dir = os.path.join(
             BASE_DIR,
@@ -2027,7 +2052,9 @@ def update_layer_sync_remote(request):
         d = request.data
         layer_id = d.get("layer_id")
         if layer_id is None:
-            return Response({"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         result = update_layer_sync_status(
             layer_id=layer_id,
