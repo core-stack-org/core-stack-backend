@@ -1,37 +1,26 @@
 from functools import wraps
 from unittest.mock import patch
 import logging
-import os
-import json
-import re
 from contextvars import ContextVar
 
 from celery.app.task import Task
 from django.conf import settings
 
 from utilities.layer_generation_logging import log_task_failure, log_task_step
+from utilities.stac_spec_collector import collect_generated_stac_specs
 
 logger = logging.getLogger("core_stack.layer_generation")
 _SYNC_LAYER_GENERATION_CONTEXT = ContextVar(
     "sync_layer_generation_context",
     default=False,
 )
+_SYNC_STAC_LAYERS = ContextVar("sync_stac_layers", default=None)
+_SYNC_LAYER_IDS = ContextVar("sync_layer_ids", default=None)
+_SYNC_STAC_ERRORS = ContextVar("sync_stac_errors", default=None)
 
 
 def _sync_layer_generation_enabled():
     return bool(getattr(settings, "LAYER_GENERATION_SYNC_MODE", False))
-
-
-def _sanitize_text(text):
-    text = re.sub(r"[^a-zA-Z0-9 .,:;_-]", "", text)
-    return text.replace(" ", "_")
-
-
-def _read_json(path):
-    if not os.path.exists(path):
-        return None
-    with open(path) as f:
-        return json.load(f)
 
 
 def _get_request_value(data, *keys):
@@ -80,54 +69,215 @@ def read_location_from_request(request):
     return state, district, block
 
 
+def record_sync_stac_error(message):
+    errors = _SYNC_STAC_ERRORS.get()
+    if errors is not None:
+        errors.append(str(message))
+
+
+def record_sync_layer_id(layer_id):
+    """Track a Layer row synced to GeoServer during the current sync request."""
+    layer_ids = _SYNC_LAYER_IDS.get()
+    if layer_ids is None or not layer_id:
+        return
+    layer_ids.append(layer_id)
+
+
+def record_sync_stac_layer(
+    *,
+    state,
+    district,
+    block,
+    layer_name,
+    layer_type,
+    start_year="",
+    end_year="",
+):
+    """Track a layer whose STAC was generated during the current sync request."""
+    layers = _SYNC_STAC_LAYERS.get()
+    if layers is None:
+        return
+    layers.append(
+        {
+            "state": state,
+            "district": district,
+            "block": block,
+            "layer_name": layer_name,
+            "layer_type": layer_type,
+            "start_year": start_year,
+            "end_year": end_year,
+        }
+    )
+
+
+def _request_layer_targets(request):
+    """Build layer targets from explicit request fields (e.g. generate_stac_collection)."""
+    if request is None or not hasattr(request, "data"):
+        return []
+    data = request.data
+    state = data.get("state")
+    district = data.get("district")
+    block = data.get("block")
+    layer_name = data.get("layer_name")
+    layer_type = data.get("layer_type")
+    if not all([state, district, block, layer_name, layer_type]):
+        return []
+    return [
+        {
+            "state": state,
+            "district": district,
+            "block": block,
+            "layer_name": layer_name,
+            "layer_type": layer_type,
+            "start_year": data.get("start_year", "") or "",
+            "end_year": data.get("end_year", "") or "",
+        }
+    ]
+
+
+def _stac_targets_from_layer_ids(layer_ids):
+    from computing.models import Layer
+    from computing.stac_layer_resolution import stac_collect_target_for_layer
+
+    targets = []
+    seen = set()
+    for layer_id in layer_ids:
+        layer = Layer.objects.filter(id=layer_id).first()
+        if layer is None:
+            continue
+        target = stac_collect_target_for_layer(layer)
+        if target is None:
+            continue
+        key = (
+            target["state"],
+            target["district"],
+            target["block"],
+            target["layer_name"],
+            target["layer_type"],
+            target["start_year"],
+            target["end_year"],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        targets.append(target)
+    return targets
+
+
+def _ensure_stac_for_sync_layer_ids(layer_ids):
+    from computing.models import Layer
+    from computing.STAC_specs.stac_collection import generate_stac_collection_task
+    from computing.stac_layer_resolution import stac_task_kwargs_for_layer
+
+    for layer_id in layer_ids:
+        layer = Layer.objects.filter(id=layer_id).first()
+        if layer is None or layer.is_stac_specs_generated:
+            continue
+        task_kwargs = stac_task_kwargs_for_layer(layer)
+        if task_kwargs is None:
+            msg = (
+                f"No STAC mapping for layer id={layer_id} "
+                f"(dataset={getattr(layer.dataset, 'name', None)}, "
+                f"layer_name={layer.layer_name}). "
+                "Run: python manage.py load_layer_mappings"
+            )
+            logger.warning("Sync STAC skipped: %s", msg)
+            record_sync_stac_error(msg)
+            continue
+        result = generate_stac_collection_task.apply(kwargs=task_kwargs)
+        if getattr(result, "failed", lambda: False)():
+            msg = f"STAC generation failed for layer id={layer_id}: {result.result}"
+            logger.error(msg)
+            record_sync_stac_error(msg)
+            continue
+        if not result.result:
+            msg = (
+                f"STAC generation returned False for layer id={layer_id} "
+                f"({task_kwargs['layer_type']}/{task_kwargs['layer_name']}). "
+                "Check GeoServer layer exists and GEOSERVER_URL in .env."
+            )
+            logger.error(msg)
+            record_sync_stac_error(msg)
+            continue
+        record_sync_stac_layer(
+            state=task_kwargs["state"],
+            district=task_kwargs["district"],
+            block=task_kwargs["block"],
+            layer_name=task_kwargs["layer_name"],
+            layer_type=task_kwargs["layer_type"],
+            start_year=task_kwargs["start_year"],
+            end_year=task_kwargs["end_year"],
+        )
+
+
+def _empty_stac_spec(state, district, block):
+    spec = collect_generated_stac_specs(
+        state=state,
+        district=district,
+        block=block,
+        layer_name="__none__",
+        layer_type="vector",
+    )
+    spec["items"] = []
+    spec["stac_status"] = "not_generated_yet"
+    return spec
+
+
 def _collect_stac_for_request(request):
-    state, district, block = read_location_from_request(request)
-    if not all([state, district, block]):
+    layer_targets = list(_SYNC_STAC_LAYERS.get() or [])
+    layer_ids = list(_SYNC_LAYER_IDS.get() or [])
+
+    if not layer_targets and layer_ids:
+        _ensure_stac_for_sync_layer_ids(layer_ids)
+        layer_targets = _stac_targets_from_layer_ids(layer_ids)
+
+    if not layer_targets:
+        layer_targets = _request_layer_targets(request)
+
+    if not layer_targets:
+        state, district, block = read_location_from_request(request)
+        if all([state, district, block]):
+            if layer_ids:
+                record_sync_stac_error(
+                    "Layer synced but STAC mapping was not resolved "
+                    "(run python manage.py load_layer_mappings)."
+                )
+            else:
+                record_sync_stac_error(
+                    "Layer was not marked synced to GeoServer (GeoServer publish may have failed)."
+                )
+            spec = _empty_stac_spec(state, district, block)
+            errors = list(_SYNC_STAC_ERRORS.get() or [])
+            if errors:
+                spec["stac_errors"] = errors
+            return spec
         return None
 
-    state = _sanitize_text(str(state).lower())
-    district = _sanitize_text(str(district).lower())
-    block = _sanitize_text(str(block).lower())
+    merged_items = []
+    merged_spec = None
+    for target in layer_targets:
+        spec = collect_generated_stac_specs(**target)
+        if merged_spec is None:
+            merged_spec = spec
+        merged_items.extend(spec.get("items") or [])
 
-    # Use the same directory STAC generation writes to (BASE_DIR/data/STAC_specs/...),
-    # not settings.DATA_DIR which may point to a different mount in Docker.
-    from computing.STAC_specs.stac_collection import STACConfig
+    if merged_spec is None:
+        return None
 
-    stac_config = STACConfig()
-    stac_root = stac_config.stac_files_dir
-    tehsil_dir = os.path.join(stac_root, stac_config.tehsil_dirname)
-    state_dir = os.path.join(tehsil_dir, state)
-    district_dir = os.path.join(state_dir, district)
-    block_dir = os.path.join(district_dir, block)
-
-    items = []
-    if os.path.isdir(block_dir):
-        for entry in sorted(os.listdir(block_dir)):
-            item_dir = os.path.join(block_dir, entry)
-            if not os.path.isdir(item_dir):
-                continue
-            item_json = os.path.join(item_dir, f"{entry}.json")
-            item_spec = _read_json(item_json)
-            if item_spec is not None:
-                items.append(item_spec)
-
-    root_catalog = _read_json(os.path.join(stac_root, "catalog.json"))
-    tehsil_catalog = _read_json(os.path.join(tehsil_dir, "catalog.json"))
-    state_collection = _read_json(os.path.join(state_dir, "collection.json"))
-    district_collection = _read_json(os.path.join(district_dir, "collection.json"))
-    block_collection = _read_json(os.path.join(block_dir, "collection.json"))
-
-    has_stac_data = bool(block_collection) or bool(items)
-
-    return {
-        "stac_status": "available" if has_stac_data else "not_generated_yet",
-        "root_catalog": root_catalog,
-        "tehsil_catalog": tehsil_catalog,
-        "state_collection": state_collection,
-        "district_collection": district_collection,
-        "block_collection": block_collection,
-        "items": items,
-    }
+    has_stac_data = bool(merged_items)
+    merged_spec["items"] = merged_items
+    merged_spec["stac_status"] = "available" if has_stac_data else "not_generated_yet"
+    if not has_stac_data and layer_targets:
+        record_sync_stac_error(
+            "STAC items not found on disk after generation. "
+            "Verify GEOSERVER_URL points at the GeoServer where the layer was published."
+        )
+    errors = list(_SYNC_STAC_ERRORS.get() or [])
+    if errors:
+        merged_spec["stac_errors"] = errors
+    if layer_targets:
+        merged_spec["stac_layers"] = layer_targets
+    return merged_spec
 
 
 def _read_request_mode(request):
@@ -246,22 +396,34 @@ def sync_layer_generation_if_enabled(view_func):
             getattr(view_func, "__name__", "unknown"),
         )
         token = _SYNC_LAYER_GENERATION_CONTEXT.set(True)
+        stac_layers_token = _SYNC_STAC_LAYERS.set([])
+        layer_ids_token = _SYNC_LAYER_IDS.set([])
+        stac_errors_token = _SYNC_STAC_ERRORS.set([])
         try:
             with patch.object(Task, "apply_async", _apply_async_in_process):
                 response = view_func(*args, **kwargs)
-        finally:
-            _SYNC_LAYER_GENERATION_CONTEXT.reset(token)
 
-        try:
-            payload = getattr(response, "data", None)
-            if isinstance(payload, dict) and "stac" not in payload:
-                stac_spec = _collect_stac_for_request(request)
-                stac = format_stac_for_api_response(stac_spec)
-                if stac is not None:
-                    payload["stac"] = stac
-                payload.pop("stac_spec", None)
-        except Exception:
-            logger.exception("Failed to enrich sync response with STAC specs")
+            try:
+                payload = getattr(response, "data", None)
+                if isinstance(payload, dict) and "stac" not in payload:
+                    stac_spec = _collect_stac_for_request(request)
+                    stac = format_stac_for_api_response(stac_spec)
+                    if stac is not None:
+                        payload["stac"] = stac
+                    if stac_spec is not None and stac_spec.get("stac_errors"):
+                        payload["stac_errors"] = stac_spec["stac_errors"]
+                    payload.pop("stac_spec", None)
+                    if payload.get("status") == "initiated":
+                        payload["status"] = "completed"
+                        payload["Success"] = "Layer generation completed"
+                        payload["message"] = "Layer generation completed"
+            except Exception:
+                logger.exception("Failed to enrich sync response with STAC specs")
+        finally:
+            _SYNC_STAC_ERRORS.reset(stac_errors_token)
+            _SYNC_LAYER_IDS.reset(layer_ids_token)
+            _SYNC_STAC_LAYERS.reset(stac_layers_token)
+            _SYNC_LAYER_GENERATION_CONTEXT.reset(token)
 
         return response
 

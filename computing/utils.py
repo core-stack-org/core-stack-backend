@@ -1017,6 +1017,21 @@ def mark_layer_synced_to_geoserver(layer_id, sync_result):
 def update_layer_sync_status(
     layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
+    try:
+        from utilities.layer_generation_mode import (
+            is_sync_layer_generation_context_active,
+            record_sync_layer_id,
+        )
+
+        if (
+            is_sync_layer_generation_context_active()
+            and sync_to_geoserver
+            and layer_id is not None
+        ):
+            record_sync_layer_id(layer_id)
+    except Exception:
+        logger.exception("Failed to record sync layer id for STAC response")
+
     if _get_prod_backend_url():
         _update_layer_sync_remote(
             layer_id,
