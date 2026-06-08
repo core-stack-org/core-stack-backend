@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -30,7 +31,6 @@ from .serializers import (
     PlanCreateSerializer,
     PlanUpdateSerializer,
 )
-from rest_framework.pagination import PageNumberPagination
 
 STATE_CENTROIDS = {
     "Jammu & Kashmir": {"lat": 34.0837, "lon": 74.7973},
@@ -649,59 +649,12 @@ class SuperAdminPlanPermission(permissions.BasePermission):
         if hasattr(obj, "enabled") and not obj.enabled:
             return False
 
-        return request.user.is_superadmin or request.user.is_superuser
-
-
-_ORG_ADMIN_GROUPS = ("Organization Admin", "Org Admin", "Administrator")
-
-
-class OrganizationAdminPlanPermission(permissions.BasePermission):
-    """
-    Permission for org-scoped plan endpoints
-    (URL: /api/v1/organizations/{organization_id}/watershed/plans/...).
-
-    Allows:
-        - Superadmins / superusers (any organization)
-        - Org admins (only when the URL's organization matches their own)
-    """
-
-    schema = None
-
-    def _is_org_admin(self, user):
-        return user.groups.filter(name__in=_ORG_ADMIN_GROUPS).exists()
-
-    def _user_owns_org(self, user, organization_id):
-        user_org = getattr(user, "organization", None)
-        return bool(user_org) and str(user_org.id) == str(organization_id)
-
-    def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-
         if request.user.is_superadmin or request.user.is_superuser:
             return True
 
-        organization_id = view.kwargs.get("organization_pk")
-        if not organization_id:
-            return False
-
-        return self._is_org_admin(request.user) and self._user_owns_org(
-            request.user, organization_id
-        )
-
-    def has_object_permission(self, request, view, obj):
-        if hasattr(obj, "enabled") and not obj.enabled:
-            return False
-
-        if request.user.is_superadmin or request.user.is_superuser:
-            return True
-
-        if not self._is_org_admin(request.user):
-            return False
-
-        obj_org = getattr(obj, "organization", None)
-        user_org = getattr(request.user, "organization", None)
-        return bool(obj_org) and obj_org == user_org
+        return request.user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
 
 
 class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1110,9 +1063,9 @@ class OrganizationPlanPagination(PageNumberPagination):
 
 class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    ViewSet for organization level watershed planning ops.
-    Allows superadmins (any org) and org admins (their own org) to view plans.
-    URL: /api/v1/organizations/{organization_id}/watershed/plans/
+    ViewSet for organization level watershed planning ops
+    Allows superadmins to view plans for a specific organization
+    URL: /api/v1/organization/{organization_id}/watershed/plans/
     """
 
     schema = None
