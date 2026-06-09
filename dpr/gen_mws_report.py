@@ -2183,6 +2183,194 @@ def get_hydro_tabular_data(state, district, block, uid):
         return "-", "-", "-", "-", "-", "-", "-"
 
 
+def get_terrain_and_lulc_data(state, district, block, uid):
+    try:
+        base_path = f"{DATA_DIR_TEMP}{state.upper()}/{district.upper()}/{district.lower()}_{block.lower()}.xlsx"
+        
+        # Terrain Description
+        terrain_desc = "-"
+        try:
+            df_terrain = pd.read_excel(base_path, sheet_name="terrain")
+            row_t = df_terrain.loc[df_terrain["UID"] == uid]
+            if not row_t.empty:
+                terrain_desc = row_t["terrain_description"].values[0]
+        except Exception as e:
+            logger.info(f"Failed to read terrain sheet for {uid}: {e}")
+
+        # LULC sums
+        trees = 0.0
+        crops = 0.0
+        shrubs = 0.0
+        barren = 0.0
+        built_up = 0.0
+        
+        def get_vals(df, u):
+            if df.empty: return 0.0, 0.0, 0.0, 0.0, 0.0
+            row = df.loc[df["UID"] == u]
+            if row.empty: return 0.0, 0.0, 0.0, 0.0, 0.0
+            
+            def val(col):
+                if col in row.columns:
+                    v = row[col].values[0]
+                    return float(v) if not pd.isna(v) else 0.0
+                return 0.0
+            
+            t = val("forests_area_percent")
+            c = val("single_kharif_area_percent") + val("single_non_kharif_area_percent") + val("double_cropping_area_percent") + val("triple_cropping_area_percent")
+            s = val("shrub_scrubs_area_percent")
+            b = val("barren_area_percent")
+            bu = val("built_up_area_percent")
+            return t, c, s, b, bu
+
+        ts_val, cs_val, ss_val, bs_val, bus_val = 0.0, 0.0, 0.0, 0.0, 0.0
+        tp_val, cp_val, sp_val, bp_val, bup_val = 0.0, 0.0, 0.0, 0.0, 0.0
+
+        try:
+            df_slope = pd.read_excel(base_path, sheet_name="terrain_lulc_slope")
+            ts_val, cs_val, ss_val, bs_val, bus_val = get_vals(df_slope, uid)
+            trees += ts_val
+            crops += cs_val
+            shrubs += ss_val
+            barren += bs_val
+            built_up += bus_val
+        except Exception as e:
+            pass
+            
+        try:
+            df_plain = pd.read_excel(base_path, sheet_name="terrain_lulc_plain")
+            tp_val, cp_val, sp_val, bp_val, bup_val = get_vals(df_plain, uid)
+            trees += tp_val
+            crops += cp_val
+            shrubs += sp_val
+            barren += bp_val
+            built_up += bup_val
+        except Exception as e:
+            pass
+
+        return {
+            "terrain_desc": terrain_desc,
+            "tree_map_trees": round(trees, 2),
+            "tree_map_crops": round(crops, 2),
+            "tree_map_shrubs": round(shrubs, 2),
+            "tree_map_barren": round(barren, 2),
+            "tree_map_built_up": round(built_up, 2),
+            "slope_trees": round(ts_val, 2),
+            "slope_crops": round(cs_val, 2),
+            "slope_shrubs": round(ss_val, 2),
+            "slope_barren": round(bs_val, 2),
+            "slope_built_up": round(bus_val, 2),
+            "plain_trees": round(tp_val, 2),
+            "plain_crops": round(cp_val, 2),
+            "plain_shrubs": round(sp_val, 2),
+            "plain_barren": round(bp_val, 2),
+            "plain_built_up": round(bup_val, 2)
+        }
+    except Exception as e:
+        logger.info(f"Error in get_terrain_and_lulc_data for {uid}: {e}")
+        return {
+            "terrain_desc": "-",
+            "tree_map_trees": 0, "tree_map_crops": 0, "tree_map_shrubs": 0, "tree_map_barren": 0, "tree_map_built_up": 0,
+            "slope_trees": 0, "slope_crops": 0, "slope_shrubs": 0, "slope_barren": 0, "slope_built_up": 0,
+            "plain_trees": 0, "plain_crops": 0, "plain_shrubs": 0, "plain_barren": 0, "plain_built_up": 0
+        }
+
+
+def get_latest_col_val(df, prefix, uid):
+    cols = [c for c in df.columns if c.startswith(prefix)]
+    if cols:
+        cols.sort(reverse=True)
+        col = cols[0]
+        row = df.loc[df["UID"] == uid]
+        if not row.empty:
+            v = row[col].values[0]
+            return float(v) if not pd.isna(v) else 0.0
+    return 0.0
+
+
+def get_cropping_water_hydro_data(state, district, block, uid):
+    try:
+        base_path = f"{DATA_DIR_TEMP}{state.upper()}/{district.upper()}/{district.lower()}_{block.lower()}.xlsx"
+        
+        # Cropping Area
+        try:
+            df_crop = pd.read_excel(base_path, sheet_name="croppingIntensity_annual")
+            single_kharif = get_latest_col_val(df_crop, "single_kharif_cropped_area_in_ha_", uid)
+            doubly = get_latest_col_val(df_crop, "doubly_cropped_area_in_ha_", uid)
+            triply = get_latest_col_val(df_crop, "triply_cropped_area_in_ha_", uid)
+            single_non = get_latest_col_val(df_crop, "single_non_kharif_cropped_area_in_ha_", uid)
+
+            crop_kharif_area = round(single_kharif + doubly + triply, 2)
+            crop_rabi_area = round(single_non + doubly + triply, 2)
+            crop_zaid_area = round(triply, 2)
+        except Exception as e:
+            logger.info(f"Failed to read croppingIntensity_annual sheet for {uid}: {e}")
+            crop_kharif_area, crop_rabi_area, crop_zaid_area = "-", "-", "-"
+
+        # Surface Water
+        try:
+            df_swb = pd.read_excel(base_path, sheet_name="surfaceWaterBodies_annual")
+            water_kharif = round(get_latest_col_val(df_swb, "kharif_area_in_ha_", uid), 2)
+            water_rabi = round(get_latest_col_val(df_swb, "rabi_area_in_ha_", uid), 2)
+            water_zaid = round(get_latest_col_val(df_swb, "zaid_area_in_ha_", uid), 2)
+            
+            water_kharif = water_kharif if water_kharif != 0.0 else "-"
+            water_rabi = water_rabi if water_rabi != 0.0 else "-"
+            water_zaid = water_zaid if water_zaid != 0.0 else "-"
+        except Exception as e:
+            logger.info(f"Failed to read surfaceWaterBodies_annual sheet for {uid}: {e}")
+            water_kharif, water_rabi, water_zaid = "-", "-", "-"
+
+        # Hydrology Seasonal
+        try:
+            df_hydro = pd.read_excel(base_path, sheet_name="hydrological_seasonal")
+            rf_kharif = round(get_latest_col_val(df_hydro, "precipitation_kharif_in_mm_", uid), 2)
+            rf_rabi = round(get_latest_col_val(df_hydro, "precipitation_rabi_in_mm_", uid), 2)
+            rf_zaid = round(get_latest_col_val(df_hydro, "precipitation_zaid_in_mm_", uid), 2)
+
+            et_kharif = round(get_latest_col_val(df_hydro, "et_kharif_in_mm_", uid), 2)
+            et_rabi = round(get_latest_col_val(df_hydro, "et_rabi_in_mm_", uid), 2)
+            et_zaid = round(get_latest_col_val(df_hydro, "et_zaid_in_mm_", uid), 2)
+
+            ro_kharif = round(get_latest_col_val(df_hydro, "runoff_kharif_in_mm_", uid), 2)
+            ro_rabi = round(get_latest_col_val(df_hydro, "runoff_rabi_in_mm_", uid), 2)
+            ro_zaid = round(get_latest_col_val(df_hydro, "runoff_zaid_in_mm_", uid), 2)
+        except Exception as e:
+            logger.info(f"Failed to read hydrological_seasonal sheet for {uid}: {e}")
+            rf_kharif, rf_rabi, rf_zaid = "-", "-", "-"
+            et_kharif, et_rabi, et_zaid = "-", "-", "-"
+            ro_kharif, ro_rabi, ro_zaid = "-", "-", "-"
+
+        return {
+            "crop_kharif": crop_kharif_area,
+            "crop_rabi": crop_rabi_area,
+            "crop_zaid": crop_zaid_area,
+            "water_kharif": water_kharif,
+            "water_rabi": water_rabi,
+            "water_zaid": water_zaid,
+            "rf_kharif": rf_kharif,
+            "rf_rabi": rf_rabi,
+            "rf_zaid": rf_zaid,
+            "et_kharif": et_kharif,
+            "et_rabi": et_rabi,
+            "et_zaid": et_zaid,
+            "ro_kharif": ro_kharif,
+            "ro_rabi": ro_rabi,
+            "ro_zaid": ro_zaid
+        }
+
+    except Exception as e:
+        logger.info(f"Error in get_cropping_water_hydro_data for {uid}: {e}")
+        return {
+            k: "-" for k in [
+                "crop_kharif", "crop_rabi", "crop_zaid",
+                "water_kharif", "water_rabi", "water_zaid",
+                "rf_kharif", "rf_rabi", "rf_zaid",
+                "et_kharif", "et_rabi", "et_zaid",
+                "ro_kharif", "ro_rabi", "ro_zaid"
+            ]
+        }
+
+
 def get_soge_data(state, district, block, uid):
     try :
         df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="aquifer_vector")
