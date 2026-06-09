@@ -41,6 +41,7 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from utilities.geoserver_utils import Geoserver
+from django.core.mail import EmailMessage
 
 logger = logging.getLogger(__name__)
 
@@ -1030,3 +1031,29 @@ def update_layer_sync_status(
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
+
+
+def send_missing_layers_report(result: dict, recipients: list = None) -> bool:
+    if recipients is None:
+        recipients = getattr(settings, "MISSING_LAYER_RECIPIENTS", [])
+
+    if isinstance(recipients, str):
+        recipients = [recipients]
+
+    if not recipients:
+        logger.error("No recipients configured for missing layers report.")
+        return False
+
+    try:
+        email = EmailMessage(
+            subject="Missing Layers Report",
+            body=json.dumps(result, indent=4),
+            from_email=settings.EMAIL_HOST_USER,
+            to=recipients,
+        )
+        email.send()
+        logger.info(f"Missing layers report sent to {recipients}")
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to send missing layers report: {e}")
+        return False

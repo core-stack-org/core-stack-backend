@@ -7,10 +7,19 @@ from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
 import json
-import os
 from django.conf import settings
 from pathlib import Path
 from utilities.constants import GEOSERVER_BASE
+from utilities.logger import setup_logger
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from rest_framework.response import Response
+from rest_framework import status
+from .utils import send_missing_layers_report
+
+logger = setup_logger(__name__)
 
 
 def get_url(geoserver_url, workspace, layer_name):
@@ -201,94 +210,180 @@ def get_layers_of_workspace(self, workspace):
         return []
 
 
-def check_missing_layers(workspace):
-    missing_layers = []
-    print(f"{workspace=}")
-    workspace_config = load_workspace_config()
-    workspace_types = get_workspace_types(workspace)
-    print(f"Found types: {workspace_types}")
-    if not workspace_types:
-        print(f"No config found for workspace: {workspace}")
-        return {"no config found": []}
-    layer_config = get_layer_config_by_type(
-        workspace_config, workspace, workspace_types
-    )
-    # fetch raster layers once
-    available_raster_layers = valid_raster_layers_for_workspace(workspace)
-    count = 0
-    active_tehsils = TehsilSOI.objects.filter(active_status=True)
-    for tehsil in active_tehsils:
-        state = tehsil.district.state.state_name
-        district = tehsil.district.district_name
-        tehsil = tehsil.tehsil_name
-        district_name = valid_gee_text(district.lower())
-        tehsil_name = valid_gee_text(tehsil.lower())
-        for layer_type, config in layer_config.items():
-            prefix = config.get("prefix")
-            suffix = config.get("suffix")
-            layer_name_parts = [
-                prefix,
-                district_name,
-                tehsil_name,
-                suffix,
-            ]
-            layer_name = "_".join(part for part in layer_name_parts if part)
-            # raster check
-            if layer_type == "raster":
-                count += 1
-                if layer_name not in available_raster_layers:
-                    missing_layers.append(state + " " + layer_name)
-
-            # vector check
-            elif layer_type == "vector":
-                count += 1
-                is_valid = is_valid_vector_layer(workspace, layer_name)
-
-                if not is_valid:
-                    missing_layers.append(state + " " + layer_name)
-
-    return {"missing_layers": missing_layers, "layer_count": count}
-
-
-def valid_raster_layers_for_workspace(workspace):
-    """
-
-    Args:
-        workspace:
-
-    Returns:
-        all valid (have data)layers for particular workspace
-    """
+@lru_cache(maxsize=32)
+def valid_raster_layers_for_workspace(workspace: str) -> set:
+    session = get_session_with_retry()
     capabilities_url = (
         f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
     )
-    response = requests.get(capabilities_url)
-    if response.status_code != 200:
-        print(f"Failed to retrieve capabilities from {workspace}.")
-        return []
+    try:
+        response = session.get(capabilities_url, timeout=(5, 15))
+        response.raise_for_status()
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout fetching raster capabilities for {workspace}")
+        return set()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed raster capabilities for {workspace}: {e}")
+        return set()
+
     root = ET.fromstring(response.content)
     ns = {"wms": root.tag.split("}")[0].strip("{")}
     layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
-    available_layers = [layer.text for layer in layers]
-    return available_layers
+    return {layer.text for layer in layers}
 
 
-def is_valid_vector_layer(workspace, layer_name):
+@lru_cache(maxsize=32)
+def valid_vector_layers_for_workspace(workspace: str) -> set:
+    session = get_session_with_retry()
+    capabilities_url = (
+        f"{GEOSERVER_BASE}{workspace}/wfs"
+        f"?service=WFS&version=2.0.0&request=GetCapabilities"
+    )
+    try:
+        response = session.get(capabilities_url, timeout=(5, 15))
+        response.raise_for_status()
+    except requests.exceptions.Timeout:
+        logger.warning(
+            f"WFS GetCapabilities timed out for {workspace} — "
+            f"falling back to parallel individual checks"
+        )
+        return set()  # triggers parallel fallback in check_missing_layers
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed WFS capabilities for {workspace}: {e}")
+        return set()
+
+    root = ET.fromstring(response.content)
+    ns = {"wfs": "http://www.opengis.net/wfs/2.0"}
+    names = root.findall(".//wfs:FeatureType/wfs:Name", namespaces=ns)
+    return {name.text.split(":")[-1] for name in names}
+
+
+def is_valid_vector_layer(workspace: str, layer_name: str) -> bool:
+    """Used in parallel fallback only."""
+    session = get_session_with_retry()
+    try:
+        layer_url = get_url(GEOSERVER_URL, workspace, layer_name)
+        res = session.get(layer_url, timeout=(5, 10))  # shorter timeout per layer
+        if res.status_code == 200:
+            root = ET.fromstring(res.text)
+            return int(root.attrib.get("numberOfFeatures", 0)) > 0
+    except requests.exceptions.Timeout:
+        logger.warning(f"Timeout checking vector layer: {layer_name}")
+    except Exception as e:
+        logger.warning(f"Vector check failed for {layer_name}: {e}")
+    return False
+
+
+def bulk_check_vector_layers(
+    workspace: str,
+    layer_names: list[str],
+    max_workers: int = 20,
+) -> dict[str, bool]:
     """
-
-    Args:
-        workspace:
-        layer_name:
-
-    Returns:
-        True if layer have data else False
+    Checks multiple vector layers concurrently using a thread pool.
+    Returns {layer_name: is_valid} mapping.
     """
-    layer_url = get_url(GEOSERVER_URL, workspace, layer_name)
-    res_layer_url = requests.get(layer_url)
-    if res_layer_url.status_code == 200:
-        root = ET.fromstring(res_layer_url.text)
-        total_features = int(root.attrib.get("numberOfFeatures", 0))
-        return True if total_features > 0 else False
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_layer = {
+            executor.submit(is_valid_vector_layer, workspace, name): name
+            for name in layer_names
+        }
+        for future in as_completed(future_to_layer):
+            layer_name = future_to_layer[future]
+            try:
+                results[layer_name] = future.result()
+            except Exception as e:
+                logger.warning(f"Failed check for {layer_name}: {e}")
+                results[layer_name] = False
+    return results
+
+
+def missing_layer_for_all_workspace():
+    workspaces = (
+        Dataset.objects.filter(workspace__isnull=False)
+        .values_list("workspace", flat=True)
+        .distinct()
+    )
+    workspaces = [w.strip() for w in workspaces if w and w.strip()]
+    result = {}
+    for workspace in workspaces:
+        result[workspace] = check_missing_layers(workspace)
+    send_missing_layers_report(result)
+    return result
+
+
+def check_missing_layers(workspace: str) -> dict:
+    logger.info(f"{workspace=}")
+    workspace_config = load_workspace_config()
+    workspace_types = get_workspace_types(workspace)
+    logger.info(f"Found types: {workspace_types}")
+
+    if not workspace_types:
+        logger.critical(f"No config found for workspace: {workspace}")
+        return {"no config found": []}
+
+    layer_config = get_layer_config_by_type(
+        workspace_config, workspace, workspace_types
+    )
+
+    # ── Fetch all available layers ONCE (bulk, cached) ──────────────────────
+    available_raster_layers = valid_raster_layers_for_workspace(workspace)
+    available_vector_layers = valid_vector_layers_for_workspace(workspace)  # bulk WFS`
+    use_bulk_vector = bool(available_vector_layers)  # fallback if WFS unavailable
+
+    # ── Pre-build all (tehsil, layer_type, layer_name, state) combos ────────
+    active_tehsils = TehsilSOI.objects.select_related(
+        "district__state"  # eliminates N+1 DB queries
+    ).filter(active_status=True)
+
+    tasks = []  # (state, layer_type, layer_name)
+    for tehsil_obj in active_tehsils:
+        state = tehsil_obj.district.state.state_name
+        district_name = valid_gee_text(tehsil_obj.district.district_name.lower())
+        tehsil_name = valid_gee_text(tehsil_obj.tehsil_name.lower())
+
+        for layer_type, configs in layer_config.items():
+            for config in configs:
+                prefix = config.get("prefix")
+                suffix = config.get("suffix")
+                layer_name = "_".join(
+                    p for p in [prefix, district_name, tehsil_name, suffix] if p
+                )
+                tasks.append((state, layer_type, layer_name))
+
+    # ── Check raster layers (pure set lookup, no HTTP) ───────────────────────
+    missing_layers = []
+    vector_tasks = []  # collect for batch/parallel processing
+
+    for state, layer_type, layer_name in tasks:
+        if layer_type == "raster":
+            if layer_name not in available_raster_layers:
+                missing_layers.append(f"{state} {layer_name}")
+
+        elif layer_type == "vector":
+            if use_bulk_vector:
+                # O(1) set lookup — no HTTP call needed
+                if layer_name not in available_vector_layers:
+                    missing_layers.append(f"{state} {layer_name}")
+            else:
+                vector_tasks.append((state, layer_name))  # queue for parallel check
+
+    # ── Parallel fallback for vector layers (if WFS bulk fetch failed) ───────
+    if vector_tasks:
+        layer_names = [ln for _, ln in vector_tasks]
+        state_by_name = {ln: st for st, ln in vector_tasks}
+        validity = bulk_check_vector_layers(workspace, layer_names)
+
+        for layer_name, is_valid in validity.items():
+            if not is_valid:
+                missing_layers.append(f"{state_by_name[layer_name]} {layer_name}")
+
+    return {
+        "missing_layers": missing_layers,
+        "missing_layer_count": len(missing_layers),
+        "layer_count": len(tasks),
+    }
 
 
 def get_workspace_types(workspace_name):
@@ -305,7 +400,7 @@ def get_workspace_types(workspace_name):
 
 def get_layer_config_by_type(workspace_config, workspace_name, layer_types):
     """
-    Return prefix and suffix for each layer type.
+    Return list of prefix/suffix configs for each layer type.
 
     Args:
         workspace_config (dict): config JSON
@@ -313,7 +408,7 @@ def get_layer_config_by_type(workspace_config, workspace_name, layer_types):
         layer_types (list): ['raster', 'vector']
 
     Returns:
-        dict
+        dict: {'raster': [{'prefix': ..., 'suffix': ...}, ...], 'vector': [...]}
     """
     result = {}
 
@@ -321,9 +416,28 @@ def get_layer_config_by_type(workspace_config, workspace_name, layer_types):
         if config.get("name") == workspace_name and config.get("type") in layer_types:
             layer_type = config["type"]
 
-            result[layer_type] = {
-                "prefix": config.get("prefix"),
-                "suffix": config.get("suffix"),
-            }
+            if layer_type not in result:
+                result[layer_type] = []
+
+            result[layer_type].append(
+                {
+                    "prefix": config.get("prefix"),
+                    "suffix": config.get("suffix"),
+                }
+            )
 
     return result
+
+
+def get_session_with_retry():
+    """Creates a requests session with retry and timeout handling."""
+    session = requests.Session()
+    retry = Retry(
+        total=3,
+        backoff_factor=1,  # waits 1s, 2s, 4s between retries
+        status_forcelist=[500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
