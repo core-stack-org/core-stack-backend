@@ -193,7 +193,7 @@ LANGUAGE_MAP = {
 
 
 def load_form_labels(form_id):
-    label_file = Path(settings.BASE_DIR) / "dpr" / "labels" / f"{form_id}.json"
+    label_file = Path(settings.BASE_DIR) / "data" / "dpr" / "labels" / f"{form_id}.json"
 
     if not label_file.exists():
         return {}
