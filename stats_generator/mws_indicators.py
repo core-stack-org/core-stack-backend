@@ -825,13 +825,13 @@ def generate_mws_data_for_kyl_filters(
                         mws_dem_data = dem_df[dem_df["UID"] == specific_mws_id]
 
                         # Average of all UID mean elevations
-                        overall_mean_elevation = dem_df["mean_elevation"].mean()
+                        overall_mean_elevation = dem_df["mean_elevation_in_m"].mean()
                         if not mws_dem_data.empty:
                             row = mws_dem_data.iloc[0]
                             relief = round(
-                                row["max_elevation"] - row["min_elevation"], 2
+                                row["max_elevation_in_m"] - row["min_elevation_in_m"], 2
                             )
-                            mean_elevation = round(row["mean_elevation"], 2)
+                            mean_elevation = round(row["mean_elevation_in_m"], 2)
 
                             # Relative mean elevation
                             if overall_mean_elevation != 0:

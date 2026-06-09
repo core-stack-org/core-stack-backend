@@ -272,6 +272,7 @@ def create_excel_for_antyodaya_20(data, writer):
 
 
 def create_excel_for_drainage_density(data, writer):
+    import ast
     print("Inside create_excel_for Drainage Density")
     df_data = []
     features = data["features"]
@@ -282,6 +283,7 @@ def create_excel_for_drainage_density(data, writer):
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
             "drainage_density": properties.get("drainage_density", ""),
+            "stream_order_length_in_km": sum(ast.literal_eval(properties.get("stream_length_km", ""))),
         }
 
         df_data.append(row)
@@ -397,9 +399,9 @@ def create_excel_for_dem(data, writer):
 
         row = {
             "UID": properties.get("uid", ""),
-            "min_elevation": properties.get("min_elevation", ""),
-            "max_elevation": properties.get("max_elevation", ""),
-            "mean_elevation": properties.get("mean_elevation", ""),
+            "min_elevation_in_m": properties.get("min_elevation", ""),
+            "max_elevation_in_m": properties.get("max_elevation", ""),
+            "mean_elevation_in_m": properties.get("mean_elevation", ""),
         }
 
         df_data.append(row)
@@ -469,19 +471,34 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
     print("Excel sheet 'mws_intersect_swb' created successfully")
 
 
+import pandas as pd
+
 def create_excel_for_facilities(data, writer):
     features = data["features"]
     df_data = [feature["properties"] for feature in features]
 
     df = pd.DataFrame(df_data)
 
-    # keep first columns
     first_cols = ["censuscode2011", "censusname"]
     other_cols = [c for c in df.columns if c not in first_cols]
     df = df[first_cols + other_cols]
+
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
+
+    exclude_cols = ["censuscode2011", "censusname", "district", "core_admin_uid", "shrid2", "state", "tehsil"]
+    df.rename(
+        columns={
+            col: f"{col}_in_km"
+            for col in df.columns
+            if col not in exclude_cols
+        },
+        inplace=True
+    )
+
+    # Write to Excel
     df.to_excel(writer, sheet_name="facilities_proximity", index=False)
+
     print("Excel file created for facilities_proximity")
 
 
