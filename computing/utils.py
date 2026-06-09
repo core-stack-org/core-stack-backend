@@ -619,6 +619,7 @@ def save_layer_info_to_db(
     algorithm_version="1.0",
     misc=None,
     is_override=False,
+    is_gee_asset=True,
 ):
     print("inside the save_layer_info_to_db function")
 
@@ -636,7 +637,7 @@ def save_layer_info_to_db(
         print("Error fetching in state district block:", e)
         return
 
-    is_public = is_asset_public(asset_id)
+    is_public = is_asset_public(asset_id) if is_gee_asset else False
 
     # Check if there’s an existing layer
     existing_layer = (

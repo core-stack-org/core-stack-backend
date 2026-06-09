@@ -25,9 +25,16 @@ from typing import Any
 import pyogrio
 from django.conf import settings
 
-from computing.utils import fix_invalid_geometry_in_gdf, push_shape_to_geoserver
+from computing.models import Dataset, LayerType
+from computing.utils import (
+    fix_invalid_geometry_in_gdf,
+    push_shape_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from nrm_app.celery import app
 from utilities.constants import LIVESTOCKS
+from utilities.geoserver_utils import Geoserver, GeoserverException
 
 
 SOURCE_LAYER = "livestock"
@@ -35,6 +42,9 @@ LOCATION_INDEX = "idx_livestock_location"
 OUTPUT_DIR = "data/livestock/output/tehsil_data"
 GEOSERVER_WORKSPACE = "livestocks"
 LAYER_PREFIX = "livestocks"
+DATASET_NAME = "Livestock Census"
+ALGORITHM = "local-pan-india-tehsil-clip"
+ALGORITHM_VERSION = "1.0"
 INTEGER_COLUMNS = (
     "pc11_village_id",
     "pc11_state_id",
@@ -185,8 +195,19 @@ def _write_clip(gdf, output_dir: Path, layer_name: str) -> Path:
     return gpkg_path
 
 
+def _ensure_geoserver_workspace() -> None:
+    geoserver = Geoserver()
+    try:
+        geoserver.get_workspace(GEOSERVER_WORKSPACE)
+    except GeoserverException as exc:
+        if exc.status != 404:
+            raise
+        geoserver.create_workspace(GEOSERVER_WORKSPACE)
+
+
 def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> dict[str, Any]:
     try:
+        _ensure_geoserver_workspace()
         response = push_shape_to_geoserver(
             str(gpkg_path.with_suffix("")),
             store_name=layer_name,
@@ -201,6 +222,26 @@ def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> 
             "error_type": exc.__class__.__name__,
             "error": str(exc)[:500],
         }
+
+
+def _geoserver_url(layer_name: str) -> str:
+    base_url = settings.GEOSERVER_URL.rstrip("/")
+    return (
+        f"{base_url}/{GEOSERVER_WORKSPACE}/ows"
+        "?service=WFS&version=1.0.0&request=GetFeature"
+        f"&typeName={GEOSERVER_WORKSPACE}:{layer_name}"
+        "&outputFormat=application/json"
+    )
+
+
+def _ensure_dataset() -> None:
+    Dataset.objects.get_or_create(
+        name=DATASET_NAME,
+        defaults={
+            "layer_type": LayerType.VECTOR,
+            "workspace": GEOSERVER_WORKSPACE,
+        },
+    )
 
 
 @app.task(bind=True)
@@ -230,8 +271,39 @@ def generate_livestocks_layer_task(
     gpkg_path = _write_clip(gdf, output_dir, layer_name)
 
     geoserver = None
+    layer_id = None
+    geoserver_url = None
     if _bool(sync_to_geoserver):
         geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
+        if geoserver.get("ok"):
+            geoserver_url = _geoserver_url(layer_name)
+            _ensure_dataset()
+            layer_id = save_layer_info_to_db(
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name,
+                asset_id=geoserver_url,
+                dataset_name=DATASET_NAME,
+                algorithm=ALGORITHM,
+                algorithm_version=ALGORITHM_VERSION,
+                misc={
+                    "is_generated_locally": True,
+                    "source": _repo_path(LIVESTOCKS).as_posix(),
+                    "gpkg_path": gpkg_path.as_posix(),
+                    "output_dir": output_dir.as_posix(),
+                    "geoserver_workspace": GEOSERVER_WORKSPACE,
+                    "geoserver_layer_name": layer_name,
+                    "geoserver_url": geoserver_url,
+                },
+                is_override=_bool(overwrite),
+                is_gee_asset=False,
+            )
+            if layer_id:
+                update_layer_sync_status(
+                    layer_id=layer_id,
+                    sync_to_geoserver=True,
+                )
 
     return {
         "status": "success",
@@ -245,5 +317,7 @@ def generate_livestocks_layer_task(
         "tehsil": resolved_block,
         "sync_to_geoserver": _bool(sync_to_geoserver),
         "geoserver": geoserver,
+        "geoserver_url": geoserver_url,
+        "layer_id": layer_id,
         "elapsed_seconds": round(time.perf_counter() - started, 3),
     }
