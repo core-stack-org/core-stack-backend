@@ -2414,6 +2414,7 @@ def generate_antyodaya(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
+            "None",
             generate_antyodaya_data_local_task,
         )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
