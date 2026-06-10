@@ -16,6 +16,7 @@ _SYNC_LAYER_GENERATION_CONTEXT = ContextVar(
 )
 _SYNC_STAC_LAYERS = ContextVar("sync_stac_layers", default=None)
 _SYNC_LAYER_IDS = ContextVar("sync_layer_ids", default=None)
+_SYNC_LAYER_GENERATED = ContextVar("sync_layer_generated", default=None)
 _SYNC_STAC_ERRORS = ContextVar("sync_stac_errors", default=None)
 
 
@@ -81,6 +82,13 @@ def record_sync_layer_id(layer_id):
     if layer_ids is None or not layer_id:
         return
     layer_ids.append(layer_id)
+    _SYNC_LAYER_GENERATED.set(True)
+
+
+def record_sync_no_layer_generated():
+    """Mark that the current sync request completed without creating a layer."""
+    if _SYNC_LAYER_GENERATION_CONTEXT.get():
+        _SYNC_LAYER_GENERATED.set(False)
 
 
 def record_sync_stac_layer(
@@ -398,6 +406,7 @@ def sync_layer_generation_if_enabled(view_func):
         token = _SYNC_LAYER_GENERATION_CONTEXT.set(True)
         stac_layers_token = _SYNC_STAC_LAYERS.set([])
         layer_ids_token = _SYNC_LAYER_IDS.set([])
+        layer_generated_token = _SYNC_LAYER_GENERATED.set(None)
         stac_errors_token = _SYNC_STAC_ERRORS.set([])
         try:
             with patch.object(Task, "apply_async", _apply_async_in_process):
@@ -405,12 +414,17 @@ def sync_layer_generation_if_enabled(view_func):
 
             try:
                 payload = getattr(response, "data", None)
-                if isinstance(payload, dict) and "stac" not in payload:
-                    stac_spec = _collect_stac_for_request(request)
-                    payload["stac"] = format_stac_for_api_response(stac_spec)
-                    if stac_spec is not None and stac_spec.get("stac_errors"):
-                        payload["stac_errors"] = stac_spec["stac_errors"]
-                    payload.pop("stac_spec", None)
+                if isinstance(payload, dict):
+                    if _SYNC_LAYER_GENERATED.get() is False:
+                        payload.pop("asset_id", None)
+                        payload.pop("asset_ids", None)
+                        payload["layer_generated"] = False
+                    if "stac" not in payload:
+                        stac_spec = _collect_stac_for_request(request)
+                        payload["stac"] = format_stac_for_api_response(stac_spec)
+                        if stac_spec is not None and stac_spec.get("stac_errors"):
+                            payload["stac_errors"] = stac_spec["stac_errors"]
+                        payload.pop("stac_spec", None)
                     if payload.get("status") == "initiated":
                         payload["status"] = "completed"
                         payload["Success"] = "Layer generation completed"
@@ -419,6 +433,7 @@ def sync_layer_generation_if_enabled(view_func):
                 logger.exception("Failed to enrich sync response with STAC specs")
         finally:
             _SYNC_STAC_ERRORS.reset(stac_errors_token)
+            _SYNC_LAYER_GENERATED.reset(layer_generated_token)
             _SYNC_LAYER_IDS.reset(layer_ids_token)
             _SYNC_STAC_LAYERS.reset(stac_layers_token)
             _SYNC_LAYER_GENERATION_CONTEXT.reset(token)
