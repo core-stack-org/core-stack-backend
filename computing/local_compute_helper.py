@@ -22,6 +22,8 @@ from computing.config_loader import (
     TERRAIN_RASTER_PATH,
 )
 
+PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
+
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
