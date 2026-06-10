@@ -1812,7 +1812,7 @@ def get_surface_Water_bodies_data(state, district, block, uid):
     except Exception as e:
         print(e)
         logger.info("Not able to access excel for %s state, %s district, %s block for Waterbodies",state.upper(),district.upper(),block.upper())
-        return "", "", "", [], [], [], []
+        return "-", "", "", "", [], [], [], [], []
 
 
 def get_water_balance_data(state, district, block, uid):
@@ -1882,6 +1882,8 @@ def get_water_balance_data(state, district, block, uid):
         filtered_df_g = df.loc[df["UID"] == uid, selected_column_g].values[0]
 
         result = mk.original_test(filtered_df_g)
+        
+        short_trend = result.trend.capitalize()
 
         if avg_del_g >= 0:
             if result.trend == "increasing":
@@ -2092,6 +2094,7 @@ def get_water_balance_data(state, district, block, uid):
         filtered_df_dg = (df.loc[df["UID"] == uid, selected_columns_dg].values[0].tolist())
 
         return (
+            short_trend,
             trend_desc,
             good_rainfall,
             bad_rainfall,
@@ -2108,20 +2111,70 @@ def get_water_balance_data(state, district, block, uid):
             district,
             block
         )
-        return "", "", "", [], [], [], [], []
+        return "-", "", "", "", [], [], [], [], []
 
 
 def get_hydro_tabular_data(state, district, block, uid):
     try:
         base_path = f"{DATA_DIR_TEMP}{state.upper()}/{district.upper()}/{district.lower()}_{block.lower()}.xlsx"
         
+        # Read Area from mws sheet
+        try:
+            df_mws = pd.read_excel(base_path, sheet_name="mws")
+            row_mws = df_mws.loc[df_mws["UID"] == uid]
+            if not row_mws.empty and "area_in_ha" in row_mws.columns:
+                import math
+                import requests
+                from shapely.geometry import shape
+                import pyproj
+                from shapely.ops import transform
+                import urllib3
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                
+                area_val = row_mws["area_in_ha"].values[0]
+                area = round(float(area_val), 2) if not pd.isna(area_val) else "-"
+                if area != "-":
+                    perimeter_circle = 0.2 * math.sqrt(math.pi * area)
+                    
+                    # Fetch true MWS perimeter from Geoserver using DEM layer
+                    try:
+                        url = f"https://geoserver.core-stack.org:8443/geoserver/dem/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=dem:{district.lower()}_{block.lower()}_dem_vector&cql_filter=uid='{uid}'&outputFormat=application/json"
+                        res = requests.get(url, verify=False)
+                        if res.status_code == 200:
+                            data = res.json()
+                            if len(data.get("features", [])) > 0:
+                                geom = shape(data["features"][0]["geometry"])
+                                project = pyproj.Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True).transform
+                                geom_proj = transform(project, geom)
+                                perimeter_mws = geom_proj.length / 1000
+                                perimeter = round(perimeter_mws, 2)
+                                compactness = round(perimeter_mws / perimeter_circle, 2)
+                            else:
+                                perimeter = "-"
+                                compactness = "-"
+                        else:
+                            perimeter = "-"
+                            compactness = "-"
+                    except Exception as e:
+                        logger.info(f"Failed to calculate MWS perimeter for {uid}: {e}")
+                        perimeter = "-"
+                        compactness = "-"
+                else:
+                    perimeter = "-"
+                    compactness = "-"
+            else:
+                area, perimeter, compactness = "-", "-", "-"
+        except Exception as e:
+            logger.info(f"Failed to read mws sheet for {uid}: {e}")
+            area, perimeter, compactness = "-", "-", "-"
+
         # Read DEM
         try:
             df_dem = pd.read_excel(base_path, sheet_name="dem")
             row_dem = df_dem.loc[df_dem["UID"] == uid]
             if not row_dem.empty:
-                min_elev = row_dem["min_elevation"].values[0]
-                max_elev = row_dem["max_elevation"].values[0]
+                min_elev = row_dem["min_elevation_in_m"].values[0]
+                max_elev = row_dem["max_elevation_in_m"].values[0]
                 min_elev = round(float(min_elev), 2) if not pd.isna(min_elev) else "-"
                 max_elev = round(float(max_elev), 2) if not pd.isna(max_elev) else "-"
                 relief = round(max_elev - min_elev, 2) if min_elev != "-" and max_elev != "-" else "-"
@@ -2176,11 +2229,11 @@ def get_hydro_tabular_data(state, district, block, uid):
             logger.info(f"Failed to read drainage_density sheet for {uid}: {e}")
             drainage_density, total_length = "-", "-"
 
-        return min_elev, max_elev, relief, aquifer_class, soge_class, drainage_density, total_length
+        return min_elev, max_elev, relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness
 
     except Exception as e:
         logger.info(f"Error in get_hydro_tabular_data for {uid}: {e}")
-        return "-", "-", "-", "-", "-", "-", "-"
+        return "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"
 
 
 def get_terrain_and_lulc_data(state, district, block, uid):

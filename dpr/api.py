@@ -260,6 +260,7 @@ def generate_mws_report(request):
 
         # ? Water Balance Description
         (
+            water_balance_trend,
             wb_desc,
             good_rainfall,
             bad_rainfall,
@@ -274,7 +275,7 @@ def generate_mws_report(request):
         soge_desc = get_soge_data(state, district, block, uid)
 
         # ? Hydro Tabular Data
-        min_elev, max_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length = get_hydro_tabular_data(state, district, block, uid)
+        min_elev, max_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
 
         # ? Cropping, Water, and Hydrology Data
         cwh_data = get_cropping_water_hydro_data(state, district, block, uid)
@@ -332,6 +333,7 @@ def generate_mws_report(request):
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,
+            "water_balance_trend": water_balance_trend,
             "wb_desc": wb_desc,
             "good_rainfall": good_rainfall,
             "bad_rainfall": bad_rainfall,
@@ -346,6 +348,9 @@ def generate_mws_report(request):
             "soge_class": soge_class,
             "drainage_density": drainage_density,
             "drainage_length": total_length,
+            "area": area,
+            "perimeter": perimeter,
+            "compactness": compactness,
             **cwh_data,
             **terrain_lulc_data,
             "mws_areas": json.dumps(mws_areas),

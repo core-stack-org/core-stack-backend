@@ -932,7 +932,6 @@
             }
 
             .map,
-            .map>div,
             .map .ol-viewport,
             .map .ol-overlaycontainer,
             .map .ol-overlaycontainer-stopevent {
@@ -974,7 +973,6 @@
             }
 
             .map-group .map,
-            .map-group .map>div,
             .map-group .map .ol-viewport,
             .map-group .map .ol-overlaycontainer,
             .map-group .map .ol-overlaycontainer-stopevent {
@@ -1007,7 +1005,6 @@
             }
 
             .map-group-3 .map,
-            .map-group-3 .map>div,
             .map-group-3 .map .ol-viewport,
             .map-group-3 .map .ol-overlaycontainer,
             .map-group-3 .map .ol-overlaycontainer-stopevent {
@@ -1025,7 +1022,6 @@
             }
 
             #mainMap,
-            #mainMap>div,
             #mainMap .ol-viewport {
                 width: 100% !important;
                 height: 500px !important;
@@ -1041,8 +1037,6 @@
 
             #terrainMap,
             #compMap1,
-            #terrainMap>div,
-            #compMap1>div,
             #terrainMap .ol-viewport,
             #compMap1 .ol-viewport {
                 width: 100% !important;
@@ -1059,8 +1053,6 @@
 
             #lulcMap,
             #compMap2,
-            #lulcMap>div,
-            #compMap2>div,
             #lulcMap .ol-viewport,
             #compMap2 .ol-viewport {
                 width: 100% !important;
@@ -1077,8 +1069,6 @@
 
             #degradLandMap,
             #compMap3,
-            #degradLandMap>div,
-            #compMap3>div,
             #degradLandMap .ol-viewport,
             #compMap3 .ol-viewport {
                 width: 100% !important;
@@ -1095,8 +1085,6 @@
 
             #treeReduceMap,
             #compMap4,
-            #treeReduceMap>div,
-            #compMap4>div,
             #treeReduceMap .ol-viewport,
             #compMap4 .ol-viewport {
                 width: 100% !important;
@@ -1113,8 +1101,6 @@
 
             #urbanMap,
             #compMap5,
-            #urbanMap>div,
-            #compMap5>div,
             #urbanMap .ol-viewport,
             #compMap5 .ol-viewport {
                 width: 100% !important;
@@ -1130,7 +1116,6 @@
             }
 
             #swbMap,
-            #swbMap>div,
             #swbMap .ol-viewport {
                 width: 100% !important;
                 height: 500px !important;
@@ -1703,9 +1688,9 @@
                         <td style="padding: 10px; border: 1px solid black; width: 16%;">Relief</td>
                     </tr>
                     <tr>
-                        <td id="tbl-area" style="padding: 10px; border: 1px solid black;">-</td>
-                        <td id="tbl-perimeter" style="padding: 10px; border: 1px solid black;">-</td>
-                        <td id="tbl-compactness" style="padding: 10px; border: 1px solid black;">-</td>
+                        <td id="tbl-area" style="padding: 10px; border: 1px solid black;">{{ area }}</td>
+                        <td id="tbl-perimeter" style="padding: 10px; border: 1px solid black;">{{ perimeter }}</td>
+                        <td id="tbl-compactness" style="padding: 10px; border: 1px solid black;">{{ compactness }}</td>
                         <td id="tbl-max-elev" style="padding: 10px; border: 1px solid black;">{{ max_elev }}</td>
                         <td id="tbl-min-elev" style="padding: 10px; border: 1px solid black;">{{ min_elev }}</td>
                         <td id="tbl-relief" style="padding: 10px; border: 1px solid black;">{{ dem_relief }}</td>
@@ -1713,7 +1698,7 @@
                 </tbody>
             </table>
 
-            <h4>DRAINAGE NETWORK</h4>
+            <!-- <h4>DRAINAGE NETWORK</h4>
             <table
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
@@ -1726,7 +1711,7 @@
                         <td colspan="3" id="tbl-drainage-density" style="padding: 10px; border: 1px solid black;">{{ drainage_density }}</td>
                     </tr>
                 </tbody>
-            </table>
+            </table> -->
 
             <h4>GROUNDWATER & AQUIFER CHARACTERISTICS</h4>
             <table
@@ -1741,7 +1726,7 @@
                         <td colspan="2" id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">{{ aquifer_class }}</td>
                         <td colspan="2" id="tbl-soge" style="padding: 10px; border: 1px solid black;">{{ soge_class }}
                         </td>
-                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">-</td>
+                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">{{ water_balance_trend }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -3606,8 +3591,7 @@
                 mainMap.addLayer(vectorLayer);
 
                 const arr = vectorSource.getExtent();
-                const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
-                mainMap.getView().setCenter(mapcenter);
+                mainMap.getView().fit(arr, { padding: [20, 20, 20, 20], maxZoom: 15 });
             })
             .catch(error => {
                 // Silently handle fetch errors
@@ -3617,23 +3601,7 @@
         // FETCH FEATURE BY UID AND APPLY SPATIAL FILTERING
         // ============================================================================
 
-        const populateHydrologyTable = async (mwsFeature) => {
-            const uid = mwsFeature.get('uid');
-            const area = mwsFeature.get('area_in_ha');
 
-            if (area !== undefined) {
-                document.getElementById('tbl-area').innerText = parseFloat(area).toFixed(2);
-            }
-
-            try {
-                const geom = mwsFeature.getGeometry();
-                const lengthMeters = ol.sphere.getLength(geom, { projection: 'EPSG:4326' });
-                const perimeterKm = (lengthMeters / 1000).toFixed(2);
-                document.getElementById('tbl-perimeter').innerText = perimeterKm;
-            } catch (e) {
-                console.error("Error calculating perimeter:", e);
-            }
-        };
 
         const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
             await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
@@ -3680,7 +3648,7 @@
                         addVillageBoundariesToMap(swbMap, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
                         addDemographicBoundariesToMap(feature);
-                        populateHydrologyTable(feature);
+
                     }
 
                     const styleFunctionComp = feature => {
@@ -3718,76 +3686,31 @@
                     addMwsBoundaryToMap(hydroVectorMap);
 
                     const arr = vectorSource.getExtent();
-                    const mapcenter = [(arr[0] + arr[2]) / 2, (arr[1] + arr[3]) / 2];
+                    const fitOptions = { padding: [20, 20, 20, 20], maxZoom: 15 };
 
-                    TerrainMap.getView().setCenter(mapcenter);
-                    TerrainMap.getView().setZoom(13);
-
-                    demMap.getView().setCenter(mapcenter);
-                    demMap.getView().setZoom(13);
-
-                    drainageMap.getView().setCenter(mapcenter);
-                    drainageMap.getView().setZoom(13);
-
-                    terrainRasterMap.getView().setCenter(mapcenter);
-                    terrainRasterMap.getView().setZoom(13);
-
-                    landscapeLulcMap.getView().setCenter(mapcenter);
-                    landscapeLulcMap.getView().setZoom(13);
-
-                    croppingIntensityMap.getView().setCenter(mapcenter);
-                    croppingIntensityMap.getView().setZoom(13);
-
-                    hydroVectorMap.getView().setCenter(mapcenter);
-                    hydroVectorMap.getView().setZoom(13);
-
-                    DegradMap.getView().setCenter(mapcenter);
-                    DegradMap.getView().setZoom(13);
-
-                    lulcMap.getView().setCenter(mapcenter);
-                    lulcMap.getView().setZoom(13);
-
-                    treeReduceMap.getView().setCenter(mapcenter);
-                    treeReduceMap.getView().setZoom(13);
-
-                    ComparisonMap1.getView().setCenter(mapcenter);
-                    ComparisonMap1.getView().setZoom(13);
-
-                    ComparisonMap2.getView().setCenter(mapcenter);
-                    ComparisonMap2.getView().setZoom(13);
-
-                    ComparisonMap3.getView().setCenter(mapcenter);
-                    ComparisonMap3.getView().setZoom(13);
-
-                    ComparisonMap4.getView().setCenter(mapcenter);
-                    ComparisonMap4.getView().setZoom(13);
-
-                    ComparisonMap5.getView().setCenter(mapcenter);
-                    ComparisonMap5.getView().setZoom(13);
-
-                    urbanMap.getView().setCenter(mapcenter);
-                    urbanMap.getView().setZoom(13);
-
-                    farmLossMap.getView().setCenter(mapcenter);
-                    farmLossMap.getView().setZoom(13);
-
-                    treeLossMap.getView().setCenter(mapcenter);
-                    treeLossMap.getView().setZoom(13);
-
-                    demographicPopMap.getView().setCenter(mapcenter);
-                    demographicPopMap.getView().setZoom(12);
-
-                    demographicLitMap.getView().setCenter(mapcenter);
-                    demographicLitMap.getView().setZoom(12);
-
-                    demographicMargMap.getView().setCenter(mapcenter);
-                    demographicMargMap.getView().setZoom(12);
-
-                    swbMap.getView().setCenter(mapcenter);
-                    swbMap.getView().setZoom(13);
-
-                    sogeMap.getView().setCenter(mapcenter);
-                    sogeMap.getView().setZoom(13);
+                    TerrainMap.getView().fit(arr, fitOptions);
+                    demMap.getView().fit(arr, fitOptions);
+                    drainageMap.getView().fit(arr, fitOptions);
+                    terrainRasterMap.getView().fit(arr, fitOptions);
+                    landscapeLulcMap.getView().fit(arr, fitOptions);
+                    croppingIntensityMap.getView().fit(arr, fitOptions);
+                    hydroVectorMap.getView().fit(arr, fitOptions);
+                    DegradMap.getView().fit(arr, fitOptions);
+                    lulcMap.getView().fit(arr, fitOptions);
+                    treeReduceMap.getView().fit(arr, fitOptions);
+                    ComparisonMap1.getView().fit(arr, fitOptions);
+                    ComparisonMap2.getView().fit(arr, fitOptions);
+                    ComparisonMap3.getView().fit(arr, fitOptions);
+                    ComparisonMap4.getView().fit(arr, fitOptions);
+                    ComparisonMap5.getView().fit(arr, fitOptions);
+                    urbanMap.getView().fit(arr, fitOptions);
+                    farmLossMap.getView().fit(arr, fitOptions);
+                    treeLossMap.getView().fit(arr, fitOptions);
+                    demographicPopMap.getView().fit(arr, fitOptions);
+                    demographicLitMap.getView().fit(arr, fitOptions);
+                    demographicMargMap.getView().fit(arr, fitOptions);
+                    swbMap.getView().fit(arr, fitOptions);
+                    sogeMap.getView().fit(arr, fitOptions);
                 })
                 .catch(error => {
                     // Silently handle fetch errors
