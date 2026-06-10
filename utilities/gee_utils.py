@@ -355,6 +355,37 @@ def check_gee_task_status(task_id):
         print("Exception in check_gee_task_status", e)
 
 
+def wait_for_gee_task(task_id, poll_interval=30, timeout=7200):
+    """
+    Poll ee.data.getTaskStatus until a batch task completes.
+
+    Prefer this over check_task_status in sync paths: completed tasks drop off
+    listOperations, which makes check_task_status return stale pending ids.
+    """
+    if not task_id:
+        raise ValueError("task_id is required")
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        statuses = ee.data.getTaskStatus(task_id)
+        if not statuses:
+            time.sleep(poll_interval)
+            continue
+
+        state = statuses[0].get("state")
+        if state == "COMPLETED":
+            return True
+        if state in ("FAILED", "CANCELLED"):
+            error = statuses[0].get("error_message") or state
+            raise RuntimeError(f"GEE task {task_id} {state}: {error}")
+
+        time.sleep(poll_interval)
+
+    raise RuntimeError(
+        f"GEE task {task_id} did not complete within {timeout} seconds"
+    )
+
+
 def check_task_status(task_id_list, sleep_time=60):
     task_id_list = list(filter(None, task_id_list))
     if len(task_id_list) > 0:
