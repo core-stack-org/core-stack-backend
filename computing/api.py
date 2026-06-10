@@ -2410,27 +2410,16 @@ def generate_antyodaya(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
         compute = _get_compute_mode(request)
-        if compute == "local":
-            gee_account_id = request.data.get("gee_account_id")
-            generate_antyodaya_data_local_task.apply_async(
-                kwargs={
-                    "state": state,
-                    "district": district,
-                    "block": block,
-                    "gee_account_id": gee_account_id,
-                },
-                queue="nrm",
-            )
-        else:
-            sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-            overwrite = request.data.get("overwrite", False)
-            generate_antyodaya_layer_task.apply_async(
-                args=[state, district, block, sync_to_geoserver, overwrite],
-                queue="nrm",
-            )
+        task = _select_compute_task(
+            compute,
+            generate_antyodaya_data_local_task,
+        )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in generate_antyodaya api :: ", e)
