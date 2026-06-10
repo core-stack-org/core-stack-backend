@@ -188,9 +188,7 @@ def _task_started_response(
     elif isinstance(asset_id, list):
         payload["asset_ids"] = asset_id
     if stac_spec is not None:
-        stac = format_stac_for_api_response(stac_spec)
-        if stac is not None:
-            payload["stac"] = stac
+        payload["stac"] = format_stac_for_api_response(stac_spec)
     return Response(payload, status=status.HTTP_200_OK)
 
 

@@ -39,21 +39,21 @@ def _get_request_value(data, *keys):
 
 
 def format_stac_for_api_response(stac_payload):
-    """Return only STAC Feature item(s) for the API ``stac`` field."""
+    """Return STAC Feature item(s) for the API ``stac`` field, or ``{}`` when absent."""
     if not stac_payload:
-        return None
+        return {}
     if isinstance(stac_payload, dict) and stac_payload.get("type") == "Feature":
         return stac_payload
     if isinstance(stac_payload, list):
         return stac_payload
     if not isinstance(stac_payload, dict):
-        return None
+        return {}
     items = stac_payload.get("items") or []
     if len(items) == 1:
         return items[0]
     if len(items) > 1:
         return items
-    return None
+    return {}
 
 
 def read_location_from_request(request):
@@ -407,9 +407,7 @@ def sync_layer_generation_if_enabled(view_func):
                 payload = getattr(response, "data", None)
                 if isinstance(payload, dict) and "stac" not in payload:
                     stac_spec = _collect_stac_for_request(request)
-                    stac = format_stac_for_api_response(stac_spec)
-                    if stac is not None:
-                        payload["stac"] = stac
+                    payload["stac"] = format_stac_for_api_response(stac_spec)
                     if stac_spec is not None and stac_spec.get("stac_errors"):
                         payload["stac_errors"] = stac_spec["stac_errors"]
                     payload.pop("stac_spec", None)
