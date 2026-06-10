@@ -1,16 +1,7 @@
-"""Livestock census tehsil clipping from the pan-India local GeoPackage.
+"""Clip livestock census data by tehsil and optionally publish it.
 
-Runtime contract:
-
-- request names may be spaces or snake_case; stored names are resolved from the
-  GeoPackage before clipping
-- local output is always written first
-- GeoServer publish is enabled by default and can be disabled per request;
-  failure is reported without breaking local generation
-
-The source GeoPackage should have an attribute index on
-``(state_name, district_name, TEHSIL)``. The task creates it once if missing,
-which keeps reads sub-second for normal tehsil clips on the local server.
+Names may use spaces or snake_case. The local GPKG is always written first;
+successful GeoServer layers are registered in the database by their WFS URL.
 """
 
 from __future__ import annotations
@@ -195,19 +186,16 @@ def _write_clip(gdf, output_dir: Path, layer_name: str) -> Path:
     return gpkg_path
 
 
-def _ensure_geoserver_workspace() -> None:
-    geoserver = Geoserver()
-    try:
-        geoserver.get_workspace(GEOSERVER_WORKSPACE)
-    except GeoserverException as exc:
-        if exc.status != 404:
-            raise
-        geoserver.create_workspace(GEOSERVER_WORKSPACE)
-
-
 def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> dict[str, Any]:
     try:
-        _ensure_geoserver_workspace()
+        geoserver = Geoserver()
+        try:
+            geoserver.get_workspace(GEOSERVER_WORKSPACE)
+        except GeoserverException as exc:
+            if exc.status != 404:
+                raise
+            geoserver.create_workspace(GEOSERVER_WORKSPACE)
+
         response = push_shape_to_geoserver(
             str(gpkg_path.with_suffix("")),
             store_name=layer_name,
@@ -222,26 +210,6 @@ def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> 
             "error_type": exc.__class__.__name__,
             "error": str(exc)[:500],
         }
-
-
-def _geoserver_url(layer_name: str) -> str:
-    base_url = settings.GEOSERVER_URL.rstrip("/")
-    return (
-        f"{base_url}/{GEOSERVER_WORKSPACE}/ows"
-        "?service=WFS&version=1.0.0&request=GetFeature"
-        f"&typeName={GEOSERVER_WORKSPACE}:{layer_name}"
-        "&outputFormat=application/json"
-    )
-
-
-def _ensure_dataset() -> None:
-    Dataset.objects.get_or_create(
-        name=DATASET_NAME,
-        defaults={
-            "layer_type": LayerType.VECTOR,
-            "workspace": GEOSERVER_WORKSPACE,
-        },
-    )
 
 
 @app.task(bind=True)
@@ -276,12 +244,23 @@ def generate_livestocks_layer_task(
     if _bool(sync_to_geoserver):
         geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
         if geoserver.get("ok"):
-            geoserver_url = _geoserver_url(layer_name)
-            _ensure_dataset()
+            geoserver_url = (
+                f"{settings.GEOSERVER_URL.rstrip('/')}/{GEOSERVER_WORKSPACE}/ows"
+                "?service=WFS&version=1.0.0&request=GetFeature"
+                f"&typeName={GEOSERVER_WORKSPACE}:{layer_name}"
+                "&outputFormat=application/json"
+            )
+            Dataset.objects.get_or_create(
+                name=DATASET_NAME,
+                defaults={
+                    "layer_type": LayerType.VECTOR,
+                    "workspace": GEOSERVER_WORKSPACE,
+                },
+            )
             layer_id = save_layer_info_to_db(
-                state=state,
-                district=district,
-                block=block,
+                state=resolved_state,
+                district=resolved_district,
+                block=resolved_block,
                 layer_name=layer_name,
                 asset_id=geoserver_url,
                 dataset_name=DATASET_NAME,
