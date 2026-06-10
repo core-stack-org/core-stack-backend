@@ -212,7 +212,7 @@ def _ensure_layer_stac_spec(
     end_year="",
 ):
     """Read STAC JSON for a layer; generate inline when missing (sync API path)."""
-    stac_spec = _collect_generated_stac_specs(
+    stac_spec = collect_generated_stac_specs(
         state=state,
         district=district,
         block=block,
@@ -246,7 +246,7 @@ def _ensure_layer_stac_spec(
         stac_spec["stac_error"] = "STAC collection generation returned False"
         return stac_spec
 
-    stac_spec = _collect_generated_stac_specs(
+    stac_spec = collect_generated_stac_specs(
         state=state,
         district=district,
         block=block,
