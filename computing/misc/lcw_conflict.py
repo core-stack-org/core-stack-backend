@@ -22,6 +22,7 @@ from utilities.layer_generation_logging import (
     log_task_step,
     task_location_context,
 )
+from utilities.layer_generation_mode import record_sync_no_layer_generated
 from nrm_app.celery import app
 
 TASK_NAME = "generate_lcw_conflict_data"
@@ -103,6 +104,7 @@ def generate_lcw_conflict_data(self, state, district, block, gee_account_id):
                 message="No LCW conflict areas in this block; skipping export",
                 **ctx,
             )
+            record_sync_no_layer_generated()
             return True
 
         log_task_step(TASK_NAME, "create_gee_directory", **ctx)
