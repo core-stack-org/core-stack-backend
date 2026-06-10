@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from types import SimpleNamespace
 
 import pandas as pd
@@ -16,18 +17,55 @@ from utilities.gee_utils import valid_gee_text
 
 log = logging.getLogger(__name__)
 
+_LULC_DATASETS = frozenset({"LULC_level_1", "LULC_level_2", "LULC_level_3"})
+_LULC_LAYER_RE = re.compile(r"^LULC_(\d{2})_(\d{2})_", re.IGNORECASE)
+
+
+def _two_digit_hydrological_year(value) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if len(text) == 2 and text.isdigit():
+        return text
+    if len(text) == 4 and text.isdigit():
+        return str(int(text) % 100).zfill(2)
+    return text
+
+
+def lulc_years_from_layer_name(layer_name: str):
+    match = _LULC_LAYER_RE.match(layer_name or "")
+    if not match:
+        return None, None
+    return match.group(1), match.group(2)
+
+
+def lulc_calendar_start_year(layer_name: str):
+    start_yy, _ = lulc_years_from_layer_name(layer_name)
+    if not start_yy:
+        return ""
+    return str(2000 + int(start_yy))
+
 
 def format_geoserver_name(template: str, layer: Layer) -> str:
     if not template:
         return ""
     misc = layer.misc or {}
+    start_year = str(misc.get("start_year", "") or "")
+    end_year = str(misc.get("end_year", "") or "")
+    lulc_start, lulc_end = lulc_years_from_layer_name(layer.layer_name or "")
+    if lulc_start:
+        start_year = lulc_start
+        end_year = lulc_end or lulc_start
+    elif "{start_year}" in template:
+        start_year = _two_digit_hydrological_year(start_year)
+        end_year = _two_digit_hydrological_year(end_year or start_year)
     try:
         return template.format(
             district=valid_gee_text(layer.district.district_name.lower()),
             block=valid_gee_text(layer.block.tehsil_name.lower()),
             state=valid_gee_text(layer.state.state_name.lower()),
-            start_year=str(misc.get("start_year", "") or ""),
-            end_year=str(misc.get("end_year", "") or ""),
+            start_year=start_year,
+            end_year=end_year,
         )
     except (KeyError, IndexError, AttributeError):
         return ""
@@ -101,6 +139,10 @@ def resolve_layer_mapping(layer: Layer):
     if not dataset_name:
         return None
 
+    if dataset_name in _LULC_DATASETS and dataset_name != "LULC_level_3":
+        # Only level_3 is catalogued for STAC; level_1/level_2 share GeoServer naming.
+        return None
+
     candidates = list(
         LayerMapping.objects.filter(db_dataset_name=dataset_name, auto_stac=True)
     )
@@ -147,14 +189,20 @@ def stac_task_kwargs_for_layer(layer: Layer, mapping=None):
         return None
 
     misc = layer.misc or {}
+    start_year = str(misc.get("start_year", "") or "")
+    end_year = str(misc.get("end_year", "") or "")
+    lulc_year = lulc_calendar_start_year(layer.layer_name or "")
+    if lulc_year:
+        start_year = lulc_year
+        end_year = lulc_year
     return {
         "layer_type": mapping.layer_type,
         "state": layer.state.state_name,
         "district": layer.district.district_name,
         "block": layer.block.tehsil_name,
         "layer_name": mapping.layer_name,
-        "start_year": str(misc.get("start_year", "") or ""),
-        "end_year": str(misc.get("end_year", "") or ""),
+        "start_year": start_year,
+        "end_year": end_year,
         "upload_to_s3": bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
         "overwrite_metadata": bool(getattr(settings, "STAC_OVERWRITE_METADATA", True)),
         "layer_id": layer.id,
