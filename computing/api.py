@@ -599,28 +599,12 @@ def lulc_v3(request):
         asset_ids = layer_assets.lulc_v3_clip_asset_ids(
             state, district, block, start_year, end_year
         )
-        asset_id = layer_assets.resolve_asset_id_field(asset_ids=asset_ids)
-
-        if is_sync_layer_generation_request(request):
-            task_result = clip_lulc_v3.apply(
-                args=[state, district, block, start_year, end_year, gee_account_id]
-            )
-            if task_result.failed():
-                return Response(
-                    {"error": str(task_result.result), "asset_id": asset_id},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
-            return Response(
-                {"Success": "LULC v3 completed", "asset_id": asset_id},
-                status=status.HTTP_200_OK,
-            )
-
         task = clip_lulc_v3.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
         return _task_started_response(
-            "LULC v3 task initiated", task=task, asset_ids=asset_ids
+            "Successfully initiated", task=task, asset_ids=asset_ids
         )
     except Exception as e:
         return layer_api_error_response("lulc_v3", e, request=request)

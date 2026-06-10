@@ -129,7 +129,7 @@ def _request_layer_targets(request):
     layer_name = data.get("layer_name")
     layer_type = data.get("layer_type")
     if not all([state, district, block, layer_name, layer_type]):
-        return []
+        return _lulc_stac_targets_from_request(request)
     return [
         {
             "state": state,
@@ -141,6 +141,50 @@ def _request_layer_targets(request):
             "end_year": data.get("end_year", "") or "",
         }
     ]
+
+
+def _lulc_stac_targets_from_request(request):
+    """STAC target for year-range LULC v3 clip APIs (land_use_land_cover_raster)."""
+    state, district, block = read_location_from_request(request)
+    if request is None or not hasattr(request, "data"):
+        return []
+    data = request.data
+    start_year = data.get("start_year")
+    end_year = data.get("end_year")
+    if not all([state, district, block, start_year, end_year]):
+        return []
+    return [
+        {
+            "state": state,
+            "district": district,
+            "block": block,
+            "layer_name": "land_use_land_cover_raster",
+            "layer_type": "raster",
+            "start_year": str(start_year),
+            "end_year": str(end_year),
+        }
+    ]
+
+
+def _merge_stac_targets(*target_lists):
+    merged = []
+    seen = set()
+    for targets in target_lists:
+        for target in targets or []:
+            key = (
+                target.get("state"),
+                target.get("district"),
+                target.get("block"),
+                target.get("layer_name"),
+                target.get("layer_type"),
+                target.get("start_year"),
+                target.get("end_year"),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(target)
+    return merged
 
 
 def _stac_targets_from_layer_ids(layer_ids):
@@ -218,6 +262,65 @@ def _ensure_stac_for_sync_layer_ids(layer_ids):
         )
 
 
+def _ensure_stac_for_layer_targets(layer_targets):
+    from computing.STAC_specs.stac_collection import generate_stac_collection_task
+
+    for target in layer_targets:
+        existing = collect_generated_stac_specs(**target)
+        if existing.get("items"):
+            record_sync_stac_layer(
+                state=target["state"],
+                district=target["district"],
+                block=target["block"],
+                layer_name=target["layer_name"],
+                layer_type=target["layer_type"],
+                start_year=target.get("start_year", "") or "",
+                end_year=target.get("end_year", "") or "",
+            )
+            continue
+
+        task_kwargs = {
+            "layer_type": target["layer_type"],
+            "state": target["state"],
+            "district": target["district"],
+            "block": target["block"],
+            "layer_name": target["layer_name"],
+            "start_year": target.get("start_year", "") or "",
+            "end_year": target.get("end_year", "") or "",
+            "upload_to_s3": bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
+            "overwrite_metadata": bool(
+                getattr(settings, "STAC_OVERWRITE_METADATA", True)
+            ),
+        }
+        result = generate_stac_collection_task.apply(kwargs=task_kwargs)
+        if getattr(result, "failed", lambda: False)():
+            msg = (
+                f"STAC generation failed for {target['layer_type']}/"
+                f"{target['layer_name']}: {result.result}"
+            )
+            logger.error(msg)
+            record_sync_stac_error(msg)
+            continue
+        if not result.result:
+            msg = (
+                f"STAC generation returned False for {target['layer_type']}/"
+                f"{target['layer_name']}. Check GeoServer layer exists and "
+                "GEOSERVER_URL in .env."
+            )
+            logger.error(msg)
+            record_sync_stac_error(msg)
+            continue
+        record_sync_stac_layer(
+            state=target["state"],
+            district=target["district"],
+            block=target["block"],
+            layer_name=target["layer_name"],
+            layer_type=target["layer_type"],
+            start_year=target.get("start_year", "") or "",
+            end_year=target.get("end_year", "") or "",
+        )
+
+
 def _empty_stac_spec(state, district, block):
     spec = collect_generated_stac_specs(
         state=state,
@@ -239,8 +342,14 @@ def _collect_stac_for_request(request):
         _ensure_stac_for_sync_layer_ids(layer_ids)
         layer_targets = _stac_targets_from_layer_ids(layer_ids)
 
-    if not layer_targets:
-        layer_targets = _request_layer_targets(request)
+    layer_targets = _merge_stac_targets(
+        layer_targets,
+        _request_layer_targets(request),
+        _lulc_stac_targets_from_request(request),
+    )
+
+    if layer_targets:
+        _ensure_stac_for_layer_targets(layer_targets)
 
     if not layer_targets:
         state, district, block = read_location_from_request(request)
