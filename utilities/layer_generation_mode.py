@@ -221,7 +221,7 @@ def _ensure_stac_for_sync_layer_ids(layer_ids):
     from computing.STAC_specs.stac_collection import generate_stac_collection_task
     from computing.stac_layer_resolution import stac_task_kwargs_for_layer
 
-    for layer_id in layer_ids:
+    for layer_id in dict.fromkeys(layer_ids):
         layer = Layer.objects.filter(id=layer_id).first()
         if layer is None or layer.is_stac_specs_generated:
             continue
