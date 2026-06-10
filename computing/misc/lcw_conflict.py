@@ -10,7 +10,7 @@ from utilities.constants import LCW_PAN_INDIA_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
-    check_task_status,
+    wait_for_gee_task,
     make_asset_public,
     is_gee_asset_exists,
     export_vector_asset_to_gee,
@@ -94,6 +94,16 @@ def generate_lcw_conflict_data(self, state, district, block, gee_account_id):
             return feature.set("uid", uid).set("roi_match", None)
 
         clipped_data_with_uid = joined_data.map(add_uid)
+        feature_count = clipped_data_with_uid.size().getInfo()
+        log_task_step(TASK_NAME, "clip_complete", feature_count=feature_count, **ctx)
+        if feature_count == 0:
+            log_task_step(
+                TASK_NAME,
+                "no_lcw_conflict_features",
+                message="No LCW conflict areas in this block; skipping export",
+                **ctx,
+            )
+            return True
 
         log_task_step(TASK_NAME, "create_gee_directory", **ctx)
         create_gee_directory(state, district, block)
@@ -107,11 +117,8 @@ def generate_lcw_conflict_data(self, state, district, block, gee_account_id):
                 raise RuntimeError(
                     f"Failed to start GEE export for LCW layer at {asset_id}"
                 )
-            pending = check_task_status([task_id])
-            if pending:
-                raise RuntimeError(
-                    f"GEE export for LCW layer did not complete (task_id={task_id})"
-                )
+            log_task_step(TASK_NAME, "wait_for_gee_export", task_id=task_id, **ctx)
+            wait_for_gee_task(task_id)
         else:
             log_task_step(TASK_NAME, "gee_asset_exists", asset_id=asset_id, **ctx)
 
