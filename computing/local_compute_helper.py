@@ -905,3 +905,49 @@ def get_compute_mode(request, default="local"):
 
 def select_compute_task(compute, gee_task, local_task):
     return gee_task if compute == "gee" else local_task
+
+
+def load_precomputed_panchayat(
+    state,
+    district,
+    block,
+    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
+):
+    try:
+        panchayat_path = resolve_precomputed_panchayat_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Precomputed panchayat boundary file",
+        )
+
+    except FileNotFoundError:
+
+        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
+
+        # Generate dynamically
+        generate_gpkg(
+            state=state,
+            district=district,
+            block=block,
+            workspace="panchayat_boundaries",
+        )
+
+        # Retry after generation
+        panchayat_path = resolve_precomputed_panchayat_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Generated panchayat boundary file not found",
+        )
+
+    panchayat_gdf = read_validated_vector_file(
+        panchayat_path,
+        f"Precomputed panchayat file has no valid geometries: {panchayat_path}",
+    )
+
+    print(f"Loaded panchayat boundaries: {panchayat_path}")
+
+    return panchayat_gdf, str(panchayat_path)
