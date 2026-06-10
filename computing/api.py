@@ -73,6 +73,7 @@ from .views import (
     layer_status,
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
+    clear_layer_cache,
 )
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
@@ -1886,6 +1887,13 @@ def missing_layers(request):
     except Exception as e:
         print("Exception in get_layers_for_workspace api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def refresh_layer_cache(request, workspace=None):
+    clear_layer_cache(workspace)
+    return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
 
 
 @api_view(["POST"])

@@ -42,6 +42,7 @@ from utilities.gee_utils import (
 )
 from utilities.geoserver_utils import Geoserver
 from django.core.mail import EmailMessage
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -1033,6 +1034,7 @@ def update_layer_sync_status(
         print(f"Error updating layer sync status: {e}")
 
 
+# send missing layer to recipient email
 def send_missing_layers_report(result: dict, recipients: list = None) -> bool:
     if recipients is None:
         recipients = getattr(settings, "MISSING_LAYER_RECIPIENTS", [])
@@ -1057,3 +1059,20 @@ def send_missing_layers_report(result: dict, recipients: list = None) -> bool:
     except Exception as e:
         logger.exception(f"Failed to send missing layers report: {e}")
         return False
+
+
+def _is_cache_valid(cache: dict, workspace: str) -> bool:
+    if workspace not in cache:
+        return False
+    age = time.time() - cache[workspace]["cached_at"]
+    if age > 3600:
+        logger.info(f"Cache expired for {workspace} (age: {int(age)}s)")
+        return False
+    return True
+
+
+def _set_cache(cache: dict, workspace: str, data: set):
+    cache[workspace] = {
+        "data": data,
+        "cached_at": time.time(),
+    }
