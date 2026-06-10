@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -30,7 +31,6 @@ from .serializers import (
     PlanCreateSerializer,
     PlanUpdateSerializer,
 )
-from rest_framework.pagination import PageNumberPagination
 
 STATE_CENTROIDS = {
     "Jammu & Kashmir": {"lat": 34.0837, "lon": 74.7973},
