@@ -368,16 +368,13 @@ def wait_for_gee_task(task_id, poll_interval=30, timeout=7200):
     deadline = time.time() + timeout
     while time.time() < deadline:
         statuses = ee.data.getTaskStatus(task_id)
-        if not statuses:
-            time.sleep(poll_interval)
-            continue
-
-        state = statuses[0].get("state")
-        if state == "COMPLETED":
-            return True
-        if state in ("FAILED", "CANCELLED"):
-            error = statuses[0].get("error_message") or state
-            raise RuntimeError(f"GEE task {task_id} {state}: {error}")
+        if statuses:
+            state = statuses[0].get("state")
+            if state == "COMPLETED":
+                return True
+            if state in ("FAILED", "CANCELLED"):
+                error = statuses[0].get("error_message") or state
+                raise RuntimeError(f"GEE task {task_id} {state}: {error}")
 
         time.sleep(poll_interval)
 

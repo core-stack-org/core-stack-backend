@@ -120,7 +120,7 @@ def generate_lcw_conflict_data(self, state, district, block, gee_account_id):
                     f"Failed to start GEE export for LCW layer at {asset_id}"
                 )
             log_task_step(TASK_NAME, "wait_for_gee_export", task_id=task_id, **ctx)
-            wait_for_gee_task(task_id)
+            wait_for_gee_task(task_id, poll_interval=10)
         else:
             log_task_step(TASK_NAME, "gee_asset_exists", asset_id=asset_id, **ctx)
 
