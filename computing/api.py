@@ -210,6 +210,9 @@ from .misc.lcw_conflict_local_compute import (
     generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
 )
 from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.antyodaya_local_compute import (
+    generate_antyodaya_data_local as generate_antyodaya_data_local_task,
+)
 
 
 @api_security_check(allowed_methods="POST")
@@ -2407,12 +2410,25 @@ def generate_antyodaya(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
-        generate_antyodaya_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
-            queue="nrm",
-        )
+        compute = _get_compute_mode(request)
+        if compute == "local":
+            gee_account_id = request.data.get("gee_account_id")
+            generate_antyodaya_data_local_task.apply_async(
+                kwargs={
+                    "state": state,
+                    "district": district,
+                    "block": block,
+                    "gee_account_id": gee_account_id,
+                },
+                queue="nrm",
+            )
+        else:
+            sync_to_geoserver = request.data.get("sync_to_geoserver", True)
+            overwrite = request.data.get("overwrite", False)
+            generate_antyodaya_layer_task.apply_async(
+                args=[state, district, block, sync_to_geoserver, overwrite],
+                queue="nrm",
+            )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
