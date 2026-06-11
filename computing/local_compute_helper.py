@@ -1004,6 +1004,52 @@ def select_compute_task(compute, gee_task, local_task):
     return gee_task if compute == "gee" else local_task
 
 
+def read_geojson_with_string_coords(path, mask_gdf):
+    """
+    Safely reads a GeoJSON file with malformed string coordinates that cause fiona to crash.
+    Pre-filters using the bounding box of mask_gdf to prevent high memory usage.
+    """
+    import json
+    with open(path, 'r') as f:
+        data = json.load(f)
+        
+    def _convert_coords(coords):
+        if not coords:
+            return coords
+        if isinstance(coords[0], (list, tuple)):
+            return [_convert_coords(c) for c in coords]
+        return [float(c) for c in coords]
+        
+    minx, miny, maxx, maxy = mask_gdf.total_bounds
+    buffer_deg = 0.05
+    
+    def _is_roughly_in_bounds(coords):
+        if not coords: return False
+        if isinstance(coords[0], (list, tuple)):
+            for c in coords:
+                if _is_roughly_in_bounds(c): return True
+            return False
+        else:
+            try:
+                x, y = float(coords[0]), float(coords[1])
+                return (minx - buffer_deg <= x <= maxx + buffer_deg) and (miny - buffer_deg <= y <= maxy + buffer_deg)
+            except Exception:
+                return True
+
+    filtered_features = []
+    for feature in data.get("features", []):
+        geom = feature.get("geometry")
+        if geom and "coordinates" in geom:
+            if _is_roughly_in_bounds(geom["coordinates"]):
+                try:
+                    geom["coordinates"] = _convert_coords(geom["coordinates"])
+                    filtered_features.append(feature)
+                except Exception:
+                    pass
+                
+    return gpd.GeoDataFrame.from_features(filtered_features, crs="EPSG:4326")
+
+
 def load_precomputed_panchayat(
     state,
     district,

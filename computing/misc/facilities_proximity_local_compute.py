@@ -15,6 +15,7 @@ from computing.local_compute_helper import (
     read_validated_vector_file,
     write_vector_output,
     validate_geometry,
+    read_geojson_with_string_coords,
 )
 from computing.config_loader import (
     PAN_INDIA_FACILITIES_PATH,
@@ -86,7 +87,7 @@ def generate_facilities_proximity_local(
 
     print("Loading Facilities data overlapping ROI...")
     try:
-        facilities_gdf = gpd.read_file(PAN_INDIA_FACILITIES_PATH, mask=panchayat_gdf)
+        facilities_gdf = read_geojson_with_string_coords(PAN_INDIA_FACILITIES_PATH, mask_gdf=panchayat_gdf)
         facilities_gdf = validate_geometry(facilities_gdf)
     except Exception as e:
         print(f"Failed to read facilities with mask: {e}")
