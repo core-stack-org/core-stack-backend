@@ -183,13 +183,25 @@ def load_precomputed_roi(
     block,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
 ):
-    roi_path = resolve_precomputed_vector_file(
-        state=state,
-        district=district,
-        block=block,
-        precomputed_roi_dir=precomputed_roi_dir,
-        missing_file_label="Precomputed tehsil watershed file",
-    )
+    try:
+        roi_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Precomputed tehsil watershed file",
+        )
+    except FileNotFoundError:
+        print(f"Precomputed ROI not found for {state}/{district}/{block}. Downloading...")
+        generate_gpkg(state=state, district=district, block=block, workspace="mws")
+        roi_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Generated tehsil watershed file",
+        )
+
     roi_gdf = read_validated_vector_file(
         roi_path,
         f"Precomputed ROI file has no valid geometries: {roi_path}",
