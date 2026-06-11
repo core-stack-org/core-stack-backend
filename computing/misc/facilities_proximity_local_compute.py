@@ -139,7 +139,7 @@ def generate_facilities_proximity_local(
             block=block,
             layer_name=layer_name,
             asset_id=asset_id,
-            dataset_name="Facilities",
+            dataset_name="Facilities Proximity",
             misc={"is_generated_locally": True},
         )
         if layer_id:
