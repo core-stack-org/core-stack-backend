@@ -28,13 +28,45 @@ UNIT_KEYWORDS = [
     ("drought", "index"),
 ]
 
+# Strip from annual / tehsil metric keys; unit moves to *_units maps.
+METRIC_UNIT_SUFFIXES = (
+    ("_in_mm", "mm"),
+    ("_in_ha", "ha"),
+    ("_in_km", "km"),
+    ("_in_m", "m"),
+    ("_in_percent", "%"),
+    ("_percent", "%"),
+)
+
+ANNUAL_METRIC_UNIT_OVERRIDES = {
+    "g": "mm",
+    "deltag": "mm",
+    "delta_g": "mm",
+    "welldepth": "m",
+}
+
 
 def _infer_unit(metric_name):
     metric = str(metric_name).strip().lower()
+    if metric in ANNUAL_METRIC_UNIT_OVERRIDES:
+        return ANNUAL_METRIC_UNIT_OVERRIDES[metric]
+    if metric == "g" or metric.startswith("g_"):
+        return "mm"
+    if "delta_g" in metric or "deltag" in metric:
+        return "mm"
     for keyword, unit in UNIT_KEYWORDS:
         if keyword in metric:
             return unit
     return "value"
+
+
+def _split_metric_unit_suffix(metric):
+    """Return (metric_without_unit_suffix, unit)."""
+    m = str(metric).strip().lower()
+    for suffix, unit in METRIC_UNIT_SUFFIXES:
+        if m.endswith(suffix):
+            return m[: -len(suffix)], unit
+    return m, _infer_unit(m)
 
 
 # Exact column names from KYL JSON (lowercase); anything else falls back to _infer_unit().
@@ -393,7 +425,8 @@ def annual_structure_from_dict(item):
             metadata[key] = _convert_nested_timeseries(value)
             continue
 
-        metric = match.group("metric")
+        metric_raw = _normalize_key_name(match.group("metric"))
+        metric, _ = _split_metric_unit_suffix(metric_raw)
         period_raw = match.group("period")
         period_label = _normalize_period_label(period_raw)
         grouped.setdefault(period_label, {})[metric] = value
@@ -499,20 +532,28 @@ def _normalize_key_name(key):
     k = k.replace("block", "tehsil")
     k = k.replace("afforestation", "tree_cover_increase")
     k = k.replace("deforestation", "tree_cover_decrease")
+    if k == "deltag" or k.startswith("deltag_"):
+        k = k.replace("deltag", "delta_g", 1)
     return k
 
 
+# Tehsil Excel sheets whose rows use metric_<period> columns (Open-Meteo annual axis).
+TEHSIL_ANNUAL_SHEETS = frozenset(
+    {
+        "hydrological_annual",
+        "hydrological_seasonal",
+    }
+)
+
+
+def _normalize_row_keys_for_annual(row):
+    if not isinstance(row, dict):
+        return row
+    return {_normalize_key_name(k): v for k, v in row.items()}
+
+
 def _split_key_unit(key):
-    for suffix, unit in (
-        ("_in_ha", "ha"),
-        ("_in_km", "km"),
-        ("_in_m", "m"),
-        ("_in_percent", "%"),
-        ("_percent", "%"),
-    ):
-        if key.endswith(suffix):
-            return key[: -len(suffix)], unit
-    return key, _infer_unit(key)
+    return _split_metric_unit_suffix(key)
 
 
 def _stringify_precise_coord(value):
@@ -653,6 +694,14 @@ def tehsil_structure_from_dict(payload):
             normalized_sheet = "canopy_height"
         if not isinstance(rows, list):
             tehsil_data[normalized_sheet] = rows
+            tehsil_units[normalized_sheet] = {}
+            continue
+
+        if normalized_sheet in TEHSIL_ANNUAL_SHEETS:
+            tehsil_data[normalized_sheet] = [
+                annual_structure_from_dict(_normalize_row_keys_for_annual(row))
+                for row in rows
+            ]
             tehsil_units[normalized_sheet] = {}
             continue
 
