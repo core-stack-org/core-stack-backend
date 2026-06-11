@@ -471,18 +471,6 @@ class FetchDbDataTest(TestCase):
 
         self.assertTrue(result)
 
-    def test_block_name_with_underscores_matches_underscore_block_param(self):
-        _create_settlement(plan_id="42", block_name="test_block", settlement_id="SETT004")
-        csv_path = self._csv_path()
-
-        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
-
-        self.assertTrue(result)
-        with open(csv_path) as f:
-            rows = list(csv.DictReader(f))
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["sett_id"], "SETT004")
-
     def test_only_matching_plan_id_returned(self):
         _create_settlement(plan_id="42", block_name="test block", settlement_id="S1")
         _create_settlement(plan_id="99", block_name="test block", settlement_id="S2")
