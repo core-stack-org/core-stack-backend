@@ -92,29 +92,12 @@ def generate_facilities_proximity_local(
         )
 
     print("Loading Facilities data overlapping ROI...")
-    # Loading using custom json parser because the source GeoJSON has coordinates as strings 
-    # which causes fiona to crash. 
-    import json
-    with open(PAN_INDIA_FACILITIES_PATH, 'r') as f:
-        facilities_data = json.load(f)
-        
-    def _convert_coords(coords):
-        if not coords:
-            return coords
-        if isinstance(coords[0], (list, tuple)):
-            return [_convert_coords(c) for c in coords]
-        return [float(c) for c in coords]
-        
-    for feature in facilities_data.get("features", []):
-        geom = feature.get("geometry")
-        if geom and "coordinates" in geom:
-            try:
-                geom["coordinates"] = _convert_coords(geom["coordinates"])
-            except Exception:
-                pass
-                
-    facilities_gdf = gpd.GeoDataFrame.from_features(facilities_data.get("features", []), crs="EPSG:4326")
-    facilities_gdf = validate_geometry(facilities_gdf)
+    try:
+        facilities_gdf = gpd.read_file(PAN_INDIA_FACILITIES_PATH, mask=panchayat_gdf)
+        facilities_gdf = validate_geometry(facilities_gdf)
+    except Exception as e:
+        print(f"Failed to read facilities with mask: {e}")
+        facilities_gdf = gpd.GeoDataFrame()
     if facilities_gdf.empty:
         print(
             "Warning: PAN INDIA Facilities file has no valid geometries overlapping ROI"
