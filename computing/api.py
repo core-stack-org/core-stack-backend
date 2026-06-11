@@ -2425,9 +2425,11 @@ def generate_antyodaya(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
-            "None",
+            None,
             generate_antyodaya_data_local_task,
         )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
