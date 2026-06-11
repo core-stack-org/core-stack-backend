@@ -38,7 +38,7 @@ def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
 
     outer_boundary = panchayat_gdf.geometry.unary_union
 
-    # Simple clipping
+    # Clip facilities to the overall boundary first to reduce size
     facilities_in_roi = gpd.clip(facilities_gdf, outer_boundary)
 
     # Final cleanup
