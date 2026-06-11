@@ -35,6 +35,9 @@ METRIC_UNIT_SUFFIXES = (
     ("_in_km", "km"),
     ("_in_m", "m"),
     ("_in_percent", "%"),
+    ("_in_weeks", "weeks"),
+    ("_sqkm", "sqkm"),
+    ("_count", "count"),
     ("_percent", "%"),
 )
 
@@ -43,6 +46,15 @@ ANNUAL_METRIC_UNIT_OVERRIDES = {
     "deltag": "mm",
     "delta_g": "mm",
     "welldepth": "m",
+    "no_drought": "weeks",
+    "mild": "weeks",
+    "moderate": "weeks",
+    "severe": "weeks",
+    "drysp_unit_4_weeks": "weeks",
+    "total_weeks": "weeks",
+    "monsoon_onset": "iso8601",
+    "kharif_cropped": "sqkm",
+    "cropping_intensity_unit_less": "ratio",
 }
 
 
@@ -54,6 +66,12 @@ def _infer_unit(metric_name):
         return "mm"
     if "delta_g" in metric or "deltag" in metric:
         return "mm"
+    if metric.endswith("_weeks") or metric == "total_weeks":
+        return "weeks"
+    if "onset" in metric:
+        return "iso8601"
+    if "sqkm" in metric:
+        return "sqkm"
     for keyword, unit in UNIT_KEYWORDS:
         if keyword in metric:
             return unit
@@ -417,6 +435,7 @@ def annual_structure_from_dict(item):
         )
 
     grouped = {}
+    metric_units = {}
     metadata = {}
 
     for key, value in item.items():
@@ -426,10 +445,11 @@ def annual_structure_from_dict(item):
             continue
 
         metric_raw = _normalize_key_name(match.group("metric"))
-        metric, _ = _split_metric_unit_suffix(metric_raw)
+        metric, unit = _split_metric_unit_suffix(metric_raw)
         period_raw = match.group("period")
         period_label = _normalize_period_label(period_raw)
         grouped.setdefault(period_label, {})[metric] = value
+        metric_units.setdefault(metric, unit)
 
     if not grouped:
         return round_floats(
@@ -468,11 +488,11 @@ def annual_structure_from_dict(item):
 
             fortnight["time"].extend([point[0] for point in flat_points])
             fortnight[metric] = [point[1] for point in flat_points]
-            fortnight_units[metric] = _infer_unit(metric)
+            fortnight_units[metric] = metric_units.get(metric) or _infer_unit(metric)
             continue
 
         annual[metric] = values
-        annual_units[metric] = _infer_unit(metric)
+        annual_units[metric] = metric_units.get(metric) or _infer_unit(metric)
 
     response = {
         "metadata": metadata,
@@ -535,15 +555,6 @@ def _normalize_key_name(key):
     if k == "deltag" or k.startswith("deltag_"):
         k = k.replace("deltag", "delta_g", 1)
     return k
-
-
-# Tehsil Excel sheets whose rows use metric_<period> columns (Open-Meteo annual axis).
-TEHSIL_ANNUAL_SHEETS = frozenset(
-    {
-        "hydrological_annual",
-        "hydrological_seasonal",
-    }
-)
 
 
 def _normalize_row_keys_for_annual(row):
@@ -697,17 +708,15 @@ def tehsil_structure_from_dict(payload):
             tehsil_units[normalized_sheet] = {}
             continue
 
-        if normalized_sheet in TEHSIL_ANNUAL_SHEETS:
-            tehsil_data[normalized_sheet] = [
-                annual_structure_from_dict(_normalize_row_keys_for_annual(row))
-                for row in rows
-            ]
-            tehsil_units[normalized_sheet] = {}
-            continue
-
         normalized_rows = []
         sheet_units = {}
         for row in rows:
+            normalized_keys_row = _normalize_row_keys_for_annual(row)
+            if _has_timeseries_keys(normalized_keys_row):
+                normalized_rows.append(
+                    annual_structure_from_dict(normalized_keys_row)
+                )
+                continue
             normalized_row, row_units = _normalize_tehsil_row(normalized_sheet, row)
             normalized_rows.append(normalized_row)
             for key, unit in row_units.items():
