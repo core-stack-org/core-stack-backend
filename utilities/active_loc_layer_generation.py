@@ -45,7 +45,7 @@ def download_excel(state, district, block):
 
 def restoration_vector(state, district, block):
     # Updated base URL
-    base_url = "http://localhost:8001/api/v1/generate_dem_raster_vector/"
+    base_url = "http://localhost:8001/api/v1/generate_facilities_proximity/"
 
     headers = {
         "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzg0NTQwNTQ2LCJpYXQiOjE3NzY3NjQ1NDYsImp0aSI6IjIxYmVmZTMwYWE2MzQ4ZDM4YmE5M2EyNGQ3MjdhYzgyIiwidXNlcl9pZCI6NH0.FHqq8dRaI39L5zIDKotjYIlwnnc8JWyi9B1vDLWBhZQ",
