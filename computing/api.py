@@ -2316,8 +2316,11 @@ def generate_fabdem_raster_vector(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
+            None,
             generate_febdem_raster_vector_clip_local_task,
         )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -2339,8 +2342,11 @@ def generate_canal_vector(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
+            None,
             canal_vector_local_task,
         )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2365,8 +2371,11 @@ def generate_river_data(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
+            None,
             river_vector_local_task,
         )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2389,9 +2398,11 @@ def generate_drainage_density_data(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
-            "None",
+            None,
             drainage_density_vector_local_task,
         )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},

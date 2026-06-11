@@ -4,8 +4,6 @@ from rasterio.mask import mask
 from shapely.geometry import mapping
 
 from utilities.gee_utils import valid_gee_text
-import pyproj
-
 from nrm_app.celery import app
 from computing.utils import push_shape_to_geoserver
 
@@ -22,14 +20,6 @@ from computing.local_compute_helper import (
     write_vector_output,
 )
 
-# ---------------------------------------------------------------------------
-# Fix broken PROJ installation BEFORE any pyproj/geopandas import uses it
-# ---------------------------------------------------------------------------
-try:
-    os.environ["PROJ_DATA"] = pyproj.datadir.get_data_dir()
-    os.environ["PROJ_LIB"] = pyproj.datadir.get_data_dir()
-except Exception:
-    pass
 
 from computing.config_loader import (
     PAN_INDIA_FABDEM_PATH,
