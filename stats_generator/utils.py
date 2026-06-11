@@ -282,8 +282,8 @@ def create_excel_for_drainage_density(data, writer):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "drainage_density": properties.get("drainage_density", ""),
-            "drainage_density_std": properties.get("drainage_density_std", ""),
+            "drainage_density_in_km_per_km2": properties.get("drainage_density", ""),
+            "drainage_density_std_in_km_per_km2": properties.get("drainage_density_std", ""),
             "stream_order_length_in_km": sum(ast.literal_eval(properties.get("stream_length_km", ""))),
         }
 
@@ -349,24 +349,27 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
 
 def create_excel_for_canal(data, writer):
     print("Inside create_excel_for Canal")
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties.get("uid", ""),
-            "project_name": properties.get("prjname", ""),
-            "canal_code": properties.get("cancode", ""),
-            "canal_name": properties.get("canname", ""),
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties.get("uid", ""),
+                "project_name": properties.get("prjname", ""),
+                "canal_code": properties.get("cancode", ""),
+                "canal_name": properties.get("canname", ""),
+            }
 
-        df_data.append(row)
+            df_data.append(row)
 
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="canal", index=False)
-    print("Excel file created for canal")
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="canal", index=False)
+        print("Excel file created for canal")
+    except Exception as e:
+        print("Canal Layer not found :: ", e)
 
 
 def create_excel_for_river(data, writer):
@@ -389,7 +392,7 @@ def create_excel_for_river(data, writer):
         df.to_excel(writer, sheet_name="river", index=False)
         print("Excel file created for river")
     except Exception as e:
-        print("Exception in create_excel_for_river api :: ", e)
+        print("River Layer not found :: ", e)
 
 
 def create_excel_for_dem(data, writer):
