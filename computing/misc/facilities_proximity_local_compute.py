@@ -32,20 +32,13 @@ def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
         return facilities_gdf
 
     # Ensure CRS matches
-    if (
-        panchayat_gdf.crs
-        and facilities_gdf.crs
-        and panchayat_gdf.crs != facilities_gdf.crs
-    ):
+    if panchayat_gdf.crs and facilities_gdf.crs and panchayat_gdf.crs != facilities_gdf.crs:
         facilities_gdf = facilities_gdf.to_crs(panchayat_gdf.crs)
 
     outer_boundary = panchayat_gdf.geometry.unary_union
 
-    # Precise intersection check (since load-time mask is just bounding box)
-    facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
-
-    # Precisely clip the geometries so they don't extend outside the panchayat boundary
-    facilities_in_roi = gpd.clip(facilities_in_roi, outer_boundary)
+    # Simple clipping
+    facilities_in_roi = gpd.clip(facilities_gdf, outer_boundary)
 
     # Final cleanup
     facilities_in_roi = facilities_in_roi[~facilities_in_roi.geometry.is_empty]
