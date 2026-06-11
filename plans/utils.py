@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 
 import dateutil.parser
 import requests
-from django.db.models import Q
 
 from dpr.models import (
     ODK_settlement, ODK_well, ODK_waterbody,
@@ -37,27 +36,6 @@ def normalize_name(name):
     if not name:
         return ""
     return name.lower().replace(" ", "_").strip()
-
-
-def _block_filter_q(block):
-    """
-    Accept both historical block-name storage styles in the DB:
-    `foo bar` and `foo_bar`.
-    """
-    raw = (block or "").strip()
-    if not raw:
-        return Q()
-
-    variants = {
-        raw,
-        raw.replace("_", " ").strip(),
-        raw.replace(" ", "_").strip(),
-    }
-
-    query = Q()
-    for variant in variants:
-        query |= Q(block_name__icontains=variant)
-    return query
 
 _RESOURCE_TYPES_FLAT_HEADER = frozenset({
     "settlement", "well", "waterbody", "cropping",
@@ -625,7 +603,7 @@ def fetch_db_data(csv_path, resource_type, block, plan_id) -> int:
 
     qs = model.objects.filter(plan_id=str(plan_id), is_deleted=False)
     if has_block_col:
-        qs = qs.filter(_block_filter_q(block))
+        qs = qs.filter(block_name__icontains=block.replace("_", " ").strip())
 
     raw_rows = list(qs.values(data_field, *projection_fields))
     logger.info(
