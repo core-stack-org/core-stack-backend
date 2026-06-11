@@ -371,22 +371,25 @@ def create_excel_for_canal(data, writer):
 
 def create_excel_for_river(data, writer):
     print("Inside create_excel_for River")
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties.get("uid", ""),
-            "river_name": properties.get("rivname", ""),
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties.get("uid", ""),
+                "river_name": properties.get("rivname", ""),
+            }
 
-        df_data.append(row)
+            df_data.append(row)
 
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="river", index=False)
-    print("Excel file created for river")
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="river", index=False)
+        print("Excel file created for river")
+    except Exception as e:
+        print("Exception in create_excel_for_river api :: ", e)
 
 
 def create_excel_for_dem(data, writer):
@@ -471,8 +474,6 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
     df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
     print("Excel sheet 'mws_intersect_swb' created successfully")
 
-
-import pandas as pd
 
 def create_excel_for_facilities(data, writer):
     features = data["features"]
