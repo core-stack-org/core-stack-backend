@@ -283,6 +283,7 @@ def create_excel_for_drainage_density(data, writer):
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
             "drainage_density": properties.get("drainage_density", ""),
+            "drainage_density_std": properties.get("drainage_density_std", ""),
             "stream_order_length_in_km": sum(ast.literal_eval(properties.get("stream_length_km", ""))),
         }
 
