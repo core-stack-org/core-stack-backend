@@ -1,18 +1,3 @@
-"""Mission Antyodaya tehsil clipping from the pan-India local GeoPackage.
-
-Runtime contract:
-
-- request names may be spaces or snake_case; stored names are resolved from the
-  GeoPackage before clipping
-- local output is always written first
-- GeoServer publish is enabled by default and can be disabled per request;
-  failure is reported without breaking local generation
-
-The source GeoPackage should have an attribute index on
-``(state_name, district_name, TEHSIL)``. The task creates it once if missing,
-which keeps reads sub-second for normal tehsil clips on the local server.
-"""
-
 import os
 import geopandas as gpd
 
@@ -32,38 +17,68 @@ from computing.local_compute_helper import (
     validate_geometry,
 )
 from computing.config_loader import (
-    PAN_INDIA_ANTYODAYA_2020,
-    LOCAL_ANTYODAYA_2020_OUTPUT,
+    PAN_INDIA_LIVESTOCKS,
+    LOCAL_LIVESTOCKS_OUTPUT,
 )
 
-GEOSERVER_WORKSPACE = "antyodaya_2020"
+GEOSERVER_WORKSPACE = "livestocks"
 
+INTEGER_COLUMNS = (
+    "pc11_village_id",
+    "pc11_state_id",
+    "pc11_district_id",
+    "pc11_subdistrict_id",
+    "cattle_male",
+    "cattle_female",
+    "cattle_total",
+    "buffalo_male",
+    "buffalo_female",
+    "buffalo_total",
+    "sheep_male",
+    "sheep_female",
+    "sheep_total",
+    "goat_male",
+    "goat_female",
+    "goat_total",
+    "pig_male",
+    "pig_female",
+    "pig_total",
+)
 
-def _compute_antyodaya_for_watersheds(watersheds_gdf, antyodaya_gdf):
+def _coerce_nullable_integer_columns(gdf):
     """
-    Spatially filters Antyodaya features with watershed/ROI boundaries.
+    Ensure the livestock columns are the correct integer types.
     """
-    if antyodaya_gdf.empty:
-        return antyodaya_gdf
+    for column in INTEGER_COLUMNS:
+        if column in gdf.columns:
+            gdf[column] = gdf[column].astype("Int64")
+    return gdf
+
+def _compute_livestocks_for_watersheds(watersheds_gdf, livestocks_gdf):
+    """
+    Spatially filters Livestock features with watershed/ROI boundaries.
+    """
+    if livestocks_gdf.empty:
+        return livestocks_gdf
         
-    if watersheds_gdf.crs and antyodaya_gdf.crs and watersheds_gdf.crs != antyodaya_gdf.crs:
-        antyodaya_gdf = antyodaya_gdf.to_crs(watersheds_gdf.crs)
+    if watersheds_gdf.crs and livestocks_gdf.crs and watersheds_gdf.crs != livestocks_gdf.crs:
+        livestocks_gdf = livestocks_gdf.to_crs(watersheds_gdf.crs)
 
     outer_boundary = watersheds_gdf.geometry.unary_union
 
     # Precise intersection check
-    antyodaya_in_roi = antyodaya_gdf[antyodaya_gdf.intersects(outer_boundary)].copy()
+    livestocks_in_roi = livestocks_gdf[livestocks_gdf.intersects(outer_boundary)].copy()
 
     # Final cleanup
-    antyodaya_in_roi = antyodaya_in_roi[~antyodaya_in_roi.geometry.is_empty]
-    antyodaya_in_roi = antyodaya_in_roi[antyodaya_in_roi.geometry.is_valid]
-    antyodaya_in_roi = antyodaya_in_roi[antyodaya_in_roi.geometry.notna()]
+    livestocks_in_roi = livestocks_in_roi[~livestocks_in_roi.geometry.is_empty]
+    livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.is_valid]
+    livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.notna()]
 
-    return antyodaya_in_roi
+    return _coerce_nullable_integer_columns(livestocks_in_roi)
 
 
 @app.task(bind=True)
-def generate_antyodaya_data_local(
+def generate_livestocks_data_local(
     self,
     state=None,
     district=None,
@@ -76,7 +91,7 @@ def generate_antyodaya_data_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"antyodaya20_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        layer_name = f"livestocks_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
             district=district,
@@ -87,33 +102,33 @@ def generate_antyodaya_data_local(
     else:
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name = f"antyodaya20_{valid_gee_text(asset_suffix).lower()}"
+        layer_name = f"livestocks_{valid_gee_text(asset_suffix).lower()}"
         watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
         print(f"ROI source: {roi_path}")
 
-    if not os.path.exists(PAN_INDIA_ANTYODAYA_2020):
-        raise FileNotFoundError(f"PAN INDIA Antyodaya file not found at {PAN_INDIA_ANTYODAYA_2020}")
+    if not os.path.exists(PAN_INDIA_LIVESTOCKS):
+        raise FileNotFoundError(f"PAN INDIA Livestocks file not found at {PAN_INDIA_LIVESTOCKS}")
 
-    print("Loading Antyodaya data overlapping ROI...")
-    antyodaya_gdf = gpd.read_file(PAN_INDIA_ANTYODAYA_2020, mask=watersheds_gdf)
-    antyodaya_gdf = validate_geometry(antyodaya_gdf)
-    if antyodaya_gdf.empty:
-        print("Warning: PAN INDIA Antyodaya file has no valid geometries overlapping ROI")
+    print("Loading Livestocks data overlapping ROI...")
+    livestocks_gdf = gpd.read_file(PAN_INDIA_LIVESTOCKS, mask=watersheds_gdf)
+    livestocks_gdf = validate_geometry(livestocks_gdf)
+    if livestocks_gdf.empty:
+        print("Warning: PAN INDIA Livestocks file has no valid geometries overlapping ROI")
     else:
-        print(f"Loaded {len(antyodaya_gdf)} Antyodaya features")
+        print(f"Loaded {len(livestocks_gdf)} Livestock features")
 
-    result_gdf = _compute_antyodaya_for_watersheds(
+    result_gdf = _compute_livestocks_for_watersheds(
         watersheds_gdf=watersheds_gdf,
-        antyodaya_gdf=antyodaya_gdf,
+        livestocks_gdf=livestocks_gdf,
     )
-    print(f"Final valid Antyodaya features after spatial filter: {len(result_gdf)}")
+    print(f"Final valid Livestock features after spatial filter: {len(result_gdf)}")
 
     output_path = build_output_vector_path(
         layer_name=layer_name,
         state=state,
         district=district,
         block=block,
-        output_base_dir=LOCAL_ANTYODAYA_2020_OUTPUT,
+        output_base_dir=LOCAL_LIVESTOCKS_OUTPUT,
     )
 
     asset_id = write_vector_output(
@@ -121,7 +136,7 @@ def generate_antyodaya_data_local(
         output_path=output_path,
         layer_name=layer_name,
     )
-    print(f"Saved local Antyodaya vector: {asset_id}")
+    print(f"Saved local Livestock vector: {asset_id}")
 
     layer_at_geoserver = False
 
@@ -143,11 +158,11 @@ def generate_antyodaya_data_local(
             block=block,
             layer_name=layer_name,
             asset_id=asset_id,
-            dataset_name="Antyodaya 2020",
+            dataset_name="Livestock Census",
             misc={"is_generated_locally": True},
         )
         if layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("Sync to GeoServer flag updated for Antyodaya vector")
+            print("Sync to GeoServer flag updated for Livestock vector")
 
     return layer_at_geoserver

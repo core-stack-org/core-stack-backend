@@ -264,4 +264,9 @@ urlpatterns = [
         api.generate_antyodaya,
         name="generate_antyodaya",
     ),
+    path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
 ]

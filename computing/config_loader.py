@@ -166,3 +166,6 @@ LOCAL_FABDEM_OUTPUT = PROJECT_ROOT / "data/fabdem/fabdem_local"
 
 PAN_INDIA_ANTYODAYA_2020 = PROJECT_ROOT / "data/base_layers/pan_india_antyodaya_2020.gpkg"
 LOCAL_ANTYODAYA_2020_OUTPUT = PROJECT_ROOT / "data/antyodaya/output/antyodaya_local"
+
+PAN_INDIA_LIVESTOCKS = PROJECT_ROOT / "data/base_layers/pan_india_livestock.gpkg"
+LOCAL_LIVESTOCKS_OUTPUT = PROJECT_ROOT / "data/livestock/output/livestock_local"
