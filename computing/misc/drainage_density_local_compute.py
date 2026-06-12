@@ -65,9 +65,9 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
     watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
 
-    watersheds_gdf["drainage_density"] = 0.0
-    watersheds_gdf["drainage_density_stream"] = None
-    watersheds_gdf["stream_length_km"] = None
+    # watersheds_gdf["drainage_density"] = 0.0
+    # watersheds_gdf["drainage_density_stream"] = None
+    # watersheds_gdf["stream_length_km"] = None
 
     for index, watershed in watersheds_gdf.iterrows():
         # Clip drainage lines to this watershed boundary
