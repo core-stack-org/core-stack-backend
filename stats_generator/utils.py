@@ -246,12 +246,36 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_drainage_density(geojson_data, writer)
             elif workspace == "antyodaya_analysis":
                 create_excel_for_antyodaya_20(geojson_data, writer)
+            elif workspace == "livestocks":
+                create_excel_for_livestock(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_livestock(data, writer):
+    features = data.get("features", [])
+    df_data = [feature.get("properties", {}) for feature in features]
+    df = pd.DataFrame(df_data)
+
+    # Columns to exclude
+    exclude_cols = ["state_name","district_name","TEHSIL"]
+    df = df.drop(columns=exclude_cols, errors="ignore")
+
+    # Keep important columns first if they exist
+    first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
+    other_cols = [c for c in df.columns if c not in first_cols]
+    df = df[first_cols + other_cols]
+
+    # # Round numeric columns
+    # numeric_cols = df.select_dtypes(include=["number"]).columns
+    # df[numeric_cols] = df[numeric_cols].round(2)
+
+    df.to_excel(writer, sheet_name="livestock", index=False)
+    print("Excel file created for livestock")
 
 
 def create_excel_for_antyodaya_20(data, writer):
