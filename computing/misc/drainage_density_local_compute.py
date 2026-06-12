@@ -94,7 +94,7 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
 
         # Store results as strings of lists to match GEE output
         watersheds_gdf.at[index, "drainage_density_std"] = (float(sum(stream_length.values())) / area_km2)
-        watersheds_gdf.at[index, "drainage_density"] = float(sum(stream_dd.values()))
+        watersheds_gdf.at[index, "drainage_density_weighted"] = float(sum(stream_dd.values()))
         watersheds_gdf.at[index, "drainage_density_stream"] = str(
             [float(v) for v in stream_dd.values()]
         )
