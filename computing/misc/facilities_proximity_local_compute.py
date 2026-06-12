@@ -27,7 +27,8 @@ GEOSERVER_WORKSPACE = "facilities_proximity"
 
 def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
     """
-    Filters facilities to strictly those intersecting the panchayat boundaries.
+    Filters facilities to strictly those intersecting the panchayat boundaries,
+    without altering/clipping their geometries.
     """
     if facilities_gdf.empty:
         return facilities_gdf
@@ -38,8 +39,8 @@ def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
 
     outer_boundary = panchayat_gdf.geometry.unary_union
 
-    # Clip facilities to the overall boundary first to reduce size
-    facilities_in_roi = gpd.clip(facilities_gdf, outer_boundary)
+    # Keep facilities that intersect the boundary, geometries unchanged
+    facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
 
     # Final cleanup
     facilities_in_roi = facilities_in_roi[~facilities_in_roi.geometry.is_empty]
@@ -86,12 +87,18 @@ def generate_facilities_proximity_local(
         )
 
     print("Loading Facilities data overlapping ROI...")
-    try:
-        facilities_gdf = read_geojson_with_string_coords(PAN_INDIA_FACILITIES_PATH, mask_gdf=panchayat_gdf)
-        facilities_gdf = validate_geometry(facilities_gdf)
-    except Exception as e:
-        print(f"Failed to read facilities with mask: {e}")
-        facilities_gdf = gpd.GeoDataFrame()
+
+    # Ensure mask is in EPSG:4326 since the source GeoJSON is in EPSG:4326
+    if panchayat_gdf.crs and panchayat_gdf.crs.to_epsg() != 4326:
+        mask_gdf = panchayat_gdf.to_crs(epsg=4326)
+    else:
+        mask_gdf = panchayat_gdf
+
+    facilities_gdf = read_geojson_with_string_coords(
+        PAN_INDIA_FACILITIES_PATH, mask_gdf=mask_gdf
+    )
+    facilities_gdf = validate_geometry(facilities_gdf)
+
     if facilities_gdf.empty:
         print(
             "Warning: PAN INDIA Facilities file has no valid geometries overlapping ROI"
