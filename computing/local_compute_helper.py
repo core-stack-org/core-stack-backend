@@ -21,6 +21,9 @@ from computing.config_loader import (
     PROJECT_ROOT,
     TERRAIN_RASTER_PATH,
 )
+from utilities.download_gpkg_from_geoserver import generate_gpkg
+
+PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
 
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
 VALID_COMPUTE_TYPES = {"gee", "local"}
@@ -99,19 +102,60 @@ def resolve_precomputed_vector_file(
     )
 
 
+def resolve_precomputed_panchayat_vector_file(
+    state,
+    district,
+    block,
+    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
+    extensions=PRECOMPUTED_ROI_EXTENSIONS,
+    missing_file_label="Precomputed vector file",
+):
+    roi_dir = Path(precomputed_roi_dir or PRECOMPUTED_PANCHAYAT_DIR)
+    state_slug = _slug(state, "unknown_state")
+    district_slug = _slug(district, "unknown_district")
+    block_slug = _slug(block, "unknown_tehsil")
+
+    expected_paths = [
+        roi_dir / state_slug / district_slug / f"{block_slug}{ext}"
+        for ext in extensions
+    ]
+    for path in expected_paths:
+        if path.exists():
+            return path
+
+    raise FileNotFoundError(
+        f"{missing_file_label} not found. "
+        f"state={state}, district={district}, block={block}. "
+        f"Expected one of: {[str(path) for path in expected_paths]}"
+    )
+
+
 def load_precomputed_watersheds(
     state,
     district,
     block,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
 ):
-    watershed_path = resolve_precomputed_vector_file(
-        state=state,
-        district=district,
-        block=block,
-        precomputed_roi_dir=precomputed_roi_dir,
-        missing_file_label="Precomputed watershed boundary file",
-    )
+    try:
+        watershed_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Precomputed watershed boundary file",
+        )
+
+    except FileNotFoundError:
+        print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
+        generate_gpkg(state=state, district=district, block=block, workspace="mws")
+        watershed_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Generated watershed boundary file not found",
+        )
+
     watersheds_gdf = read_validated_vector_file(
         watershed_path,
         f"Precomputed watershed file has no valid geometries: {watershed_path}",
@@ -120,19 +164,72 @@ def load_precomputed_watersheds(
     return watersheds_gdf, str(watershed_path)
 
 
+def load_precomputed_panchayat(
+    state,
+    district,
+    block,
+    precomputed_roi_dir=PRECOMPUTED_PANCHAYAT_DIR,
+):
+    try:
+        panchayat_path = resolve_precomputed_panchayat_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Precomputed panchayat boundary file",
+        )
+
+    except FileNotFoundError:
+        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
+        generate_gpkg(
+            state=state,
+            district=district,
+            block=block,
+            workspace="panchayat_boundaries",
+        )
+
+        panchayat_path = resolve_precomputed_panchayat_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Generated panchayat boundary file not found",
+        )
+
+    panchayat_gdf = read_validated_vector_file(
+        panchayat_path,
+        f"Precomputed panchayat file has no valid geometries: {panchayat_path}",
+    )
+
+    print(f"Loaded panchayat boundaries: {panchayat_path}")
+    return panchayat_gdf, str(panchayat_path)
+
+
 def load_precomputed_roi(
     state,
     district,
     block,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
 ):
-    roi_path = resolve_precomputed_vector_file(
-        state=state,
-        district=district,
-        block=block,
-        precomputed_roi_dir=precomputed_roi_dir,
-        missing_file_label="Precomputed tehsil watershed file",
-    )
+    try:
+        roi_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Precomputed tehsil watershed file",
+        )
+    except FileNotFoundError:
+        print(f"Precomputed ROI not found for {state}/{district}/{block}. Downloading...")
+        generate_gpkg(state=state, district=district, block=block, workspace="mws")
+        roi_path = resolve_precomputed_vector_file(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+            missing_file_label="Generated tehsil watershed file",
+        )
+
     roi_gdf = read_validated_vector_file(
         roi_path,
         f"Precomputed ROI file has no valid geometries: {roi_path}",
@@ -905,3 +1002,50 @@ def get_compute_mode(request, default="local"):
 
 def select_compute_task(compute, gee_task, local_task):
     return gee_task if compute == "gee" else local_task
+
+
+def read_geojson_with_string_coords(path, mask_gdf):
+    """
+    Safely reads a GeoJSON file with malformed string coordinates that cause fiona to crash.
+    Pre-filters using the bounding box of mask_gdf to prevent high memory usage.
+    """
+    import json
+    with open(path, 'r') as f:
+        data = json.load(f)
+        
+    def _convert_coords(coords):
+        if not coords:
+            return coords
+        if isinstance(coords[0], (list, tuple)):
+            return [_convert_coords(c) for c in coords]
+        return [float(c) for c in coords]
+        
+    minx, miny, maxx, maxy = mask_gdf.total_bounds
+    buffer_deg = 0.05
+    
+    def _is_roughly_in_bounds(coords):
+        if not coords: return False
+        if isinstance(coords[0], (list, tuple)):
+            for c in coords:
+                if _is_roughly_in_bounds(c): return True
+            return False
+        else:
+            try:
+                x, y = float(coords[0]), float(coords[1])
+                return (minx - buffer_deg <= x <= maxx + buffer_deg) and (miny - buffer_deg <= y <= maxy + buffer_deg)
+            except Exception:
+                return True
+
+    filtered_features = []
+    for feature in data.get("features", []):
+        geom = feature.get("geometry")
+        if geom and "coordinates" in geom:
+            if _is_roughly_in_bounds(geom["coordinates"]):
+                try:
+                    geom["coordinates"] = _convert_coords(geom["coordinates"])
+                    filtered_features.append(feature)
+                except Exception:
+                    pass
+                
+    return gpd.GeoDataFrame.from_features(filtered_features, crs="EPSG:4326")
+
