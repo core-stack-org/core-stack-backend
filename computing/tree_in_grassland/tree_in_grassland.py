@@ -38,8 +38,8 @@ def generate_tree_in_grassland_layer(
     state,
     district,
     block,
-    start_year=2017,
-    end_year=2019,
+    start_year,
+    end_year,
     gee_account_id=None,
     app_type="MWS",
 ):
@@ -122,14 +122,14 @@ def generate_tree_in_grassland_layer(
         # Load pan-India LULC images for the required year range
         lulc_by_year = {
             year: load_pan_india_lulc(year)
-            for year in range(start_year-1, end_year + 2)
+            for year in range(start_year, end_year+1)
         }
 
         pixel_area = ee.Image.pixelArea()
 
         # Temporal windows (overlapping 3-year periods)
-        start_years = [start_year-1, start_year, start_year + 1]
-        end_years = [end_year - 1, end_year, end_year+1] #need to change
+        start_years = [start_year, start_year + 1, start_year + 2]#[start_year-1, start_year, start_year + 1]
+        end_years = [end_year - 2, end_year - 1, end_year]#[end_year - 1, end_year, end_year+1] #need to change
 
         # ---- inner compute functions (closures over EE objects) ------
 

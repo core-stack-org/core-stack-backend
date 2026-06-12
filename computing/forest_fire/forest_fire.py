@@ -135,7 +135,6 @@ def generate_forest_fire_layer(
 
         # ---- per-MWS compute function (closure over EE objects) ------
 
-
         def compute_fire_metrics(f):
             geom = f.geometry()
 
@@ -147,20 +146,28 @@ def generate_forest_fire_layer(
                     maxPixels=MAXPIX,
                     bestEffort=True,
                 ).get(band)
-                return ee.Number(ee.Algorithms.If(
-                    ee.Algorithms.IsEqual(val, None), 0, val
-                ))
+                return ee.Number(
+                    ee.Algorithms.If(ee.Algorithms.IsEqual(val, None), 0, val)
+                )
 
-            return ee.Feature(f.geometry()).set({
-                "uid":                   f.get("uid"),
-                "fire_frp_sum_per_year": reduce(frp_sum_img,    ee.Reducer.sum(),  "MaxFRP"),
-                "fire_frp_mean":         reduce(frp_mean_img,   ee.Reducer.mean(), "MaxFRP"),
-                "fire_frp_max":          reduce(frp_max_img,    ee.Reducer.mean(), "MaxFRP"),  # ← mean not max
-                "fire_count_per_year":   reduce(fire_count_img, ee.Reducer.sum(),  "fire"),
-            })
+            return f.set(
+                {
+                    "uid": f.get("uid"),
+                    "fire_frp_sum_per_year": reduce(
+                        frp_sum_img, ee.Reducer.sum(), "MaxFRP"
+                    ),
+                    "fire_frp_mean": reduce(frp_mean_img, ee.Reducer.mean(), "MaxFRP"),
+                    "fire_frp_max": reduce(
+                        frp_max_img, ee.Reducer.mean(), "MaxFRP"
+                    ),  # ← mean not max
+                    "fire_count_per_year": reduce(
+                        fire_count_img, ee.Reducer.sum(), "fire"
+                    ),
+                }
+            )
 
         # ---- map compute over all MWS features ----
-        mws_fc = mws_fc.filter(ee.Filter.notNull(['uid']))
+        mws_fc = mws_fc.filter(ee.Filter.notNull(["uid"]))
 
         # After your area filter, add geometry repair
         def repair_geometry(f):
@@ -169,25 +176,24 @@ def generate_forest_fire_layer(
         def validate_feature(f):
             geom = f.geometry()
 
-            return f.set({
-                "geom_type": geom.type(),
-                "area_m2": geom.area(1)
-            })
+            return f.set({"geom_type": geom.type(), "area_m2": geom.area(1)})
 
         validated = mws_fc.map(validate_feature)
 
         mws_fc = validated.filter(ee.Filter.gt("area_m2", 0))
-        mws_fc = mws_fc.map(repair_geometry)           
+        mws_fc = mws_fc.map(repair_geometry)
 
         fc = mws_fc.map(compute_fire_metrics)
 
-        fc = fc.select([
-            "uid",
-            "fire_frp_sum_per_year",
-            "fire_frp_mean",
-            "fire_frp_max",
-            "fire_count_per_year",
-        ])
+        fc = fc.select(
+            [
+                "uid",
+                "fire_frp_sum_per_year",
+                "fire_frp_mean",
+                "fire_frp_max",
+                "fire_count_per_year",
+            ]
+        )
 
         # --------------------------------------------------------------
         # STEP 4: Export to GEE
@@ -249,9 +255,7 @@ def _save_to_db_and_sync_to_geoserver(
     make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(
-        fc, asset_suffix, layer_name, "forest_fire"
-    )
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fire")
     print(res)
 
     layer_at_geoserver = False

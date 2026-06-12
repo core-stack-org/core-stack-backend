@@ -57,7 +57,7 @@ def load_pan_india_lulc(year):
     """
     return (
         ee.Image(
-            f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year - 1}_{year}"
+            f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year+1}"
         )
         .select("predicted_label")
         .unmask(0)
