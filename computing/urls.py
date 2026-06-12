@@ -258,4 +258,34 @@ urlpatterns = [
         api.rainfall_resilience_resistance,
         name="rainfall_resilience_resistance",
     ),
+    path(
+        "generate_dem_raster_vector/",
+        api.generate_fabdem_raster_vector,
+        name="generate-dem-raster-vector",
+    ),
+    path(
+        "generate_canal_vector/",
+        api.generate_canal_vector,
+        name="generate-canal-vector",
+    ),
+    path(
+        "generate_river_data/",
+        api.generate_river_data,
+        name="generate-river-data",
+    ),
+    path(
+        "generate_density_vector/",
+        api.generate_drainage_density_data,
+        name="generate-drainage-density-vector",
+    ),
+    path(
+        "generate_antyodaya/",
+        api.generate_antyodaya,
+        name="generate_antyodaya",
+    ),
+    path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
 ]
