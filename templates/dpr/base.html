@@ -92,6 +92,17 @@
             break-inside: avoid;
         }
 
+        .footnote {
+            margin-top: 30px;
+            font-size: 10pt;
+            color: #555;
+            text-align: center;
+        }
+
+        .footnote hr {
+            margin-bottom: 10px;
+        }
+
     </style>
 </head>
 
@@ -126,6 +137,10 @@
     {% include "dpr/section_f.html" %}
     {% include "dpr/section_g.html" %}
 
+    <div class="footnote">
+        <hr>
+        <p>{{ footnote }}</p>
+    </div>
 
 
 </body>
