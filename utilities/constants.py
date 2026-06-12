@@ -8,6 +8,8 @@ ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
+ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
+
 MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
@@ -114,6 +116,10 @@ ODK_SYNC_URL_IRRIGATION_STRUCTURE = (
 
 ODK_SYNC_URL_LIVELIHOOD = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM%20Livelihood%20Form/submissions"
+)
+
+ODK_SYNC_URL_AGROHORTICULTURE = (
+    ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Agrohorticulture/submissions"
 )
 
 ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE = (

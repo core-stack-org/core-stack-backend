@@ -37,9 +37,7 @@ LULC_CLASSES = {
 NEIGHBOR_CLASSES = [k for k in LULC_CLASSES.keys() if k != TREE_CLASS]
 THRESHOLD = 0.5  # strictly > 50%
 
-PAN_INDIA_LULC_PATH = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
-)
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
 
 
 def load_pan_india_lulc(year):
@@ -56,9 +54,7 @@ def load_pan_india_lulc(year):
         ee.Image with the 'predicted_label' band, unmasked and cast to Int.
     """
     return (
-        ee.Image(
-            f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year+1}"
-        )
+        ee.Image(f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year + 1}")
         .select("predicted_label")
         .unmask(0)
         .toInt()
@@ -97,9 +93,7 @@ def tree_context_all(lulc, aoi):
     )
 
     shrub_frac = (
-        shrub_mask.toInt()
-        .reduceNeighborhood(ee.Reducer.sum(), kernel)
-        .divide(total_px)
+        shrub_mask.toInt().reduceNeighborhood(ee.Reducer.sum(), kernel).divide(total_px)
     )
 
     # Tree embedded in shrubland
@@ -140,12 +134,8 @@ def temporal_context(lulc_by_year, aoi, start_years, end_years):
     start_contexts = [tree_context_all(lulc_by_year[y], aoi) for y in start_years]
     end_contexts = [tree_context_all(lulc_by_year[y], aoi) for y in end_years]
 
-    context_start = (
-        ee.ImageCollection(start_contexts).reduce(ee.Reducer.mode()).toInt()
-    )
+    context_start = ee.ImageCollection(start_contexts).reduce(ee.Reducer.mode()).toInt()
 
-    context_end = (
-        ee.ImageCollection(end_contexts).reduce(ee.Reducer.mode()).toInt()
-    )
+    context_end = ee.ImageCollection(end_contexts).reduce(ee.Reducer.mode()).toInt()
 
     return context_start, context_end

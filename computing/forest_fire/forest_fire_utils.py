@@ -55,6 +55,7 @@ def prepare_frp_images(frp_collection, n_years):
         dict with keys 'sum', 'mean', 'max', 'count', each mapping to
         an ee.Image ready for spatial reduction.
     """
+
     # Mask zeros for FRP statistics
     def mask_fire(img):
         return img.updateMask(img.gt(0))
@@ -68,9 +69,9 @@ def prepare_frp_images(frp_collection, n_years):
     fire_binary_collection = frp_collection.map(fire_binary)
 
     return {
-        "sum": frp_masked.sum().divide(n_years),          # yearly-normalised total FRP
-        "mean": frp_masked.mean(),                         # temporal mean FRP
+        "sum": frp_masked.sum().divide(n_years),  # yearly-normalised total FRP
+        "mean": frp_masked.mean(),  # temporal mean FRP
         # "max": frp_masked.max(),                           # peak FRP
-        "max": frp_masked.max(), 
+        "max": frp_masked.max(),
         "count": fire_binary_collection.sum().divide(n_years),  # yearly fire frequency
     }

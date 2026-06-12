@@ -28,9 +28,11 @@ from .utils import ensure_str, format_text, get_waterbody_repair_activities
 
 
 def _active_settlements(plan_id):
-    return ODK_settlement.objects.filter(plan_id=plan_id).exclude(
-        status_re="rejected"
-    ).exclude(is_deleted=True)
+    return (
+        ODK_settlement.objects.filter(plan_id=plan_id)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    )
 
 
 def _active_qs(model, plan_id, data_field=None):
@@ -44,27 +46,57 @@ def _active_qs(model, plan_id, data_field=None):
 # Summary
 # ---------------------------------------------------------------------------
 
+
 def get_dpr_summary(plan_id):
     pid = str(plan_id)
     return {
         "plan_id": plan_id,
         "sections": {
             "settlements": _active_settlements(pid).count(),
-            "crops": ODK_crop.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
-            "wells": ODK_well.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
-            "waterbodies": ODK_waterbody.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
+            "crops": ODK_crop.objects.filter(plan_id=pid)
+            .exclude(status_re="rejected")
+            .exclude(is_deleted=True)
+            .count(),
+            "wells": ODK_well.objects.filter(plan_id=pid)
+            .exclude(status_re="rejected")
+            .exclude(is_deleted=True)
+            .count(),
+            "waterbodies": ODK_waterbody.objects.filter(plan_id=pid)
+            .exclude(status_re="rejected")
+            .exclude(is_deleted=True)
+            .count(),
             "maintenance": {
-                "gw": GW_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True).count(),
-                "agri": Agri_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True).count(),
-                "swb": SWB_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True).count(),
-                "swb_rs": SWB_RS_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True).count(),
+                "gw": GW_maintenance.objects.filter(plan_id=pid)
+                .exclude(is_deleted=True)
+                .count(),
+                "agri": Agri_maintenance.objects.filter(plan_id=pid)
+                .exclude(is_deleted=True)
+                .count(),
+                "swb": SWB_maintenance.objects.filter(plan_id=pid)
+                .exclude(is_deleted=True)
+                .count(),
+                "swb_rs": SWB_RS_maintenance.objects.filter(plan_id=pid)
+                .exclude(is_deleted=True)
+                .count(),
             },
             "nrm_works": {
-                "recharge": ODK_groundwater.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
-                "irrigation": ODK_agri.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
+                "recharge": ODK_groundwater.objects.filter(plan_id=pid)
+                .exclude(status_re="rejected")
+                .exclude(is_deleted=True)
+                .count(),
+                "irrigation": ODK_agri.objects.filter(plan_id=pid)
+                .exclude(status_re="rejected")
+                .exclude(is_deleted=True)
+                .count(),
             },
-            "livelihood": ODK_livelihood.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
-            "agrohorticulture": ODK_agrohorticulture.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True).count(),
+            "livelihood": ODK_livelihood.objects.filter(plan_id=pid)
+            .exclude(status_re="rejected")
+            .exclude(is_deleted=True)
+            .count(),
+            "agrohorticulture": ODK_agrohorticulture.objects.filter(plan_id=pid)
+            .exclude(status_re="rejected")
+            .exclude(is_deleted=True)
+            .count(),
         },
     }
 
@@ -72,6 +104,7 @@ def get_dpr_summary(plan_id):
 # ---------------------------------------------------------------------------
 # Section A – Team Details
 # ---------------------------------------------------------------------------
+
 
 def get_team_details(plan):
     return {
@@ -86,6 +119,7 @@ def get_team_details(plan):
 # ---------------------------------------------------------------------------
 # Section B – Village Brief
 # ---------------------------------------------------------------------------
+
 
 def get_village_brief(plan):
     pid = str(plan.id)
@@ -105,6 +139,7 @@ def get_village_brief(plan):
 # Section C – Socio-Economic Profile
 # ---------------------------------------------------------------------------
 
+
 def get_settlements_data(plan_id):
     result = []
     for item in _active_settlements(str(plan_id)):
@@ -119,34 +154,40 @@ def get_settlements_data(plan_id):
         else:
             caste_group_detail = None
 
-        result.append({
-            "settlement_id": item.settlement_id,
-            "settlement_name": item.settlement_name,
-            "number_of_households": item.number_of_households,
-            "settlement_type": item.largest_caste,
-            "caste_group_detail": caste_group_detail,
-            "caste_counts": {
-                "sc": ds.get("count_sc"),
-                "st": ds.get("count_st"),
-                "obc": ds.get("count_obc"),
-                "general": ds.get("count_general"),
-            },
-            "marginal_farmers": ff.get("marginal_farmers"),
-            "nrega_job_applied": item.nrega_job_applied,
-            "nrega_job_card": item.nrega_job_card,
-            "nrega_work_days": item.nrega_work_days,
-            "nrega_past_work": item.nrega_past_work,
-            "nrega_demand": item.nrega_demand,
-            "nrega_issues": item.nrega_issues,
-            "latitude": item.latitude,
-            "longitude": item.longitude,
-        })
+        result.append(
+            {
+                "settlement_id": item.settlement_id,
+                "settlement_name": item.settlement_name,
+                "number_of_households": item.number_of_households,
+                "settlement_type": item.largest_caste,
+                "caste_group_detail": caste_group_detail,
+                "caste_counts": {
+                    "sc": ds.get("count_sc"),
+                    "st": ds.get("count_st"),
+                    "obc": ds.get("count_obc"),
+                    "general": ds.get("count_general"),
+                },
+                "marginal_farmers": ff.get("marginal_farmers"),
+                "nrega_job_applied": item.nrega_job_applied,
+                "nrega_job_card": item.nrega_job_card,
+                "nrega_work_days": item.nrega_work_days,
+                "nrega_past_work": item.nrega_past_work,
+                "nrega_demand": item.nrega_demand,
+                "nrega_issues": item.nrega_issues,
+                "latitude": item.latitude,
+                "longitude": item.longitude,
+            }
+        )
     return result
 
 
 def get_crops_data(plan_id):
     result = []
-    for crop in ODK_crop.objects.filter(plan_id=str(plan_id)).exclude(status_re="rejected").exclude(is_deleted=True):
+    for crop in (
+        ODK_crop.objects.filter(plan_id=str(plan_id))
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
         dc = crop.data_crop or {}
 
         def _to_acres(key):
@@ -158,19 +199,21 @@ def get_crops_data(plan_id):
             except (ValueError, TypeError):
                 return None
 
-        result.append({
-            "crop_grid_id": crop.crop_grid_id,
-            "beneficiary_settlement": crop.beneficiary_settlement,
-            "irrigation_source": crop.irrigation_source,
-            "land_classification": crop.land_classification,
-            "kharif_crops": crop.cropping_patterns_kharif,
-            "kharif_acres": _to_acres("total_area_cultivation_kharif"),
-            "rabi_crops": crop.cropping_patterns_rabi,
-            "rabi_acres": _to_acres("total_area_cultivation_Rabi"),
-            "zaid_crops": crop.cropping_patterns_zaid,
-            "zaid_acres": _to_acres("total_area_cultivation_Zaid"),
-            "cropping_intensity": crop.agri_productivity,
-        })
+        result.append(
+            {
+                "crop_grid_id": crop.crop_grid_id,
+                "beneficiary_settlement": crop.beneficiary_settlement,
+                "irrigation_source": crop.irrigation_source,
+                "land_classification": crop.land_classification,
+                "kharif_crops": crop.cropping_patterns_kharif,
+                "kharif_acres": _to_acres("total_area_cultivation_kharif"),
+                "rabi_crops": crop.cropping_patterns_rabi,
+                "rabi_acres": _to_acres("total_area_cultivation_Rabi"),
+                "zaid_crops": crop.cropping_patterns_zaid,
+                "zaid_acres": _to_acres("total_area_cultivation_Zaid"),
+                "cropping_intensity": crop.agri_productivity,
+            }
+        )
     return result
 
 
@@ -183,17 +226,20 @@ def get_livestock_data(plan_id):
 
     for item in _active_settlements(str(plan_id)):
         lc = item.livestock_census or {}
-        result.append({
-            "settlement_id": item.settlement_id,
-            "settlement_name": item.settlement_name,
-            **{lt.lower(): _fmt(lc.get(lt)) for lt in livestock_types},
-        })
+        result.append(
+            {
+                "settlement_id": item.settlement_id,
+                "settlement_name": item.settlement_name,
+                **{lt.lower(): _fmt(lc.get(lt)) for lt in livestock_types},
+            }
+        )
     return result
 
 
 # ---------------------------------------------------------------------------
 # Section D – Wells and Water Structures
 # ---------------------------------------------------------------------------
+
 
 def _extract_well_fields(well):
     dw = well.data_well or {}
@@ -251,9 +297,11 @@ def _extract_well_fields(well):
 
 
 def get_wells_data(plan_id):
-    wells = ODK_well.objects.filter(plan_id=str(plan_id)).exclude(
-        status_re="rejected"
-    ).exclude(is_deleted=True)
+    wells = (
+        ODK_well.objects.filter(plan_id=str(plan_id))
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    )
     return [_extract_well_fields(w) for w in wells]
 
 
@@ -292,9 +340,11 @@ def _extract_waterbody_fields(wb):
 
 
 def get_waterbodies_data(plan_id):
-    wbs = ODK_waterbody.objects.filter(plan_id=str(plan_id)).exclude(
-        status_re="rejected"
-    ).exclude(is_deleted=True)
+    wbs = (
+        ODK_waterbody.objects.filter(plan_id=str(plan_id))
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    )
     return [_extract_waterbody_fields(wb) for wb in wbs]
 
 
@@ -302,7 +352,10 @@ def get_waterbodies_data(plan_id):
 # Section E – Maintenance
 # ---------------------------------------------------------------------------
 
-def _resolve_repair_activity(data, structure_type, reverse_mapping, fallback_key="select_one_activities"):
+
+def _resolve_repair_activity(
+    data, structure_type, reverse_mapping, fallback_key="select_one_activities"
+):
     repair_activities = None
     if structure_type and structure_type != "NA" and structure_type in reverse_mapping:
         repair_key = reverse_mapping[structure_type]
@@ -323,70 +376,101 @@ def get_maintenance_data(plan_id, maintenance_type):
     if maintenance_type == "gw":
         for m in GW_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
             d = m.data_gw_maintenance or {}
-            structure_type = d.get("select_one_recharge_structure") or d.get("select_one_water_structure") or "NA"
-            repair = _resolve_repair_activity(d, structure_type, RECHARGE_STRUCTURE_REVERSE_MAPPING)
-            result.append({
-                "id": m.gw_maintenance_id,
-                "demand_type": classify_demand_type(d.get("demand_type")),
-                "beneficiary_settlement": d.get("beneficiary_settlement"),
-                "beneficiary_name": d.get("Beneficiary_Name"),
-                "beneficiary_father_name": d.get("ben_father"),
-                "structure_type": structure_type,
-                "repair_activities": repair,
-                "latitude": m.latitude,
-                "longitude": m.longitude,
-            })
+            structure_type = (
+                d.get("select_one_recharge_structure")
+                or d.get("select_one_water_structure")
+                or "NA"
+            )
+            repair = _resolve_repair_activity(
+                d, structure_type, RECHARGE_STRUCTURE_REVERSE_MAPPING
+            )
+            result.append(
+                {
+                    "id": m.gw_maintenance_id,
+                    "demand_type": classify_demand_type(d.get("demand_type")),
+                    "beneficiary_settlement": d.get("beneficiary_settlement"),
+                    "beneficiary_name": d.get("Beneficiary_Name"),
+                    "gender": d.get("select_gender"),
+                    "beneficiary_father_name": d.get("ben_father"),
+                    "structure_type": structure_type,
+                    "repair_activities": repair,
+                    "latitude": m.latitude,
+                    "longitude": m.longitude,
+                }
+            )
 
     elif maintenance_type == "agri":
         for m in Agri_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
             d = m.data_agri_maintenance or {}
-            structure_type = d.get("select_one_water_structure") or d.get("select_one_irrigation_structure") or "NA"
-            repair = _resolve_repair_activity(d, structure_type, IRRIGATION_STRUCTURE_REVERSE_MAPPING)
-            result.append({
-                "id": m.agri_maintenance_id,
-                "demand_type": classify_demand_type(d.get("demand_type")),
-                "beneficiary_settlement": d.get("beneficiary_settlement"),
-                "beneficiary_name": d.get("Beneficiary_Name"),
-                "beneficiary_father_name": d.get("ben_father"),
-                "structure_type": structure_type,
-                "repair_activities": repair,
-                "latitude": m.latitude,
-                "longitude": m.longitude,
-            })
+            structure_type = (
+                d.get("select_one_water_structure")
+                or d.get("select_one_irrigation_structure")
+                or "NA"
+            )
+            repair = _resolve_repair_activity(
+                d, structure_type, IRRIGATION_STRUCTURE_REVERSE_MAPPING
+            )
+            result.append(
+                {
+                    "id": m.agri_maintenance_id,
+                    "demand_type": classify_demand_type(d.get("demand_type")),
+                    "beneficiary_settlement": d.get("beneficiary_settlement"),
+                    "beneficiary_name": d.get("Beneficiary_Name"),
+                    "beneficiary_father_name": d.get("ben_father"),
+                    "structure_type": structure_type,
+                    "repair_activities": repair,
+                    "latitude": m.latitude,
+                    "longitude": m.longitude,
+                }
+            )
 
     elif maintenance_type == "swb":
         for m in SWB_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
             d = m.data_swb_maintenance or {}
-            structure_type = d.get("TYPE_OF_WORK") or d.get("select_one_water_structure") or "NA"
-            repair = _resolve_repair_activity(d, structure_type, WATER_STRUCTURE_REVERSE_MAPPING)
-            result.append({
-                "id": m.swb_maintenance_id,
-                "demand_type": classify_demand_type(d.get("demand_type")),
-                "beneficiary_settlement": d.get("beneficiary_settlement"),
-                "beneficiary_name": d.get("Beneficiary_Name"),
-                "beneficiary_father_name": d.get("ben_father"),
-                "structure_type": structure_type,
-                "repair_activities": repair,
-                "latitude": m.latitude,
-                "longitude": m.longitude,
-            })
+            structure_type = (
+                d.get("TYPE_OF_WORK") or d.get("select_one_water_structure") or "NA"
+            )
+            repair = _resolve_repair_activity(
+                d, structure_type, WATER_STRUCTURE_REVERSE_MAPPING
+            )
+            result.append(
+                {
+                    "id": m.swb_maintenance_id,
+                    "demand_type": classify_demand_type(d.get("demand_type")),
+                    "beneficiary_settlement": d.get("beneficiary_settlement"),
+                    "beneficiary_name": d.get("Beneficiary_Name"),
+                    "gender": d.get("select_gender"),
+                    "beneficiary_father_name": d.get("ben_father"),
+                    "structure_type": structure_type,
+                    "repair_activities": repair,
+                    "latitude": m.latitude,
+                    "longitude": m.longitude,
+                }
+            )
 
     elif maintenance_type == "swb_rs":
-        for m in SWB_RS_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
+        for m in SWB_RS_maintenance.objects.filter(plan_id=pid).exclude(
+            is_deleted=True
+        ):
             d = m.data_swb_rs_maintenance or {}
             structure_type = d.get("TYPE_OF_WORK") or "NA"
-            repair = _resolve_repair_activity(d, structure_type, RS_WATER_STRUCTIRE_REVERSE_MAPPING)
-            result.append({
-                "id": m.swb_rs_maintenance_id,
-                "demand_type": classify_demand_type(d.get("demand_type")),
-                "beneficiary_settlement": d.get("beneficiary_settlement"),
-                "beneficiary_name": d.get("Beneficiary_Name"),
-                "beneficiary_father_name": d.get("ben_father"),
-                "structure_type": structure_type,
-                "repair_activities": repair,
-                "latitude": m.latitude,
-                "longitude": m.longitude,
-            })
+            repair = _resolve_repair_activity(
+                d, structure_type, RS_WATER_STRUCTIRE_REVERSE_MAPPING
+            )
+            result.append(
+                {
+                    "id": m.swb_rs_maintenance_id,
+                    "demand_type": classify_demand_type(d.get("demand_type")),
+                    "beneficiary_settlement": d.get("beneficiary_settlement"),
+                    "beneficiary_name": d.get("Beneficiary_Name"),
+                    "gender": d.get("select_gender"),
+                    "beneficiary_father_name": d.get("ben_father"),
+                    "structure_type": structure_type,
+                    "repair_activities": repair,
+                    "latitude": m.latitude,
+                    "longitude": m.longitude,
+                }
+            )
 
     return result
 
@@ -395,40 +479,53 @@ def get_maintenance_data(plan_id, maintenance_type):
 # Section F – New NRM Works
 # ---------------------------------------------------------------------------
 
+
 def get_nrm_works_data(plan_id):
     pid = str(plan_id)
     result = []
 
-    for structure in ODK_groundwater.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True):
+    for structure in (
+        ODK_groundwater.objects.filter(plan_id=pid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
         dg = structure.data_groundwater or {}
-        result.append({
-            "work_category": "Recharge Structure",
-            "demand_type": classify_demand_type(dg.get("demand_type")),
-            "work_demand": structure.work_type,
-            "beneficiary_settlement": structure.beneficiary_settlement,
-            "beneficiary_name": dg.get("Beneficiary_Name"),
-            "gender": dg.get("select_gender"),
-            "beneficiary_father_name": dg.get("ben_father"),
-            "latitude": structure.latitude,
-            "longitude": structure.longitude,
-        })
+        result.append(
+            {
+                "work_category": "Recharge Structure",
+                "demand_type": classify_demand_type(dg.get("demand_type")),
+                "work_demand": structure.work_type,
+                "beneficiary_settlement": structure.beneficiary_settlement,
+                "beneficiary_name": dg.get("Beneficiary_Name"),
+                "gender": dg.get("select_gender"),
+                "beneficiary_father_name": dg.get("ben_father"),
+                "latitude": structure.latitude,
+                "longitude": structure.longitude,
+            }
+        )
 
-    for irr in ODK_agri.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True):
+    for irr in (
+        ODK_agri.objects.filter(plan_id=pid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
         da = irr.data_agri or {}
         work_demand = irr.work_type
         if (irr.work_type or "").lower() == "other":
             work_demand = da.get("TYPE_OF_WORK_ID_other") or "Other (unspecified)"
-        result.append({
-            "work_category": "Irrigation Work",
-            "demand_type": classify_demand_type(da.get("demand_type_irrigation")),
-            "work_demand": work_demand,
-            "beneficiary_settlement": irr.beneficiary_settlement,
-            "beneficiary_name": da.get("Beneficiary_Name"),
-            "gender": da.get("gender"),
-            "beneficiary_father_name": da.get("ben_father"),
-            "latitude": irr.latitude,
-            "longitude": irr.longitude,
-        })
+        result.append(
+            {
+                "work_category": "Irrigation Work",
+                "demand_type": classify_demand_type(da.get("demand_type_irrigation")),
+                "work_demand": work_demand,
+                "beneficiary_settlement": irr.beneficiary_settlement,
+                "beneficiary_name": da.get("Beneficiary_Name"),
+                "gender": da.get("gender"),
+                "beneficiary_father_name": da.get("ben_father"),
+                "latitude": irr.latitude,
+                "longitude": irr.longitude,
+            }
+        )
 
     return result
 
@@ -437,11 +534,16 @@ def get_nrm_works_data(plan_id):
 # Section G – Livelihood
 # ---------------------------------------------------------------------------
 
+
 def get_livelihood_data(plan_id):
     pid = str(plan_id)
     result = []
 
-    for record in ODK_livelihood.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True):
+    for record in (
+        ODK_livelihood.objects.filter(plan_id=pid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
         dl = record.data_livelihood or {}
 
         livestock_group = dl.get("Livestock") or {}
@@ -451,7 +553,8 @@ def get_livelihood_data(plan_id):
 
         is_livestock = (
             ensure_str(livestock_group.get("is_demand_livestock", "")).lower() == "yes"
-            or ensure_str(dl.get("select_one_demand_promoting_livestock", "")).lower() == "yes"
+            or ensure_str(dl.get("select_one_demand_promoting_livestock", "")).lower()
+            == "yes"
         )
         if is_livestock:
             demands = ensure_str(livestock_group.get("demands_promoting_livestock"))
@@ -461,21 +564,27 @@ def get_livelihood_data(plan_id):
                 demands = ensure_str(dl.get("select_one_promoting_livestock"))
                 if demands and demands.lower() == "other":
                     demands = dl.get("select_one_promoting_livestock_other")
-            result.append({
-                "livelihood_work": "Livestock",
-                "demand_type": livestock_group.get("livestock_demand"),
-                "work_demand": format_text(demands).strip() if demands else None,
-                "beneficiary_settlement": record.beneficiary_settlement,
-                "beneficiary_name": dl.get("beneficiary_name") or livestock_group.get("ben_livestock"),
-                "gender": livestock_group.get("gender_livestock"),
-                "beneficiary_father_name": livestock_group.get("ben_father_livestock"),
-                "latitude": record.latitude,
-                "longitude": record.longitude,
-            })
+            result.append(
+                {
+                    "livelihood_work": "Livestock",
+                    "demand_type": livestock_group.get("livestock_demand"),
+                    "work_demand": format_text(demands).strip() if demands else None,
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or livestock_group.get("ben_livestock"),
+                    "gender": livestock_group.get("gender_livestock"),
+                    "beneficiary_father_name": livestock_group.get(
+                        "ben_father_livestock"
+                    ),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
 
         is_fisheries = (
             ensure_str(fisheries_group.get("is_demand_fisheris", "")).lower() == "yes"
-            or ensure_str(dl.get("select_one_demand_promoting_fisheries", "")).lower() == "yes"
+            or ensure_str(dl.get("select_one_demand_promoting_fisheries", "")).lower()
+            == "yes"
         )
         if is_fisheries:
             demands = ensure_str(fisheries_group.get("select_one_promoting_fisheries"))
@@ -485,70 +594,105 @@ def get_livelihood_data(plan_id):
                 demands = ensure_str(dl.get("select_one_promoting_fisheries"))
                 if demands and demands.lower() == "other":
                     demands = dl.get("select_one_promoting_fisheries_other")
-            result.append({
-                "livelihood_work": "Fisheries",
-                "demand_type": fisheries_group.get("demand_type_fisheries"),
-                "work_demand": format_text(demands).strip() if demands else None,
-                "beneficiary_settlement": record.beneficiary_settlement,
-                "beneficiary_name": dl.get("beneficiary_name") or fisheries_group.get("ben_fisheries"),
-                "gender": fisheries_group.get("gender_fisheries"),
-                "beneficiary_father_name": fisheries_group.get("ben_father_fisheries"),
-                "latitude": record.latitude,
-                "longitude": record.longitude,
-            })
+            result.append(
+                {
+                    "livelihood_work": "Fisheries",
+                    "demand_type": fisheries_group.get("demand_type_fisheries"),
+                    "work_demand": format_text(demands).strip() if demands else None,
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or fisheries_group.get("ben_fisheries"),
+                    "gender": fisheries_group.get("gender_fisheries"),
+                    "beneficiary_father_name": fisheries_group.get(
+                        "ben_father_fisheries"
+                    ),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
 
         is_plantation = (
             ensure_str(dl.get("select_one_demand_plantation", "")).lower() == "yes"
-            or ensure_str(plantation_group.get("select_plantation_demands", "")).lower() == "yes"
+            or ensure_str(plantation_group.get("select_plantation_demands", "")).lower()
+            == "yes"
         )
         if is_plantation:
-            result.append({
-                "livelihood_work": "Plantations",
-                "demand_type": classify_demand_type(plantation_group.get("demand_type_plantations")),
-                "work_demand": dl.get("Plantation") or plantation_group.get("crop_name"),
-                "beneficiary_settlement": record.beneficiary_settlement,
-                "beneficiary_name": dl.get("beneficiary_name") or plantation_group.get("ben_plantation"),
-                "gender": plantation_group.get("gender"),
-                "beneficiary_father_name": plantation_group.get("ben_father"),
-                "total_acres": dl.get("Plantation_crop") or plantation_group.get("crop_area"),
-                "latitude": record.latitude,
-                "longitude": record.longitude,
-            })
+            result.append(
+                {
+                    "livelihood_work": "Plantations",
+                    "demand_type": classify_demand_type(
+                        plantation_group.get("demand_type_plantations")
+                    ),
+                    "work_demand": dl.get("Plantation")
+                    or plantation_group.get("crop_name"),
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or plantation_group.get("ben_plantation"),
+                    "gender": plantation_group.get("gender"),
+                    "beneficiary_father_name": plantation_group.get("ben_father"),
+                    "total_acres": dl.get("Plantation_crop")
+                    or plantation_group.get("crop_area"),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
 
         is_kitchen_garden = (
             ensure_str(dl.get("indi_assets", "")).lower() == "yes"
             or ensure_str(kitchen_garden_group.get("assets_kg", "")).lower() == "yes"
         )
         if is_kitchen_garden:
-            result.append({
-                "livelihood_work": "Kitchen Garden",
-                "demand_type": kitchen_garden_group.get("demand_type_kitchen_garden"),
-                "work_demand": dl.get("Plantation"),
-                "beneficiary_settlement": record.beneficiary_settlement,
-                "beneficiary_name": dl.get("beneficiary_name") or kitchen_garden_group.get("ben_kitchen_gardens"),
-                "gender": kitchen_garden_group.get("gender_kitchen_gardens"),
-                "beneficiary_father_name": kitchen_garden_group.get("ben_father_kitchen_gardens"),
-                "total_acres": dl.get("area_didi_badi") or kitchen_garden_group.get("area_kg"),
-                "latitude": record.latitude,
-                "longitude": record.longitude,
-            })
+            result.append(
+                {
+                    "livelihood_work": "Kitchen Garden",
+                    "demand_type": kitchen_garden_group.get(
+                        "demand_type_kitchen_garden"
+                    ),
+                    "work_demand": dl.get("Plantation"),
+                    "beneficiary_settlement": record.beneficiary_settlement,
+                    "beneficiary_name": dl.get("beneficiary_name")
+                    or kitchen_garden_group.get("ben_kitchen_gardens"),
+                    "gender": kitchen_garden_group.get("gender_kitchen_gardens"),
+                    "beneficiary_father_name": kitchen_garden_group.get(
+                        "ben_father_kitchen_gardens"
+                    ),
+                    "total_acres": dl.get("area_didi_badi")
+                    or kitchen_garden_group.get("area_kg"),
+                    "latitude": record.latitude,
+                    "longitude": record.longitude,
+                }
+            )
 
-    for agrohorti in ODK_agrohorticulture.objects.filter(plan_id=pid).exclude(status_re="rejected").exclude(is_deleted=True):
+    for agrohorti in (
+        ODK_agrohorticulture.objects.filter(plan_id=pid)
+        .exclude(status_re="rejected")
+        .exclude(is_deleted=True)
+    ):
         data = agrohorti.data_agohorticulture or {}
-        species_parts = filter(None, [data.get("select_multiple_species"), data.get("select_multiple_species_other")])
+        species_parts = filter(
+            None,
+            [
+                data.get("select_multiple_species"),
+                data.get("select_multiple_species_other"),
+            ],
+        )
         species = " ".join(species_parts) or None
-        result.append({
-            "livelihood_work": "Plantations",
-            "demand_type": classify_demand_type(data.get("demand_type_plantations")),
-            "work_demand": species,
-            "beneficiary_settlement": data.get("beneficiary_settlement"),
-            "beneficiary_name": data.get("beneficiary_name"),
-            "gender": data.get("gender"),
-            "beneficiary_father_name": data.get("ben_father"),
-            "total_acres": data.get("crop_area"),
-            "latitude": agrohorti.latitude,
-            "longitude": agrohorti.longitude,
-        })
+        result.append(
+            {
+                "livelihood_work": "Plantations",
+                "demand_type": classify_demand_type(
+                    data.get("demand_type_plantations")
+                ),
+                "work_demand": species,
+                "beneficiary_settlement": data.get("beneficiary_settlement"),
+                "beneficiary_name": data.get("beneficiary_name"),
+                "gender": data.get("gender"),
+                "beneficiary_father_name": data.get("ben_father"),
+                "total_acres": data.get("crop_area"),
+                "latitude": agrohorti.latitude,
+                "longitude": agrohorti.longitude,
+            }
+        )
 
     return result
 
@@ -565,14 +709,38 @@ RESOURCE_TYPE_MAP = {
 }
 
 DEMAND_TYPE_MAP = {
-    "groundwater": (ODK_groundwater, "recharge_structure_id", "recharge_structure_demand_status"),
+    "groundwater": (
+        ODK_groundwater,
+        "recharge_structure_id",
+        "recharge_structure_demand_status",
+    ),
     "agri": (ODK_agri, "irrigation_work_id", "irrigation_work_demand_status"),
     "livelihood": (ODK_livelihood, "livelihood_id", "livelihood_demand_status"),
-    "agrohorticulture": (ODK_agrohorticulture, "agrohorticulture_id", "agrohorticulture_demand_status"),
-    "gw_maintenance": (GW_maintenance, "gw_maintenance_id", "recharge_structure_maintenance_status"),
-    "swb_rs_maintenance": (SWB_RS_maintenance, "swb_rs_maintenance_id", "swb_rs_maintenance_status"),
-    "swb_maintenance": (SWB_maintenance, "swb_maintenance_id", "swb_maintenance_status"),
-    "agri_maintenance": (Agri_maintenance, "agri_maintenance_id", "irrigation_structure_maintenance_status"),
+    "agrohorticulture": (
+        ODK_agrohorticulture,
+        "agrohorticulture_id",
+        "agrohorticulture_demand_status",
+    ),
+    "gw_maintenance": (
+        GW_maintenance,
+        "gw_maintenance_id",
+        "recharge_structure_maintenance_status",
+    ),
+    "swb_rs_maintenance": (
+        SWB_RS_maintenance,
+        "swb_rs_maintenance_id",
+        "swb_rs_maintenance_status",
+    ),
+    "swb_maintenance": (
+        SWB_maintenance,
+        "swb_maintenance_id",
+        "swb_maintenance_status",
+    ),
+    "agri_maintenance": (
+        Agri_maintenance,
+        "agri_maintenance_id",
+        "irrigation_structure_maintenance_status",
+    ),
 }
 
 ALL_TYPE_MAP = {**RESOURCE_TYPE_MAP, **DEMAND_TYPE_MAP}
@@ -584,7 +752,11 @@ def _count_by_status(type_map, plan_id, target_status):
     pid = str(plan_id)
     total = 0
     for _model, _pk, demand_field in type_map.values():
-        total += _model.objects.filter(plan_id=pid, **{demand_field: target_status}).exclude(is_deleted=True).count()
+        total += (
+            _model.objects.filter(plan_id=pid, **{demand_field: target_status})
+            .exclude(is_deleted=True)
+            .count()
+        )
     return total
 
 
@@ -628,8 +800,7 @@ def get_global_status_tracking(filters=None):
     filters = filters or {}
 
     plan_qs = (
-        PlanApp.objects
-        .filter(enabled=True)
+        PlanApp.objects.filter(enabled=True)
         .exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
         .exclude(organization_id=CFPT_ORG_ID)
     )
@@ -650,8 +821,7 @@ def get_global_status_tracking(filters=None):
         matching_ids = set()
         for model, pk_field, demand_field in ALL_TYPE_MAP.values():
             ids = (
-                model.objects
-                .exclude(is_deleted=True)
+                model.objects.exclude(is_deleted=True)
                 .filter(plan_id__in=plan_ids, **{demand_field: status_filter})
                 .values_list("plan_id", flat=True)
                 .distinct()
@@ -684,12 +854,16 @@ def get_dpr_status_tracking(plan_id):
                     {
                         "key": "RESOURCES_SUBMITTED",
                         "label": "Resources Submitted",
-                        "count": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
+                        "count": _count_by_status(
+                            RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"
+                        ),
                     },
                     {
                         "key": "DEMANDS_SUBMITTED",
                         "label": "Demands Submitted",
-                        "count": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+                        "count": _count_by_status(
+                            DEMAND_TYPE_MAP, plan_id, "SUBMITTED"
+                        ),
                     },
                 ],
             },
@@ -709,10 +883,16 @@ def get_dpr_status_tracking(plan_id):
 
 def update_demand_status(plan_id, resource_type, resource_id, new_status):
     if resource_type not in ALL_TYPE_MAP:
-        return None, f"Invalid resource_type. Choose from: {', '.join(sorted(ALL_TYPE_MAP))}"
+        return (
+            None,
+            f"Invalid resource_type. Choose from: {', '.join(sorted(ALL_TYPE_MAP))}",
+        )
 
     if new_status not in VALID_DEMAND_STATUSES:
-        return None, f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+        return (
+            None,
+            f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}",
+        )
 
     model, pk_field, demand_field = ALL_TYPE_MAP[resource_type]
     try:
@@ -748,8 +928,12 @@ def get_dpr_report_status(plan_id):
         "plan_id": plan_id,
         "status": report.status,
         "submitted_breakdown": {
-            "resources_submitted": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
-            "demands_submitted": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+            "resources_submitted": _count_by_status(
+                RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"
+            ),
+            "demands_submitted": _count_by_status(
+                DEMAND_TYPE_MAP, plan_id, "SUBMITTED"
+            ),
         },
         "dpr_report_s3_url": report.dpr_report_s3_url,
         "dpr_generated_at": report.dpr_generated_at,
@@ -818,14 +1002,26 @@ def patch_dpr_report_status(plan_id, payload, user):
     demands_status = payload.get("demands_submitted")
 
     if not any([new_status, resources_status, demands_status]):
-        return None, "At least one of status, resources_submitted, or demands_submitted is required"
+        return (
+            None,
+            "At least one of status, resources_submitted, or demands_submitted is required",
+        )
 
     if new_status and new_status not in ALLOWED_DPR_WORKFLOW_STATUSES:
-        return None, f"Invalid status. Choose from: {', '.join(sorted(ALLOWED_DPR_WORKFLOW_STATUSES))}"
+        return (
+            None,
+            f"Invalid status. Choose from: {', '.join(sorted(ALLOWED_DPR_WORKFLOW_STATUSES))}",
+        )
 
-    for label, value in [("resources_submitted", resources_status), ("demands_submitted", demands_status)]:
+    for label, value in [
+        ("resources_submitted", resources_status),
+        ("demands_submitted", demands_status),
+    ]:
         if value and value not in VALID_DEMAND_STATUSES:
-            return None, f"Invalid {label} status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+            return (
+                None,
+                f"Invalid {label} status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}",
+            )
 
     try:
         report = DPR_Report.objects.select_related("plan_id").get(plan_id=plan_id)
@@ -865,8 +1061,12 @@ def patch_dpr_report_status(plan_id, payload, user):
         "plan_id": plan_id,
         "status": report.status,
         "submitted_breakdown": {
-            "resources_submitted": _count_by_status(RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"),
-            "demands_submitted": _count_by_status(DEMAND_TYPE_MAP, plan_id, "SUBMITTED"),
+            "resources_submitted": _count_by_status(
+                RESOURCE_TYPE_MAP, plan_id, "SUBMITTED"
+            ),
+            "demands_submitted": _count_by_status(
+                DEMAND_TYPE_MAP, plan_id, "SUBMITTED"
+            ),
         },
         "last_updated_at": report.last_updated_at,
         "last_updated_by": report.last_updated_by_id,

@@ -1,5 +1,9 @@
 ## CoRE Stack Backend
 
+### Documentation
+
+Please find [full CoRE-Stack documentation](https://docs.core-stack.org/) and develop with us!
+
 ### Installation
 
 We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
@@ -37,7 +41,7 @@ chmod +x install.sh
 > The script will automatically install Conda, PostgreSQL, Apache, set up the `corestack-backend` environment, run
 > migrations, and configure Apache.
 
-> For any installation issues, check [Installation Documentation](./installation/INSTALLATION.md) and [Troubleshooting Guide](./installation/TROUBLESHOOTING.md).
+> For any installation issues, check [Installation Documentation](https://docs.core-stack.org/developers/installer/) and [Troubleshooting Guide](https://docs.core-stack.org/developers/setup-troubleshooting/).
 
 #### 3. Running the server
 After the successfull installation of all the packages, run the following commands to start the Django server:

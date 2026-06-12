@@ -47,12 +47,12 @@ from .forest_fringe_utils import (
 
 @app.task(bind=True)
 def generate_forest_fringe_layer(
-    self,
-    state,
-    district,
-    block,
-    gee_account_id=None,
-    app_type="MWS",
+        self,
+        state,
+        district,
+        block,
+        gee_account_id=None,
+        app_type="MWS",
 ):
     """
     Generate forest-fringe metrics as a vector layer.
@@ -83,7 +83,7 @@ def generate_forest_fringe_layer(
     ee_initialize(gee_account_id)
 
     asset_suffix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
     asset_folder_list = [state, district, block]
 
@@ -91,11 +91,11 @@ def generate_forest_fringe_layer(
     layer_name = f"{asset_suffix}_forest_fringe"
 
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + description
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + description
     )
 
     print(f"Forest Fringe pipeline started: {asset_id=}")
@@ -104,12 +104,12 @@ def generate_forest_fringe_layer(
     # STEP 2: Set up ROI (MWS boundaries from GEE)
     # ------------------------------------------------------------------
     roi_path = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + f"filtered_mws_{valid_gee_text(district.lower())}"
-        + f"_{valid_gee_text(block.lower())}_uid"
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + f"filtered_mws_{valid_gee_text(district.lower())}"
+            + f"_{valid_gee_text(block.lower())}_uid"
     )
     mws_fc = ee.FeatureCollection(roi_path)
 
@@ -152,16 +152,11 @@ def generate_forest_fringe_layer(
             # 5) Build fringe rings and clip to original MWS
             fringes = ltps.map(make_fringe)
             fringes_clipped = fringes.map(
-                lambda fr: ee.Feature(
-                    fr.geometry().intersection(mws_geom, 1)
-                )
+                lambda fr: ee.Feature(fr.geometry().intersection(mws_geom, 1))
             )
 
             fringe_img = (
-                ee.Image.constant(1)
-                .paint(fringes_clipped, 1)
-                .selfMask()
-                .clip(mws_geom)
+                ee.Image.constant(1).paint(fringes_clipped, 1).selfMask().clip(mws_geom)
             )
 
             # ---- Fringe area (geometry-based) ----
@@ -185,26 +180,18 @@ def generate_forest_fringe_layer(
                 .clip(mws_geom)
             )
 
-            degradation = (
-                overall_change.eq(-1)
-                .updateMask(tree_mode)
-                .clip(mws_geom)
-            )
+            degradation = overall_change.eq(-1).updateMask(tree_mode).clip(mws_geom)
 
             # ---- Areas in MWS ----
             defo_mws_area = (
                 pixel_area.updateMask(deforestation)
-                .reduceRegion(
-                    ee.Reducer.sum(), mws_geom, SCALE, maxPixels=MAXPIX
-                )
+                .reduceRegion(ee.Reducer.sum(), mws_geom, SCALE, maxPixels=MAXPIX)
                 .get("area")
             )
 
             degr_mws_area = (
                 pixel_area.updateMask(degradation)
-                .reduceRegion(
-                    ee.Reducer.sum(), mws_geom, SCALE, maxPixels=MAXPIX
-                )
+                .reduceRegion(ee.Reducer.sum(), mws_geom, SCALE, maxPixels=MAXPIX)
                 .get("area")
             )
 
@@ -227,63 +214,59 @@ def generate_forest_fringe_layer(
 
             defo_fringe_area = (
                 pixel_area.updateMask(deforestation_fringe)
-                .reduceRegion(
-                    ee.Reducer.sum(), fringe_geom, SCALE, maxPixels=MAXPIX
-                )
+                .reduceRegion(ee.Reducer.sum(), fringe_geom, SCALE, maxPixels=MAXPIX)
                 .get("area")
             )
 
             degr_fringe_area = (
                 pixel_area.updateMask(degradation_fringe)
-                .reduceRegion(
-                    ee.Reducer.sum(), fringe_geom, SCALE, maxPixels=MAXPIX
-                )
+                .reduceRegion(ee.Reducer.sum(), fringe_geom, SCALE, maxPixels=MAXPIX)
                 .get("area")
             )
 
             # ---- Ratios ----
             fringe_to_mws_ratio = ee.Number(fringe_area).divide(mws_area)
-            degr_fringe_ratio = ee.Number(degr_fringe_area).divide(
-                fringe_area
-            )
-            defo_fringe_ratio = ee.Number(defo_fringe_area).divide(
-                fringe_area
-            )
+            degr_fringe_ratio = ee.Number(degr_fringe_area).divide(fringe_area)
+            defo_fringe_ratio = ee.Number(defo_fringe_area).divide(fringe_area)
 
-            return ee.Feature(f.geometry()).set({
-                "uid": f.get("uid"),
-                "mws_area_m2": mws_area,
-                "forest_fringe_area_m2": fringe_area,
-                "forest_fringe_ratio": fringe_to_mws_ratio,
-                "tree_degradation_mws_area_m2": degr_mws_area,
-                "tree_degradation_fringe_area_m2": degr_fringe_area,
-                "tree_degradation_fringe_ratio": degr_fringe_ratio,
-                "tree_deforestation_mws_area_m2": defo_mws_area,
-                "tree_deforestation_fringe_area_m2": defo_fringe_area,
-                "tree_deforestation_fringe_ratio": defo_fringe_ratio,
-            })
+            return ee.Feature(f.geometry()).set(
+                {
+                    "uid": f.get("uid"),
+                    "mws_area_m2": mws_area,
+                    "forest_fringe_area_m2": fringe_area,
+                    "forest_fringe_ratio": fringe_to_mws_ratio,
+                    "tree_degradation_mws_area_m2": degr_mws_area,
+                    "tree_degradation_fringe_area_m2": degr_fringe_area,
+                    "tree_degradation_fringe_ratio": degr_fringe_ratio,
+                    "tree_deforestation_mws_area_m2": defo_mws_area,
+                    "tree_deforestation_fringe_area_m2": defo_fringe_area,
+                    "tree_deforestation_fringe_ratio": defo_fringe_ratio,
+                }
+            )
 
         # ---- map compute over all MWS features ----
         results_fc = mws_fc.map(compute_metrics_per_mws)
 
-        fc = results_fc.select([
-            "uid",
-            "mws_area_m2",
-            "forest_fringe_area_m2",
-            "forest_fringe_ratio",
-            "tree_degradation_mws_area_m2",
-            "tree_degradation_fringe_area_m2",
-            "tree_degradation_fringe_ratio",
-            "tree_deforestation_mws_area_m2",
-            "tree_deforestation_fringe_area_m2",
-            "tree_deforestation_fringe_ratio",
-        ])
+        fc = results_fc.select(
+            [
+                "uid",
+                "mws_area_m2",
+                "forest_fringe_area_m2",
+                "forest_fringe_ratio",
+                "tree_degradation_mws_area_m2",
+                "tree_degradation_fringe_area_m2",
+                "tree_degradation_fringe_ratio",
+                "tree_deforestation_mws_area_m2",
+                "tree_deforestation_fringe_area_m2",
+                "tree_deforestation_fringe_ratio",
+            ]
+        )
 
         # --------------------------------------------------------------
         # STEP 4: Export to GEE
         # --------------------------------------------------------------
         task_id = export_vector_asset_to_gee(fc, description, asset_id)
-        
+
         if task_id:
             check_task_status([task_id])
             print("Forest Fringe layer exported to GEE.")
@@ -308,12 +291,12 @@ def generate_forest_fringe_layer(
 
 
 def _save_to_db_and_sync_to_geoserver(
-    layer_name=None,
-    asset_id=None,
-    asset_suffix=None,
-    state=None,
-    district=None,
-    block=None,
+        layer_name=None,
+        asset_id=None,
+        asset_suffix=None,
+        state=None,
+        district=None,
+        block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fringe: save_to_db_and_sync_to_geoserver")
@@ -332,9 +315,7 @@ def _save_to_db_and_sync_to_geoserver(
     make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(
-        fc, asset_suffix, layer_name, "forest_fringe"
-    )
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fringe")
     print(res)
 
     layer_at_geoserver = False

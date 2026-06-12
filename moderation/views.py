@@ -71,11 +71,28 @@ class SubmissionsOfPlan:
         field_name = FETCH_FIELD_MAP.get(model)
         if not field_name:
             raise ValueError(f"No fetch field configured for {model.__name__}")
-        qs = (
-            model.objects.filter(plan_id=plan_id)
-            .exclude(is_deleted=True)
-            .values_list(field_name, "is_moderated")
-        )
+
+        if model in [Agri_maintenance, GW_maintenance]:
+            qs = (
+                model.objects.filter(plan_id=plan_id)
+                .exclude(is_deleted=True)
+                .order_by("-submission_time")
+                .values_list(field_name, "is_moderated", "uuid")
+            )
+        elif model == ODK_agrohorticulture:
+            qs = (
+                model.objects.filter(plan_id=plan_id)
+                .exclude(is_deleted=True)
+                .order_by("-agrohorticulture_id")
+                .values_list(field_name, "is_moderated")
+            )
+        else:
+            qs = (
+                model.objects.filter(plan_id=plan_id)
+                .exclude(is_deleted=True)
+                .order_by("-submission_time")
+                .values_list(field_name, "is_moderated")
+            )
         if page is None:
             data = list(qs)
             return {
@@ -174,9 +191,9 @@ def sync_odk_to_csdb():
             elif form_name == "propose maintenance on existing irrigation form":
                 resync_agri_maintenance(agri_maintenance_submissions)
             elif form_name == "propose maintenance on water structure form":
-                resync_gw_maintenance(gw_maintenance_submissions)
-            elif form_name == "propose maintenance on existing water recharge form":
                 resync_swb_maintenance(swb_maintenance_submissions)
+            elif form_name == "propose maintenance on existing water recharge form":
+                resync_gw_maintenance(gw_maintenance_submissions)
             elif (
                 form_name
                 == "propose maintenance of remotely sensed water structure form"

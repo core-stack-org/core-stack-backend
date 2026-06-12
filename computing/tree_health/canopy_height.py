@@ -14,7 +14,6 @@ from utilities.gee_utils import (
     get_gee_dir_path,
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
-from computing.STAC_specs import generate_STAC_layerwise
 
 
 # Celery task to generate canopy height raster
@@ -133,17 +132,6 @@ def tree_health_ch_raster(
 
             if res and layer_id:
                 layer_at_geoserver = True
-
-                # layer_STAC_generated = False
-                # layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                #     state=state,
-                #     district=district,
-                #     block=block,
-                #     layer_name="ch_raster",
-                #     start_year=year,
-                # )
-
-                # Update sync flag in DB
                 update_layer_sync_status(
                     layer_id=layer_id,
                     sync_to_geoserver=layer_at_geoserver,

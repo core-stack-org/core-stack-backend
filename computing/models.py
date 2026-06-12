@@ -69,3 +69,37 @@ class Layer(models.Model):
 
     def __str__(self):
         return str(self.layer_name)
+
+
+class LayerMapping(models.Model):
+    """Registry mirroring `data/STAC_specs/input/metadata/layer_mapping.csv`.
+
+    Resolves a saved `Layer` (dataset + geoserver-style layer_name) to the
+    canonical STAC `layer_name` and `layer_type` so STAC generation can be
+    triggered automatically without hardcoding per-task strings.
+    """
+
+    id = models.AutoField(primary_key=True)
+    display_name = models.CharField(max_length=255, blank=True, default="")
+    layer_type = models.CharField(max_length=16, choices=LayerType.choices)
+    layer_name = models.CharField(max_length=255, db_index=True)
+    spatial_resolution_in_meters = models.FloatField(null=True, blank=True)
+    ee_layer_name = models.CharField(max_length=255, blank=True, default="")
+    db_dataset_name = models.CharField(max_length=255, db_index=True)
+    geoserver_workspace_name = models.CharField(max_length=255, blank=True, default="")
+    geoserver_layer_name = models.CharField(max_length=511, blank=True, default="")
+    start_year = models.CharField(max_length=16, blank=True, default="")
+    end_year = models.CharField(max_length=16, blank=True, default="")
+    style_file_url = models.CharField(max_length=1024, blank=True, default="")
+    theme = models.CharField(max_length=255, blank=True, default="")
+    auto_stac = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Layer Mapping"
+        verbose_name_plural = "Layer Mappings"
+        unique_together = (("layer_name", "layer_type", "ee_layer_name"),)
+
+    def __str__(self):
+        return f"{self.layer_name} ({self.layer_type})"

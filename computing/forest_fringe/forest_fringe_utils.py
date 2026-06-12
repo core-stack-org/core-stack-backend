@@ -17,9 +17,7 @@ OUTER_BUFFER = 100
 SCALE = 30
 MAXPIX = 1e12
 
-PAN_INDIA_LULC_PATH = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
-)
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
 
 LTP_CHANGE_PATH = (
     "projects/corestack-datasets/assets/datasets/"
@@ -27,8 +25,7 @@ LTP_CHANGE_PATH = (
 )
 
 OVERALL_CHANGE_PATH = (
-    "projects/corestack-trees/assets/tree_characteristics/"
-    "overall_change_2017_2023"
+    "projects/corestack-trees/assets/tree_characteristics/" "overall_change_2017_2023"
 )
 
 # LULC years used by the forest fringe pipeline
@@ -45,12 +42,14 @@ def load_tree_mode():
     Returns:
         ee.Image – binary tree-mode image (1 where mode is tree, masked elsewhere).
     """
-    lulc_imgs = ee.ImageCollection([
-        ee.Image(
-            f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year + 1}"
-        ).select("predicted_label").eq(TREE_CLASS)
-        for year in LULC_YEARS
-    ])
+    lulc_imgs = ee.ImageCollection(
+        [
+            ee.Image(f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year + 1}")
+            .select("predicted_label")
+            .eq(TREE_CLASS)
+            for year in LULC_YEARS
+        ]
+    )
     return lulc_imgs.reduce(ee.Reducer.mode()).selfMask()
 
 

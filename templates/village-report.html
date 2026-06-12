@@ -1,0 +1,553 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Village Report - {{ village_name }}</title>
+    
+    <!-- OpenLayers CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.4.0/ol.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.12.0"></script>
+
+    <!-- OpenLayers JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol@v10.4.0/dist/ol.js"></script>
+
+    <!-- OpenLayers-ext JS -->
+    <script src="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.js"></script>
+
+    <!-- OpenLayers-ext CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/ol-ext@4.0.27/dist/ol-ext.min.css" rel="stylesheet">
+
+    <style>
+        /* ===== ROOT VARIABLES - EARTH TONE PALETTE ===== */
+        :root {
+            --primary-dark: #3e2723;
+            --primary-accent: #c17a4a;
+            --primary-light: #e8dcc8;
+            --secondary-green: #6b7c59;
+            --supporting-gray: #8b8680;
+            --supporting-beige: #d4c4b0;
+            --background-main: #faf8f3;
+            --text-primary: #3e2723;
+            --text-secondary: #8b8680;
+            --border-color: #d4c4b0;
+        }
+
+        /* ===== RESET & BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: 'Georgia', 'Garamond', serif;
+            color: var(--text-primary);
+            background-color: var(--background-main);
+            line-height: 1.6;
+        }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            body {
+                background-color: white;
+                margin: 0;
+                padding: 20mm;
+            }
+
+            .page-break {
+                page-break-after: always;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            /* Prevent dark colors from affecting print */
+            * {
+                box-shadow: none !important;
+                text-shadow: none !important;
+            }
+
+            /* Ensure maps render properly */
+            .map-container {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            /* Keep maps visible in print */
+            .ol-viewport {
+                background: white !important;
+            }
+        }
+
+        /* ===== CONTAINER ===== */
+        .container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20mm;
+        }
+
+        /* ===== VILLAGE PROFILE SECTION ===== */
+        .section {
+            margin-bottom: 40px;
+            page-break-inside: avoid;
+        }
+
+        .section-heading {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary-dark);
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid var(--primary-accent);
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== SUBSECTION HEADING (for h2) ===== */
+        .subsection-heading {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-dark);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-accent);
+            letter-spacing: 0.3px;
+        }
+
+        /* ===== MAP CONTAINER ===== */
+        .map-container {
+            width: 100%;
+            height: 400px;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            margin-bottom: 16px;
+            background-color: #f5f5f5;
+            overflow: hidden;
+        }
+
+        .ol-viewport {
+            background: white;
+        }
+
+        /* Map controls styling */
+        .ol-control {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 2px;
+        }
+
+        .ol-control:hover {
+            background-color: rgba(255, 255, 255, 0.95);
+        }
+
+        .ol-zoom .ol-zoom-in,
+        .ol-zoom .ol-zoom-out {
+            color: var(--primary-dark);
+        }
+
+        /* ===== MAP CAPTION ===== */
+        .map-caption {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-style: italic;
+            padding: 12px;
+            background-color: var(--primary-light);
+            border-left: 4px solid var(--primary-accent);
+            margin-bottom: 24px;
+            border-radius: 2px;
+        }
+
+        .map-caption strong {
+            color: var(--text-primary);
+            font-style: normal;
+            font-weight: 600;
+        }
+
+        /* ===== CHART CONTAINER ===== */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto 24px;
+            padding: 30px;
+            background-color: var(--primary-light);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+        }
+
+        .chart-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            padding: 16px;
+            background-color: rgba(232, 220, 200, 0.4);
+            border-left: 4px solid var(--primary-accent);
+            margin-bottom: 24px;
+            border-radius: 2px;
+        }
+
+        .chart-description p {
+            margin: 0;
+        }
+
+        /* ===== PRINT STYLES FOR CHARTS ===== */
+        @media print {
+            .chart-container {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                background-color: white;
+                border: 1px solid #ccc;
+            }
+        }
+
+        /* ===== BREADCRUMB / LOCATION INFO ===== */
+        .location-breadcrumb {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .location-breadcrumb span {
+            display: flex;
+            align-items: center;
+        }
+
+        .location-breadcrumb span:not(:last-child)::after {
+            content: "›";
+            margin-left: 8px;
+            color: var(--primary-accent);
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .container {
+                padding: 16px;
+                max-width: 100%;
+            }
+
+            .section-heading {
+                font-size: 24px;
+            }
+
+            .map-container {
+                height: 300px;
+            }
+        }
+
+        /* ===== CHART CONTAINER ===== */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto 24px;
+            padding: 30px;
+            background-color: var(--primary-light);
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-container canvas {
+            max-width: 100%;
+        }
+
+        .chart-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.8;
+            padding: 16px;
+            background-color: rgba(232, 220, 200, 0.4);
+            border-left: 4px solid var(--primary-accent);
+            margin-bottom: 24px;
+            border-radius: 2px;
+        }
+
+        .chart-description p {
+            margin: 0;
+        }
+
+        /* ===== PRINT STYLES FOR CHARTS ===== */
+        @media print {
+            .chart-container {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                background-color: white;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- ===== SECTION 1: VILLAGE PROFILE ===== -->
+        <section class="section">
+            <h1 class="section-heading">Village Profile</h1>
+
+            <!-- Location Breadcrumb -->
+            <div class="location-breadcrumb">
+                <span>{{ state }}</span>
+                <span>{{ district }}</span>
+                <span>{{ block }}</span>
+                <span>ID: {{ village_id }}</span>
+            </div>
+
+            <!-- Map Container -->
+            <div id="mainMap" class="map-container"></div>
+
+            <!-- Map Caption -->
+            <div class="map-caption">
+                {% if village_name %}
+                    Village <strong>{{ village_name }}</strong> 
+                    {% if gram_panchayat_name %}
+                        lies in Gram Panchayat <strong>{{ gram_panchayat_name }}</strong>
+                    {% endif %}
+                    {% if area_hectares %}
+                        and spans <strong>{{ area_hectares }}</strong> hectares.
+                    {% else %}
+                        in {{ block }}, {{ district }}.
+                    {% endif %}
+                {% else %}
+                    Village in {{ block }}, {{ district }}, {{ state }}.
+                {% endif %}
+            </div>
+
+        </section>
+
+        <!-- ===== SECTION 2: VILLAGE DEVELOPMENT OVERVIEW ===== -->
+        <section class="section page-break">
+            <h2 class="subsection-heading">Village Development Overview</h2>
+
+            <div class="chart-container">
+                <canvas id="developmentRadarChart"></canvas>
+            </div>
+
+            <div class="chart-description">
+                <p>The radar chart above illustrates the village's development across ten key dimensions, each rated on a scale of 0.25 to 1.00. This multidimensional assessment provides insights into infrastructure, health, education, financial inclusion, governance, livelihoods, agriculture, and environmental resilience.</p>
+            </div>
+        </section>
+
+        <!-- ADDITIONAL SECTIONS WILL GO HERE -->
+
+    </div>
+
+    <script>
+        // ===== INITIALIZE MAP =====
+        const mainMap = new ol.Map({
+            target: 'mainMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        // ===== ADD VILLAGE POLYGON LAYER =====
+        try {
+            const villagePolygonFeature = JSON.parse('{{ village_polygon|escapejs }}');
+
+            if (villagePolygonFeature && Object.keys(villagePolygonFeature).length > 0) {
+                // Create GeoJSON source
+                const vectorSource = new ol.source.Vector({
+                    features: new ol.format.GeoJSON().readFeatures(villagePolygonFeature, {
+                        featureProjection: 'EPSG:4326'
+                    })
+                });
+
+                // Style for polygon
+                const polygonStyle = new ol.style.Style({
+                    fill: new ol.style.Fill({
+                        color: 'rgba(107, 124, 89, 0.2)' // Olive green with transparency
+                    }),
+                    stroke: new ol.style.Stroke({
+                        color: '#c17a4a', // Terracotta border
+                        width: 2.5
+                    })
+                });
+
+                // Create vector layer
+                const vectorLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    style: polygonStyle,
+                    zIndex: 10
+                });
+
+                mainMap.addLayer(vectorLayer);
+
+                // Zoom to polygon extent
+                const extent = vectorSource.getExtent();
+                if (extent && !ol.extent.isEmpty(extent)) {
+                    mainMap.getView().fit(extent, {
+                        padding: [40, 40, 40, 40],
+                        maxZoom: 15,
+                        duration: 500
+                    });
+                }
+            }
+        } catch (error) {
+            console.warn('Village polygon not available:', error);
+        }
+
+        // ===== INITIALIZE RADAR CHART =====
+        const developmentLabels = [
+            'Basic Infrastructure',
+            'Health and WASH',
+            'Access to Educational Institutions',
+            'Financial Inclusion',
+            'Welfare Inclusion',
+            'Community Institutions and Governance',
+            'Livelihood Diversification',
+            'Livestock Management',
+            'Agricultural Productivity & Resource Use',
+            'Ecological & Climate Resilience Practices'
+        ];
+
+        // Get data from Django context
+        let developmentScores = [];
+        try {
+            developmentScores = JSON.parse('{{ development_scores|escapejs }}');
+        } catch (error) {
+            console.warn('Development scores not available:', error);
+        }
+
+        if (developmentScores && Array.isArray(developmentScores) && developmentScores.length > 0) {
+            const radarCtx = document.getElementById('developmentRadarChart').getContext('2d');
+            const radarChart = new Chart(radarCtx, {
+                type: 'radar',
+                data: {
+                    labels: developmentLabels,
+                    datasets: [
+                        {
+                            label: 'Village Development Score',
+                            data: developmentScores,
+                            borderColor: '#c17a4a', // Terracotta
+                            backgroundColor: 'rgba(107, 124, 89, 0.15)', // Olive green with transparency
+                            borderWidth: 2.5,
+                            pointBackgroundColor: '#c17a4a',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            fill: true,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: {
+                        padding: {
+                            top: 30,
+                            right: 30,
+                            bottom: 30,
+                            left: 30
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    family: "'Georgia', 'Garamond', serif",
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                color: '#3e2723',
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
+                            titleFont: {
+                                family: "'Georgia', 'Garamond', serif",
+                                size: 12,
+                                weight: 'bold'
+                            },
+                            bodyFont: {
+                                family: "'Georgia', 'Garamond', serif",
+                                size: 12
+                            },
+                            padding: 12,
+                            displayColors: true,
+                            borderColor: '#c17a4a',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.r.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            min: 0,
+                            max: 1,
+                            ticks: {
+                                stepSize: 0.25,
+                                font: {
+                                    family: "'Georgia', 'Garamond', serif",
+                                    size: 11
+                                },
+                                color: '#8b8680',
+                                backdropColor: 'transparent'
+                            },
+                            grid: {
+                                color: 'rgba(212, 196, 176, 0.3)',
+                                drawBorder: true,
+                                borderColor: '#d4c4b0'
+                            },
+                            angleLines: {
+                                color: 'rgba(212, 196, 176, 0.4)',
+                                lineWidth: 1
+                            },
+                            pointLabels: {
+                                font: {
+                                    family: "'Georgia', 'Garamond', serif",
+                                    size: 11,
+                                    weight: '500'
+                                },
+                                color: '#3e2723',
+                                padding: 15
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

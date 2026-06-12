@@ -43,7 +43,13 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["settlement_name", "settlement_id", "block_name", "submitted_by", "plan_name"]
+    search_fields = [
+        "settlement_name",
+        "settlement_id",
+        "block_name",
+        "submitted_by",
+        "plan_name",
+    ]
     readonly_fields = [
         "uuid",
         "system",
@@ -173,7 +179,13 @@ class ODKWellAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["well_id", "beneficiary_settlement", "owner", "block_name", "plan_name"]
+    search_fields = [
+        "well_id",
+        "beneficiary_settlement",
+        "owner",
+        "block_name",
+        "plan_name",
+    ]
     readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
     ordering = ["-submission_time"]
 
@@ -266,7 +278,13 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "beneficiary_contact",
         "plan_name",
     ]
-    readonly_fields = ["uuid", "system", "gps_point", "water_structure_dimension", "data_before_moderation"]
+    readonly_fields = [
+        "uuid",
+        "system",
+        "gps_point",
+        "water_structure_dimension",
+        "data_before_moderation",
+    ]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -374,8 +392,19 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["recharge_structure_id", "beneficiary_settlement", "block_name", "plan_name"]
-    readonly_fields = ["uuid", "system", "gps_point", "work_dimensions", "data_before_moderation"]
+    search_fields = [
+        "recharge_structure_id",
+        "beneficiary_settlement",
+        "block_name",
+        "plan_name",
+    ]
+    readonly_fields = [
+        "uuid",
+        "system",
+        "gps_point",
+        "work_dimensions",
+        "data_before_moderation",
+    ]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -453,8 +482,19 @@ class ODKAgriAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["irrigation_work_id", "beneficiary_settlement", "block_name", "plan_name"]
-    readonly_fields = ["uuid", "system", "gps_point", "work_dimensions", "data_before_moderation"]
+    search_fields = [
+        "irrigation_work_id",
+        "beneficiary_settlement",
+        "block_name",
+        "plan_name",
+    ]
+    readonly_fields = [
+        "uuid",
+        "system",
+        "gps_point",
+        "work_dimensions",
+        "data_before_moderation",
+    ]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -625,8 +665,19 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "is_moderated",
         "is_deleted",
     ]
-    search_fields = ["beneficiary_settlement", "block_name", "beneficiary_contact", "plan_name"]
-    readonly_fields = ["livelihood_id", "uuid", "system", "gps_point", "data_before_moderation"]
+    search_fields = [
+        "beneficiary_settlement",
+        "block_name",
+        "beneficiary_contact",
+        "plan_name",
+    ]
+    readonly_fields = [
+        "livelihood_id",
+        "uuid",
+        "system",
+        "gps_point",
+        "data_before_moderation",
+    ]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -885,7 +936,10 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Status", {"fields": ("status_re", "irrigation_structure_maintenance_status")}),
+        (
+            "Status",
+            {"fields": ("status_re", "irrigation_structure_maintenance_status")},
+        ),
         ("Location", {"fields": ("latitude", "longitude")}),
         (
             "Moderation",
@@ -1005,21 +1059,31 @@ class DPRReportAdmin(admin.ModelAdmin):
         "dpr_report_id",
         "plan_id__id",
         "plan_name",
+        "organization_name",
+        "project_name",
         "status",
         "dpr_generated_at",
         "created_at",
         "s3_link",
     ]
-    list_filter = ["status", "created_at", "dpr_generated_at"]
-    search_fields = ["plan_name", "plan_id__plan"]
-    readonly_fields = ["dpr_report_id", "created_at", "dpr_generated_at", "s3_link_display"]
+    list_filter = ["status", "created_at", "dpr_generated_at", "plan_id__organization"]
+    search_fields = ["plan_name", "plan_id__plan", "plan_id__organization__name", "plan_id__project__name"]
+    readonly_fields = [
+        "dpr_report_id",
+        "created_at",
+        "dpr_generated_at",
+        "s3_link_display",
+    ]
     ordering = ["-created_at"]
     date_hierarchy = "created_at"
 
     def s3_link(self, obj):
         if obj.dpr_report_s3_url:
-            return format_html('<a href="{}" target="_blank">Download</a>', obj.dpr_report_s3_url)
+            return format_html(
+                '<a href="{}" target="_blank">Download</a>', obj.dpr_report_s3_url
+            )
         return "-"
+
     s3_link.short_description = "S3 Link"
 
     def s3_link_display(self, obj):
@@ -1027,10 +1091,29 @@ class DPRReportAdmin(admin.ModelAdmin):
             return format_html(
                 '<a href="{}" target="_blank" style="word-break: break-all;">{}</a>',
                 obj.dpr_report_s3_url,
-                obj.dpr_report_s3_url
+                obj.dpr_report_s3_url,
             )
         return "-"
+
     s3_link_display.short_description = "S3 URL"
+
+    def organization_name(self, obj):
+        try:
+            return obj.plan_id.organization.name
+        except AttributeError:
+            return "-"
+
+    organization_name.short_description = "Organization"
+    organization_name.admin_order_field = "plan_id__organization__name"
+
+    def project_name(self, obj):
+        try:
+            return obj.plan_id.project.name
+        except AttributeError:
+            return "-"
+
+    project_name.short_description = "Project"
+    project_name.admin_order_field = "plan_id__project__name"
 
     fieldsets = (
         (
@@ -1048,7 +1131,12 @@ class DPRReportAdmin(admin.ModelAdmin):
         (
             "Audit",
             {
-                "fields": ("created_at", "created_by", "last_updated_at", "last_updated_by"),
+                "fields": (
+                    "created_at",
+                    "created_by",
+                    "last_updated_at",
+                    "last_updated_by",
+                ),
                 "classes": ("collapse",),
             },
         ),
