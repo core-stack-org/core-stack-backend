@@ -2432,7 +2432,7 @@ def generate_antyodaya(request):
         )
         if task is None:
             return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
             status=status.HTTP_200_OK,
@@ -2459,7 +2459,7 @@ def generate_livestocks(request):
         )
         if task is None:
             return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
             status=status.HTTP_200_OK,
