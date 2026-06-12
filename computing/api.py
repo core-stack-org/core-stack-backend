@@ -29,7 +29,12 @@ from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from computing.misc.drainage_lines import clip_drainage_lines
+from computing.misc.drainage_lines import (
+    clip_drainage_lines as clip_drainage_lines_gee_task,
+)
+from computing.misc.drainage_lines_local_compute import (
+    clip_drainage_lines as clip_drainage_lines_local_task,
+)
 from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from utilities.auth_check_decorator import api_security_check
@@ -162,13 +167,74 @@ from .misc.naturaldepression import generate_natural_depression_data
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
 from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
-from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_connectivity import (
+    generate_mws_connectivity_data as generate_mws_connectivity_gee_task,
+)
+from .mws.mws_connectivity_local_compute import (
+    mws_connectivity_vector as generate_mws_connectivity_local_task,
+)
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
+from .mws.mws_centroid_local_compute import (
+    generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
+)
+from .misc.facilities_proximity_local_compute import (
+    generate_facilities_proximity_local as generate_facilities_proximity_local_task,
+)
+from .misc.digital_elevation_model_local import (
+    generate_febdem_raster_vector_clip as generate_febdem_raster_vector_clip_local_task,
+)
+from .misc.canal_local_compute import canal_vector as canal_vector_local_task
+from .misc.river_local_compute import river_vector as river_vector_local_task
+from .misc.drainage_density_local_compute import (
+    drainage_density as drainage_density_vector_local_task,
+)
+from .misc.restoration_opportunity_local_compute import (
+    generate_restoration_opportunity_local as generate_restoration_opportunity_local_task,
+)
+from .misc.soge_vector_local_compute import (
+    generate_soge_vector_local as generate_soge_vector_local_task,
+)
+from .misc.nrega_local_compute import (
+    generate_nrega_data_local as generate_nrega_data_local_task,
+)
+from .misc.catchment_area_local_compute import (
+    generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task,
+)
+from .misc.distancetonearestdrainage_local_compute import (
+    generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task,
+)
+from .misc.naturaldepression_local_compute import (
+    generate_natural_depression_data_local as generate_natural_depression_data_local_task,
+)
+from .misc.slope_percentage_local_compute import (
+    generate_slope_percentage_data_local as generate_slope_percentage_data_local_task,
+)
+from .misc.mining_data_local_compute import (
+    generate_mining_data_local as generate_mining_data_local_task,
+)
+from .misc.green_credit_local_compute import (
+    generate_green_credit_data_local as generate_green_credit_data_local_task,
+)
+from .misc.factory_csr_local_compute import (
+    generate_factory_csr_data_local as generate_factory_csr_data_local_task,
+)
+from .misc.agroecological_space_local_compute import (
+    generate_agroecological_data_local as generate_agroecological_data_local_task,
+)
+from .misc.lcw_conflict_local_compute import (
+    generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
+)
+from .misc.antyodaya_local_compute import (
+    generate_antyodaya_data_local as generate_antyodaya_data_local_task,
+)
+from .misc.livestocks_local_compute import (
+    generate_livestocks_data_local as generate_livestocks_data_local_task,
+)
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
@@ -199,8 +265,20 @@ def generate_nrega_layer(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        clip_nrega_district_block.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            clip_nrega_district_block,
+            generate_nrega_data_local_task,
+        )
+        task.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -219,7 +297,13 @@ def generate_drainage_layer(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        clip_drainage_lines.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            clip_drainage_lines_gee_task,
+            clip_drainage_lines_local_task,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -231,6 +315,9 @@ def generate_drainage_layer(request):
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        print("Invalid request in generate_drainage_layer api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_drainage_layer api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1127,9 +1214,13 @@ def restoration_opportunity(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_restoration_opportunity.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_restoration_opportunity,
+            generate_restoration_opportunity_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "restoration_opportunity task initiated"},
             status=status.HTTP_200_OK,
@@ -1217,9 +1308,13 @@ def soge_vector(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_soge_vector.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_soge_vector,
+            generate_soge_vector_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "SOGE vector task initiated"},
             status=status.HTTP_200_OK,
@@ -1486,9 +1581,13 @@ def generate_lcw(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_lcw_conflict_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_lcw_conflict_data,
+            generate_lcw_conflict_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1506,9 +1605,13 @@ def generate_agroecological(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_agroecological_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_agroecological_data,
+            generate_agroecological_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1526,9 +1629,13 @@ def generate_factory_csr(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_factory_csr_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_factory_csr_data,
+            generate_factory_csr_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1546,9 +1653,13 @@ def generate_green_credit(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_green_credit_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_green_credit_data,
+            generate_green_credit_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1566,9 +1677,13 @@ def generate_mining(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_mining_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_mining_data,
+            generate_mining_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1599,9 +1714,13 @@ def generate_natural_depression(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_natural_depression_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_natural_depression_data,
+            generate_natural_depression_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1619,9 +1738,13 @@ def generate_distance_nearest_upstream_DL(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_distance_to_nearest_drainage_line.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_distance_to_nearest_drainage_line,
+            generate_distance_to_nearest_drainage_line_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1639,9 +1762,13 @@ def generate_catchment_area_SF(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_catchment_area_singleflow.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_catchment_area_singleflow,
+            generate_catchment_area_singleflow_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1659,9 +1786,13 @@ def generate_slope_percentage(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_slope_percentage_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_slope_percentage_data,
+            generate_slope_percentage_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1736,20 +1867,36 @@ def generate_zoi_to_gee(request):
 @api_view(["POST"])
 @schema(None)
 def generate_mws_connectivity(request):
-    print("Inside generate_mws_connectivity_to_gee API.")
+    print("Inside generate_mws_connectivity API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_mws_connectivity_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_mws_connectivity_gee_task,
+            generate_mws_connectivity_local_task,
+        )
+        task.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        print("Invalid request in generate_mws_connectivity api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_mws_connectivity_to_gee api :: ", e)
+        print("Exception in generate_mws_connectivity api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1762,9 +1909,13 @@ def generate_mws_centroid(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_mws_centroid_data.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_mws_centroid_data,
+            generate_mws_centroid_data_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -1782,9 +1933,13 @@ def generate_facilities_proximity(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_facilities_proximity_task,
+            generate_facilities_proximity_local_task,
         )
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -2244,4 +2399,167 @@ def rainfall_resilience_resistance(request):
         )
     except Exception as e:
         print("Exception in rainfall_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+@api_view(["POST"])
+@schema(None)
+def generate_fabdem_raster_vector(request):
+    print("Inside generate DEM raster layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            None,
+            generate_febdem_raster_vector_clip_local_task,
+        )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print(f"Exception in generate DEM raster layer for {district} - {block}:: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_canal_vector(request):
+    print("Inside generate canal vector layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            None,
+            canal_vector_local_task,
+        )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print(
+            f"Exception in generate canal vector layer for {district} - {block}:: ", e
+        )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_river_data(request):
+    print("Inside river data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            None,
+            river_vector_local_task,
+        )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in river data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_drainage_density_data(request):
+    print("Inside river data API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            None,
+            drainage_density_vector_local_task,
+        )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in river data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+@api_view(["POST"])
+@schema(None)
+def generate_antyodaya(request):
+    print("Inside generate_antyodaya API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            None,
+            generate_antyodaya_data_local_task,
+        )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_antyodaya api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_livestocks(request):
+    print("Inside generate_livestocks API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            None,
+            generate_livestocks_data_local_task,
+        )
+        if task is None:
+            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated {compute} task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_livestocks api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
