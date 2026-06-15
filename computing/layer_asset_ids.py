@@ -9,20 +9,35 @@ from utilities.constants import GEE_PATHS
 from utilities.gee_utils import get_gee_dir_path, valid_gee_text
 
 
+def _flatten_asset_ids(values):
+    """Flatten accidental nested lists, e.g. [[a, b, c]] -> [a, b, c]."""
+    if values is None:
+        return None
+    flat = []
+    for value in values:
+        if isinstance(value, (list, tuple)):
+            flat.extend(_flatten_asset_ids(value) or [])
+        elif value is not None:
+            flat.append(value)
+    return flat
+
+
 def resolve_asset_id_field(asset_id=None, asset_ids=None):
     """
     API response value for asset_id:
     - one asset -> string
-    - multiple assets -> list of strings
+    - multiple assets -> flat list of strings
     """
     if asset_ids is not None:
-        if len(asset_ids) == 0:
+        asset_ids = _flatten_asset_ids(asset_ids)
+        if not asset_ids:
             return None
         if len(asset_ids) == 1:
             return asset_ids[0]
         return asset_ids
     if isinstance(asset_id, list):
-        if len(asset_id) == 0:
+        asset_id = _flatten_asset_ids(asset_id)
+        if not asset_id:
             return None
         if len(asset_id) == 1:
             return asset_id[0]
