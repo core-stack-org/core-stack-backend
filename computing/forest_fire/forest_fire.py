@@ -39,14 +39,14 @@ from .forest_fire_utils import (
 
 @app.task(bind=True)
 def generate_forest_fire_layer(
-        self,
-        state,
-        district,
-        block,
-        start_year=2001,
-        end_year=2022,
-        gee_account_id=None,
-        app_type="MWS",
+    self,
+    state,
+    district,
+    block,
+    start_year=2001,
+    end_year=2022,
+    gee_account_id=None,
+    app_type="MWS",
 ):
     """
     Generate MODIS fire-risk metrics as a vector layer.
@@ -75,7 +75,7 @@ def generate_forest_fire_layer(
     n_years = end_year - start_year + 1
 
     asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
     asset_folder_list = [state, district, block]
 
@@ -83,11 +83,11 @@ def generate_forest_fire_layer(
     layer_name = f"{asset_suffix}_forest_fire"
 
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + description
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + description
     )
 
     print(f"Forest Fire pipeline started: {asset_id=}")
@@ -96,12 +96,12 @@ def generate_forest_fire_layer(
     # STEP 2: Set up ROI (MWS boundaries from GEE)
     # ------------------------------------------------------------------
     roi_path = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + f"filtered_mws_{valid_gee_text(district.lower())}"
-            + f"_{valid_gee_text(block.lower())}_uid"
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + f"filtered_mws_{valid_gee_text(district.lower())}"
+        + f"_{valid_gee_text(block.lower())}_uid"
     )
     mws_fc = ee.FeatureCollection(roi_path)
 
@@ -250,14 +250,14 @@ def _reduce_fire_metric(fc, image, reducer, metric_name, projection):
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        start_year=None,
-        end_year=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
+    layer_name=None,
+    asset_id=None,
+    start_year=None,
+    end_year=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fire: save_to_db_and_sync_to_geoserver")

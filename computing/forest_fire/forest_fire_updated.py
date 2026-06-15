@@ -42,14 +42,14 @@ METRIC_FIELDS = [
 
 @app.task(bind=True)
 def generate_forest_fire_layer_updated(
-        self,
-        state,
-        district,
-        block,
-        start_year=2001,
-        end_year=2022,
-        gee_account_id=None,
-        app_type="MWS",
+    self,
+    state,
+    district,
+    block,
+    start_year=2001,
+    end_year=2022,
+    gee_account_id=None,
+    app_type="MWS",
 ):
     """
     Generate MODIS fire metrics as a vector layer for each MWS feature.
@@ -64,7 +64,7 @@ def generate_forest_fire_layer_updated(
 
     n_years = end_year - start_year + 1
     asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
     asset_folder_list = [state, district, block]
 
@@ -80,9 +80,9 @@ def generate_forest_fire_layer_updated(
 
     if not is_gee_asset_exists(asset_id):
         roi_path = (
-                gee_base_path
-                + f"filtered_mws_{valid_gee_text(district.lower())}"
-                + f"_{valid_gee_text(block.lower())}_uid"
+            gee_base_path
+            + f"filtered_mws_{valid_gee_text(district.lower())}"
+            + f"_{valid_gee_text(block.lower())}_uid"
         )
         mws_fc = _prepare_mws_features(roi_path)
 
@@ -222,14 +222,14 @@ def _reduce_metric(fc, image, reducer, metric_name, projection):
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        start_year=None,
-        end_year=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
+    layer_name=None,
+    asset_id=None,
+    start_year=None,
+    end_year=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
 ):
     print("Forest Fire updated: save_to_db_and_sync_to_geoserver")
 

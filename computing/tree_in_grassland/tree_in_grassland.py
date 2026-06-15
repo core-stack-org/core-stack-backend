@@ -34,14 +34,14 @@ from .tree_in_grassland_utils import (
 
 @app.task(bind=True)
 def generate_tree_in_grassland_layer(
-        self,
-        state,
-        district,
-        block,
-        start_year,
-        end_year,
-        gee_account_id=None,
-        app_type="MWS",
+    self,
+    state,
+    district,
+    block,
+    start_year,
+    end_year,
+    gee_account_id=None,
+    app_type="MWS",
 ):
     """
     Generate tree-in-grassland context metrics as a vector layer.
@@ -83,7 +83,7 @@ def generate_tree_in_grassland_layer(
     end_year = int(end_year)
 
     asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
     asset_folder_list = [state, district, block]
 
@@ -91,11 +91,11 @@ def generate_tree_in_grassland_layer(
     layer_name = f"{asset_suffix}_tree_in_grassland"
 
     asset_id = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + description
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + description
     )
     print(f"Tree in Grassland pipeline started: {asset_id=}")
 
@@ -103,12 +103,12 @@ def generate_tree_in_grassland_layer(
     # STEP 2: Set up ROI (MWS boundaries from GEE)
     # ------------------------------------------------------------------
     roi_path = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + f"filtered_mws_{valid_gee_text(district.lower())}"
-            + f"_{valid_gee_text(block.lower())}_uid"
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + f"filtered_mws_{valid_gee_text(district.lower())}"
+        + f"_{valid_gee_text(block.lower())}_uid"
     )
     mws_fc = ee.FeatureCollection(roi_path)
 
@@ -220,9 +220,9 @@ def generate_tree_in_grassland_layer(
 
             return f.set(
                 {
-                    "tree_shrub_to_built_area_m2": area(to_built),
-                    "tree_shrub_to_kharif_water_area_m2": area(to_kharif),
-                    "tree_shrub_to_kharif_rabi_water_area_m2": area(to_kharif_rabi),
+                    "tree_shrub_to_built_area_m2": area(to_built), # TODO Change to hectares
+                    "tree_shrub_to_kharif_water_area_m2": area(to_kharif),  # TODO Change to hectares
+                    "tree_shrub_to_kharif_rabi_water_area_m2": area(to_kharif_rabi), # TODO Change to hectares
                 }
             )
 
@@ -332,14 +332,14 @@ def generate_tree_in_grassland_layer(
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        start_year=None,
-        end_year=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
+    layer_name=None,
+    asset_id=None,
+    start_year=None,
+    end_year=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Tree in Grassland: save_to_db_and_sync_to_geoserver")
