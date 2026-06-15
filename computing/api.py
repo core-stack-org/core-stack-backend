@@ -747,6 +747,7 @@ def generate_swb(request):
         state = state.lower()
         district = district.lower()
         block = block.lower()
+        asset_ids = layer_assets.swb_pipeline_asset_ids(state, district, block)
         task_result = generate_swb_layer.apply(
             kwargs={
                 "state": state,
@@ -757,21 +758,30 @@ def generate_swb(request):
                 "gee_account_id": gee_account_id,
             }
         )
-        asset_ids = layer_assets.swb_pipeline_asset_ids(state, district, block)
-        asset_id = layer_assets.resolve_asset_id_field(asset_ids=asset_ids)
         if task_result.failed():
             return Response(
-                {"error": str(task_result.result)},
+                {
+                    "error": str(task_result.result),
+                    "asset_id": layer_assets.resolve_asset_id_field(
+                        asset_ids=asset_ids
+                    ),
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         if not task_result.result:
             return Response(
-                {"error": "SWB generation failed", "asset_id": asset_id},
+                {
+                    "error": "SWB generation failed",
+                    "asset_id": layer_assets.resolve_asset_id_field(
+                        asset_ids=asset_ids
+                    ),
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        return Response(
-            {"Success": "Generate swb completed", "asset_id": asset_id},
-            status=status.HTTP_200_OK,
+        return _task_started_response(
+            "Generate swb completed",
+            asset_ids=asset_ids,
+            completed=True,
         )
     except Exception as e:
         return layer_api_error_response("generate_swb", e, request=request)
