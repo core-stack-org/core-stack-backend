@@ -33,8 +33,8 @@ def load_fire_collections(start_year, end_year):
     Returns:
         ee.ImageCollection – merged, date-filtered MaxFRP collection.
     """
-    start_date = f"{start_year}-01-01"
-    end_date = f"{end_year}-12-31"
+    start_date = f"{start_year}-07-01"
+    end_date = f"{end_year + 1}-07-01"
 
     terra = ee.ImageCollection(TERRA_FIRE_PATH)
     aqua = ee.ImageCollection(AQUA_FIRE_PATH)

@@ -97,7 +97,6 @@ def generate_tree_in_grassland_layer(
             )
             + description
     )
-
     print(f"Tree in Grassland pipeline started: {asset_id=}")
 
     # ------------------------------------------------------------------

@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
     api_view,
@@ -2014,7 +2015,7 @@ def generate_forest_fire(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fire_layer.apply_async(
+        generate_forest_fire_layer_updated.apply_async(
             kwargs={
                 "state": state,
                 "district": district,

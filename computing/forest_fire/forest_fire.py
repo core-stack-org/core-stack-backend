@@ -32,7 +32,6 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 from .forest_fire_utils import (
     SCALE,
-    MAXPIX,
     load_fire_collections,
     prepare_frp_images,
 )
@@ -40,14 +39,14 @@ from .forest_fire_utils import (
 
 @app.task(bind=True)
 def generate_forest_fire_layer(
-    self,
-    state,
-    district,
-    block,
-    start_year=2001,
-    end_year=2022,
-    gee_account_id=None,
-    app_type="MWS",
+        self,
+        state,
+        district,
+        block,
+        start_year=2001,
+        end_year=2022,
+        gee_account_id=None,
+        app_type="MWS",
 ):
     """
     Generate MODIS fire-risk metrics as a vector layer.
@@ -76,7 +75,7 @@ def generate_forest_fire_layer(
     n_years = end_year - start_year + 1
 
     asset_suffix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
     asset_folder_list = [state, district, block]
 
@@ -84,11 +83,11 @@ def generate_forest_fire_layer(
     layer_name = f"{asset_suffix}_forest_fire"
 
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + description
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + description
     )
 
     print(f"Forest Fire pipeline started: {asset_id=}")
@@ -97,12 +96,12 @@ def generate_forest_fire_layer(
     # STEP 2: Set up ROI (MWS boundaries from GEE)
     # ------------------------------------------------------------------
     roi_path = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + f"filtered_mws_{valid_gee_text(district.lower())}"
-        + f"_{valid_gee_text(block.lower())}_uid"
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + f"filtered_mws_{valid_gee_text(district.lower())}"
+            + f"_{valid_gee_text(block.lower())}_uid"
     )
     mws_fc = ee.FeatureCollection(roi_path)
 
@@ -132,40 +131,6 @@ def generate_forest_fire_layer(
         frp_mean_img = fire_images["mean"]
         frp_max_img = fire_images["max"]
         fire_count_img = fire_images["count"]
-
-        # ---- per-MWS compute function (closure over EE objects) ------
-
-        def compute_fire_metrics(f):
-            geom = f.geometry()
-
-            def reduce(img, reducer, band):
-                val = img.reduceRegion(
-                    reducer=reducer,
-                    geometry=geom,
-                    scale=SCALE,
-                    maxPixels=MAXPIX,
-                    bestEffort=True,
-                ).get(band)
-                return ee.Number(
-                    ee.Algorithms.If(ee.Algorithms.IsEqual(val, None), 0, val)
-                )
-
-            return f.set(
-                {
-                    "uid": f.get("uid"),
-                    "fire_frp_sum_per_year": reduce(
-                        frp_sum_img, ee.Reducer.sum(), "MaxFRP"
-                    ),
-                    "fire_frp_mean": reduce(frp_mean_img, ee.Reducer.mean(), "MaxFRP"),
-                    "fire_frp_max": reduce(
-                        frp_max_img, ee.Reducer.mean(), "MaxFRP"
-                    ),  # ← mean not max
-                    "fire_count_per_year": reduce(
-                        fire_count_img, ee.Reducer.sum(), "fire"
-                    ),
-                }
-            )
-
         # ---- map compute over all MWS features ----
         mws_fc = mws_fc.filter(ee.Filter.notNull(["uid"]))
 
@@ -183,7 +148,50 @@ def generate_forest_fire_layer(
         mws_fc = validated.filter(ee.Filter.gt("area_m2", 0))
         mws_fc = mws_fc.map(repair_geometry)
 
-        fc = mws_fc.map(compute_fire_metrics)
+        fire_projection = ee.Image(frp_collection.first()).select("MaxFRP").projection()
+        metric_images = {
+            "fire_frp_sum_per_year": frp_sum_img.rename(
+                "fire_frp_sum_per_year"
+            ).setDefaultProjection(fire_projection),
+            "fire_frp_mean": frp_mean_img.rename("fire_frp_mean").setDefaultProjection(
+                fire_projection
+            ),
+            "fire_frp_max": frp_max_img.rename("fire_frp_max").setDefaultProjection(
+                fire_projection
+            ),
+            "fire_count_per_year": fire_count_img.rename(
+                "fire_count_per_year"
+            ).setDefaultProjection(fire_projection),
+        }
+
+        fc = _reduce_fire_metric(
+            mws_fc,
+            metric_images["fire_frp_sum_per_year"],
+            ee.Reducer.sum(),
+            "fire_frp_sum_per_year",
+            fire_projection,
+        )
+        fc = _reduce_fire_metric(
+            fc,
+            metric_images["fire_frp_mean"],
+            ee.Reducer.mean(),
+            "fire_frp_mean",
+            fire_projection,
+        )
+        fc = _reduce_fire_metric(
+            fc,
+            metric_images["fire_frp_max"],
+            ee.Reducer.mean(),
+            "fire_frp_max",
+            fire_projection,
+        )
+        fc = _reduce_fire_metric(
+            fc,
+            metric_images["fire_count_per_year"],
+            ee.Reducer.sum(),
+            "fire_count_per_year",
+            fire_projection,
+        )
 
         fc = fc.select(
             [
@@ -219,20 +227,37 @@ def generate_forest_fire_layer(
     return layer_at_geoserver
 
 
+def _reduce_fire_metric(fc, image, reducer, metric_name, projection):
+    reduced = image.reduceRegions(
+        collection=fc,
+        reducer=reducer,
+        scale=SCALE,
+        crs=projection,
+        tileScale=4,
+    )
+
+    def fill_null(feature):
+        value = feature.get(metric_name)
+        value = ee.Algorithms.If(ee.Algorithms.IsEqual(value, None), 0, value)
+        return feature.set(metric_name, ee.Number(value))
+
+    return reduced.map(fill_null)
+
+
 # ------------------------------------------------------------------
 # Private helpers (publish / persist)
 # ------------------------------------------------------------------
 
 
 def _save_to_db_and_sync_to_geoserver(
-    layer_name=None,
-    asset_id=None,
-    start_year=None,
-    end_year=None,
-    asset_suffix=None,
-    state=None,
-    district=None,
-    block=None,
+        layer_name=None,
+        asset_id=None,
+        start_year=None,
+        end_year=None,
+        asset_suffix=None,
+        state=None,
+        district=None,
+        block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fire: save_to_db_and_sync_to_geoserver")
