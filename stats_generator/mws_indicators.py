@@ -959,6 +959,7 @@ def generate_mws_data_for_kyl_filters(
                         lulc_crop_percent = round(
                             (cropped_area_in_ha / area_in_ha) * 100, 2
                         )
+
                     else:
                         lulc_shrub_percent = -9999
                         lulc_forest_percent = -9999
