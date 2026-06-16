@@ -2551,18 +2551,86 @@ def expand_keep_output_columns(
     return expanded
 
 
+def as_geodataframe_like(frame: Any, template: Any) -> Any:
+    return gpd.GeoDataFrame(
+        frame,
+        geometry=template.geometry.name,
+        crs=template.crs,
+    )
+
+
+def append_join_output_columns(
+    gdf: Any,
+    *,
+    normalised_keys: Any,
+    records: dict[str, tuple[Any, ...]],
+    matched: Any,
+    join_table: JoinTable,
+    match_status_column: str | None,
+) -> Any:
+    frames = [gdf]
+    overlapping_columns: set[str] = set()
+
+    if join_table.output_columns:
+        empty_record = tuple(None for _ in join_table.output_columns)
+        joined_records = [
+            records.get(key, empty_record) if key is not None else empty_record
+            for key in normalised_keys
+        ]
+        joined_frame = pd.DataFrame.from_records(
+            joined_records,
+            columns=join_table.output_columns,
+            index=gdf.index,
+        )
+        frames.append(joined_frame)
+        overlapping_columns.update(
+            column for column in joined_frame.columns if column in gdf.columns
+        )
+
+    if match_status_column is not None:
+        matched_frame = pd.DataFrame(
+            {
+                match_status_column: pd.Series(
+                    matched,
+                    index=gdf.index,
+                    dtype="boolean",
+                )
+            },
+            index=gdf.index,
+        )
+        frames.append(matched_frame)
+        if match_status_column in gdf.columns:
+            overlapping_columns.add(match_status_column)
+
+    base_gdf = gdf.drop(columns=list(overlapping_columns)) if overlapping_columns else gdf
+    frames[0] = base_gdf
+    return as_geodataframe_like(pd.concat(frames, axis=1), gdf)
+
+
 def coerce_join_output_columns(gdf: Any, join_table: JoinTable) -> Any:
+    replacements: dict[str, Any] = {}
     for column in JOIN_OUTPUT_INTEGER_COLUMNS:
         if column in gdf.columns:
-            gdf[column] = pd.to_numeric(gdf[column], errors="coerce").astype("Int64")
+            replacements[column] = pd.to_numeric(gdf[column], errors="coerce").astype("Int64")
     for column in join_table.output_columns:
         if column in join_table.numeric_columns:
             numeric = pd.to_numeric(gdf[column], errors="coerce")
             if column in join_table.integer_columns:
-                gdf[column] = numeric.astype("Int64")
+                replacements[column] = numeric.astype("Int64")
             else:
-                gdf[column] = numeric.astype("Float64")
-    return gdf
+                replacements[column] = numeric.astype("Float64")
+    if not replacements:
+        return gdf
+
+    replacement_columns = [column for column in gdf.columns if column in replacements]
+    replacement_frame = pd.DataFrame(
+        {column: replacements[column] for column in replacement_columns},
+        index=gdf.index,
+    )
+    unchanged_frame = gdf.drop(columns=replacement_columns)
+    combined = pd.concat([unchanged_frame, replacement_frame], axis=1)
+    combined = combined.loc[:, list(gdf.columns)]
+    return as_geodataframe_like(combined, gdf)
 
 
 def write_join_summary(reports_dir: Path, summary: dict[str, Any]) -> None:
@@ -2655,15 +2723,16 @@ def join_properties_to_admin(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 matched_rows += int(matched.sum())
 
-                for column_index, output_column in enumerate(join_table.output_columns):
-                    gdf[output_column] = [
-                        records[key][column_index]
-                        if key is not None and key in records
-                        else None
-                        for key in normalised_keys
-                    ]
-                if not args.no_match_status:
-                    gdf[args.match_status_column] = matched.astype("boolean")
+                gdf = append_join_output_columns(
+                    gdf,
+                    normalised_keys=normalised_keys,
+                    records=records,
+                    matched=matched,
+                    join_table=join_table,
+                    match_status_column=(
+                        None if args.no_match_status else args.match_status_column
+                    ),
+                )
                 gdf = coerce_join_output_columns(gdf, join_table)
                 gdf = project_and_rename_output(
                     gdf,
@@ -2827,6 +2896,73 @@ def export_gpkg_layer_to_geojson(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
+def export_geojson_to_gpkg(args: argparse.Namespace) -> dict[str, Any]:
+    ensure_dependencies()
+    started = time.perf_counter()
+    input_geojson = repo_path(args.input_geojson)
+    output_gpkg = repo_path(args.output_gpkg)
+    reports_dir = repo_path(args.reports_dir)
+    if not input_geojson.exists():
+        raise SystemExit(f"Input GeoJSON not found: {input_geojson}")
+    validate_output_path(output_gpkg, overwrite=args.overwrite, label="GeoPackage")
+
+    info = pyogrio.read_info(input_geojson)
+    total_features = int(info.get("features") or 0)
+    rows_written = 0
+    offset = 0
+    first_chunk = True
+    final_fields: list[str] = []
+    print(
+        f"[export] writing {total_features:,} features from "
+        f"{input_geojson} to {output_gpkg}:{args.output_layer}",
+        flush=True,
+    )
+    while True:
+        gdf = pyogrio.read_dataframe(
+            input_geojson,
+            skip_features=offset,
+            max_features=args.chunk_size,
+        )
+        if gdf.empty:
+            break
+        final_fields = [column for column in gdf.columns if column != gdf.geometry.name]
+        pyogrio.write_dataframe(
+            gdf,
+            output_gpkg,
+            layer=args.output_layer,
+            driver="GPKG",
+            append=not first_chunk,
+            promote_to_multi=True,
+        )
+        rows_written += len(gdf)
+        offset += len(gdf)
+        first_chunk = False
+        if rows_written == len(gdf) or rows_written % (args.chunk_size * 2) == 0:
+            print(f"[export] wrote {rows_written:,}/{total_features:,} features", flush=True)
+
+    summary = {
+        "input_geojson": input_geojson.as_posix(),
+        "output_gpkg": output_gpkg.as_posix(),
+        "output_layer": args.output_layer,
+        "rows_written": rows_written,
+        "final_output_columns": final_fields,
+        "total_seconds": round(time.perf_counter() - started, 6),
+    }
+    write_join_summary(reports_dir, summary)
+    write_gpkg_metadata(
+        output_gpkg,
+        f"{normalize_slug(args.output_layer)}_format_conversion_metadata",
+        {},
+        summary,
+    )
+    print(
+        f"[export] complete: wrote {rows_written:,} features in "
+        f"{summary['total_seconds']:.1f}s",
+        flush=True,
+    )
+    return summary
+
+
 def config_list(value: Any, *, field: str) -> list[str]:
     if value is None:
         return []
@@ -2906,13 +3042,19 @@ def asset_config_namespace(
     config_path: Path,
     overwrite: bool,
     chunk_size_override: int | None,
+    output_formats_override: str | None,
+    geojson_output_override: Path | None,
 ) -> argparse.Namespace:
     admin = config_mapping(config["admin"], field="admin")
     source = config_mapping(config["source"], field="source")
     output = config_mapping(config["output"], field="output")
     processing = config_mapping(config.get("processing", {}), field="processing")
 
-    formats = config_list(output.get("formats", ["gpkg"]), field="output.formats")
+    formats = (
+        parse_output_formats(output_formats_override)
+        if output_formats_override
+        else config_list(output.get("formats", ["gpkg"]), field="output.formats")
+    )
     keep_columns = config_list(
         output.get("admin_columns", output.get("keep_columns", [])),
         field="output.admin_columns",
@@ -2943,7 +3085,11 @@ def asset_config_namespace(
         output=Path(output["gpkg"]),
         output_layer=str(output["layer"]),
         output_formats=",".join(formats),
-        geojson_output=Path(output["geojson"]) if output.get("geojson") else None,
+        geojson_output=(
+            geojson_output_override
+            if geojson_output_override is not None
+            else Path(output["geojson"]) if output.get("geojson") else None
+        ),
         left_key=str(admin.get("left_key", "pc11_village_id")),
         right_key=str(source["right_key"]),
         columns=",".join(config_list(source.get("columns"), field="source.columns")),
@@ -3091,6 +3237,165 @@ def validate_asset_config(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def requested_asset_outputs(args: argparse.Namespace) -> dict[str, Path]:
+    output_gpkg = repo_path(args.output)
+    output_geojson = (
+        repo_path(args.geojson_output)
+        if args.geojson_output
+        else default_geojson_path(output_gpkg)
+    )
+    return {
+        "gpkg": output_gpkg,
+        "geojson": output_geojson,
+    }
+
+
+def namespace_with(args: argparse.Namespace, **updates: Any) -> argparse.Namespace:
+    values = vars(args).copy()
+    values.update(updates)
+    return argparse.Namespace(**values)
+
+
+def export_configured_gpkg_to_geojson(args: argparse.Namespace, *, overwrite: bool) -> dict[str, Any]:
+    paths = requested_asset_outputs(args)
+    return export_gpkg_layer_to_geojson(
+        argparse.Namespace(
+            input_gpkg=paths["gpkg"],
+            input_layer=args.output_layer,
+            geojson_output=paths["geojson"],
+            overwrite=overwrite,
+            chunk_size=args.chunk_size,
+            reports_dir=args.reports_dir,
+            keep_output_columns=None,
+            rename_output_columns=None,
+        )
+    )
+
+
+def export_configured_geojson_to_gpkg(args: argparse.Namespace, *, overwrite: bool) -> dict[str, Any]:
+    paths = requested_asset_outputs(args)
+    return export_geojson_to_gpkg(
+        argparse.Namespace(
+            input_geojson=paths["geojson"],
+            output_gpkg=paths["gpkg"],
+            output_layer=args.output_layer,
+            overwrite=overwrite,
+            chunk_size=args.chunk_size,
+            reports_dir=args.reports_dir,
+        )
+    )
+
+
+def run_configured_asset_plan(
+    args: argparse.Namespace,
+    *,
+    force_raw_join: bool = False,
+) -> dict[str, Any]:
+    formats = parse_output_formats(args.output_formats)
+    requested = set(formats)
+    paths = requested_asset_outputs(args)
+    gpkg_exists = paths["gpkg"].exists()
+    geojson_exists = paths["geojson"].exists()
+    summaries: list[dict[str, Any]] = []
+
+    if requested == {"geojson"}:
+        if geojson_exists and not args.overwrite:
+            print(f"[asset] GeoJSON already exists; nothing to build: {paths['geojson']}", flush=True)
+            return {"strategy": "existing_geojson", "output": paths["geojson"].as_posix()}
+        if not force_raw_join and gpkg_exists:
+            print(
+                f"[asset] using existing GeoPackage to create GeoJSON: {paths['gpkg']}",
+                flush=True,
+            )
+            summaries.append(export_configured_gpkg_to_geojson(args, overwrite=args.overwrite))
+            return {"strategy": "gpkg_to_geojson", "steps": summaries}
+
+    if requested == {"gpkg"}:
+        if gpkg_exists and not args.overwrite:
+            print(f"[asset] GeoPackage already exists; nothing to build: {paths['gpkg']}", flush=True)
+            return {"strategy": "existing_gpkg", "output": paths["gpkg"].as_posix()}
+        if not force_raw_join and not gpkg_exists and geojson_exists:
+            print(
+                f"[asset] using existing GeoJSON to create GeoPackage: {paths['geojson']}",
+                flush=True,
+            )
+            summaries.append(export_configured_geojson_to_gpkg(args, overwrite=args.overwrite))
+            return {"strategy": "geojson_to_gpkg", "steps": summaries}
+
+    if not force_raw_join and requested == {"gpkg", "geojson"} and not args.overwrite:
+        if gpkg_exists:
+            if geojson_exists:
+                print("[asset] requested GPKG and GeoJSON already exist; nothing to build", flush=True)
+                return {
+                    "strategy": "existing_outputs",
+                    "outputs": {key: path.as_posix() for key, path in paths.items()},
+                }
+            print(
+                f"[asset] using existing GeoPackage to create missing GeoJSON: {paths['gpkg']}",
+                flush=True,
+            )
+            summaries.append(export_configured_gpkg_to_geojson(args, overwrite=False))
+            return {"strategy": "existing_gpkg_to_geojson", "steps": summaries}
+        if geojson_exists:
+            print(
+                f"[asset] using existing GeoJSON to create missing GeoPackage: {paths['geojson']}",
+                flush=True,
+            )
+            summaries.append(export_configured_geojson_to_gpkg(args, overwrite=False))
+            return {"strategy": "existing_geojson_to_gpkg", "steps": summaries}
+
+    if requested == {"gpkg", "geojson"}:
+        print(
+            "[asset] building GeoPackage from source first, then exporting GeoJSON from it",
+            flush=True,
+        )
+        gpkg_args = namespace_with(args, output_formats="gpkg")
+        summaries.append(join_properties_to_admin(gpkg_args))
+        summaries.append(export_configured_gpkg_to_geojson(args, overwrite=True))
+        return {"strategy": "raw_join_gpkg_then_geojson", "steps": summaries}
+
+    print("[asset] building requested asset from source inputs", flush=True)
+    summaries.append(join_properties_to_admin(args))
+    return {"strategy": "raw_join", "steps": summaries}
+
+
+def can_materialize_from_existing_asset(
+    args: argparse.Namespace,
+    *,
+    force_raw_join: bool,
+) -> bool:
+    if force_raw_join:
+        return False
+    requested = set(parse_output_formats(args.output_formats))
+    paths = requested_asset_outputs(args)
+    gpkg_exists = paths["gpkg"].exists()
+    geojson_exists = paths["geojson"].exists()
+
+    if requested == {"geojson"}:
+        return (geojson_exists and not args.overwrite) or gpkg_exists
+    if requested == {"gpkg"}:
+        return (gpkg_exists and not args.overwrite) or (not gpkg_exists and geojson_exists)
+    if requested == {"gpkg", "geojson"} and not args.overwrite:
+        return gpkg_exists or geojson_exists
+    return False
+
+
+def existing_asset_plan_summary(args: argparse.Namespace) -> dict[str, Any]:
+    paths = requested_asset_outputs(args)
+    return {
+        "asset_name": getattr(args, "asset_name", None),
+        "asset_config": getattr(args, "asset_config", None),
+        "asset_config_sha256": getattr(args, "asset_config_sha256", None),
+        "output_formats": parse_output_formats(args.output_formats),
+        "output_gpkg": paths["gpkg"].as_posix(),
+        "output_gpkg_exists": paths["gpkg"].exists(),
+        "output_geojson": paths["geojson"].as_posix(),
+        "output_geojson_exists": paths["geojson"].exists(),
+        "output_layer": args.output_layer,
+        "plan": "derive from existing sibling asset where needed",
+    }
+
+
 def run_configured_asset(args: argparse.Namespace) -> dict[str, Any]:
     config_path = resolve_asset_config_path(args.config)
     config = load_asset_config(config_path)
@@ -3099,12 +3404,30 @@ def run_configured_asset(args: argparse.Namespace) -> dict[str, Any]:
         config_path=config_path,
         overwrite=args.overwrite,
         chunk_size_override=args.chunk_size,
+        output_formats_override=args.output_formats,
+        geojson_output_override=args.geojson_output,
     )
+    if args.validate_only:
+        validation = validate_asset_config(join_args)
+        print(json_dumps_text(validation, indent=True), flush=True)
+        return validation
+    if can_materialize_from_existing_asset(
+        join_args,
+        force_raw_join=args.force_raw_join,
+    ):
+        summary = existing_asset_plan_summary(join_args)
+        print(json_dumps_text(summary, indent=True), flush=True)
+        return run_configured_asset_plan(
+            join_args,
+            force_raw_join=args.force_raw_join,
+        )
+
     validation = validate_asset_config(join_args)
     print(json_dumps_text(validation, indent=True), flush=True)
-    if args.validate_only:
-        return validation
-    return join_properties_to_admin(join_args)
+    return run_configured_asset_plan(
+        join_args,
+        force_raw_join=args.force_raw_join,
+    )
 
 
 def run_livestock(args: argparse.Namespace) -> dict[str, Any]:
@@ -3317,6 +3640,20 @@ def add_asset_args(parser: argparse.ArgumentParser) -> None:
         "--chunk-size",
         type=int,
         help="Override the configured admin read/write chunk size.",
+    )
+    parser.add_argument(
+        "--output-formats",
+        help="Override configured output formats: gpkg, geojson, or gpkg,geojson.",
+    )
+    parser.add_argument(
+        "--geojson-output",
+        type=Path,
+        help="Override configured GeoJSON output path.",
+    )
+    parser.add_argument(
+        "--force-raw-join",
+        action="store_true",
+        help="Ignore existing sibling assets and rebuild requested outputs from source inputs.",
     )
 
 
