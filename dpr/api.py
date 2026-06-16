@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
+from django.templatetags.i18n import language
 from django.urls import reverse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -138,6 +139,7 @@ def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
+        language = request.data.get("language")
         regenerate = request.data.get("regenerate", False)
 
         logger.info(
@@ -161,7 +163,9 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        generate_dpr_task.apply_async(args=[plan_id, email_id, regenerate], queue="dpr")
+        generate_dpr_task.apply_async(
+            args=[plan_id, email_id, language, regenerate], queue="dpr"
+        )
 
         return Response(
             {
@@ -572,13 +576,15 @@ def generate_village_report(request):
 
         for key, value in params.items():
             result[key] = value
-        
+
         context = {
             "state": result["state"],
             "district": result["district"],
             "block": result["block"],
-            "village_id" : result["villageId"],
-            "development_scores": json.dumps([0.85, 0.72, 0.65, 0.78, 0.82, 0.75, 0.68, 0.80, 0.75, 0.70])  # Serialize to JSON string
+            "village_id": result["villageId"],
+            "development_scores": json.dumps(
+                [0.85, 0.72, 0.65, 0.78, 0.82, 0.75, 0.68, 0.80, 0.75, 0.70]
+            ),  # Serialize to JSON string
         }
 
         return render(request, "village-report.html", context)
@@ -586,6 +592,7 @@ def generate_village_report(request):
     except Exception as e:
         logger.exception("Exception in generate_village_report api :: ", e)
         return render(request, "error-page.html", {})
+
 
 # ---------------------------------------------------------------------------
 # DPR Data API
