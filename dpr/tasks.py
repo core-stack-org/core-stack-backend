@@ -16,19 +16,19 @@ from .utils import (
     upload_dpr_to_s3,
     check_dpr_exists_on_s3,
 )
-from .views import generate_dpr_pdf
+
+# from .views import generate_dpr_pdf
 
 logger = setup_logger(__name__)
 
 
-def get_or_generate_dpr(plan, regenerate=False, language="en"):
+def get_or_generate_dpr(plan, regenerate=False):
     dpr_report, created = DPR_Report.objects.get_or_create(
-        plan_id=plan,
-        defaults={"plan_name": plan.plan, "status": "PENDING"},
+        plan_id=plan, defaults={"plan_name": plan.plan, "status": "PENDING"}
     )
-    dpr_report_s3_url = f"https://dpr-resources.s3.ap-south-1.amazonaws.com/dpr-reports/{plan.id}_{plan.plan}_{language}.pdf"
+
     if not regenerate:
-        s3_exists = check_dpr_exists_on_s3(dpr_report_s3_url)
+        s3_exists = check_dpr_exists_on_s3(dpr_report.dpr_report_s3_url)
         if not created and not dpr_report.needs_regeneration() and s3_exists:
             logger.info(
                 f"Using cached DPR for plan {plan.id} from S3: {dpr_report.dpr_report_s3_url}"
@@ -39,8 +39,8 @@ def get_or_generate_dpr(plan, regenerate=False, language="en"):
     dpr_report.status = "GENERATING"
     dpr_report.save(update_fields=["status"])
 
-    doc = generate_dpr_pdf(plan, language=language)
-    s3_url = upload_dpr_to_s3(doc, plan.id, plan.plan, language)
+    doc = create_dpr_document(plan)
+    s3_url = upload_dpr_to_s3(doc, plan.id, plan.plan)
 
     dpr_report.dpr_report_s3_url = s3_url
     dpr_report.dpr_generated_at = timezone.now()
@@ -60,17 +60,13 @@ def get_or_generate_dpr(plan, regenerate=False, language="en"):
 
 
 @app.task(bind=True, name="dpr.generate_dpr_task")
-def generate_dpr_task(
-    self, plan_id: int, email_id: str, language: str, regenerate: bool = False
-):
+def generate_dpr_task(self, plan_id: int, email_id: str, regenerate: bool = False):
     plan = get_plan_details(plan_id)
     if plan is None:
         logger.error(f"Plan not found for ID: {plan_id}")
         return {"error": "Plan not found"}
 
-    dpr_report, was_regenerated = get_or_generate_dpr(
-        plan, regenerate=regenerate, language=language
-    )
+    dpr_report, was_regenerated = get_or_generate_dpr(plan, regenerate=regenerate)
     mws_Ids = get_mws_ids_for_report(plan)
 
     mws_reports = []

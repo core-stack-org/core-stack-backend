@@ -1,7 +1,8 @@
 from datetime import date
 from django.template.loader import render_to_string
 from dpr.service.translation_service import load_translations
-from weasyprint import HTML
+
+# from weasyprint import HTML
 from .gen_dpr import get_settlement_count_for_plan
 from .utils import get_vector_layer_geoserver, transform_name
 from nrm_app.settings import GEOSERVER_URL
@@ -54,10 +55,10 @@ def generate_dpr_html(plan, language="en"):
     return html
 
 
-def generate_dpr_pdf(plan, language="en"):
-    sync_odk_forms()
-    html = generate_dpr_html(plan, language)
-
-    pdf = HTML(string=html).write_pdf()
-
-    return pdf
+# def generate_dpr_pdf(plan, language="en"):
+#     sync_odk_forms()
+#     html = generate_dpr_html(plan, language)
+#
+#     pdf = HTML(string=html).write_pdf()
+#
+#     return pdf

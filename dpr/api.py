@@ -139,7 +139,7 @@ def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
-        language = request.data.get("language")
+        # language = request.data.get("language")
         regenerate = request.data.get("regenerate", False)
 
         logger.info(
@@ -163,9 +163,7 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        generate_dpr_task.apply_async(
-            args=[plan_id, email_id, language, regenerate], queue="dpr"
-        )
+        generate_dpr_task.apply_async(args=[plan_id, email_id, regenerate], queue="dpr")
 
         return Response(
             {
