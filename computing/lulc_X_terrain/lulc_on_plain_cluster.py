@@ -31,7 +31,7 @@ def lulc_on_plain_cluster(
         valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
-        + "_lulcXplains_clusters_bk02_june"
+        + "_lulcXplains_clusters"
     )
     asset_id = get_gee_asset_path(state, district, block) + asset_description
 
