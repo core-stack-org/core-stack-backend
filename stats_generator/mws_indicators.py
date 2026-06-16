@@ -567,7 +567,7 @@ def generate_mws_data_for_kyl_filters(
                     ).iloc[0]
                     mws_intersect_villages = ast.literal_eval(mws_intersect_villages)
                 except:
-                    mws_intersect_villages = -9999
+                    mws_intersect_villages = []
 
                 ############  Change Detection Degradation  ###################
                 try:
@@ -818,11 +818,11 @@ def generate_mws_data_for_kyl_filters(
                             axis=1,
                         ).tolist()
                     else:
-                        mws_intersect_swb = -9999
+                        mws_intersect_swb = []
 
                 except Exception as e:
                     print(f"Error in SWB funda: {e}")
-                    mws_intersect_swb = -9999
+                    mws_intersect_swb = []
 
                 ############ DEM (Digital Elevation Model) ########################
                 try:
@@ -979,7 +979,7 @@ def generate_mws_data_for_kyl_filters(
                         ]
                         if not mws_drainage_density_data.empty:
                             row = mws_drainage_density_data.iloc[0]
-                            drainage_density = round(row["drainage_density"], 2)
+                            drainage_density = round(row["drainage_density_std_in_km_per_km2"], 2)
                         else:
                             drainage_density = 0
 

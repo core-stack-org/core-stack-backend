@@ -244,7 +244,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
             elif workspace == "drainage_density":
                 create_excel_for_drainage_density(geojson_data, writer)
-            elif workspace == "antyodaya_analysis":
+            elif workspace == "antyodaya_2020":
                 create_excel_for_antyodaya_20(geojson_data, writer)
             elif workspace == "livestocks":
                 create_excel_for_livestock(geojson_data, writer)
@@ -257,42 +257,44 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
 
 
 def create_excel_for_livestock(data, writer):
-    features = data.get("features", [])
-    df_data = [feature.get("properties", {}) for feature in features]
-    df = pd.DataFrame(df_data)
+    try:
+        features = data.get("features", [])
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
 
-    # Columns to exclude
-    exclude_cols = ["state_name","district_name","TEHSIL"]
-    df = df.drop(columns=exclude_cols, errors="ignore")
+        # Columns to exclude
+        exclude_cols = ["state_name","district_name","TEHSIL"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
 
-    # Keep important columns first if they exist
-    first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
-    other_cols = [c for c in df.columns if c not in first_cols]
-    df = df[first_cols + other_cols]
+        # Keep important columns first if they exist
+        first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
+        other_cols = [c for c in df.columns if c not in first_cols]
+        df = df[first_cols + other_cols]
 
-    # # Round numeric columns
-    # numeric_cols = df.select_dtypes(include=["number"]).columns
-    # df[numeric_cols] = df[numeric_cols].round(2)
-
-    df.to_excel(writer, sheet_name="livestock", index=False)
-    print("Excel file created for livestock")
+        df.to_excel(writer, sheet_name="livestock", index=False)
+        print("Excel file created for livestock")
+    except Exception as e:
+        print(f"Error in getting livestock data: {e}")
 
 
 def create_excel_for_antyodaya_20(data, writer):
-    features = data.get("features", [])
-    df_data = [feature.get("properties", {}) for feature in features]
-    df = pd.DataFrame(df_data)
+    try:
+        features = data.get("features", [])
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
 
-    # Keep important columns first if they exist
-    first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
-    other_cols = [c for c in df.columns if c not in first_cols]
-    df = df[first_cols + other_cols]
+        # Keep important columns first if they exist
+        first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
+        other_cols = [c for c in df.columns if c not in first_cols]
+        df = df[first_cols + other_cols]
 
-    # Round numeric columns
-    numeric_cols = df.select_dtypes(include=["number"]).columns
-    df[numeric_cols] = df[numeric_cols].round(2)
-    df.to_excel(writer, sheet_name="antyodaya", index=False)
-    print("Excel file created for antyodaya")
+        # Round numeric columns
+        numeric_cols = df.select_dtypes(include=["number"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="antyodaya", index=False)
+        print("Excel file created for antyodaya")
+    except Exception as e:
+        print(f"Error in getting antyodaya data: {e}")
 
 
 def create_excel_for_drainage_density(data, writer):
@@ -503,32 +505,36 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
 
 
 def create_excel_for_facilities(data, writer):
-    features = data["features"]
-    df_data = [feature["properties"] for feature in features]
+    try:
+        features = data["features"]
+        df_data = [feature["properties"] for feature in features]
 
-    df = pd.DataFrame(df_data)
+        df = pd.DataFrame(df_data)
 
-    first_cols = ["censuscode2011", "censusname"]
-    other_cols = [c for c in df.columns if c not in first_cols]
-    df = df[first_cols + other_cols]
+        first_cols = ["censuscode2011", "censusname"]
+        other_cols = [c for c in df.columns if c not in first_cols]
+        df = df[first_cols + other_cols]
 
-    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-    df[numeric_cols] = df[numeric_cols].round(2)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
 
-    exclude_cols = ["censuscode2011", "censusname", "district", "core_admin_uid", "shrid2", "state", "tehsil"]
-    df.rename(
-        columns={
-            col: f"{col}_in_km"
-            for col in df.columns
-            if col not in exclude_cols
-        },
-        inplace=True
-    )
+        exclude_cols = ["censuscode2011", "censusname", "district", "core_admin_uid", "shrid2", "state", "tehsil"]
+        df.rename(
+            columns={
+                col: f"{col}_in_km"
+                for col in df.columns
+                if col not in exclude_cols
+            },
+            inplace=True
+        )
 
-    # Write to Excel
-    df.to_excel(writer, sheet_name="facilities_proximity", index=False)
+        # Write to Excel
+        df.to_excel(writer, sheet_name="facilities_proximity", index=False)
 
-    print("Excel file created for facilities_proximity")
+        print("Excel file created for facilities_proximity")
+    except Exception as e:
+        print("facilities_proximity Layer not found :: ", e)
+    
 
 
 def create_excel_for_mws(data, writer):
@@ -617,108 +623,123 @@ def create_excel_for_stream_order(data, writer):
 
 
 def create_excel_for_mining(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "division": properties["company_na"],
-            "proposal": properties["proposal"],
-            "sector_moefcc": properties["sector_moe"],
-            "village": properties["village"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "division": properties["company_na"],
+                "proposal": properties["proposal"],
+                "sector_moefcc": properties["sector_moe"],
+                "village": properties["village"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df.replace("", "unknown", inplace=True)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="mining", index=False)
-    print("Excel file created for mining")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df.replace("", "unknown", inplace=True)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="mining", index=False)
+        print("Excel file created for mining")
+    except Exception as e:
+        print("Mining Layer not found :: ", e)
 
 
 def create_excel_for_green_credit(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "division": properties["division"],
-            # "parcel_id": properties["parcel_id"],
-            "land_info": properties["land_info"],
-            "kml_url": properties["kml_url"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "division": properties["division"],
+                # "parcel_id": properties["parcel_id"],
+                "land_info": properties["land_info"],
+                "kml_url": properties["kml_url"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="green_credit", index=False)
-    print("Excel file created for green_credit")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="green_credit", index=False)
+        print("Excel file created for green_credit")
+    except Exception as e:
+        print("green credit Layer not found :: ", e)
 
 
 def create_excel_for_factory_csr(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "Company_Name": properties["COMPANY NA"],
-            "ADDRESS": properties["ADDRESS"],
-            "LOCATION T": properties["LOCATION T"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "Company_Name": properties["COMPANY NA"],
+                "ADDRESS": properties["ADDRESS"],
+                "LOCATION T": properties["LOCATION T"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="factory_csr", index=False)
-    print("Excel file created for factory_csr")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="factory_csr", index=False)
+        print("Excel file created for factory_csr")
+    except Exception as e:
+        print("factory csr Layer not found :: ", e)
 
 
 def create_excel_for_agroecological(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "organization_name": properties["organization_name"],
-            "organization_type": properties["organization_type"],
-            "created_at": properties["created_at"],
-            "contact_person": properties["contact_person"],
-            "email": properties["email"],
-            "domains": properties["domains"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "organization_name": properties["organization_name"],
+                "organization_type": properties["organization_type"],
+                "created_at": properties["created_at"],
+                "contact_person": properties["contact_person"],
+                "email": properties["email"],
+                "domains": properties["domains"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="agroecological", index=False)
-    print("Excel file created for agroecological")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="agroecological", index=False)
+        print("Excel file created for agroecological")
+    except Exception as e:
+        print("agroecological Layer not found :: ", e)
 
 
 def create_excel_for_lcw(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "title_of_conflict": properties["Title of Conflict"],
-            "link_to_conflict": properties["Link to conflict"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "title_of_conflict": properties["Title of Conflict"],
+                "link_to_conflict": properties["Link to conflict"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="lcw_conflict", index=False)
-    print("Excel file created for lcw_conflict")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="lcw_conflict", index=False)
+        print("Excel file created for lcw_conflict")
+    except Exception as e:
+        print("lcw Layer not found :: ", e)
 
 
 def create_excel_for_soge(data, xlsx_file, writer):
