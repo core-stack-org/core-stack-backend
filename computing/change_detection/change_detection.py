@@ -25,6 +25,8 @@ def get_change_detection(
     """
     # Initialize the Earth Engine
     ee_initialize(gee_account_id)
+    start_year = int(start_year)
+    end_year = int(end_year)
     param_dict = {
         "Urbanization": built_up,
         "Degradation": change_degradation,

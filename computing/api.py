@@ -16,8 +16,17 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from computing.change_detection.change_detection import (
+    get_change_detection as get_change_detection_gee_task,
+)
+from computing.change_detection.change_detection_local import (
+    get_change_detection as get_change_detection_local_task,
+)
 from computing.change_detection.change_detection_vector import (
-    vectorise_change_detection,
+    vectorise_change_detection as vectorise_change_detection_gee_task,
+)
+from computing.change_detection.change_detection_vector_local import (
+    vectorise_change_detection as vectorise_change_detection_local_task,
 )
 from .utils import (
     save_layer_info_to_db,
@@ -58,7 +67,6 @@ from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
 from .clart.clart import generate_clart_layer
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.nrega import clip_nrega_district_block
-from computing.change_detection.change_detection import get_change_detection
 from .lulc.lulc_v3 import clip_lulc_v3
 from .crop_grid.crop_grid import create_crop_grids
 from .tree_health.ccd import tree_health_ccd_raster
@@ -1005,18 +1013,33 @@ def change_detection(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        task = get_change_detection.apply_async(
+        compute = get_compute_mode(request)
+        task = select_compute_task(
+            compute,
+            get_change_detection_gee_task,
+            get_change_detection_local_task,
+        )
+        task_result = task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
         asset_ids = layer_assets.change_detection_asset_ids(
-            state, district, block, int(start_year), int(end_year)
+            state, district, block, start_year, end_year
         )
+        sync_mode = is_sync_layer_generation_request(request)
         return _task_started_response(
-            "change_detection task initiated", task=task, asset_ids=asset_ids
+            "change_detection completed" if sync_mode else "change_detection task initiated",
+            task=task_result,
+            asset_ids=asset_ids,
+            completed=sync_mode,
+        )
+    except ValueError as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     except Exception as e:
         return layer_api_error_response("change_detection", e, request=request)
@@ -1030,18 +1053,35 @@ def change_detection_vector(request):
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
+        start_year = int(request.data.get("start_year"))
+        end_year = int(request.data.get("end_year"))
         gee_account_id = request.data.get("gee_account_id")
-        task = vectorise_change_detection.apply_async(
+        compute = get_compute_mode(request)
+        task = select_compute_task(
+            compute,
+            vectorise_change_detection_gee_task,
+            vectorise_change_detection_local_task,
+        )
+        task_result = task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
         )
         asset_ids = layer_assets.change_detection_vector_asset_ids(
-            state, district, block, int(start_year), int(end_year)
+            state, district, block, start_year, end_year
         )
+        sync_mode = is_sync_layer_generation_request(request)
         return _task_started_response(
-            "change_detection_vector task initiated", task=task, asset_ids=asset_ids
+            "change_detection_vector completed"
+            if sync_mode
+            else "change_detection_vector task initiated",
+            task=task_result,
+            asset_ids=asset_ids,
+            completed=sync_mode,
+        )
+    except ValueError as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     except Exception as e:
         return layer_api_error_response("change_detection_vector", e, request=request)
