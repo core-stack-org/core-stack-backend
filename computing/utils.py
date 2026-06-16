@@ -41,6 +41,8 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from utilities.geoserver_utils import Geoserver
+from django.core.mail import EmailMessage, get_connection
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -1030,3 +1032,90 @@ def update_layer_sync_status(
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
+
+
+# send missing layer to recipient email
+def send_missing_layers_report(result: dict, recipients: list = None) -> bool:
+    if recipients is None:
+        recipients = getattr(settings, "MISSING_LAYER_RECIPIENTS", [])
+
+    if isinstance(recipients, str):
+        recipients = [recipients]
+
+    if not recipients:
+        logger.error("No recipients configured for missing layers report.")
+        return False
+
+    summary = []
+    total_missing = 0
+
+    for layer, data in result.items():
+        count = len(data.get("missing_layers", []))
+        total_missing += count
+        summary.append(f"{layer}: {count}")
+    body = (
+        "Missing Layers Report\n\n"
+        f"Total Missing: {total_missing}\n\n"
+        + "\n".join(summary)
+        + "\n\nDetailed report attached."
+    )
+
+    attachment_content = json.dumps(result, indent=4)
+    max_retries = 3
+
+    for attempt in range(max_retries):
+        connection = None
+        try:
+            connection = get_connection(timeout=120)
+            connection.open()
+            email = EmailMessage(
+                subject="Missing Layers Report",
+                body=body,
+                from_email=settings.EMAIL_HOST_USER,
+                to=recipients,
+                connection=connection,
+            )
+            email.attach(
+                "missing_layers.json",
+                attachment_content,
+                "application/json",
+            )
+            email.send()
+            logger.info(f"Missing layers report sent to {recipients}")
+            logger.info(
+                f"Attachment size: "
+                f"{len(attachment_content.encode('utf-8')) / 1024:.2f} KB"
+            )
+            return True
+        except Exception as e:
+            logger.exception(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                wait_time = 5 * (attempt + 1)
+                logger.info(f"Retrying after {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                logger.error("All attempts to send email failed.")
+                return False
+        finally:
+            if connection:
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+
+
+def _is_cache_valid(cache: dict, workspace: str) -> bool:
+    if workspace not in cache:
+        return False
+    age = time.time() - cache[workspace]["cached_at"]
+    if age > 3600:
+        logger.info(f"Cache expired for {workspace} (age: {int(age)}s)")
+        return False
+    return True
+
+
+def _set_cache(cache: dict, workspace: str, data: set):
+    cache[workspace] = {
+        "data": data,
+        "cached_at": time.time(),
+    }
