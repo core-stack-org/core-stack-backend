@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .utils import send_missing_layers_report, _is_cache_valid, _set_cache
 import os
+import openpyxl
 
 logger = setup_logger(__name__)
 
@@ -480,10 +481,96 @@ def refresh_layer_cache(request, workspace=None):
     return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
 
 
+EXPECTED_SHEETS = [
+    "terrain",
+    "terrain_lulc_slope",
+    "terrain_lulc_plain",
+    "surfaceWaterBodies_annual",
+    "nrega_annual",
+    "nrega_assets_village",
+    "croppingIntensity_annual",
+    "croppingDrought_kharif",
+    "hydrological_annual",
+    "hydrological_seasonal",
+    "social_economic_indicator",
+    "livestock",
+    "antyodaya",
+    "drainage_density",
+    "lulc_vector",
+    "canal",
+    "river",
+    "dem",
+    "mws_intersect_swb",
+    "facilities_proximity",
+    "mws",
+    "mws_connectivity",
+    "stream_order",
+    "mining",
+    "green_credit",
+    "factory_csr",
+    "agroecological",
+    "lcw_conflict",
+    "soge_vector",
+    "aquifer_vector",
+    "restoration_vector",
+    "overall_tree_change",
+    "Canopy_Cover_Density",
+    "Canopy_height",
+    "drought_causality",
+    "change_detection_afforestation",
+    "change_detection_cropintensity",
+    "change_detection_deforestation",
+    "change_detection_degradation",
+    "change_detection_urbanization",
+    "mws_intersect_villages",
+]
+
+
+def check_xlsx_sheets(file_path):
+    """
+    Returns dict with:
+    - missing_sheets: expected sheets not present in file
+    - empty_sheets: sheets that exist but have no data rows
+    """
+    missing_sheets = []
+    empty_sheets = []
+
+    try:
+        wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        existing_sheets = wb.sheetnames
+
+        for sheet_name in EXPECTED_SHEETS:
+            if sheet_name not in existing_sheets:
+                missing_sheets.append(sheet_name)
+            else:
+                ws = wb[sheet_name]
+                # max_row is None or 1 (header only) means no data
+                if ws.max_row is None or ws.max_row <= 1:
+                    empty_sheets.append(sheet_name)
+
+        # Flag unexpected sheets that are empty too
+        for sheet_name in existing_sheets:
+            if sheet_name not in EXPECTED_SHEETS:
+                ws = wb[sheet_name]
+                if ws.max_row is None or ws.max_row <= 1:
+                    empty_sheets.append(f"{sheet_name} (unexpected + empty)")
+
+        wb.close()
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    return {
+        "missing_sheets": missing_sheets,
+        "empty_sheets": empty_sheets,
+    }
+
+
 def check_missing_excel_files():
     """
     Check missing excel and json files for active tehsils.
     Groups all missing files per tehsil location.
+    Also checks xlsx for missing/empty sheets.
     """
     base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
     missing_location = []
@@ -506,20 +593,37 @@ def check_missing_excel_files():
             f"{district}_{tehsil_name}_KYL_village_data.json",
         ]
 
-        missing_files = [
-            filename
-            for filename in required_files
-            if not os.path.exists(os.path.join(dir_path, filename))
-            or os.path.getsize(os.path.join(dir_path, filename)) == 0
-        ]
+        missing_files = []
+        xlsx_issues = {}
 
-        if missing_files:
+        for filename in required_files:
+            file_path = os.path.join(dir_path, filename)
+
+            if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
+                missing_files.append(filename)
+
+            # Deep check for xlsx if file exists and is non-empty
+            elif filename.endswith(".xlsx"):
+                sheet_check = check_xlsx_sheets(file_path)
+                if sheet_check.get("error"):
+                    missing_files.append(
+                        f"{filename} (unreadable: {sheet_check['error']})"
+                    )
+                elif sheet_check["missing_sheets"] or sheet_check["empty_sheets"]:
+                    xlsx_issues = {
+                        "file": filename,
+                        "missing_sheets": sheet_check["missing_sheets"],
+                        "empty_sheets": sheet_check["empty_sheets"],
+                    }
+
+        if missing_files or xlsx_issues:
             missing_location.append(
                 {
                     "state": state,
                     "district": district,
                     "tehsil": tehsil_name,
                     "missing_files": missing_files,
+                    "xlsx_issues": xlsx_issues,
                 }
             )
 
