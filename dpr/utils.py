@@ -459,12 +459,13 @@ def send_dpr_email(
         logger.error(f"Failed to send email: {e}")
 
 
-def upload_dpr_to_s3(pdf_bytes, plan_id, plan_name, language="en"):
-
-    doc_bytes = BytesIO(pdf_bytes)
+def upload_dpr_to_s3(doc, plan_id, plan_name):
+    doc_bytes = BytesIO()
+    doc.save(doc_bytes)
+    doc_bytes.seek(0)
 
     safe_plan_name = transform_name(plan_name)
-    s3_key = f"{DPR_S3_FOLDER}/{plan_id}_{safe_plan_name}_{language}.pdf"
+    s3_key = f"{DPR_S3_FOLDER}/{plan_id}_{safe_plan_name}.docx"
 
     s3_client = boto3.client(
         "s3",
@@ -478,15 +479,14 @@ def upload_dpr_to_s3(pdf_bytes, plan_id, plan_name, language="en"):
         DPR_S3_BUCKET,
         s3_key,
         ExtraArgs={
-            "ContentType": "application/pdf",
-            "ContentDisposition": f'attachment; filename="DPR_{safe_plan_name}.pdf"',
+            "ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "ContentDisposition": f'attachment; filename="DPR_{safe_plan_name}.docx"',
             "CacheControl": "no-cache, no-store, must-revalidate",
         },
     )
 
     ts = int(time.time())
     s3_url = f"https://{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}?v={ts}"
-
     logger.info(f"DPR uploaded to S3: {s3_url}")
     return s3_url
 
