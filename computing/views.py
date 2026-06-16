@@ -317,7 +317,8 @@ def bulk_check_vector_layers(
     return results
 
 
-def missing_layer_for_all_workspace():
+@app.task(bind=True)
+def missing_layer_for_all_workspace(self):
     workspaces = (
         Dataset.objects.filter(workspace__isnull=False)
         .values_list("workspace", flat=True)
