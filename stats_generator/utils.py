@@ -49,10 +49,10 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
 
     # Use append mode with if_sheet_exists='replace'
     with pd.ExcelWriter(
-        xlsx_file,
-        engine="openpyxl",
-        mode=mode,
-        if_sheet_exists="replace" if mode == "a" else None,
+            xlsx_file,
+            engine="openpyxl",
+            mode=mode,
+            if_sheet_exists="replace" if mode == "a" else None,
     ) as writer:
         for layer in fetch_layers_for_excel_generation():
             workspace = layer["workspace"]
@@ -88,13 +88,13 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             if workspace == "terrain":
                 create_excel_for_terrain(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "terrain_lulc"
-                and layer_name == f"{district}_{block}_lulc_slope"
+                    workspace == "terrain_lulc"
+                    and layer_name == f"{district}_{block}_lulc_slope"
             ):
                 create_excel_for_terrain_lulc_slope(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "terrain_lulc"
-                and layer_name == f"{district}_{block}_lulc_plain"
+                    workspace == "terrain_lulc"
+                    and layer_name == f"{district}_{block}_lulc_plain"
             ):
                 create_excel_for_terrain_lulc_plain(geojson_data, xlsx_file, writer)
             elif workspace == "swb":
@@ -140,8 +140,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
             elif (
-                workspace == "mws_layers"
-                and layer_name == f"deltaG_well_depth_{district}_{block}"
+                    workspace == "mws_layers"
+                    and layer_name == f"deltaG_well_depth_{district}_{block}"
             ):
                 parsed_data_annual_mws = parse_geojson_annual_mws(geojson_data)
                 create_excel_annual_mws(parsed_data_annual_mws, xlsx_file, writer)
@@ -152,8 +152,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 except Exception as e:
                     print("Exception", str(e))
             elif (
-                workspace == "mws_layers"
-                and layer_name == f"deltaG_fortnight_{district}_{block}"
+                    workspace == "mws_layers"
+                    and layer_name == f"deltaG_fortnight_{district}_{block}"
             ):
                 processed_data = [
                     process_feature(feature) for feature in geojson_data["features"]
@@ -178,34 +178,34 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "tree_overall_ch":
                 create_excel_for_overall_tree_change(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Afforestation"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Afforestation"
             ):
                 create_excel_chan_detection_afforestation(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_CropIntensity"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_CropIntensity"
             ):
                 create_excel_chan_detection_cropintensity(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Deforestation"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Deforestation"
             ):
                 create_excel_chan_detection_deforestation(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Degradation"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Degradation"
             ):
                 create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Urbanization"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Urbanization"
             ):
                 create_excel_chan_detection_urbanization(
                     geojson_data, xlsx_file, writer
@@ -263,7 +263,7 @@ def create_excel_for_livestock(data, writer):
         df = pd.DataFrame(df_data)
 
         # Columns to exclude
-        exclude_cols = ["state_name","district_name","TEHSIL"]
+        exclude_cols = ["state_name", "district_name", "TEHSIL"]
         df = df.drop(columns=exclude_cols, errors="ignore")
 
         # Keep important columns first if they exist
@@ -299,6 +299,7 @@ def create_excel_for_antyodaya_20(data, writer):
 
 def create_excel_for_drainage_density(data, writer):
     import ast
+
     print("Inside create_excel_for Drainage Density")
     df_data = []
     features = data["features"]
@@ -308,9 +309,15 @@ def create_excel_for_drainage_density(data, writer):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "drainage_density_in_km_per_km2": properties.get("drainage_density", ""),
-            "drainage_density_std_in_km_per_km2": properties.get("drainage_density_std", ""),
-            "stream_order_length_in_km": sum(ast.literal_eval(properties.get("stream_length_km", ""))),
+            "drainage_density_in_km_per_km2": properties.get(
+                "drainage_density_weighted", ""
+            ),
+            "drainage_density_std_in_km_per_km2": properties.get(
+                "drainage_density_std", ""
+            ),
+            "stream_order_length_in_km": sum(
+                ast.literal_eval(properties.get("stream_length_km", ""))
+            ),
         }
 
         df_data.append(row)
@@ -518,14 +525,20 @@ def create_excel_for_facilities(data, writer):
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
 
-        exclude_cols = ["censuscode2011", "censusname", "district", "core_admin_uid", "shrid2", "state", "tehsil"]
+        exclude_cols = [
+            "censuscode2011",
+            "censusname",
+            "district",
+            "core_admin_uid",
+            "shrid2",
+            "state",
+            "tehsil",
+        ]
         df.rename(
             columns={
-                col: f"{col}_in_km"
-                for col in df.columns
-                if col not in exclude_cols
+                col: f"{col}_in_km" for col in df.columns if col not in exclude_cols
             },
-            inplace=True
+            inplace=True,
         )
 
         # Write to Excel
@@ -534,7 +547,6 @@ def create_excel_for_facilities(data, writer):
         print("Excel file created for facilities_proximity")
     except Exception as e:
         print("facilities_proximity Layer not found :: ", e)
-    
 
 
 def create_excel_for_mws(data, writer):
@@ -1449,7 +1461,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
         parts = uid.split("_")
         num_uid_parts_is = [
-            f"{parts[i]}_{parts[i+1]}" for i in range(0, len(parts) - 1, 2)
+            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
         ]
         if len(parts) % 2 == 1:  # Check for an unpaired last part
             num_uid_parts_is.append(parts[-1])
@@ -1461,7 +1473,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             row = {"UID": num_uid_part}
 
             for year in years:
-                short_year = f"{str(year)[-2:]}-{str(year+1)[-2:]}"
+                short_year = f"{str(year)[-2:]}-{str(year + 1)[-2:]}"
 
                 # Construct keys dynamically using the shortened year format
                 total_area_key = f"area_{short_year}"
@@ -1476,16 +1488,16 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
                 zaid_percentage = properties.get(zaid_key, 0)
 
                 # Calculate areas
-                row[f"total_area_in_ha_{year}-{year+1}"] = total_area / len(
+                row[f"total_area_in_ha_{year}-{year + 1}"] = total_area / len(
                     num_uid_parts_is
                 )
-                row[f"kharif_area_in_ha_{year}-{year+1}"] = calculate_area(
+                row[f"kharif_area_in_ha_{year}-{year + 1}"] = calculate_area(
                     total_area, kharif_percentage
                 ) / len(num_uid_parts_is)
-                row[f"rabi_area_in_ha_{year}-{year+1}"] = calculate_area(
+                row[f"rabi_area_in_ha_{year}-{year + 1}"] = calculate_area(
                     total_area, rabi_percentage
                 ) / len(num_uid_parts_is)
-                row[f"zaid_area_in_ha_{year}-{year+1}"] = calculate_area(
+                row[f"zaid_area_in_ha_{year}-{year + 1}"] = calculate_area(
                     total_area, zaid_percentage
                 ) / len(num_uid_parts_is)
 
@@ -1509,7 +1521,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
 
 def create_excel_for_nrega_assets(
-    nrega_data, mws_data, output_file, writer, start_year, end_year
+        nrega_data, mws_data, output_file, writer, start_year, end_year
 ):
     workCategoryMapping = {
         "SWC - Landscape level impact": "Soil and water conservation",
@@ -1613,7 +1625,7 @@ def create_excel_for_nrega_assets(
 
 
 def create_excel_village_nrega_assets(
-    result_df, output_file, writer, all_villages_df, start_year, end_year
+        result_df, output_file, writer, all_villages_df, start_year, end_year
 ):
     workCategoryMapping = {
         "SWC - Landscape level impact": "Soil and water conservation",
@@ -1658,7 +1670,7 @@ def create_excel_village_nrega_assets(
             continue
 
         mask = (final_df["vill_id"] == row["vill_ID"]) & (
-            final_df["vill_name"] == row["vill_name"]
+                final_df["vill_name"] == row["vill_name"]
         )
         col_name = f"{category}_count_{year}"
         final_df.loc[mask, col_name] += 1
@@ -1678,7 +1690,7 @@ def create_excel_village_nrega_assets(
 
 
 def fetch_village_asset_count(
-    state, district, block, writer, output_file, start_year, end_year
+        state, district, block, writer, output_file, start_year, end_year
 ):
     # 1. Read village data
     village_gdf = gpd.read_file(get_url("panchayat_boundaries", f"{district}_{block}"))[
