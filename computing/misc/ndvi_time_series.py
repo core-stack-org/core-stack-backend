@@ -12,6 +12,7 @@ from computing.utils import (
     get_layer_object,
     save_layer_info_to_db,
     sync_layer_to_geoserver,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     sync_fc_to_geoserver,
     create_chunk,
@@ -172,7 +173,7 @@ def ndvi_timeseries(
             )
             print(res)
 
-            if res["status_code"] == 201 and layer_id:
+            if geoserver_sync_succeeded(res) and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("sync to geoserver flag is updated")
 

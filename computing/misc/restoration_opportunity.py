@@ -15,6 +15,7 @@ from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
 )
 from utilities.constants import WRI_LAND_RESTORATION_DATASET
@@ -155,7 +156,7 @@ def generate_vector(roi, raster_asset_id, args, state, district, block, descript
         fc = ee.FeatureCollection(fc).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
         res = sync_layer_to_geoserver(state, fc, description, "restoration")
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
             layer_at_geoserver = True

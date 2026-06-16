@@ -2,6 +2,7 @@ import ee
 from computing.utils import (
     sync_fc_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     get_layer_object,
 )
@@ -190,7 +191,7 @@ def push_to_geoserver_db_stc(
 
         res = sync_fc_to_geoserver(fc, state, layer_name, "drought")
         print(res)
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True

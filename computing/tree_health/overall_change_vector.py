@@ -2,6 +2,7 @@ import ee
 from computing.utils import (
     sync_fc_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
 )
 from utilities.constants import GEE_PATHS
@@ -93,7 +94,7 @@ def tree_health_overall_change_vector(
         )
 
         # Update sync status
-        if sync_res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(sync_res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_at_geoserver = True
 

@@ -3,6 +3,7 @@ import ee
 from nrm_app.celery import app
 from computing.utils import (
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     sync_layer_to_geoserver,
 )
@@ -241,6 +242,7 @@ def stream_order_vector_generation(
     if not is_gee_asset_exists(vector_asset_id):
         return False
 
+    layer_id = None
     # Save layer metadata
     if state and district and block:
         layer_id = save_layer_info_to_db(
@@ -272,7 +274,7 @@ def stream_order_vector_generation(
     )
 
     layer_at_geoserver = False
-    if res.get("status_code") == 201 and layer_id:
+    if geoserver_sync_succeeded(res) and layer_id:
         update_layer_sync_status(
             layer_id=layer_id,
             sync_to_geoserver=True,

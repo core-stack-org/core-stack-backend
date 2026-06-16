@@ -182,8 +182,8 @@ def clip_lulc_v3(
                         asset_id=final_output_assetid_array_new[i],
                         dataset_name=workspace,
                         misc={
-                            "start_year": start_year,
-                            "end_year": end_year,
+                            "start_year": 2000 + int(s_year),
+                            "end_year": 2000 + int(s_year),
                         },
                     )
                     layer_ids.append(layer_id)
@@ -245,7 +245,7 @@ def sync_lulc_to_geoserver(
         e_year = name_arr[2][:2]
         gcs_file_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
         print("Syncing " + gcs_file_name + " to geoserver")
-        for workspace in lulc_workspaces:
+        for wi, workspace in enumerate(lulc_workspaces):
             suff = workspace.replace("LULC", "")
             style = workspace.lower() + "_style"
             if block_name:
@@ -266,8 +266,14 @@ def sync_lulc_to_geoserver(
             res = sync_raster_gcs_to_geoserver(
                 workspace, gcs_file_name, layer_name, style
             )
-            if res and layer_ids:
-                update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
-                print("geoserver flag is updated")
+            if res and layer_ids and workspace == "LULC_level_3":
+                layer_index = i * len(lulc_workspaces) + wi
+                if layer_index < len(layer_ids):
+                    update_layer_sync_status(
+                        layer_id=layer_ids[layer_index], sync_to_geoserver=True
+                    )
+                    print("geoserver flag is updated")
+                    layer_at_geoserver = True
+            elif res and not layer_ids:
                 layer_at_geoserver = True
     return layer_at_geoserver

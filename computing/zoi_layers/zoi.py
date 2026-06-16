@@ -1,10 +1,39 @@
 from computing.zoi_layers.zoi1 import generate_zoi1
 from computing.zoi_layers.zoi2 import generate_zoi_ci
-from computing.zoi_layers.zoi3 import get_ndvi_for_zoi
+from computing.zoi_layers.zoi_ndvi_from_timeseries import (
+    get_ndvi_for_zoi_from_timeseries_compute,
+)
 from projects.models import Project
 from utilities.gee_utils import ee_initialize, valid_gee_text, check_task_status
 from waterrejuvenation.utils import wait_for_task_completion, delete_asset_on_GEE
 from nrm_app.celery import app
+from datetime import datetime
+
+
+DEFAULT_ZOI_START_DATE = "2017-07-01"
+DEFAULT_ZOI_END_DATE = "2025-06-30"
+
+
+def _resolve_zoi_time_window(start_date=None, end_date=None):
+    start_date = (start_date or DEFAULT_ZOI_START_DATE).strip()
+    end_date = (end_date or DEFAULT_ZOI_END_DATE).strip()
+
+    try:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError("start_date and end_date must be in YYYY-MM-DD format.") from exc
+
+    if start_dt > end_dt:
+        raise ValueError("start_date must be less than or equal to end_date.")
+
+    # ZOI CI/NDVI use hydrological years (July -> June), represented by start-year.
+    start_year = start_dt.year if start_dt.month >= 7 else start_dt.year - 1
+    end_year = end_dt.year if end_dt.month >= 7 else end_dt.year - 1
+    if start_year > end_year:
+        raise ValueError("Provided date window does not contain a valid hydrological year.")
+
+    return start_date, end_date, start_year, end_year
 
 
 @app.task()
@@ -18,6 +47,8 @@ def generate_zoi(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
+    start_date=None,
+    end_date=None,
 ):
     print(f"gee account id {gee_account_id}")
     ee_initialize(gee_account_id)
@@ -30,6 +61,9 @@ def generate_zoi(
         proj_obj = Project.objects.get(pk=proj_id)
         asset_folder_list = [proj_obj.name.lower()]
         asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
+    start_date, end_date, start_year, end_year = _resolve_zoi_time_window(
+        start_date, end_date
+    )
 
     generate_zoi1(
         state,
@@ -41,6 +75,8 @@ def generate_zoi(
         app_type,
         gee_account_id,
         proj_id,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     generate_zoi_ci(
@@ -52,11 +88,14 @@ def generate_zoi(
         app_type,
         gee_account_id,
         proj_id,
+        start_date=start_date,
+        end_date=end_date,
+        start_year=start_year,
+        end_year=end_year,
     )
 
-    if proj_id:
-
-        get_ndvi_for_zoi(
+    if proj_id or (state and district and block):
+        get_ndvi_for_zoi_from_timeseries_compute(
             state=state,
             district=district,
             block=block,
@@ -65,4 +104,8 @@ def generate_zoi(
             app_type=app_type,
             gee_account_id=gee_account_id,
             proj_id=proj_id,
+            start_date=start_date,
+            end_date=end_date,
+            start_year=start_year,
+            end_year=end_year,
         )

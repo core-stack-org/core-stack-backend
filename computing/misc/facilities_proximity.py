@@ -27,6 +27,7 @@ from utilities.gee_utils import (
 )
 from computing.utils import (
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     sync_fc_to_geoserver,
 )
@@ -234,7 +235,7 @@ def generate_facilities_proximity(state, district, block, gee_account_id):
                 fc, state, f"{layer_name}", FACILITIES_GEOSERVER_WORKSPACE
             )
 
-            if res and res.get("status_code") == 201 and layer_id:
+            if geoserver_sync_succeeded(res) and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 elapsed = (datetime.now() - start_time).total_seconds()
                 print(f"[{datetime.now()}] SUCCESS! Completed in {elapsed:.1f} seconds")

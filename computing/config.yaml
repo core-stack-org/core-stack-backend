@@ -1,0 +1,57 @@
+# Local compute dependency manifest.
+
+base_layers:
+    inputs:
+        - path: data/base_layers/lulc/lulc_v3_2017_2018.tif
+          source: manual
+          note: Pan-India LULC v3 rasters used for local change detection
+
+        - path: data/base_layers/Microwatershed_v2_with_details.geojson
+          source: manual
+          note: Microwatershed boundaries used to derive tehsil watershed ROIs
+
+        - path: data/base_layers/pan_india_waterbodies.geojson
+          source: manual
+          note: Pan-India surface water bodies vector layer used for local clipping
+
+        - path: data/admin-boundary/input/soi_tehsil.geojson
+          source: manual
+          note: SOI tehsil boundaries for watershed derivation
+
+        - path: data/base_layers/tehsil_watersheds/
+          source: derived
+          derived_from:
+              - data/base_layers/Microwatershed_v2_with_details.geojson
+              - data/admin-boundary/input/soi_tehsil.geojson
+          note: Per-tehsil watershed .gpkg files; generated on demand from GeoServer
+
+local_compute_outputs:
+    change_detection:
+        - path: data/change_detection/change_detection_local/{state}/{district}/{block}/
+          pattern: "change_{district}_{block}_{param_name}_{start_year}_{end_year}.tif"
+          params:
+              [
+                  Afforestation,
+                  Deforestation,
+                  Degradation,
+                  Urbanization,
+                  CropIntensity,
+              ]
+          geoserver_workspace: change_detection
+
+        - path: data/change_detection/change_detection_vector_local/{state}/{district}/{block}/
+          pattern: "change_vector_{district}_{block}_{param_name}_{start_year}_{end_year}.gpkg"
+          params:
+              [
+                  Afforestation,
+                  Deforestation,
+                  Degradation,
+                  Urbanization,
+                  CropIntensity,
+              ]
+          geoserver_workspace: change_detection
+
+    surface_water_bodies:
+        - path: data/surface_water_bodies/swb_local/{state}/{district}/{block}/
+          pattern: "surface_waterbodies_{district}_{block}.gpkg"
+          geoserver_workspace: swb

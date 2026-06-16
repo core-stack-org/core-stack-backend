@@ -18,6 +18,7 @@ from nrm_app.celery import app
 from nrm_app.settings import (
     BASE_DIR,
     GEOSERVER_PASSWORD,
+    GEOSERVER_URL,
     GEOSERVER_USERNAME,
     S3_ACCESS_KEY,
     S3_SECRET_KEY,
@@ -335,6 +336,8 @@ class MetadataProvider:
     def get_layer_mapping(
         self, layer_name, district, block, start_year="", overwrite_metadata=False
     ):
+        from utilities.gee_utils import valid_gee_text
+
         path = self.config.layer_map_csv
         if os.path.exists(path) and not overwrite_metadata:
             df = pd.read_csv(path)
@@ -342,25 +345,35 @@ class MetadataProvider:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
             df.to_csv(path, index=False)
-        row = df[df["layer_name"] == layer_name].iloc[0]
+        matches = df[df["layer_name"] == layer_name]
+        if matches.empty:
+            log.error(
+                "No layer_mapping.csv row for layer_name=%s (available: %s)",
+                layer_name,
+                sorted(df["layer_name"].dropna().unique().tolist()),
+            )
+            return None
+        row = matches.iloc[0]
         gs_layer = row["geoserver_layer_name"]
+        district_key = valid_gee_text(str(district).lower())
+        block_key = valid_gee_text(str(block).lower())
 
         if layer_name == "land_use_land_cover_raster":
             gs_layer = gs_layer.format(
                 start_year=str(int(start_year) % 100),
                 end_year=str((int(start_year) + 1) % 100),
-                district=district,
-                block=block,
+                district=district_key,
+                block=block_key,
             )
         elif layer_name in (
             "tree_canopy_cover_density_raster",
             "tree_canopy_height_raster",
         ):
             gs_layer = gs_layer.format(
-                start_year=start_year, district=district, block=block
+                start_year=start_year, district=district_key, block=block_key
             )
         else:
-            gs_layer = gs_layer.format(district=district, block=block)
+            gs_layer = gs_layer.format(district=district_key, block=block_key)
 
         return {
             "workspace": _clean_csv_value(row["geoserver_workspace_name"], ""),
@@ -852,6 +865,11 @@ class BaseSTACItemBuilder(ABC):
             overwrite_metadata=overwrite_metadata,
         )
         log.debug("Resolved layer_map: %s", layer_map)
+        if layer_map is None:
+            log.error(
+                "STAC build aborted: no layer mapping for layer=%s", layer_name
+            )
+            return None
         item = self._create_item(
             state, district, block, layer_name, description, layer_map, **kwargs
         )
@@ -1136,8 +1154,11 @@ class VectorSTACItemBuilder(BaseSTACItemBuilder):
 class STACCollectionGenerator:
     def __init__(self, config=None):
         self.config = config or STACConfig()
+        geoserver_base_url = (GEOSERVER_URL or "").strip().rstrip("/")
+        if not geoserver_base_url:
+            geoserver_base_url = self.config.geoserver_base_url
         self.geoserver = GeoServerClient(
-            self.config.geoserver_base_url,
+            geoserver_base_url,
             username=GEOSERVER_USERNAME,
             password=GEOSERVER_PASSWORD,
         )

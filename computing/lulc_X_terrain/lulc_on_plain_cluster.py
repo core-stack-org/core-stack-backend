@@ -3,6 +3,7 @@ from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db,
+    geoserver_sync_succeeded,
     update_layer_sync_status,
     create_chunk,
     merge_chunks,
@@ -169,7 +170,7 @@ def lulc_on_plain_cluster(
             "terrain_lulc",
         )
         print(res)
-        if res["status_code"] == 201 and layer_id:
+        if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag updated")
             layer_at_geoserver = True
