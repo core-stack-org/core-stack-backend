@@ -1,5 +1,11 @@
 import ee
 import datetime
+from computing.mws.utils import (
+    hydrology_period_columns,
+    hydrology_period_end,
+    hydrology_period_label,
+    parse_hydrology_period_start,
+)
 from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -126,9 +132,7 @@ def _generate_data(
         asset_path + "ET_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # et feature collection
 
-    col_names = prec.first().propertyNames().getInfo()
-    col_names = [col for col in col_names if col.startswith("20")]
-    col_names.sort()
+    col_names = hydrology_period_columns(prec.first().propertyNames().getInfo())
 
     if start_date in col_names and col_names[0] != start_date:
         col_names = col_names[col_names.index(start_date) :]
@@ -149,23 +153,15 @@ def _generate_data(
             g = p.subtract(q).subtract(e)
             values = [p, q, e, g]
             d = ee.Dictionary.fromLists(keys, values)
-            g_col_date = datetime.datetime.strptime(col_date, "%Y-%m-%d")
-            g_col_date = (
-                str(g_col_date.year) + "_" + str(g_col_date.year + 1)
-                if is_annual
-                else col_date
-            )
+            g_col_date = hydrology_period_label(col_date, is_annual)
             feat = feat.set(ee.String(g_col_date), ee.String.encodeJSON(d))
             return feat
 
         roi = roi.map(get_delta_g)
         start_date = col_date
 
-    start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d")
-    if is_annual:
-        last_date = start_date + datetime.timedelta(days=364)
-    else:
-        last_date = start_date + datetime.timedelta(days=14)
+    period_start = parse_hydrology_period_start(start_date)
+    last_date = hydrology_period_end(period_start, is_annual)
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(roi, description, asset_id)

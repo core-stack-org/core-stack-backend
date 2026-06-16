@@ -3,6 +3,10 @@ import datetime
 import json
 import os
 
+from computing.mws.utils import (
+    hydrology_period_columns,
+    parse_hydrology_end_date,
+)
 from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS, MERGE_MWS_PATH
 from utilities.gee_utils import (
@@ -49,24 +53,19 @@ def calculate_g(
             print("layer not found. So, reading the column name from asset_id.")
 
         if layer_obj:
-            db_end_date = layer_obj.misc["end_date"]
+            db_end_date = parse_hydrology_end_date(layer_obj.misc["end_date"])
         else:
             roi = ee.FeatureCollection(asset_id)
             col_names = roi.first().propertyNames().getInfo()
-            filtered_col = [col for col in col_names if col.startswith("20")]
-            filtered_col.sort()
-            db_end_date = filtered_col[-1]  # .split("-")[0].split("_")[-1]
-
-        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            period_cols = hydrology_period_columns(col_names)
+            db_end_date = parse_hydrology_end_date(period_cols[-1])
         if db_end_date.year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
             return asset_id
 
     fc = ee.FeatureCollection(delta_g_asset_id)
-    deltaG_col_names = fc.first().propertyNames().getInfo()
-    deltaG_col_names = [col for col in deltaG_col_names if col.startswith("20")]
-    deltaG_col_names.sort()
+    deltaG_col_names = hydrology_period_columns(fc.first().propertyNames().getInfo())
     fc = fc.getInfo()
     features = fc["features"]
 

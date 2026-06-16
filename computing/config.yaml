@@ -1,0 +1,28 @@
+# Local compute dependency manifest (SWB and shared base layers).
+
+base_layers:
+    inputs:
+        - path: data/base_layers/Microwatershed_v2_with_details.geojson
+          source: manual
+          note: Microwatershed boundaries used to derive tehsil watershed ROIs
+
+        - path: data/base_layers/pan_india_waterbodies.geojson
+          source: manual
+          note: Pan-India surface water bodies vector layer used for local clipping
+
+        - path: data/admin-boundary/input/soi_tehsil.geojson
+          source: manual
+          note: SOI tehsil boundaries for watershed derivation
+
+        - path: data/base_layers/tehsil_watersheds/
+          source: derived
+          derived_from:
+              - data/base_layers/Microwatershed_v2_with_details.geojson
+              - data/admin-boundary/input/soi_tehsil.geojson
+          note: Per-tehsil watershed .gpkg files; generated on demand from GeoServer
+
+local_compute_outputs:
+    surface_water_bodies:
+        - path: data/surface_water_bodies/swb_local/{state}/{district}/{block}/
+          pattern: "surface_waterbodies_{district}_{block}.gpkg"
+          geoserver_workspace: swb
