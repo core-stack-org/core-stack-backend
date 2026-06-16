@@ -1,5 +1,5 @@
 import requests
-from nrm_app.settings import GEOSERVER_URL
+from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
 from utilities.gee_utils import valid_gee_text
 import xml.etree.ElementTree as ET
 from lxml import etree as LET
@@ -17,6 +17,7 @@ from urllib3.util.retry import Retry
 from rest_framework.response import Response
 from rest_framework import status
 from .utils import send_missing_layers_report, _is_cache_valid, _set_cache
+import os
 
 logger = setup_logger(__name__)
 
@@ -477,3 +478,49 @@ def clear_layer_cache(workspace: str = None):
 def refresh_layer_cache(request, workspace=None):
     clear_layer_cache(workspace)
     return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
+
+
+def check_missing_excel_files():
+    """
+    Check missing excel and json files for active tehsils.
+    Groups all missing files per tehsil location.
+    """
+    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
+    missing_location = []
+
+    active_tehsils = TehsilSOI.objects.filter(active_status=True).select_related(
+        "district__state"
+    )
+
+    for tehsil in active_tehsils:
+        state = valid_gee_text(tehsil.district.state.state_name.lower())
+        district = valid_gee_text(tehsil.district.district_name.lower())
+        tehsil_name = valid_gee_text(tehsil.tehsil_name.lower())
+
+        dir_path = os.path.join(base_path, state.upper(), district.upper())
+
+        required_files = [
+            f"{district}_{tehsil_name}.json",
+            f"{district}_{tehsil_name}.xlsx",
+            f"{district}_{tehsil_name}_KYL_filter_data.json",
+            f"{district}_{tehsil_name}_KYL_village_data.json",
+        ]
+
+        missing_files = [
+            filename
+            for filename in required_files
+            if not os.path.exists(os.path.join(dir_path, filename))
+            or os.path.getsize(os.path.join(dir_path, filename)) == 0
+        ]
+
+        if missing_files:
+            missing_location.append(
+                {
+                    "state": state,
+                    "district": district,
+                    "tehsil": tehsil_name,
+                    "missing_files": missing_files,
+                }
+            )
+
+    return missing_location
