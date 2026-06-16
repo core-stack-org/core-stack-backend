@@ -4,6 +4,7 @@ from plans.models import PlanApp
 
 from django.db.models import Max
 from django.db.models.functions import Greatest
+from django.utils import timezone
 
 DPR_STATUS_CHOICES = [
     ("PENDING", "PENDING"),
@@ -664,8 +665,9 @@ class DPR_Report(models.Model):
                 latest_moderation=Max("moderated_at"),
             )
             for key in ("latest_submission", "latest_deletion", "latest_moderation"):
-                if agg[key]:
-                    times.append(agg[key])
+                dt = normalize_datetime(agg[key])
+                if dt:
+                    times.append(dt)
         return max(times) if times else None
 
     def needs_regeneration(self):
@@ -675,3 +677,13 @@ class DPR_Report(models.Model):
         if not latest_change:
             return False
         return latest_change > self.dpr_generated_at
+
+
+def normalize_datetime(dt):
+    if not dt:
+        return None
+
+    if timezone.is_naive(dt):
+        return timezone.make_aware(dt, timezone.get_current_timezone())
+
+    return dt

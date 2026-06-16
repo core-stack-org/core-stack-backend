@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import api
+from . import views
 
 urlpatterns = [
     path(
@@ -21,9 +22,16 @@ urlpatterns = [
         name="generate_resource_report",
     ),
     path("download_report/", api.download_report, name="download_report"),
-    path("generate_tehsil_report/", api.generate_tehsil_report, name="generate_tehsil_report"),
-     path("generate_village_report/", api.generate_village_report, name="generate_village_report"),
-
+    path(
+        "generate_tehsil_report/",
+        api.generate_tehsil_report,
+        name="generate_tehsil_report",
+    ),
+    path(
+        "generate_village_report/",
+        api.generate_village_report,
+        name="generate_village_report",
+    ),
     # DPR Data API
     path("dpr_data/<int:plan_id>/summary/", api.dpr_summary, name="dpr_summary"),
     path(

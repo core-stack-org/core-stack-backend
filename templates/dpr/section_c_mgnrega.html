@@ -1,0 +1,66 @@
+<div class="section">
+
+    <h2>
+        {{ t.section_c_mgnrega.title }}
+    </h2>
+
+    <table>
+
+            <tr>
+                <th>{{ t.section_c_mgnrega.settlement_name }}</th>
+                <th>{{ t.section_c_mgnrega.total_household_applied_job_card }}</th>
+                <th>{{ t.section_c_mgnrega.work_days_previous_year }}</th>
+                <th>{{ t.section_c_mgnrega.demand_made_in_previous_year }}</th>
+                <th>{{ t.section_c_mgnrega.involved_in_village_planing }}</th>
+                <th>{{ t.section_c_mgnrega.issues }}</th>
+            </tr>
+
+            {% for item in section_c.mgnrega %}
+            <tr>
+
+                <td>
+                    {{ item.settlement_name|default:t.common.na }}
+                </td>
+
+                <td>
+                    <p>{{ t.section_c_mgnrega.applied }}:
+                        {% if item.nrega_job_applied == 0 %}
+                            {{ t.common.na }}
+                        {% else %}
+                            {{ item.nrega_job_applied }}
+                        {% endif %}
+                    </p>
+                    <p>{{ t.section_c_mgnrega.having }}:
+                        {% if item.nrega_job_card == 0 %}
+                            {{ t.common.na }}
+                        {% else %}
+                            {{ item.nrega_job_card }}
+                        {% endif %}
+                    </p>
+                </td>
+
+                <td>
+                    {% if item.nrega_work_days == 0 %}
+                        {{ t.common.na }}
+                    {% else %}
+                        {{ item.nrega_work_days }}
+                    {% endif %}
+                </td>
+
+                <td>
+                    {{ item.nrega_past_work_label|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.nrega_demand_label|default:t.common.na}}
+                </td>
+
+                <td>
+                    {{ item.nrega_issues_label|default:t.common.na }}
+                </td>
+
+            </tr>
+            {% endfor %}
+    </table>
+
+</div>
