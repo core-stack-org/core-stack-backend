@@ -55,7 +55,7 @@
   "processing": {
     "join_storage": "sqlite",
     "join_work_db": "data/antyodaya/output/.antyodaya_2020_join_work.sqlite3",
-    "source_chunk_size": 2500,
-    "chunk_size": 5000
+    "source_chunk_size": 10000,
+    "chunk_size": 10000
   }
 }
