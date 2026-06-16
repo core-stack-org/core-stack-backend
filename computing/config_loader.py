@@ -30,6 +30,14 @@ def _output_entry(module: str, index: int = 0) -> dict:
     return _cfg["local_compute_outputs"][module][index]
 
 
+LULC_BASE_DIR: Path = _abs(
+    next(
+        item["path"]
+        for item in _cfg["base_layers"]["inputs"]
+        if item["path"].startswith("data/base_layers/lulc/")
+    )
+).parent
+
 PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = _abs(
     _find_input("data/base_layers/tehsil_watersheds/")["path"]
 )
@@ -38,6 +46,18 @@ SWB_VECTOR_PATH: Path = PROJECT_ROOT / _find_input(
     "data/base_layers/pan_india_waterbodies.geojson"
 )["path"]
 
+CHANGE_DETECTION_RASTER_OUTPUT_DIR: Path = _abs(
+    _output_entry("change_detection", 0)["path"]
+)
+
+CHANGE_DETECTION_VECTOR_OUTPUT_DIR: Path = _abs(
+    _output_entry("change_detection", 1)["path"]
+)
+
 SWB_VECTOR_OUTPUT_DIR: Path = _abs(
     _output_entry("surface_water_bodies", 0)["path"]
 )
+
+# Optional paths referenced by shared local_compute_helper utilities.
+TERRAIN_RASTER_PATH: Path = PROJECT_ROOT / "data/base_layers/terrain_raster_fabdam_pan_india.tif"
+AEZ_VECTOR_PATH: Path = PROJECT_ROOT / "data/base_layers/AEZs/Agro_Ecological_Regions.shp"
