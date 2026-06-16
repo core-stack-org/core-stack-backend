@@ -271,6 +271,7 @@ USE_TZ = True
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
+SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
 STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
 STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=True)
 

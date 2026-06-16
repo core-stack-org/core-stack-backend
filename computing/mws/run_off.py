@@ -1,7 +1,12 @@
 import ee
 import datetime
 
-from computing.mws.utils import get_last_date
+from computing.mws.utils import (
+    get_last_date,
+    hydrology_period_columns,
+    hydrology_period_end,
+    parse_hydrology_period_start,
+)
 from computing.utils import create_chunk, merge_chunks, get_layer_object
 from gee_computing.models import GEEAccount
 from utilities.constants import (
@@ -144,16 +149,9 @@ def _generate_layer(
                 if not last_date:
                     fc = ee.FeatureCollection(chunk_asset_id)
                     col_names = fc.first().propertyNames().getInfo()
-                    filtered_col = [col for col in col_names if col.startswith("20")]
-                    filtered_col.sort()
-                    chunk_end_date = datetime.datetime.strptime(
-                        filtered_col[-1], "%Y-%m-%d"
-                    )
-                    if is_annual:
-                        chunk_end_date = chunk_end_date + datetime.timedelta(days=364)
-                    else:
-                        chunk_end_date = chunk_end_date + datetime.timedelta(days=14)
-
+                    period_cols = hydrology_period_columns(col_names)
+                    period_start = parse_hydrology_period_start(period_cols[-1])
+                    chunk_end_date = hydrology_period_end(period_start, is_annual)
                     last_date = str(chunk_end_date.date())
 
         check_task_status(tasks, 500)

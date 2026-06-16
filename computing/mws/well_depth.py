@@ -3,6 +3,10 @@ import datetime
 
 from dateutil.relativedelta import relativedelta
 
+from computing.mws.utils import (
+    hydrology_period_columns,
+    parse_hydrology_end_date,
+)
 from computing.utils import get_layer_object
 from utilities.constants import GEE_PATHS, PRINCIPAL_AQUIFER
 from utilities.gee_utils import (
@@ -46,8 +50,7 @@ def well_depth(
             )
         db_end_date = None
         if layer_obj:
-            db_end_date = layer_obj.misc["end_date"]
-            db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            db_end_date = parse_hydrology_end_date(layer_obj.misc["end_date"])
 
         if not db_end_date or db_end_date.year < end_date.year:
             ee.data.deleteAsset(asset_id)
@@ -141,9 +144,7 @@ def _generate_data(
     shape = delta_g.map(fun2)
     keys = ["Precipitation", "RunOff", "ET", "DeltaG", "WellDepth"]
 
-    col_names = delta_g.first().propertyNames().getInfo()
-    col_names = [col for col in col_names if col.startswith("20")]
-    col_names.sort()
+    col_names = hydrology_period_columns(delta_g.first().propertyNames().getInfo())
 
     for col_date in col_names:
 

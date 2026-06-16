@@ -46,7 +46,11 @@ from django.core.files.storage import FileSystemStorage
 from utilities.constants import KML_PATH
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
-from .surface_water_bodies.swb import generate_swb_layer
+from .local_compute_helper import get_compute_mode, select_compute_task
+from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
+from .surface_water_bodies.swb_local import (
+    generate_swb_layer as generate_swb_local_task,
+)
 from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
@@ -720,11 +724,15 @@ def generate_swb(request):
         state = request.data.get("state") or request.data.get("State")
         district = request.data.get("district") or request.data.get("District")
         block = request.data.get("block") or request.data.get("Block")
+        roi = request.data.get("roi")
+        roi_path = request.data.get("roi_path")
+        asset_suffix = request.data.get("asset_suffix")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id") or request.data.get(
             "gee_account_d"
         )
+        compute = get_compute_mode(request)
 
         missing = []
         if not state:
@@ -748,16 +756,29 @@ def generate_swb(request):
         district = district.lower()
         block = block.lower()
         asset_ids = layer_assets.swb_pipeline_asset_ids(state, district, block)
-        task_result = generate_swb_layer.apply(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            }
+        task = select_compute_task(
+            compute,
+            generate_swb_gee_task,
+            generate_swb_local_task,
         )
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "start_year": start_year,
+            "end_year": end_year,
+            "gee_account_id": gee_account_id,
+        }
+        if compute == "local":
+            task_kwargs.update(
+                {
+                    "roi": roi,
+                    "roi_path": roi_path,
+                    "asset_suffix": asset_suffix,
+                }
+            )
+        sync_mode = is_sync_layer_generation_request(request)
+        task_result = task.apply_async(kwargs=task_kwargs, queue="nrm")
         if task_result.failed():
             return Response(
                 {
@@ -779,9 +800,14 @@ def generate_swb(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         return _task_started_response(
-            "Generate swb completed",
+            "Generate swb completed" if sync_mode else "Generate swb task initiated",
             asset_ids=asset_ids,
-            completed=True,
+            completed=sync_mode,
+        )
+    except ValueError as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_400_BAD_REQUEST,
         )
     except Exception as e:
         return layer_api_error_response("generate_swb", e, request=request)
