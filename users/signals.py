@@ -45,7 +45,7 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
           <p style="font-size: 16px; margin-bottom: 15px;">Please take the following action:</p>
           <ol style="padding-left: 20px; font-size: 15px;">
             <li>
-              <a href="{user_approval_url}" 
+              <a href="{user_approval_url}"
                  style="color: #1a73e8; text-decoration: none; font-weight: bold;">
                  Assign user to a project
               </a>
@@ -57,7 +57,7 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
       </tr>
       <tr>
         <td style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #888; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
-          © 2025 CoRE Stack. All rights reserved.  
+          © 2025 CoRE Stack. All rights reserved.
         </td>
       </tr>
     </table>

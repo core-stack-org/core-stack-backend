@@ -46,4 +46,5 @@ urlpatterns = [
     path("", include(org_watershed_router.urls)),
     path("", include(global_router.urls)),
     path("map_plan_to_gp/", api.map_plan_to_gp, name="map_plan_to_gp"),
+    path("plan_count/", api.plan_count, name="plan_count"),
 ]
