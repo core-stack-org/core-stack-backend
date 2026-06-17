@@ -49,6 +49,7 @@ from computing.misc.ndvi_time_series import ndvi_timeseries
 from computing.zoi_layers.zoi import generate_zoi
 from computing.misc.facilities_proximity import generate_facilities_proximity_task
 from computing.mws.mws_centroid import generate_mws_centroid_data
+from stats_generator.utils import generate_stats_excel_file
 from utilities.gee_utils import valid_gee_text
 import os
 from nrm_app.celery import app
