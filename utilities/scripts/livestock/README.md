@@ -351,7 +351,7 @@ If a user clicks a village on the map, a compact, floating Sunburst chart is hig
 ```json
 {
   "layername": "livestocks_census_2019",
-  "layer_description": "Village-level rural livestock population counts from the 20th Livestock Census 2019 for cattle, buffalo, sheep, goat, and pig. The layer uses the ARTPARK/IISc district-harmonized CSV as a processing base, extends harmonization to LGD village_code using CoRE Stack matching logic, and contains one row per matched rural LGD village.",
+  "layer_description": "Village-level rural livestock population counts from the 20th Livestock Census 2019 for cattle, buffalo, sheep, goat, and pig. The layer uses the ARTPARK/IISc district-harmonized CSV as a processing base, extends harmonization to village level using character and spatial matching, and contains rural level harmonisation with block, GP, Village ids added where match was successful.",
   "ee_layer_name": "projects/corestack-datasets/assets/datasets/pan_india_livestocks",
   "db_dataset_name": "livestocks_census_2019",
   "columns": [
