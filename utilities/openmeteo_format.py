@@ -1,13 +1,19 @@
 """
 Open-Meteo-style API payloads: aligned time arrays + units, shared across apps.
 """
+import ast
 import json
 import re
 
 from utilities.renderers import round_floats
 
 YEAR_SUFFIX_RE = re.compile(
-    r"^(?P<metric>.+)_(?P<period>\d{2}-\d{2}|\d{4}(?:[-_]\d{4})?|\d{4})$"
+    r"^(?P<metric>.+)_(?P<period>\d{2}-\d{2}|\d{4}[-_]\d{4}|\d{4}-\d{2}|\d{4})$"
+)
+
+# Cumulative hydroyear total (one value per range, not a per-year time series).
+HYDROYEAR_CUMULATIVE_RE = re.compile(
+    r"^(?P<metric>.+_ever_hydroyear)_(?P<start>\d{4})_(?P<end>\d{4})$"
 )
 
 UNIT_KEYWORDS = [
@@ -41,6 +47,26 @@ METRIC_UNIT_SUFFIXES = (
     ("_percent", "%"),
 )
 
+METADATA_FIELD_UNITS = {
+    "uid": "id",
+    "mws_id": "id",
+    "vill_id": "id",
+    "village_id": "id",
+    "vill_name": "name",
+    "village_name": "name",
+    "area": "ha",
+    "area_in_ha": "ha",
+    "sum": "ha",
+    "sum_area": "ha",
+    "total_swb_area": "ha",
+    "zoi": "count",
+    "zoi_area": "ha",
+}
+
+HYDROYEAR_CUMULATIVE_FIELD_UNITS = {
+    "total_cropable_area_ever_hydroyear": "ha",
+}
+
 ANNUAL_METRIC_UNIT_OVERRIDES = {
     "g": "mm",
     "deltag": "mm",
@@ -55,6 +81,10 @@ ANNUAL_METRIC_UNIT_OVERRIDES = {
     "monsoon_onset": "iso8601",
     "kharif_cropped": "sqkm",
     "cropping_intensity_unit_less": "ratio",
+    "cropping_intensity": "ratio",
+    "severe_moderate_drought_causality": "category",
+    "mild_drought_causality": "category",
+    "total_cropable_area_ever_hydroyear": "ha",
 }
 
 
@@ -170,6 +200,7 @@ def flat_kyl_indicator_payload(rows):
 # get_generated_layer_urls: list of GeoServer layers (no time-series axes).
 GENERATED_LAYER_FIELD_UNITS = {
     "layer_name": "name",
+    "dataset_name": "name",
     "layer_type": "vector|raster|point|custom",
     "layer_url": "geoserver_wfs_or_wcs_url",
     "layer_version": "version_label",
@@ -370,28 +401,41 @@ def success_envelope(data_block):
 
 
 def _period_sort_key(period_label):
-    if "-" in period_label:
-        first = period_label.split("-")[0]
-        if len(first) == 2:
-            return int(f"20{first}")
-        return int(first)
-    return int(period_label)
+    token = str(period_label).split("-")[0]
+    if len(token) == 2:
+        return int(f"20{token}")
+    return int(token)
 
 
 def _normalize_period_label(period):
+    """Return agricultural-year start (e.g. 2017-2018 → 2017, 17-18 → 2017)."""
     if len(period) == 5 and period[2] == "-":
-        start = int(period[:2])
-        end = int(period[3:])
-        return f"{2000 + start}-{2000 + end}"
-    if len(period) == 9 and period[4] == "-":
-        return period
-    if len(period) == 9 and period[4] == "_":
-        start = int(period[:4])
-        end = int(period[5:])
-        return f"{start}-{end}"
+        return str(2000 + int(period[:2]))
+    if len(period) == 7 and period[4] == "-":
+        return period[:4]
+    if len(period) == 9 and period[4] in "-_":
+        return period[:4]
     if len(period) == 4:
         return period
     return period
+
+
+def _metadata_unit_for_key(key):
+    k = _normalize_key_name(key)
+    if k in METADATA_FIELD_UNITS:
+        return METADATA_FIELD_UNITS[k]
+    return _infer_unit(k)
+
+
+def _metadata_units_map(metadata):
+    if not isinstance(metadata, dict):
+        return {}
+    return {k: _metadata_unit_for_key(k) for k in sorted(metadata.keys())}
+
+
+def _merge_sheet_units(sheet_units, extra_units):
+    for key, unit in extra_units.items():
+        sheet_units.setdefault(key, unit)
 
 
 def _has_timeseries_keys(payload):
@@ -402,15 +446,7 @@ def _has_timeseries_keys(payload):
 
 def _decode_fortnight_series(value):
     """Decode a {date: value} timeseries from dict/JSON-string payloads."""
-    decoded = value
-    if isinstance(decoded, str):
-        text = decoded.strip()
-        if not text:
-            return None
-        try:
-            decoded = json.loads(text)
-        except Exception:
-            return None
+    decoded = _safe_json_dict(value) if not isinstance(value, dict) else value
     if not isinstance(decoded, dict):
         return None
 
@@ -422,50 +458,149 @@ def _decode_fortnight_series(value):
     return out
 
 
+def _is_normalized_map_shape(data):
+    if not isinstance(data, dict):
+        return False
+    keys = set(data.keys())
+    return keys <= {"keys", "values"} or keys <= {"time", "values"}
+
+
+def _coerce_metadata_entry(key, value):
+    """Normalize metadata values: parse dict strings ('...' / \"...\") to keys/values."""
+    field = _normalize_key_name(key)
+    unit = _infer_unit(field)
+
+    if isinstance(value, str):
+        parsed = _safe_json_dict(value)
+        if isinstance(parsed, dict):
+            if _has_timeseries_keys(parsed):
+                return annual_structure_from_dict(parsed)
+            coerced, _ = _normalize_map_value(parsed, field, unit)
+            return coerced
+        return value
+
+    if isinstance(value, dict):
+        if _is_normalized_map_shape(value):
+            return value
+        if _has_timeseries_keys(value):
+            return annual_structure_from_dict(value)
+        if _looks_like_iso_date_map(value) or any(
+            not YEAR_SUFFIX_RE.match(str(k)) for k in value.keys()
+        ):
+            coerced, _ = _normalize_map_value(value, field, unit)
+            return coerced
+        return {k: _coerce_metadata_entry(k, v) for k, v in value.items()}
+
+    if isinstance(value, list):
+        return [_coerce_metadata_entry(key, v) for v in value]
+
+    return value
+
+
+def _sanitize_dict_strings(obj, field_name=""):
+    """Final pass: no dict payloads left as raw quoted strings in API output."""
+    if isinstance(obj, str):
+        coerced, map_units = _normalize_map_value(
+            obj, field_name, _infer_unit(field_name)
+        )
+        if map_units:
+            return coerced
+        return obj
+    if isinstance(obj, dict):
+        return {
+            k: _sanitize_dict_strings(v, _normalize_key_name(k))
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_sanitize_dict_strings(v, field_name) for v in obj]
+    return obj
+
+
+def _finalize_openmeteo_block(block):
+    return round_floats(_sanitize_dict_strings(block), precision=2)
+
+
+def _hydroyear_cumulative_field(key):
+    match = HYDROYEAR_CUMULATIVE_RE.match(str(key))
+    if not match:
+        return None
+    return _normalize_key_name(match.group("metric"))
+
+
+def waterbody_structure_from_dict(item):
+    """Flatten waterbody + zoi_properties into one Open-Meteo annual block."""
+    if not isinstance(item, dict):
+        return annual_structure_from_dict(item)
+
+    flat = {k: v for k, v in item.items() if k != "zoi_properties"}
+    zoi = item.get("zoi_properties")
+    if isinstance(zoi, dict):
+        flat.update(zoi)
+    elif zoi is not None:
+        flat["zoi_properties"] = zoi
+    return annual_structure_from_dict(flat)
+
+
 def annual_structure_from_dict(item):
     """Fold metric_2017, metric_17-18, etc. into annual.time + aligned arrays."""
     if not isinstance(item, dict):
-        return round_floats(
+        return _finalize_openmeteo_block(
             {
                 "metadata": item,
+                "metadata_units": {},
                 "annual": {"time": []},
-                "annual_units": {"time": "period"},
-            },
-            precision=2,
+                "annual_units": {"time": "agricultural_year"},
+            }
         )
 
     grouped = {}
     metric_units = {}
     metadata = {}
+    metadata_units_extra = {}
 
     for key, value in item.items():
+        hydro_metric = _hydroyear_cumulative_field(key)
+        if hydro_metric:
+            metadata[hydro_metric] = value
+            metadata_units_extra[hydro_metric] = HYDROYEAR_CUMULATIVE_FIELD_UNITS.get(
+                hydro_metric, "ha"
+            )
+            continue
+
         match = YEAR_SUFFIX_RE.match(key)
         if not match:
-            metadata[key] = _convert_nested_timeseries(value)
+            metadata[key] = _coerce_metadata_entry(key, value)
             continue
 
         metric_raw = _normalize_key_name(match.group("metric"))
         metric, unit = _split_metric_unit_suffix(metric_raw)
         period_raw = match.group("period")
         period_label = _normalize_period_label(period_raw)
-        grouped.setdefault(period_label, {})[metric] = value
-        metric_units.setdefault(metric, unit)
+        normalized_value, value_units = _normalize_map_value(value, metric, unit)
+        grouped.setdefault(period_label, {})[metric] = normalized_value
+        if value_units:
+            _merge_sheet_units(metric_units, value_units)
+        else:
+            metric_units.setdefault(metric, unit)
+
+    metadata_units = _metadata_units_map(metadata)
+    _merge_sheet_units(metadata_units, metadata_units_extra)
 
     if not grouped:
-        return round_floats(
+        return _finalize_openmeteo_block(
             {
                 "metadata": metadata,
+                "metadata_units": metadata_units,
                 "annual": {"time": []},
-                "annual_units": {"time": "period"},
-            },
-            precision=2,
+                "annual_units": {"time": "agricultural_year"},
+            }
         )
 
     periods = sorted(grouped.keys(), key=_period_sort_key)
     metric_names = sorted({m for period in periods for m in grouped[period].keys()})
 
     annual = {"time": periods}
-    annual_units = {"time": "period"}
+    annual_units = {"time": "agricultural_year"}
     fortnight = {"time": []}
     fortnight_units = {"time": "iso8601", "time_step": "15_days"}
 
@@ -492,10 +627,12 @@ def annual_structure_from_dict(item):
             continue
 
         annual[metric] = values
-        annual_units[metric] = metric_units.get(metric) or _infer_unit(metric)
+
+    _merge_sheet_units(annual_units, metric_units)
 
     response = {
         "metadata": metadata,
+        "metadata_units": metadata_units,
         "annual": annual,
         "annual_units": annual_units,
     }
@@ -503,10 +640,15 @@ def annual_structure_from_dict(item):
         response["fortnight"] = fortnight
         response["fortnight_units"] = fortnight_units
 
-    return round_floats(response, precision=2)
+    return _finalize_openmeteo_block(response)
 
 
 def _convert_nested_timeseries(value):
+    if isinstance(value, str):
+        parsed = _safe_json_dict(value)
+        if isinstance(parsed, dict):
+            return _coerce_metadata_entry("", parsed)
+        return value
     if isinstance(value, dict):
         if _has_timeseries_keys(value):
             return annual_structure_from_dict(value)
@@ -517,18 +659,28 @@ def _convert_nested_timeseries(value):
 
 
 def _safe_json_dict(value):
+    """Parse dict payloads stored as JSON, single-quoted, or backslash-escaped strings."""
     if isinstance(value, dict):
         return value
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text or not text.startswith("{") or not text.endswith("}"):
+        return None
+    candidates = (text, text.replace("'", '"'), text.replace('\\"', '"'))
+    for candidate in candidates:
         try:
-            parsed = json.loads(text)
+            parsed = json.loads(candidate)
         except Exception:
-            return None
+            continue
         if isinstance(parsed, dict):
             return parsed
+    try:
+        parsed = ast.literal_eval(text)
+    except Exception:
+        return None
+    if isinstance(parsed, dict):
+        return parsed
     return None
 
 
@@ -593,6 +745,35 @@ def _dict_to_keys_values(data):
     }
 
 
+def _map_field_units(field_name, value_unit):
+    return {
+        f"{field_name}.keys": "label",
+        f"{field_name}.values": value_unit,
+    }
+
+
+def _normalize_map_value(value, field_name="", value_unit="value"):
+    if _is_normalized_map_shape(value):
+        return value, {}
+    parsed_map = value if isinstance(value, dict) else _safe_json_dict(value)
+    if not isinstance(parsed_map, dict):
+        return value, {}
+    if _is_normalized_map_shape(parsed_map):
+        return parsed_map, {}
+    if _looks_like_iso_date_map(parsed_map):
+        items = sorted(parsed_map.items(), key=lambda x: str(x[0]))
+        normalized = {
+            "time": [str(k) for k, _ in items],
+            "values": [v for _, v in items],
+        }
+        unit = "index" if "ndvi" in field_name else value_unit
+        return normalized, {
+            f"{field_name}.time": "iso8601",
+            f"{field_name}.values": unit,
+        }
+    return _dict_to_keys_values(parsed_map), _map_field_units(field_name, value_unit)
+
+
 def _extract_stream_order_arrays(row):
     pairs = []
     drop_keys = []
@@ -642,19 +823,11 @@ def _normalize_tehsil_row(sheet_name, row):
         key = _normalize_key_name(raw_key)
         key, unit = _split_key_unit(key)
 
-        value = raw_value
-        parsed_map = _safe_json_dict(value)
-        if isinstance(parsed_map, dict):
-            if _looks_like_iso_date_map(parsed_map):
-                items = sorted(parsed_map.items(), key=lambda x: str(x[0]))
-                value = {
-                    "time": [str(k) for k, _ in items],
-                    "values": [v for _, v in items],
-                }
-                units[key] = "index" if "ndvi" in key else unit
-                out[key] = value
-                continue
-            value = _dict_to_keys_values(parsed_map)
+        value, map_units = _normalize_map_value(raw_value, key, unit)
+        if map_units:
+            out[key] = value
+            _merge_sheet_units(units, map_units)
+            continue
 
         if sheet_name == "mws_intersect_swb" and key in {"latitude", "longitude"}:
             value = _stringify_precise_coord(value)
@@ -664,7 +837,7 @@ def _normalize_tehsil_row(sheet_name, row):
 
         out[key] = value
         if key not in units:
-            units[key] = unit
+            units[key] = METADATA_FIELD_UNITS.get(key, unit)
 
     if sheet_name == "stream_order":
         out = _extract_stream_order_arrays(out)
@@ -713,24 +886,25 @@ def tehsil_structure_from_dict(payload):
         for row in rows:
             normalized_keys_row = _normalize_row_keys_for_annual(row)
             if _has_timeseries_keys(normalized_keys_row):
-                normalized_rows.append(
-                    annual_structure_from_dict(normalized_keys_row)
+                annual_block = annual_structure_from_dict(normalized_keys_row)
+                normalized_rows.append(annual_block)
+                _merge_sheet_units(sheet_units, annual_block.get("annual_units", {}))
+                _merge_sheet_units(
+                    sheet_units, annual_block.get("metadata_units", {})
                 )
                 continue
             normalized_row, row_units = _normalize_tehsil_row(normalized_sheet, row)
             normalized_rows.append(normalized_row)
-            for key, unit in row_units.items():
-                sheet_units.setdefault(key, unit)
+            _merge_sheet_units(sheet_units, row_units)
 
         tehsil_data[normalized_sheet] = normalized_rows
         tehsil_units[normalized_sheet] = sheet_units
 
-    return round_floats(
+    return _finalize_openmeteo_block(
         {
             "tehsil_data": tehsil_data,
             "tehsil_units": tehsil_units,
-        },
-        precision=2,
+        }
     )
 
 

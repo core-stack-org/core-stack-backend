@@ -537,6 +537,7 @@ generated_layer_urls_schema = {
                         ],
                         "layer_field_units": {
                             "layer_name": "name",
+                            "dataset_name": "name",
                             "layer_type": "vector|raster|point|custom",
                             "layer_url": "geoserver_wfs_or_wcs_url",
                             "layer_version": "version_label",
