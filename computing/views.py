@@ -16,7 +16,11 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from rest_framework.response import Response
 from rest_framework import status
-from .utils import send_missing_layers_report, _is_cache_valid, _set_cache
+from .utils import (
+    _is_cache_valid,
+    _set_cache,
+    send_report_email,
+)
 import os
 import openpyxl
 
@@ -330,7 +334,7 @@ def missing_layer_for_all_workspace(self):
     result = {}
     for workspace in workspaces:
         result[workspace] = check_missing_layers(workspace)
-    send_missing_layers_report(result)
+    send_report_email(result, report_type="missing_layers")
     return result
 
 
@@ -566,7 +570,8 @@ def check_xlsx_sheets(file_path):
     }
 
 
-def check_missing_excel_files():
+@app.task(bind=True)
+def check_missing_excel_files(self):
     """
     Check missing excel and json files for active tehsils.
     Groups all missing files per tehsil location.
@@ -626,5 +631,5 @@ def check_missing_excel_files():
                     "xlsx_issues": xlsx_issues,
                 }
             )
-
+    send_report_email(missing_location, report_type="missing_excel_files")
     return missing_location
