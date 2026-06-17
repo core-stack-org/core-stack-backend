@@ -14,9 +14,9 @@ from nrm_app.settings import (
     MONGODB_WATERBODIES_COLLECTION,
 )
 from utilities.openmeteo_format import (
-    annual_structure_from_dict,
     error_envelope,
     success_envelope,
+    waterbody_structure_from_dict,
 )
 from utilities.renderers import round_floats
 from utilities.auth_check_decorator import api_security_check
@@ -60,7 +60,7 @@ def _error_response(message, http_status, details=None):
 
 def _success_response_for_admin(merged_data, state_norm, district_l, block_l):
     data = list(merged_data.values()) if isinstance(merged_data, dict) else []
-    timeseries_data = [annual_structure_from_dict(item) for item in data]
+    timeseries_data = [waterbody_structure_from_dict(item) for item in data]
     body = success_envelope(timeseries_data)
     body["location"] = {
         "state": state_norm,
@@ -71,7 +71,7 @@ def _success_response_for_admin(merged_data, state_norm, district_l, block_l):
 
 
 def _success_response_for_uid(item, uid, state_norm, district_l, block_l):
-    body = success_envelope(annual_structure_from_dict(item))
+    body = success_envelope(waterbody_structure_from_dict(item))
     body["uid"] = str(uid)
     body["location"] = {
         "state": state_norm,
