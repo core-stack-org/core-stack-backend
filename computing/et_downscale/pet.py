@@ -67,10 +67,12 @@ def generate_pet(
     return pet_stack, proj, spec
 
 
-def _make_raw_monthly_pet(month, modis_col, year, proj):
-    start = ee.Date.fromYMD(year, month, 1)
+def _make_raw_monthly_pet(date, agri_month, modis_col, year, proj):
+    start = ee.Date(date)
     end = start.advance(1, "month")
     mid = start.advance(15, "day").millis()
+
+    month = start.get("month")
 
     monthly_collection = modis_col.filterDate(start, end)
     source_count = monthly_collection.size()
@@ -92,7 +94,8 @@ def _make_raw_monthly_pet(month, modis_col, year, proj):
 
     return (
         ensure_monthly_band(pet, "PET_daily", proj)
-        .set("month", month)
+        .set("month", agri_month)
+        .set("calendar_month", month)
         .set("system:time_start", mid)
         .set("source_count", source_count)
         .set("is_placeholder", source_count.eq(0))
@@ -109,9 +112,19 @@ def build_pet_stack(
     Months with no MODIS composites are filled using a +/-30 day window.
     """
     modis_col = ee.ImageCollection(modis_col_id).filterBounds(region)
-    months = ee.List.sequence(1, 12)
+    # months = ee.List.sequence(1, 12)
+    start_date = ee.Date.fromYMD(year, 7, 1)
+    months = ee.List.sequence(0, 11)
     raw_monthly = ee.ImageCollection.fromImages(
-        months.map(lambda m: _make_raw_monthly_pet(ee.Number(m), modis_col, year, proj))
+        months.map(
+            lambda agri_month_idx: _make_raw_monthly_pet(
+                start_date.advance(agri_month_idx, "month"),
+                ee.Number(agri_month_idx).add(1),
+                modis_col,
+                year,
+                proj,
+            )
+        )
     )
     interp_col = fill_monthly_collection(raw_monthly, "PET_daily", proj=proj)
     stack = monthly_collection_to_stack(interp_col, "PET_daily", "PET_", region)

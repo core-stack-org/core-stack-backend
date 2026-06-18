@@ -81,7 +81,7 @@ def generate_aet(cfg, region):
             "units": "bands 1-12: mm/day; band 13: mm/yr",
             "year": str(year),
             "asset_suffix": asset_suffix,
-            "roi_path": cfg["roi_path"],
+            # "roi_path": cfg["roi_path"],
             "model_aez": cfg["model_aez"],
             "description": "Bands 1-12: mean daily AET per month at 30 m; band 13: annual total AET",
         },
@@ -104,17 +104,26 @@ def build_aet_stack(
     ls_col = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
         .filterBounds(region)
-        .filterDate(ee.Date.fromYMD(year, 1, 1), ee.Date.fromYMD(year + 1, 1, 1))
+        .filterDate(ee.Date.fromYMD(year, 7, 1), ee.Date.fromYMD(year + 1, 7, 1))
     )
 
     if proj is None:
         proj = get_proj_30m(region, year)
 
-    months = ee.List.sequence(1, 12)
+    # months = ee.List.sequence(1, 12)
+    start_date = ee.Date.fromYMD(year, 7, 1)
+
+    months = ee.List.sequence(0, 11)
     raw_monthly = ee.ImageCollection.fromImages(
         months.map(
-            lambda m: make_raw_monthly(
-                ee.Number(m), ls_col, region, classifier, year, proj
+            lambda agri_month_idx: make_raw_monthly(
+                start_date.advance(agri_month_idx, "month"),
+                ee.Number(agri_month_idx).add(1),
+                ls_col,
+                region,
+                classifier,
+                year,
+                proj,
             )
         )
     )
@@ -174,10 +183,13 @@ def predict_daily_et(
     )
 
 
-def make_raw_monthly(month, ls_col, region, classifier, year, proj=None):
-    start = ee.Date.fromYMD(year, month, 1)
+def make_raw_monthly(date, agri_month, ls_col, region, classifier, year, proj=None):
+    start = ee.Date(date)
     end = start.advance(1, "month")
     mid = start.advance(15, "day").millis()
+
+    month = start.get("month")
+
     monthly_collection = ls_col.filterDate(start, end)
 
     source_count = monthly_collection.size()
@@ -193,7 +205,8 @@ def make_raw_monthly(month, ls_col, region, classifier, year, proj=None):
     et = safe_collection.mean().rename("ET_daily")
     return (
         ensure_monthly_band(et, "ET_daily", proj)
-        .set("month", month)
+        .set("month", agri_month)
+        .set("calendar_month", month)
         .set("system:time_start", mid)
         .set("source_count", source_count)
         .set("is_placeholder", source_count.eq(0))

@@ -6,18 +6,18 @@ import time
 
 
 MONTH_ABBR = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
     "Jul",
     "Aug",
     "Sep",
     "Oct",
     "Nov",
     "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
 ]
 
 MODIS_COL = "MODIS/061/MOD16A2GF"
@@ -71,15 +71,23 @@ def build_common_pixel_mask(
 
 
 def ee_annual_total_band(
-    monthly_stack: ee.Image, prefix: str, year: int, band_name: str = "annual"
+    monthly_stack: ee.Image,
+    prefix: str,
+    year: int,
+    band_name: str = "annual",
+    start_month=7,
 ) -> ee.Image:
     annual = ee.Image.constant(0).float()
     valid_count = ee.Image.constant(0).float()
-    for month in range(1, 13):
-        month_band = monthly_stack.select(f"{prefix}_{month:02d}")
-        days = calendar.monthrange(year, month)[1]
+
+    for agri_month_idx in range(12):
+        month_band = monthly_stack.select(f"{prefix}_{agri_month_idx + 1:02d}")
+        actual_month = ((start_month - 1 + agri_month_idx) % 12) + 1
+        actual_year = year if actual_month >= start_month else year + 1
+        days = calendar.monthrange(actual_year, actual_month)[1]
         annual = annual.add(month_band.unmask(0).multiply(days))
         valid_count = valid_count.add(month_band.mask().gt(0).unmask(0))
+
     return annual.updateMask(valid_count.gt(0)).rename(band_name).float()
 
 

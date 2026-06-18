@@ -81,7 +81,7 @@ def generate_et_downscale(
     state: str | None = None,
     district: str | None = None,
     tehsil: str | None = None,
-    roi_path: str | None = None,
+    roi: str | None = None,
     asset_suffix=None,
     asset_folder_list=None,
     start_year: int = 2017,
@@ -92,6 +92,8 @@ def generate_et_downscale(
     wait_exports: bool = True,
     poll_seconds: int = 30,
     app_type: str = "MWS",
+    aez=None,
+    asset_root=None,
 ):
     ee_initialize(account_id=gee_account_id)
     if state and district and tehsil:
@@ -111,15 +113,17 @@ def generate_et_downscale(
             + "_uid"
         )
 
-    roi = ee.FeatureCollection(roi_path)
-    model_aez = get_model_aez(roi)
+        roi = ee.FeatureCollection(roi_path)
 
-    asset_root = get_gee_dir_path(
-        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-    )
+    model_aez = get_model_aez(roi, aez)
+
+    if not asset_root:
+        asset_root = get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
 
     specs_list = []
-
+    roi_path = f"{asset_root}/{asset_suffix}"
     for year in range(start_year, end_year + 1):
         cfg = _build_cfg(
             roi_path=roi_path,
@@ -176,7 +180,7 @@ def generate_et_downscale(
             specs = result[-1]
             specs_list.append(specs)
 
-    if len(specs_list) > 0:
+    if not aez and len(specs_list) > 0:
         wait_for_tasks(specs_list)
         sync_to_db_and_geoserver(state, district, tehsil, specs_list)
 
@@ -210,10 +214,19 @@ def _build_cfg(
     }
 
 
-def get_model_aez(roi):
-    aez = ee.FeatureCollection(AEZ)
-    filtered_aez = aez.filterBounds(roi.geometry()).first().get("ae_regcode").getInfo()
-    return f"projects/corestack-datasets-beta/assets/models_downscaling_et/rf_aez{filtered_aez}_final"
+def get_model_aez(roi, aez=None):
+    if not aez:
+        aez = (
+            ee.FeatureCollection(AEZ)
+            .filterBounds(roi.geometry())
+            .first()
+            .get("ae_regcode")
+            .getInfo()
+        )
+    if aez == 1:
+        raise RuntimeError("No model for AEZ 1")
+
+    return f"projects/corestack-datasets-beta/assets/models_downscaling_et/rf_aez{aez}_final"
 
 
 def run_all(
@@ -319,10 +332,6 @@ def run_all(
             derived_task_specs, cfg.get("poll_seconds", 30), fail_on_error=True
         )
 
-        # for layer in derived_task_specs:
-        #     asset_id = layer["asset_id"]
-        #     layer_name = asset_id.split("/")[-1]
-        #     sync_to_geoserver(asset_id, layer_name, "ET")
         sync_to_db_and_geoserver(state, district, tehsil, derived_task_specs)
     else:
         print(

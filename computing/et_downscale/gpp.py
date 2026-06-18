@@ -155,18 +155,32 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
     vpd_min = bplut_img.select("vpd_min")
     vpd_max = bplut_img.select("vpd_max")
 
-    year_start = ee.Date.fromYMD(year, 1, 1)
-    year_end = ee.Date.fromYMD(year + 1, 1, 1)
+    # year_start = ee.Date.fromYMD(year, 1, 1)
+    # year_end = ee.Date.fromYMD(year + 1, 1, 1)
+
+    start_date = ee.Date.fromYMD(year, 7, 1)
     ls_col = (
         ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
         .filterBounds(region)
-        .filterDate(year_start, year_end)
+        .filterDate(start_date, start_date.advance(12, "month"))
     )
-    months = ee.List.sequence(1, 12)
+    # months = ee.List.sequence(1, 12)
+    start_date = ee.Date.fromYMD(year, 7, 1)
+    months = ee.List.sequence(0, 11)
+
     raw_ndvi_monthly = ee.ImageCollection.fromImages(
-        months.map(lambda m: make_raw_monthly_ndvi(ee.Number(m), ls_col, year, proj))
+        months.map(
+            lambda agri_month_idx: make_raw_monthly_ndvi(
+                start_date.advance(agri_month_idx, "month"),
+                ee.Number(agri_month_idx).add(1),
+                ls_col,
+                year,
+                proj,
+            )
+        )
     )
     ndvi_monthly = fill_monthly_collection(raw_ndvi_monthly, "NDVI", proj=proj)
+
     ndvi_by_month = {
         month: ee.Image(
             ndvi_monthly.filter(ee.Filter.eq("month", month)).first()
@@ -175,8 +189,8 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
     }
 
     bands = []
-    for month in range(1, 13):
-        start = ee.Date.fromYMD(year, month, 1)
+    for agri_month_i in range(12):
+        start = ee.Date(start_date.advance(agri_month_i, "month"))
         end = start.advance(1, "month")
 
         gldas = (
@@ -196,7 +210,10 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
         swdown = _gldas_mean_reproj("SWdown_f_tavg").multiply(0.0864)
         par = swdown.multiply(0.45)
 
-        ndvi = ndvi_by_month[month]
+        agri_month = agri_month_i + 1
+        ndvi = ndvi_by_month[agri_month]
+
+        # ndvi = ndvi_by_month[month]
         fapar = (
             ndvi.multiply(1.24)
             .subtract(0.168)
@@ -235,7 +252,7 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
         )
 
         eps = eps_max.multiply(tmin_scalar).multiply(vpd_scalar)
-        gpp = par.multiply(fapar).multiply(eps).rename(f"GPP_{month:02d}").float()
+        gpp = par.multiply(fapar).multiply(eps).rename(f"GPP_{agri_month:02d}").float()
         bands.append(gpp)
 
     stack = bands[0]
@@ -244,10 +261,13 @@ def build_gpp_stack(region: ee.Geometry, year: int, proj: ee.Projection) -> ee.I
     return stack.clip(region)
 
 
-def make_raw_monthly_ndvi(month, ls_col, year, proj=None):
-    start = ee.Date.fromYMD(year, month, 1)
+def make_raw_monthly_ndvi(date, agri_month, ls_col, year, proj=None):
+    start = ee.Date(date)
     end = start.advance(1, "month")
     mid = start.advance(15, "day").millis()
+
+    month = start.get("month")
+
     monthly_collection = ls_col.filterDate(start, end)
     source_count = monthly_collection.size()
     ndvi_collection = monthly_collection.map(
@@ -262,7 +282,8 @@ def make_raw_monthly_ndvi(month, ls_col, year, proj=None):
     ndvi = safe_collection.mean().rename("NDVI")
     return (
         ensure_monthly_band(ndvi, "NDVI", proj)
-        .set("month", month)
+        .set("month", agri_month)
+        .set("calendar_month", month)
         .set("system:time_start", mid)
         .set("source_count", source_count)
         .set("is_placeholder", source_count.eq(0))
