@@ -16,7 +16,7 @@ The final village layer is keyed by LGD `village_code` corresponding to a matche
 
 **Geospatial Assets:**
 
-- GeoPackage: [pan_india_livestock.gpkg](https://drive.google.com/file/d/1LBioUKUI596mQ_SHojN0rOSdO7UxO0z6/view?usp=sharing)
+- GeoPackage: [pan_india_livestock.gpkg](https://drive.google.com/file/d/1kLSMPVb0Iysg8Ms_ViomHK-vyxogv0HM/view?usp=sharing)
 - Google Earth Engine asset: `projects/corestack-datasets/assets/datasets/pan_india_livestocks`
 
 ## Sources
@@ -29,8 +29,6 @@ The primary source is the Department of Animal Husbandry and Dairying, Governmen
 - File: https://dahd.gov.in/sites/default/files/2023-07/VillageAndWardLevelDataMale-Female.xlsx
 - Page title: Village and Ward Level Data [Male & Female] - 20th LSC
 - DAHD page section: Basic Animal Husbandry Statistics
-- DAHD page date: 2020-03-31
-- DAHD page submission timestamp: 2023-07-17
 
 The workbook has four sheets:
 
@@ -95,7 +93,7 @@ The village harmonization step uses Local Government Directory-compatible rural 
 The harmonized village-level layer is generated with:
 
 ```text
-utilities/scripts/prepare_livestock.py
+utilities/scripts/livestock/prepare_livestock.py
 ```
 
 The script uses `data/livestock/all-india-20th-livestock-census-artpark-iitm.csv` as input, processes only `location.type = rural`, and emits:
@@ -155,16 +153,14 @@ rural_match_rate: 0.86813
 duplicate_village_codes_in_output: 0
 ```
 
-The match rate is calculated against rural source rows. The final row count is lower than matched source rows because some source rows are grouped and summed into one final village record.
-
-The primary tabular output has `513599` unique village codes. The current local GeoPackage used for spatial QA has `634393` village geometry features, of which `476445` have joined livestock attributes. In simple terms: the CSV is the authoritative matched livestock table, while the GeoPackage is the geometry layer with livestock fields filled where the geometry-side key joined successfully.
+The match rate is calculated against rural source rows. The final row count is lower than matched source rows due to some mismatches.
 
 ## Descriptive Analysis Files
 
 Descriptive QA files for the GeoPackage are generated with:
 
 ```text
-uv run --with pandas --with numpy python utilities/scripts/analyze_livestock_gpkg.py
+uv run --with pandas --with numpy python utilities/scripts/livestock/analyze_livestock_gpkg.py
 ```
 
 This produces:
@@ -343,9 +339,6 @@ If a user clicks a village on the map, a compact, floating Sunburst chart is hig
 * **Color Design Tip:** Keep one consistent hue family per species (e.g., shades of brown/orange for cattle, dark greys for buffalo, greens for goats). Divide the outer ring into lighter variants for males ($♂$) and deeper saturated tones for females ($♀$) to create an immediate visual pattern without needing a massive legend.
 
 
-
-
-
 ## Catalog Metadata JSON
 
 ```json
@@ -353,7 +346,7 @@ If a user clicks a village on the map, a compact, floating Sunburst chart is hig
   "layername": "livestocks_census_2019",
   "layer_description": "Village-level rural livestock population counts from the 20th Livestock Census 2019 for cattle, buffalo, sheep, goat, and pig. The layer uses the ARTPARK/IISc district-harmonized CSV as a processing base, extends harmonization to village level using character and spatial matching, and contains rural level harmonisation with block, GP, Village ids added where match was successful.",
   "ee_layer_name": "projects/corestack-datasets/assets/datasets/pan_india_livestocks",
-  "db_dataset_name": "livestocks_census_2019",
+  "db_dataset_name": "Livestock Census 2019",
   "columns": [
     {
       "column_name": "village_code",
