@@ -21,11 +21,11 @@ def generate_et(aez_no):
         roi=roi,
         asset_suffix=f"AEZ_{str(aez_no)}",
         asset_folder_list=["et_downscale"],
-        start_year=2023,
+        start_year=2017,
         end_year=2024,
         gee_account_id=7,
         application="aet",
         app_type="MWS",
         aez=aez_no,
-        asset_root="projects/corestack1-dev-alpha/assets/et_downscale/",
+        asset_root="projects/corestack1-dev-alpha/assets/et_downscale/",  # Change it with the GEE project path where to export the asset
     )
