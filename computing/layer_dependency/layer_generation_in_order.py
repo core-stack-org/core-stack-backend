@@ -266,11 +266,14 @@ def run_layer_with_dependency(
             print(
                 f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
             )
-            result = (
-                node_func_obj(state=state, district=district, block=block, **args)
-                if args
-                else node_func_obj(state, district, block)
-            )
+            if node_func_name == "generate_stats_excel_file":
+                result = node_func_obj(state, district, block)
+            else:
+                result = (
+                    node_func_obj(state=state, district=district, block=block, **args)
+                    if args
+                    else node_func_obj(state, district, block)
+                )
             if result:
                 print(f"{node_func_name} is completed...")
                 status[node_func_name] = True
