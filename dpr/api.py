@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
+from nrm_app.settings import BASE_API_URL
 
 from .gen_dpr import (
     get_plan_details,
@@ -67,6 +68,7 @@ from .gen_mws_report import (
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
+    get_intersecting_village_ids
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
@@ -99,8 +101,16 @@ from .gen_village_report import (
     get_agri_support_service,
     get_ecological_climate_resiliance,
     get_all_villages_basic_infrastructure,
+    get_all_villages_health_and_wash,
     get_all_villages_education_institutions,
-    get_mwses_boundaries,
+    get_all_villages_financial_inclusion,
+    get_all_villages_welfare_inclusion,
+    get_all_villages_community_institutes,
+    get_all_villages_livestock_management,
+    get_all_villages_irrigation_infra,
+    get_all_villages_agri_support_service,
+    get_all_villages_ecological_climate_resiliance,
+    get_mwses_ids,
 )
 from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email, transform_name
@@ -324,10 +334,14 @@ def generate_mws_report(request):
 
         green_credits = get_green_credit_data(state, district, block, uid)
 
+        village_ids = get_intersecting_village_ids(state, district, block, uid)
+
         context = {
+            "state" : state,
             "district": district,
             "block": block,
             "mws_id": uid,
+            "base_url" : BASE_API_URL,
             "block_osm": parameter_block,
             "mws_osm": parameter_mws,
             "terrain_mws": terrain_mws,
@@ -389,6 +403,7 @@ def generate_mws_report(request):
             "factory_desc": factory_desc,
             "mining_desc": mining_desc,
             "green_credit_desc": green_credits,
+            "village_ids" : json.dumps(village_ids)
         }
 
         # print("Api Processing End 1", datetime.now())
@@ -593,6 +608,13 @@ def generate_village_report(request):
     district = request.GET.get('district')
     block = request.GET.get('block')
     village_id = request.GET.get('villageId')
+
+    if village_id == '0':
+        return render(request, 'village-report-unavailable.html', {
+            'state': state,
+            'district': district,
+            'block': block,
+        })
     
     # Get village polygon and info from GeoServer
     village_data = get_village_polygon_and_info(state, district, block, village_id)
@@ -658,9 +680,18 @@ def generate_village_report(request):
 
     #Map Data
     basic_infra_map = get_all_villages_basic_infrastructure(state, district, block)
+    health_wash_map = get_all_villages_health_and_wash(state, district, block)
     education_map = get_all_villages_education_institutions(state, district, block)
-    mwses_data = get_mwses_boundaries(state, district, block, village_id)
+    financial_map = get_all_villages_financial_inclusion(state, district, block)
+    welfare_map = get_all_villages_welfare_inclusion(state, district, block)
+    community_map = get_all_villages_community_institutes(state, district, block)
+    livestock_map = get_all_villages_livestock_management(state, district, block)
+    irrigation_infra_map = get_all_villages_irrigation_infra(state, district, block)
+    agri_support_map = get_all_villages_agri_support_service(state, district, block)
+    climate_resiliance_map = get_all_villages_ecological_climate_resiliance(state, district, block)
 
+    mws_ids = get_mwses_ids(state, district, block, village_id)
+    mws_pattern_intensity = get_pattern_intensity(state, district, block)
  
     # Build context for template
     context = {
@@ -669,6 +700,7 @@ def generate_village_report(request):
         "district": district,
         "block": block,
         "village_id": village_id,
+        "base_url" : BASE_API_URL,
         "village_name": village_data['village_name'],
         "gram_panchayat_name": village_data['gram_panchayat_name'],
         "area_hectares": village_data['area_hectares'],
@@ -717,10 +749,22 @@ def generate_village_report(request):
         "climate_resiliance_data" : json.dumps(climate_resiliance_data),
 
         "village_polygon": json.dumps(village_data['village_polygon']),
-        "mwses_polygon": json.dumps(mwses_data['polygon']),
 
         "basic_infra_map" : json.dumps(basic_infra_map),
-        "education_map" : json.dumps(education_map)
+        "health_wash_map" : json.dumps(health_wash_map),
+        "education_map" : json.dumps(education_map),
+        "financial_map" : json.dumps(financial_map),
+        "welfare_map" : json.dumps(welfare_map),
+        "community_map" : json.dumps(community_map),
+        "livestock_map" : json.dumps(livestock_map),
+        "irrigation_infra_map" : json.dumps(irrigation_infra_map),
+        "agri_support_map" : json.dumps(agri_support_map),
+        "climate_resiliance_map" : json.dumps(climate_resiliance_map),
+
+        "mws_ids" : json.dumps(mws_ids),
+        "pattern_intensity": json.dumps(mws_pattern_intensity['intensity']),
+        "mws_active_patterns": json.dumps(mws_pattern_intensity['mws_active_patterns']),
+        "pattern_display_mapping": json.dumps(mws_pattern_intensity['pattern_display_mapping']),
     }
     
     return render(request, 'village-report.html', context)
