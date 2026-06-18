@@ -78,16 +78,7 @@ STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
 GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
 ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
-ALLOWED_HOSTS = [
-    "geoserver.core-stack.org",
-    "127.0.0.1",
-    "localhost",
-    "0.0.0.0",
-    "api-doc.core-stack.org",
-    "2f2de623c34b.ngrok-free.app",
-    "odk.core-stack.org",
-    "unrecognizably-deft-aimee.ngrok-free.dev",
-]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 CE_API_URL = env("CE_API_URL")
 CE_BUCKET_NAME = env("CE_BUCKET_NAME")
 # MARK: Django Apps
