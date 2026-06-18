@@ -513,7 +513,7 @@ EXPECTED_SHEETS = [
     "change_detection_urbanization",
 ]
 
-may_data = [
+PARTIAL_DATA_SHEETS = [
     "mws_intersect_villages",
     "mining",
     "green_credit",
@@ -548,6 +548,8 @@ def check_xlsx_sheets(file_path):
 
         for sheet_name in EXPECTED_SHEETS:
             if sheet_name not in existing_sheets:
+                if sheet_name in PARTIAL_DATA_SHEETS:
+                    continue
                 missing_sheets.append(sheet_name)
             else:
                 ws = wb[sheet_name]
