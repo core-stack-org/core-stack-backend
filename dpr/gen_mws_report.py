@@ -2616,3 +2616,81 @@ def get_village_data(state, district, block, uid):
             block,
         )
         return [], [], [], [], [], [], [], [], [], [], []
+    
+
+
+import ast
+
+def get_intersecting_village_ids(state, district, block, mws_uid):
+    """
+    Reads the mws_intersect_villages sheet and returns the list of
+    village IDs that intersect with the given MWS UID.
+    """
+    try:
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+        available_sheets = excel_file.sheet_names
+
+        if "mws_intersect_villages" not in available_sheets:
+            logger.info(
+                "mws_intersect_villages sheet not found for %s district, %s block",
+                district,
+                block
+            )
+            return []
+
+        df = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
+
+        if "Village IDs" not in df.columns:
+            logger.info(
+                "Village IDs column not found in mws_intersect_villages sheet for %s district, %s block",
+                district,
+                block
+            )
+            return []
+
+        matching = df.loc[df["MWS UID"] == mws_uid, "Village IDs"]
+
+        if matching.empty:
+            return []
+
+        raw_value = matching.iloc[0]
+
+        if pd.isna(raw_value):
+            return []
+
+        try:
+            village_ids = ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError) as parse_error:
+            logger.info(
+                "Could not parse Village IDs for MWS UID %s in %s district, %s block: %s",
+                mws_uid,
+                district,
+                block,
+                parse_error
+            )
+            return []
+
+        if not isinstance(village_ids, list):
+            return []
+
+        return village_ids
+
+    except Exception as e:
+        logger.info(
+            "Error accessing excel for %s district, %s block: %s",
+            district,
+            block,
+        )
+        return []

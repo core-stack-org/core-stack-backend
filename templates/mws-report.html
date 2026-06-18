@@ -1760,27 +1760,27 @@
             </div>
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                <div class="legend-color" style="background-color: #A9A9A9;"></div>
                     <span>Barren Lands</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #D9F0A3;"></div>
+                    <div class="legend-color" style="background-color: #F0F4A3;"></div>
                     <span>Single Kharif</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #A6D96A;"></div>
+                    <div class="legend-color" style="background-color: #D6E96B;"></div>
                     <span>Single Non-Kharif</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #4DAF4A;"></div>
+                    <div class="legend-color" style="background-color: #B7D43A;"></div>
                     <span>Double Cropping</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #006D2C;"></div>
+                    <div class="legend-color" style="background-color: #7FAF2E;"></div>
                     <span>Tripple/Annual/Perennial Cropping</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #A18F60;"></div>
+                    <div class="legend-color" style="background-color: #8C7A4F;"></div>
                     <span>Shrubs and Scrubs</span>
                 </div>
             </div>
@@ -1982,6 +1982,9 @@
         </div>
     </footer>
     <script>
+    
+    const VILLAGE_IDS = JSON.parse('{{ village_ids|escapejs }}');
+
     const baseLayer = new ol.layer.Tile({
         source: new ol.source.XYZ({
             url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
@@ -2012,61 +2015,133 @@
     });
     
     // ============================================================================
-    // HELPER FUNCTION: Add village boundaries with spatial filtering
+    // HELPER: Build village report URL
+    // ============================================================================
+    function buildVillageReportUrl(villageId) {
+        const baseUrl = '{{ base_url }}/generate_village_report/';
+        const params = new URLSearchParams({
+            state: '{{ state }}',
+            district: '{{ district }}',
+            block: '{{ block }}',
+            villageId: villageId
+        });
+        return baseUrl + '?' + params.toString();
+    }
+
+    // ============================================================================
+    // HELPER: Create village popup overlay (call once, reuse for all maps)
+    // ============================================================================
+    function createVillagePopup(map) {
+        const popupEl = document.createElement('div');
+        popupEl.style.cssText = `
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid var(--supporting-beige, #d4c4b0);
+            border-radius: 0.375rem;
+            padding: 0.75rem 1rem;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+            font-family: 'Georgia', 'Garamond', serif;
+            min-width: 180px;
+            z-index: 1000;
+            transform: translate(-50%, calc(-100% - 12px));
+        `;
+        popupEl.innerHTML = `
+            <p id="popupVillageName" style="font-weight: 700; color: var(--primary-dark, #3e2723); margin-bottom: 0.5rem; font-size: 0.9rem;"></p>
+            <button id="popupViewReportBtn" style="
+                background-color: var(--primary-accent, #c17a4a);
+                color: white;
+                border: none;
+                border-radius: 0.3rem;
+                padding: 0.45rem 0.9rem;
+                font-size: 0.8rem;
+                font-weight: 600;
+                cursor: pointer;
+                width: 100%;
+            ">View Village Report</button>
+            <button id="popupCloseBtn" style="
+                position: absolute;
+                top: 4px;
+                right: 6px;
+                background: none;
+                border: none;
+                color: var(--supporting-gray, #8b8680);
+                font-size: 14px;
+                cursor: pointer;
+                line-height: 1;
+            ">&times;</button>
+        `;
+
+        const overlay = new ol.Overlay({
+            element: popupEl,
+            positioning: 'bottom-center',
+            stopEvent: true,
+            offset: [0, -10]
+        });
+
+        map.addOverlay(overlay);
+
+        popupEl.querySelector('#popupCloseBtn').addEventListener('click', () => {
+            popupEl.style.display = 'none';
+        });
+
+        return { overlay, popupEl };
+    }
+
+    // ============================================================================
+    // HELPER FUNCTION: Add village boundaries using exact village ID match
     // ============================================================================
     const addVillageBoundariesToMap = async (map, mwsFeature) => {
         try {
-            const mwsGeometry = mwsFeature.getGeometry();
             const mwsUid = mwsFeature.get('uid');
-            
-            if (!mwsGeometry || !mwsUid) {
+
+            if (!mwsUid) {
                 return;
             }
-    
-            // Get the bounding box of the MWS
-            const extent = mwsGeometry.getExtent();
-            const minLon = extent[0];
-            const minLat = extent[1];
-            const maxLon = extent[2];
-            const maxLat = extent[3];
-    
-            // Create WFS URL with BBOX filter (simpler, more compatible)
+
+            if (!VILLAGE_IDS || !Array.isArray(VILLAGE_IDS) || VILLAGE_IDS.length === 0) {
+                console.warn('No village IDs available for MWS', mwsUid);
+                return;
+            }
+
+            const idList = VILLAGE_IDS.join(',');
+            const cqlFilter = `vill_ID IN (${idList})`;
+
             const baseUrl = 'https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows';
-            
-            // BBOX filter syntax: BBOX(geometry_column, minx, miny, maxx, maxy)
-            const bboxFilter = `BBOX(the_geom,${minLon},${minLat},${maxLon},${maxLat})`;
-    
+
             const params = new URLSearchParams({
                 service: 'WFS',
                 version: '1.0.0',
                 request: 'GetFeature',
                 typeName: `panchayat_boundaries:{{district}}_{{block}}`,
                 outputFormat: 'application/json',
-                CQL_FILTER: bboxFilter
+                CQL_FILTER: cqlFilter
             });
-    
+
             const url = baseUrl + '?' + params.toString();
-    
-            // Fetch villages from GeoServer
+
             const response = await fetch(url);
-            
+
             if (!response.ok) {
+                console.warn('GeoServer request failed for MWS', mwsUid, response.status);
                 return;
             }
-    
+
             const geoJsonData = await response.json();
-    
-            // Check if we got any features
+
             if (!geoJsonData.features || geoJsonData.features.length === 0) {
+                console.warn('No village features returned for MWS', mwsUid);
                 return;
             }
-    
-            // Create vector source from GeoJSON
+
+            console.log('Village boundaries fetched for MWS', mwsUid, '-', geoJsonData.features.length, 'villages');
+
             const villageSource = new ol.source.Vector({
-                features: new ol.format.GeoJSON().readFeatures(geoJsonData)
+                features: new ol.format.GeoJSON().readFeatures(geoJsonData, {
+                    featureProjection: 'EPSG:4326'
+                })
             });
-    
-            // Create and style the village layer
+
             const villageLayer = new ol.layer.Vector({
                 source: villageSource,
                 style: new ol.style.Style({
@@ -2074,28 +2149,56 @@
                         color: 'yellow',
                         width: 1.5,
                     }),
-                    // fill: new ol.style.Fill({
-                    //     color: 'rgba(255, 255, 0, 0.1)',
-                    // }),
+                    fill: new ol.style.Fill({
+                        color: 'rgba(0, 0, 0, 0)'   // fully transparent, but hit-testable
+                    }),
                 }),
                 zIndex: 5,
             });
-    
-            // Add layer to map
+
             map.addLayer(villageLayer);
-    
-            // Handle errors silently
-            villageSource.on('change', (e) => {
-                if (villageSource.getState() === 'error') {
-                    // Silently handle errors
+
+            // ===== CLICK HANDLER: show popup with "View Village Report" =====
+            const { overlay, popupEl } = createVillagePopup(map);
+
+            map.on('click', function (evt) {
+                const feature = map.forEachFeatureAtPixel(evt.pixel, function (feat, layer) {
+                    if (layer === villageLayer) return feat;
+                });
+
+                if (feature) {
+                    const villageId = feature.get('vill_ID');
+                    const villageName = feature.get('vill_name') || 'Unknown Village';
+
+                    popupEl.querySelector('#popupVillageName').textContent = villageName;
+
+                    const btn = popupEl.querySelector('#popupViewReportBtn');
+                    // Clear any previous listener by replacing the node's onclick
+                    btn.onclick = function () {
+                        const reportUrl = buildVillageReportUrl(villageId);
+                        window.open(reportUrl, '_blank');
+                    };
+
+                    overlay.setPosition(evt.coordinate);
+                    popupEl.style.display = 'block';
+                } else {
+                    popupEl.style.display = 'none';
                 }
             });
-    
+
+            // Change cursor to pointer when hovering over a village
+            map.on('pointermove', function (evt) {
+                const hit = map.forEachFeatureAtPixel(evt.pixel, function (feat, layer) {
+                    return layer === villageLayer;
+                });
+                map.getTargetElement().style.cursor = hit ? 'pointer' : '';
+            });
+
         } catch (error) {
-            // Gracefully handle any errors without breaking map rendering
+            console.error('Error adding village boundaries for MWS:', error);
         }
     };
-    
+        
     // ============================================================================
     // WMS AND VECTOR LAYER DEFINITIONS
     // ============================================================================
@@ -2956,9 +3059,9 @@
                 labels: cropYears, // TODO : Get years from backend, don't hardcode as year would increase as data increase
                 datasets: [
                     {
-                        label: 'Single-Cropping',
-                        data: single,
-                        backgroundColor: '#57ad2b',
+                        label: 'Triple-Cropping',
+                        data: triple,
+                        backgroundColor: '#b3561d'
 
                     },
                     {
@@ -2968,9 +3071,9 @@
 
                     },
                     {
-                        label: 'Triple-Cropping',
-                        data: triple,
-                        backgroundColor: '#b3561d'
+                        label: 'Single-Cropping',
+                        data: single,
+                        backgroundColor: '#57ad2b',
 
                     },
                     {
