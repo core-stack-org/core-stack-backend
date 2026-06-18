@@ -343,6 +343,7 @@ LOGGING = {
 
 # MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
+BASE_API_URL = env("BASE_API_URL")
 
 # MARK: Email Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
