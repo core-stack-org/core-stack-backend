@@ -158,6 +158,7 @@ def _clip_and_mask_ch(ch_path, lulc_path, roi_gdf, output_path):
     return str(output_path)
 
 
+@app.task(bind=True)
 def tree_health_ch_raster_local(
     state=None,
     district=None,
@@ -274,37 +275,3 @@ def tree_health_ch_raster_local(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return layer_at_geoserver if push_to_geoserver else True
-
-
-@app.task(bind=True)
-def tree_health_ch_raster(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    start_year=None,
-    end_year=None,
-    app_type="MWS",
-    gee_account_id=None,
-    precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    ch_dir=LOCAL_CH_BASE_DIR,
-    lulc_dir=LULC_BASE_DIR,
-):
-    _ = self, asset_folder_list, app_type, gee_account_id
-    return tree_health_ch_raster_local(
-        state=state,
-        district=district,
-        block=block,
-        roi=roi,
-        asset_suffix=asset_suffix,
-        start_year=start_year,
-        end_year=end_year,
-        precomputed_roi_dir=precomputed_roi_dir,
-        ch_dir=ch_dir,
-        lulc_dir=lulc_dir,
-        push_to_geoserver=True,
-        sync_layer_metadata=True,
-    )

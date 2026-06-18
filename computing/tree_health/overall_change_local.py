@@ -188,7 +188,7 @@ def _build_overall_change_raster(
 
     return str(output_path)
 
-
+@app.task(bind=True)
 def tree_health_overall_change_raster_local(
     state=None,
     district=None,
@@ -312,41 +312,3 @@ def tree_health_overall_change_raster_local(
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return True
-
-
-@app.task(bind=True)
-def tree_health_overall_change_raster(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    start_year=None,
-    end_year=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    app_type="MWS",
-    gee_account_id=None,
-    precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    tree_change_dir=LOCAL_TREE_CHANGE_BASE_DIR,
-    change_dir=CHANGE_DETECTION_RASTER_OUTPUT_DIR,
-    deforestation_path=None,
-    afforestation_path=None,
-):
-    _ = self, asset_folder_list, app_type, gee_account_id
-    return tree_health_overall_change_raster_local(
-        state=state,
-        district=district,
-        block=block,
-        start_year=start_year,
-        end_year=end_year,
-        roi=roi,
-        asset_suffix=asset_suffix,
-        precomputed_roi_dir=precomputed_roi_dir,
-        tree_change_dir=tree_change_dir,
-        change_dir=change_dir,
-        deforestation_path=deforestation_path,
-        afforestation_path=afforestation_path,
-        push_to_geoserver=True,
-        sync_layer_metadata=True,
-    )

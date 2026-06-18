@@ -57,7 +57,7 @@ def _resolve_ch_output_raster(asset_suffix, year, state=None, district=None, blo
         "Run canopy_height_local.py first."
     )
 
-
+@app.task(bind=True)
 def tree_health_ch_vector_local(
     state=None,
     district=None,
@@ -171,33 +171,3 @@ def tree_health_ch_vector_local(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return True
-
-
-@app.task(bind=True)
-def tree_health_ch_vector(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    start_year=None,
-    end_year=None,
-    app_type="MWS",
-    gee_account_id=None,
-    precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-):
-    _ = self, asset_folder_list, app_type, gee_account_id
-    return tree_health_ch_vector_local(
-        state=state,
-        district=district,
-        block=block,
-        roi=roi,
-        asset_suffix=asset_suffix,
-        start_year=start_year,
-        end_year=end_year,
-        precomputed_roi_dir=precomputed_roi_dir,
-        push_to_geoserver=True,
-        sync_layer_metadata=True,
-    )
