@@ -9,7 +9,7 @@ from utilities.geoserver_utils import Geoserver
 import json
 from django.conf import settings
 from pathlib import Path
-from utilities.constants import GEOSERVER_BASE
+from utilities.constants import GEOSERVER_BASE, EXPECTED_SHEETS, PARTIAL_DATA_SHEETS
 from utilities.logger import setup_logger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
@@ -485,54 +485,6 @@ def refresh_layer_cache(request, workspace=None):
     return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
 
 
-EXPECTED_SHEETS = [
-    "terrain",
-    "surfaceWaterBodies_annual",
-    "croppingIntensity_annual",
-    "croppingDrought_kharif",
-    "hydrological_annual",
-    "hydrological_seasonal",
-    "drainage_density",
-    "lulc_vector",
-    "dem",
-    "mws_intersect_swb",
-    "mws",
-    "mws_connectivity",
-    "stream_order",
-    "soge_vector",
-    "aquifer_vector",
-    "restoration_vector",
-    "overall_tree_change",
-    "Canopy_Cover_Density",
-    "Canopy_height",
-    "drought_causality",
-    "change_detection_afforestation",
-    "change_detection_cropintensity",
-    "change_detection_deforestation",
-    "change_detection_degradation",
-    "change_detection_urbanization",
-]
-
-PARTIAL_DATA_SHEETS = [
-    "mws_intersect_villages",
-    "mining",
-    "green_credit",
-    "factory_csr",
-    "agroecological",
-    "lcw_conflict",
-    "facilities_proximity",
-    "canal",
-    "river",
-    "livestock",
-    "antyodaya",
-    "social_economic_indicator",
-    "nrega_annual",
-    "nrega_assets_village",
-    "terrain_lulc_slope",
-    "terrain_lulc_plain",
-]
-
-
 def check_xlsx_sheets(file_path):
     """
     Returns dict with:
@@ -582,6 +534,8 @@ def check_missing_excel_files(self):
     Groups all missing files per tehsil location.
     Also checks xlsx for missing/empty sheets.
     """
+    logger.info("inside check missing excel for active locations")
+
     base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
     missing_location = []
 
@@ -637,4 +591,5 @@ def check_missing_excel_files(self):
                 }
             )
     send_report_email(missing_location, report_type="missing_excel_files")
+    logger.info("report sent")
     return missing_location

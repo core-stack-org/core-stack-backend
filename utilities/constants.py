@@ -366,3 +366,51 @@ TREE_OVERALL_CHANGE = (
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
+
+# excel sheets
+EXPECTED_SHEETS = [
+    "terrain",
+    "surfaceWaterBodies_annual",
+    "croppingIntensity_annual",
+    "croppingDrought_kharif",
+    "hydrological_annual",
+    "hydrological_seasonal",
+    "drainage_density",
+    "lulc_vector",
+    "dem",
+    "mws_intersect_swb",
+    "mws",
+    "mws_connectivity",
+    "stream_order",
+    "soge_vector",
+    "aquifer_vector",
+    "restoration_vector",
+    "overall_tree_change",
+    "Canopy_Cover_Density",
+    "Canopy_height",
+    "drought_causality",
+    "change_detection_afforestation",
+    "change_detection_cropintensity",
+    "change_detection_deforestation",
+    "change_detection_degradation",
+    "change_detection_urbanization",
+]
+
+PARTIAL_DATA_SHEETS = [
+    "mws_intersect_villages",
+    "mining",
+    "green_credit",
+    "factory_csr",
+    "agroecological",
+    "lcw_conflict",
+    "facilities_proximity",
+    "canal",
+    "river",
+    "livestock",
+    "antyodaya",
+    "social_economic_indicator",
+    "nrega_annual",
+    "nrega_assets_village",
+    "terrain_lulc_slope",
+    "terrain_lulc_plain",
+]
