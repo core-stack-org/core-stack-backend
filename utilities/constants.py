@@ -396,7 +396,7 @@ EXPECTED_SHEETS = [
     "change_detection_urbanization",
 ]
 
-PARTIAL_DATA_SHEETS = [
+CONDITIONAL_DATA_SHEETS = [
     "mws_intersect_villages",
     "mining",
     "green_credit",

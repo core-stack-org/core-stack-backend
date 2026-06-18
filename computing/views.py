@@ -9,7 +9,7 @@ from utilities.geoserver_utils import Geoserver
 import json
 from django.conf import settings
 from pathlib import Path
-from utilities.constants import GEOSERVER_BASE, EXPECTED_SHEETS, PARTIAL_DATA_SHEETS
+from utilities.constants import GEOSERVER_BASE, EXPECTED_SHEETS, CONDITIONAL_DATA_SHEETS
 from utilities.logger import setup_logger
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
@@ -493,15 +493,15 @@ def check_xlsx_sheets(file_path):
     """
     missing_sheets = []
     empty_sheets = []
-
+    conditional_sheets = []
     try:
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         existing_sheets = wb.sheetnames
 
-        for sheet_name in EXPECTED_SHEETS:
+        for sheet_name in EXPECTED_SHEETS + CONDITIONAL_DATA_SHEETS:
             if sheet_name not in existing_sheets:
-                if sheet_name in PARTIAL_DATA_SHEETS:
-                    continue
+                if sheet_name in CONDITIONAL_DATA_SHEETS:
+                    conditional_sheets.append(sheet_name)
                 missing_sheets.append(sheet_name)
             else:
                 ws = wb[sheet_name]
@@ -524,6 +524,7 @@ def check_xlsx_sheets(file_path):
     return {
         "missing_sheets": missing_sheets,
         "empty_sheets": empty_sheets,
+        "conditional_sheets": conditional_sheets,
     }
 
 
@@ -573,11 +574,16 @@ def check_missing_excel_files(self):
                     missing_files.append(
                         f"{filename} (unreadable: {sheet_check['error']})"
                     )
-                elif sheet_check["missing_sheets"] or sheet_check["empty_sheets"]:
+                elif (
+                    sheet_check["missing_sheets"]
+                    or sheet_check["empty_sheets"]
+                    or sheet_check["conditional_sheets"]
+                ):
                     xlsx_issues = {
                         "file": filename,
                         "missing_sheets": sheet_check["missing_sheets"],
                         "empty_sheets": sheet_check["empty_sheets"],
+                        "conditional_sheets": sheet_check["conditional_sheets"],
                     }
 
         if missing_files or xlsx_issues:
