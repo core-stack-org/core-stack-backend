@@ -1,0 +1,82 @@
+<div class="section">
+
+    <h2>
+        {{ t.section_c_socio_economic.title }}
+    </h2>
+
+    <p>{{ t.section_c_socio_economic.description }}</p>
+
+    <table class="socio-table">
+
+        <thead>
+            <tr>
+                <th>{{ t.section_c_socio_economic.name_of_the_settlement }}</th>
+                <th>{{ t.section_c_socio_economic.number_of_households }}</th>
+                <th>{{ t.section_c_socio_economic.settlement_type }}</th>
+                <th>{{ t.section_c_socio_economic.caste_group }}</th>
+                <th>{{ t.section_c_socio_economic.total_households }}</th>
+                <th>{{ t.section_c_socio_economic.marginal_farmer }}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in section_c.socio_eco %}
+            <tr>
+
+                <td>
+                    {{ item.settlement_name|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.number_of_households|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.largest_caste_label|default:t.common.na }}
+                </td>
+
+                <td>
+                    {% if item.largest_caste|lower == "single caste group" %}
+                        {{ item.smallest_caste_label|default:t.common.na }}
+                    {% elif item.largest_caste|lower == "mixed caste group" %}
+                        {{ item.settlement_status_label|default:t.common.na }}
+                    {% else %}
+                        {{ t.common.na }}
+                    {% endif %}
+                </td>
+
+                <td>
+                    <table class="nested-table">
+                        <tr>
+                            <td><strong>{{ t.section_c_socio_economic.sc }}</strong></td>
+                            <td>{{ item.data_settlement.count_sc|default:t.common.na }}</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>{{ t.section_c_socio_economic.st }}</strong></td>
+                            <td>{{ item.data_settlement.count_st|default:t.common.na }}</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>{{ t.section_c_socio_economic.obc }}</strong></td>
+                            <td>{{ item.data_settlement.count_obc|default:t.common.na }}</td>
+                        </tr>
+
+                        <tr>
+                            <td><strong>{{ t.section_c_socio_economic.gen }}</strong></td>
+                            <td>{{ item.data_settlement.count_general|default:t.common.na }}</td>
+                        </tr>
+                    </table>
+                </td>
+
+                <td>
+                    {{ item.farmer_family.marginal_farmers|default:t.common.na }}
+                </td>
+
+            </tr>
+            {% endfor %}
+        </tbody>
+
+    </table>
+
+</div>

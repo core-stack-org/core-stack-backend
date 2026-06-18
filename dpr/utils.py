@@ -14,7 +14,16 @@ from django.core.mail import EmailMessage
 from django.core.mail.backends.smtp import EmailBackend
 from docx import Document
 
-from nrm_app.settings import EMAIL_HOST, EMAIL_HOST_PASSWORD, EMAIL_HOST_USER, EMAIL_PORT, EMAIL_TIMEOUT, EMAIL_USE_SSL, ODK_PASSWORD, ODK_USERNAME
+from nrm_app.settings import (
+    EMAIL_HOST,
+    EMAIL_HOST_PASSWORD,
+    EMAIL_HOST_USER,
+    EMAIL_PORT,
+    EMAIL_TIMEOUT,
+    EMAIL_USE_SSL,
+    ODK_PASSWORD,
+    ODK_USERNAME,
+)
 from utilities.constants import (
     ODK_URL_AGRI_MAINTENANCE,
     ODK_URL_GW_MAINTENANCE,
@@ -45,7 +54,13 @@ from .models import (
 )
 
 import boto3
-from nrm_app.settings import DPR_S3_ACCESS_KEY, DPR_S3_SECRET_KEY, DPR_S3_REGION, DPR_S3_BUCKET, DPR_S3_FOLDER
+from nrm_app.settings import (
+    DPR_S3_ACCESS_KEY,
+    DPR_S3_SECRET_KEY,
+    DPR_S3_REGION,
+    DPR_S3_BUCKET,
+    DPR_S3_FOLDER,
+)
 from botocore.exceptions import ClientError
 
 warnings.filterwarnings("ignore")
@@ -265,8 +280,8 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
                     and data_waterbody.get(other_field)
                 ):
                     return f"Other: {data_waterbody.get(other_field)}"
-                elif repair_value:
-                    return repair_value.replace("_", " ").title()
+                # elif repair_value:
+                #     return repair_value.replace("_", " ").title()
         return "NA"
 
     repair_field = structure_type_mapping.get(structure_type_lower)
@@ -287,7 +302,7 @@ def get_waterbody_repair_activities(data_waterbody, water_structure_type):
         else:
             return "Other"
 
-    return repair_activity.replace("_", " ").title()
+    return repair_activity
 
 
 def sort_key(settlement):
@@ -304,9 +319,10 @@ def transform_name(name):
     name = re.sub(r"^_|_$", "", name)
     return name.lower()
 
+
 def to_utf8(value):
     """Ensure value is a properly encoded UTF-8 string for Word document.
-    
+
     Handles cases where UTF-8 text was incorrectly decoded as Latin-1,
     resulting in garbled characters like 'à²ªà²¾à²...' for Kannada/Hindi text.
     """
@@ -316,13 +332,13 @@ def to_utf8(value):
         value = " ".join(str(v) for v in value)
     if isinstance(value, bytes):
         try:
-            return value.decode('utf-8')
+            return value.decode("utf-8")
         except UnicodeDecodeError:
-            return value.decode('latin-1')
+            return value.decode("latin-1")
     if not isinstance(value, str):
         value = str(value)
     try:
-        return value.encode('latin-1').decode('utf-8')
+        return value.encode("latin-1").decode("utf-8")
     except (UnicodeDecodeError, UnicodeEncodeError):
         return value
 
@@ -443,21 +459,21 @@ def send_dpr_email(
         logger.error(f"Failed to send email: {e}")
 
 
-def upload_dpr_to_s3(doc, plan_id, plan_name): 
+def upload_dpr_to_s3(doc, plan_id, plan_name):
     doc_bytes = BytesIO()
     doc.save(doc_bytes)
     doc_bytes.seek(0)
-    
+
     safe_plan_name = transform_name(plan_name)
     s3_key = f"{DPR_S3_FOLDER}/{plan_id}_{safe_plan_name}.docx"
-    
+
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=DPR_S3_ACCESS_KEY,
         aws_secret_access_key=DPR_S3_SECRET_KEY,
         region_name=DPR_S3_REGION,
     )
-    
+
     s3_client.upload_fileobj(
         doc_bytes,
         DPR_S3_BUCKET,
@@ -466,9 +482,9 @@ def upload_dpr_to_s3(doc, plan_id, plan_name):
             "ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "ContentDisposition": f'attachment; filename="DPR_{safe_plan_name}.docx"',
             "CacheControl": "no-cache, no-store, must-revalidate",
-        }
+        },
     )
-    
+
     ts = int(time.time())
     s3_url = f"https://{DPR_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}?v={ts}"
     logger.info(f"DPR uploaded to S3: {s3_url}")
@@ -476,7 +492,7 @@ def upload_dpr_to_s3(doc, plan_id, plan_name):
 
 
 def _extract_s3_key(s3_url):
-    
+
     parsed = urlparse(s3_url)
     return parsed.path.lstrip("/")
 
@@ -484,19 +500,19 @@ def _extract_s3_key(s3_url):
 def check_dpr_exists_on_s3(s3_url):
     if not s3_url:
         return False
-    
+
     try:
         s3_key = _extract_s3_key(s3_url)
     except (IndexError, AttributeError):
         return False
-    
+
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=DPR_S3_ACCESS_KEY,
         aws_secret_access_key=DPR_S3_SECRET_KEY,
         region_name=DPR_S3_REGION,
     )
-    
+
     try:
         s3_client.head_object(Bucket=DPR_S3_BUCKET, Key=s3_key)
         return True
@@ -507,18 +523,18 @@ def check_dpr_exists_on_s3(s3_url):
 
 def download_dpr_from_s3(s3_url):
     s3_key = _extract_s3_key(s3_url)
-    
+
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=DPR_S3_ACCESS_KEY,
         aws_secret_access_key=DPR_S3_SECRET_KEY,
         region_name=DPR_S3_REGION,
     )
-    
+
     doc_bytes = BytesIO()
     s3_client.download_fileobj(DPR_S3_BUCKET, s3_key, doc_bytes)
     doc_bytes.seek(0)
-    
+
     doc = Document(doc_bytes)
     logger.info(f"DPR downloaded from S3: {s3_url}")
     return doc
