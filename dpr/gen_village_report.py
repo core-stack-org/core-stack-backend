@@ -6,9 +6,6 @@ import numpy as np
 import pymannkendall as mk
 import json
 import ast
-from shapely.geometry import shape, mapping
-from shapely.wkt import dumps as shapely_to_wkt
-from shapely.ops import unary_union
 
 from nrm_app.settings import EXCEL_DIR, GEOSERVER_URL, OVERPASS_URL
 from utilities.logger import setup_logger
@@ -77,312 +74,6 @@ def calculate_demographics(properties):
     }
     
     return demographic_data
-
-
-def _convert_wkt_to_gml_coordinates(wkt):
-    """
-    Convert WKT coordinates to GML format.
-    Example: "POLYGON ((x1 y1, x2 y2, ...))" → "<gml:pos>x1 y1</gml:pos><gml:pos>x2 y2</gml:pos>..."
-    """
-    try:
-        # Extract coordinates from WKT
-        # WKT format: "POLYGON ((lon lat, lon lat, ...))"
-        import re
-        
-        # Extract the coordinate string
-        coords_str = re.search(r'\(\((.*?)\)\)', wkt).group(1)
-        
-        # Split into individual coordinates
-        coords = coords_str.split(',')
-        
-        # Convert to GML format
-        gml_coords = []
-        for coord in coords:
-            coord = coord.strip()
-            if coord:
-                gml_coords.append(f"<gml:pos>{coord}</gml:pos>")
-        
-        return '\n           '.join(gml_coords)
-    
-    except Exception as e:
-        print(f"[WARN] Error converting WKT to GML: {str(e)}")
-        return ""
- 
- 
-def _try_bbox_query(layer_name, bounds):
-    """
-    Fallback: Query using bounding box instead of spatial intersection.
-    """
-    
-    try:
-        minx, miny, maxx, maxy = bounds
-        
-        # Add small buffer
-        buffer = 0.01
-        minx -= buffer
-        miny -= buffer
-        maxx += buffer
-        maxy += buffer
-        
-        print(f"[DEBUG] BBOX query bounds: {minx}, {miny}, {maxx}, {maxy}")
-        
-        wfs_url = f"{GEOSERVER_URL}/wfs"
-        
-        params = {
-            'service': 'WFS',
-            'version': '2.0.0',
-            'request': 'GetFeature',
-            'typeNames': f"mws_layers:{layer_name}",
-            'outputFormat': 'application/json',
-            'bbox': f"{minx},{miny},{maxx},{maxy},urn:ogc:def:crs:EPSG:4326",
-            'srsName': 'EPSG:4326'
-        }
-        
-        response = requests.get(wfs_url, params=params, timeout=30)
-        
-        if response.status_code == 200:
-            mws_data = response.json()
-            
-            if mws_data.get('features'):
-                print(f"[SUCCESS] BBOX query found {len(mws_data['features'])} features")
-                return {
-                    'success': True,
-                    'features': mws_data['features'],
-                    'count': len(mws_data['features']),
-                    'error': None
-                }
-            else:
-                print(f"[INFO] BBOX query returned 0 features")
-                return {
-                    'success': True,
-                    'features': [],
-                    'count': 0,
-                    'error': 'No features in bbox'
-                }
-        else:
-            error_msg = f"Status {response.status_code}"
-            print(f"[ERROR] BBOX query failed: {error_msg}")
-            return {
-                'success': False,
-                'features': [],
-                'count': 0,
-                'error': error_msg
-            }
-    
-    except Exception as e:
-        print(f"[ERROR] BBOX query exception: {str(e)}")
-        return {
-            'success': False,
-            'features': [],
-            'count': 0,
-            'error': str(e)
-        }
- 
- 
-def test_mws_layer(district, block):
-    """
-    Test if the MWSes layer exists in GeoServer.
-    """
-    
-    mws_layer_name = f"deltaG_well_depth_{district}_{block}".lower()
-    
-    try:
-        wfs_url = f"{GEOSERVER_URL}/wfs"
-        
-        params = {
-            'service': 'WFS',
-            'version': '2.0.0',
-            'request': 'GetFeature',
-            'typeNames': f"mws_layers:{mws_layer_name}",
-            'outputFormat': 'application/json',
-            'maxFeatures': 1
-        }
-        
-        response = requests.get(wfs_url, params=params, timeout=10)
-        
-        if response.status_code == 200:
-            print(f"✓ Layer '{mws_layer_name}' exists")
-            data = response.json()
-            features_count = len(data.get('features', []))
-            print(f"  Features available: {features_count}")
-            if data.get('features'):
-                print(f"  Geometry type: {data['features'][0].get('geometry', {}).get('type')}")
-                print(f"  Sample properties: {list(data['features'][0].get('properties', {}).keys())[:5]}")
-            return True
-        else:
-            print(f"✗ Layer '{mws_layer_name}' returned status {response.status_code}")
-            return False
-    
-    except Exception as e:
-        print(f"✗ Error testing layer: {str(e)}")
-        return False
-
-
-def _try_post_intersects_query(layer_name, village_wkt):
-    """
-    Try INTERSECTS spatial filter using POST request.
-    POST avoids URL length limits for complex geometries.
-    """
-    
-    try:
-        print(f"[DEBUG] Attempting POST INTERSECTS query...")
-        
-        wfs_url = f"{GEOSERVER_URL}/wfs"
-        
-        # Build WFS query with CQL filter in request body
-        wfs_query = f"""<?xml version="1.0" encoding="UTF-8"?>
-<wfs:GetFeature service='WFS' version='2.0.0'
- xmlns:topp='http://www.openplans.org/topp'
- xmlns:fes='http://www.opengis.net/fes/2.0'
- xmlns:wfs='http://www.opengis.net/wfs/2.0'
- outputFormat='application/json'>
- <wfs:Query typeNames='mws_layers:{layer_name}'/>
- <fes:Filter>
-   <fes:Intersects>
-     <fes:ValueReference>the_geom</fes:ValueReference>
-     <gml:Polygon xmlns:gml='http://www.opengis.net/gml/3.2' srsName='EPSG:4326'>
-       <gml:exterior>
-         <gml:LinearRing>
-           {_convert_wkt_to_gml_coordinates(village_wkt)}
-         </gml:LinearRing>
-       </gml:exterior>
-     </gml:Polygon>
-   </fes:Intersects>
- </fes:Filter>
-</wfs:GetFeature>"""
-        
-        headers = {
-            'Content-Type': 'application/xml'
-        }
-        
-        response = requests.post(wfs_url, data=wfs_query, headers=headers, timeout=30)
-        print(f"[DEBUG] POST response status: {response.status_code}")
-        
-        if response.status_code == 200:
-            mws_data = response.json()
-            if mws_data.get('features'):
-                print(f"[SUCCESS] Found {len(mws_data['features'])} features")
-                return {
-                    'success': True,
-                    'features': mws_data['features'],
-                    'count': len(mws_data['features']),
-                    'error': None
-                }
-            else:
-                print(f"[INFO] No features found")
-                return {
-                    'success': True,
-                    'features': [],
-                    'count': 0,
-                    'error': 'No intersecting features'
-                }
-        else:
-            error_msg = f"Status {response.status_code}: {response.text[:200]}"
-            print(f"[WARN] POST query failed: {error_msg}")
-            return {
-                'success': False,
-                'features': [],
-                'count': 0,
-                'error': error_msg
-            }
-    
-    except Exception as e:
-        print(f"[WARN] POST query exception: {str(e)}")
-        return {
-            'success': False,
-            'features': [],
-            'count': 0,
-            'error': str(e)
-        }
-
-
-def get_mwses_boundaries(state, district, block, village_id):
-    """
-    Get all MWSes (Micro-Watersheds) boundaries that intersect with the given village.
-    Uses POST requests to avoid URL length limits with complex geometries.
-    """
-    
-    try:
-        # Step 1: Get village geometry
-        village_data = get_village_polygon_and_info(state, district, block, village_id)
- 
-        if not village_data or not village_data.get('village_polygon'):
-            return {'polygon': {}, 'count': 0, 'error': 'Village polygon not found'}
-        
-        village_geom = village_data['village_polygon']
-        print(f"[DEBUG] village_geom type: {type(village_geom)}")
-        
-        # Step 2: Convert to Shapely
-        village_shapely = None
-        
-        if isinstance(village_geom, dict):
-            if village_geom.get('type') == 'FeatureCollection':
-                geometries = []
-                for feature in village_geom.get('features', []):
-                    if 'geometry' in feature:
-                        geometries.append(shape(feature['geometry']))
-                village_shapely = unary_union(geometries)
-                print(f"[DEBUG] Converted FeatureCollection to Shapely (unary_union)")
-            elif village_geom.get('type') == 'Feature':
-                village_shapely = shape(village_geom['geometry'])
-                print(f"[DEBUG] Converted Feature to Shapely")
-            elif village_geom.get('type') in ['Polygon', 'MultiPolygon', 'Point', 'LineString']:
-                village_shapely = shape(village_geom)
-                print(f"[DEBUG] Converted {village_geom.get('type')} to Shapely")
-        
-        if village_shapely is None:
-            return {'polygon': {}, 'count': 0, 'error': 'Could not convert village geometry'}
-        
-        # Step 3: Query MWSes layer
-        mws_layer_name = f"deltaG_well_depth_{district}_{block}".lower()
-        print(f"[DEBUG] Querying layer: {mws_layer_name}")
-        
-        # Convert to WKT
-        village_wkt = shapely_to_wkt(village_shapely)
-        print(f"[DEBUG] Village WKT length: {len(village_wkt)} characters")
-        
-        # Step 4: Try POST request with INTERSECTS (avoids URL length limits)
-        result = _try_post_intersects_query(mws_layer_name, village_wkt)
-        
-        if result['success']:
-            print(f"[SUCCESS] POST INTERSECTS query returned {result['count']} features")
-            return {
-                'polygon': {'type': 'FeatureCollection', 'features': result['features']},
-                'count': result['count'],
-                'error': None
-            }
-        
-        print(f"[WARNING] POST INTERSECTS query failed: {result['error']}")
-        
-        # Step 5: Fallback to BBOX query
-        print(f"[INFO] Trying fallback with BBOX query...")
-        bounds = village_shapely.bounds
-        result = _try_bbox_query(mws_layer_name, bounds)
-        
-        if result['success']:
-            print(f"[SUCCESS] BBOX query returned {result['count']} features")
-            return {
-                'polygon': {'type': 'FeatureCollection', 'features': result['features']},
-                'count': result['count'],
-                'error': None
-            }
-        
-        print(f"[ERROR] BBOX query also failed: {result['error']}")
-        return {
-            'polygon': {},
-            'count': 0,
-            'error': f"Both queries failed. BBOX error: {result['error']}"
-        }
-    
-    except Exception as e:
-        print(f"[EXCEPTION] {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {
-            'polygon': {},
-            'count': 0,
-            'error': f'Error: {str(e)}'
-        }
 
 
 def get_mwses_ids(state, district, block, village_id):
@@ -1478,36 +1169,43 @@ def get_block_development_data(state, district, block):
         return []
     
 
-def get_basic_infrastructure(state, district, block, village_id):
-    
+def get_basic_infrastructure(state, district, block, village_id, df=None):
+
     def safe_float(value, default=0):
         try:
             return float(value)
         except:
             return default
-        
+
     try:
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
 
-        excel_file = pd.ExcelFile(file_path)
+        # Only load excel if dataframe not supplied
+        if df is None:
 
-        df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df["village_id"] = (
-            df["village_id"]
-            .astype(str)
-            .str.strip()
-        )
+            excel_file = pd.ExcelFile(file_path)
+
+            df = pd.read_excel(
+                excel_file,
+                sheet_name="antyodaya"
+            )
+
+            df["village_id"] = (
+                df["village_id"]
+                .astype(str)
+                .str.strip()
+            )
 
         village_id = str(village_id).strip()
 
@@ -1516,35 +1214,38 @@ def get_basic_infrastructure(state, district, block, village_id):
         ]
 
         if matched_rows.empty:
-            logger.info(
-                "No data found for village_id %s in %s district, %s block",
-                village_id,
-                district,
-                block,
-            )
             return []
 
         row = matched_rows.iloc[0]
 
-        road_score = safe_float(row.get("road_connectivity_cat_value", 0))
-
-        energy_score = safe_float(row.get("energy_access_cat_value", 0))
-
-        housing_score = safe_float(row.get("housing_quality_cat_value", 0))
-
         return [
-            road_score,
-            energy_score,
-            housing_score
+            safe_float(
+                row.get(
+                    "road_connectivity_cat_value",
+                    0
+                )
+            ),
+            safe_float(
+                row.get(
+                    "energy_access_cat_value",
+                    0
+                )
+            ),
+            safe_float(
+                row.get(
+                    "housing_quality_cat_value",
+                    0
+                )
+            )
         ]
 
     except Exception as e:
+
         logger.info(
-            "Not able to access excel for %s district, %s block. Error: %s",
-            district,
-            block,
+            "Not able to access infrastructure data. Error: %s",
             str(e),
         )
+
         return []
 
 
@@ -1684,7 +1385,7 @@ def get_health_and_wash(state, district, block, village_id):
         return []
 
 
-def get_education_institutions(state, district, block, village_id):
+def get_education_institutions(state, district, block, village_id, df_facilities=None):
 
     def get_numeric(row, column):
         return pd.to_numeric(row.get(column, None), errors="coerce")
@@ -1705,30 +1406,32 @@ def get_education_institutions(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df_facilities is None:
 
-        excel_file = pd.ExcelFile(file_path)
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+            excel_file = pd.ExcelFile(file_path)
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
-            .astype(str)
-            .str.strip()
-        )
+            df_facilities = pd.read_excel(
+                excel_file,
+                sheet_name="facilities_proximity"
+            )
+
+            df_facilities["censuscode2011"] = (
+                df_facilities["censuscode2011"]
+                .astype(str)
+                .str.strip()
+            )
 
         village_id = str(village_id).strip()
 
@@ -1802,7 +1505,7 @@ def get_education_institutions(state, district, block, village_id):
         return []
 
 
-def get_financial_inclusion(state, district, block, village_id):
+def get_financial_inclusion(state, district, block, village_id, df_facilities=None):
 
     def get_numeric(row, column):
         return pd.to_numeric(row.get(column, None), errors="coerce")
@@ -1839,30 +1542,31 @@ def get_financial_inclusion(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df_facilities is None:
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        excel_file = pd.ExcelFile(file_path)
+            excel_file = pd.ExcelFile(file_path)
 
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+            df_facilities = pd.read_excel(
+                excel_file,
+                sheet_name="facilities_proximity"
+            )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
-            .astype(str)
-            .str.strip()
-        )
+            df_facilities["censuscode2011"] = (
+                df_facilities["censuscode2011"]
+                .astype(str)
+                .str.strip()
+            )
 
         village_id = str(village_id).strip()
 
@@ -1920,7 +1624,7 @@ def get_financial_inclusion(state, district, block, village_id):
         return []
 
 
-def get_welfare_inclusion(state, district, block, village_id):
+def get_welfare_inclusion(state, district, block, village_id, df=None, df_facilities=None):
 
     def safe_float(value, default=0):
         try:
@@ -1932,30 +1636,47 @@ def get_welfare_inclusion(state, district, block, village_id):
         return pd.to_numeric(row.get(column, None), errors="coerce")
 
     try:
+        if df is None or df_facilities is None:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        excel_file = pd.ExcelFile(file_path)
+            excel_file = pd.ExcelFile(file_path)
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            if df is None:
 
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+                df = pd.read_excel(
+                    excel_file,
+                    sheet_name="antyodaya"
+                )
+
+                df["village_id"] = (
+                    df["village_id"]
+                    .astype(str)
+                    .str.strip()
+                )
+
+            if df_facilities is None:
+
+                df_facilities = pd.read_excel(
+                    excel_file,
+                    sheet_name="facilities_proximity"
+                )
+
+                df_facilities["censuscode2011"] = (
+                    df_facilities["censuscode2011"]
+                    .astype(str)
+                    .str.strip()
+                )
 
         df["village_id"] = (
             df["village_id"]
@@ -2036,7 +1757,7 @@ def get_welfare_inclusion(state, district, block, village_id):
         return []
 
 
-def get_community_institutes(state, district, block, village_id):
+def get_community_institutes(state, district, block, village_id, df=None):
 
     def safe_float(value, default=0):
         try:
@@ -2046,24 +1767,26 @@ def get_community_institutes(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None:
 
-        excel_file = pd.ExcelFile(file_path)
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            excel_file = pd.ExcelFile(file_path)
+
+            df = pd.read_excel(
+                excel_file,
+                sheet_name="antyodaya"
+            )
 
         df["village_id"] = (
             df["village_id"]
@@ -2204,7 +1927,7 @@ def get_livelihood_diversification(state, district, block, village_id):
         return []
 
 
-def get_livestock_management(state, district, block, village_id):
+def get_livestock_management(state, district, block, village_id, df=None, df_facilities=None):
 
     def safe_float(value, default=0):
         try:
@@ -2217,29 +1940,33 @@ def get_livestock_management(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None or df_facilities is None:
 
-        excel_file = pd.ExcelFile(file_path)
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            excel_file = pd.ExcelFile(file_path)
 
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+            if df is None:
+                df = pd.read_excel(
+                    excel_file,
+                    sheet_name="antyodaya"
+                )
+
+            if df_facilities is None:
+                df_facilities = pd.read_excel(
+                    excel_file,
+                    sheet_name="facilities_proximity"
+                )
 
         df["village_id"] = (
             df["village_id"]
@@ -2386,7 +2113,7 @@ def get_land_cultivation(state, district, block, village_id):
         return []
 
 
-def get_irrigation_Infra(state, district, block, village_id):
+def get_irrigation_Infra(state, district, block, village_id, df=None):
 
     def safe_float(value, default=0):
         try:
@@ -2396,24 +2123,26 @@ def get_irrigation_Infra(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None:
 
-        excel_file = pd.ExcelFile(file_path)
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            excel_file = pd.ExcelFile(file_path)
+
+            df = pd.read_excel(
+                excel_file,
+                sheet_name="antyodaya"
+            )
 
         df["village_id"] = (
             df["village_id"]
@@ -2488,7 +2217,7 @@ def get_irrigation_Infra(state, district, block, village_id):
         return []
     
 
-def get_agri_support_service(state, district, block, village_id):
+def get_agri_support_service(state, district, block, village_id, df=None, df_facilities=None):
 
     def safe_float(value, default=0):
         try:
@@ -2515,29 +2244,33 @@ def get_agri_support_service(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None or df_facilities is None:
 
-        excel_file = pd.ExcelFile(file_path)
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            excel_file = pd.ExcelFile(file_path)
 
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+            if df is None:
+                df = pd.read_excel(
+                    excel_file,
+                    sheet_name="antyodaya"
+                )
+
+            if df_facilities is None:
+                df_facilities = pd.read_excel(
+                    excel_file,
+                    sheet_name="facilities_proximity"
+                )
 
         df["village_id"] = (
             df["village_id"]
@@ -2669,7 +2402,7 @@ def get_agri_support_service(state, district, block, village_id):
         return []
 
 
-def get_ecological_climate_resiliance(state,district,block,village_id):
+def get_ecological_climate_resiliance(state, district, block, village_id, df=None, df_nrega=None):
 
     def safe_float(value, default=0):
         try:
@@ -2679,29 +2412,33 @@ def get_ecological_climate_resiliance(state,district,block,village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None or df_nrega is None:
 
-        excel_file = pd.ExcelFile(file_path)
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            excel_file = pd.ExcelFile(file_path)
 
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
-        )
+            if df is None:
+                df = pd.read_excel(
+                    excel_file,
+                    sheet_name="antyodaya"
+                )
+
+            if df_nrega is None:
+                df_nrega = pd.read_excel(
+                    excel_file,
+                    sheet_name="nrega_assets_village"
+                )
 
         df["village_id"] = (
             df["village_id"]
@@ -2757,8 +2494,10 @@ def get_ecological_climate_resiliance(state,district,block,village_id):
         if nrega_match.empty:
 
             return [
-                None,
-                {},
+                None,                       # year_range
+                {},                         # category_counts
+                0,                          # total_work_count
+                "red",                      # nrega_work_color
                 organic_farming_score,
                 organic_farming_color
             ]
@@ -2774,8 +2513,8 @@ def get_ecological_climate_resiliance(state,district,block,village_id):
             if column in ["vill_id", "vill_name"]:
                 continue
 
-            # Split from right to extract year
             try:
+
                 work_type, year = column.rsplit("_", 1)
 
                 year = int(year)
@@ -2806,11 +2545,23 @@ def get_ecological_climate_resiliance(state,district,block,village_id):
             "to_year": max(years) if years else None,
         }
 
+        total_work_count = sum(
+            category_counts.values()
+        )
+
+        nrega_work_color = (
+            "green"
+            if total_work_count > 100
+            else "red"
+        )
+
         return [
-            year_range,
-            category_counts,
-            organic_farming_score,
-            organic_farming_color
+            year_range,                 # index 0
+            category_counts,            # index 1
+            total_work_count,           # index 2
+            nrega_work_color,           # index 3
+            organic_farming_score,      # index 4
+            organic_farming_color       # index 5
         ]
 
     except Exception as e:
@@ -2826,12 +2577,9 @@ def get_ecological_climate_resiliance(state,district,block,village_id):
     
 
 
-
 #? Get Tehsil Map Data
 def get_all_villages_basic_infrastructure(state, district, block):
-
     try:
-
         file_path = (
             DATA_DIR_TEMP
             + state.upper()
@@ -2846,15 +2594,41 @@ def get_all_villages_basic_infrastructure(state, district, block):
 
         excel_file = pd.ExcelFile(file_path)
 
-        df_nrega = pd.read_excel(excel_file,sheet_name="nrega_assets_village")
+        # Read once
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
 
-        village_ids = (df_nrega["vill_id"].dropna().astype(str).unique())
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        df_nrega = pd.read_excel(
+            excel_file,
+            sheet_name="nrega_assets_village"
+        )
+
+        village_ids = (
+            df_nrega["vill_id"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            vid
+            for vid in village_ids.unique()
+            if vid and vid != "0"
+        ]
 
         result = {}
 
         for village_id in village_ids:
 
-            village_data = get_basic_infrastructure(state, district, block, village_id)
+            village_data = get_basic_infrastructure(state, district, block, village_id, df=df)
 
             if not village_data:
 
@@ -2866,9 +2640,7 @@ def get_all_villages_basic_infrastructure(state, district, block):
 
                 continue
 
-            road_score = village_data[0]
-            energy_score = village_data[1]
-            housing_score = village_data[2]
+            road_score, energy_score, housing_score = village_data
 
             result[village_id] = {
 
@@ -2903,8 +2675,15 @@ def get_all_villages_basic_infrastructure(state, district, block):
         )
 
         return {}
-    
-def get_all_villages_education_institutions(state, district, block):
+
+
+def get_all_villages_health_and_wash(state, district, block):
+
+    def safe_float(value, default=0):
+        try:
+            return float(value)
+        except:
+            return default
 
     try:
 
@@ -2922,20 +2701,152 @@ def get_all_villages_education_institutions(state, district, block):
 
         excel_file = pd.ExcelFile(file_path)
 
-        df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            matched_rows = df[
+                df["village_id"] == village_id
+            ]
+
+            if matched_rows.empty:
+
+                village_data[village_id] = {
+                    "maternal_child_health_color": "black",
+                    "water_sanitation_color": "black"
+                }
+
+                continue
+
+            row = matched_rows.iloc[0]
+
+            maternal_child_score = safe_float(
+                row.get(
+                    "maternal_child_health_cat_value",
+                    0
+                )
+            )
+
+            water_sanitation_score = safe_float(
+                row.get(
+                    "water_sanitation_cat_value",
+                    0
+                )
+            )
+
+            # Maternal Child Health Color
+
+            if maternal_child_score <= 0.33:
+                maternal_child_health_color = "red"
+
+            elif maternal_child_score <= 0.66:
+                maternal_child_health_color = "yellow"
+
+            else:
+                maternal_child_health_color = "green"
+
+            # Water & Sanitation Color
+
+            if water_sanitation_score <= 0.33:
+                water_sanitation_color = "red"
+
+            elif water_sanitation_score <= 0.66:
+                water_sanitation_color = "yellow"
+
+            else:
+                water_sanitation_color = "green"
+
+            village_data[village_id] = {
+                "maternal_child_health_color": (
+                    maternal_child_health_color
+                ),
+                "water_sanitation_color": (
+                    water_sanitation_color
+                )
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access health and wash data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}    
+
+
+def get_all_villages_education_institutions( state, district, block):
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df_nrega = pd.read_excel(
+            excel_file,
+            sheet_name="nrega_assets_village"
+        )
+
+        df_facilities = pd.read_excel(
+            excel_file,
+            sheet_name="facilities_proximity"
+        )
+
+        df_facilities["censuscode2011"] = (
+            df_facilities["censuscode2011"]
+            .astype(str)
+            .str.strip()
+        )
 
         village_ids = (
             df_nrega["vill_id"]
             .dropna()
             .astype(str)
-            .unique()
+            .str.strip()
         )
+
+        village_ids = [
+            vid
+            for vid in village_ids.unique()
+            if vid and vid != "0"
+        ]
 
         result = {}
 
         for village_id in village_ids:
 
-            education_data = get_education_institutions(state,district, block, village_id )
+            education_data = get_education_institutions(state, district, block, village_id, df_facilities=df_facilities)
 
             if not education_data:
 
@@ -2960,4 +2871,569 @@ def get_all_villages_education_institutions(state, district, block):
 
         return {}
 
+
+def get_all_villages_financial_inclusion(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df_nrega = pd.read_excel(
+            excel_file,
+            sheet_name="nrega_assets_village"
+        )
+
+        df_facilities = pd.read_excel(
+            excel_file,
+            sheet_name="facilities_proximity"
+        )
+
+        df_facilities["censuscode2011"] = (
+            df_facilities["censuscode2011"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = (
+            df_nrega["vill_id"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            vid
+            for vid in village_ids.unique()
+            if vid and vid != "0"
+        ]
+
+        result = {}
+
+        for village_id in village_ids:
+
+            financial_data = get_financial_inclusion(
+                state,
+                district,
+                block,
+                village_id,
+                df_facilities=df_facilities
+            )
+
+            if not financial_data:
+
+                result[village_id] = {
+                    "financial_color": "black"
+                }
+
+                continue
+
+            result[village_id] = {
+                "financial_color": financial_data[2]
+            }
+
+        return result
+
+    except Exception as e:
+
+        logger.info(
+            "Error calculating financial inclusion colors for all villages: %s",
+            str(e)
+        )
+
+        return {}
+
+
+def get_all_villages_welfare_inclusion(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        df_facilities = pd.read_excel(
+            excel_file,
+            sheet_name="facilities_proximity"
+        )
+
+        df_facilities["censuscode2011"] = (
+            df_facilities["censuscode2011"]
+            .astype(str)
+            .str.strip()
+        )
+
+        df_nrega = pd.read_excel(
+            excel_file,
+            sheet_name="nrega_assets_village"
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df_nrega["vill_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        result = {}
+
+        for village_id in village_ids:
+
+            welfare_data = get_welfare_inclusion(
+                state,
+                district,
+                block,
+                village_id,
+                df=df,
+                df_facilities=df_facilities
+            )
+
+            if not welfare_data:
+
+                result[village_id] = {
+                    "welfare_color": "black"
+                }
+
+                continue
+
+            result[village_id] = {
+                "welfare_color": welfare_data[2]
+            }
+
+        return result
+
+    except Exception as e:
+
+        logger.info(
+            "Error calculating welfare inclusion colors for all villages: %s",
+            str(e)
+        )
+
+        return {}
+
+
+def get_all_villages_community_institutes(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            community_info = get_community_institutes(
+                state,
+                district,
+                block,
+                village_id,
+                df=df
+            )
+
+            if not community_info:
+
+                village_data[village_id] = {
+                    "community_color": "black",
+                    "civic_color": "black"
+                }
+
+                continue
+
+            village_data[village_id] = {
+                "community_color": community_info[2],
+                "civic_color": community_info[3]
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access community institution data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
+
+
+def get_all_villages_livestock_management(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df_facilities = pd.read_excel(
+            excel_file,
+            sheet_name="facilities_proximity"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            livestock_info = get_livestock_management(
+                state,
+                district,
+                block,
+                village_id,
+                df=df,
+                df_facilities=df_facilities
+            )
+
+            if not livestock_info:
+
+                village_data[village_id] = {
+                    "veterinary_color": "black",
+                    "pasture_color": "black"
+                }
+
+                continue
+
+            village_data[village_id] = {
+                "veterinary_color": livestock_info[3],
+                "pasture_color": livestock_info[4]
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access livestock management data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
+
+
+def get_all_villages_irrigation_infra(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            irrigation_info = get_irrigation_Infra(
+                state,
+                district,
+                block,
+                village_id,
+                df=df
+            )
+
+            if not irrigation_info:
+
+                village_data[village_id] = {
+                    "irrigation_watershed_color": "black",
+                    "modern_irrigation_color": "black"
+                }
+
+                continue
+
+            village_data[village_id] = {
+                "irrigation_watershed_color": irrigation_info[2],
+                "modern_irrigation_color": irrigation_info[3]
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access irrigation infrastructure data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
+
+
+def get_all_villages_agri_support_service(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df_facilities = pd.read_excel(
+            excel_file,
+            sheet_name="facilities_proximity"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            agri_info = get_agri_support_service(
+                state,
+                district,
+                block,
+                village_id,
+                df=df,
+                df_facilities=df_facilities
+            )
+
+            if not agri_info:
+
+                village_data[village_id] = {
+                    "agri_support_color": "black",
+                    "agri_market_color": "black"
+                }
+
+                continue
+
+            village_data[village_id] = {
+                "agri_support_color": agri_info[4],
+                "agri_market_color": agri_info[5]
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access agri support service data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
+
+
+def get_all_villages_ecological_climate_resiliance(state, district, block):
+
+    try:
+
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        excel_file = pd.ExcelFile(file_path)
+
+        df = pd.read_excel(
+            excel_file,
+            sheet_name="antyodaya"
+        )
+
+        df_nrega = pd.read_excel(
+            excel_file,
+            sheet_name="nrega_assets_village"
+        )
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df_nrega["vill_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            ecology_info = (
+                get_ecological_climate_resiliance(
+                    state,
+                    district,
+                    block,
+                    village_id,
+                    df=df,
+                    df_nrega=df_nrega
+                )
+            )
+
+            if not ecology_info:
+
+                village_data[village_id] = {
+                    "organic_farming_color": "black",
+                    "nrega_work_color": "black"
+                }
+
+                continue
+
+            village_data[village_id] = {
+                "organic_farming_color": ecology_info[5],
+                "nrega_work_color": ecology_info[3]
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access ecology data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
 
