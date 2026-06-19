@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from users.permissions import IsOrganizationMember
 from users.serializers import UserProjectGroup, UserProjectGroupSerializer
+from django.db.models import Count, Q
 
 from .models import AppType, Project
 from .serializers import (
@@ -23,26 +24,42 @@ class ProjectViewSet(viewsets.ModelViewSet):
         include_disabled = self.action == "enable"
 
         if user.is_superadmin or user.is_superuser:
-            qs = Project.objects.all() if include_disabled else Project.objects.filter(enabled=True)
+            qs = (
+                Project.objects.all()
+                if include_disabled
+                else Project.objects.filter(enabled=True)
+            )
 
             organization_id = self.request.query_params.get("organization")
             if organization_id:
                 qs = qs.filter(organization_id=organization_id)
 
-            return qs
+            return qs.annotate(
+                total_plan=Count("plans", filter=Q(plans__enabled=True)),
+                completed_plan=Count("plans", filter=Q(plans__is_completed=True)),
+            )
 
         if user.groups.filter(name="Test Plan Reviewer").exists():
             return Project.objects.filter(
                 app_type=AppType.WATERSHED, enabled=True
+            ).annotate(
+                total_plan=Count("plans", filter=Q(plans__enabled=True)),
+                completed_plan=Count("plans", filter=Q(plans__is_completed=True)),
             )
 
         if user.organization:
             qs = Project.objects.filter(organization=user.organization)
             if not include_disabled:
                 qs = qs.filter(enabled=True)
-            return qs
+            return qs.annotate(
+                total_plan=Count("plans", filter=Q(plans__enabled=True)),
+                completed_plan=Count("plans", filter=Q(plans__is_completed=True)),
+            )
 
-        return Project.objects.none()
+        return Project.objects.none().annotate(
+            total_plan=Count("plans", filter=Q(plans__enabled=True)),
+            completed_plan=Count("plans", filter=Q(plans__is_completed=True)),
+        )
 
     def get_serializer_class(self):
         if self.action == "retrieve":
@@ -114,7 +131,9 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if user.is_superadmin or user.is_superuser:
             queryset = Project.objects.filter(enabled=False)
         elif user.organization:
-            queryset = Project.objects.filter(organization=user.organization, enabled=False)
+            queryset = Project.objects.filter(
+                organization=user.organization, enabled=False
+            )
         else:
             queryset = Project.objects.none()
 
