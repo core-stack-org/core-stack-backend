@@ -266,6 +266,9 @@ def create_excel_for_livestock(data, writer):
         exclude_cols = ["state_name", "district_name", "TEHSIL"]
         df = df.drop(columns=exclude_cols, errors="ignore")
 
+        if "pc11_village_id" in df.columns:
+            df = df[df["pc11_village_id"].notna() &(df["pc11_village_id"].astype(str).str.strip() != "") &(df["pc11_village_id"] != 0)]
+
         # Keep important columns first if they exist
         first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
         other_cols = [c for c in df.columns if c not in first_cols]
@@ -282,6 +285,9 @@ def create_excel_for_antyodaya_20(data, writer):
         features = data.get("features", [])
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
+
+        if "village_id" in df.columns:
+            df = df[df["village_id"].notna() &(df["village_id"].astype(str).str.strip() != "") &(df["village_id"] != 0)]
 
         # Keep important columns first if they exist
         first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
@@ -309,7 +315,7 @@ def create_excel_for_drainage_density(data, writer):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "drainage_density_in_km_per_km2": properties.get(
+            "drainage_density_weighted_in_km_per_km2": properties.get(
                 "drainage_density_weighted", ""
             ),
             "drainage_density_std_in_km_per_km2": properties.get(
@@ -517,6 +523,8 @@ def create_excel_for_facilities(data, writer):
         df_data = [feature["properties"] for feature in features]
 
         df = pd.DataFrame(df_data)
+        if "censuscode2011" in df.columns:
+            df = df[df["censuscode2011"].notna() &(df["censuscode2011"].astype(str).str.strip() != "") &(df["censuscode2011"] != 0)]
 
         first_cols = ["censuscode2011", "censusname"]
         other_cols = [c for c in df.columns if c not in first_cols]
