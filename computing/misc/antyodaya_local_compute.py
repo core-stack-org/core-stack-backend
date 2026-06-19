@@ -40,10 +40,13 @@ GEOSERVER_WORKSPACE = "antyodaya_2020"
 
 
 def _compute_antyodaya_for_panchayat(panchayat_gdf, antyodaya_gdf):
+    if antyodaya_gdf.empty:
+        return antyodaya_gdf
+
     outer_boundary = panchayat_gdf.geometry.unary_union
 
-    # Precise intersection check
-    antyodaya_in_roi = antyodaya_gdf[antyodaya_gdf.intersects(outer_boundary)].copy()
+    # Clip Antyodaya geometries to the panchayat boundary
+    antyodaya_in_roi = gpd.clip(antyodaya_gdf, outer_boundary).copy()
 
     # Final cleanup
     antyodaya_in_roi = antyodaya_in_roi[~antyodaya_in_roi.geometry.is_empty]
