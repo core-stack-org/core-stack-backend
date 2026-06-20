@@ -14,6 +14,7 @@ from computing.local_compute_helper import (
     load_precomputed_watersheds,
     read_validated_vector_file,
     write_vector_output,
+    validate_geometry,
 )
 
 from computing.config_loader import (
@@ -40,9 +41,6 @@ INFLUENCE_FACTORS = [
 
 
 def _load_drainage_lines_for_roi(watersheds_gdf):
-    bounds = watersheds_gdf.geometry.total_bounds
-    bbox_geom = box(*bounds)
-
     print(f"Loading drainage lines from: {PAN_INDIA_DRAINAGE_LINES_GPKG_PATH}")
     if not os.path.exists(PAN_INDIA_DRAINAGE_LINES_GPKG_PATH):
         # Fallback to checking common locations if the exact path is missing
@@ -50,8 +48,9 @@ def _load_drainage_lines_for_roi(watersheds_gdf):
             f"Warning: {PAN_INDIA_DRAINAGE_LINES_GPKG_PATH} not found. Drainage density calculation will fail."
         )
 
-    lines_gdf = gpd.read_file(PAN_INDIA_DRAINAGE_LINES_GPKG_PATH, bbox=bbox_geom)
-    print(f"Loaded {len(lines_gdf)} drainage line features within bounding box")
+    lines_gdf = gpd.read_file(PAN_INDIA_DRAINAGE_LINES_GPKG_PATH, mask=watersheds_gdf)
+    lines_gdf = validate_geometry(lines_gdf)
+    print(f"Loaded {len(lines_gdf)} drainage line features within ROI mask")
     return lines_gdf
 
 
@@ -67,7 +66,12 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     
     for index, watershed in watersheds_gdf.iterrows():
         # Clip drainage lines to this watershed boundary
-        clipped_lines = gpd.clip(drainage_lines_gdf, watershed.geometry)
+        clipped_lines = gpd.clip(drainage_lines_gdf, watershed.geometry).copy()
+
+        # Final cleanup
+        clipped_lines = clipped_lines[~clipped_lines.geometry.is_empty]
+        clipped_lines = clipped_lines[clipped_lines.geometry.is_valid]
+        clipped_lines = clipped_lines[clipped_lines.geometry.notna()]
 
         # Area in km² (area_in_ha / 100)
         area_km2 = watershed["area_in_ha"] / 100
