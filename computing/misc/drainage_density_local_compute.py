@@ -76,10 +76,6 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     drainage_lines_gdf = drainage_lines_gdf[drainage_lines_gdf.geometry.is_valid]
     drainage_lines_gdf = drainage_lines_gdf[drainage_lines_gdf.geometry.notna()]
 
-    # # Reproject to metric CRS for accurate length/area calculation
-    # # (7755 is India-specific metric projection)
-    # drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
-    # watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
     
     for index, watershed in watersheds_gdf.iterrows():
         # Clip drainage lines to this watershed boundary
