@@ -23,6 +23,37 @@ from computing.config_loader import (
 
 GEOSERVER_WORKSPACE = "livestocks"
 
+INTEGER_COLUMNS = (
+    "pc11_village_id",
+    "pc11_state_id",
+    "pc11_district_id",
+    "pc11_subdistrict_id",
+    "cattle_male",
+    "cattle_female",
+    "cattle_total",
+    "buffalo_male",
+    "buffalo_female",
+    "buffalo_total",
+    "sheep_male",
+    "sheep_female",
+    "sheep_total",
+    "goat_male",
+    "goat_female",
+    "goat_total",
+    "pig_male",
+    "pig_female",
+    "pig_total",
+)
+
+def _coerce_nullable_integer_columns(gdf):
+    """
+    Ensure the livestock columns are the correct integer types.
+    """
+    for column in INTEGER_COLUMNS:
+        if column in gdf.columns:
+            gdf[column] = gdf[column].astype("Int64")
+    return gdf
+
 def _compute_livestocks_for_panchayat(panchayat_gdf, livestocks_gdf):
     if livestocks_gdf.empty:
         return livestocks_gdf
@@ -35,7 +66,7 @@ def _compute_livestocks_for_panchayat(panchayat_gdf, livestocks_gdf):
     livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.is_valid]
     livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.notna()]
 
-    return livestocks_in_roi
+    return _coerce_nullable_integer_columns(livestocks_in_roi)
 
 
 @app.task(bind=True)
