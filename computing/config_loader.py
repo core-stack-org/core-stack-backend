@@ -3,7 +3,8 @@ from pathlib import Path
 import yaml
 
 _CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+# PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path("/home/cfpt-jedi/developer/repos/core-stack-backend")
 
 
 def _load():
