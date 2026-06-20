@@ -39,6 +39,17 @@ def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
     facilities_in_roi = facilities_in_roi[facilities_in_roi.geometry.is_valid]
     facilities_in_roi = facilities_in_roi[facilities_in_roi.geometry.notna()]
 
+    # Rename NAME to censusname
+    if "NAME" in facilities_in_roi.columns:
+        facilities_in_roi = facilities_in_roi.rename(columns={"NAME": "censusname"})
+
+    # Add state, district, tehsil from panchayat_gdf
+    for col in ["state", "district", "tehsil"]:
+        if col in panchayat_gdf.columns:
+            # Assign the value for the tehsil (taking the first valid row)
+            first_val = panchayat_gdf[col].dropna().iloc[0] if not panchayat_gdf[col].dropna().empty else None
+            facilities_in_roi[col] = first_val
+
     return facilities_in_roi
 
 
