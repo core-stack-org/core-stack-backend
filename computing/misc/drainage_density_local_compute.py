@@ -59,10 +59,27 @@ def _compute_drainage_density(watersheds_gdf, drainage_lines_gdf):
     Core calculation logic for Drainage Density.
     Matches the GEE version's methodology.
     """
-    # Reproject to metric CRS for accurate length/area calculation
-    # (7755 is India-specific metric projection)
-    drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
-    watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
+    if drainage_lines_gdf.empty:
+        # Initialize columns even if no drainage lines
+        watersheds_gdf["drainage_density_std"] = 0.0
+        watersheds_gdf["drainage_density_weighted"] = 0.0
+        watersheds_gdf["drainage_density_stream"] = str([0.0]*11)
+        watersheds_gdf["stream_length_km"] = str([0.0]*11)
+        return watersheds_gdf
+
+    # Clip to the outer boundary of watersheds_gdf
+    outer_boundary = watersheds_gdf.geometry.unary_union
+    drainage_lines_gdf = gpd.clip(drainage_lines_gdf, outer_boundary).copy()
+
+    # Final cleanup of the global clip
+    drainage_lines_gdf = drainage_lines_gdf[~drainage_lines_gdf.geometry.is_empty]
+    drainage_lines_gdf = drainage_lines_gdf[drainage_lines_gdf.geometry.is_valid]
+    drainage_lines_gdf = drainage_lines_gdf[drainage_lines_gdf.geometry.notna()]
+
+    # # Reproject to metric CRS for accurate length/area calculation
+    # # (7755 is India-specific metric projection)
+    # drainage_lines_gdf = drainage_lines_gdf.to_crs(crs=7755)
+    # watersheds_gdf = watersheds_gdf.to_crs(crs=7755)
     
     for index, watershed in watersheds_gdf.iterrows():
         # Clip drainage lines to this watershed boundary
