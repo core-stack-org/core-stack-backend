@@ -26,21 +26,13 @@ GEOSERVER_WORKSPACE = "facilities_proximity"
 
 
 def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
-    """
-    Filters facilities to strictly those intersecting the panchayat boundaries,
-    without altering/clipping their geometries.
-    """
     if facilities_gdf.empty:
         return facilities_gdf
-
-    # Ensure CRS matches
-    if panchayat_gdf.crs and facilities_gdf.crs and panchayat_gdf.crs != facilities_gdf.crs:
-        facilities_gdf = facilities_gdf.to_crs(panchayat_gdf.crs)
 
     outer_boundary = panchayat_gdf.geometry.unary_union
 
     # Keep facilities that intersect the boundary, geometries unchanged
-    facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
+    facilities_in_roi = gpd.clip(facilities_gdf, outer_boundary).copy()
 
     # Final cleanup
     facilities_in_roi = facilities_in_roi[~facilities_in_roi.geometry.is_empty]
@@ -64,7 +56,7 @@ def generate_facilities_proximity_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"facilities_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        layer_name = f"facilities_12_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
         panchayat_gdf, panchayat_source = load_precomputed_panchayat(
             state=state,
             district=district,
