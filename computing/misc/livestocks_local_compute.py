@@ -54,27 +54,21 @@ def _coerce_nullable_integer_columns(gdf):
             gdf[column] = gdf[column].astype("Int64")
     return gdf
 
-def _compute_livestocks_for_watersheds(watersheds_gdf, livestocks_gdf):
-    """
-    Spatially filters Livestock features with watershed/ROI boundaries.
-    """
+def _compute_livestocks_for_watersheds(panchayat_gdf, livestocks_gdf):
     if livestocks_gdf.empty:
         return livestocks_gdf
-        
-    if watersheds_gdf.crs and livestocks_gdf.crs and watersheds_gdf.crs != livestocks_gdf.crs:
-        livestocks_gdf = livestocks_gdf.to_crs(watersheds_gdf.crs)
 
-    outer_boundary = watersheds_gdf.geometry.unary_union
+    outer_boundary = panchayat_gdf.geometry.unary_union
 
-    # Precise intersection check
+    # Clip Antyodaya geometries to the panchayat boundary
+    livestocks_in_roi = gpd.clip(livestocks_gdf, outer_boundary).copy()
+
     livestocks_in_roi = livestocks_gdf[livestocks_gdf.intersects(outer_boundary)].copy()
-
-    # Final cleanup
     livestocks_in_roi = livestocks_in_roi[~livestocks_in_roi.geometry.is_empty]
     livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.is_valid]
     livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.notna()]
 
-    return _coerce_nullable_integer_columns(livestocks_in_roi)
+    return livestocks_in_roi
 
 
 @app.task(bind=True)
