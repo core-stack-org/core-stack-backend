@@ -31,8 +31,6 @@ def _compute_livestocks_for_panchayat(panchayat_gdf, livestocks_gdf):
 
     # Clip Antyodaya geometries to the panchayat boundary
     livestocks_in_roi = gpd.clip(livestocks_gdf, outer_boundary).copy()
-
-    livestocks_in_roi = livestocks_gdf[livestocks_gdf.intersects(outer_boundary)].copy()
     livestocks_in_roi = livestocks_in_roi[~livestocks_in_roi.geometry.is_empty]
     livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.is_valid]
     livestocks_in_roi = livestocks_in_roi[livestocks_in_roi.geometry.notna()]
