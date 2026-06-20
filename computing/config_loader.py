@@ -149,7 +149,7 @@ LOCAL_CATCHMENT_AREA_OUTPUT = PROJECT_ROOT / "data/layers/catchment_area_singlef
 PAN_INDIA_SLOPE_PERCENTAGE_PATH = PROJECT_ROOT / "data/base_layers/Pan_India_slope_percentage.tif"
 LOCAL_SLOPE_PERCENTAGE_OUTPUT = PROJECT_ROOT / "data/layers/slope_percentage"
 
-PAN_INDIA_MWS_CONNECTIVITY_PATH = PROJECT_ROOT / "data/layers/mws_connectivity/Pan_India_mws_connectivity.geojson"
+PAN_INDIA_MWS_CONNECTIVITY_PATH = PROJECT_ROOT / "data/base_layers/Pan_India_mws_connectivity.geojson"
 LOCAL_MWS_CONNECTIVITY_OUTPUT = PROJECT_ROOT / "data/layers/mws_connectivity/mws_connectivity_local"
 
 LOCAL_MWS_CENTROID_OUTPUT = PROJECT_ROOT / "data/layers/mws_centroid"
