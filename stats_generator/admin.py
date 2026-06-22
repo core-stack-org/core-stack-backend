@@ -10,6 +10,7 @@ class LayerInfoAdmin(admin.ModelAdmin):
         "layer_type",
         "workspace",
         "excel_to_be_generated",
+        "sheet_name",
         "start_year",
         "end_year",
         "created_at",
@@ -17,7 +18,13 @@ class LayerInfoAdmin(admin.ModelAdmin):
     )
 
     # Fields to filter by in the admin panel
-    list_filter = ("layer_type", "excel_to_be_generated", "start_year", "end_year", "created_at")
+    list_filter = (
+        "layer_type",
+        "excel_to_be_generated",
+        "start_year",
+        "end_year",
+        "created_at",
+    )
 
     # Fields that can be searched in the admin panel
     search_fields = ("layer_name", "layer_desc", "workspace")

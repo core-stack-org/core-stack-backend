@@ -1073,18 +1073,60 @@ def send_report_email(
     if report_type == "missing_layers":
         subject = "Missing Layers Report"
         attachment_name = "missing_layers.json"
-        summary = []
-        total_missing = 0
-        for layer, data in result.items():
+
+        strict_result = result.get("Mandatory", {})
+        can_be_empty_result = result.get("can_be_empty", {})
+
+        # Filter out workspaces with zero missing layers
+        strict_filtered = {
+            ws: data for ws, data in strict_result.items() if data.get("missing_layers")
+        }
+        can_be_empty_filtered = {
+            ws: data
+            for ws, data in can_be_empty_result.items()
+            if data.get("missing_layers")
+        }
+
+        strict_summary = []
+        total_strict_missing = 0
+        for layer, data in strict_filtered.items():
             count = len(data.get("missing_layers", []))
-            total_missing += count
-            summary.append(f"{layer}: {count}")
+            total_strict_missing += count
+            strict_summary.append(f"{layer}: {count}")
+
+        can_be_empty_summary = []
+        total_can_be_empty_missing = 0
+        for layer, data in can_be_empty_filtered.items():
+            count = len(data.get("missing_layers", []))
+            total_can_be_empty_missing += count
+            can_be_empty_summary.append(f"{layer}: {count}")
+
+        total_missing = total_strict_missing + total_can_be_empty_missing
+
         body = (
             "Missing Layers Report\n\n"
-            f"Total Missing: {total_missing}\n\n"
-            + "\n".join(summary)
+            f"Total Missing: {total_missing}\n"
+            f"  - Mandatory (needs attention): {total_strict_missing}\n"
+            f"  - Can-Be-Empty (may be legitimately absent): {total_can_be_empty_missing}\n\n"
+            "---- Mandatory Workspaces (data expected everywhere) ----\n"
+            + (
+                "\n".join(strict_summary)
+                if strict_summary
+                else "None — nothing missing"
+            )
+            + "\n\n"
+            "---- Can-Be-Empty Workspaces (some locations may legitimately have no data) ----\n"
+            + (
+                "\n".join(can_be_empty_summary)
+                if can_be_empty_summary
+                else "None — nothing missing"
+            )
             + "\n\nDetailed report attached."
         )
+        result = {
+            "Mandatory": strict_filtered,
+            "can_be_empty": can_be_empty_filtered,
+        }
 
     elif report_type == "missing_excel_files":
         subject = "Missing Stats Excel/JSON Files Report"
@@ -1094,9 +1136,9 @@ def send_report_email(
         total_xlsx_issues = sum(1 for loc in result if loc.get("xlsx_issues"))
         body = (
             "Missing Stats Excel/JSON Files Report\n\n"
-            f"Tehsils with issues: {total_locations}\n"
+            f"Tehsils which files(json/excel) are missing: {total_locations}\n"
             f"Total missing files: {total_missing_files}\n"
-            f"Tehsils with xlsx sheet issues: {total_xlsx_issues}\n\n"
+            f"Tehsils with xlsx sheet missing: {total_xlsx_issues}\n\n"
             "Detailed report attached."
         )
 

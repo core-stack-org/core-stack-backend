@@ -325,15 +325,22 @@ def bulk_check_vector_layers(
 
 @app.task(bind=True)
 def missing_layer_for_all_workspace(self):
-    workspaces = (
-        Dataset.objects.filter(workspace__isnull=False)
+    dataset_qs = Dataset.objects.filter(workspace__isnull=False, is_active=True)
+    workspaces = dataset_qs.values_list("workspace", flat=True).distinct()
+    can_be_empty_workspaces = (
+        dataset_qs.filter(can_be_empty=True)
         .values_list("workspace", flat=True)
         .distinct()
     )
     workspaces = [w.strip() for w in workspaces if w and w.strip()]
-    result = {}
+    can_be_empty = set(w.strip() for w in can_be_empty_workspaces if w and w.strip())
+    result = {"Mandatory": {}, "can_be_empty": {}}
     for workspace in workspaces:
-        result[workspace] = check_missing_layers(workspace)
+        layer_result = check_missing_layers(workspace)
+        if workspace in can_be_empty:
+            result["can_be_empty"][workspace] = layer_result
+        else:
+            result["Mandatory"][workspace] = layer_result
     send_report_email(result, report_type="missing_layers")
     return result
 
@@ -386,13 +393,17 @@ def check_missing_layers(workspace: str) -> dict:
     for state, district_name, tehsil_name, layer_type, layer_name in tasks:
         if layer_type == "raster":
             if layer_name not in available_raster_layers:
-                missing_layers.append(f"{state}, {district_name}, {tehsil_name}")
+                missing_layers.append(
+                    f"{state}, {district_name}, {tehsil_name}, {layer_name}"
+                )
 
         elif layer_type == "vector":
             if use_bulk_vector:
                 # O(1) set lookup — no HTTP call needed
                 if layer_name not in available_vector_layers:
-                    missing_layers.append(f"{state}, {district_name}, {tehsil_name}")
+                    missing_layers.append(
+                        f"{state}, {district_name}, {tehsil_name}, {layer_name}"
+                    )
             else:
                 vector_tasks.append(
                     (state, district_name, tehsil_name, layer_name)
@@ -407,7 +418,9 @@ def check_missing_layers(workspace: str) -> dict:
         for layer_name, is_valid in validity.items():
             if not is_valid:
                 state, district_name, tehsil_name = info_by_name[layer_name]
-                missing_layers.append(f"{state}, {district_name}, {tehsil_name}")
+                missing_layers.append(
+                    f"{state}, {district_name}, {tehsil_name}, {layer_name}"
+                )
 
     return {"missing_layers": missing_layers}
 
@@ -502,7 +515,8 @@ def check_xlsx_sheets(file_path):
             if sheet_name not in existing_sheets:
                 if sheet_name in CONDITIONAL_DATA_SHEETS:
                     conditional_sheets.append(sheet_name)
-                missing_sheets.append(sheet_name)
+                else:
+                    missing_sheets.append(sheet_name)
             else:
                 ws = wb[sheet_name]
                 # max_row is None or 1 (header only) means no data
