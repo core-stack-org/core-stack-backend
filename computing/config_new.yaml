@@ -1,0 +1,132 @@
+# Local compute manifest.
+
+base_layers:
+    static_layers:
+        - name: mws
+          local_path: data/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
+          type: file
+
+        - name: terrain
+          local_path: data/base_layers/terrain_raster_fabdam_pan_india.tif
+          source: s3://corestack-datasets/base_layers/static_layers/terrain/terrain_raster_fabdam_pan_india.tif
+          type: file
+
+        - name: slope percentage
+          local_path: data/base_layers/slope_percentage/slope_percentage.tif
+          source: s3://corestack-datasets/base_layers/static_layers/slope_percentage/slope_percentage.tif
+          type: file
+        
+        - name: aquifer
+          local_path: data/base_layers/aquifer/aquifer.tif
+          source: s3://corestack-datasets/base_layers/static_layers/aquifer/aquifer.tif
+          type: file
+
+        - name: aez
+          local_path: data/base_layers/AEZs/Agro_Ecological_Regions.shp
+          source: s3://corestack-datasets/base_layers/AEZs/Agro_Ecological_Regions.shp
+          type: file
+
+        - name: restoration opportunity
+          local_path: data/base_layers/restoration_opportunity/restoration_opportunity.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/restoration_opportunity/restoration_opportunity.geojson
+          type: file
+
+        - name: soge
+          local_path: data/base_layers/soge/soge.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/soge/soge.geojson
+          type: file
+
+        - name: lcw
+          local_path: data/base_layers/lcw/lcw.tif
+          source: s3://corestack-datasets/base_layers/static_layers/lcw/lcw.tif
+          type: file
+
+        - name: factory csr
+          local_path: data/base_layers/factory_csr/factory_csr.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/factory_csr/factory_csr.geojson
+          type: file
+
+        - name: mining
+          local_path: data/base_layers/mining/mining.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/mining/mining.geojson
+          type: file
+
+        - name: facilities
+          local_path: data/base_layers/facilities/facilities.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/facilities/facilities.geojson
+          type: file
+
+        - name: dem
+          local_path: data/base_layers/dem/dem.tif
+          source: s3://corestack-datasets/base_layers/static_layers/dem/dem.tif
+          type: file
+
+        - name: river
+          local_path: data/base_layers/river/river.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/river/river.geojson
+          type: file
+
+        - name: canal
+          local_path: data/base_layers/canal/canal.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/canal/canal.geojson
+          type: file
+
+        - name: hydrological soil group
+          local_path: data/base_layers/hydrological_soil_group/hydrological_soil_group.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/hydrological_soil_group/hydrological_soil_group.geojson
+          type: file
+
+    periodic_layers:
+        - name: lulc_v3
+          filename: lulc_v3_{year}_{year+1}.tif
+          local_path: data/base_layers/lulc/{filename}
+          periodicity: annual
+          start_year: 2017
+          end_year: 2024
+          source: s3://corestack-datasets/base_layers/periodic_layers/lulc/lulc_v3/{filename}
+          type: file
+
+        - name: lulc_v4
+          filename: lulc_v4_{year}_{year+1}.tif
+          local_path: data/base_layers/lulc/{filename}
+          periodicity: annual
+          start_year: 2017
+          end_year: 2024
+          source: s3://corestack-datasets/base_layers/periodic_layers/lulc/lulc_v4/{filename}
+          type: file
+
+    on_demand_layers:
+        - name: farm_boundary
+          local_path: data/base_layers/farm_boundary/farm_boundary.geojson
+
+derived_layers: # layers that are computed
+    - name: change detection
+      params: [
+        Afforestation,
+        Deforestation,
+        Degradation,
+        Urbanization,
+        CropIntensity
+      ]
+      filename: change_{district}_{tehsil}_{param_name}_{start_year}_{end_year}.tif
+      local_path: data/derived_layers/change_detection/{filename}
+      geoserver_workspace: change_detection
+      layer_type: raster
+
+    - name: change detection vector
+      params: [
+        Afforestation,
+        Deforestation,
+        Degradation,
+        Urbanization,
+        CropIntensity
+      ]
+      filename: change_vector_{district}_{tehsil}_{param_name}_{start_year}_{end_year}.geojson
+      local_path: data/derived_layers/change_detection/{filename}
+      geoserver_workspace: change_detection
+      layer_type: vector
+
+  
+    
+    
