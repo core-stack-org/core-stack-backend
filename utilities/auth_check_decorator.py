@@ -15,6 +15,7 @@ from django.contrib.auth import get_user_model
 from geoadmin.models import UserAPIKey
 from rest_framework.decorators import api_view as drf_api_view
 from rest_framework.schemas import AutoSchema
+from utilities.drf_throttling import enforce_throttles
 
 User = get_user_model()
 
@@ -97,6 +98,10 @@ def api_security_check(auth_type="JWT", allowed_methods="GET", required_headers=
                         {"error": "Missing headers", "missing": missing_headers},
                         status.HTTP_400_BAD_REQUEST
                     )
+
+                throttle_response = enforce_throttles(request, view_func)
+                if throttle_response is not None:
+                    return throttle_response
 
                 result = view_func(request, *args, **kwargs)
 

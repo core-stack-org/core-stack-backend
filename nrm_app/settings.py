@@ -163,7 +163,26 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "utilities.drf_throttling.CoreStackUserRateThrottle",
+        "utilities.drf_throttling.CoreStackAnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("API_THROTTLE_ANON", default="100/hour"),
+        "user": env("API_THROTTLE_USER", default="1000/hour"),
+    },
 }
+
+# Required for DRF throttling (request counters).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "core-stack-default-cache",
+    }
+}
+
+# Set API_RATE_LIMIT_ENABLED=False in .env to disable throttling locally.
+API_RATE_LIMIT_ENABLED = env.bool("API_RATE_LIMIT_ENABLED", default=True)
 
 # MARK: JWT settings
 SIMPLE_JWT = {
