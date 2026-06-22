@@ -109,7 +109,6 @@ from .mws.mws import mws_layer
 from .mws.mws_centroid import generate_mws_centroid_data
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .plantation.site_suitability import site_suitability
-from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
 from .surface_water_bodies.swb_local import (
