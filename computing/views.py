@@ -513,14 +513,26 @@ def check_xlsx_sheets(file_path):
     dataset_qs = LayerInfo.objects.filter(
         workspace__isnull=False, excel_to_be_generated=True
     )
-    mandatory_sheet_name = dataset_qs.values_list("sheet_name", flat=True).distinct()
-    conditional_sheet_name = (
-        dataset_qs.filter(can_be_present=False)
+    mandatory_sheet_name = (
+        dataset_qs.filter(can_be_absent=False)
         .values_list("sheet_name", flat=True)
         .distinct()
     )
-    EXPECTED_SHEETS = list(mandatory_sheet_name)
-    CONDITIONAL_DATA_SHEETS = list(conditional_sheet_name)
+    conditional_sheet_name = (
+        dataset_qs.filter(can_be_absent=True)
+        .values_list("sheet_name", flat=True)
+        .distinct()
+    )
+    EXPECTED_SHEETS = list(
+        dict.fromkeys(
+            s.strip() for item in mandatory_sheet_name for s in item.split(",")
+        )
+    )
+    CONDITIONAL_DATA_SHEETS = list(
+        dict.fromkeys(
+            s.strip() for item in conditional_sheet_name for s in item.split(",")
+        )
+    )
     try:
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         existing_sheets = wb.sheetnames
