@@ -16,6 +16,7 @@ class LayerInfo(models.Model):
     layer_desc = models.TextField(blank=True, null=True)
     excel_to_be_generated = models.BooleanField(default=False)
     sheet_name = models.TextField(blank=True, null=True)
+    can_be_present = models.BooleanField(default=True)
     start_year = models.PositiveIntegerField(blank=True, null=True)
     end_year = models.PositiveIntegerField(blank=True, null=True)
     style_name = models.CharField(max_length=255, blank=True, null=True)

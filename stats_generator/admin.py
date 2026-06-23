@@ -11,6 +11,7 @@ class LayerInfoAdmin(admin.ModelAdmin):
         "workspace",
         "excel_to_be_generated",
         "sheet_name",
+        "can_be_present",
         "start_year",
         "end_year",
         "created_at",
@@ -24,6 +25,7 @@ class LayerInfoAdmin(admin.ModelAdmin):
         "start_year",
         "end_year",
         "created_at",
+        "can_be_present",
     )
 
     # Fields that can be searched in the admin panel
@@ -57,3 +59,4 @@ class LayerInfoAdmin(admin.ModelAdmin):
 
     # Fields to be read-only
     readonly_fields = ("created_at", "updated_at")
+    list_editable = ["can_be_present"]
