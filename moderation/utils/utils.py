@@ -345,6 +345,8 @@ def sync_edited_updated_cropping_pattern(cp_submission):
         return
 
     system = cp_submission.get("__system", {})
+    gps = cp_submission.get("GPS_point") or {}
+    lat, lon = extract_lat_lon_from_gps(gps)
 
     def get_crop_pattern(field_name, other_field_name):
         crops = cp_submission.get(field_name, "")
@@ -390,7 +392,10 @@ def sync_edited_updated_cropping_pattern(cp_submission):
         "plan_id": cp_submission.get("plan_id") or "NA",
         "plan_name": to_utf8(cp_submission.get("plan_name") or "NA"),
         "status_re": system.get("reviewState") or "in progress",
+        "latitude": lat,
+        "longitude": lon,
         "system": system,
+        "gps_point": gps,
         "data_crop": cp_submission,
     }
 
@@ -651,6 +656,9 @@ def _extract_crop_fields(data):
                 return f"{crops}: {other}"
         return crops or "NA"
 
+    gps = data.get("GPS_point") or {}
+    lat, lon = extract_lat_lon_from_gps(gps)
+
     return {
         "beneficiary_settlement": to_utf8(data.get("beneficiary_settlement") or "NA"),
         "irrigation_source": to_utf8(data.get("select_multiple_widgets") or "NA"),
@@ -672,6 +680,9 @@ def _extract_crop_fields(data):
             )
         ),
         "agri_productivity": to_utf8(data.get("select_one_productivity") or "NA"),
+        "latitude": lat,
+        "longitude": lon,
+        "gps_point": gps,
     }
 
 

@@ -1,0 +1,39 @@
+<div class="section">
+
+    <h3>{{ t.section_d_well_summary.title }}</h3>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>{{ t.section_d_well_summary.beneficiary_settlement }}</th>
+                <th>{{ t.section_d_well_summary.no_of_wells }}</th>
+                <th>{{ t.section_d_well_summary.household_benefitted }}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for item in section_d.well_summary %}
+            <tr>
+
+                <td>
+                    {{ item.settlement|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.num_wells|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.households|default:t.common.na }}
+                </td>
+
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>

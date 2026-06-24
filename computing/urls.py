@@ -243,4 +243,9 @@ urlpatterns = [
         api.generate_canal_vector,
         name="generate-canal-vector",
     ),
+    path("refresh_cache/", api.refresh_layer_cache, name="refresh_cache"),
+    path(
+        "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
+    ),
+    path("missing_excel/", api.missing_excel, name="missing_excel"),
 ]

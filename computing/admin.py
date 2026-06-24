@@ -37,8 +37,9 @@ class LayerAdmin(admin.ModelAdmin):
 @admin.register(Dataset)
 class DatasetAdmin(admin.ModelAdmin):
     search_fields = ("name",)
-    list_display = ["name", "layer_type", "workspace"]
-    list_filter = ["layer_type"]
+    list_display = ["name", "layer_type", "workspace", "can_be_empty", "is_active"]
+    list_filter = ["layer_type", "can_be_empty", "is_active"]
+    list_editable = ["is_active", "can_be_empty"]
 
 
 @admin.register(LayerMapping)

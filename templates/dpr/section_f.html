@@ -1,0 +1,64 @@
+<div class="section">
+
+    <h2>
+        {{ t.section_f.title }}
+    </h2>
+
+    <p>
+        {{ t.section_f.description }}
+    </p>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>{{ t.section_f.serial_no }}</th>
+                <th>{{ t.section_f.work_category }}</th>
+                <th>{{ t.section_f.type_of_demand }}</th>
+                <th>{{ t.section_f.work_demand }}</th>
+                <th>{{ t.section_f.beneficiary_settlement }}</th>
+                <th>{{ t.section_f.beneficiary_name }}</th>
+                <th>{{ t.section_f.gender }}</th>
+                <th>{{ t.section_f.father_name }}</th>
+                <th>{{ t.section_f.latitude }}</th>
+                <th>{{ t.section_f.longitude }}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for item in section_f.works %}
+            <tr>
+
+                <td>{{ forloop.counter }}</td>
+
+                <td>{{ item.work_category|default:t.common.na }}</td>
+
+                <td>{{ item.demand_type|default:t.common.na }}</td>
+
+                <td>{{ item.work_demand|default:t.common.na }}</td>
+
+                <td>{{ item.beneficiary_settlement|default:t.common.na }}</td>
+
+                <td>{{ item.beneficiary_name|default:t.common.na }}</td>
+
+                <td>{{ item.gender|default:t.common.na }}</td>
+
+                <td>{{ item.beneficiary_father_name|default:t.common.na }}</td>
+
+                <td>{{ item.latitude|default:t.common.na }}</td>
+
+                <td>{{ item.longitude|default:t.common.na }}</td>
+
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10">{{ t.common.na }}</td>
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>

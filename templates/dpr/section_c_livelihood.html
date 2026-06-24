@@ -1,0 +1,52 @@
+
+<div class="section">
+
+    <h2>
+        {{ t.section_c_livelihood.title }}
+    </h2>
+
+    <table>
+
+            <tr>
+                <th>{{ t.section_c_livelihood.settlement_name }}</th>
+                <th>{{ t.section_c_livelihood.goat }}</th>
+                <th>{{ t.section_c_livelihood.sheep }}</th>
+                <th>{{ t.section_c_livelihood.cattle }}</th>
+                <th>{{ t.section_c_livelihood.piggery }}</th>
+                <th>{{ t.section_c_livelihood.poultary }}</th>
+            </tr>
+
+            {% for item in section_c.livestock_info %}
+            <tr>
+
+                <td>
+                    {{ item.settlement_name|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.goats|default:t.common.na }}
+
+                </td>
+
+                <td>
+                    {{ item.sheep|default:t.common.na }}
+
+                </td>
+
+                <td>
+                    {{ item.cattle |default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.piggery |default:t.common.na}}
+                </td>
+
+                <td>
+                    {{ item.poultry |default:t.common.na }}
+                </td>
+
+            </tr>
+            {% endfor %}
+    </table>
+
+</div>

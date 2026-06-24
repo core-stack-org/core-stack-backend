@@ -1,0 +1,61 @@
+<div class="section">
+
+    <h2>
+        {{ t.section_a.title }}
+    </h2>
+
+    <table>
+
+        <tr>
+            <td class="label">
+                {{ t.section_a.organization }}
+            </td>
+
+            <td>
+                {{ section_a.organization.name|default:t.common.na }}
+            </td>
+        </tr>
+
+        <tr>
+            <td class="label">
+                {{ t.section_a.project }}
+            </td>
+
+            <td>
+                {{ section_a.project.name|default:t.common.na }}
+            </td>
+        </tr>
+
+        <tr>
+            <td class="label">
+                {{ t.section_a.plan }}
+            </td>
+
+            <td>
+                {{ section_a.plan|default:t.common.na }}
+            </td>
+        </tr>
+
+        <tr>
+            <td class="label">
+                {{ t.section_a.facilitator }}
+            </td>
+
+            <td>
+                {{ section_a.facilitator_name|default:t.common.na }}
+            </td>
+        </tr>
+
+        <tr>
+            <td class="label">
+                {{ t.section_a.process_preparation }}
+            </td>
+
+            <td>
+                {{ t.section_a.process_preparation_value }}
+            </td>
+        </tr>
+
+    </table>
+
+</div>

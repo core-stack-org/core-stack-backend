@@ -1,0 +1,36 @@
+<div class="section">
+
+    <h3>{{ t.section_d_water_structure_summary.title }}</h3>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>{{ t.section_d_water_structure_summary.beneficiary_settlement }}</th>
+                <th>{{ t.section_d_water_structure_summary.water_structure_type }}</th>
+                <th>{{ t.section_d_water_structure_summary.waterbodies_number }}</th>
+                <th>{{ t.section_d_water_structure_summary.household_benefitted }}</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for item in section_d.water_summary %}
+            <tr>
+
+                <td>{{ item.settlement|default:t.common.na }}</td>
+
+                <td>{{ item.structure_type|default:t.common.na }}</td>
+
+                <td>{{ item.count|default:t.common.na }}</td>
+
+                <td>{{ item.households|default:t.common.na }}</td>
+
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
