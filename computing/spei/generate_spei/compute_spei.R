@@ -1,20 +1,24 @@
-"""
-    SPEI Pipeline
-    Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
-    write 3 multiband output GeoTIFFs with named bands.
-    Here the reference baseline period is taken as 2004-2023.
-    Change the end_year variable to whatever year you wanna extend the pipeline to.
-    If it is not intentional, don't touch the ref_start and ref_end variables for
-    extending the pipeline as it will change the SPEI values for all previous years too.
-"""
+
+# SPEI Pipeline
+# Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
+# write 3 multiband output GeoTIFFs with named bands.
+# Here the reference baseline period is taken as 2004-2023.
+# Change the end_year variable to whatever year you wanna extend the pipeline to.
+# If it is not intentional, don't touch the ref_start and ref_end variables for
+# extending the pipeline as it will change the SPEI values for all previous years too.
+# Run below commands for installing the dependencies if not already installed:
+# sudo apt install r-base-core
+# conda install -c conda-forge r-spei r-raster
+# Rscript -e "install.packages('terra', repos='https://cloud.r-project.org')"
+# Rscript -e "install.packages('raster', repos='https://cloud.r-project.org')"
 
 library(SPEI)
 library(raster)
 
 run_spei_pipeline <- function(aez, start_year, end_year) {
 
-    input_file <- paste0("data/drought_inputs/", aez, "/monthly/P_PET_AEZ_", aez, "_monthly_multiband.tif")
-    output_dir <- paste0("data/drought_inputs/", aez, "/monthly")
+    input_file <- paste0("data/base_layers/spei/inputs/", aez, "/monthly/P_PET_AEZ_", aez, "_monthly_multiband.tif")
+    output_dir <- paste0("data/base_layers/spei/inputs/", aez, "/monthly")
 
     if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 

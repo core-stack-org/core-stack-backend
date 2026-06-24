@@ -24,7 +24,7 @@ def generate_spei_pipeline(
 ):
     ee_initialize(gee_account_id)
     start_date = f"{str(start_year)}-01-01"
-    end_date = f"{str(end_year)}-12-31"
+    end_date = f"{str(end_year+1)}-06-30"
 
     download_data_locally(
         aez=aez,

@@ -23,7 +23,7 @@ from utilities.gee_utils import valid_gee_text
 
 
 LOCAL_CCD_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ccd"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health/ccd_local"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "ccd"
 GEOSERVER_STYLE = "ccd_style"
 
@@ -134,11 +134,12 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
             dst_transform=output_meta["transform"],
             dst_crs=output_meta["crs"],
             dst_nodata=0,
-            resampling=Resampling.nearest,
+            resampling=Resampling.mode,
         )
 
     # Keep CCD values only for tree pixels. Everything else becomes nodata.
     tree_mask = lulc_array == TREE_LULC_CLASS
+
     valid_ccd = ccd_array != nodata
     output_array = np.where(tree_mask & valid_ccd, ccd_array, nodata).astype(
         ccd_array.dtype,

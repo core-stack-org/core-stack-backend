@@ -141,7 +141,7 @@ def _clip_and_mask_ch(ch_path, lulc_path, roi_gdf, output_path):
             dst_transform=output_meta["transform"],
             dst_crs=output_meta["crs"],
             dst_nodata=0,
-            resampling=Resampling.nearest,
+            resampling=Resampling.mode,
         )
 
     tree_mask = lulc_array == TREE_LULC_CLASS
