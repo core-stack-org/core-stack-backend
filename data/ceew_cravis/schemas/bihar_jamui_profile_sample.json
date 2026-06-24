@@ -1,0 +1,840 @@
+{
+  "_sample_file_note": {
+    "purpose": "Human-readable sample of one district profile. It is valid JSON, but it intentionally uses _note, _same_shape_as, _available_*, and _omitted_* fields to keep repeated data short.",
+    "source_profile": "data/ceew_cravis/output/district_profiles/bihar/jamui/bihar_jamui_profile.json",
+    "district": "Bihar / Jamui",
+    "renamed_terms_for_readability": {
+      "imd": "historical",
+      "scenario": "projection"
+    },
+    "reading_rule": "The first occurrence of each major data kind is expanded. Later occurrences are trimmed or represented as skeletons."
+  },
+  "profile_kind": "district",
+  "location": {
+    "state_name": "Bihar",
+    "district_name": "Jamui",
+    "zonal_id": "jamui_bihar",
+    "aliases": [
+      "Bihar",
+      "Jamui",
+      "BIHAR",
+      "JAMUI"
+    ]
+  },
+  "climate": {
+    "_shape": "climate.{framework}.{source_or_scenario}.{category}.{metric_group?}.{metric}.{timeframe}",
+    "_leaf_object_shape": {
+      "period_summaries": "Compact named-period summaries. Best for maps, report cards, and short values.",
+      "yearly_series": "Annual time series. Use for line charts or detailed drill-downs only."
+    },
+    "_field_notes": {
+      "period_key": "Named climate period or warming level, such as 1981-2010, 2011-2024, 1c, 1_5c, 2c, or 3c.",
+      "mean_value": "Average value over the period. Usually the best single value to show.",
+      "min_value_and_max_value": "Lowest and highest annual values inside the period.",
+      "min_year_and_max_year": "Years in which the minimum and maximum occurred.",
+      "delta_value": "Supplied trend-style/change field for the period. Label carefully; do not describe as a simple future-minus-baseline difference unless separately verified.",
+      "historical": "Readable name used in this sample for IMD observed series.",
+      "projection": "Readable name used in this sample for modeled scenario series."
+    },
+    "globalWarming": {
+      "_meaning": "Climate branch organised around global warming levels and supporting annual series.",
+      "_available_sources_or_scenarios": [
+        "historical",
+        "RCP45",
+        "RCP85"
+      ],
+      "historical": {
+        "temperature": {
+          "_category_note": "Temperature baseline metrics. These have annual, seasonal, and monthly timeframes.",
+          "maximum_temperature": {
+            "_units": "degC",
+            "_available_timeframes": [
+              "annual",
+              "winter_JF",
+              "summer_MAM",
+              "monsoon_JJAS",
+              "post_monsoon_OND",
+              "january",
+              "february",
+              "march",
+              "april",
+              "may",
+              "june",
+              "july",
+              "august",
+              "september",
+              "october",
+              "november",
+              "december"
+            ],
+            "annual": {
+              "_note": "First fully expanded climate leaf. Yearly series is shortened only to keep the sample readable.",
+              "period_summaries": [
+                {
+                  "period_key": "1c",
+                  "min_value": 30.6,
+                  "min_year": 2003,
+                  "max_value": 32.3,
+                  "max_year": 2010,
+                  "mean_value": 31.4,
+                  "delta_value": 0.08
+                },
+                {
+                  "period_key": "1_5c",
+                  "min_value": 30.7,
+                  "min_year": 2020,
+                  "max_value": 32.0,
+                  "max_year": 2016,
+                  "mean_value": 31.5,
+                  "delta_value": 0.11
+                },
+                {
+                  "period_key": "2c",
+                  "min_value": 32.2,
+                  "min_year": 2035,
+                  "max_value": 33.2,
+                  "max_year": 2047,
+                  "mean_value": 32.7,
+                  "delta_value": 0.24
+                },
+                {
+                  "period_key": "3c",
+                  "min_value": 33.0,
+                  "min_year": 2058,
+                  "max_value": 33.9,
+                  "max_year": 2065,
+                  "mean_value": 33.4,
+                  "delta_value": 0.29
+                }
+              ],
+              "yearly_series": {
+                "projection": {
+                  "2006": 31.65,
+                  "2007": 31.79,
+                  "2008": 31.82,
+                  "2009": 31.9,
+                  "2010": 32.09,
+                  "_omitted_years": "84 annual values omitted",
+                  "2095": 34.45,
+                  "2096": 34.31,
+                  "2097": 35.1,
+                  "2098": 34.95,
+                  "2099": 35.21
+                },
+                "historical": {
+                  "1981": 31.0,
+                  "1982": 31.7,
+                  "1983": 31.4,
+                  "1984": 30.9,
+                  "1985": 31.7,
+                  "_omitted_years": "34 annual values omitted",
+                  "2020": 30.7,
+                  "2021": 31.2,
+                  "2022": 31.5,
+                  "2023": 32.0,
+                  "2024": 31.7
+                }
+              }
+            },
+            "summer_MAM": {
+              "_same_shape_as": "climate.globalWarming.historical.temperature.maximum_temperature.annual",
+              "_note": "Second occurrence of the same leaf shape, trimmed.",
+              "period_summaries": [
+                {
+                  "period_key": "1c",
+                  "min_value": 33.6,
+                  "min_year": 1981,
+                  "max_value": 37.7,
+                  "max_year": 2010,
+                  "mean_value": 35.7,
+                  "delta_value": 0.17
+                },
+                {
+                  "_omitted_period_summaries": 3
+                }
+              ],
+              "yearly_series": {
+                "projection": {
+                  "2006": 36.47,
+                  "2007": 36.31,
+                  "2008": 36.54,
+                  "_omitted_years": "89 annual values omitted",
+                  "2098": 38.0,
+                  "2099": 38.68
+                },
+                "historical": {
+                  "1981": 33.61,
+                  "1982": 35.37,
+                  "1983": 34.91,
+                  "_omitted_years": "39 annual values omitted",
+                  "2023": 35.65,
+                  "2024": 35.98
+                }
+              }
+            },
+            "monsoon_JJAS": {
+              "_same_shape_as": "climate.globalWarming.historical.temperature.maximum_temperature.annual",
+              "_contains": [
+                "period_summaries",
+                "yearly_series"
+              ],
+              "_note": "Later seasonal/monthly timeframes repeat the same leaf shape."
+            },
+            "_other_timeframes": [
+              "winter_JF",
+              "post_monsoon_OND",
+              "january",
+              "february",
+              "march",
+              "april",
+              "may",
+              "june",
+              "july",
+              "august",
+              "september",
+              "october",
+              "november",
+              "december"
+            ]
+          },
+          "minimum_temperature": {
+            "_same_shape_as": "temperature.maximum_temperature.{timeframe}",
+            "_contains": [
+              "period_summaries",
+              "yearly_series"
+            ],
+            "_available_timeframes": [
+              "annual",
+              "winter_JF",
+              "summer_MAM",
+              "monsoon_JJAS",
+              "post_monsoon_OND",
+              "january",
+              "february",
+              "march",
+              "april",
+              "may",
+              "june",
+              "july",
+              "august",
+              "september",
+              "october",
+              "november",
+              "december"
+            ]
+          },
+          "average_temperature": {
+            "_same_shape_as": "temperature.maximum_temperature.{timeframe}",
+            "_contains": [
+              "period_summaries",
+              "yearly_series"
+            ],
+            "_available_timeframes": [
+              "annual",
+              "winter_JF",
+              "summer_MAM",
+              "monsoon_JJAS",
+              "post_monsoon_OND",
+              "january",
+              "february",
+              "march",
+              "april",
+              "may",
+              "june",
+              "july",
+              "august",
+              "september",
+              "october",
+              "november",
+              "december"
+            ]
+          }
+        },
+        "precipitation": {
+          "_category_note": "Rainfall metrics split into raw rainfall totals and derived rainfall/drought indicators.",
+          "time_series_metrics": {
+            "total_rainfall": {
+              "_units": "mm",
+              "_available_timeframes": [
+                "annual",
+                "winter_JF",
+                "summer_MAM",
+                "monsoon_JJAS",
+                "post_monsoon_OND",
+                "january",
+                "february",
+                "march",
+                "april",
+                "may",
+                "june",
+                "july",
+                "august",
+                "september",
+                "october",
+                "november",
+                "december"
+              ],
+              "annual": {
+                "_same_shape_as": "climate.globalWarming.historical.temperature.maximum_temperature.annual",
+                "_note": "Raw rainfall aggregate with the same period_summaries/yearly_series leaf shape.",
+                "period_summaries": [
+                  {
+                    "period_key": "1c",
+                    "min_value": 760.0,
+                    "min_year": 1992,
+                    "max_value": 1665.0,
+                    "max_year": 1984,
+                    "mean_value": 1173.0,
+                    "delta_value": -84.62
+                  },
+                  {
+                    "period_key": "1_5c",
+                    "min_value": 750.0,
+                    "min_year": 2022,
+                    "max_value": 1201.0,
+                    "max_year": 2014,
+                    "mean_value": 1030.0,
+                    "delta_value": -99.16
+                  },
+                  {
+                    "_omitted_period_summaries": 2
+                  }
+                ],
+                "yearly_series": {
+                  "projection": {
+                    "2006": 1467.39,
+                    "2007": 1377.69,
+                    "2008": 1462.51,
+                    "_omitted_years": "89 annual values omitted",
+                    "2098": 1769.54,
+                    "2099": 1837.77
+                  },
+                  "historical": {
+                    "1981": 1267.3,
+                    "1982": 1085.5,
+                    "1983": 1335.0,
+                    "_omitted_years": "39 annual values omitted",
+                    "2023": 955.0,
+                    "2024": 982.4
+                  }
+                }
+              },
+              "monsoon_JJAS": {
+                "_same_shape_as": "precipitation.time_series_metrics.total_rainfall.annual",
+                "_contains": [
+                  "period_summaries",
+                  "yearly_series"
+                ]
+              },
+              "_other_timeframes": [
+                "winter_JF",
+                "summer_MAM",
+                "post_monsoon_OND",
+                "january",
+                "february",
+                "march",
+                "april",
+                "may",
+                "june",
+                "july",
+                "august",
+                "september",
+                "october",
+                "november",
+                "december"
+              ]
+            }
+          },
+          "derived_metrics": {
+            "wet_days": {
+              "_units": "days",
+              "annual": {
+                "_same_shape_as": "precipitation.time_series_metrics.total_rainfall.annual",
+                "period_summaries": [
+                  {
+                    "period_key": "1c",
+                    "min_value": 64.0,
+                    "min_year": 2009,
+                    "max_value": 110.0,
+                    "max_year": 1990,
+                    "mean_value": 89.0,
+                    "delta_value": -4.72
+                  },
+                  {
+                    "_omitted_period_summaries": 3
+                  }
+                ],
+                "yearly_series": {
+                  "projection": {
+                    "2006": 177.75,
+                    "2007": 179.58,
+                    "2008": 175.08,
+                    "_omitted_years": "89 annual values omitted",
+                    "2098": 308.0,
+                    "2099": 308.25
+                  },
+                  "historical": {
+                    "1981": 100.6,
+                    "1982": 85.5,
+                    "1983": 92.4,
+                    "_omitted_years": "39 annual values omitted",
+                    "2023": 67.2,
+                    "2024": 73.2
+                  }
+                }
+              }
+            },
+            "wet_days_in_extended_monsoon_jjaso": {
+              "_units": "days",
+              "_definition": "Count of wet days during JJASO: June, July, August, September, and October.",
+              "annual": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "period_summaries": [
+                  {
+                    "period_key": "1c",
+                    "min_value": 58.0,
+                    "min_year": 2009,
+                    "max_value": 92.0,
+                    "max_year": 1999,
+                    "mean_value": 75.0,
+                    "delta_value": -1.7
+                  },
+                  {
+                    "_omitted_period_summaries": 3
+                  }
+                ],
+                "yearly_series": {
+                  "projection": {
+                    "2006": 126.92,
+                    "2007": 127.67,
+                    "2008": 125.08,
+                    "_omitted_years": "89 annual values omitted",
+                    "2098": 153.0,
+                    "2099": 153.0
+                  },
+                  "historical": {
+                    "1981": 72.2,
+                    "1982": 69.6,
+                    "1983": 72.2,
+                    "_omitted_years": "39 annual values omitted",
+                    "2023": 56.8,
+                    "2024": 60.0
+                  }
+                }
+              }
+            },
+            "_other_derived_metrics": {
+              "heaviest_1_day_rainfall": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "mm"
+              },
+              "heaviest_3_day_rainfall": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "mm"
+              },
+              "heaviest_3_month_rainfall": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "mm"
+              },
+              "longest_dry_spell": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "days"
+              },
+              "unusually_heavy_rainy_days": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "days"
+              },
+              "unusually_very_heavy_rainy_days": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "days"
+              },
+              "6_month_drought_severity": {
+                "_same_shape_as": "precipitation.derived_metrics.wet_days.annual",
+                "_units": "normalized index"
+              }
+            }
+          }
+        },
+        "hot_weather": {
+          "_category_note": "Annual heat metrics. Most are derived threshold, percentile, or degree-day metrics.",
+          "days_with_maximum_temperature_greater_than_35c": {
+            "_units": "days",
+            "annual": {
+              "_same_shape_as": "climate.globalWarming.historical.temperature.maximum_temperature.annual",
+              "period_summaries": [
+                {
+                  "period_key": "1c",
+                  "min_value": 47.0,
+                  "min_year": 1981,
+                  "max_value": 110.0,
+                  "max_year": 2010,
+                  "mean_value": 77.0,
+                  "delta_value": 2.04
+                },
+                {
+                  "period_key": "1_5c",
+                  "min_value": 51.0,
+                  "min_year": 2020,
+                  "max_value": 109.0,
+                  "max_year": 2022,
+                  "mean_value": 85.0,
+                  "delta_value": 8.53
+                },
+                {
+                  "_omitted_period_summaries": 2
+                }
+              ],
+              "yearly_series": {
+                "projection": {
+                  "2006": 82.0,
+                  "2007": 90.0,
+                  "2008": 81.0,
+                  "_omitted_years": "89 annual values omitted",
+                  "2098": 218.0,
+                  "2099": 205.0
+                },
+                "historical": {
+                  "1981": 46.7,
+                  "1982": 87.9,
+                  "1983": 82.0,
+                  "_omitted_years": "39 annual values omitted",
+                  "2023": 89.8,
+                  "2024": 107.5
+                }
+              }
+            }
+          },
+          "unusually_warm_nights": {
+            "_units": "days",
+            "_definition": "Nights above the local 90th percentile minimum-temperature threshold from the 1981-2010 baseline.",
+            "annual": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "period_summaries": [
+                {
+                  "period_key": "1c",
+                  "min_value": 0.0,
+                  "min_year": 1990,
+                  "max_value": 51.0,
+                  "max_year": 2010,
+                  "mean_value": 12.0,
+                  "delta_value": 5.09
+                },
+                {
+                  "_omitted_period_summaries": 3
+                }
+              ],
+              "yearly_series": {
+                "projection": {
+                  "2006": 4.0,
+                  "2007": 9.0,
+                  "2008": 3.0,
+                  "_omitted_years": "89 annual values omitted",
+                  "2098": 79.0,
+                  "2099": 91.0
+                },
+                "historical": {
+                  "1981": 2.0,
+                  "1982": 5.0,
+                  "1983": 14.0,
+                  "_omitted_years": "39 annual values omitted",
+                  "2023": 21.0,
+                  "2024": 64.0
+                }
+              }
+            }
+          },
+          "_other_hot_weather_metrics": {
+            "days_with_maximum_temperature_greater_than_40c": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "days"
+            },
+            "days_with_minimum_temperature_greater_than_20c": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "days"
+            },
+            "days_with_minimum_temperature_greater_than_25c": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "days"
+            },
+            "cooling_degree_days": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "degree-days"
+            },
+            "average_day_night_temperature_difference": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "degC"
+            },
+            "highest_maximum_temperature_in_a_year": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "degC"
+            },
+            "unusually_hot_days": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "_units": "days"
+            }
+          }
+        },
+        "cold_weather": {
+          "_category_note": "Annual cold-weather metrics. Use only where cold exposure is relevant.",
+          "unusually_cold_days": {
+            "_units": "days",
+            "annual": {
+              "_same_shape_as": "hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+              "period_summaries": [
+                {
+                  "period_key": "1c",
+                  "min_value": 0.0,
+                  "min_year": 1985,
+                  "max_value": 19.0,
+                  "max_year": 2003,
+                  "mean_value": 3.0,
+                  "delta_value": 1.24
+                },
+                {
+                  "_omitted_period_summaries": 3
+                }
+              ],
+              "yearly_series": {
+                "projection": {
+                  "2006": 0.0,
+                  "2007": 0.0,
+                  "2008": 0.0,
+                  "_omitted_years": "89 annual values omitted",
+                  "2098": 0.0,
+                  "2099": 0.0
+                },
+                "historical": {
+                  "1981": 4.0,
+                  "1982": 1.0,
+                  "1983": 8.0,
+                  "_omitted_years": "39 annual values omitted",
+                  "2023": 11.0,
+                  "2024": 14.0
+                }
+              }
+            }
+          },
+          "_other_cold_weather_metrics": {
+            "heating_degree_days": {
+              "_same_shape_as": "cold_weather.unusually_cold_days.annual",
+              "_units": "degree-days"
+            },
+            "unusually_cold_nights": {
+              "_same_shape_as": "cold_weather.unusually_cold_days.annual",
+              "_units": "days"
+            }
+          }
+        }
+      },
+      "RCP45": {
+        "_same_structure_as": "climate.globalWarming.historical",
+        "_scenario_note": "Medium-emissions scenario branch."
+      },
+      "RCP85": {
+        "_same_structure_as": "climate.globalWarming.historical",
+        "_scenario_note": "High-emissions cautionary branch when SSP585 is not present."
+      }
+    },
+    "rcpssp": {
+      "_meaning": "Climate branch organised around historical periods and RCP/SSP-style scenarios.",
+      "_available_sources_or_scenarios": [
+        "historical",
+        "RCP45",
+        "RCP85"
+      ],
+      "historical": {
+        "_same_structure_as": "climate.globalWarming.historical"
+      },
+      "RCP45": {
+        "_same_structure_as": "climate.globalWarming.RCP45"
+      },
+      "RCP85": {
+        "_same_structure_as": "climate.globalWarming.RCP85",
+        "_recommended_use": "Use as the cautionary high-emissions branch in current profiles when SSP585 is not available.",
+        "_compact_example": {
+          "hot_weather": {
+            "days_with_maximum_temperature_greater_than_35c": {
+              "_units": "days",
+              "annual": {
+                "_same_shape_as": "climate.rcpssp.RCP85.hot_weather.days_with_maximum_temperature_greater_than_35c.annual",
+                "_note": "Example from the cautionary rcpssp/RCP85 branch. Its period keys are calendar periods such as 1981-2010 and 2051-2070.",
+                "period_summaries": [
+                  {
+                    "period_key": "1981-2010",
+                    "min_value": 47.0,
+                    "min_year": 1981,
+                    "max_value": 110.0,
+                    "max_year": 2010,
+                    "mean_value": 77.0,
+                    "delta_value": 2.04
+                  },
+                  {
+                    "period_key": "2011-2024",
+                    "min_value": 51.0,
+                    "min_year": 2020,
+                    "max_value": 109.0,
+                    "max_year": 2022,
+                    "mean_value": 85.0,
+                    "delta_value": 8.53
+                  },
+                  {
+                    "_omitted_period_summaries": 2
+                  }
+                ],
+                "yearly_series": {
+                  "projection": {
+                    "2006": 82.0,
+                    "2007": 90.0,
+                    "2008": 81.0,
+                    "_omitted_years": "89 annual values omitted",
+                    "2098": 218.0,
+                    "2099": 205.0
+                  },
+                  "historical": {
+                    "1981": 46.7,
+                    "1982": 87.9,
+                    "1983": 82.0,
+                    "_omitted_years": "39 annual values omitted",
+                    "2023": 89.8,
+                    "2024": 107.5
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  
+  "risk": {
+    "_shape_note": "Risk is a direct district-level scalar map. Values are not nested under risk.indices in the profile file.",
+    "_display_rule": "Usually show only risk_score >= 3, or when the report section already discusses that hazard.",
+    "risk_flood": {
+      "risk_score": 4,
+      "risk_index": "high",
+      "categories": {
+        "risk_score": {
+          "mean": 4,
+          "risk_score": 4,
+          "risk_index": "high"
+        }
+      }
+    },
+    "risk_heat": {
+      "risk_score": 3,
+      "risk_index": "moderate",
+      "categories": {
+        "risk_score": {
+          "mean": 3,
+          "risk_score": 3,
+          "risk_index": "moderate"
+        }
+      }
+    },
+    "risk_forest_fire": {
+      "_same_shape_as": "risk.risk_flood",
+      "risk_score": 1,
+      "risk_index": "very low",
+      "categories": {
+        "_same_nested_shape_as": "risk.risk_flood.categories"
+      }
+    },
+    "risk_landslide": {
+      "_same_shape_as": "risk.risk_flood",
+      "risk_score": 1,
+      "risk_index": "very low"
+    },
+    "risk_lightning": {
+      "_same_shape_as": "risk.risk_flood",
+      "risk_score": 1,
+      "risk_index": "very low"
+    }
+  },
+  "sectoral": {
+    "_shape_note": "District-level supporting layers. These are data available in the profile; current compact report integration uses them selectively.",
+    "zonal_observations": {
+      "_layer_counts": {
+        "agriculture_sugarcane": 1,
+        "agriculture_wheat": 1,
+        "extreme_event_flood_susceptibility_area": 1,
+        "extreme_event_frequency_of_forest_fires": 1,
+        "extreme_event_number_of_lightning_days": 1,
+        "extreme_event_return_period_years": 1,
+        "extreme_event_total_number_of_landslides": 1,
+        "lulc_barrenland": 1,
+        "lulc_builtup_urban": 1,
+        "lulc_crops": 1,
+        "lulc_shrubs": 1,
+        "lulc_trees": 1,
+        "lulc_water": 1
+      },
+      "_record_shape": "Each layer is an array of records with district id, grid id where available, value, category, year, source, and optional extra fields.",
+      "agriculture_sugarcane": [
+        {
+          "zonal_id": "jamui_bihar",
+          "grid_id": "8625_2475",
+          "name": "Sugarcane",
+          "district_name": "JAMUI",
+          "state_name": "BIHAR",
+          "value": 1467.0,
+          "value_text": null,
+          "category": "Sugarcane",
+          "year": "2019-20",
+          "source": "India Data Portal",
+          "extra": {}
+        }
+      ],
+      "_other_layers": {
+        "agriculture_wheat": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "extreme_event_flood_susceptibility_area": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "extreme_event_frequency_of_forest_fires": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "extreme_event_number_of_lightning_days": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "extreme_event_return_period_years": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "extreme_event_total_number_of_landslides": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "lulc_barrenland": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "lulc_builtup_urban": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "lulc_crops": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "lulc_shrubs": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "lulc_trees": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        },
+        "lulc_water": {
+          "_same_record_shape_as": "sectoral.zonal_observations.agriculture_sugarcane[0]",
+          "_record_count": 1
+        }
+      }
+    }
+  }
+}
