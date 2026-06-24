@@ -22,6 +22,8 @@ class Dataset(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.CharField(max_length=255, blank=True, null=True)
     updated_by = models.CharField(max_length=255, blank=True, null=True)
+    is_active = models.BooleanField(default=False)
+    can_be_empty = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Dataset"

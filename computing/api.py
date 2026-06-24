@@ -74,6 +74,7 @@ from .views import (
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
     clear_layer_cache,
+    check_missing_excel_files,
 )
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
@@ -89,6 +90,7 @@ from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
@@ -1612,6 +1614,28 @@ def generate_antyodaya(request):
 
 @api_view(["POST"])
 @schema(None)
+def generate_livestocks(request):
+    print("Inside generate_livestocks API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
+        overwrite = request.data.get("overwrite", False)
+        generate_livestocks_layer_task.apply_async(
+            args=[state, district, block, sync_to_geoserver, overwrite],
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
 def generate_stac_collection(request):
     try:
         state = request.data.get("state")
@@ -1885,7 +1909,7 @@ def missing_layers(request):
         result = missing_layer_for_all_workspace()
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in get_layers_for_workspace api :: ", e)
+        print("Exception in missing_layers api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1938,4 +1962,15 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_excel(request):
+    try:
+        result = check_missing_excel_files()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in missing_excel api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

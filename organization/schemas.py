@@ -17,5 +17,8 @@ class OrganizationRead(OrganizationBase):
     created_at: datetime
     updated_at: datetime
 
+    total_plan: int = 0
+    completed_plan: int = 0
+
     class Config:
         from_attributes = True
