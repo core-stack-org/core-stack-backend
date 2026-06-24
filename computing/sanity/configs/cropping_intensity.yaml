@@ -1,0 +1,22 @@
+layer_name: cropping_intensity
+
+rules:
+
+  - name: ci_max
+    type: max_value
+    field_pattern: "cropping_intensity_*"
+    value: 3
+
+  - name: ci_min
+    type: min_value
+    field_pattern: "cropping_intensity_*"
+    value: 0
+
+  - name: ci_not_null
+    type: not_null
+    field_pattern: "cropping_intensity_*"
+
+  - name: ci_allowed
+    type: allowed_values
+    field_pattern: "cropping_intensity_*"
+    value: [ 0, 1, 2, 3 ]
