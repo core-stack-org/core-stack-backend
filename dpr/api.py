@@ -275,7 +275,7 @@ def generate_mws_report(request):
         soge_desc = get_soge_data(state, district, block, uid)
 
         # ? Hydro Tabular Data
-        min_elev, max_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
+        min_elev, max_elev, mean_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
 
         # ? Cropping, Water, and Hydrology Data
         cwh_data = get_cropping_water_hydro_data(state, district, block, uid)
@@ -343,6 +343,7 @@ def generate_mws_report(request):
             "soge_desc": soge_desc,
             "min_elev": min_elev,
             "max_elev": max_elev,
+            "mean_elev": mean_elev,
             "dem_relief": dem_relief,
             "aquifer_class": aquifer_class,
             "soge_class": soge_class,

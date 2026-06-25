@@ -2175,14 +2175,13 @@ def get_hydro_tabular_data(state, district, block, uid):
             if not row_dem.empty:
                 min_elev = row_dem["min_elevation_in_m"].values[0]
                 max_elev = row_dem["max_elevation_in_m"].values[0]
-                min_elev = round(float(min_elev), 2) if not pd.isna(min_elev) else "-"
-                max_elev = round(float(max_elev), 2) if not pd.isna(max_elev) else "-"
-                relief = round(max_elev - min_elev, 2) if min_elev != "-" and max_elev != "-" else "-"
+                mean_elev = row_dem["mean_elevation_in_m"].values[0] if "mean_elevation_in_m" in row_dem.columns else "-"
+                relief = max_elev - min_elev if min_elev != "-" and max_elev != "-" else "-"
             else:
-                min_elev, max_elev, relief = "-", "-", "-"
+                min_elev, max_elev, mean_elev, relief = "-", "-", "-", "-"
         except Exception as e:
             logger.info(f"Failed to read dem sheet for {uid}: {e}")
-            min_elev, max_elev, relief = "-", "-", "-"
+            min_elev, max_elev, mean_elev, relief = "-", "-", "-", "-"
 
         # Read Aquifer
         try:
@@ -2207,20 +2206,14 @@ def get_hydro_tabular_data(state, district, block, uid):
             df_dd = pd.read_excel(base_path, sheet_name="drainage_density")
             row_dd = df_dd.loc[df_dd["UID"] == uid]
             if not row_dd.empty:
-                drainage_density = row_dd["drainage_density"].values[0]
-                drainage_density = round(float(drainage_density), 2) if not pd.isna(drainage_density) else "-"
+                if "drainage_density_std_in_km_per_km2" in df_dd.columns:
+                    drainage_density = row_dd["drainage_density_std_in_km_per_km2"].values[0]
+                else:
+                    drainage_density = "-"
                 
-                # Check for stream_length_km
-                if "stream_length_km" in df_dd.columns:
-                    val = row_dd["stream_length_km"].values[0]
-                    if pd.isna(val):
-                        total_length = "-"
-                    elif isinstance(val, str) and val.startswith("["):
-                        import ast
-                        arr = ast.literal_eval(val)
-                        total_length = round(sum(arr), 2)
-                    else:
-                        total_length = round(float(val), 2)
+                # Check for stream_order_length_in_km
+                if "stream_order_length_in_km" in df_dd.columns:
+                    total_length = row_dd["stream_order_length_in_km"].values[0]
                 else:
                     total_length = "-"
             else:
@@ -2228,12 +2221,13 @@ def get_hydro_tabular_data(state, district, block, uid):
         except Exception as e:
             logger.info(f"Failed to read drainage_density sheet for {uid}: {e}")
             drainage_density, total_length = "-", "-"
+        print(f"drainage density is {drainage_density} and total length {total_length}")
 
-        return min_elev, max_elev, relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness
+        return min_elev, max_elev, mean_elev, relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness
 
     except Exception as e:
         logger.info(f"Error in get_hydro_tabular_data for {uid}: {e}")
-        return "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"
+        return "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"
 
 
 def get_terrain_and_lulc_data(state, district, block, uid):

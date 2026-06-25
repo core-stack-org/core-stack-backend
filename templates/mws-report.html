@@ -879,6 +879,18 @@
                 box-sizing: border-box;
             }
 
+            div[style*="background"], 
+            .legend-color, 
+            .legend-item, 
+            span {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .section {
+                page-break-inside: auto !important;
+            }
+
             html,
             body {
                 width: 100%;
@@ -1376,48 +1388,60 @@
             <h2>Landscape Overview</h2>
             <p>{{mws_osm}}</p>
 
-            <div id="mainMap" class="map"></div>
-            <p class="legend-note" style="margin-bottom: 20px;">Fig: tehsil map with MWS highlighted. MWS id: {{mws_id}}
+            <div id="mainMap" class="map" style="position: relative;">
+            </div>
+            <p class="legend-note" style="margin-bottom: 20px;">Fig: Tehsil map with MWS highlighted. MWS id: {{mws_id}}
             </p>
 
             <div class="map-group-3">
                 <div id="demMap" class="map" style="position: relative;">
-                    <!-- Legend overlay 
-                    <div style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none;">
-                        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute Elevation (m)</h4>
+                    <div
+                        style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; transform: scale(0.75); transform-origin: bottom left;">
+                        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute
+                            Elevation (m)</h4>
                         <div style="display: flex; gap: 8px;">
-                            <div style="width: 18px; height: 160px; background: linear-gradient(to top, #0d0030 0.0%, #1a0f6e 7.1%, #1746a0 14.3%, #1a72c0 21.4%, #2191c0 28.6%, #1aab9e 35.7%, #16a085 42.9%, #1cb870 48.6%, #27ae60 54.3%, #5ab836 58.6%, #95c623 62.9%, #d4d400 67.1%, #f1c40f 71.4%, #e09a30 75.7%, #d4845a 80.0%, #b0623a 84.3%, #8b5e3c 88.6%, #c4a882 94.3%, #f5f0e8 100.0%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;"></div>
-                            
+                            <div
+                                style="width: 18px; height: 160px; background: linear-gradient(to top, #0d0030 0.0%, #1a0f6e 7.1%, #1746a0 14.3%, #1a72c0 21.4%, #2191c0 28.6%, #1aab9e 35.7%, #16a085 42.9%, #1cb870 48.6%, #27ae60 54.3%, #5ab836 58.6%, #95c623 62.9%, #d4d400 67.1%, #f1c40f 71.4%, #e09a30 75.7%, #d4845a 80.0%, #b0623a 84.3%, #8b5e3c 88.6%, #c4a882 94.3%, #f5f0e8 100.0%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;">
+                            </div>
+
                             <div style="position: relative; height: 160px; flex: 1;">
-                                <div style="position: absolute; bottom: 0%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 0%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">0</span>
                                 </div>
-                                <div style="position: absolute; bottom: 14.3%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 14.3%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">100</span>
                                 </div>
-                                <div style="position: absolute; bottom: 28.6%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 28.6%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">200</span>
                                 </div>
-                                <div style="position: absolute; bottom: 42.9%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 42.9%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">300</span>
                                 </div>
-                                <div style="position: absolute; bottom: 57.1%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 57.1%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">400</span>
                                 </div>
-                                <div style="position: absolute; bottom: 71.4%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 71.4%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">500</span>
                                 </div>
-                                <div style="position: absolute; bottom: 85.7%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 85.7%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">600</span>
                                 </div>
-                                <div style="position: absolute; bottom: 100%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                <div
+                                    style="position: absolute; bottom: 100%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
                                     <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
                                     <span style="font-size: 10px; color: #6b7280; line-height: 1;">700</span>
                                 </div>
@@ -1425,11 +1449,12 @@
                         </div>
 
                         <div style="display: flex; align-items: center; gap: 6px; margin-top: 12px;">
-                            <div style="width: 20px; height: 2px; background: #8B4513; border-radius: 1px; flex-shrink: 0;"></div>
+                            <div
+                                style="width: 20px; height: 2px; background: #8B4513; border-radius: 1px; flex-shrink: 0;">
+                            </div>
                             <span style="font-size: 10px; color: #6b7280;">Contour lines</span>
                         </div>
                     </div>
-                    -->
                 </div>
                 <div id="drainageMap" class="map"></div>
                 <div id="terrainRasterMap" class="map" style="position: relative;">
@@ -1496,58 +1521,84 @@
 
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 32%; text-align: center;">DEM Raster overlaid with contour lines</div>
-                <div style="width: 32%; text-align: center;">Drainage Lines Network</div>
+                <div style="width: 32%; text-align: center;">DEM Raster</div>
+                <div style="width: 32%; text-align: center;">Drainage Lines</div>
                 <div style="width: 32%; text-align: center;">Terrain Raster</div>
             </div>
 
             <div class="map-group">
                 <div id="landscapeLulcMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes</h4>
+                    <div
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
+                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes
+                        </h4>
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #C94C4C; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #C94C4C; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Built Up</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #74CCF4; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #74CCF4; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Kharif Water</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #1ca3ec; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
-                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Kharif and Rabi Water</span>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #1ca3ec; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
+                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Kharif and Rabi
+                                    Water</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #0f5e9c; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
-                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Kharif, Rabi & Zaid Water</span>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #0f5e9c; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
+                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Kharif, Rabi & Zaid
+                                    Water</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #1B5E20; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #1B5E20; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees / Forests</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #A9A9A9; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #A9A9A9; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Barren Lands</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #F0F4A3; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #F0F4A3; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Single Kharif</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #D6E96B; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #D6E96B; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Single Non-Kharif</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #B7D43A; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #B7D43A; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Double Cropping</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #7FAF2E; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #7FAF2E; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Triple Cropping</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #8C7A4F; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #8C7A4F; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Shrubs and Scrubs</span>
                             </div>
                         </div>
@@ -1563,91 +1614,112 @@
             </div>
 
             <div class="map-group">
-                <div id="hydroVectorMap" class="map"></div>
+                <div id="hydroVectorMap" class="map" style="position: relative;">
+                    <div
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
+                        <!-- <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Hydrology Features</h4> -->
+                        <div style="display: flex; flex-direction: column; gap: 3px;">
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #00FFFF; border: 1px solid #0000FF; flex-shrink: 0;">
+                                </div>
+                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Waterbodies</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <div style="width: 10px; height: 3px; background-color: #0000FF; flex-shrink: 0;"></div>
+                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Rivers</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <div style="width: 10px; height: 3px; background-color: #FF4500; flex-shrink: 0;"></div>
+                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Canals</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="legend" style="margin-top: 10px;">
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #00BFFF; border: 1px solid #0000FF;"></div>
-                    <span>Waterbodies</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #0000FF; height: 4px; margin-top: 5px;"></div>
-                    <span>Rivers</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #FF4500; height: 4px; margin-top: 5px;"></div>
-                    <span>Canals</span>
-                </div>
-            </div>
-
-            <div style="text-align: center; font-size: 0.8em; margin-top: 5px;">
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
                 Map showing Waterbodies, Rivers and Canals
             </div>
-        </section>
-
-        <section class="section">
-            <h3>Climate Trend</h3>
-            <p>Annual Precipitation</p>
 
             <div class="chart-container">
                 <canvas id="precipChart"></canvas>
             </div>
-            <br />
-        </section>
-
-
-        <section class="section">
-            <h3>Change Detection</h3>
-            <p>Farm Cover Loss and Tree Cover Loss</p>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Annual Precipitation
+            </div>
 
             <div class="map-group">
                 <div id="farmLossMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Farm Cover Loss</h4>
+                    <div
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
+                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Farm Cover
+                            Loss</h4>
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #F0F4A3; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #F0F4A3; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Crops</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #ff0000; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #ff0000; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Built_Up</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #a9a9a9; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #a9a9a9; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Barren</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #8C7A4F; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
-                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Shrubs_and_Scrubs</span>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #8C7A4F; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
+                                <span
+                                    style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Shrubs_and_Scrubs</span>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div id="treeLossMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Tree Cover Loss</h4>
+                    <div
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
+                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Tree Cover
+                            Loss</h4>
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #73bb53; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #73bb53; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Trees</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #ff0000; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #ff0000; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Built_Up</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #eee05d; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #eee05d; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Crops</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #a9a9a9; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #a9a9a9; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Barren</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
-                                <div style="width: 10px; height: 10px; background-color: #4c4ef5; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;"></div>
-                                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Shrubs_and_Scrubs</span>
+                                <div
+                                    style="width: 10px; height: 10px; background-color: #4c4ef5; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                </div>
+                                <span
+                                    style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Shrubs_and_Scrubs</span>
                             </div>
                         </div>
                     </div>
@@ -1659,22 +1731,24 @@
                 <div style="width: 48%; text-align: center;">Farm Cover Loss</div>
                 <div style="width: 48%; text-align: center;">Tree Cover Loss</div>
             </div>
-        </section>
 
-        <section class="section">
-            <h3>Demographics</h3>
-            <p>Village-level Demographics (Census 2011)</p>
             <div class="map-group-3">
                 <div id="demographicPopMap" class="map"></div>
                 <div id="demographicLitMap" class="map"></div>
                 <div id="demographicMargMap" class="map"></div>
             </div>
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 32%; text-align: center;">Total Population</div>
+                <div style="width: 32%; text-align: center;">Literacy</div>
+                <div style="width: 32%; text-align: center;">Marginal Communities</div>
+            </div>
         </section>
 
         <section class="section" id="hydro-table-section">
-            <h3>Hydrology and Land Use Land Cover in this Microwatershed</h3>
+            <h2>Hydrology and Land Use Land Cover in this Microwatershed</h2>
 
-            <h4>BASIN SHAPE</h4>
+            <h5 style="margin-bottom: 5px;">BASIN SHAPE</h5>
             <table
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
@@ -1683,9 +1757,9 @@
                         <td style="padding: 10px; border: 1px solid black; width: 16%;">Perimeter<br>(km)</td>
                         <td style="padding: 10px; border: 1px solid black; width: 16%;">
                             Compactness<br>(Kc)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Max Elev</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Min Elev</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Relief</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Max Elev<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Min Elev<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Relief<br>(m)</td>
                     </tr>
                     <tr>
                         <td id="tbl-area" style="padding: 10px; border: 1px solid black;">{{ area }}</td>
@@ -1698,22 +1772,26 @@
                 </tbody>
             </table>
 
-            <!-- <h4>DRAINAGE NETWORK</h4>
+            <h5 style="margin-bottom: 5px;">DRAINAGE NETWORK</h5>
             <table
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
                     <tr style="font-weight: bold;">
-                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Total Length</td>
-                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Drainage Density</td>
+                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Total Length (km)</td>
+                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Drainage Density (km/km²)</td>
                     </tr>
                     <tr>
-                        <td colspan="3" id="tbl-drainage-length" style="padding: 10px; border: 1px solid black;">{{ drainage_length }}</td>
-                        <td colspan="3" id="tbl-drainage-density" style="padding: 10px; border: 1px solid black;">{{ drainage_density }}</td>
+                        <td colspan="3" id="tbl-drainage-length" style="padding: 10px; border: 1px solid black;">
+                            {{ drainage_length }}
+                        </td>
+                        <td colspan="3" id="tbl-drainage-density" style="padding: 10px; border: 1px solid black;">
+                            {{ drainage_density }}
+                        </td>
                     </tr>
                 </tbody>
-            </table> -->
+            </table>
 
-            <h4>GROUNDWATER & AQUIFER CHARACTERISTICS</h4>
+            <h5 style="margin-bottom: 5px;">GROUNDWATER & AQUIFER CHARACTERISTICS</h5>
             <table
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
@@ -1723,67 +1801,24 @@
                         <td colspan="2" style="padding: 10px; border: 1px solid black;">Water Balance Trend</td>
                     </tr>
                     <tr>
-                        <td colspan="2" id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">{{ aquifer_class }}</td>
-                        <td colspan="2" id="tbl-soge" style="padding: 10px; border: 1px solid black;">{{ soge_class }}
+                        <td colspan="2" id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">
+                            {{ aquifer_class }}
                         </td>
-                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">{{ water_balance_trend }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </section>
-
-        <section class="section" id="cropping-water-table-section">
-            <h4>CROPPING LAND USE AND WATER AVAILABILITY</h4>
-            <table
-                style="width: 100%; border-collapse: collapse; text-align: left; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
-                <tbody>
-                    <tr>
-                        <td rowspan="2" style="padding: 10px; border: 1px solid black; font-weight: bold;"></td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Water</td>
-                        <td colspan="3" style="padding: 10px; border: 1px solid black; font-weight: bold;">Hydrology
+                        <td colspan="2" id="tbl-soge" style="padding: 10px; border: 1px solid black;">
+                            {{ soge_class }}
                         </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping Area</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Surface water
-                            availability</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rainfall</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">ET</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Run off</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Kharif</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ crop_kharif }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ water_kharif }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ rf_kharif }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ et_kharif }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ ro_kharif }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rabi</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ crop_rabi }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ water_rabi }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ rf_rabi }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ et_rabi }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ ro_rabi }}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Zaid</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ crop_zaid }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ water_zaid }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ rf_zaid }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ et_zaid }}</td>
-                        <td style="padding: 10px; border: 1px solid black;">{{ ro_zaid }}</td>
+                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">
+                            {{ water_balance_trend }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </section>
 
         <section class="section">
-            <h3>TERRAIN AND LAND USE LAND COVER</h3>
+            <h5 style="margin-bottom: 5px;">TERRAIN AND LAND USE LAND COVER</h5>
 
-            <div id="terrainLayout" style="display: flex; flex-direction: column; margin-top: 20px;">
+            <div id="terrainLayout" style="display: flex; flex-direction: column; margin-top: 5px;">
                 <!-- Top Box -->
                 <div
                     style="background-color: #71a2d5; padding: 10px; font-size: 16px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; margin-bottom: 0;">
@@ -1894,8 +1929,126 @@
             </script>
         </section>
 
+        <section class="section" id="cropping-water-table-section">
+            <h5 style="margin-bottom: 5px;">CROPPING LAND USE AND WATER AVAILABILITY</h5>
+            <table
+                style="width: 100%; border-collapse: collapse; text-align: left; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
+                <tbody>
+                    <tr>
+                        <td rowspan="2" style="padding: 10px; border: 1px solid black; font-weight: bold;"></td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Water</td>
+                        <td colspan="3" style="padding: 10px; border: 1px solid black; font-weight: bold;">Hydrology
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping Area</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Surface water
+                            availability</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rainfall</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">ET</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Run off</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Kharif</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ crop_kharif }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ water_kharif }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ rf_kharif }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ et_kharif }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ ro_kharif }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rabi</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ crop_rabi }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ water_rabi }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ rf_rabi }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ et_rabi }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ ro_rabi }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Zaid</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ crop_zaid }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ water_zaid }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ rf_zaid }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ et_zaid }}</td>
+                        <td style="padding: 10px; border: 1px solid black;">{{ ro_zaid }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
         <section class="section">
-            <h3>Terrain Comparison Map</h3>
+            <h2>Terrain Comparison Map</h2>
+
+            <div id="demMapTerrain" class="map" style="position: relative;">
+                    <div
+                        style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; transform: scale(0.75); transform-origin: bottom left;">
+                        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute
+                            Elevation (m)</h4>
+                        <div style="display: flex; gap: 8px;">
+                            <div
+                                style="width: 18px; height: 160px; background: linear-gradient(to top, #0d0030 0.0%, #1a0f6e 7.1%, #1746a0 14.3%, #1a72c0 21.4%, #2191c0 28.6%, #1aab9e 35.7%, #16a085 42.9%, #1cb870 48.6%, #27ae60 54.3%, #5ab836 58.6%, #95c623 62.9%, #d4d400 67.1%, #f1c40f 71.4%, #e09a30 75.7%, #d4845a 80.0%, #b0623a 84.3%, #8b5e3c 88.6%, #c4a882 94.3%, #f5f0e8 100.0%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;">
+                            </div>
+
+                            <div style="position: relative; height: 160px; flex: 1;">
+                                <div
+                                    style="position: absolute; bottom: 0%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">0</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 14.3%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">100</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 28.6%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">200</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 42.9%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">300</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 57.1%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">400</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 71.4%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">500</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 85.7%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">600</span>
+                                </div>
+                                <div
+                                    style="position: absolute; bottom: 100%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);">
+                                    <div style="width: 5px; height: 1px; background: #9ca3af;"></div>
+                                    <span style="font-size: 10px; color: #6b7280; line-height: 1;">700</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 12px;">
+                            <div
+                                style="width: 20px; height: 2px; background: #8B4513; border-radius: 1px; flex-shrink: 0;">
+                            </div>
+                            <span style="font-size: 10px; color: #6b7280;">Contour lines</span>
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+                </div>
+
+            <p style="text-align: center; margin-top: 5px; margin-bottom: 20px; font-size: 0.9em; font-weight: bold;">
+                The microwatershed relief is {{ dem_relief }}m and the mean elevation is {{ mean_elev }}m.
+            </p>
+
             <p>{{terrain_mws}}</p>
 
             <div class="map-group">
@@ -2537,6 +2690,15 @@
             preload: 4,
         });
 
+        const getBaseLayer = () => new ol.layer.Tile({
+            source: new ol.source.XYZ({
+                url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                maxZoom: 30,
+                transition: 500,
+            }),
+            preload: 4,
+        });
+
         const view = new ol.View({
             center: [78.9, 23.6],
             zoom: 10,
@@ -2829,7 +2991,8 @@
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/dem/wms',
                 params: {
-                    'LAYERS': "dem:{{district}}_{{block}}_dem_raster"
+                    'LAYERS': "dem:{{district}}_{{block}}_dem_raster",
+                    'STYLES': 'dem_grayscale'
                 },
                 ratio: 1,
                 serverType: 'geoserver',
@@ -2942,7 +3105,7 @@
                 url: 'https://geoserver.core-stack.org:8443/geoserver/swb/wms',
                 params: {
                     'LAYERS': waterbodiesLayerName,
-                    'SLD_BODY': getPolygonSld(waterbodiesLayerName, '#00BFFF', '#0000FF')
+                    'SLD_BODY': getPolygonSld(waterbodiesLayerName, '#00FFFF', '#0000FF')
                 },
                 ratio: 1,
                 serverType: 'geoserver',
@@ -3063,7 +3226,7 @@
 
         const TerrainMap = new ol.Map({
             target: 'terrainMap',
-            layers: [wmsLayer],
+            layers: [getBaseLayer(), wmsLayer],
             view: tempView1,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3101,7 +3264,7 @@
 
         const demMap = new ol.Map({
             target: 'demMap',
-            layers: [demLayer, demContourLayer],
+            layers: [getBaseLayer(), demLayer, demContourLayer],
             view: demView,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3125,9 +3288,73 @@
             }
         });
 
+        const demTerrainView = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        });
+
+        const demLayerTerrain = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/dem/wms',
+                params: {
+                    'LAYERS': "dem:{{district}}_{{block}}_dem_raster",
+                    'STYLES': 'dem_grayscale'
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+        });
+
+        const demContourSourceTerrain = new ol.source.TileWMS({
+            url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+            params: {
+                'LAYERS': "dem:{{district}}_{{block}}_dem_raster",
+                'STYLES': 'dem_contours',
+                'TILED': true,
+                'TRANSPARENT': true,
+                'FORMAT': 'image/png',
+                'ENV': `interval:200`,
+            },
+            serverType: 'geoserver',
+        });
+
+        const demContourLayerTerrain = new ol.layer.Tile({
+            source: demContourSourceTerrain,
+        });
+
+        const demMapTerrain = new ol.Map({
+            target: 'demMapTerrain',
+            layers: [getBaseLayer(), demLayerTerrain, demContourLayerTerrain],
+            view: demTerrainView,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
+
+        let lastIntervalTerrain = getContourInterval(demTerrainView.getResolution() || 0.002);
+        demContourSourceTerrain.updateParams({ ENV: `interval:${lastIntervalTerrain}` });
+
+        demMapTerrain.on('moveend', () => {
+            const resolution = demMapTerrain.getView().getResolution();
+            if (resolution) {
+                const interval = getContourInterval(resolution);
+                if (interval !== lastIntervalTerrain) {
+                    lastIntervalTerrain = interval;
+                    demContourSourceTerrain.updateParams({ ENV: `interval:${interval}` });
+                }
+            }
+        });
+
         const drainageMap = new ol.Map({
             target: 'drainageMap',
-            layers: [drainageLayer],
+            layers: [getBaseLayer(), drainageLayer],
             view: drainageView,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3138,7 +3365,7 @@
 
         const terrainRasterMap = new ol.Map({
             target: 'terrainRasterMap',
-            layers: [terrainRasterLayer2],
+            layers: [getBaseLayer(), terrainRasterLayer2],
             view: terrainRasterView,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3149,7 +3376,7 @@
 
         const landscapeLulcMap = new ol.Map({
             target: 'landscapeLulcMap',
-            layers: [landscapeLulcRasterLayer],
+            layers: [getBaseLayer(), landscapeLulcRasterLayer],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3193,7 +3420,7 @@
 
         const farmLossMap = new ol.Map({
             target: 'farmLossMap',
-            layers: [farmLossRasterMapLayer],
+            layers: [getBaseLayer(), farmLossRasterMapLayer],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3211,7 +3438,7 @@
 
         const treeLossMap = new ol.Map({
             target: 'treeLossMap',
-            layers: [treeLossRasterMapLayer],
+            layers: [getBaseLayer(), treeLossRasterMapLayer],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3229,7 +3456,7 @@
 
         const demographicPopMap = new ol.Map({
             target: 'demographicPopMap',
-            layers: [],
+            layers: [getBaseLayer()],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3247,7 +3474,7 @@
 
         const demographicLitMap = new ol.Map({
             target: 'demographicLitMap',
-            layers: [],
+            layers: [getBaseLayer()],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3265,7 +3492,7 @@
 
         const demographicMargMap = new ol.Map({
             target: 'demographicMargMap',
-            layers: [],
+            layers: [getBaseLayer()],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3283,7 +3510,7 @@
 
         const croppingIntensityMap = new ol.Map({
             target: 'croppingIntensityMap',
-            layers: [],
+            layers: [getBaseLayer()],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3301,7 +3528,7 @@
 
         const hydroVectorMap = new ol.Map({
             target: 'hydroVectorMap',
-            layers: [waterbodiesLayer, riverLayer, canalLayer],
+            layers: [getBaseLayer(), waterbodiesLayer, riverLayer, canalLayer],
             view: new ol.View({
                 center: [78.9, 23.6],
                 zoom: 10,
@@ -3455,7 +3682,7 @@
 
         const lulcMap = new ol.Map({
             target: 'lulcMap',
-            layers: [lulcRaster],
+            layers: [getBaseLayer(), lulcRaster],
             view: tempView2,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3466,7 +3693,7 @@
 
         const DegradMap = new ol.Map({
             target: 'degradLandMap',
-            layers: [degradRaster],
+            layers: [getBaseLayer(), degradRaster],
             view: tempView3_2,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3477,7 +3704,7 @@
 
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
-            layers: [treeReduceRaster],
+            layers: [getBaseLayer(), treeReduceRaster],
             view: tempView4,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3542,7 +3769,7 @@
 
         const urbanMap = new ol.Map({
             target: 'urbanMap',
-            layers: [urbanRaster],
+            layers: [getBaseLayer(), urbanRaster],
             view: tempView5,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
@@ -3568,18 +3795,19 @@
                     let fillColor = 'rgba(135, 206, 235, 0.4)';
 
                     if (uid === '{{mws_id}}') {
-                        strokeColor = '#87CEEB';
-                        fillColor = 'rgba(135, 206, 235, 0.4)';
+                        strokeColor = 'yellow';
+                        fillColor = 'rgba(255, 255, 0, 0.4)';
                     }
 
                     return new ol.style.Style({
                         stroke: new ol.style.Stroke({
                             color: strokeColor,
-                            width: 2,
+                            width: uid === '{{mws_id}}' ? 3 : 2,
                         }),
                         fill: new ol.style.Fill({
                             color: fillColor,
                         }),
+                        zIndex: uid === '{{mws_id}}' ? 1 : 0,
                     });
                 };
 
@@ -3629,6 +3857,8 @@
 
                         demLayer.addFilter(crop);
                         demContourLayer.addFilter(crop);
+                        demLayerTerrain.addFilter(crop);
+                        demContourLayerTerrain.addFilter(crop);
                         drainageLayer.addFilter(crop);
                         terrainRasterLayer2.addFilter(crop);
                         landscapeLulcRasterLayer.addFilter(crop);
@@ -3679,6 +3909,7 @@
                     addMwsBoundaryToMap(swbMap);
 
                     addMwsBoundaryToMap(demMap);
+                    addMwsBoundaryToMap(demMapTerrain);
                     addMwsBoundaryToMap(drainageMap);
                     addMwsBoundaryToMap(terrainRasterMap);
                     addMwsBoundaryToMap(landscapeLulcMap);
@@ -3690,6 +3921,7 @@
 
                     TerrainMap.getView().fit(arr, fitOptions);
                     demMap.getView().fit(arr, fitOptions);
+                    demMapTerrain.getView().fit(arr, fitOptions);
                     drainageMap.getView().fit(arr, fitOptions);
                     terrainRasterMap.getView().fit(arr, fitOptions);
                     landscapeLulcMap.getView().fit(arr, fitOptions);
@@ -3862,6 +4094,7 @@
             // Add scale bars to ALL maps
             if (typeof mainMap !== 'undefined') addVisualScaleBar(mainMap);
             if (typeof demMap !== 'undefined') addVisualScaleBar(demMap);
+            if (typeof demMapTerrain !== 'undefined') addVisualScaleBar(demMapTerrain);
             if (typeof drainageMap !== 'undefined') addVisualScaleBar(drainageMap);
             if (typeof terrainRasterMap !== 'undefined') addVisualScaleBar(terrainRasterMap);
 
@@ -4489,7 +4722,7 @@
         window.addEventListener('beforeprint', function () {
             const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, demMap, drainageMap, terrainRasterMap, swbMap, sogeMap];
+                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, sogeMap];
 
             allMaps.forEach(function (map) {
                 if (map) {
@@ -4507,7 +4740,7 @@
 
             const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, sogeMap];
+                ComparisonMap4, ComparisonMap5, swbMap, sogeMap, demMapTerrain];
 
             setTimeout(function () {
                 allMaps.forEach(function (map) {
@@ -4555,7 +4788,7 @@
             }
 
             [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
-                demMap, drainageMap, terrainRasterMap,
+                demMap, demMapTerrain, drainageMap, terrainRasterMap,
                 ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
                 .filter(Boolean)
                 .forEach(m => m.once('rendercomplete', afterRender));
@@ -4569,7 +4802,7 @@
                     settleTimer = setTimeout(() => {
                         try {
                             [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
-                                demMap, drainageMap, terrainRasterMap,
+                                demMap, demMapTerrain, drainageMap, terrainRasterMap,
                                 ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
                                 .filter(Boolean)
                                 .forEach(m => m.renderSync());
