@@ -38,6 +38,7 @@ class User(AbstractUser):
     profile_picture = models.ImageField(
         upload_to="profile_pictures/", blank=True, null=True
     )
+    user_consent = models.BooleanField(default=False, blank=True, null=True)
 
     groups = models.ManyToManyField(
         Group,
