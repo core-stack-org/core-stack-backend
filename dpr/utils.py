@@ -348,7 +348,6 @@ def send_dpr_email(
     plan_name,
     mws_reports,
     mws_Ids,
-    resource_report,
     resource_report_url,
     dpr_s3_url,
     state_name="",
@@ -440,11 +439,6 @@ def send_dpr_email(
         )
 
         email.content_subtype = "html"
-
-        if resource_report is not None:
-            email.attach(
-                f"Resource Report_{plan_name}.pdf", resource_report, "application/pdf"
-            )
 
         logger.info("Sending DPR email to %s", email_id)
         email.send(fail_silently=False)

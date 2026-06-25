@@ -2,7 +2,6 @@ from django.templatetags.i18n import language
 from django.utils import timezone
 from nrm_app.celery import app
 from utilities.logger import setup_logger
-import requests
 
 from .gen_dpr import (
     create_dpr_document,
@@ -98,20 +97,11 @@ def generate_dpr_task(
         f"?report_type=resource&district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
     )
 
-    resource_report = None
-    try:
-        response = requests.get(resource_report_url, timeout=30)
-        response.raise_for_status()
-        resource_report = response.content
-    except Exception as e:
-        logger.error(f"Failed to fetch resource report: {e}")
-
     send_dpr_email(
         email_id=email_id,
         plan_name=plan.plan,
         mws_reports=mws_reports,
         mws_Ids=successful_mws_ids,
-        resource_report=resource_report,
         resource_report_url=resource_report_url,
         dpr_s3_url=dpr_report.dpr_report_s3_url,
         state_name=plan.state_soi.state_name,
