@@ -2,7 +2,7 @@ from django.templatetags.i18n import language
 from django.utils import timezone
 from nrm_app.celery import app
 from utilities.logger import setup_logger
-
+from moderation.views import sync_odk_to_csdb
 from .gen_dpr import (
     create_dpr_document,
     get_mws_ids_for_report,
@@ -38,7 +38,7 @@ def get_or_generate_dpr(plan, regenerate=False, language="en"):
     logger.info(f"Generating new DPR for plan {plan.id}")
     dpr_report.status = "GENERATING"
     dpr_report.save(update_fields=["status"])
-
+    sync_odk_to_csdb()
     doc = generate_dpr_pdf(plan, language=language)
     s3_url = upload_dpr_to_s3(doc, plan.id, plan.plan, language)
 
