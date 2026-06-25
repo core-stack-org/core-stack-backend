@@ -338,13 +338,13 @@ BASE_API_URL = env("BASE_API_URL")
 
 # MARK: Email Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtpout.secureserver.net"
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True
-EMAIL_USE_TLS = False
+EMAIL_HOST = env("EMAIL_HOST", default="smtpout.secureserver.net")
+EMAIL_PORT = env.int("EMAIL_PORT", default=465)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=True)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-EMAIL_TIMEOUT = 900
+EMAIL_TIMEOUT = 30
 MISSING_LAYER_RECIPIENTS = env.list("MISSING_LAYER_RECIPIENTS")
 PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 
