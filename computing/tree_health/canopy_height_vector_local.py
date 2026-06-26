@@ -19,7 +19,7 @@ from computing.tree_health.canopy_height_local import (
 )
 
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health/canopy_height_vector_local"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "canopy_height"
 
 CH_CLASSES = [
@@ -59,6 +59,7 @@ def _resolve_ch_output_raster(asset_suffix, year, state=None, district=None, blo
 
 @app.task(bind=True)
 def tree_health_ch_vector_local(
+    self,
     state=None,
     district=None,
     block=None,

@@ -17,7 +17,7 @@ from utilities.gee_utils import valid_gee_text
 from computing.tree_health.ccd_local import LOCAL_OUTPUT_BASE_DIR as CCD_RASTER_DIR
 
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health/ccd_vector_local"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "ccd"
 
 CCD_CLASSES = [
@@ -54,8 +54,9 @@ def _resolve_ccd_output_raster(asset_suffix, year, state=None, district=None, bl
         "Run ccd_local.py first."
     )
 
-
+@app.task(bind=True)
 def tree_health_ccd_vector_local(
+    self,
     state=None,
     district=None,
     block=None,

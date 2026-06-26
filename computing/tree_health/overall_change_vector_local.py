@@ -19,7 +19,7 @@ from computing.tree_health.overall_change_local import (
 )
 
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health/overall_change_vector_local"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "tree_overall_ch"
 
 OVERALL_CHANGE_CLASSES = [
@@ -62,6 +62,7 @@ def _resolve_overall_change_raster(asset_suffix, state=None, district=None, bloc
 
 @app.task(bind=True)
 def tree_health_overall_change_vector_local(
+    self,
     state=None,
     district=None,
     block=None,

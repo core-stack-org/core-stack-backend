@@ -21,8 +21,8 @@ from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
 
-LOCAL_TREE_CHANGE_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/overall_change"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health/overall_change_local"
+LOCAL_TREE_CHANGE_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "tree_overall_ch"
 GEOSERVER_STYLE = "tree_overall_ch_style"
 BACKGROUND = -9999
@@ -190,6 +190,7 @@ def _build_overall_change_raster(
 
 @app.task(bind=True)
 def tree_health_overall_change_raster_local(
+    self,
     state=None,
     district=None,
     block=None,

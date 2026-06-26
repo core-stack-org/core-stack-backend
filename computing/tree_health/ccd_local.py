@@ -153,8 +153,9 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
 
     return str(output_path)
 
-# @app.task(bind=True)
+@app.task(bind=True)
 def tree_health_ccd_raster_local(
+    self,
     state=None,
     district=None,
     block=None,
@@ -233,42 +234,42 @@ def tree_health_ccd_raster_local(
         )
         print(f"Saved local CCD raster: {raster_path}")
 
-        # layer_id = None
-        # if sync_layer_metadata and state and district and block:
-        #     layer_id = save_layer_info_to_db(
-        #         state=state,
-        #         district=district,
-        #         block=block,
-        #         layer_name=layer_name,
-        #         asset_id=raster_path,
-        #         dataset_name="Ccd Raster",
-        #         misc={
-        #             "start_year": start_year,
-        #             "end_year": end_year,
-        #             "is_generated_locally": True,
-        #         },
-        #         algorithm="local_ccd_clip_tree_mask",
-        #         algorithm_version="local-1.0",
-        #     )
+        layer_id = None
+        if sync_layer_metadata and state and district and block:
+            layer_id = save_layer_info_to_db(
+                state=state,
+                district=district,
+                block=block,
+                layer_name=layer_name,
+                asset_id=raster_path,
+                dataset_name="Ccd Raster",
+                misc={
+                    "start_year": start_year,
+                    "end_year": end_year,
+                    "is_generated_locally": True,
+                },
+                algorithm="local_ccd_clip_tree_mask",
+                algorithm_version="local-1.0",
+            )
 
-        # if not push_to_geoserver:
-        #     continue
+        if not push_to_geoserver:
+            continue
 
-        # try:
-        #     upload_res, style_res = push_local_raster_to_geoserver(
-        #         file_path=raster_path,
-        #         layer_name=layer_name,
-        #         workspace=GEOSERVER_WORKSPACE,
-        #         style_name=GEOSERVER_STYLE,
-        #     )
-        #     print(f"GeoServer upload response for {layer_name}: {upload_res}")
-        #     print(f"GeoServer style response for {layer_name}: {style_res}")
-        # except Exception as error:
-        #     print(f"Failed to sync local CCD raster {layer_name}: {error}")
-        #     layer_at_geoserver = False
-        #     continue
+        try:
+            upload_res, style_res = push_local_raster_to_geoserver(
+                file_path=raster_path,
+                layer_name=layer_name,
+                workspace=GEOSERVER_WORKSPACE,
+                style_name=GEOSERVER_STYLE,
+            )
+            print(f"GeoServer upload response for {layer_name}: {upload_res}")
+            print(f"GeoServer style response for {layer_name}: {style_res}")
+        except Exception as error:
+            print(f"Failed to sync local CCD raster {layer_name}: {error}")
+            layer_at_geoserver = False
+            continue
 
-        # if layer_id:
-        #     update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        if layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return layer_at_geoserver if push_to_geoserver else True

@@ -22,8 +22,8 @@ from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
 
-LOCAL_CH_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/canopy_height"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health/canopy_height_local"
+LOCAL_CH_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ch"
+LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "canopy_height"
 GEOSERVER_STYLE = "ch_style"
 
@@ -160,6 +160,7 @@ def _clip_and_mask_ch(ch_path, lulc_path, roi_gdf, output_path):
 
 @app.task(bind=True)
 def tree_health_ch_raster_local(
+    self,
     state=None,
     district=None,
     block=None,

@@ -68,9 +68,12 @@ def generate_shape_files(path):
 
 
 def convert_to_zip(dir_name, file_type):
+    print(dir_name)
     if file_type == "gpkg":
+        if dir_name.split(".")[-1] != "gpkg":
+            dir_name += ".gpkg"
         with zipfile.ZipFile(dir_name + ".zip", "w", zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(dir_name + ".gpkg", arcname=os.path.basename(dir_name + ".gpkg"))
+            zipf.write(dir_name, arcname=os.path.basename(dir_name))
         return dir_name + ".zip"
     else:
         return shutil.make_archive(dir_name, "zip", dir_name + "/")
