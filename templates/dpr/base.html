@@ -1,16 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+    {% load static %}
     <meta charset="UTF-8">
 
     <style>
 
         body {
-            font-family: Arial, sans-serif;
             font-size: 12px;
             line-height: 1.5;
             margin: 24px;
-            font-family: "Noto Sans Devanagari", sans-serif;
+            font-family: "NotoSansDevanagari", sans-serif;
         }
 
         h1 {
@@ -77,12 +77,16 @@
 
         @font-face {
             font-family: "NotoSansDevanagari";
-            src: url("/path/to/NotoSansDevanagari-Regular.ttf");
+            src:   url("{{ font_regular }}");
+            font-weight: normal;
         }
 
-        body {
-            font-family: "NotoSansDevanagari", sans-serif;
+        @font-face {
+            font-family: "NotoSansDevanagari";
+            src: url("{{ font_bold }}");
+            font-weight: bold;
         }
+
         .socio-table {
             page-break-inside: auto;
         }

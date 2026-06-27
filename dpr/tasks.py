@@ -2,8 +2,7 @@ from django.templatetags.i18n import language
 from django.utils import timezone
 from nrm_app.celery import app
 from utilities.logger import setup_logger
-import requests
-
+from moderation.views import sync_odk_to_csdb
 from .gen_dpr import (
     create_dpr_document,
     get_mws_ids_for_report,
@@ -17,18 +16,19 @@ from .utils import (
     check_dpr_exists_on_s3,
 )
 
-# from .views import generate_dpr_pdf
+from .views import generate_dpr_pdf
 
 logger = setup_logger(__name__)
 
 
-def get_or_generate_dpr(plan, regenerate=False):
+def get_or_generate_dpr(plan, regenerate=False, language="en"):
     dpr_report, created = DPR_Report.objects.get_or_create(
-        plan_id=plan, defaults={"plan_name": plan.plan, "status": "PENDING"}
+        plan_id=plan,
+        defaults={"plan_name": plan.plan, "status": "PENDING"},
     )
-
+    dpr_report_s3_url = f"https://dpr-resources.s3.ap-south-1.amazonaws.com/dpr-reports/{plan.id}_{plan.plan}_{language}.pdf"
     if not regenerate:
-        s3_exists = check_dpr_exists_on_s3(dpr_report.dpr_report_s3_url)
+        s3_exists = check_dpr_exists_on_s3(dpr_report_s3_url)
         if not created and not dpr_report.needs_regeneration() and s3_exists:
             logger.info(
                 f"Using cached DPR for plan {plan.id} from S3: {dpr_report.dpr_report_s3_url}"
@@ -38,9 +38,9 @@ def get_or_generate_dpr(plan, regenerate=False):
     logger.info(f"Generating new DPR for plan {plan.id}")
     dpr_report.status = "GENERATING"
     dpr_report.save(update_fields=["status"])
-
-    doc = create_dpr_document(plan)
-    s3_url = upload_dpr_to_s3(doc, plan.id, plan.plan)
+    sync_odk_to_csdb()
+    doc = generate_dpr_pdf(plan, language=language)
+    s3_url = upload_dpr_to_s3(doc, plan.id, plan.plan, language)
 
     dpr_report.dpr_report_s3_url = s3_url
     dpr_report.dpr_generated_at = timezone.now()
@@ -60,13 +60,17 @@ def get_or_generate_dpr(plan, regenerate=False):
 
 
 @app.task(bind=True, name="dpr.generate_dpr_task")
-def generate_dpr_task(self, plan_id: int, email_id: str, regenerate: bool = False):
+def generate_dpr_task(
+    self, plan_id: int, email_id: str, language: str, regenerate: bool = False
+):
     plan = get_plan_details(plan_id)
     if plan is None:
         logger.error(f"Plan not found for ID: {plan_id}")
         return {"error": "Plan not found"}
 
-    dpr_report, was_regenerated = get_or_generate_dpr(plan, regenerate=regenerate)
+    dpr_report, was_regenerated = get_or_generate_dpr(
+        plan, regenerate=regenerate, language=language
+    )
     mws_Ids = get_mws_ids_for_report(plan)
 
     mws_reports = []
@@ -93,20 +97,11 @@ def generate_dpr_task(self, plan_id: int, email_id: str, regenerate: bool = Fals
         f"?report_type=resource&district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
     )
 
-    resource_report = None
-    try:
-        response = requests.get(resource_report_url, timeout=30)
-        response.raise_for_status()
-        resource_report = response.content
-    except Exception as e:
-        logger.error(f"Failed to fetch resource report: {e}")
-
     send_dpr_email(
         email_id=email_id,
         plan_name=plan.plan,
         mws_reports=mws_reports,
         mws_Ids=successful_mws_ids,
-        resource_report=resource_report,
         resource_report_url=resource_report_url,
         dpr_s3_url=dpr_report.dpr_report_s3_url,
         state_name=plan.state_soi.state_name,
