@@ -45,7 +45,7 @@ class MaxValueRule(Rule):
 
         for field in fields:
             invalid = gdf[gdf[field] > self.value]
-            uid_column = "uid"
+            uid_column = "UID"
             results.append(
                 {
                     "field": field,
@@ -72,7 +72,7 @@ class MinValueRule(Rule):
 
         for field in fields:
             invalid = gdf[gdf[field] < self.value]
-            uid_column = "uid"
+            uid_column = "UID"
 
             results.append(
                 {
@@ -100,7 +100,7 @@ class NotNullRule(Rule):
 
         for field in fields:
             invalid = gdf[gdf[field].isna()]
-            uid_column = "uid"
+            uid_column = "UID"
 
             results.append(
                 {
@@ -128,7 +128,7 @@ class AllowedValuesRule(Rule):
 
         for field in fields:
             invalid = gdf[gdf[field].isin(self.value)]
-            uid_column = "uid"
+            uid_column = "UID"
 
             results.append(
                 {
