@@ -145,6 +145,24 @@ def _start_asset_export(image: ee.Image, asset_id: str, description: str):
     return task
 
 
+def _start_asset_drive_export(
+    image: ee.Image, asset_id: str, description: str, aez: str
+):
+    export_kwargs = {
+        "image": image,
+        "description": description,
+        "folder": f"ET_downscale_{aez}",
+        "fileFormat": "GeoTIFF",
+        "scale": 30,
+        "crs": "EPSG:4326",
+        "maxPixels": 1e13,
+    }
+    task = ee.batch.Export.image.toDrive(**export_kwargs)
+    task.start()
+    print(f"  Export task started -> {asset_id}")
+    return task
+
+
 def wait_for_tasks(
     task_specs: list, poll_seconds: int = 30, fail_on_error: bool = False
 ) -> dict:
@@ -222,11 +240,19 @@ def export_product_asset(
     print(f"  {display_name} asset -> {asset_id}")
     task = None
     if not asset_exists:
-        task = _start_asset_export(
-            image,
-            asset_id,
-            description=f"export_{label}_{_asset_token(cfg['asset_suffix'])}_{cfg['year']}",
-        )
+        if cfg.get("aez", False):
+            task = _start_asset_export(
+                image,
+                asset_id,
+                description=f"export_{label}_{_asset_token(cfg['asset_suffix'])}_{cfg['year']}",
+            )
+        else:
+            _start_asset_drive_export(
+                image,
+                asset_id,
+                description=f"export_{label}_{_asset_token(cfg['asset_suffix'])}_{cfg['year']}",
+                aez=cfg["aez"],
+            )
     return {"asset_id": asset_id, "task": task, "label": label}
 
 

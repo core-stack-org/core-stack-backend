@@ -95,7 +95,9 @@ def generate_et_downscale(
     aez=None,
     asset_root=None,
 ):
-    ee_initialize(account_id=gee_account_id)
+    if not aez:
+        ee_initialize(account_id=gee_account_id)
+
     if state and district and tehsil:
         asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(tehsil.lower())
@@ -117,7 +119,7 @@ def generate_et_downscale(
 
     model_aez = get_model_aez(roi, aez)
 
-    if not asset_root:
+    if not asset_root and not aez:
         asset_root = get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
@@ -126,6 +128,7 @@ def generate_et_downscale(
     roi_path = f"{asset_root}/{asset_suffix}"
     for year in range(start_year, end_year + 1):
         cfg = _build_cfg(
+            aez=str(aez),
             roi_path=roi_path,
             model_aez=model_aez,
             asset_root=asset_root,
@@ -189,6 +192,7 @@ def generate_et_downscale(
 
 def _build_cfg(
     *,
+    aez: str,
     roi_path: str,
     model_aez: str,
     asset_root: str,
@@ -201,6 +205,7 @@ def _build_cfg(
     poll_seconds: int = 30,
 ) -> dict:
     return {
+        "aez": aez,
         "roi_path": roi_path,
         "model_aez": model_aez,
         "asset_root": asset_root,
