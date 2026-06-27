@@ -1,6 +1,7 @@
 from django.db import models
 from geoadmin.models import State, District, Block
 
+
 # Create your models here.
 class LayerInfo(models.Model):
     LAYER_TYPE_CHOICES = [
@@ -14,6 +15,8 @@ class LayerInfo(models.Model):
     workspace = models.CharField(max_length=255, blank=True, null=True)
     layer_desc = models.TextField(blank=True, null=True)
     excel_to_be_generated = models.BooleanField(default=False)
+    sheet_name = models.TextField(blank=True, null=True)
+    can_be_absent = models.BooleanField(default=False)
     start_year = models.PositiveIntegerField(blank=True, null=True)
     end_year = models.PositiveIntegerField(blank=True, null=True)
     style_name = models.CharField(max_length=255, blank=True, null=True)
@@ -21,7 +24,7 @@ class LayerInfo(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.workspace + '/' + self.layer_name
+        return self.workspace + "/" + self.layer_name
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]

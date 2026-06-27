@@ -8,7 +8,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from nrm_app.celery import app
-from utilities.constants import AEZ, GEE_HELPER_PATH
+from utilities.constants import AEZ, GEE_ASSET_PATH
 from utilities.gee_utils import (
     check_task_status,
     ee_initialize,
@@ -102,7 +102,7 @@ def lulc_on_plain_cluster(
             )
 
             chunk_asset_id = (
-                get_gee_dir_path([state, district, block], GEE_HELPER_PATH) + desc
+                get_gee_dir_path([state, district, block], GEE_ASSET_PATH) + desc
             )
             temp_assets.append(chunk_asset_id)
 
@@ -121,6 +121,7 @@ def lulc_on_plain_cluster(
             [state, district, block],
             asset_description,
             chunk_size,
+            chunk_asset_path=GEE_ASSET_PATH,
             merge_asset_id=asset_id,
         )
         if final_task_id:

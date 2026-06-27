@@ -20,6 +20,9 @@ class ProjectSerializer(serializers.ModelSerializer):
         source="tehsil_soi.tehsil_name", read_only=True
     )
 
+    total_plan = serializers.IntegerField(read_only=True)
+    completed_plan = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = Project
         fields = [
@@ -42,6 +45,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_by",
             "updated_at",
             "updated_by",
+            "total_plan",
+            "completed_plan",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
