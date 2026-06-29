@@ -1,6 +1,11 @@
 layer_name: cropping_intensity
 
 rules:
+  -
+  - name: ci_type
+    type: data_type
+    field_pattern: "cropping_intensity_*"
+    expected_type: integer
 
   - name: ci_max
     type: max_value

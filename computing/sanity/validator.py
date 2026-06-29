@@ -20,6 +20,7 @@ class VectorValidator:
                     field=rule_cfg.get("field"),
                     field_pattern=rule_cfg.get("field_pattern"),
                     value=rule_cfg.get("value"),
+                    expected_type=rule_cfg.get("expected_type"),
                     severity=rule_cfg.get("severity", "ERROR"),
                 )
             )
