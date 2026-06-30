@@ -49,6 +49,29 @@ After the successfull installation of all the packages, run the following comman
 conda activate corestack-backend (or whatever is the name of your virtual environment)
 python manage.py runserver
 ```
+
+#### Download base layers
+
+After installation, download the local base layers into `data/` before running local compute pipelines:
+
+```bash
+conda activate corestack-backend
+python manage.py base_layer_setup
+```
+
+To inspect available layer selectors:
+
+```bash
+python manage.py base_layer_setup --list
+```
+
+To download only specific layers or groups:
+
+```bash
+python manage.py base_layer_setup terrain mws lulc_v3
+python manage.py base_layer_setup static_layers
+```
+
 - **Running celery:**
 If you are running some tasks, you need to run 
 ```bash

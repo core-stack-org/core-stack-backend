@@ -25,11 +25,19 @@ def _layer_key(name: str) -> str:
     return name.strip().lower().replace(" ", "_").replace("-", "_")
 
 
+def _layer_matches(layer: dict, key: str) -> bool:
+    names = [layer.get("name", ""), *layer.get("aliases", [])]
+    return key in {_layer_key(name) for name in names}
+
+
 def _format_periodic_value(template: str, year: int) -> str:
     return template.replace("{year+1}", str(year + 1)).replace("{year}", str(year))
 
 
 def _expand_periodic_layer(layer: dict) -> list[dict]:
+    if not layer.get("periodicity"):
+        return [layer]
+
     if layer.get("periodicity") != "annual":
         raise ValueError(
             f"Unsupported periodicity for base layer '{layer.get('name')}': "
@@ -68,7 +76,7 @@ def _manifest_base_layers() -> list[dict]:
 def _base_layer(name: str, *, required: bool = True) -> dict | None:
     key = _layer_key(name)
     for layer in _manifest_base_layers():
-        if _layer_key(layer["name"]) == key:
+        if _layer_matches(layer, key):
             return layer
     if required:
         raise KeyError(f"No base layer found in {_CONFIG_PATH.name} for name: {name}")
@@ -100,7 +108,7 @@ def _find_legacy_input(path_suffix: str) -> dict:
 def _derived_layer(name: str) -> dict | None:
     key = _layer_key(name)
     for layer in _cfg.get("derived_layers", []):
-        if _layer_key(layer.get("name", "")) == key and layer.get("local_path"):
+        if _layer_matches(layer, key) and layer.get("local_path"):
             return layer
     return None
 

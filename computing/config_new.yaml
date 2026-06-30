@@ -2,11 +2,6 @@
 
 base_layers:
     static_layers:
-        - name: mws
-          local_path: data/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
-          source: s3://corestack-datasets/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
-          type: file
-
         - name: terrain
           local_path: data/base_layers/terrain_raster_fabdam_pan_india.tif
           source: s3://corestack-datasets/base_layers/static_layers/terrain/terrain_raster_fabdam_pan_india.tif
@@ -16,15 +11,12 @@ base_layers:
           local_path: data/base_layers/slope_percentage/slope_percentage.tif
           source: s3://corestack-datasets/base_layers/static_layers/slope_percentage/slope_percentage.tif
           type: file
-        
-        - name: aquifer
+
+        - name: Aquifer Layer
+          aliases:
+              - aquifer
           local_path: data/base_layers/aquifer/aquifer.tif
           source: s3://corestack-datasets/base_layers/static_layers/aquifer/aquifer.tif
-          type: file
-
-        - name: aez
-          local_path: data/base_layers/AEZs/Agro_Ecological_Regions.shp
-          source: s3://corestack-datasets/base_layers/AEZs/Agro_Ecological_Regions.shp
           type: file
 
         - name: restoration opportunity
@@ -77,6 +69,87 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/hydrological_soil_group/hydrological_soil_group.geojson
           type: file
 
+        - name: mission antyodaya
+          local_path: data/base_layers/mission_antyodaya/mission_antyodaya.gpkg
+          source: ""
+          type: file
+
+        - name: ceew climate data
+          local_path: data/base_layers/ceew_climate_data/ceew_climate_data.tif
+          source: ""
+          type: file
+
+        - name: water quality aikosh
+          local_path: data/base_layers/water_quality_aikosh/water_quality_aikosh.geojson
+          source: ""
+          type: file
+
+        - name: groundwater quality
+          local_path: data/base_layers/groundwater_quality/groundwater_quality.geojson
+          source: ""
+          type: file
+
+        - name: admin boundaries
+          local_path: data/admin-boundary/input/soi_tehsil.geojson
+          source: ""
+          type: file
+
+        - name: MWS Boundaries
+          aliases:
+              - mws
+          local_path: data/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
+          source: s3://corestack-datasets/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
+          type: file
+
+        - name: stream order
+          local_path: data/base_layers/stream_order/stream_order.tif
+          source: ""
+          type: file
+
+        - name: drainage lines
+          local_path: data/base_layers/drainage_lines_pan_india.gpkg
+          source: ""
+          type: file
+
+        - name: natural depression
+          local_path: data/base_layers/natural_depression/natural_depression.tif
+          source: ""
+          type: file
+
+        - name: catchment area
+          local_path: data/base_layers/catchment_area/catchment_area.tif
+          source: ""
+          type: file
+
+        - name: soil health
+          local_path: data/base_layers/soil_health/soil_health.tif
+          source: ""
+          type: file
+
+        - name: Nrega Layer (Scrapping)
+          aliases:
+              - nrega layer
+          local_path: data/base_layers/nrega/nrega.gpkg
+          source: ""
+          type: file
+
+        - name: tree health
+          local_path: data/base_layers/tree_health/tree_health.tif
+          source: ""
+          type: file
+
+        - name: green credit
+          local_path: data/base_layers/green_credit/green_credit.geojson
+          source: ""
+          type: file
+
+        - name: Agroecological Natural Farming
+          aliases:
+              - aez
+          local_path: data/base_layers/AEZs/Agro_Ecological_Regions.shp
+          source: s3://corestack-datasets/base_layers/AEZs/Agro_Ecological_Regions.shp
+          type: file
+
     periodic_layers:
         - name: lulc_v3
           filename: lulc_v3_{year}_{year+1}.tif
@@ -96,11 +169,250 @@ base_layers:
           source: s3://corestack-datasets/base_layers/periodic_layers/lulc/lulc_v4/{filename}
           type: file
 
-    on_demand_layers:
-        - name: farm_boundary
-          local_path: data/base_layers/farm_boundary/farm_boundary.geojson
+        - name: lulc_v4_local_compute_cold_start
+          local_path: data/base_layers/periodic/lulc_v4_local_compute_cold_start/
+          source: ""
+          type: file
 
-derived_layers: # layers that are computed
+        - name: lulc_v4_sampling_cold_start
+          local_path: data/base_layers/periodic/lulc_v4_sampling_cold_start/
+          source: ""
+          type: file
+
+        - name: lulc_v2_river_basin
+          local_path: data/base_layers/periodic/lulc_v2_river_basin/
+          source: ""
+          type: file
+
+        - name: lulc_v3_river_basin
+          local_path: data/base_layers/periodic/lulc_v3_river_basin/
+          source: ""
+          type: file
+
+        - name: lulc_for_tehsil
+          local_path: data/base_layers/periodic/lulc_for_tehsil/
+          source: ""
+          type: file
+
+        - name: lulc_v4_aez_cold_start
+          local_path: data/base_layers/periodic/lulc_v4_aez_cold_start/
+          source: ""
+          type: file
+
+        - name: lulc_v4_temporal_correction_cold_start
+          local_path: data/base_layers/periodic/lulc_v4_temporal_correction_cold_start/
+          source: ""
+          type: file
+
+        - name: lulc_v4_aez_after_6_years
+          local_path: data/base_layers/periodic/lulc_v4_aez_after_6_years/
+          source: ""
+          type: file
+
+        - name: lulc_v4_temporal_correction_after_6_years
+          local_path: data/base_layers/periodic/lulc_v4_temporal_correction_after_6_years/
+          source: ""
+          type: file
+
+        - name: lulc_v4_local_compute_adding_new_grids
+          local_path: data/base_layers/periodic/lulc_v4_local_compute_adding_new_grids/
+          source: ""
+          type: file
+
+        - name: lulc_v4_sampling_adding_new_grids
+          local_path: data/base_layers/periodic/lulc_v4_sampling_adding_new_grids/
+          source: ""
+          type: file
+
+        - name: lulc_v4_aez_adding_new_grids
+          local_path: data/base_layers/periodic/lulc_v4_aez_adding_new_grids/
+          source: ""
+          type: file
+
+        - name: lulc_v4_temporal_correction_adding_new_grids
+          local_path: data/base_layers/periodic/lulc_v4_temporal_correction_adding_new_grids/
+          source: ""
+          type: file
+
+        - name: lulc_v4_temporal_correction_adding_new_grids_after_6_years
+          local_path: data/base_layers/periodic/lulc_v4_temporal_correction_adding_new_grids_after_6_years/
+          source: ""
+          type: file
+
+        - name: rainfall jaxa
+          local_path: data/base_layers/periodic/rainfall_jaxa/
+          source: ""
+          type: file
+
+        - name: rainfall chirps
+          local_path: data/base_layers/periodic/rainfall_chirps/
+          source: ""
+          type: file
+
+        - name: et fldas
+          local_path: data/base_layers/periodic/et_fldas/
+          source: ""
+          type: file
+
+        - name: et gldas
+          local_path: data/base_layers/periodic/et_gldas/
+          source: ""
+          type: file
+
+        - name: pet
+          local_path: data/base_layers/periodic/pet/
+          source: ""
+          type: file
+
+        - name: dw lulc
+          local_path: data/base_layers/periodic/dw_lulc/
+          source: ""
+          type: file
+
+        - name: runoff
+          local_path: data/base_layers/periodic/runoff/
+          source: ""
+          type: file
+
+        - name: swb
+          local_path: data/base_layers/periodic/swb/
+          source: ""
+          type: file
+
+        - name: drought spei
+          local_path: data/base_layers/periodic/drought_spei/
+          source: ""
+          type: file
+
+        - name: forest resistance and resilience to drought
+          local_path: data/base_layers/periodic/forest_resistance_resilience_drought/
+          source: ""
+          type: file
+
+        - name: extreme rainfall
+          local_path: data/base_layers/periodic/extreme_rainfall/
+          source: ""
+          type: file
+
+        - name: forest resistance and resilience to extreme rainfall
+          local_path: data/base_layers/periodic/forest_resistance_resilience_extreme_rainfall/
+          source: ""
+          type: file
+
+    on_demand_layers:
+        - name: lulc_farm_boundary
+          local_path: data/base_layers/on_demand/lulc_farm_boundary/
+          source: ""
+          type: file
+
+        - name: generate_ponds
+          local_path: data/base_layers/on_demand/ponds/
+          source: ""
+          type: file
+
+        - name: generate_wells
+          local_path: data/base_layers/on_demand/wells/
+          source: ""
+          type: file
+
+        - name: forest additonality
+          aliases:
+              - forest additionality
+          local_path: data/base_layers/on_demand/forest_additionality/
+          source: ""
+          type: file
+
+        - name: fes_clart_layer
+          local_path: data/base_layers/on_demand/fes_clart_layer/
+          source: ""
+          type: file
+
+        - name: generate_clart
+          local_path: data/base_layers/on_demand/clart/
+          source: ""
+          type: file
+
+        - name: generate_ndvi_timeseries
+          local_path: data/base_layers/on_demand/ndvi_timeseries/
+          source: ""
+          type: file
+
+        - name: downscaling et
+          local_path: data/base_layers/on_demand/downscaling_et/
+          source: ""
+          type: file
+
+        - name: forest fire
+          local_path: data/base_layers/on_demand/forest_fire/
+          source: ""
+          type: file
+
+        - name: grassland degradation
+          local_path: data/base_layers/on_demand/grassland_degradation/
+          source: ""
+          type: file
+
+        - name: deforestation on forest fringes core
+          local_path: data/base_layers/on_demand/deforestation_forest_fringes_core/
+          source: ""
+          type: file
+
+        - name: plantation_site_suitability
+          local_path: data/base_layers/on_demand/plantation_site_suitability/
+          source: ""
+          type: file
+
+        - name: temperature and humidity fortnightly timeseries
+          local_path: data/base_layers/on_demand/temperature_humidity_fortnightly/
+          source: ""
+          type: file
+
+        - name: pollution through satellite measured aerosol density
+          local_path: data/base_layers/on_demand/aerosol_density/
+          source: ""
+          type: file
+
+derived_layers:
+    - name: generate_mws_layer
+
+    - name: lulc v3
+      filename: "{district}_{block}_{start_year}-07-01_{end_year}-06-30_LULCmap_10m.tif"
+      local_path: data/lulc/lulc_v3_local/{state}/{district}/{block}/{filename}
+      geoserver_workspace: LULC_v3
+      layer_type: raster
+
+    - name: lulc v4
+
+    - name: generate_ci_layer
+
+    - name: generate_terrain_raster
+
+    - name: generate_terrain_descriptor
+
+    - name: terrain_lulc_slope_cluster
+      aliases:
+          - lulc slope clusters
+      filename: "{district}_{block}_lulc_slope.gpkg"
+      local_path: data/lulc_X_terrain/lulc_slope_clusters_local/{state}/{district}/{block}/{filename}
+      geoserver_workspace: terrain_lulc
+      layer_type: vector
+
+    - name: terrain_lulc_plain_cluster
+      aliases:
+          - lulc plain clusters
+      filename: "{district}_{block}_lulc_plain.gpkg"
+      local_path: data/lulc_X_terrain/lulc_plain_clusters_local/{state}/{district}/{block}/{filename}
+      geoserver_workspace: terrain_lulc
+      layer_type: vector
+
+    - name: generate_terrain_compute_all
+
+    - name: lulc vector
+      filename: lulc_vector_{district}_{block}.gpkg
+      local_path: data/lulc/lulc_vector_local/{state}/{district}/{block}/{filename}
+      geoserver_workspace: lulc_vector
+      layer_type: vector
+
     - name: change detection
       params: [
         Afforestation,
@@ -109,8 +421,8 @@ derived_layers: # layers that are computed
         Urbanization,
         CropIntensity
       ]
-      filename: change_{district}_{tehsil}_{param_name}_{start_year}_{end_year}.tif
-      local_path: data/derived_layers/change_detection/{filename}
+      filename: change_{district}_{block}_{param_name}_{start_year}_{end_year}.tif
+      local_path: data/change_detection/change_detection_local/{state}/{district}/{block}/{filename}
       geoserver_workspace: change_detection
       layer_type: raster
 
@@ -122,14 +434,166 @@ derived_layers: # layers that are computed
         Urbanization,
         CropIntensity
       ]
-      filename: change_vector_{district}_{tehsil}_{param_name}_{start_year}_{end_year}.geojson
-      local_path: data/derived_layers/change_detection/{filename}
+      filename: change_vector_{district}_{block}_{param_name}_{start_year}_{end_year}.gpkg
+      local_path: data/change_detection/change_detection_vector_local/{state}/{district}/{block}/{filename}
       geoserver_workspace: change_detection
       layer_type: vector
 
-    - name: lulc vector
-    
+    - name: aquifer vector
+      local_path: data/layers/aquifer_vector/
+      geoserver_workspace: aquifer_vector
+      layer_type: vector
 
-  
-    
-    
+    - name: generate_swb
+      local_path: data/surface_water_bodies/
+      geoserver_workspace: surface_water_bodies
+      layer_type: vector
+
+    - name: crop_grid
+
+    - name: dem_raster
+      local_path: data/fabdem/fabdem_local/
+      geoserver_workspace: dem
+      layer_type: raster
+
+    - name: dem_vector
+
+    - name: drainage_density_vector
+      local_path: data/drainage_density/
+      geoserver_workspace: drainage_density
+      layer_type: vector
+
+    - name: generate_canal_vector
+      local_path: data/canal/canal_local/
+      geoserver_workspace: canal
+      layer_type: vector
+
+    - name: generate_river_data
+      local_path: data/river/river_local/
+      geoserver_workspace: river
+      layer_type: vector
+
+    - name: run_off_daily_and_fortnightly
+
+    - name: clip_soil_health
+
+    - name: soil_health_vector
+
+    - name: tree_health_raster
+
+    - name: tree_health_vector
+
+    - name: stream_order
+
+    - name: hydrology_fortnightly
+
+    - name: hydrology_annual
+
+    - name: generate_block_layer
+
+    - name: generate_drainage_layer
+      local_path: data/layers/drainage_lines/drainage_lines_local/
+      geoserver_workspace: drainage_lines
+      layer_type: vector
+
+    - name: restoration_opportunity
+      local_path: data/layers/restoration_opportunity/
+      geoserver_workspace: restoration
+      layer_type: raster
+
+    - name: soge_vector
+      local_path: data/layers/SOGE_vector/
+      geoserver_workspace: soge
+      layer_type: vector
+
+    - name: generate_lcw
+      local_path: data/layers/lcw_conflict/
+      geoserver_workspace: lcw
+      layer_type: raster
+
+    - name: generate_agroecological
+      local_path: data/layers/agroecological/
+      geoserver_workspace: agroecological
+      layer_type: vector
+
+    - name: generate_factory_csr
+      local_path: data/layers/factory_csr/
+      geoserver_workspace: factory_csr
+      layer_type: vector
+
+    - name: generate_green_credit
+      local_path: data/layers/green_credit/
+      geoserver_workspace: green_credit
+      layer_type: vector
+
+    - name: generate_mining
+      local_path: data/layers/mining/
+      geoserver_workspace: mining
+      layer_type: vector
+
+    - name: generate_natural_depression
+      local_path: data/layers/natural_depression/
+      geoserver_workspace: natural_depression
+      layer_type: raster
+
+    - name: generate_distance_nearest_DL
+      local_path: data/layers/distance_nearest_upstream_DL/
+      geoserver_workspace: distance_nearest_upstream_DL
+      layer_type: raster
+
+    - name: generate_catchment_area_singleflow
+      local_path: data/layers/catchment_area_singleflow/
+      geoserver_workspace: catchment_area_singleflow
+      layer_type: raster
+
+    - name: generate_slope_percentage
+      local_path: data/layers/slope_percentage/
+      geoserver_workspace: slope_percentage
+      layer_type: raster
+
+    - name: generate_mws_connectivity_data
+      local_path: data/layers/mws_connectivity/mws_connectivity_local/
+      geoserver_workspace: mws_connectivity
+      layer_type: vector
+
+    - name: generate_mws_centroid
+      local_path: data/layers/mws_centroid/
+      geoserver_workspace: mws_centroid
+      layer_type: vector
+
+    - name: generate_facilities_proximity
+      local_path: data/layers/facilities/
+      geoserver_workspace: facilities
+      layer_type: vector
+
+    - name: generate_nrega_layer
+      local_path: data/layers/nrega_assets/
+      geoserver_workspace: nrega_assets
+      layer_type: vector
+
+    - name: merge_swb_ponds
+
+    - name: generate_drought_layer
+
+    - name: mws_drought_causality
+
+    - name: clip_drought_spei
+
+    - name: forest resistance and resilience to drought
+
+    - name: extreme rainfall
+
+    - name: forest resistance and resilience to extreme rainfall
+
+    - name: drought sensitivity
+
+    - name: grassland health
+
+    - name: generate_zoi_data
+
+    - name: generate_antyodaya
+      local_path: data/antyodaya/output/antyodaya_local/
+      geoserver_workspace: antyodaya
+      layer_type: vector
+
+    - name: plantation_site_suitability
