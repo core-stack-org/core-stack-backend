@@ -2,8 +2,10 @@ import logging
 import subprocess
 from functools import wraps
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
+import yaml
 
 from computing.config_loader import (
     ADMIN_BOUNDARY_INPUT_DIR,
@@ -28,12 +30,9 @@ from computing.config_loader import (
 from computing.config_loader import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR as TEHSIL_WATERSHEDS_DIR,
 )
-from computing.terrain_descriptor.store_watersheds_for_tehsils import (
-    generate_tehsil_watershed_copies,
-)
-from utilities.constants import GEOSERVER_BASE
-
 logger = logging.getLogger(__name__)
+
+CONFIG_NEW_PATH = Path(__file__).resolve().parent / "config_new.yaml"
 
 _SOI_WFS_PARAMS = {
     "service": "WFS",
@@ -48,6 +47,154 @@ def _is_dir_populated(path: Path) -> bool:
     return path.is_dir() and any(path.iterdir())
 
 
+def _layer_key(name: str) -> str:
+    return name.strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def _load_new_config() -> dict:
+    with open(CONFIG_NEW_PATH) as f:
+        return yaml.safe_load(f) or {}
+
+
+def _format_periodic_value(template: str, year: int) -> str:
+    return template.replace("{year+1}", str(year + 1)).replace("{year}", str(year))
+
+
+def _expand_periodic_layer(layer: dict) -> list[dict]:
+    if layer.get("periodicity") != "annual":
+        raise ValueError(
+            f"Unsupported periodicity for base layer '{layer.get('name')}': "
+            f"{layer.get('periodicity')}"
+        )
+
+    expanded_layers = []
+    for year in range(int(layer["start_year"]), int(layer["end_year"]) + 1):
+        filename = _format_periodic_value(layer["filename"], year)
+        expanded = dict(layer)
+        expanded["year"] = year
+        expanded["filename"] = filename
+        expanded["local_path"] = _format_periodic_value(
+            layer["local_path"].replace("{filename}", filename), year
+        )
+        expanded["source"] = _format_periodic_value(
+            layer["source"].replace("{filename}", filename), year
+        )
+        expanded_layers.append(expanded)
+
+    return expanded_layers
+
+
+def _manifest_layer_groups() -> dict[str, list[dict]]:
+    base_layers = _load_new_config().get("base_layers", {})
+    groups = {
+        "static_layers": list(base_layers.get("static_layers", [])),
+        "on_demand_layers": list(base_layers.get("on_demand_layers", [])),
+        "periodic_layers": [],
+    }
+
+    for layer in base_layers.get("periodic_layers", []):
+        groups["periodic_layers"].extend(_expand_periodic_layer(layer))
+
+    return groups
+
+
+def _manifest_layer_index() -> dict[str, list[dict]]:
+    index = {}
+    for group_name, layers in _manifest_layer_groups().items():
+        index.setdefault(group_name, []).extend(layers)
+        for layer in layers:
+            index.setdefault(_layer_key(layer["name"]), []).append(layer)
+
+    all_layers = []
+    for layers in index.values():
+        all_layers.extend(layers)
+    index["all"] = list({id(layer): layer for layer in all_layers}.values())
+    return index
+
+
+def _download_s3_file(source: str, destination: Path):
+    parsed = urlparse(source)
+    if parsed.scheme != "s3" or not parsed.netloc or not parsed.path:
+        raise ValueError(f"Invalid S3 source: {source}")
+
+    try:
+        import boto3
+    except ImportError as exc:
+        raise RuntimeError("boto3 is required to download base layers from S3") from exc
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_destination = destination.with_suffix(destination.suffix + ".part")
+
+    logger.info("Downloading %s to %s", source, destination)
+    try:
+        boto3.client("s3").download_file(
+            parsed.netloc,
+            parsed.path.lstrip("/"),
+            str(temp_destination),
+        )
+        temp_destination.replace(destination)
+    except Exception:
+        if temp_destination.exists():
+            temp_destination.unlink()
+        raise
+
+
+def ensure_manifest_base_layers(*layers):
+    """
+    Downloads base layers declared in config_new.yaml.
+
+    Accepted selectors:
+    - concrete layer names: terrain, mws, lulc_v3, slope_percentage
+    - group names: static_layers, periodic_layers, on_demand_layers
+    - all
+    """
+    selected_layers = layers or ("static_layers", "periodic_layers")
+    index = _manifest_layer_index()
+
+    for selected_layer in selected_layers:
+        layer_key = _layer_key(selected_layer)
+        layer_specs = index.get(layer_key)
+        if layer_specs is None:
+            available_layers = ", ".join(sorted(index))
+            raise ValueError(
+                f"Unknown manifest base layer '{selected_layer}'. "
+                f"Available layers/groups: {available_layers}"
+            )
+
+        for layer in layer_specs:
+            if layer.get("type") != "file":
+                raise ValueError(
+                    f"Unsupported base layer type for '{layer.get('name')}': "
+                    f"{layer.get('type')}"
+                )
+
+            local_path = PROJECT_ROOT / layer["local_path"]
+            if local_path.exists():
+                logger.info(
+                    "Base layer %s already exists at %s, skipping.",
+                    layer["name"],
+                    local_path,
+                )
+                continue
+
+            source = layer.get("source")
+            if not source:
+                logger.warning(
+                    "Base layer %s has no source in %s; create %s manually.",
+                    layer["name"],
+                    CONFIG_NEW_PATH,
+                    local_path,
+                )
+                continue
+
+            if source.startswith("s3://"):
+                _download_s3_file(source, local_path)
+            else:
+                raise ValueError(
+                    f"Unsupported source for base layer '{layer['name']}': {source}"
+                )
+
+
 def ensure_soi_tehsil():
     """
     Downloads the SOI tehsil GeoJSON from GeoServer if not already present.
@@ -59,6 +206,8 @@ def ensure_soi_tehsil():
         return
 
     SOI_TEHSIL_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    from utilities.constants import GEOSERVER_BASE
 
     wfs_url = f"{GEOSERVER_BASE}pan_india_asset/ows"
     logger.info("Downloading SOI tehsil layer from GeoServer...")
@@ -226,6 +375,10 @@ def ensure_tehsil_watersheds():
     TEHSIL_WATERSHEDS_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Generating tehsil watershed files (this may take a while)...")
 
+    from computing.terrain_descriptor.store_watersheds_for_tehsils import (
+        generate_tehsil_watershed_copies,
+    )
+
     generate_tehsil_watershed_copies(
         microwatershed_path=str(MICROWATERSHED_PATH),
         tehsil_path=str(SOI_TEHSIL_PATH),
@@ -255,24 +408,30 @@ _BASE_LAYER_ENSURERS = {
 }
 
 DEFAULT_BASE_LAYERS = (
-    "soi_tehsil",
-    "admin_boundary",
-    "village_boundaries",
+    "static_layers",
+    "periodic_layers",
 )
 
 
 def setup_base_layers(*layers):
     selected_layers = layers or DEFAULT_BASE_LAYERS
-    for layer in selected_layers:
-        try:
-            ensure_layer = _BASE_LAYER_ENSURERS[layer]
-        except KeyError as exc:
-            available_layers = ", ".join(sorted(_BASE_LAYER_ENSURERS))
-            raise ValueError(
-                f"Unknown base layer '{layer}'. Available layers: {available_layers}"
-            ) from exc
+    manifest_index = _manifest_layer_index()
 
-        ensure_layer()
+    for layer in selected_layers:
+        if layer in _BASE_LAYER_ENSURERS:
+            _BASE_LAYER_ENSURERS[layer]()
+            continue
+
+        if _layer_key(layer) in manifest_index:
+            ensure_manifest_base_layers(layer)
+            continue
+
+        legacy_layers = ", ".join(sorted(_BASE_LAYER_ENSURERS))
+        manifest_layers = ", ".join(sorted(manifest_index))
+        raise ValueError(
+            f"Unknown base layer '{layer}'. Legacy layers: {legacy_layers}. "
+            f"Manifest layers/groups: {manifest_layers}"
+        )
 
 
 def with_base_layers(*layers):
@@ -285,3 +444,6 @@ def with_base_layers(*layers):
         return wrapper
 
     return decorator
+
+
+download_base_layers = with_base_layers

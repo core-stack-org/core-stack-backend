@@ -127,6 +127,9 @@ derived_layers: # layers that are computed
       geoserver_workspace: change_detection
       layer_type: vector
 
+    - name: lulc vector
+    
+
   
     
     
