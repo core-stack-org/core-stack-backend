@@ -61,6 +61,9 @@ def _format_periodic_value(template: str, year: int) -> str:
 
 
 def _expand_periodic_layer(layer: dict) -> list[dict]:
+    if not layer.get("periodicity"):
+        return [layer]
+
     if layer.get("periodicity") != "annual":
         raise ValueError(
             f"Unsupported periodicity for base layer '{layer.get('name')}': "
@@ -104,6 +107,8 @@ def _manifest_layer_index() -> dict[str, list[dict]]:
         index.setdefault(group_name, []).extend(layers)
         for layer in layers:
             index.setdefault(_layer_key(layer["name"]), []).append(layer)
+            for alias in layer.get("aliases", []):
+                index.setdefault(_layer_key(alias), []).append(layer)
 
     all_layers = []
     for layers in index.values():
@@ -162,6 +167,16 @@ def ensure_manifest_base_layers(*layers):
             )
 
         for layer in layer_specs:
+            source = layer.get("source")
+            if not source:
+                logger.warning(
+                    "Base layer %s has no source in %s; create it manually at %s.",
+                    layer["name"],
+                    CONFIG_NEW_PATH,
+                    PROJECT_ROOT / layer["local_path"],
+                )
+                continue
+
             if layer.get("type") != "file":
                 raise ValueError(
                     f"Unsupported base layer type for '{layer.get('name')}': "
@@ -173,16 +188,6 @@ def ensure_manifest_base_layers(*layers):
                 logger.info(
                     "Base layer %s already exists at %s, skipping.",
                     layer["name"],
-                    local_path,
-                )
-                continue
-
-            source = layer.get("source")
-            if not source:
-                logger.warning(
-                    "Base layer %s has no source in %s; create %s manually.",
-                    layer["name"],
-                    CONFIG_NEW_PATH,
                     local_path,
                 )
                 continue
