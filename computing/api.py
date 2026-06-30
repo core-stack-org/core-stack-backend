@@ -810,6 +810,10 @@ def generate_terrain_compute_all(request):
         state = request.data.get("state")
         district = request.data.get("district")
         block = request.data.get("block")
+        if block is None or str(block).strip().lower() in {"", "null", "none"}:
+            raise ValueError(
+                "block is null. Please provide a block value for terrain compute-all."
+            )
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
@@ -821,6 +825,9 @@ def generate_terrain_compute_all(request):
             {"Success": "generate_terrain_compute_all task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in generate_terrain_compute_all api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_terrain_compute_all api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
