@@ -1,30 +1,20 @@
-"""Facilities proximity tehsil export from the local pan-India GeoPackage.
-
-The source GeoPackage already stores village points, L3 nearest-facility rows,
-YAML-derived class maps, and a nearest-facility lookup. This module extracts a
-state/district/TEHSIL slice into a local multi-layer GeoPackage, publishes one
-primary layer to GeoServer when requested, and registers that layer in the DB.
-
-"""
+"""Facilities proximity tehsil export from the local pan-India GeoPackage."""
 
 from __future__ import annotations
 
 import re
 import sqlite3
-import struct
 import time
+import zipfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from django.conf import settings
+from django.db import DatabaseError
 
 from computing.models import Dataset, LayerType
-from computing.utils import (
-    push_shape_to_geoserver,
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from nrm_app.celery import app
 from utilities.constants import (
     FACILITIES_DATASET_NAME,
@@ -34,22 +24,56 @@ from utilities.constants import (
 from utilities.geoserver_utils import Geoserver, GeoserverException
 
 
-SOURCE_LAYER = "village_points"
-L3_TABLE = "proximity_l3"
-CLASS_MAP_TABLE = "proximity_class_map"
-NEAREST_FACILITY_TABLE = "proximity_nearest_facilities"
+CONFIG_PATH = "utilities/scripts/facilities_utils/config/facilities_master.yaml"
+DEFAULT_TABLES = {
+    "village_shapes": "village_shapes",
+    "l3": "proximity_l3",
+    "class_map": "proximity_class_map",
+    "nearest_facilities": "proximity_nearest_facilities",
+}
 OUTPUT_DIR = "data/facilities/outputs/tehsil_data"
 LAYER_PREFIX = "facilities"
-ALGORITHM = "local-pan-india-facilities-proximity"
+ALGORITHM = "facilities-proximity"
 ALGORITHM_VERSION = "2026-07-01"
-SUPPORTED_LEVELS = ("l3", "l2", "l1")
-DEFAULT_LEVELS = ("l3",)
-LOCATION_INDEX = "idx_facilities_village_location"
+EXPORT_LEVELS = ("l3", "l2", "l1")
+PRIMARY_LEVEL = "l3"
 
 
 def _repo_path(path: str | Path) -> Path:
     path = Path(path)
     return path if path.is_absolute() else Path(settings.BASE_DIR) / path
+
+
+@lru_cache(maxsize=1)
+def _facilities_config() -> dict[str, Any]:
+    try:
+        import yaml
+    except ImportError:
+        return {}
+
+    path = _repo_path(CONFIG_PATH)
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as stream:
+        return yaml.safe_load(stream) or {}
+
+
+def _configured_output(key: str, default: str) -> str:
+    return str((_facilities_config().get("outputs") or {}).get(key) or default)
+
+
+@lru_cache(maxsize=1)
+def _tables() -> dict[str, str]:
+    configured = ((_facilities_config().get("proximity") or {}).get("tables") or {})
+    return {**DEFAULT_TABLES, **{key: str(value) for key, value in configured.items()}}
+
+
+def _table(key: str) -> str:
+    return _tables()[key]
+
+
+def _source_path() -> Path:
+    return _repo_path(_configured_output("proximity_gpkg", FACILITIES_PROXIMITY_GPKG))
 
 
 def _slug(value: Any) -> str:
@@ -74,77 +98,55 @@ def _quote_ident(value: str) -> str:
     return '"' + str(value).replace('"', '""') + '"'
 
 
-def _layer_name(district: str, block: str, primary_level: str = "l3") -> str:
-    suffix = "" if primary_level == "l3" else f"_{primary_level}"
-    return f"{LAYER_PREFIX}_{_slug(district)}_{_slug(block)}{suffix}"
+def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
+    return (
+        connection.execute(
+            "select 1 from sqlite_master where type in ('table', 'view') and name = ?",
+            (table_name,),
+        ).fetchone()
+        is not None
+    )
+
+
+def _village_layer(connection: sqlite3.Connection) -> str:
+    layer = _table("village_shapes")
+    if not _table_exists(connection, layer):
+        raise RuntimeError(
+            f"Facilities proximity source must contain {layer!r}. "
+            "Rebuild data/facilities/outputs/village_facility_proximity.gpkg with the current facilities pipeline."
+        )
+    return layer
+
+
+def _geometry_type(connection: sqlite3.Connection, layer: str) -> str:
+    row = connection.execute(
+        """
+        select geometry_type_name
+        from gpkg_geometry_columns
+        where table_name = ? and column_name = 'geom'
+        """,
+        (layer,),
+    ).fetchone()
+    return row[0] if row and row[0] else "POINT"
+
+
+def _layer_name(district: str, block: str) -> str:
+    return f"{LAYER_PREFIX}_{_slug(district)}_{_slug(block)}"
 
 
 def _output_dir(state: str, district: str, block: str) -> Path:
     return _repo_path(OUTPUT_DIR) / _slug(state) / _slug(district) / _slug(block)
 
 
-def _normalise_levels(levels: str | Iterable[str] | None) -> tuple[str, ...]:
-    if levels is None:
-        return DEFAULT_LEVELS
-    if isinstance(levels, str):
-        raw = [part.strip().lower() for part in levels.split(",")]
-    else:
-        raw = [str(part).strip().lower() for part in levels]
-    if "all" in raw:
-        return SUPPORTED_LEVELS
-    selected = tuple(dict.fromkeys(part for part in raw if part in SUPPORTED_LEVELS))
-    if not selected:
-        raise ValueError(f"No supported facilities levels requested: {levels}")
-    return selected
-
-
-def _primary_level(levels: tuple[str, ...], requested: str | None) -> str:
-    primary = (requested or levels[0]).strip().lower()
-    if primary not in levels:
-        raise ValueError(f"Primary level {primary!r} must be included in requested levels: {levels}")
-    return primary
-
-
-def _ensure_source_indexes(source_path: Path) -> None:
-    try:
-        with sqlite3.connect(source_path, timeout=300) as connection:
-            connection.execute("PRAGMA busy_timeout = 300000")
-            connection.execute(
-                f"""
-                CREATE INDEX IF NOT EXISTS {LOCATION_INDEX}
-                ON {SOURCE_LAYER} (state_name, district_name, TEHSIL)
-                """
-            )
-            connection.execute(
-                f"""
-                CREATE INDEX IF NOT EXISTS idx_facilities_l3_village_class
-                ON {L3_TABLE} (cs_feature_id, class_l3_facility_class)
-                """
-            )
-            connection.execute(
-                f"""
-                CREATE INDEX IF NOT EXISTS idx_facilities_nearest_uid
-                ON {NEAREST_FACILITY_TABLE} (facility_uid)
-                """
-            )
-            connection.commit()
-    except sqlite3.OperationalError as exc:
-        message = str(exc).lower()
-        if "readonly" in message or "attempt to write" in message:
-            return
-        raise
-
-
 @lru_cache(maxsize=1)
 def _location_rows() -> tuple[tuple[str, str, str], ...]:
-    source_path = _repo_path(FACILITIES_PROXIMITY_GPKG)
-    _ensure_source_indexes(source_path)
-    with sqlite3.connect(source_path) as connection:
+    with sqlite3.connect(_source_path()) as connection:
+        layer = _village_layer(connection)
         rows = connection.execute(
             f"""
-            SELECT DISTINCT state_name, district_name, TEHSIL
-            FROM {SOURCE_LAYER}
-            ORDER BY state_name, district_name, TEHSIL
+            select distinct state_name, district_name, TEHSIL
+            from {_quote_ident(layer)}
+            order by state_name, district_name, TEHSIL
             """
         ).fetchall()
     return tuple((row[0], row[1], row[2]) for row in rows)
@@ -156,7 +158,9 @@ def _resolve_location(state: str, district: str, block: str) -> tuple[str, str, 
     if not state_matches:
         raise ValueError(f"State not found in facilities asset: {state}")
 
-    district_matches = [row for row in state_matches if _match_key(row[1]) == district_key]
+    district_matches = [
+        row for row in state_matches if _match_key(row[1]) == district_key
+    ]
     if not district_matches:
         available = sorted({row[1] for row in state_matches})[:20]
         raise ValueError(
@@ -172,17 +176,6 @@ def _resolve_location(state: str, district: str, block: str) -> tuple[str, str, 
             f"Available examples: {available}"
         )
     return block_matches[0]
-
-
-def _gpkg_point_blob(longitude: float | None, latitude: float | None) -> bytes | None:
-    if longitude is None or latitude is None:
-        return None
-    return (
-        b"GP"
-        + bytes([0, 1])
-        + struct.pack("<I", 4326)
-        + struct.pack("<BI2d", 1, 1, float(longitude), float(latitude))
-    )
 
 
 def _create_gpkg_core(connection: sqlite3.Connection) -> None:
@@ -259,12 +252,17 @@ def _create_gpkg_core(connection: sqlite3.Connection) -> None:
     )
 
 
-def _register_feature_layer(connection: sqlite3.Connection, layer: str, bounds: dict[str, float | None]) -> None:
+def _register_feature_layer(
+    connection: sqlite3.Connection,
+    layer: str,
+    bounds: dict[str, float | None],
+    geometry_type: str,
+) -> None:
     connection.execute(
         """
-        INSERT OR REPLACE INTO gpkg_contents
+        insert or replace into gpkg_contents
         (table_name, data_type, identifier, description, last_change, min_x, min_y, max_x, max_y, srs_id)
-        VALUES (?, 'features', ?, '', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?, ?, ?, 4326)
+        values (?, 'features', ?, '', strftime('%Y-%m-%dT%H:%M:%fZ','now'), ?, ?, ?, ?, 4326)
         """,
         (
             layer,
@@ -277,63 +275,99 @@ def _register_feature_layer(connection: sqlite3.Connection, layer: str, bounds: 
     )
     connection.execute(
         """
-        INSERT OR REPLACE INTO gpkg_geometry_columns
+        insert or replace into gpkg_geometry_columns
         (table_name, column_name, geometry_type_name, srs_id, z, m)
-        VALUES (?, 'geom', 'POINT', 4326, 0, 0)
+        values (?, 'geom', ?, 4326, 0, 0)
         """,
-        (layer,),
+        (layer, geometry_type),
     )
 
 
-def _create_feature_table(connection: sqlite3.Connection, layer: str, columns: list[tuple[str, str]]) -> None:
-    fields = ["fid INTEGER PRIMARY KEY AUTOINCREMENT", "geom POINT"]
+def _create_feature_table(
+    connection: sqlite3.Connection,
+    layer: str,
+    columns: list[tuple[str, str]],
+    geometry_type: str,
+) -> None:
+    fields = ["fid INTEGER PRIMARY KEY AUTOINCREMENT", f"geom {geometry_type}"]
     fields.extend(f"{_quote_ident(name)} {sql_type}" for name, sql_type in columns)
-    connection.execute(f"CREATE TABLE {_quote_ident(layer)} ({', '.join(fields)})")
+    connection.execute(f"create table {_quote_ident(layer)} ({', '.join(fields)})")
 
 
-def _insert_rows(connection: sqlite3.Connection, layer: str, columns: list[str], rows: list[tuple[Any, ...]]) -> None:
+def _insert_rows(
+    connection: sqlite3.Connection,
+    layer: str,
+    columns: list[str],
+    rows: list[tuple[Any, ...]],
+) -> None:
     if not rows:
         return
     placeholders = ", ".join("?" for _ in ["geom", *columns])
     column_sql = ", ".join(_quote_ident(column) for column in ["geom", *columns])
     connection.executemany(
-        f"INSERT INTO {_quote_ident(layer)} ({column_sql}) VALUES ({placeholders})",
+        f"insert into {_quote_ident(layer)} ({column_sql}) values ({placeholders})",
         rows,
     )
 
 
-def _layer_bounds(source_connection: sqlite3.Connection, state: str, district: str, tehsil: str) -> dict[str, float | None]:
-    row = source_connection.execute(
+def _selected_village_sql(village_layer: str) -> str:
+    return f"""
+        select geom, cs_feature_id, state_name, district_name, TEHSIL,
+               pc11_village_id, NAME, _village_latitude, _village_longitude
+        from {_quote_ident(village_layer)}
+        where state_name = ? and district_name = ? and TEHSIL = ?
+    """
+
+
+def _selected_village_count(
+    connection: sqlite3.Connection,
+    village_layer: str,
+    state: str,
+    district: str,
+    tehsil: str,
+) -> int:
+    row = connection.execute(
         f"""
-        SELECT
+        select count(*)
+        from {_quote_ident(village_layer)}
+        where state_name = ? and district_name = ? and TEHSIL = ?
+        """,
+        (state, district, tehsil),
+    ).fetchone()
+    return int(row[0] or 0)
+
+
+def _layer_bounds(
+    connection: sqlite3.Connection,
+    village_layer: str,
+    state: str,
+    district: str,
+    tehsil: str,
+) -> dict[str, float | None]:
+    row = connection.execute(
+        f"""
+        select
             min(_village_longitude), min(_village_latitude),
             max(_village_longitude), max(_village_latitude)
-        FROM {SOURCE_LAYER}
-        WHERE state_name = ? AND district_name = ? AND TEHSIL = ?
+        from {_quote_ident(village_layer)}
+        where state_name = ? and district_name = ? and TEHSIL = ?
         """,
         (state, district, tehsil),
     ).fetchone()
     return {"min_x": row[0], "min_y": row[1], "max_x": row[2], "max_y": row[3]}
 
 
-def _selected_village_sql() -> str:
-    return f"""
-        SELECT geom, cs_feature_id, state_name, district_name, TEHSIL,
-               pc11_village_id, NAME, _village_latitude, _village_longitude
-        FROM {SOURCE_LAYER}
-        WHERE state_name = ? AND district_name = ? AND TEHSIL = ?
-    """
-
-
-def _query_villages(connection: sqlite3.Connection, state: str, district: str, tehsil: str) -> list[tuple[Any, ...]]:
-    return connection.execute(_selected_village_sql(), (state, district, tehsil)).fetchall()
-
-
-def _query_l3(connection: sqlite3.Connection, state: str, district: str, tehsil: str) -> list[tuple[Any, ...]]:
+def _query_l3(
+    connection: sqlite3.Connection,
+    village_layer: str,
+    state: str,
+    district: str,
+    tehsil: str,
+) -> list[tuple[Any, ...]]:
     return connection.execute(
         f"""
-        WITH selected_villages AS ({_selected_village_sql()})
-        SELECT
+        with selected_villages as ({_selected_village_sql(village_layer)})
+        select
             v.geom,
             v.cs_feature_id,
             v.state_name,
@@ -341,33 +375,39 @@ def _query_l3(connection: sqlite3.Connection, state: str, district: str, tehsil:
             v.TEHSIL,
             v.pc11_village_id,
             v.NAME,
+            coalesce(nf.facility_name, p.nearest_facility_uid) as title,
             m.class_l1_domain,
             m.class_l2_filter_group,
-            m.filter_logic,
             p.class_l3_facility_class,
             p.nearest_distance_km,
             p.nearest_facility_uid,
-            nf.facility_name AS nearest_facility_name,
-            nf.facility_code AS nearest_facility_code,
-            nf.latitude AS nearest_facility_latitude,
-            nf.longitude AS nearest_facility_longitude,
-            nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype
-        FROM selected_villages v
-        JOIN {L3_TABLE} p ON p.cs_feature_id = v.cs_feature_id
-        LEFT JOIN {CLASS_MAP_TABLE} m ON m.class_l3_facility_class = p.class_l3_facility_class
-        LEFT JOIN {NEAREST_FACILITY_TABLE} nf ON nf.facility_uid = p.nearest_facility_uid
-        ORDER BY v.cs_feature_id, p.class_l3_facility_class
+            nf.facility_name as nearest_facility_name,
+            nf.facility_code as nearest_facility_code,
+            nf.latitude as nearest_facility_latitude,
+            nf.longitude as nearest_facility_longitude,
+            nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype
+        from selected_villages v
+        join {_quote_ident(_table("l3"))} p on p.cs_feature_id = v.cs_feature_id
+        left join {_quote_ident(_table("class_map"))} m on m.class_l3_facility_class = p.class_l3_facility_class
+        left join {_quote_ident(_table("nearest_facilities"))} nf on nf.facility_uid = p.nearest_facility_uid
+        order by v.cs_feature_id, p.class_l3_facility_class
         """,
         (state, district, tehsil),
     ).fetchall()
 
 
-def _query_l2(connection: sqlite3.Connection, state: str, district: str, tehsil: str) -> list[tuple[Any, ...]]:
+def _query_l2(
+    connection: sqlite3.Connection,
+    village_layer: str,
+    state: str,
+    district: str,
+    tehsil: str,
+) -> list[tuple[Any, ...]]:
     return connection.execute(
         f"""
-        WITH selected_villages AS ({_selected_village_sql()}),
-        ranked AS (
-            SELECT
+        with selected_villages as ({_selected_village_sql(village_layer)}),
+        ranked as (
+            select
                 v.geom,
                 v.cs_feature_id,
                 v.state_name,
@@ -375,38 +415,39 @@ def _query_l2(connection: sqlite3.Connection, state: str, district: str, tehsil:
                 v.TEHSIL,
                 v.pc11_village_id,
                 v.NAME,
+                coalesce(nf.facility_name, p.nearest_facility_uid) as title,
                 m.class_l1_domain,
                 m.class_l2_filter_group,
                 m.filter_logic,
-                CASE
-                    WHEN m.filter_logic = 'max'
-                        THEN max(p.nearest_distance_km) OVER (
-                            PARTITION BY v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
+                case
+                    when m.filter_logic = 'max'
+                        then max(p.nearest_distance_km) over (
+                            partition by v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
                         )
-                    ELSE min(p.nearest_distance_km) OVER (
-                        PARTITION BY v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
+                    else min(p.nearest_distance_km) over (
+                        partition by v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
                     )
-                END AS logic_distance_km,
-                p.class_l3_facility_class AS selected_component_class,
+                end as logic_distance_km,
+                p.class_l3_facility_class as selected_component_class,
                 p.nearest_facility_uid,
-                nf.facility_name AS nearest_facility_name,
-                nf.facility_code AS nearest_facility_code,
-                nf.latitude AS nearest_facility_latitude,
-                nf.longitude AS nearest_facility_longitude,
-                nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype,
-                row_number() OVER (
-                    PARTITION BY v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
-                    ORDER BY
-                        CASE WHEN m.filter_logic = 'max' THEN p.nearest_distance_km END DESC,
-                        CASE WHEN coalesce(m.filter_logic, 'min') != 'max' THEN p.nearest_distance_km END ASC,
+                nf.facility_name as nearest_facility_name,
+                nf.facility_code as nearest_facility_code,
+                nf.latitude as nearest_facility_latitude,
+                nf.longitude as nearest_facility_longitude,
+                nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype,
+                row_number() over (
+                    partition by v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
+                    order by
+                        case when m.filter_logic = 'max' then p.nearest_distance_km end desc,
+                        case when coalesce(m.filter_logic, 'min') != 'max' then p.nearest_distance_km end asc,
                         p.class_l3_facility_class
-                ) AS rn
-            FROM selected_villages v
-            JOIN {L3_TABLE} p ON p.cs_feature_id = v.cs_feature_id
-            JOIN {CLASS_MAP_TABLE} m ON m.class_l3_facility_class = p.class_l3_facility_class
-            LEFT JOIN {NEAREST_FACILITY_TABLE} nf ON nf.facility_uid = p.nearest_facility_uid
+                ) as rn
+            from selected_villages v
+            join {_quote_ident(_table("l3"))} p on p.cs_feature_id = v.cs_feature_id
+            join {_quote_ident(_table("class_map"))} m on m.class_l3_facility_class = p.class_l3_facility_class
+            left join {_quote_ident(_table("nearest_facilities"))} nf on nf.facility_uid = p.nearest_facility_uid
         )
-        SELECT
+        select
             geom,
             cs_feature_id,
             state_name,
@@ -414,9 +455,9 @@ def _query_l2(connection: sqlite3.Connection, state: str, district: str, tehsil:
             TEHSIL,
             pc11_village_id,
             NAME,
+            title,
             class_l1_domain,
             class_l2_filter_group,
-            filter_logic,
             logic_distance_km,
             selected_component_class,
             nearest_facility_uid,
@@ -425,20 +466,26 @@ def _query_l2(connection: sqlite3.Connection, state: str, district: str, tehsil:
             nearest_facility_latitude,
             nearest_facility_longitude,
             nearest_class_l4_facility_subtype
-        FROM ranked
-        WHERE rn = 1
-        ORDER BY cs_feature_id, class_l1_domain, class_l2_filter_group
+        from ranked
+        where rn = 1
+        order by cs_feature_id, class_l1_domain, class_l2_filter_group
         """,
         (state, district, tehsil),
     ).fetchall()
 
 
-def _query_l1(connection: sqlite3.Connection, state: str, district: str, tehsil: str) -> list[tuple[Any, ...]]:
+def _query_l1(
+    connection: sqlite3.Connection,
+    village_layer: str,
+    state: str,
+    district: str,
+    tehsil: str,
+) -> list[tuple[Any, ...]]:
     return connection.execute(
         f"""
-        WITH selected_villages AS ({_selected_village_sql()}),
-        ranked AS (
-            SELECT
+        with selected_villages as ({_selected_village_sql(village_layer)}),
+        ranked as (
+            select
                 v.geom,
                 v.cs_feature_id,
                 v.state_name,
@@ -446,26 +493,27 @@ def _query_l1(connection: sqlite3.Connection, state: str, district: str, tehsil:
                 v.TEHSIL,
                 v.pc11_village_id,
                 v.NAME,
+                coalesce(nf.facility_name, p.nearest_facility_uid) as title,
                 m.class_l1_domain,
-                p.nearest_distance_km AS closest_domain_distance_km,
-                m.class_l2_filter_group AS selected_filter_group,
-                p.class_l3_facility_class AS selected_component_class,
+                p.nearest_distance_km as closest_domain_distance_km,
+                m.class_l2_filter_group as selected_filter_group,
+                p.class_l3_facility_class as selected_component_class,
                 p.nearest_facility_uid,
-                nf.facility_name AS nearest_facility_name,
-                nf.facility_code AS nearest_facility_code,
-                nf.latitude AS nearest_facility_latitude,
-                nf.longitude AS nearest_facility_longitude,
-                nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype,
-                row_number() OVER (
-                    PARTITION BY v.cs_feature_id, m.class_l1_domain
-                    ORDER BY p.nearest_distance_km ASC, p.class_l3_facility_class
-                ) AS rn
-            FROM selected_villages v
-            JOIN {L3_TABLE} p ON p.cs_feature_id = v.cs_feature_id
-            JOIN {CLASS_MAP_TABLE} m ON m.class_l3_facility_class = p.class_l3_facility_class
-            LEFT JOIN {NEAREST_FACILITY_TABLE} nf ON nf.facility_uid = p.nearest_facility_uid
+                nf.facility_name as nearest_facility_name,
+                nf.facility_code as nearest_facility_code,
+                nf.latitude as nearest_facility_latitude,
+                nf.longitude as nearest_facility_longitude,
+                nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype,
+                row_number() over (
+                    partition by v.cs_feature_id, m.class_l1_domain
+                    order by p.nearest_distance_km asc, p.class_l3_facility_class
+                ) as rn
+            from selected_villages v
+            join {_quote_ident(_table("l3"))} p on p.cs_feature_id = v.cs_feature_id
+            join {_quote_ident(_table("class_map"))} m on m.class_l3_facility_class = p.class_l3_facility_class
+            left join {_quote_ident(_table("nearest_facilities"))} nf on nf.facility_uid = p.nearest_facility_uid
         )
-        SELECT
+        select
             geom,
             cs_feature_id,
             state_name,
@@ -473,6 +521,7 @@ def _query_l1(connection: sqlite3.Connection, state: str, district: str, tehsil:
             TEHSIL,
             pc11_village_id,
             NAME,
+            title,
             class_l1_domain,
             closest_domain_distance_km,
             selected_filter_group,
@@ -483,61 +532,76 @@ def _query_l1(connection: sqlite3.Connection, state: str, district: str, tehsil:
             nearest_facility_latitude,
             nearest_facility_longitude,
             nearest_class_l4_facility_subtype
-        FROM ranked
-        WHERE rn = 1
-        ORDER BY cs_feature_id, class_l1_domain
+        from ranked
+        where rn = 1
+        order by cs_feature_id, class_l1_domain
         """,
         (state, district, tehsil),
     ).fetchall()
 
 
-def _query_level(connection: sqlite3.Connection, level: str, state: str, district: str, tehsil: str) -> list[tuple[Any, ...]]:
+def _query_level(
+    connection: sqlite3.Connection,
+    level: str,
+    village_layer: str,
+    state: str,
+    district: str,
+    tehsil: str,
+) -> list[tuple[Any, ...]]:
     if level == "l3":
-        return _query_l3(connection, state, district, tehsil)
+        return _query_l3(connection, village_layer, state, district, tehsil)
     if level == "l2":
-        return _query_l2(connection, state, district, tehsil)
-    return _query_l1(connection, state, district, tehsil)
+        return _query_l2(connection, village_layer, state, district, tehsil)
+    return _query_l1(connection, village_layer, state, district, tehsil)
 
 
-def _nearest_facility_rows(level_rows: dict[str, list[tuple[Any, ...]]], primary_level: str) -> list[tuple[Any, ...]]:
-    selected = level_rows.get(primary_level) or []
+def _nearest_facility_rows(
+    level_rows: dict[str, list[tuple[Any, ...]]],
+) -> list[tuple[Any, ...]]:
+    selected = level_rows.get(PRIMARY_LEVEL) or []
     seen = set()
     rows = []
-    uid_index = {"l3": 12, "l2": 12, "l1": 11}[primary_level]
+    uid_index = _column_row_index(L3_COLUMNS, "nearest_facility_uid")
     for row in selected:
         facility_uid = row[uid_index]
         if not facility_uid or facility_uid in seen:
             continue
         seen.add(facility_uid)
-        facility_name = row[uid_index + 1]
-        facility_code = row[uid_index + 2]
-        latitude = row[uid_index + 3]
-        longitude = row[uid_index + 4]
-        subtype = row[uid_index + 5]
+        title = row[uid_index + 1] or facility_uid
         rows.append(
             (
-                _gpkg_point_blob(longitude, latitude),
+                _facility_point_blob(row[uid_index + 4], row[uid_index + 3]),
                 facility_uid,
-                facility_name,
-                facility_code,
-                latitude,
-                longitude,
-                subtype,
+                title,
+                row[uid_index + 1],
+                row[uid_index + 2],
+                row[uid_index + 3],
+                row[uid_index + 4],
+                row[uid_index + 5],
             )
         )
     return rows
 
 
-VILLAGE_COLUMNS = [
-    ("cs_feature_id", "TEXT"),
-    ("state_name", "TEXT"),
-    ("district_name", "TEXT"),
-    ("TEHSIL", "TEXT"),
-    ("pc11_village_id", "TEXT"),
-    ("NAME", "TEXT"),
-    ("_village_latitude", "REAL"),
-    ("_village_longitude", "REAL"),
-]
+def _column_row_index(columns: list[tuple[str, str]], column_name: str) -> int:
+    for index, (name, _) in enumerate(columns, start=1):
+        if name == column_name:
+            return index
+    raise KeyError(f"Column {column_name!r} is not exported")
+
+
+def _facility_point_blob(longitude: float | None, latitude: float | None) -> bytes | None:
+    if longitude is None or latitude is None:
+        return None
+    import struct
+
+    return (
+        b"GP"
+        + bytes([0, 1])
+        + struct.pack("<I", 4326)
+        + struct.pack("<BI2d", 1, 1, float(longitude), float(latitude))
+    )
+
 
 L3_COLUMNS = [
     ("cs_feature_id", "TEXT"),
@@ -546,9 +610,9 @@ L3_COLUMNS = [
     ("TEHSIL", "TEXT"),
     ("pc11_village_id", "TEXT"),
     ("NAME", "TEXT"),
+    ("title", "TEXT"),
     ("class_l1_domain", "TEXT"),
     ("class_l2_filter_group", "TEXT"),
-    ("filter_logic", "TEXT"),
     ("class_l3_facility_class", "TEXT"),
     ("nearest_distance_km", "REAL"),
     ("nearest_facility_uid", "TEXT"),
@@ -566,9 +630,9 @@ L2_COLUMNS = [
     ("TEHSIL", "TEXT"),
     ("pc11_village_id", "TEXT"),
     ("NAME", "TEXT"),
+    ("title", "TEXT"),
     ("class_l1_domain", "TEXT"),
     ("class_l2_filter_group", "TEXT"),
-    ("filter_logic", "TEXT"),
     ("logic_distance_km", "REAL"),
     ("selected_component_class", "TEXT"),
     ("nearest_facility_uid", "TEXT"),
@@ -586,6 +650,7 @@ L1_COLUMNS = [
     ("TEHSIL", "TEXT"),
     ("pc11_village_id", "TEXT"),
     ("NAME", "TEXT"),
+    ("title", "TEXT"),
     ("class_l1_domain", "TEXT"),
     ("closest_domain_distance_km", "REAL"),
     ("selected_filter_group", "TEXT"),
@@ -600,12 +665,22 @@ L1_COLUMNS = [
 
 NEAREST_FACILITY_COLUMNS = [
     ("facility_uid", "TEXT"),
+    ("title", "TEXT"),
     ("facility_name", "TEXT"),
     ("facility_code", "TEXT"),
     ("latitude", "REAL"),
     ("longitude", "REAL"),
     ("class_l4_facility_subtype", "TEXT"),
 ]
+
+
+def _write_output_zip(gpkg_path: Path) -> Path:
+    zip_path = gpkg_path.with_suffix(".zip")
+    if zip_path.exists():
+        zip_path.unlink()
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
+        archive.write(gpkg_path, arcname=gpkg_path.name)
+    return zip_path
 
 
 def _write_tehsil_gpkg(
@@ -615,56 +690,71 @@ def _write_tehsil_gpkg(
     state: str,
     district: str,
     tehsil: str,
-    levels: tuple[str, ...],
-    primary_level: str,
-    include_nearest_facilities: bool,
-) -> tuple[Path, dict[str, int]]:
+) -> tuple[Path, Path, dict[str, int], str, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_path = output_dir / f"{layer_name}.gpkg"
-    zip_path = output_dir / f"{layer_name}.zip"
+    zip_path = gpkg_path.with_suffix(".zip")
     for path in (gpkg_path, zip_path):
         if path.exists():
             path.unlink()
 
-    _ensure_source_indexes(source_path)
     counts: dict[str, int] = {}
     with sqlite3.connect(source_path) as source, sqlite3.connect(gpkg_path) as output:
         _create_gpkg_core(output)
-        bounds = _layer_bounds(source, state, district, tehsil)
-
-        village_rows = _query_villages(source, state, district, tehsil)
-        if not village_rows:
+        village_layer = _village_layer(source)
+        village_geometry_type = _geometry_type(source, village_layer)
+        village_count = _selected_village_count(
+            source,
+            village_layer,
+            state,
+            district,
+            tehsil,
+        )
+        if not village_count:
             raise ValueError(f"No facilities village rows found for {state}/{district}/{tehsil}")
-        village_layer = f"{layer_name}_villages"
-        _create_feature_table(output, village_layer, VILLAGE_COLUMNS)
-        _insert_rows(output, village_layer, [column for column, _ in VILLAGE_COLUMNS], village_rows)
-        _register_feature_layer(output, village_layer, bounds)
-        counts["villages"] = len(village_rows)
+        counts["villages"] = village_count
+        bounds = _layer_bounds(source, village_layer, state, district, tehsil)
 
         level_rows: dict[str, list[tuple[Any, ...]]] = {}
-        for level in levels:
-            rows = _query_level(source, level, state, district, tehsil)
+        for level in EXPORT_LEVELS:
+            rows = _query_level(source, level, village_layer, state, district, tehsil)
             level_rows[level] = rows
-            layer = layer_name if level == primary_level else f"{layer_name}_{level}"
+            layer = layer_name if level == PRIMARY_LEVEL else f"{layer_name}_{level}"
             columns = {"l3": L3_COLUMNS, "l2": L2_COLUMNS, "l1": L1_COLUMNS}[level]
-            _create_feature_table(output, layer, columns)
+            _create_feature_table(output, layer, columns, geometry_type=village_geometry_type)
             _insert_rows(output, layer, [column for column, _ in columns], rows)
-            _register_feature_layer(output, layer, bounds)
+            _register_feature_layer(
+                output,
+                layer,
+                bounds,
+                geometry_type=village_geometry_type,
+            )
             counts[level] = len(rows)
 
-        if include_nearest_facilities:
-            nearest_rows = _nearest_facility_rows(level_rows, primary_level)
-            facility_layer = f"{layer_name}_nearest_facilities"
-            _create_feature_table(output, facility_layer, NEAREST_FACILITY_COLUMNS)
-            _insert_rows(output, facility_layer, [column for column, _ in NEAREST_FACILITY_COLUMNS], nearest_rows)
-            _register_feature_layer(output, facility_layer, bounds)
-            counts["nearest_facilities"] = len(nearest_rows)
+        nearest_rows = _nearest_facility_rows(level_rows)
+        facility_layer = f"{layer_name}_nearest_facilities"
+        _create_feature_table(
+            output,
+            facility_layer,
+            NEAREST_FACILITY_COLUMNS,
+            geometry_type="POINT",
+        )
+        _insert_rows(
+            output,
+            facility_layer,
+            [column for column, _ in NEAREST_FACILITY_COLUMNS],
+            nearest_rows,
+        )
+        _register_feature_layer(output, facility_layer, bounds, geometry_type="POINT")
+        counts["nearest_facilities"] = len(nearest_rows)
 
         output.commit()
-    return gpkg_path, counts
+
+    zip_path = _write_output_zip(gpkg_path)
+    return gpkg_path, zip_path, counts, village_layer, village_geometry_type
 
 
-def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> dict[str, Any]:
+def _publish_to_geoserver(gpkg_path: Path, zip_path: Path, layer_name: str, overwrite: bool) -> dict[str, Any]:
     try:
         geoserver = Geoserver()
         try:
@@ -674,12 +764,19 @@ def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> 
                 raise
             geoserver.create_workspace(FACILITIES_GEOSERVER_WORKSPACE)
 
-        response = push_shape_to_geoserver(
-            str(gpkg_path.with_suffix("")),
+        if overwrite:
+            geoserver.delete_vector_store(
+                workspace=FACILITIES_GEOSERVER_WORKSPACE,
+                store=layer_name,
+            )
+
+        if not zip_path.exists():
+            zip_path = _write_output_zip(gpkg_path)
+        response = geoserver.create_shp_datastore(
+            path=zip_path.as_posix(),
             store_name=layer_name,
             workspace=FACILITIES_GEOSERVER_WORKSPACE,
-            layer_name=layer_name if overwrite else None,
-            file_type="gpkg",
+            file_extension="gpkg",
         )
         return {"ok": True, "response": response}
     except Exception as exc:
@@ -690,22 +787,82 @@ def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> 
         }
 
 
+def _register_layer_in_db(
+    state: str,
+    district: str,
+    block: str,
+    layer_name: str,
+    geoserver_url: str,
+    source_path: Path,
+    gpkg_path: Path,
+    zip_path: Path,
+    output_dir: Path,
+    row_counts: dict[str, int],
+    source_village_layer: str,
+    source_village_geometry: str,
+    overwrite: bool,
+) -> tuple[int | None, dict[str, Any]]:
+    try:
+        Dataset.objects.get_or_create(
+            name=FACILITIES_DATASET_NAME,
+            defaults={
+                "layer_type": LayerType.VECTOR,
+                "workspace": FACILITIES_GEOSERVER_WORKSPACE,
+            },
+        )
+        layer_id = save_layer_info_to_db(
+            state,
+            district,
+            block,
+            layer_name,
+            geoserver_url,
+            FACILITIES_DATASET_NAME,
+            False,
+            "1.0",
+            ALGORITHM,
+            ALGORITHM_VERSION,
+            {
+                "is_generated_locally": True,
+                "source": source_path.as_posix(),
+                "gpkg_path": gpkg_path.as_posix(),
+                "zip_path": zip_path.as_posix(),
+                "output_dir": output_dir.as_posix(),
+                "geoserver_workspace": FACILITIES_GEOSERVER_WORKSPACE,
+                "geoserver_layer_name": layer_name,
+                "geoserver_url": geoserver_url,
+                "row_counts": row_counts,
+                "source_village_layer": source_village_layer,
+                "source_village_geometry": source_village_geometry,
+            },
+            _bool(overwrite),
+            False,
+        )
+        if layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        return layer_id, {"ok": True}
+    except DatabaseError as exc:
+        return None, {
+            "ok": False,
+            "error_type": exc.__class__.__name__,
+            "error": str(exc)[:500],
+        }
+    except Exception as exc:
+        return None, {
+            "ok": False,
+            "error_type": exc.__class__.__name__,
+            "error": str(exc)[:500],
+        }
+
+
 def generate_facilities_proximity(
     state: str,
     district: str,
     block: str,
-    gee_account_id: str | None = None,
-    levels: str | Iterable[str] | None = None,
-    primary_level: str | None = None,
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
-    include_nearest_facilities: bool = True,
 ) -> dict[str, Any]:
     """Export facilities proximity rows for one state/district/TEHSIL."""
-    del gee_account_id  # Kept for API/task backward compatibility.
     started = time.perf_counter()
-    selected_levels = _normalise_levels(levels)
-    selected_primary = _primary_level(selected_levels, primary_level)
 
     resolved_state = _canonical_asset_name(state)
     resolved_district = _canonical_asset_name(district)
@@ -723,26 +880,29 @@ def generate_facilities_proximity(
             block,
         )
 
-    source_path = _repo_path(FACILITIES_PROXIMITY_GPKG)
-    layer_name = _layer_name(resolved_district, resolved_block, selected_primary)
+    source_path = _source_path()
+    layer_name = _layer_name(resolved_district, resolved_block)
     output_dir = _output_dir(resolved_state, resolved_district, resolved_block)
-    gpkg_path, row_counts = _write_tehsil_gpkg(
+    gpkg_path, zip_path, row_counts, source_village_layer, source_village_geometry = _write_tehsil_gpkg(
         source_path=source_path,
         output_dir=output_dir,
         layer_name=layer_name,
         state=resolved_state,
         district=resolved_district,
         tehsil=resolved_block,
-        levels=selected_levels,
-        primary_level=selected_primary,
-        include_nearest_facilities=_bool(include_nearest_facilities),
     )
 
     geoserver = None
     layer_id = None
     geoserver_url = None
+    db_registration = None
     if _bool(sync_to_geoserver):
-        geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
+        geoserver = _publish_to_geoserver(
+            gpkg_path,
+            zip_path,
+            layer_name,
+            _bool(overwrite),
+        )
         if geoserver.get("ok"):
             geoserver_url = (
                 f"{settings.GEOSERVER_URL.rstrip('/')}/{FACILITIES_GEOSERVER_WORKSPACE}/ows"
@@ -750,55 +910,39 @@ def generate_facilities_proximity(
                 f"&typeName={FACILITIES_GEOSERVER_WORKSPACE}:{layer_name}"
                 "&outputFormat=application/json"
             )
-            Dataset.objects.get_or_create(
-                name=FACILITIES_DATASET_NAME,
-                defaults={
-                    "layer_type": LayerType.POINT,
-                    "workspace": FACILITIES_GEOSERVER_WORKSPACE,
-                },
-            )
-            layer_id = save_layer_info_to_db(
+            layer_id, db_registration = _register_layer_in_db(
                 state=resolved_state,
                 district=resolved_district,
                 block=resolved_block,
                 layer_name=layer_name,
-                asset_id=geoserver_url,
-                dataset_name=FACILITIES_DATASET_NAME,
-                algorithm=ALGORITHM,
-                algorithm_version=ALGORITHM_VERSION,
-                misc={
-                    "is_generated_locally": True,
-                    "source": source_path.as_posix(),
-                    "gpkg_path": gpkg_path.as_posix(),
-                    "output_dir": output_dir.as_posix(),
-                    "geoserver_workspace": FACILITIES_GEOSERVER_WORKSPACE,
-                    "geoserver_layer_name": layer_name,
-                    "geoserver_url": geoserver_url,
-                    "levels": selected_levels,
-                    "primary_level": selected_primary,
-                    "row_counts": row_counts,
-                },
-                is_override=_bool(overwrite),
-                is_gee_asset=False,
+                geoserver_url=geoserver_url,
+                source_path=source_path,
+                gpkg_path=gpkg_path,
+                zip_path=zip_path,
+                output_dir=output_dir,
+                row_counts=row_counts,
+                source_village_layer=source_village_layer,
+                source_village_geometry=source_village_geometry,
+                overwrite=_bool(overwrite),
             )
-            if layer_id:
-                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return {
         "status": "success",
         "layer_name": layer_name,
         "row_counts": row_counts,
         "source": source_path.as_posix(),
+        "source_village_layer": source_village_layer,
+        "source_village_geometry": source_village_geometry,
         "gpkg_path": gpkg_path.as_posix(),
+        "zip_path": zip_path.as_posix(),
         "output_dir": output_dir.as_posix(),
         "state_name": resolved_state,
         "district_name": resolved_district,
         "tehsil": resolved_block,
-        "levels": selected_levels,
-        "primary_level": selected_primary,
         "sync_to_geoserver": _bool(sync_to_geoserver),
         "geoserver": geoserver,
         "geoserver_url": geoserver_url,
+        "db_registration": db_registration,
         "layer_id": layer_id,
         "elapsed_seconds": round(time.perf_counter() - started, 3),
     }
@@ -810,22 +954,14 @@ def generate_facilities_proximity_task(
     state: str,
     district: str,
     block: str,
-    gee_account_id: str | None = None,
-    levels: str | Iterable[str] | None = None,
-    primary_level: str | None = None,
     sync_to_geoserver: bool = True,
-    overwrite: bool = False,
-    include_nearest_facilities: bool = True,
+    overwrite: bool = True,
 ) -> dict[str, Any]:
     """Celery task wrapper for local facilities proximity tehsil export."""
     return generate_facilities_proximity(
         state=state,
         district=district,
         block=block,
-        gee_account_id=gee_account_id,
-        levels=levels,
-        primary_level=primary_level,
         sync_to_geoserver=sync_to_geoserver,
         overwrite=overwrite,
-        include_nearest_facilities=include_nearest_facilities,
     )

@@ -1583,25 +1583,15 @@ def generate_facilities_proximity(request):
                 {"Exception": "state, district and block are required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        gee_account_id = request.data.get("gee_account_id")
-        levels = request.data.get("levels")
-        primary_level = request.data.get("primary_level")
         sync_to_geoserver = request.data.get("sync_to_geoserver", True)
         overwrite = request.data.get("overwrite", False)
-        include_nearest_facilities = request.data.get(
-            "include_nearest_facilities", True
-        )
         generate_facilities_proximity_task.apply_async(
             args=[
                 state,
                 district,
                 block,
-                gee_account_id,
-                levels,
-                primary_level,
                 sync_to_geoserver,
                 overwrite,
-                include_nearest_facilities,
             ],
             queue="nrm",
         )
