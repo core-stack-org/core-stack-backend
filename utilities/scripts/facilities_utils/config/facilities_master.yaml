@@ -1,0 +1,549 @@
+pipeline:
+  name: pan_india_facilities
+  raw_dir: data/facilities/raw
+  reference_dir: data/facilities/reference
+  intermediate_dir: data/facilities/intermediate
+  output_dir: data/facilities/outputs
+  state_path: data/facilities/state/pipeline_state.json
+  log_path: data/facilities/state/pipeline.log
+
+schema:
+  crs: EPSG:4326
+  class_k_count: 8
+  facility_layer: facilities
+  membership_table: facility_memberships
+  taxonomy_table: facility_taxonomy
+  source_summary_table: source_summary
+  invalid_table: invalid_coordinates
+  facility_columns:
+    - facility_uid
+    - latitude
+    - longitude
+    - facility_name
+    - facility_code
+    - class_l1_domain
+    - class_l2_filter_group
+    - class_l3_facility_class
+    - class_l4_facility_subtype
+    - class_k1
+    - class_k2
+    - class_k3
+    - class_k4
+    - class_k5
+    - class_k6
+    - class_k7
+    - class_k8
+    - urban_rural
+    - pincode
+    - establishment_year
+    - district_lgd
+    - village_census11
+    - village_name
+    - membership_count
+  membership_columns:
+    - facility_uid
+    - class_l1_domain
+    - class_l2_filter_group
+    - class_l3_facility_class
+    - class_l4_facility_subtype
+    - class_k1
+    - class_k2
+    - class_k3
+    - class_k4
+    - class_k5
+    - class_k6
+    - class_k7
+    - class_k8
+  dropped_from_facility_layer:
+    - source_dataset
+    - source_clean_file
+    - source_clean_file_list
+    - coordinate_status
+    - class_l1_domain_list
+    - class_l2_filter_group_list
+    - class_l3_facility_class_list
+    - class_l4_facility_subtype_list
+    - class_k_list_columns
+    - facility_type
+    - facility_type_code
+    - source_category_detail
+    - management
+    - management_code
+    - ownership
+
+outputs:
+  facilities_csv: data/facilities/outputs/pan_india_facilities.csv
+  memberships_csv: data/facilities/outputs/facility_memberships.csv
+  taxonomy_csv: data/facilities/outputs/facility_taxonomy.csv
+  source_summary_csv: data/facilities/outputs/source_summary.csv
+  invalid_coordinates_csv: data/facilities/outputs/invalid_coordinates.csv
+  facilities_gpkg: data/facilities/outputs/pan_india_facilities.gpkg
+  proximity_gpkg: data/facilities/outputs/village_facility_proximity.gpkg
+  metadata_monitor_yaml: utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
+
+references:
+  pincode_centroids: data/facilities/reference/india_pincodes_centroid.csv
+
+proximity:
+  village_gpkg: data/admin-boundary/cs_admin_sanitised.gpkg
+  village_layer: cs_admin_sanitised
+  village_id_col: cs_feature_id
+  village_context_cols:
+    - state_name
+    - district_name
+    - TEHSIL
+    - pc11_village_id
+    - NAME
+  backend: kdtree
+  stored_level: l3_facility_class
+  derive_l2_from_l3: true
+  derive_l1_from_l3: true
+  create_derived_views: true
+  materialize_derived_tables: false
+  write_village_points: true
+  output_mode: l3_base_with_derived_views
+  tables:
+    village_points: village_points
+    class_map: proximity_class_map
+    nearest_facilities: proximity_nearest_facilities
+    l3: proximity_l3
+    l2_view: proximity_l2
+    l1_view: proximity_l1
+    l2_materialized: proximity_l2_materialized
+    l1_materialized: proximity_l1_materialized
+  distance_precision: 6
+  l3_base_columns:
+    - village_id
+    - class_l3_facility_class
+    - nearest_distance_km
+    - nearest_facility_uid
+  nearest_facility_lookup_columns:
+    - facility_uid
+    - facility_name
+    - facility_code
+    - latitude
+    - longitude
+    - class_l4_facility_subtype
+  l1_l2_derivation:
+    class_map_table: proximity_class_map
+    method: Rebuild proximity_class_map from taxonomy in this YAML, then derive L1/L2 from proximity_l3.
+
+filter_logic:
+  education:
+    essential_education: max
+    higher_education: min
+  health:
+    essential_health: max
+    advanced_health: min
+  food_security:
+    essential_services: direct
+  finance:
+    financial_inclusion: max
+  agriculture:
+    apmc_access: min
+    post_harvest: min
+    cooperative: direct
+    livestock: direct
+    agri_support_infra: direct
+
+mappings:
+  school:
+    category_labels:
+      1: Primary
+      2: Primary with Upper Primary
+      3: Pr. with Up.Pr. Sec. and H.Sec.
+      4: Upper Primary only
+      5: Up. Pr. Secondary and Higher Sec
+      6: Pr. Up Pr. and Secondary Only
+      7: Upper Pr. and Secondary
+      8: Secondary Only
+      10: Secondary with Higher Secondary
+      11: Higher Secondary only/Jr. College
+      12: Pre-Primary Only
+    category_to_classes:
+      1: [school_primary]
+      2: [school_primary, school_upper_primary]
+      3: [school_primary, school_upper_primary, school_secondary, school_higher_secondary]
+      4: [school_upper_primary]
+      5: [school_upper_primary, school_secondary, school_higher_secondary]
+      6: [school_primary, school_upper_primary, school_secondary]
+      7: [school_upper_primary, school_secondary]
+      8: [school_secondary]
+      10: [school_secondary, school_higher_secondary]
+      11: [school_higher_secondary]
+      12: [school_primary]
+  apmc:
+    category_normalise:
+      Farmers Market/Village Market: FCM
+      rural market: FCM
+      Others: Other
+      "": Other
+    category_labels:
+      PMY: Primary Market Yard
+      SMY: Sub Market Yard
+      RPM: Regulated Primary Market
+      RSM: Regulated Sub Market
+      NRM: Non-Regulated Market
+      FCM: Farmers Consumer Market
+      Other: Other
+  agri_industry:
+    category_to_class:
+      Markets & Trading: agri_industry_markets_trading
+      Storage & Warehousing: agri_industry_storage_warehousing
+      Distribution & Utilities: agri_industry_distribution_utilities
+      Agri-Processing: agri_industry_agri_processing
+      Industrial Manufacturing: agri_industry_industrial_manufacturing
+      Co-operatives & Societies: agri_industry_co_operatives_societies
+      Dairy & Animal Husbandry: agri_industry_dairy_animal_husbandry
+      Agri-Support & Infrastructure: agri_industry_agri_support_infrastructure
+    subtype_categories:
+      Agri-Processing:
+        - Agro Industry
+        - Aqua Industry
+        - Bakery
+        - Cashew Industry
+        - Coconut Industry
+        - Dal Mill
+        - Lamon grass oil production ce*
+        - Maize Milling Unit
+        - Paraboiled Industries
+        - Rice/Flour/Oil Mill
+        - Sugar Mill
+        - Tea Industry
+      Agri-Support & Infrastructure:
+        - Fertilizer Depot
+        - Green House
+        - IFFCO Centre
+        - Krishi Bhavan
+        - Pesticide Depot
+        - Rice Research Centre
+        - Soil Testing Lab
+        - Sugar Cane Centre
+      Co-operatives & Societies:
+        - Agricultural Co operative Soc*
+        - Co operative Society
+        - Farmer Welfare Society
+        - MPCS
+        - Primary Agricultural Cooperat
+      Dairy & Animal Husbandry:
+        - Animal Epicenter
+        - Animal Husbandry
+        - Cattle Farm
+        - Cattle Feed
+        - Chicken Center
+        - Cow Farm
+        - Dairy Farm
+        - Fish Farm
+        - Fisheries
+        - Goat Farm
+        - Honey Farm
+        - Kshreera Bhavan
+        - Milk Centre
+        - Milk Chilling Centre
+        - Milk Co Operative Society
+        - Pig Farm
+        - Poultry Farm
+        - Pultry Farm
+        - Sheep Farm
+      Distribution & Utilities:
+        - Civil supply Corporation
+        - Distribution Centre
+        - Echoshop
+        - Electricity Distribution Cent*
+        - Food Corporation of India
+        - Indian Gas Distribution
+      Industrial Manufacturing:
+        - Brick Industry
+        - Camphor Manufacturing Unit
+        - Coir Industry
+        - Cotton Industry
+        - Jute Industry
+        - Latex Industry
+        - Resham Farm
+        - Rubber Industry
+        - Rubber Processing Unit
+        - Saw Mill
+        - Silk Farm
+        - Tobaco Industry
+        - Wood Industry
+      Markets & Trading:
+        - APMC
+        - Bazaar
+        - Collection Centre
+        - Dhan Kharidi Kendra
+        - Direct Purchase Centre
+        - Fish Mart
+        - GRaM
+        - GRaM (Notified)
+        - Mandi
+        - Mandi (Notified)
+        - Market
+        - PACCS GRaM
+        - Vegetable /fruit store and Shop
+      Storage & Warehousing:
+        - Cold Storage
+        - FCI Godown
+        - Fish Storage
+        - GSSS Godown
+        - Godown
+        - LPG Godown
+        - Warehouse
+
+taxonomy:
+  education:
+    essential_education:
+      school_primary:
+        subtypes:
+          - Primary
+          - Primary with Upper Primary
+          - Pr. Up Pr. and Secondary Only
+          - Pr. with Up.Pr. Sec. and H.Sec.
+          - Pre-Primary Only
+      school_upper_primary:
+        subtypes:
+          - Primary with Upper Primary
+          - Upper Primary only
+          - Pr. Up Pr. and Secondary Only
+          - Pr. with Up.Pr. Sec. and H.Sec.
+          - Upper Pr. and Secondary
+          - Up. Pr. Secondary and Higher Sec
+      school_secondary:
+        subtypes:
+          - Pr. Up Pr. and Secondary Only
+          - Pr. with Up.Pr. Sec. and H.Sec.
+          - Upper Pr. and Secondary
+          - Up. Pr. Secondary and Higher Sec
+          - Secondary Only
+          - Secondary with Higher Secondary
+    higher_education:
+      school_higher_secondary:
+        subtypes:
+          - Pr. with Up.Pr. Sec. and H.Sec.
+          - Up. Pr. Secondary and Higher Sec
+          - Secondary with Higher Secondary
+          - Higher Secondary only/Jr. College
+      college:
+        subtypes:
+          - Affiliated College
+          - Constituent / University College
+          - Recognized Center
+          - PG Center / Off-Campus Center
+          - Autonomous College
+      universities:
+        subtypes:
+          - Technical/Polytechnic
+          - Nursing
+          - Teacher Training
+          - Paramedical
+          - PGDM Institutes
+          - Institutes under Ministries
+          - Hotel Management and Catering
+  health:
+    essential_health:
+      health_sub_cen:
+        subtypes: []
+      health_phc:
+        subtypes: []
+    advanced_health:
+      health_chc:
+        subtypes: []
+      health_dis_h:
+        subtypes: []
+      health_s_t_h:
+        subtypes: []
+  food_security:
+    essential_services:
+      pds:
+        subtypes: []
+  finance:
+    financial_inclusion:
+      csc:
+        subtypes: []
+      bank_mitra:
+        subtypes: []
+      bank_branch:
+        subtypes: []
+      bank_atm:
+        subtypes: []
+  agriculture:
+    apmc_access:
+      apmc:
+        subtypes:
+          - Primary Market Yard
+          - Sub Market Yard
+          - Other
+          - Regulated Primary Market
+          - Regulated Sub Market
+          - Farmers Consumer Market
+          - Non-Regulated Market
+      agri_industry_markets_trading:
+        subtypes: []
+    post_harvest:
+      agri_industry_storage_warehousing:
+        subtypes: []
+      agri_industry_distribution_utilities:
+        subtypes: []
+      agri_industry_agri_processing:
+        subtypes: []
+      agri_industry_industrial_manufacturing:
+        subtypes: []
+    cooperative:
+      agri_industry_co_operatives_societies:
+        subtypes: []
+    livestock:
+      agri_industry_dairy_animal_husbandry:
+        subtypes: []
+    agri_support_infra:
+      agri_industry_agri_support_infrastructure:
+        subtypes: []
+
+sources:
+  school:
+    active: true
+    processor: school_mhrd
+    raw_files:
+      - School__Source___MHRD_2023__4.csv
+    facility_uid_prefix: school
+    class_k:
+      class_k1:
+        source: management
+        label: school_management
+      class_k2:
+        source: schmgt
+        label: school_management_code
+  college:
+    active: true
+    processor: table
+    raw_files: [college.csv]
+    facility_class: college
+    facility_uid_prefix: college
+    id_col: aishecode
+    name_col: collegeins
+    lat_col: latitude
+    lon_col: longitude
+    subtype_col: collegetyp
+    facility_code_col: affiliatin
+    urban_rural_col: locationid
+    pincode_col: pincode
+    establishment_year_col: yearofesta
+    district_lgd_col: districtlg
+    clean_text_cols: [collegeins, affiliatin]
+    class_k:
+      class_k1:
+        source: management
+        label: management
+      class_k2:
+        source: ownerships
+        label: ownership
+  universities:
+    active: true
+    processor: table
+    raw_files: [universities.csv]
+    facility_class: universities
+    facility_uid_prefix: universities
+    id_col: aishecode
+    name_col: name
+    lat_col: latitude
+    lon_col: longitude
+    subtype_col: typeofinst
+    facility_code_col: aishe_code
+    urban_rural_col: locationid
+    pincode_col: pincode
+    establishment_year_col: yearofesta
+    district_lgd_col: districtlg
+    clean_text_cols: [name]
+    class_k:
+      class_k1:
+        source: management
+        label: management
+      class_k2:
+        source: ownerships
+        label: ownership
+  health_center:
+    active: true
+    processor: health_center_split
+    raw_files:
+      - Health_Center_Source___Data_gov_2022__6.csv
+    facility_uid_prefix: health
+    type_to_class:
+      sub_cen: health_sub_cen
+      phc: health_phc
+      chc: health_chc
+      dis_h: health_dis_h
+      s_t_h: health_s_t_h
+  pds:
+    active: true
+    processor: table
+    raw_files: [PDS__Sources___DoFD_2023__7.csv]
+    facility_class: pds
+    facility_uid_prefix: pds
+    id_col: fps_code
+    name_col: fpsname
+    lat_col: latitude
+    lon_col: longitude
+    facility_code_col: fps_code
+    village_census11_col: villagecod
+    village_name_col: villagenam
+    uid_strategy: id_coord
+  csc:
+    active: true
+    processor: table
+    raw_files: [CSC-MeitY-2022.csv]
+    facility_class: csc
+    facility_uid_prefix: csc
+    id_col: csc_id
+    lat_col: latitude
+    lon_col: longitude
+    uid_strategy: id_coord
+  bank_mitra:
+    active: true
+    processor: table
+    raw_files: [bank_mitra.csv]
+    facility_class: bank_mitra
+    facility_uid_prefix: bank_mitra
+    id_col: objectid
+    name_col: bank_name
+    lat_col: bk_m_lat
+    lon_col: bk_m_long
+    coord_fallback_col: coordinates
+    facility_code_col: bk_mitr_cd
+    clean_text_cols: [bank_name]
+  bank_branch:
+    active: true
+    processor: table
+    raw_files: [bank_branch.csv]
+    facility_class: bank_branch
+    facility_uid_prefix: bank_branch
+    id_col: objectid
+    name_col: bank_name
+    lat_col: br_lat
+    lon_col: br_long
+    facility_code_col: br_ifsc_cd
+    pincode_col: br_pin_cod
+    clean_text_cols: [bank_name]
+  bank_atm:
+    active: true
+    processor: table
+    raw_files: [bank_atm.csv]
+    facility_class: bank_atm
+    facility_uid_prefix: bank_atm
+    id_col: objectid
+    name_col: bank_name
+    lat_col: atm_lat
+    lon_col: atm_long
+    facility_code_col: atm_cd
+    pincode_col: atm_pin_cd
+    clean_text_cols: [bank_name]
+  apmc:
+    active: true
+    processor: apmc
+    raw_files: [apmc.csv]
+    facility_class: apmc
+    facility_uid_prefix: apmc
+  agri_industry:
+    active: true
+    processor: agri_industry_reclassified
+    raw_files:
+      - Industries__Sources___PMGSY_2023__11.csv
+      - Agri_Resources__Sources___PMGSY_2023__10.csv
+    facility_uid_prefix: agri_industry
