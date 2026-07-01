@@ -578,6 +578,21 @@ def upload_file_to_gcs(local_path: Path, credentials: Any, key: Dict[str, Any], 
     return f"gs://{bucket_name}/{blob_name}"
 
 
+def delete_gcs_blob(credentials: Any, key: Dict[str, Any], bucket_name: str, blob_name: str) -> bool:
+    from google.cloud import storage
+    from google.api_core.exceptions import Forbidden, NotFound
+
+    bucket = storage.Client(project=key.get("project_id"), credentials=credentials).bucket(bucket_name)
+    try:
+        bucket.blob(blob_name).delete()
+        return True
+    except NotFound:
+        return False
+    except Forbidden as exc:
+        log.warning("Could not delete gs://%s/%s: %s", bucket_name, blob_name, exc.message)
+        return False
+
+
 def start_table_ingestion(
     ee_module: Any,
     asset_id: str,
@@ -681,27 +696,44 @@ def upload_assets(args: argparse.Namespace) -> Dict[str, Any]:
             ee_module.data.deleteAsset(asset_id)
             time.sleep(1)
 
-        blob_name = f"{upload_cfg.get('gcs_prefix', 'gee/facilities_v2').strip('/')}/{slug(name)}_{uuid.uuid4().hex}.tsv"
+        bucket_name = args.gcs_bucket or upload_cfg.get("gcs_bucket", "core_stack")
+        gcs_extension = str(upload_cfg.get("gcs_object_extension") or local_file.suffix or ".csv")
+        if not gcs_extension.startswith("."):
+            gcs_extension = f".{gcs_extension}"
+        blob_name = f"{upload_cfg.get('gcs_prefix', 'gee/facilities_rev').strip('/')}/{slug(name)}_{uuid.uuid4().hex}{gcs_extension}"
+        if local_file.suffix.lower() != gcs_extension.lower():
+            log.info(
+                "Staging %s as %s for Earth Engine table ingestion; delimiter remains %r.",
+                local_file.name,
+                gcs_extension,
+                upload_cfg.get("csv_delimiter", "\t"),
+            )
         gcs_uri = upload_file_to_gcs(
             local_file,
             credentials,
             key,
-            args.gcs_bucket or upload_cfg.get("gcs_bucket", "core_stack"),
+            bucket_name,
             blob_name,
             int(upload_cfg.get("chunk_size_mb", 64)),
         )
-        ingestion = start_table_ingestion(
-            ee_module,
-            asset_id,
-            gcs_uri,
-            asset_cfg.get("geometry_column", "geometry"),
-            upload_cfg,
-            {
-                "corestack_asset": name,
-                "source_file": local_file.name,
-                "built_by": "utilities/scripts/facilities_utils/facilities_gee_assets.py",
-            },
-        )
+        try:
+            ingestion = start_table_ingestion(
+                ee_module,
+                asset_id,
+                gcs_uri,
+                asset_cfg.get("geometry_column", "geometry"),
+                upload_cfg,
+                {
+                    "corestack_asset": name,
+                    "source_file": local_file.name,
+                    "built_by": "utilities/scripts/facilities_utils/facilities_gee_assets.py",
+                },
+            )
+        except Exception:
+            if args.cleanup_gcs:
+                log.info("Cleaning staged GCS object after failed ingestion start: %s", gcs_uri)
+                delete_gcs_blob(credentials, key, bucket_name, blob_name)
+            raise
         result = {
             "asset_id": asset_id,
             "source_tsv": str(local_file),
@@ -722,13 +754,7 @@ def upload_assets(args: argparse.Namespace) -> Dict[str, Any]:
         if args.make_public:
             result["made_public"] = make_asset_public(ee_module, asset_id)
         if args.cleanup_gcs:
-            from google.cloud import storage
-
-            bucket = storage.Client(project=key.get("project_id"), credentials=credentials).bucket(
-                args.gcs_bucket or upload_cfg.get("gcs_bucket", "core_stack")
-            )
-            bucket.blob(blob_name).delete()
-            result["cleaned_gcs"] = True
+            result["cleaned_gcs"] = delete_gcs_blob(credentials, key, bucket_name, blob_name)
         results["assets"][name] = result
 
     summary_path = resolve_path(repo_root, config["outputs"]["summary_yaml"]).with_name("facilities_gee_upload_summary.yaml")
