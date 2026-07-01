@@ -1575,24 +1575,13 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
-        state = str(request.data.get("state", "")).lower()
-        district = str(request.data.get("district", "")).lower()
-        block = str(request.data.get("block", "")).lower()
-        if not all([state, district, block]):
-            return Response(
-                {"Exception": "state, district and block are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
         sync_to_geoserver = request.data.get("sync_to_geoserver", True)
         overwrite = request.data.get("overwrite", False)
         generate_facilities_proximity_task.apply_async(
-            args=[
-                state,
-                district,
-                block,
-                sync_to_geoserver,
-                overwrite,
-            ],
+            args=[state, district, block, sync_to_geoserver, overwrite],
             queue="nrm",
         )
         return Response(
