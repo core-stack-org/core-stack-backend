@@ -62,7 +62,7 @@ def generate_dpr_html(plan, language="en"):
             "section_e": section_e_data,
             "section_f": section_f_data,
             "section_g": section_g_data,
-            "footnote": f"DPR supported by {plan.organization.name} in {date.today().year}",
+            "footnote": f"DPR supported by {plan.organization.name} in {plan.created_at.year}",
             "font_regular": font_regular,
             "font_bold": font_bold,
         },
