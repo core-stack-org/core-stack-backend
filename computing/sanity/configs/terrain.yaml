@@ -1,0 +1,34 @@
+layer_name: terrain
+sheet_names:
+  - terrain
+
+rules:
+  # Source: STAC Terrain Clusters vector table:columns.
+  - name: terrain_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: terrain_schema_present
+    type: required_any_field_pattern
+    value:
+      - "terrain_cluster_id"
+      - "terrain_description"
+      - "*_area_percent"
+
+  - name: terrain_percent_type
+    type: data_type
+    field_pattern: "*_area_percent"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: terrain_percent_min
+    type: min_value
+    field_pattern: "*_area_percent"
+    value: 0
+    allow_missing_fields: true
+
+  - name: terrain_percent_max
+    type: max_value
+    field_pattern: "*_area_percent"
+    value: 100
+    allow_missing_fields: true

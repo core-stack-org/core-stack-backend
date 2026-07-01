@@ -1,0 +1,28 @@
+layer_name: surface_water_bodies
+sheet_names:
+  - surfaceWaterBodies_annual
+
+rules:
+  # Source: STAC Surface Water Bodies vector table:columns.
+  - name: swb_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+    allow_missing_fields: true
+
+  - name: swb_schema_present
+    type: required_any_field_pattern
+    value:
+      - "total_area_in_ha_*"
+      - "kharif_area_in_ha_*"
+
+  - name: swb_area_type
+    type: data_type
+    field_pattern: "*area_in_ha*"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: swb_area_min
+    type: min_value
+    field_pattern: "*area_in_ha*"
+    value: 0
+    allow_missing_fields: true

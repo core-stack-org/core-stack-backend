@@ -1,0 +1,21 @@
+layer_name: mws_connectivity
+sheet_names:
+  - mws_connectivity
+
+rules:
+  # Source: STAC MWS Connectivity vector table:columns.
+  - name: mws_connectivity_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: mws_connectivity_schema_present
+    type: required_any_field_pattern
+    value:
+      - "downstream_mws"
+      - "upstream_mws"
+      - "direction"
+
+  - name: mws_connectivity_direction_not_null
+    type: not_null
+    field: direction
+    allow_missing_fields: true

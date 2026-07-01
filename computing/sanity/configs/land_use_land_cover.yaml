@@ -1,0 +1,32 @@
+layer_name: land_use_land_cover
+sheet_names:
+  - lulc_vector
+
+rules:
+  # Source: STAC Land Use Land Cover vector table:columns.
+  - name: lulc_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: lulc_schema_present
+    type: required_any_field_pattern
+    value:
+      - "cropland_in_ha_*"
+      - "barrenland_in_ha_*"
+      - "built_up_area_in_ha_*"
+
+  - name: lulc_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "id"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: lulc_area_min
+    type: min_value
+    field_pattern: "*_in_ha*"
+    value: 0
+    allow_missing_fields: true

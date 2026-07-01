@@ -1,0 +1,13 @@
+layer_name: river
+sheet_names:
+  - river
+
+rules:
+  # Source: Pan India STAC drainage/river vector metadata.
+  - name: river_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: river_name_not_null
+    type: not_null
+    field: river_name

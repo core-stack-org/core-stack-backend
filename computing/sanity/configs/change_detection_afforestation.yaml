@@ -1,0 +1,35 @@
+layer_name: change_detection_afforestation
+sheet_names:
+  - change_detection_afforestation
+
+rules:
+  # Source: STAC Land Use Change: Tree cover gain vector table:columns.
+  - name: afforestation_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: afforestation_schema_present
+    type: required_any_field_pattern
+    value:
+      - "total_aff*"
+      - "total_afforestation_area_in_ha"
+
+  - name: afforestation_area_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: afforestation_area_min
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true

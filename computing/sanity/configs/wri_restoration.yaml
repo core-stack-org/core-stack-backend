@@ -1,0 +1,27 @@
+layer_name: wri_restoration
+sheet_names:
+  - restoration_vector
+
+rules:
+  # Source: STAC WRI restoration opportunities atlas metadata.
+  - name: restoration_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+    allow_missing_fields: true
+
+  - name: restoration_schema_present
+    type: required_any_field_pattern
+    value:
+      - "wide_scale_restoration_area_in_ha"
+      - "mosaic_restoration_area_in_ha"
+      - "protection_area_in_ha"
+
+  - name: restoration_area_type
+    type: data_type
+    field_pattern: "*area_in_ha"
+    expected_type: numeric
+
+  - name: restoration_area_min
+    type: min_value
+    field_pattern: "*area_in_ha"
+    value: 0

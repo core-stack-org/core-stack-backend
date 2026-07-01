@@ -1,0 +1,25 @@
+layer_name: drainage_lines_vector
+
+rules:
+  # Source: STAC Drainage Lines vector table:columns.
+  - name: drainage_lines_id_not_null
+    type: not_null
+    field: id
+
+  - name: drainage_lines_schema_present
+    type: required_any_field_pattern
+    value:
+      - "ORDER"
+      - "stream_typ"
+      - "type_code"
+
+  - name: drainage_lines_order_min
+    type: min_value
+    field_pattern: "ORDER"
+    value: 0
+
+  - name: drainage_lines_type_code_allowed
+    type: allowed_values
+    field: type_code
+    value: [0, 1]
+    allow_missing_fields: true

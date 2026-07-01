@@ -1,0 +1,24 @@
+layer_name: facilities_proximity
+sheet_names:
+  - facilities_proximity
+
+rules:
+  # Source: Pan India STAC Facilities Proximity collection and stats-generator export.
+  - name: facilities_censuscode_not_null
+    type: not_null
+    field: censuscode2011
+
+  - name: facilities_schema_present
+    type: required_any_field_pattern
+    value:
+      - "*_distance_in_km"
+
+  - name: facilities_distance_type
+    type: data_type
+    field_pattern: "*_distance_in_km"
+    expected_type: numeric
+
+  - name: facilities_distance_min
+    type: min_value
+    field_pattern: "*_distance_in_km"
+    value: 0

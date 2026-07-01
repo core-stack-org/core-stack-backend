@@ -1,0 +1,36 @@
+layer_name: administrative_boundaries
+sheet_names:
+  - social_economic_indicator
+
+rules:
+  # Source: STAC Admin Boundaries vector table:columns.
+  - name: admin_village_id_not_null
+    type: not_null
+    field_pattern: "*village*id"
+    allow_missing_fields: true
+
+  - name: admin_schema_present
+    type: required_any_field_pattern
+    value:
+      - "village_id"
+      - "vill_ID"
+      - "total_population_count"
+      - "TOT_P"
+
+  - name: admin_count_min
+    type: min_value
+    field_pattern: "*count"
+    value: 0
+    allow_missing_fields: true
+
+  - name: admin_percent_min
+    type: min_value
+    field_pattern: "*percent"
+    value: 0
+    allow_missing_fields: true
+
+  - name: admin_percent_max
+    type: max_value
+    field_pattern: "*percent"
+    value: 100
+    allow_missing_fields: true

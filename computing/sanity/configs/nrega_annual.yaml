@@ -1,0 +1,28 @@
+layer_name: nrega_annual
+sheet_names:
+  - nrega_annual
+
+rules:
+  # Source: STAC NREGA Works vector metadata and stats-generator annual export.
+  - name: nrega_mws_id_not_null
+    type: not_null
+    field_pattern: "*id"
+
+  - name: nrega_schema_present
+    type: required_any_field_pattern
+    value:
+      - "*_count_*"
+      - "WorkCatego"
+      - "Asset ID"
+
+  - name: nrega_count_type
+    type: data_type
+    field_pattern: "*_count_*"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: nrega_count_min
+    type: min_value
+    field_pattern: "*_count_*"
+    value: 0
+    allow_missing_fields: true

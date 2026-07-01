@@ -1,0 +1,35 @@
+layer_name: change_detection_cropintensity
+sheet_names:
+  - change_detection_cropintensity
+
+rules:
+  # Source: STAC Land Use Change: Cropping intensity vector table:columns.
+  - name: cropintensity_change_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: cropintensity_change_schema_present
+    type: required_any_field_pattern
+    value:
+      - "total_chan*"
+      - "total_change_crop_intensity_area_in_ha"
+
+  - name: cropintensity_change_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: cropintensity_change_area_min
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true

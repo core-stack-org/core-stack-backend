@@ -1,0 +1,25 @@
+layer_name: livestock
+sheet_names:
+  - livestock
+
+rules:
+  # Source: stats-generator village-level livestock export.
+  - name: livestock_village_id_not_null
+    type: not_null
+    field: pc11_village_id
+
+  - name: livestock_schema_present
+    type: required_any_field_pattern
+    value:
+      - "cattle_total"
+      - "buffalo_total"
+      - "goat_total"
+
+  - name: livestock_count_min
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "NAME"
+      - "*id"
+    allow_missing_fields: true

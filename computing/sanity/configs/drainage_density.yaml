@@ -1,0 +1,31 @@
+layer_name: drainage_density
+sheet_names:
+  - drainage_density
+
+rules:
+  # Source: Pan India STAC drainage metadata and stats-generator drainage density export.
+  - name: drainage_density_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: drainage_density_schema_present
+    type: required_any_field_pattern
+    value:
+      - "drainage_density_weighted_in_km_per_km2"
+      - "stream_order_length_in_km"
+
+  - name: drainage_density_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "geometry"
+
+  - name: drainage_density_min
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "*uid*"
+      - "geometry"

@@ -1,0 +1,29 @@
+layer_name: stream_order
+sheet_names:
+  - stream_order
+
+rules:
+  # Source: STAC Drainage Lines vector and stream-order raster metadata.
+  - name: stream_order_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: stream_order_schema_present
+    type: required_any_field_pattern
+    value:
+      - "order_*_area_percent"
+
+  - name: stream_order_percent_type
+    type: data_type
+    field_pattern: "order_*_area_percent"
+    expected_type: numeric
+
+  - name: stream_order_percent_min
+    type: min_value
+    field_pattern: "order_*_area_percent"
+    value: 0
+
+  - name: stream_order_percent_max
+    type: max_value
+    field_pattern: "order_*_area_percent"
+    value: 100

@@ -1,0 +1,16 @@
+layer_name: canal
+sheet_names:
+  - canal
+
+rules:
+  # Source: Pan India STAC drainage/irrigation-adjacent vector metadata.
+  - name: canal_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: canal_schema_present
+    type: required_any_field_pattern
+    value:
+      - "project_name"
+      - "canal_code"
+      - "canal_name"

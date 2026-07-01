@@ -1,0 +1,35 @@
+layer_name: change_detection_urbanization
+sheet_names:
+  - change_detection_urbanization
+
+rules:
+  # Source: STAC Land Use Change: Urbanization vector table:columns.
+  - name: urbanization_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: urbanization_schema_present
+    type: required_any_field_pattern
+    value:
+      - "total_urb*"
+      - "total_urbanization_area_in_ha"
+
+  - name: urbanization_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: urbanization_area_min
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true

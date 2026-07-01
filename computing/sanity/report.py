@@ -1,6 +1,15 @@
-def summarize(results):
+import logging
+from typing import Any, Dict, List
+
+
+logger = logging.getLogger(__name__)
+
+
+def summarize(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Convert detailed rule results into a compact pass/fail report."""
     errors = []
 
+    # Preserve invalid row identifiers in the summary so callers can inspect data.
     for rule in results:
 
         for field_result in rule["results"]:
@@ -10,12 +19,19 @@ def summarize(results):
                     {
                         "rule": rule["rule"],
                         "field": field_result["field"],
-                        "invalid_count": field_result["invalid_count"],
-                        "invalid_uids": field_result["uids"],
+                        "invalid_count": field_result.get("invalid_count", 0),
+                        "invalid_uids": field_result.get("uids", []),
+                        "message": field_result.get("message"),
                     }
                 )
 
-    return {
+    report = {
         "status": "FAILED" if errors else "PASSED",
         "errors": errors,
     }
+    logger.info(
+        "Validation summary generated with status '%s' and %d errors",
+        report["status"],
+        len(errors),
+    )
+    return report

@@ -1,0 +1,28 @@
+layer_name: overall_tree_change
+sheet_names:
+  - overall_tree_change
+
+rules:
+  # Source: STAC tree-cover change vectors and stats-generator summary export.
+  - name: tree_change_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: tree_change_schema_present
+    type: required_any_field_pattern
+    value:
+      - "afforestation_area_in_ha"
+      - "deforestation_area_in_ha"
+      - "degradation_area_in_ha"
+
+  - name: tree_change_numeric_type
+    type: data_type
+    field_pattern: "*_area_in_ha"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: tree_change_area_min
+    type: min_value
+    field_pattern: "*_area_in_ha"
+    value: 0
+    allow_missing_fields: true

@@ -1,0 +1,35 @@
+layer_name: change_detection_deforestation
+sheet_names:
+  - change_detection_deforestation
+
+rules:
+  # Source: STAC Land Use Change: Loss of tree cover vector table:columns.
+  - name: deforestation_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: deforestation_schema_present
+    type: required_any_field_pattern
+    value:
+      - "total_def*"
+      - "total_deforestation_area_in_ha"
+
+  - name: deforestation_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: deforestation_area_min
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "*uid*"
+      - "the_geom"
+      - "geometry"
+    allow_missing_fields: true

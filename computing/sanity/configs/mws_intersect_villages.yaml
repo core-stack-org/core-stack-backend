@@ -1,0 +1,21 @@
+layer_name: mws_intersect_villages
+sheet_names:
+  - mws_intersect_villages
+
+rules:
+  # Source: stats-generator MWS-village intersection export.
+  - name: mws_village_uid_not_null
+    type: not_null
+    field: MWS UID
+
+  - name: mws_village_schema_present
+    type: required_any_field_pattern
+    value:
+      - "Village IDs"
+      - "Village Details"
+
+  - name: mws_village_area_min
+    type: min_value
+    field: area_in_ha
+    value: 0
+    allow_missing_fields: true

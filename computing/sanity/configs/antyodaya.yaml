@@ -1,0 +1,22 @@
+layer_name: antyodaya
+sheet_names:
+  - antyodaya
+
+rules:
+  # Source: stats-generator village-level Antyodaya export.
+  - name: antyodaya_village_id_not_null
+    type: not_null
+    field: village_id
+
+  - name: antyodaya_schema_present
+    type: required_any_field_pattern
+    value:
+      - "*_cluster"
+      - "*_value"
+      - "total_hhd"
+
+  - name: antyodaya_numeric_min
+    type: min_value
+    field_pattern: "total*"
+    value: 0
+    allow_missing_fields: true

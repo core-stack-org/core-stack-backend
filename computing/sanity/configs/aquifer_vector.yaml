@@ -1,0 +1,66 @@
+layer_name: aquifer_vector
+sheet_names:
+  - aquifer_vector
+
+rules:
+  # Source: STAC Aquifer vector table:columns.
+  - name: aquifer_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+    allow_missing_fields: true
+
+  - name: aquifer_schema_present
+    type: required_any_field_pattern
+    value:
+      - "aquifer_class"
+      - "principle_aq_*"
+      - "Principal_*"
+      - "Major_Aq*"
+
+  - name: aquifer_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "*id"
+      - "id"
+      - "*class*"
+      - "*name*"
+      - "state"
+      - "system"
+      - "test"
+      - "Age"
+      - "Lithology_*"
+      - "Major_Aq*"
+      - "Major_Aqui"
+      - "Principal_*"
+      - "Recommende"
+      - "avg_mbgl"
+      - "m2_perday"
+      - "m3_per_day"
+      - "mbgl"
+      - "newcode*"
+      - "per_cm"
+      - "yeild__"
+      - "zone_m"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: aquifer_area_min
+    type: min_value
+    field_pattern: "*area*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: aquifer_percent_min
+    type: min_value
+    field_pattern: "*percent"
+    value: 0
+    allow_missing_fields: true
+
+  - name: aquifer_percent_max
+    type: max_value
+    field_pattern: "*percent"
+    value: 100
+    allow_missing_fields: true

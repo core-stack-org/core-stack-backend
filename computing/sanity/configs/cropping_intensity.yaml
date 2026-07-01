@@ -1,27 +1,118 @@
 layer_name: cropping_intensity
+sheet_names:
+  - croppingIntensity_annual
 
 rules:
-  -
-  - name: ci_type
+  # Every raw vector or Excel export should carry an MWS identifier.
+  - name: ci_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  # Accept either raw vector names or stats-generator Excel names.
+  - name: ci_intensity_schema_present
+    type: required_any_field_pattern
+    value:
+      - "cropping_intensity_*"
+      - "cropping_intensity_unit_less_*"
+
+  # Common area checks shared by vector and Excel representations.
+  - name: ci_area_type
+    type: data_type
+    fields:
+      - area_in_ha
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: ci_area_min
+    type: min_value
+    fields:
+      - area_in_ha
+    value: 0
+    allow_missing_fields: true
+
+  # Raw vector intensity fields use one calendar year in the field name.
+  - name: ci_vector_intensity_type
     type: data_type
     field_pattern: "cropping_intensity_*"
-    expected_type: integer
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*geometry*"
+    allow_missing_fields: true
 
-  - name: ci_max
-    type: max_value
-    field_pattern: "cropping_intensity_*"
-    value: 3
-
-  - name: ci_min
+  - name: ci_vector_intensity_min
     type: min_value
     field_pattern: "cropping_intensity_*"
     value: 0
+    allow_missing_fields: true
 
-  - name: ci_not_null
-    type: not_null
+  - name: ci_vector_intensity_max
+    type: max_value
     field_pattern: "cropping_intensity_*"
+    value: 3
+    allow_missing_fields: true
 
-  - name: ci_allowed
-    type: allowed_values
-    field_pattern: "cropping_intensity_*"
-    value: [ 0, 1, 2, 3 ]
+  # Raw vector area fields produced by the cropping-intensity computation.
+  - name: ci_vector_area_type
+    type: data_type
+    fields:
+      - total_cropable_area_ever_hydroyear_2017_2023
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: ci_vector_area_fields_type
+    type: data_type
+    field_pattern: "*cropped_area_*"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: ci_vector_area_fields_min
+    type: min_value
+    field_pattern: "*cropped_area_*"
+    value: 0
+    allow_missing_fields: true
+
+  # Excel export intensity fields use hydro-year ranges and explicit units.
+  - name: ci_excel_intensity_type
+    type: data_type
+    field_pattern: "cropping_intensity_unit_less_*"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: ci_excel_intensity_min
+    type: min_value
+    field_pattern: "cropping_intensity_unit_less_*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: ci_excel_intensity_max
+    type: max_value
+    field_pattern: "cropping_intensity_unit_less_*"
+    value: 3
+    allow_missing_fields: true
+
+  # Excel export area fields are emitted with the _area_in_ha suffix.
+  - name: ci_excel_area_type
+    type: data_type
+    field_pattern: "*_area_in_ha*"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: ci_excel_area_min
+    type: min_value
+    field_pattern: "*_area_in_ha*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: ci_excel_sum_area_type
+    type: data_type
+    fields:
+      - sum_area_in_ha
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: ci_excel_sum_area_min
+    type: min_value
+    fields:
+      - sum_area_in_ha
+    value: 0
+    allow_missing_fields: true

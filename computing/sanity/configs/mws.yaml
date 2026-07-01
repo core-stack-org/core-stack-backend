@@ -1,0 +1,22 @@
+layer_name: mws
+sheet_names:
+  - mws
+
+rules:
+  # Source: STAC hydrological boundary / microwatershed metadata.
+  - name: mws_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: mws_schema_present
+    type: required_any_field_pattern
+    value:
+      - "watershed_code"
+      - "basin_code"
+      - "sub_basin_code"
+
+  - name: mws_area_min
+    type: min_value
+    field: area_in_ha
+    value: 0
+    allow_missing_fields: true

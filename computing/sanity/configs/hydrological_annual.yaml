@@ -1,0 +1,33 @@
+layer_name: hydrological_annual
+sheet_names:
+  - hydrological_annual
+
+rules:
+  # Source: STAC Annual water balance / change in well depth vector table:columns.
+  - name: hydrological_annual_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: hydrological_annual_schema_present
+    type: required_any_field_pattern
+    value:
+      - "ET_in_mm_*"
+      - "RunOff_in_mm_*"
+      - "Precipitation_in_mm_*"
+      - "Net*"
+
+  - name: hydrological_annual_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "id"
+      - "geometry"
+    allow_missing_fields: true
+
+  - name: hydrological_annual_area_min
+    type: min_value
+    field_pattern: "*area*"
+    value: 0
+    allow_missing_fields: true

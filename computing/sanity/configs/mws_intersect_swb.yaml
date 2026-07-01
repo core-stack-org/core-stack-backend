@@ -1,0 +1,53 @@
+layer_name: mws_intersect_swb
+sheet_names:
+  - mws_intersect_swb
+
+rules:
+  # Source: STAC Surface Water Bodies vector metadata and MWS-SWB intersection export.
+  - name: mws_swb_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+
+  - name: mws_swb_schema_present
+    type: required_any_field_pattern
+    value:
+      - "SWB_UID"
+      - "Waterbodies_name"
+      - "Latitude"
+      - "Longitude"
+
+  - name: mws_swb_latitude_type
+    type: data_type
+    field: Latitude
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: mws_swb_longitude_type
+    type: data_type
+    field: Longitude
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: mws_swb_latitude_min
+    type: min_value
+    field: Latitude
+    value: -90
+    allow_missing_fields: true
+
+  - name: mws_swb_latitude_max
+    type: max_value
+    field: Latitude
+    value: 90
+    allow_missing_fields: true
+
+  - name: mws_swb_longitude_min
+    type: min_value
+    field: Longitude
+    value: -180
+    allow_missing_fields: true
+
+  - name: mws_swb_longitude_max
+    type: max_value
+    field: Longitude
+    value: 180
+    allow_missing_fields: true

@@ -1,0 +1,35 @@
+layer_name: stage_of_groundwater_extraction
+sheet_names:
+  - soge_vector
+
+rules:
+  # Source: STAC Stage of Groundwater extraction vector table:columns.
+  - name: soge_uid_not_null
+    type: not_null
+    field_pattern: "*uid*"
+    allow_missing_fields: true
+
+  - name: soge_schema_present
+    type: required_any_field_pattern
+    value:
+      - "soge_dev_percent"
+      - "class_code"
+      - "class_name"
+
+  - name: soge_percent_type
+    type: data_type
+    field: soge_dev_percent
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: soge_percent_min
+    type: min_value
+    field: soge_dev_percent
+    value: 0
+    allow_missing_fields: true
+
+  - name: soge_class_code_allowed
+    type: allowed_values
+    field: class_code
+    value: [1, 2, 3, 4]
+    allow_missing_fields: true
