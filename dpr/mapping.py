@@ -174,8 +174,11 @@ surface_waterbodies = [
 ]
 
 _COMMUNITY_DEMAND_VALUES = {
-    "community", "community well", "community demand",
-    "public", "public well",
+    "community",
+    "community well",
+    "community demand",
+    "public",
+    "public well",
     "shared among families",
 }
 _INDIVIDUAL_DEMAND_VALUES = {"private", "privately owned", "individual demand"}
@@ -303,7 +306,9 @@ def populate_maintenance_from_waterbody(plan):
         activity_type = get_activity_type_from_waterbody(waterbody)
 
         common_data = {
-            "demand_type": classify_demand_type(waterbody.data_waterbody.get("select_one_owns")),
+            "demand_type": classify_demand_type(
+                waterbody.data_waterbody.get("select_one_owns")
+            ),
             "beneficiary_settlement": waterbody.beneficiary_settlement,
             "Beneficiary_Name": waterbody.data_waterbody.get("Beneficiary_name"),
             "ben_father": waterbody.data_waterbody.get("ben_father"),
@@ -460,3 +465,67 @@ def populate_maintenance_from_waterbody(plan):
             print(f"Well maintenance record already exists for {well_id}")
 
     print("Maintenance records created successfully")
+
+
+# yuktdhara kml icon mapping
+ICON_MAP = {
+    "Farm pond": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_farm_pond.png",
+    "Community Pond": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_community_pond.png",
+    "Large water body": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_large_water_body.png",
+    "Canal": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_canal.png",
+    "Check dam": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_check_dam.png",
+    "Percolation tank": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_percolation_tank.png",
+    "Earthen gully plug": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_earthen_gully_plug.png",
+    "Drainage/soakage channels": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_drainage_soakage_channels.png",
+    "Recharge pits": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_recharge_pits.png",
+    "Soakage pits": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_soakage_pits.png",
+    "Trench cum bund network": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_trench_cum_bund_network.png",
+    "Continuous contour trenches (CCT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_continuous_contour_trenches_cct.png",
+    "Staggered Contour trenches(SCT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_staggered_contour_trenches_sct.png",
+    "Water absorption trenches(WAT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_water_absorption_trenches_wat.png",
+    "Loose boulder structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_loose_boulder_structure.png",
+    "Rock fill dam": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_rock_fill_dam.png",
+    "Stone bunding": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_stone_bunding.png",
+    "Bunding:Contour bunds/ graded bunds": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_bunding_contour_bunds_graded_bunds.png",
+    "Farm bund": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_farm_bund.png",
+    "5% model structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_5_model_structure.png",
+    "30-40 model structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_30-40_model_structure.png",
+    "Farm pond": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_farm_pond.png",
+    "Community Pond": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_community_pond.png",
+    "Large water body": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_large_water_body.png",
+    "Canal": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_canal.png",
+    "Check dam": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_check_dam.png",
+    "Percolation tank": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_percolation_tank.png",
+    "Earthen gully plug": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_earthen_gully_plug.png",
+    "Drainage/soakage channels": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_drainage_soakage_channels.png",
+    "Recharge pits": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_recharge_pits.png",
+    "Soakage pits": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_soakage_pits.png",
+    "Trench cum bund network": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_trench_cum_bund_network.png",
+    "Continuous contour trenches (CCT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_continuous_contour_trenches_cct.png",
+    "Staggered Contour trenches(SCT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_staggered_contour_trenches_sct.png",
+    "Water absorption trenches(WAT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_water_absorption_trenches_wat.png",
+    "Bunding:Contour bunds/ graded bunds": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_bunding_contour_bunds_graded_bunds.png",
+    "Farm bund": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_farm_bund.png",
+    "5% model structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_5_model_structure.png",
+    "30-40 model structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/wb_icons_maintenance_30-40_model_structure.png",
+    "Check dam": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_check_dam.png",
+    "Percolation tank": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_percolation_tank.png",
+    "Earthen gully plug": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_earthen_gully_plug.png",
+    "Drainage/soakage channels": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_drainage_soakage_channels.png",
+    "Recharge pits": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_recharge_pits.png",
+    "Sokage pits": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_sokage_pits.png",
+    "Trench cum bund network": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_trench_cum_bund_network.png",
+    "Continuous contour trenches (CCT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_continuous_contour_trenches_cct.png",
+    "Staggered Contour trenches(SCT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_staggered_contour_trenches_sct.png",
+    "Water absorption trenches(WAT)": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_water_absorption_trenches_wat.png",
+    "Loose boulder structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_loose_boulder_structure.png",
+    "Rock fill dam": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_rock_fill_dam.png",
+    "Stone bunding": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_stone_bunding.png",
+    "Bunding:Contour bunds/ graded bunds": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_bunding_contour_bunds_graded_bunds.png",
+    "5% model structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_5_model_structure.png",
+    "30-40 model structure": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/recharge_icons_30-40_model_structure.png",
+    "approved": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/socialmapping_icons_well_approved.png",
+    "rejected": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/socialmapping_icons_well_rejected.png",
+    "proposed": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/socialmapping_icons_well_proposed.png",
+    "maintenance": "https://raw.githubusercontent.com/core-stack-org/core-stack-backend/refs/heads/main/dpr/icons/socialmapping_icons_well_maintenance.png",
+}
