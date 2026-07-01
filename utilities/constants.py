@@ -10,6 +10,7 @@ NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
 ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
 LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
+FACILITIES_PROXIMITY_GPKG = "data/facilities/outputs/village_facility_proximity.gpkg"
 
 MERGE_MWS_PATH = "data/merge_mws"
 
@@ -333,7 +334,7 @@ CRS_4326 = "EPSG:4326"
 DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 
 # workspace
-FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
+FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity_test_v2"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
