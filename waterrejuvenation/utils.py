@@ -606,9 +606,16 @@ def generate_draught_with_mws(draught_asset_id, mws_fc, proj_id):
     sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, "waterrej")
 
 
+def _waterbody_area_ha(feature):
+    """Area in hectares; use geometry when area_ored is missing (e.g. water rej layers)."""
+    geom_area_ha = ee.Number(feature.geometry().area(maxError=1)).divide(10000)
+    stored_area = feature.get("area_ored")
+    return ee.Number(ee.Algorithms.If(stored_area, stored_area, geom_area_ha))
+
+
 def compute_zoi(feature):
 
-    area_of_wb = ee.Number(feature.get("area_ored"))  # assumes area field exists
+    area_of_wb = _waterbody_area_ha(feature)
 
     # logistic_weight
     def logistic_weight(x, x0=0.2, k=50):

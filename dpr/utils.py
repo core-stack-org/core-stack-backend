@@ -357,14 +357,16 @@ def send_dpr_email(
     try:
         mws_rows_html = ""
         if mws_reports and mws_Ids:
-            for idx, (mws_id, report_url) in enumerate(zip(mws_Ids, mws_reports), start=1):
+            for idx, (mws_id, report_url) in enumerate(
+                zip(mws_Ids, mws_reports), start=1
+            ):
                 row_bg = "#ffffff" if idx % 2 == 1 else "#f8fafc"
                 mws_rows_html += (
                     f'<tr style="background-color: {row_bg};">'
                     f'<td style="padding: 12px 20px; font-size: 13px; color: #374151; border-bottom: 1px solid #e2e8f0; font-family: monospace;">{mws_id}</td>'
                     f'<td style="padding: 12px 20px; text-align: right; border-bottom: 1px solid #e2e8f0;">'
                     f'<a href="{report_url}" style="display: inline-block; background-color: #0f4c81; color: #ffffff; font-size: 12px; font-weight: 600; text-decoration: none; padding: 6px 14px; border-radius: 4px; letter-spacing: 0.3px;">Download</a>'
-                    f'</td></tr>'
+                    f"</td></tr>"
                 )
 
         mws_section_html = ""
@@ -460,7 +462,6 @@ def send_dpr_email(
                         <td valign="middle">
                           <p style="margin: 0 0 2px 0; font-size: 11px; font-weight: 700; color: #93c5fd; letter-spacing: 1px; text-transform: uppercase;">Primary Document</p>
                           <p style="margin: 0; font-size: 17px; font-weight: 700; color: #ffffff;">Detailed Project Report (DPR)</p>
-                          <p style="margin: 6px 0 0 0; font-size: 13px; color: #bfdbfe;">Complete watershed plan with all data and projections</p>
                         </td>
                         <td valign="middle" align="right" style="padding-left: 20px; white-space: nowrap;">
                           <a href="{dpr_s3_url}" style="display: inline-block; background-color: #ffffff; color: #0f4c81; font-size: 13px; font-weight: 700; text-decoration: none; padding: 11px 22px; border-radius: 6px; letter-spacing: 0.3px;">&#8659;&nbsp; Download DPR</a>
@@ -488,7 +489,6 @@ def send_dpr_email(
                       <tr>
                         <td valign="middle">
                           <p style="margin: 0 0 2px 0; font-size: 13px; font-weight: 600; color: #1e293b;">Resource Report</p>
-                          <p style="margin: 0; font-size: 12px; color: #64748b;">Natural resource inventory and analysis</p>
                         </td>
                         <td valign="middle" align="right" style="padding-left: 16px; white-space: nowrap;">
                           <a href="{resource_report_url}" style="display: inline-block; background-color: #0f4c81; color: #ffffff; font-size: 12px; font-weight: 600; text-decoration: none; padding: 8px 16px; border-radius: 5px; letter-spacing: 0.3px;">Download</a>
