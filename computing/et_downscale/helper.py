@@ -241,17 +241,17 @@ def export_product_asset(
     task = None
     if not asset_exists:
         if cfg.get("aez", False):
-            task = _start_asset_export(
-                image,
-                asset_id,
-                description=f"export_{label}_{_asset_token(cfg['asset_suffix'])}_{cfg['year']}",
-            )
-        else:
             _start_asset_drive_export(
                 image,
                 asset_id,
                 description=f"export_{label}_{_asset_token(cfg['asset_suffix'])}_{cfg['year']}",
                 aez=cfg["aez"],
+            )
+        else:
+            task = _start_asset_export(
+                image,
+                asset_id,
+                description=f"export_{label}_{_asset_token(cfg['asset_suffix'])}_{cfg['year']}",
             )
     return {"asset_id": asset_id, "task": task, "label": label}
 

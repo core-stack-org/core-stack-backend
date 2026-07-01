@@ -6,7 +6,14 @@ from utilities.gee_utils import ee_initialize
 
 
 def generate_et_aez(aez_no=None, project_name="corestack-datasets"):
-    # ee_initialize(7)
+    """
+    We are exporting the assets directly to drive in case of AEZ level generation because they take a lot of space
+    which is not manageable on GEE. So here instead of using service_account for GEE authentication,
+    we are using browser-based authentication.
+    Args:
+        aez_no: ae_regcode of the AEZ for which we want to generate the assets
+        project_name: GEE project name on which we want to run the computation
+    """
     initialize_gee_and_drive(project_name)
     if aez_no:
         generate_et(aez_no)
@@ -33,8 +40,7 @@ def generate_et(aez_no):
 
 def initialize_gee_and_drive(project_name: str):
     """
-    Initialize Google Earth Engine (GEE) and authenticate the user.
-    This function is called in the constructor of the class.
+    Initialize Google Earth Engine (GEE) and authenticate the user through the browser where the GEE account is logged in.
 
     Args:
         project_name (str): The name of the GEE project to initialize.
@@ -46,11 +52,3 @@ def initialize_gee_and_drive(project_name: str):
     except Exception as e:
         print(f"Error initializing GEE: {e}")
         print("Please authenticate your Google Earth Engine account.")
-    # if False:
-    #     try:
-    #         drive.mount("/content/drive")
-    #         print("Google Drive mounted successfully.")
-    #     except Exception as e:
-    #         print(
-    #             "Google Drive is not available. Please run this code in Google Colab."
-    #         )
