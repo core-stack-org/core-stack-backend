@@ -1,13 +1,13 @@
 metadata_name: pan_india_facilities_metadata_monitor
 schema_version: generated_1.0
 status: generated_from_current_config_and_assets
-generated_at_utc: '2026-07-01T09:19:41+00:00'
+generated_at_utc: '2026-07-01T15:31:24+00:00'
 source_of_truth:
-  master_yaml: utilities/scripts/facilities_utils/config/facilities_master.yaml
-  raw_dir: data/facilities/raw
+  master_yaml: /mnt/y/core-stack-org/core-stack-backend/utilities/scripts/facilities_utils/config/facilities_master.yaml
+  raw_dir: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw
   reference_files:
     pincode_centroids:
-      path: data/facilities/reference/india_pincodes_centroid.csv
+      path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/reference/india_pincodes_centroid.csv
       exists: true
       size_bytes: 1158553
       size_mb: 1.105
@@ -19,12 +19,12 @@ pipeline_design:
   class_k_policy: class_k1..class_k8 hold source-specific categorical parameters with source trace and EDA.
   derived_levels: L1 and L2 proximity outputs are generated from L3 rows plus proximity_class_map.
 paths:
-  facilities_gpkg: data/facilities/outputs/pan_india_facilities.gpkg
-  proximity_gpkg: data/facilities/outputs/village_facility_proximity.gpkg
-  metadata_monitor_yaml: utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
+  facilities_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
+  proximity_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
+  metadata_monitor_yaml: /mnt/y/core-stack-org/core-stack-backend/utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
 outputs:
   facilities_csv:
-    path: data/facilities/outputs/pan_india_facilities.csv
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.csv
     exists: true
     size_bytes: 612569393
     size_mb: 584.192
@@ -32,7 +32,7 @@ outputs:
     csv_rows: null
     csv_rows_status: not_scanned_larger_than_52428800_bytes
   memberships_csv:
-    path: data/facilities/outputs/facility_memberships.csv
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/facility_memberships.csv
     exists: true
     size_bytes: 454443767
     size_mb: 433.391
@@ -40,7 +40,7 @@ outputs:
     csv_rows: null
     csv_rows_status: not_scanned_larger_than_52428800_bytes
   taxonomy_csv:
-    path: data/facilities/outputs/facility_taxonomy.csv
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/facility_taxonomy.csv
     exists: true
     size_bytes: 2413
     size_mb: 0.002
@@ -48,7 +48,7 @@ outputs:
     csv_rows: 25
     csv_rows_status: counted
   source_summary_csv:
-    path: data/facilities/outputs/source_summary.csv
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/source_summary.csv
     exists: true
     size_bytes: 1466
     size_mb: 0.001
@@ -56,7 +56,7 @@ outputs:
     csv_rows: 11
     csv_rows_status: counted
   invalid_coordinates_csv:
-    path: data/facilities/outputs/invalid_coordinates.csv
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/invalid_coordinates.csv
     exists: true
     size_bytes: 225137
     size_mb: 0.215
@@ -64,20 +64,20 @@ outputs:
     csv_rows: 1554
     csv_rows_status: counted
   facilities_gpkg:
-    path: data/facilities/outputs/pan_india_facilities.gpkg
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
     exists: true
     size_bytes: 2094641152
     size_mb: 1997.605
     modified_utc: '2026-07-01T03:12:35+00:00'
   proximity_gpkg:
-    path: data/facilities/outputs/village_facility_proximity.gpkg
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
     exists: true
-    size_bytes: 3365081088
-    size_mb: 3209.191
-    modified_utc: '2026-07-01T05:32:17+00:00'
+    size_bytes: 4243357696
+    size_mb: 4046.781
+    modified_utc: '2026-07-01T15:30:25+00:00'
 asset_layers:
   facilities_gpkg:
-    path: data/facilities/outputs/pan_india_facilities.gpkg
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
     exists: true
     size_bytes: 2094641152
     size_mb: 1997.605
@@ -183,11 +183,11 @@ asset_layers:
       - sample_rows
     views: []
   proximity_gpkg:
-    path: data/facilities/outputs/village_facility_proximity.gpkg
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
     exists: true
-    size_bytes: 3365081088
-    size_mb: 3209.191
-    modified_utc: '2026-07-01T05:32:17+00:00'
+    size_bytes: 4243357696
+    size_mb: 4046.781
+    modified_utc: '2026-07-01T15:30:25+00:00'
     layers:
     - name: proximity_class_map
       type: attributes
@@ -221,6 +221,20 @@ asset_layers:
       - latitude
       - longitude
       - class_l4_facility_subtype
+    - name: village_shapes
+      type: features
+      rows: 634393
+      columns:
+      - fid
+      - geom
+      - cs_feature_id
+      - state_name
+      - district_name
+      - TEHSIL
+      - pc11_village_id
+      - NAME
+      - _village_latitude
+      - _village_longitude
     views:
     - proximity_l1
     - proximity_l2
@@ -761,7 +775,7 @@ source_catalog:
     active: true
     processor: school_mhrd
     raw_files:
-    - path: data/facilities/raw/School__Source___MHRD_2023__4.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/School__Source___MHRD_2023__4.csv
       exists: true
       size_bytes: 415584044
       size_mb: 396.332
@@ -792,7 +806,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/college.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/college.csv
       exists: true
       size_bytes: 7361875
       size_mb: 7.021
@@ -830,7 +844,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/universities.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/universities.csv
       exists: true
       size_bytes: 7412375
       size_mb: 7.069
@@ -868,7 +882,7 @@ source_catalog:
     active: true
     processor: health_center_split
     raw_files:
-    - path: data/facilities/raw/Health_Center_Source___Data_gov_2022__6.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/Health_Center_Source___Data_gov_2022__6.csv
       exists: true
       size_bytes: 22487565
       size_mb: 21.446
@@ -894,7 +908,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/PDS__Sources___DoFD_2023__7.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/PDS__Sources___DoFD_2023__7.csv
       exists: true
       size_bytes: 79601356
       size_mb: 75.914
@@ -924,7 +938,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/CSC-MeitY-2022.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/CSC-MeitY-2022.csv
       exists: true
       size_bytes: 2434738
       size_mb: 2.322
@@ -950,7 +964,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/bank_mitra.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/bank_mitra.csv
       exists: true
       size_bytes: 531910613
       size_mb: 507.269
@@ -978,7 +992,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/bank_branch.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/bank_branch.csv
       exists: true
       size_bytes: 84673952
       size_mb: 80.751
@@ -1006,7 +1020,7 @@ source_catalog:
     active: true
     processor: table
     raw_files:
-    - path: data/facilities/raw/bank_atm.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/bank_atm.csv
       exists: true
       size_bytes: 82569184
       size_mb: 78.744
@@ -1034,7 +1048,7 @@ source_catalog:
     active: true
     processor: apmc
     raw_files:
-    - path: data/facilities/raw/apmc.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/apmc.csv
       exists: true
       size_bytes: 604545
       size_mb: 0.577
@@ -1056,12 +1070,12 @@ source_catalog:
     active: true
     processor: agri_industry_reclassified
     raw_files:
-    - path: data/facilities/raw/Industries__Sources___PMGSY_2023__11.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/Industries__Sources___PMGSY_2023__11.csv
       exists: true
       size_bytes: 20532302
       size_mb: 19.581
       modified_utc: '2026-06-29T10:46:34+00:00'
-    - path: data/facilities/raw/Agri_Resources__Sources___PMGSY_2023__10.csv
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/Agri_Resources__Sources___PMGSY_2023__10.csv
       exists: true
       size_bytes: 14016468
       size_mb: 13.367
@@ -3328,7 +3342,8 @@ class_k_catalog:
     status: no_current_source_mapping
 proximity_status:
   available: true
-  path: data/facilities/outputs/village_facility_proximity.gpkg
+  path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
+  village_shapes: 634393
   l3_rows: 15859825
   l3_classes_complete: 25
   l3_classes_configured: 25
