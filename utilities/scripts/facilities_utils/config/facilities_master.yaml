@@ -100,10 +100,9 @@ proximity:
   derive_l1_from_l3: true
   create_derived_views: true
   materialize_derived_tables: false
-  write_village_points: true
   output_mode: l3_base_with_derived_views
   tables:
-    village_points: village_points
+    village_shapes: village_shapes
     class_map: proximity_class_map
     nearest_facilities: proximity_nearest_facilities
     l3: proximity_l3

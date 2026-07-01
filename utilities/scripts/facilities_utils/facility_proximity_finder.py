@@ -41,7 +41,7 @@ def chord_to_km(chord: np.ndarray) -> np.ndarray:
     return EARTH_RADIUS_KM * 2 * np.arcsin(chord / 2)
 
 
-def load_village_points(config: Dict[str, Any], repo_root: Path, sample_villages: Optional[int]) -> Any:
+def load_villages(config: Dict[str, Any], repo_root: Path, sample_villages: Optional[int]) -> Any:
     import geopandas as gpd
 
     prox = config["proximity"]
@@ -54,7 +54,6 @@ def load_village_points(config: Dict[str, Any], repo_root: Path, sample_villages
     villages = villages.copy()
     villages["_village_latitude"] = points.y
     villages["_village_longitude"] = points.x
-    villages.geometry = points
     return villages
 
 
@@ -87,9 +86,14 @@ def output_village_count(output_gpkg: Path, village_layer: str) -> Optional[int]
         return None
 
 
+def village_context_table(config: Dict[str, Any]) -> str:
+    tables = config["proximity"]["tables"]
+    return tables.get("village_shapes", "village_shapes")
+
+
 def prepare_output_gpkg(output_gpkg: Path, villages: Any, config: Dict[str, Any], force_full: bool) -> None:
     tables = config["proximity"]["tables"]
-    village_layer = tables["village_points"]
+    village_layer = village_context_table(config)
     existing_villages = output_village_count(output_gpkg, village_layer)
     if output_gpkg.exists() and not force_full and existing_villages == len(villages):
         log.info("Resuming existing proximity GeoPackage: %s", output_gpkg)
@@ -374,7 +378,7 @@ def outer_context_sql(config: Dict[str, Any]) -> str:
 def create_l2_view_sql(config: Dict[str, Any]) -> str:
     id_col = config["proximity"]["village_id_col"]
     l3_table = config["proximity"]["tables"]["l3"]
-    village_table = config["proximity"]["tables"]["village_points"]
+    village_table = village_context_table(config)
     map_table = class_map_table(config)
     lookup_table = nearest_lookup_table(config)
     return f"""
@@ -436,7 +440,7 @@ def create_l2_view_sql(config: Dict[str, Any]) -> str:
 def create_l1_view_sql(config: Dict[str, Any]) -> str:
     id_col = config["proximity"]["village_id_col"]
     l3_table = config["proximity"]["tables"]["l3"]
-    village_table = config["proximity"]["tables"]["village_points"]
+    village_table = village_context_table(config)
     map_table = class_map_table(config)
     lookup_table = nearest_lookup_table(config)
     return f"""
@@ -551,9 +555,9 @@ def run_proximity(
     class_filter = [item.strip() for item in classes.split(",") if item.strip()] if classes else None
 
     if refresh_derived_only:
-        expected_villages = output_village_count(out_gpkg, config["proximity"]["tables"]["village_points"])
+        expected_villages = output_village_count(out_gpkg, village_context_table(config))
         if expected_villages is None:
-            raise RuntimeError(f"Cannot refresh derived proximity outputs because {out_gpkg} has no village_points layer.")
+            raise RuntimeError(f"Cannot refresh derived proximity outputs because {out_gpkg} has no village layer.")
         all_groups = l3_groups(config, facilities_gpkg, None, None)
         completed_after = completed_l3_classes(out_gpkg, config, expected_villages)
         write_class_map(out_gpkg, config)
@@ -580,7 +584,7 @@ def run_proximity(
             log.info("Updated metadata monitor: %s", monitor_path)
         return
 
-    villages = load_village_points(config, repo_root, sample_villages)
+    villages = load_villages(config, repo_root, sample_villages)
     prepare_output_gpkg(out_gpkg, villages, config, force_full=force and not class_filter)
     if force and class_filter:
         delete_l3_classes(out_gpkg, config, class_filter)

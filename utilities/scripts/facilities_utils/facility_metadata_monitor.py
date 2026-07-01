@@ -470,9 +470,10 @@ def proximity_status(proximity_gpkg: Path, config: Dict[str, Any]) -> Dict[str, 
     if not proximity_gpkg.exists():
         return status
     tables = config["proximity"]["tables"]
-    id_col = config["proximity"]["village_id_col"]
     with sqlite3.connect(proximity_gpkg) as con:
-        village_count = table_count(con, tables["village_points"]) or 0
+        village_shape_table = tables.get("village_shapes", "village_shapes")
+        village_shape_count = table_count(con, village_shape_table) or 0
+        village_count = village_shape_count
         l3_count = table_count(con, tables["l3"]) or 0
         class_rows = {}
         if table_exists(con, tables["l3"]):
@@ -491,7 +492,7 @@ def proximity_status(proximity_gpkg: Path, config: Dict[str, Any]) -> Dict[str, 
                 }
         status.update(
             {
-                "village_points": village_count,
+                "village_shapes": village_shape_count,
                 "l3_rows": l3_count,
                 "l3_classes_complete": sum(1 for item in class_rows.values() if item["complete_for_all_villages"]),
                 "l3_classes_configured": len(taxonomy_rows(config)),

@@ -221,20 +221,6 @@ asset_layers:
       - latitude
       - longitude
       - class_l4_facility_subtype
-    - name: village_points
-      type: features
-      rows: 634393
-      columns:
-      - fid
-      - geom
-      - cs_feature_id
-      - state_name
-      - district_name
-      - TEHSIL
-      - pc11_village_id
-      - NAME
-      - _village_latitude
-      - _village_longitude
     views:
     - proximity_l1
     - proximity_l2
@@ -3343,7 +3329,6 @@ class_k_catalog:
 proximity_status:
   available: true
   path: data/facilities/outputs/village_facility_proximity.gpkg
-  village_points: 634393
   l3_rows: 15859825
   l3_classes_complete: 25
   l3_classes_configured: 25

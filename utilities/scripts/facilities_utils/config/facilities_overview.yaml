@@ -47,14 +47,14 @@ facility_gpkg_structure:
     description: Non-spatial invalid coordinate records for audit.
 
 proximity_gpkg_structure:
-  village_points:
-    description: Village representative points and key admin context columns.
+  village_shapes:
+    description: Village polygon geometries and key admin context columns used as the primary village geometry for exports.
   proximity_l3:
     description: Lean durable base table with village id, L3 facility class, nearest distance, and nearest facility uid.
     intentionally_not_kept:
       - class_l1_domain, because it is regenerated from proximity_class_map
       - class_l2_filter_group, because it is regenerated from proximity_class_map
-      - repeated village context columns, because they are stored once in village_points
+      - repeated village context columns, because they are stored once in village_shapes
       - repeated facility detail columns, because they are stored once in proximity_nearest_facilities
   proximity_nearest_facilities:
     description: Deduplicated details for facilities referenced by proximity_l3.
