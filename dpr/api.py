@@ -85,6 +85,7 @@ from .gen_tehsil_report import (
     get_agroforestry_transition_data,
 )
 from .gen_village_report import (
+    load_block_sheets,
     get_village_polygon_and_info,
     get_development_data,
     get_block_development_data,
@@ -97,6 +98,9 @@ from .gen_village_report import (
     get_community_institutes,
     get_livelihood_diversification,
     get_livestock_management,
+    get_livestock_count,
+    get_land_cultivation,
+    get_all_villages_land_cultivation,
     get_irrigation_Infra,
     get_agri_support_service,
     get_ecological_climate_resiliance,
@@ -633,7 +637,7 @@ def generate_village_report(request):
     demographic_data = calculate_demographics(village_data["properties"])
 
     # Calculate Basic Infra
-    basic_infra_data = get_basic_infrastructure(state, district, block, village_id)
+    basic_infra_data = get_basic_infrastructure(state, district, block, village_id, df=df)
     # Convert scores to performance categories
     basic_infra_performance = [
         "Low" if score <= 0.33 else "High" if score > 0.66 else "Medium"
@@ -641,7 +645,7 @@ def generate_village_report(request):
     ]
 
     # Calculate Health and Wash
-    health_wash_data = get_health_and_wash(state, district, block, village_id)
+    health_wash_data = get_health_and_wash(state, district, block, village_id, df=df, df_facilities=df_facilities)
     health_wash_performance = [
         # Maternal & Child Health (High / Low only)
         "High" if health_wash_data[0] > 0.66 else "Low",
@@ -657,7 +661,7 @@ def generate_village_report(request):
     education_data = get_education_institutions(state, district, block, village_id)
 
     # Calculate Financial Inclusion
-    finance_data = get_financial_inclusion(state, district, block, village_id)
+    finance_data = get_financial_inclusion(state, district, block, village_id, df_facilities=df_facilities)
 
     # Calculate Welfare
     welfare_data = get_welfare_inclusion(state, district, block, village_id)
