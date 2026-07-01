@@ -350,9 +350,9 @@ def add_proximity_args(parser: argparse.ArgumentParser, include_force: bool = Tr
     parser.add_argument("--sample-classes", type=int, default=None)
     parser.add_argument("--village-chunksize", type=int, default=100_000)
     parser.add_argument("--output-gpkg", type=Path, default=None)
-    parser.add_argument("--materialize-derived", action="store_true")
+    parser.add_argument("--materialize-derived", action="store_true", help="Legacy flag; L2 is materialized by default after full L3 completion.")
     parser.add_argument("--no-derived-views", action="store_true")
-    parser.add_argument("--refresh-derived-only", action="store_true", help="Rebuild class-map and L1/L2 derived outputs from existing L3 rows.")
+    parser.add_argument("--refresh-derived-only", action="store_true", help="Rebuild class-map and materialized L2 output from existing L3 rows.")
     parser.add_argument("--skip-monitor", action="store_true")
     if include_force:
         parser.add_argument("--force", action="store_true")

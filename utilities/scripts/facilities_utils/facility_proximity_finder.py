@@ -233,7 +233,6 @@ def nearest_lookup_missing(output_gpkg: Path, config: Dict[str, Any]) -> bool:
 
 def rebuild_nearest_lookup(output_gpkg: Path, config: Dict[str, Any], facilities_gpkg: Path, batch_size: int = 900) -> None:
     l3_table = config["proximity"]["tables"]["l3"]
-    lookup_table = nearest_lookup_table(config)
     with sqlite3.connect(output_gpkg) as out_con:
         if not table_exists(out_con, l3_table):
             ensure_nearest_lookup_table(out_con, config)
@@ -361,6 +360,43 @@ def write_class_map(output_gpkg: Path, config: Dict[str, Any]) -> None:
         con.commit()
 
 
+def ensure_proximity_indexes(con: sqlite3.Connection, config: Dict[str, Any]) -> None:
+    """Create the indexes needed by both derivation and tehsil export."""
+    tables = config["proximity"]["tables"]
+    id_col = config["proximity"]["village_id_col"]
+    village_table = village_context_table(config)
+    l3_table = tables["l3"]
+    map_table = class_map_table(config)
+
+    if table_exists(con, village_table):
+        con.execute(
+            f"create index if not exists idx_{village_table}_location "
+            f"on {sql_ident(village_table)}(state_name, district_name, TEHSIL)"
+        )
+        con.execute(
+            f"create index if not exists idx_{village_table}_id "
+            f"on {sql_ident(village_table)}({sql_ident(id_col)})"
+        )
+    if table_exists(con, l3_table):
+        con.execute(
+            f"create index if not exists idx_{l3_table}_village "
+            f"on {sql_ident(l3_table)}({sql_ident(id_col)})"
+        )
+        con.execute(
+            f"create index if not exists idx_{l3_table}_class "
+            f"on {sql_ident(l3_table)}(class_l3_facility_class)"
+        )
+    if table_exists(con, map_table):
+        con.execute(
+            f"create index if not exists idx_{map_table}_l3 "
+            f"on {sql_ident(map_table)}(class_l3_facility_class)"
+        )
+        con.execute(
+            f"create index if not exists idx_{map_table}_l2 "
+            f"on {sql_ident(map_table)}(class_l1_domain, class_l2_filter_group)"
+        )
+
+
 def context_select_sql(config: Dict[str, Any]) -> str:
     parts = []
     for col in config["proximity"].get("village_context_cols") or []:
@@ -486,6 +522,96 @@ def create_l1_view_sql(config: Dict[str, Any]) -> str:
     """
 
 
+def best_l2_rows(frame: pd.DataFrame, id_col: str, logic: str) -> pd.DataFrame:
+    frame = frame.dropna(subset=[id_col, "nearest_distance_km"]).copy()
+    if frame.empty:
+        return frame
+    if logic == "max":
+        idx = frame.groupby(id_col, sort=False)["nearest_distance_km"].idxmax()
+    else:
+        idx = frame.groupby(id_col, sort=False)["nearest_distance_km"].idxmin()
+    return frame.loc[idx].reset_index(drop=True)
+
+
+def materialize_l2_table(con: sqlite3.Connection, config: Dict[str, Any]) -> None:
+    """Build the ready-to-query L2 table from the durable L3 rows.
+
+    L2 groups use the taxonomy filter rule: groups marked ``max`` keep the
+    farthest required component, while all other groups keep the nearest
+    component. This avoids a full-table window rank over the 15M+ L3 table.
+    """
+    tables = config["proximity"]["tables"]
+    id_col = config["proximity"]["village_id_col"]
+    l3_table = tables["l3"]
+    map_table = class_map_table(config)
+    l2_table = tables["l2_materialized"]
+    chunksize = int(config["proximity"].get("l2_materialize_chunksize", 1_000_000))
+
+    con.execute(f"drop table if exists {sql_ident(l2_table)}")
+    class_map = pd.read_sql_query(f"select * from {sql_ident(map_table)}", con)
+    first_write = True
+    for (l1, l2), group in class_map.groupby(["class_l1_domain", "class_l2_filter_group"], sort=False):
+        classes = group["class_l3_facility_class"].dropna().astype(str).drop_duplicates().tolist()
+        if not classes:
+            continue
+        logic = "max" if (group["filter_logic"].fillna("min").astype(str).str.lower() == "max").any() else "min"
+        placeholders = ", ".join("?" for _ in classes)
+        query = (
+            f"select {sql_ident(id_col)}, class_l3_facility_class, nearest_distance_km, nearest_facility_uid "
+            f"from {sql_ident(l3_table)} "
+            f"where class_l3_facility_class in ({placeholders})"
+        )
+        best = pd.DataFrame()
+        for chunk in pd.read_sql_query(query, con, params=classes, chunksize=chunksize):
+            chunk_best = best_l2_rows(chunk, id_col, logic)
+            if chunk_best.empty:
+                continue
+            best = best_l2_rows(pd.concat([best, chunk_best], ignore_index=True), id_col, logic)
+        if best.empty:
+            continue
+        best = best.rename(
+            columns={
+                "nearest_distance_km": "logic_distance_km",
+                "class_l3_facility_class": "selected_component_class",
+            }
+        )
+        best.insert(1, "class_l1_domain", l1)
+        best.insert(2, "class_l2_filter_group", l2)
+        best[
+            [
+                id_col,
+                "class_l1_domain",
+                "class_l2_filter_group",
+                "logic_distance_km",
+                "selected_component_class",
+                "nearest_facility_uid",
+            ]
+        ].to_sql(l2_table, con, if_exists="replace" if first_write else "append", index=False)
+        first_write = False
+        log.info("Materialized L2 group %s/%s (%d villages)", l1, l2, len(best))
+
+    if first_write:
+        pd.DataFrame(
+            columns=[
+                id_col,
+                "class_l1_domain",
+                "class_l2_filter_group",
+                "logic_distance_km",
+                "selected_component_class",
+                "nearest_facility_uid",
+            ]
+        ).to_sql(l2_table, con, if_exists="replace", index=False)
+    con.execute(
+        f"create index if not exists idx_{l2_table}_village "
+        f"on {sql_ident(l2_table)}({sql_ident(id_col)})"
+    )
+    con.execute(
+        f"create index if not exists idx_{l2_table}_class "
+        f"on {sql_ident(l2_table)}(class_l1_domain, class_l2_filter_group)"
+    )
+    register_attribute_table(con, l2_table)
+
+
 def refresh_derived_outputs(output_gpkg: Path, config: Dict[str, Any], materialize: bool) -> None:
     tables = config["proximity"]["tables"]
     write_class_map(output_gpkg, config)
@@ -493,22 +619,14 @@ def refresh_derived_outputs(output_gpkg: Path, config: Dict[str, Any], materiali
     l1_sql = create_l1_view_sql(config)
     with sqlite3.connect(output_gpkg) as con:
         drop_derived_outputs(con, config)
+        ensure_proximity_indexes(con, config)
         if config["proximity"].get("create_derived_views", True):
             con.execute(f"create view {sql_ident(tables['l2_view'])} as {l2_sql}")
-            con.execute(f"create view {sql_ident(tables['l1_view'])} as {l1_sql}")
-        if materialize:
-            con.execute(f"create table {sql_ident(tables['l2_materialized'])} as {l2_sql}")
-            con.execute(f"create table {sql_ident(tables['l1_materialized'])} as {l1_sql}")
-            con.execute(
-                f"create index if not exists idx_{tables['l2_materialized']}_village "
-                f"on {sql_ident(tables['l2_materialized'])}({sql_ident(config['proximity']['village_id_col'])})"
-            )
-            con.execute(
-                f"create index if not exists idx_{tables['l1_materialized']}_village "
-                f"on {sql_ident(tables['l1_materialized'])}({sql_ident(config['proximity']['village_id_col'])})"
-            )
-            register_attribute_table(con, tables["l2_materialized"])
-            register_attribute_table(con, tables["l1_materialized"])
+            if config["proximity"].get("derive_l1_from_l3", False):
+                con.execute(f"create view {sql_ident(tables['l1_view'])} as {l1_sql}")
+        if materialize or config["proximity"].get("materialize_l2_table", True):
+            materialize_l2_table(con, config)
+            ensure_proximity_indexes(con, config)
         con.commit()
 
 
@@ -521,7 +639,8 @@ def write_proximity_metadata(output_gpkg: Path, config: Dict[str, Any], complete
             {"key": "nearest_facility_lookup_table", "value": nearest_lookup_table(config)},
             {"key": "l3_groups_completed", "value": str(completed)},
             {"key": "l3_groups_total", "value": str(total_groups)},
-            {"key": "materialize_derived_tables", "value": str(config["proximity"].get("materialize_derived_tables", False))},
+            {"key": "materialized_l2_table", "value": str(config["proximity"]["tables"].get("l2_materialized"))},
+            {"key": "derive_l1_from_l3", "value": str(config["proximity"].get("derive_l1_from_l3", False))},
         ]
     )
     with sqlite3.connect(output_gpkg) as con:
@@ -569,10 +688,10 @@ def run_proximity(
                 config,
                 materialize=materialize_derived or bool(config["proximity"].get("materialize_derived_tables", False)),
             )
-            log.info("Refreshed L1/L2 derived outputs from existing L3 proximity rows.")
+            log.info("Refreshed L2 materialized output from existing L3 proximity rows.")
         else:
             log.info(
-                "Skipping L1/L2 derived views until all L3 classes are complete (%d/%d complete)",
+                "Skipping L2 materialization until all L3 classes are complete (%d/%d complete)",
                 len(completed_after),
                 len(all_groups),
             )
@@ -611,14 +730,7 @@ def run_proximity(
         l3_table = config["proximity"]["tables"]["l3"]
         if table_exists(con, l3_table):
             register_attribute_table(con, l3_table)
-            con.execute(
-                f"create index if not exists idx_proximity_l3_village "
-                f"on {sql_ident(l3_table)}({sql_ident(config['proximity']['village_id_col'])})"
-            )
-            con.execute(
-                f"create index if not exists idx_proximity_l3_class "
-                f"on {sql_ident(l3_table)}(class_l3_facility_class)"
-            )
+        ensure_proximity_indexes(con, config)
         con.commit()
     write_class_map(out_gpkg, config)
     all_groups = l3_groups(config, facilities_gpkg, None, None)
@@ -634,7 +746,7 @@ def run_proximity(
         )
     else:
         log.info(
-            "Skipping L1/L2 derived views until all L3 classes are complete (%d/%d complete)",
+            "Skipping L2 materialization until all L3 classes are complete (%d/%d complete)",
             len(completed_after),
             len(all_groups),
         )
@@ -677,9 +789,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample-classes", type=int, default=None)
     parser.add_argument("--village-chunksize", type=int, default=100_000)
     parser.add_argument("--output-gpkg", type=Path, default=None)
-    parser.add_argument("--materialize-derived", action="store_true")
+    parser.add_argument("--materialize-derived", action="store_true", help="Legacy flag; L2 is materialized by default when all L3 classes are complete.")
     parser.add_argument("--no-derived-views", action="store_true")
-    parser.add_argument("--refresh-derived-only", action="store_true", help="Rebuild class-map and L1/L2 derived outputs from existing L3 rows.")
+    parser.add_argument("--refresh-derived-only", action="store_true", help="Rebuild class-map and materialized L2 output from existing L3 rows.")
     parser.add_argument("--skip-monitor", action="store_true", help="Skip metadata monitor generation for this run.")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--debug", action="store_true")

@@ -97,10 +97,12 @@ proximity:
   backend: kdtree
   stored_level: l3_facility_class
   derive_l2_from_l3: true
-  derive_l1_from_l3: true
+  derive_l1_from_l3: false
   create_derived_views: true
+  materialize_l2_table: true
+  l2_materialize_chunksize: 1000000
   materialize_derived_tables: false
-  output_mode: l3_base_with_derived_views
+  output_mode: l3_base_with_materialized_l2
   tables:
     village_shapes: village_shapes
     class_map: proximity_class_map

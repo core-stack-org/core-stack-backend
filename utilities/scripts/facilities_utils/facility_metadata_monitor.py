@@ -744,7 +744,7 @@ def build_monitor(config_path: Path) -> Dict[str, Any]:
             "stored_proximity_level": "class_l3_facility_class",
             "l4_policy": "class_l4_facility_subtype is scanned and retained as metadata, but proximity is not traversed at L4.",
             "class_k_policy": "class_k1..class_k8 hold source-specific categorical parameters with source trace and EDA.",
-            "derived_levels": "L1 and L2 proximity outputs are generated from L3 rows plus proximity_class_map.",
+            "derived_levels": "L2 proximity is materialized from L3 rows plus proximity_class_map; L1/domain metrics are optional future derived outputs.",
         },
         "paths": {
             "facilities_gpkg": str(facilities_gpkg),
