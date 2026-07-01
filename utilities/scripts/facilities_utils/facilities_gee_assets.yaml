@@ -13,11 +13,12 @@ outputs:
 
 upload:
   gcs_bucket: core_stack
-  gcs_prefix: gee/facilities_v2
+  gcs_prefix: gee/facilities_rev
   csv_delimiter: "\t"
   csv_qualifier: '"'
   crs: EPSG:4326
   geodesic: false
+  gcs_object_extension: .csv
   max_vertices: 0
   max_error_meters: 1.0
   chunk_size_mb: 64
