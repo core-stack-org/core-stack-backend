@@ -1,7 +1,7 @@
 metadata_name: pan_india_facilities_metadata_monitor
 schema_version: generated_1.0
 status: generated_from_current_config_and_assets
-generated_at_utc: '2026-07-01T15:31:24+00:00'
+generated_at_utc: '2026-07-01T20:40:01+00:00'
 source_of_truth:
   master_yaml: /mnt/y/core-stack-org/core-stack-backend/utilities/scripts/facilities_utils/config/facilities_master.yaml
   raw_dir: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw
@@ -17,7 +17,8 @@ pipeline_design:
   stored_proximity_level: class_l3_facility_class
   l4_policy: class_l4_facility_subtype is scanned and retained as metadata, but proximity is not traversed at L4.
   class_k_policy: class_k1..class_k8 hold source-specific categorical parameters with source trace and EDA.
-  derived_levels: L1 and L2 proximity outputs are generated from L3 rows plus proximity_class_map.
+  derived_levels: L2 proximity is materialized from L3 rows plus proximity_class_map; L1/domain metrics are optional future
+    derived outputs.
 paths:
   facilities_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
   proximity_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
@@ -72,9 +73,9 @@ outputs:
   proximity_gpkg:
     path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
     exists: true
-    size_bytes: 4243357696
-    size_mb: 4046.781
-    modified_utc: '2026-07-01T15:30:25+00:00'
+    size_bytes: 5914288128
+    size_mb: 5640.305
+    modified_utc: '2026-07-01T20:38:57+00:00'
 asset_layers:
   facilities_gpkg:
     path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
@@ -185,9 +186,9 @@ asset_layers:
   proximity_gpkg:
     path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
     exists: true
-    size_bytes: 4243357696
-    size_mb: 4046.781
-    modified_utc: '2026-07-01T15:30:25+00:00'
+    size_bytes: 5914288128
+    size_mb: 5640.305
+    modified_utc: '2026-07-01T20:38:57+00:00'
     layers:
     - name: proximity_class_map
       type: attributes
@@ -197,6 +198,16 @@ asset_layers:
       - class_l2_filter_group
       - class_l1_domain
       - filter_logic
+    - name: proximity_l2_materialized
+      type: attributes
+      rows: 6978323
+      columns:
+      - cs_feature_id
+      - class_l1_domain
+      - class_l2_filter_group
+      - logic_distance_km
+      - selected_component_class
+      - nearest_facility_uid
     - name: proximity_l3
       type: attributes
       rows: 15859825
@@ -207,7 +218,7 @@ asset_layers:
       - nearest_facility_uid
     - name: proximity_metadata
       type: attributes
-      rows: 7
+      rows: 8
       columns:
       - key
       - value
@@ -236,7 +247,6 @@ asset_layers:
       - _village_latitude
       - _village_longitude
     views:
-    - proximity_l1
     - proximity_l2
 schema:
   crs: EPSG:4326
@@ -3350,9 +3360,9 @@ proximity_status:
   nearest_facility_lookup_rows: 1712910
   class_map_rows: 25
   views:
-  - proximity_l1
   - proximity_l2
-  materialized_tables: {}
+  materialized_tables:
+    l2_materialized: 6978323
   by_l3_class:
     agri_industry_agri_processing:
       rows: 634393
