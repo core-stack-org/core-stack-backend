@@ -1,0 +1,90 @@
+schema_version: 1
+description: >
+  Build and upload GEE-ready CoRE Stack facilities v2 table assets from the
+  local facilities GeoPackages. The exported TSVs are Earth Engine table
+  ingestion inputs: one geometry column containing GeoJSON and one row per
+  output feature.
+
+service_account_json: data/gee_confs/core-stack-learn-818963fa8f26.json
+
+outputs:
+  directory: data/facilities/gee
+  summary_yaml: data/facilities/gee/facilities_gee_assets_summary.yaml
+
+upload:
+  gcs_bucket: core_stack
+  gcs_prefix: gee/facilities_v2
+  csv_delimiter: "\t"
+  csv_qualifier: '"'
+  crs: EPSG:4326
+  geodesic: false
+  max_vertices: 0
+  max_error_meters: 1.0
+  chunk_size_mb: 64
+
+assets:
+  pan_india_facilities_v2:
+    asset_id: projects/corestack-datasets/assets/datasets/pan_india_facilities_v2
+    kind: facility_membership_points
+    source_gpkg: data/facilities/outputs/pan_india_facilities.gpkg
+    output_tsv: data/facilities/gee/pan_india_facilities_v2.tsv
+    geometry_column: geometry
+    description: >
+      Point asset expanded by facility-class membership so L1/L2/L3/L4 and
+      class_k filters work natively in Earth Engine.
+    columns:
+      facility:
+        - facility_uid
+        - facility_name
+        - facility_code
+        - latitude
+        - longitude
+        - urban_rural
+        - pincode
+        - establishment_year
+        - district_lgd
+        - village_census11
+        - village_name
+      membership:
+        - class_l1_domain
+        - class_l2_filter_group
+        - class_l3_facility_class
+        - class_l4_facility_subtype
+        - class_k1
+        - class_k2
+        - class_k3
+        - class_k4
+        - class_k5
+        - class_k6
+        - class_k7
+        - class_k8
+      generated:
+        - facility_membership_uid
+
+  village_facility_proximity_v2:
+    asset_id: projects/corestack-datasets/assets/datasets/village_facility_proximity_v2
+    kind: village_proximity_wide
+    source_gpkg: data/facilities/outputs/village_facility_proximity.gpkg
+    output_tsv: data/facilities/gee/village_facility_proximity_v2.tsv
+    geometry_column: geometry
+    description: >
+      One polygon per village with wide L3/L2 distance and nearest-facility UID
+      columns for fast GEE map styling and filtering.
+    admin_columns:
+      cs_feature_id: cs_feature_id
+      state_name: state_name
+      district_name: district_name
+      TEHSIL: tehsil_name
+      pc11_village_id: village_id
+      NAME: village_name
+    include_l3:
+      distance_template: l3_{class_name}_distance_km
+      facility_uid_template: l3_{class_name}_facility_uid
+    include_l2:
+      distance_template: l2_{group_name}_distance_km
+      facility_uid_template: l2_{group_name}_facility_uid
+      selected_l3_template: l2_{group_name}_selected_l3
+    include_l1_summary:
+      enabled: true
+      nearest_distance_template: l1_{domain_name}_nearest_l2_distance_km
+      nearest_l2_template: l1_{domain_name}_nearest_l2_group
