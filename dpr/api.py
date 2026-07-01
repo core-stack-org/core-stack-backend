@@ -85,6 +85,7 @@ from .gen_tehsil_report import (
     get_agroforestry_transition_data,
 )
 from .gen_village_report import (
+    load_block_sheets,
     get_village_polygon_and_info,
     get_development_data,
     get_block_development_data,
@@ -97,6 +98,9 @@ from .gen_village_report import (
     get_community_institutes,
     get_livelihood_diversification,
     get_livestock_management,
+    get_livestock_count,
+    get_land_cultivation,
+    get_all_villages_land_cultivation,
     get_irrigation_Infra,
     get_agri_support_service,
     get_ecological_climate_resiliance,
@@ -615,19 +619,22 @@ def generate_village_report(request):
             'district': district,
             'block': block,
         })
-    
+
+    # Load all Excel sheets once — shared by every data function below
+    df, df_facilities, df_nrega, df_livestock = load_block_sheets(state, district, block)
+
     # Get village polygon and info from GeoServer
     village_data = get_village_polygon_and_info(state, district, block, village_id)
- 
+
     # Get Development Scores
-    development_score = get_development_data(state, district, block, village_id)
-    block_development_score = get_block_development_data(state, district, block)
- 
+    development_score = get_development_data(state, district, block, village_id, df=df, df_facilities=df_facilities, df_nrega=df_nrega)
+    block_development_score = get_block_development_data(state, district, block, df=df, df_facilities=df_facilities, df_nrega=df_nrega)
+
     # Calculate demographic data with percentages
     demographic_data = calculate_demographics(village_data['properties'])
 
     # Calculate Basic Infra
-    basic_infra_data = get_basic_infrastructure(state, district, block, village_id)
+    basic_infra_data = get_basic_infrastructure(state, district, block, village_id, df=df)
     # Convert scores to performance categories
     basic_infra_performance = [
         'Low' if score <= 0.33 else 'High' if score > 0.66 else 'Medium'
@@ -635,7 +642,7 @@ def generate_village_report(request):
     ]
 
     # Calculate Health and Wash
-    health_wash_data = get_health_and_wash(state, district, block, village_id)
+    health_wash_data = get_health_and_wash(state, district, block, village_id, df=df, df_facilities=df_facilities)
     health_wash_performance = [
         # Maternal & Child Health (High / Low only)
         "High" if health_wash_data[0] > 0.66 else "Low",
@@ -651,44 +658,49 @@ def generate_village_report(request):
     ]
 
     #Calculate Education Institutions
-    education_data = get_education_institutions(state, district, block, village_id)
+    education_data = get_education_institutions(state, district, block, village_id, df_facilities=df_facilities)
 
     # Calculate Financial Inclusion
-    finance_data = get_financial_inclusion(state, district, block, village_id)
+    finance_data = get_financial_inclusion(state, district, block, village_id, df_facilities=df_facilities)
 
     #Calculate Welfare
-    welfare_data = get_welfare_inclusion(state, district, block, village_id)
+    welfare_data = get_welfare_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
 
     #Calculate Community Institutions
-    community_data = get_community_institutes(state, district, block, village_id)
+    community_data = get_community_institutes(state, district, block, village_id, df=df)
 
     #Livelihood Diversification
-    livelihood_data = get_livelihood_diversification(state, district, block, village_id)
+    livelihood_data = get_livelihood_diversification(state, district, block, village_id, df=df)
 
     #Livestock Management
-    livestock_data = get_livestock_management(state, district, block, village_id)
+    livestock_data = get_livestock_management(state, district, block, village_id, df=df, df_facilities=df_facilities)
+    livestock_count_data = get_livestock_count(state, district, block, village_id, df_livestock=df_livestock)
+
+    #Land Cultivation
+    land_cultivation_data = get_land_cultivation(state, district, block, village_id, df=df)
 
     #Irrigation data
-    irrigation_data = get_irrigation_Infra(state, district, block, village_id)
+    irrigation_data = get_irrigation_Infra(state, district, block, village_id, df=df)
 
     #Agriculture Support
-    agri_support_data = get_agri_support_service(state, district, block, village_id)
+    agri_support_data = get_agri_support_service(state, district, block, village_id, df=df, df_facilities=df_facilities)
 
     #Climate Resiliance
-    climate_resiliance_data = get_ecological_climate_resiliance(state, district, block, village_id)
+    climate_resiliance_data = get_ecological_climate_resiliance(state, district, block, village_id, df=df, df_nrega=df_nrega)
 
 
     #Map Data
-    basic_infra_map = get_all_villages_basic_infrastructure(state, district, block)
-    health_wash_map = get_all_villages_health_and_wash(state, district, block)
-    education_map = get_all_villages_education_institutions(state, district, block)
-    financial_map = get_all_villages_financial_inclusion(state, district, block)
-    welfare_map = get_all_villages_welfare_inclusion(state, district, block)
-    community_map = get_all_villages_community_institutes(state, district, block)
-    livestock_map = get_all_villages_livestock_management(state, district, block)
-    irrigation_infra_map = get_all_villages_irrigation_infra(state, district, block)
-    agri_support_map = get_all_villages_agri_support_service(state, district, block)
-    climate_resiliance_map = get_all_villages_ecological_climate_resiliance(state, district, block)
+    basic_infra_map = get_all_villages_basic_infrastructure(state, district, block, df=df, df_nrega=df_nrega)
+    health_wash_map = get_all_villages_health_and_wash(state, district, block, df=df)
+    education_map = get_all_villages_education_institutions(state, district, block, df_facilities=df_facilities, df_nrega=df_nrega)
+    financial_map = get_all_villages_financial_inclusion(state, district, block, df_facilities=df_facilities, df_nrega=df_nrega)
+    welfare_map = get_all_villages_welfare_inclusion(state, district, block, df=df, df_facilities=df_facilities, df_nrega=df_nrega)
+    community_map = get_all_villages_community_institutes(state, district, block, df=df)
+    livestock_map = get_all_villages_livestock_management(state, district, block, df=df, df_facilities=df_facilities)
+    land_cultivation_map = get_all_villages_land_cultivation(state, district, block, df=df)
+    irrigation_infra_map = get_all_villages_irrigation_infra(state, district, block, df=df)
+    agri_support_map = get_all_villages_agri_support_service(state, district, block, df=df, df_facilities=df_facilities)
+    climate_resiliance_map = get_all_villages_ecological_climate_resiliance(state, district, block, df=df, df_nrega=df_nrega)
 
     mws_ids = get_mwses_ids(state, district, block, village_id)
     mws_pattern_intensity = get_pattern_intensity(state, district, block)
@@ -738,6 +750,10 @@ def generate_village_report(request):
 
         #Livestock Management
         "livestock_data" : json.dumps(livestock_data),
+        "livestock_count_data" : json.dumps(livestock_count_data),
+
+        #Land Cultivation
+        "land_cultivation_data" : json.dumps(land_cultivation_data),
 
         #Irrigation Data
         "irrigation_data" : json.dumps(irrigation_data),
@@ -757,6 +773,7 @@ def generate_village_report(request):
         "welfare_map" : json.dumps(welfare_map),
         "community_map" : json.dumps(community_map),
         "livestock_map" : json.dumps(livestock_map),
+        "land_cultivation_map" : json.dumps(land_cultivation_map),
         "irrigation_infra_map" : json.dumps(irrigation_infra_map),
         "agri_support_map" : json.dumps(agri_support_map),
         "climate_resiliance_map" : json.dumps(climate_resiliance_map),
