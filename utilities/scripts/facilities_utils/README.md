@@ -44,7 +44,7 @@ uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely 
 
 `data/facilities/outputs/village_facility_proximity.gpkg`
 
-- `village_points`: village representative points copied from the configured admin GPKG.
+- `village_shapes`: village polygon geometries and key admin context columns.
 - `proximity_l3`: lean durable base table with village id, L3 class, distance, and nearest facility uid.
 - `proximity_nearest_facilities`: deduplicated facility detail lookup for nearest facilities referenced by L3.
 - `proximity_class_map`: small YAML-derived class map from L3 to L2/L1/filter logic.
@@ -52,9 +52,33 @@ uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely 
 - `proximity_l1`: SQL view derived from L3 plus `proximity_class_map`.
 - Optional materialized L1/L2 tables when `--materialize-derived` is passed after all L3 classes are complete.
 
-The L1/L2 views are intentionally on-demand. For GEE/frontend export or repeated
+The L1/L2 views are intentionally on-demand. For frontend export or repeated
 large reads, rerun proximity with `--materialize-derived` after the L3 base is
 complete.
+The proximity source intentionally does not create or maintain a village point
+layer; representative coordinates are stored as attributes on `village_shapes`
+for bounds and distance traceability.
+
+`computing/misc/facilities_proximity.py` exports tehsil GeoPackages from this
+source asset. By default, those GeoPackages include L3, L2, L1, and nearest
+facility point layers. Exported feature layers carry map-facing fields such as
+`title`, class names, distances, and nearest-facility details; pipeline metadata
+columns such as `filter_logic` remain internal to the source tables/views.
+The API does not accept level selection parameters for this layer; each request
+exports the full tehsil facility package and uploads the zipped GeoPackage to
+GeoServer when `sync_to_geoserver` is true.
+
+API payload:
+
+```json
+{
+  "state": "uttar pradesh",
+  "district": "lucknow",
+  "block": "lucknow",
+  "sync_to_geoserver": true,
+  "overwrite": true
+}
+```
 
 ## Adding Data
 
