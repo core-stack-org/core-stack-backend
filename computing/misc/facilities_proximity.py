@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 import sqlite3
 import time
 import zipfile
@@ -30,8 +31,12 @@ DEFAULT_TABLES = {
     "l3": "proximity_l3",
     "class_map": "proximity_class_map",
     "nearest_facilities": "proximity_nearest_facilities",
+    "l2_materialized": "proximity_l2_materialized",
+    "l1_materialized": "proximity_l1_materialized",
 }
 OUTPUT_DIR = "data/facilities/outputs/tehsil_data"
+CACHE_METADATA_TABLE = "proximity_runtime_cache_metadata"
+CACHE_VERSION = "2026-07-01-working-cache-1"
 LAYER_PREFIX = "facilities"
 ALGORITHM = "facilities-proximity"
 ALGORITHM_VERSION = "2026-07-01"
@@ -74,6 +79,251 @@ def _table(key: str) -> str:
 
 def _source_path() -> Path:
     return _repo_path(_configured_output("proximity_gpkg", FACILITIES_PROXIMITY_GPKG))
+
+
+def _working_path(source_path: Path) -> Path:
+    return source_path.parent / "working" / f"{source_path.stem}_working{source_path.suffix}"
+
+
+def _source_signature(source_path: Path) -> dict[str, str]:
+    stat = source_path.stat()
+    return {
+        "cache_version": CACHE_VERSION,
+        "source_path": source_path.as_posix(),
+        "source_size": str(stat.st_size),
+        "source_mtime_ns": str(stat.st_mtime_ns),
+    }
+
+
+def _metadata_matches(connection: sqlite3.Connection, signature: dict[str, str]) -> bool:
+    if not _table_exists(connection, CACHE_METADATA_TABLE):
+        return False
+    rows = dict(connection.execute(f"select key, value from {CACHE_METADATA_TABLE}").fetchall())
+    return all(rows.get(key) == value for key, value in signature.items())
+
+
+def _working_cache_ready(working_path: Path, signature: dict[str, str]) -> bool:
+    if not working_path.exists():
+        return False
+    try:
+        with sqlite3.connect(working_path) as connection:
+            return (
+                _metadata_matches(connection, signature)
+                and _table_exists(connection, _table("village_shapes"))
+                and _table_exists(connection, _table("l3"))
+                and _table_exists(connection, _table("l2_materialized"))
+                and _table_exists(connection, _table("l1_materialized"))
+            )
+    except sqlite3.Error:
+        return False
+
+
+def _cache_lock_path(working_path: Path) -> Path:
+    return working_path.with_name(f"{working_path.name}.lock")
+
+
+def _acquire_cache_lock(working_path: Path, signature: dict[str, str]) -> bool:
+    lock_path = _cache_lock_path(working_path)
+    while True:
+        if _working_cache_ready(working_path, signature):
+            return False
+        try:
+            lock_path.mkdir(parents=True)
+            return True
+        except FileExistsError:
+            try:
+                if time.time() - lock_path.stat().st_mtime > 7200:
+                    lock_path.rmdir()
+                    continue
+            except FileNotFoundError:
+                continue
+            time.sleep(2)
+
+
+def _release_cache_lock(working_path: Path) -> None:
+    try:
+        _cache_lock_path(working_path).rmdir()
+    except FileNotFoundError:
+        return
+
+
+def _write_cache_metadata(connection: sqlite3.Connection, signature: dict[str, str]) -> None:
+    connection.execute(f"drop table if exists {CACHE_METADATA_TABLE}")
+    connection.execute(f"create table {CACHE_METADATA_TABLE} (key text primary key, value text)")
+    rows = {**signature, "built_at_epoch": str(time.time())}
+    connection.executemany(
+        f"insert into {CACHE_METADATA_TABLE} (key, value) values (?, ?)",
+        rows.items(),
+    )
+
+
+def _create_runtime_indexes(connection: sqlite3.Connection) -> None:
+    village = _quote_ident(_table("village_shapes"))
+    l3 = _quote_ident(_table("l3"))
+    class_map = _quote_ident(_table("class_map"))
+    nearest = _quote_ident(_table("nearest_facilities"))
+    l2 = _quote_ident(_table("l2_materialized"))
+    l1 = _quote_ident(_table("l1_materialized"))
+    connection.executescript(
+        f"""
+        create index if not exists idx_runtime_village_location
+          on {village}(state_name, district_name, TEHSIL);
+        create index if not exists idx_runtime_village_id
+          on {village}(cs_feature_id);
+        create index if not exists idx_runtime_l3_village
+          on {l3}(cs_feature_id);
+        create index if not exists idx_runtime_l3_class
+          on {l3}(class_l3_facility_class);
+        create index if not exists idx_runtime_class_map_l3
+          on {class_map}(class_l3_facility_class);
+        create index if not exists idx_runtime_nearest_uid
+          on {nearest}(facility_uid);
+        create index if not exists idx_runtime_l2_village
+          on {l2}(cs_feature_id);
+        create index if not exists idx_runtime_l1_village
+          on {l1}(cs_feature_id);
+        """
+    )
+
+
+def _materialize_runtime_tables(connection: sqlite3.Connection) -> None:
+    l2 = _quote_ident(_table("l2_materialized"))
+    l1 = _quote_ident(_table("l1_materialized"))
+    l3 = _quote_ident(_table("l3"))
+    class_map = _quote_ident(_table("class_map"))
+    nearest = _quote_ident(_table("nearest_facilities"))
+    connection.executescript(
+        f"""
+        drop table if exists {l2};
+        create table {l2} as
+        with ranked as (
+          select
+            p.cs_feature_id,
+            m.class_l1_domain,
+            m.class_l2_filter_group,
+            case
+              when m.filter_logic = 'max'
+                then max(p.nearest_distance_km) over (
+                  partition by p.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
+                )
+              else min(p.nearest_distance_km) over (
+                  partition by p.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
+                )
+            end as logic_distance_km,
+            p.class_l3_facility_class as selected_component_class,
+            p.nearest_facility_uid,
+            nf.facility_name as nearest_facility_name,
+            nf.facility_code as nearest_facility_code,
+            nf.latitude as nearest_facility_latitude,
+            nf.longitude as nearest_facility_longitude,
+            nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype,
+            row_number() over (
+              partition by p.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
+              order by
+                case when m.filter_logic = 'max' then p.nearest_distance_km end desc,
+                case when coalesce(m.filter_logic, 'min') != 'max' then p.nearest_distance_km end asc,
+                p.class_l3_facility_class
+            ) as rn
+          from {l3} p
+          join {class_map} m
+            on m.class_l3_facility_class = p.class_l3_facility_class
+          left join {nearest} nf
+            on nf.facility_uid = p.nearest_facility_uid
+        )
+        select
+          cs_feature_id,
+          class_l1_domain,
+          class_l2_filter_group,
+          logic_distance_km,
+          selected_component_class,
+          nearest_facility_uid,
+          nearest_facility_name,
+          nearest_facility_code,
+          nearest_facility_latitude,
+          nearest_facility_longitude,
+          nearest_class_l4_facility_subtype
+        from ranked
+        where rn = 1;
+
+        drop table if exists {l1};
+        create table {l1} as
+        with ranked as (
+          select
+            p.cs_feature_id,
+            m.class_l1_domain,
+            p.nearest_distance_km as closest_domain_distance_km,
+            m.class_l2_filter_group as selected_filter_group,
+            p.class_l3_facility_class as selected_component_class,
+            p.nearest_facility_uid,
+            nf.facility_name as nearest_facility_name,
+            nf.facility_code as nearest_facility_code,
+            nf.latitude as nearest_facility_latitude,
+            nf.longitude as nearest_facility_longitude,
+            nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype,
+            row_number() over (
+              partition by p.cs_feature_id, m.class_l1_domain
+              order by p.nearest_distance_km asc, p.class_l3_facility_class
+            ) as rn
+          from {l3} p
+          join {class_map} m
+            on m.class_l3_facility_class = p.class_l3_facility_class
+          left join {nearest} nf
+            on nf.facility_uid = p.nearest_facility_uid
+        )
+        select
+          cs_feature_id,
+          class_l1_domain,
+          closest_domain_distance_km,
+          selected_filter_group,
+          selected_component_class,
+          nearest_facility_uid,
+          nearest_facility_name,
+          nearest_facility_code,
+          nearest_facility_latitude,
+          nearest_facility_longitude,
+          nearest_class_l4_facility_subtype
+        from ranked
+        where rn = 1;
+        """
+    )
+
+
+def _build_working_cache(source_path: Path, working_path: Path, signature: dict[str, str]) -> None:
+    working_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = working_path.with_name(f"{working_path.stem}.{time.time_ns()}.tmp{working_path.suffix}")
+    if temp_path.exists():
+        temp_path.unlink()
+    shutil.copy2(source_path, temp_path)
+    try:
+        with sqlite3.connect(temp_path, timeout=3600) as connection:
+            connection.execute("pragma busy_timeout = 3600000")
+            connection.execute("pragma temp_store = memory")
+            _village_layer(connection)
+            _materialize_runtime_tables(connection)
+            _create_runtime_indexes(connection)
+            _write_cache_metadata(connection, signature)
+            connection.commit()
+        temp_path.replace(working_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+def _working_source_path() -> Path:
+    source_path = _source_path()
+    signature = _source_signature(source_path)
+    working_path = _working_path(source_path)
+    if _working_cache_ready(working_path, signature):
+        return working_path
+    has_lock = _acquire_cache_lock(working_path, signature)
+    if not has_lock:
+        return working_path
+    try:
+        if not _working_cache_ready(working_path, signature):
+            _build_working_cache(source_path, working_path, signature)
+    finally:
+        _release_cache_lock(working_path)
+    return working_path
 
 
 def _slug(value: Any) -> str:
@@ -138,9 +388,8 @@ def _output_dir(state: str, district: str, block: str) -> Path:
     return _repo_path(OUTPUT_DIR) / _slug(state) / _slug(district) / _slug(block)
 
 
-@lru_cache(maxsize=1)
 def _location_rows() -> tuple[tuple[str, str, str], ...]:
-    with sqlite3.connect(_source_path()) as connection:
+    with sqlite3.connect(_working_source_path()) as connection:
         layer = _village_layer(connection)
         rows = connection.execute(
             f"""
@@ -405,70 +654,30 @@ def _query_l2(
 ) -> list[tuple[Any, ...]]:
     return connection.execute(
         f"""
-        with selected_villages as ({_selected_village_sql(village_layer)}),
-        ranked as (
-            select
-                v.geom,
-                v.cs_feature_id,
-                v.state_name,
-                v.district_name,
-                v.TEHSIL,
-                v.pc11_village_id,
-                v.NAME,
-                coalesce(nf.facility_name, p.nearest_facility_uid) as title,
-                m.class_l1_domain,
-                m.class_l2_filter_group,
-                m.filter_logic,
-                case
-                    when m.filter_logic = 'max'
-                        then max(p.nearest_distance_km) over (
-                            partition by v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
-                        )
-                    else min(p.nearest_distance_km) over (
-                        partition by v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
-                    )
-                end as logic_distance_km,
-                p.class_l3_facility_class as selected_component_class,
-                p.nearest_facility_uid,
-                nf.facility_name as nearest_facility_name,
-                nf.facility_code as nearest_facility_code,
-                nf.latitude as nearest_facility_latitude,
-                nf.longitude as nearest_facility_longitude,
-                nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype,
-                row_number() over (
-                    partition by v.cs_feature_id, m.class_l1_domain, m.class_l2_filter_group
-                    order by
-                        case when m.filter_logic = 'max' then p.nearest_distance_km end desc,
-                        case when coalesce(m.filter_logic, 'min') != 'max' then p.nearest_distance_km end asc,
-                        p.class_l3_facility_class
-                ) as rn
-            from selected_villages v
-            join {_quote_ident(_table("l3"))} p on p.cs_feature_id = v.cs_feature_id
-            join {_quote_ident(_table("class_map"))} m on m.class_l3_facility_class = p.class_l3_facility_class
-            left join {_quote_ident(_table("nearest_facilities"))} nf on nf.facility_uid = p.nearest_facility_uid
-        )
+        with selected_villages as ({_selected_village_sql(village_layer)})
         select
-            geom,
-            cs_feature_id,
-            state_name,
-            district_name,
-            TEHSIL,
-            pc11_village_id,
-            NAME,
-            title,
-            class_l1_domain,
-            class_l2_filter_group,
-            logic_distance_km,
-            selected_component_class,
-            nearest_facility_uid,
-            nearest_facility_name,
-            nearest_facility_code,
-            nearest_facility_latitude,
-            nearest_facility_longitude,
-            nearest_class_l4_facility_subtype
-        from ranked
-        where rn = 1
-        order by cs_feature_id, class_l1_domain, class_l2_filter_group
+            v.geom,
+            v.cs_feature_id,
+            v.state_name,
+            v.district_name,
+            v.TEHSIL,
+            v.pc11_village_id,
+            v.NAME,
+            coalesce(p.nearest_facility_name, p.nearest_facility_uid) as title,
+            p.class_l1_domain,
+            p.class_l2_filter_group,
+            p.logic_distance_km,
+            p.selected_component_class,
+            p.nearest_facility_uid,
+            p.nearest_facility_name,
+            p.nearest_facility_code,
+            p.nearest_facility_latitude,
+            p.nearest_facility_longitude,
+            p.nearest_class_l4_facility_subtype
+        from selected_villages v
+        join {_quote_ident(_table("l2_materialized"))} p
+          on cast(p.cs_feature_id as text) = cast(v.cs_feature_id as text)
+        order by v.cs_feature_id, p.class_l1_domain, p.class_l2_filter_group
         """,
         (state, district, tehsil),
     ).fetchall()
@@ -483,58 +692,30 @@ def _query_l1(
 ) -> list[tuple[Any, ...]]:
     return connection.execute(
         f"""
-        with selected_villages as ({_selected_village_sql(village_layer)}),
-        ranked as (
-            select
-                v.geom,
-                v.cs_feature_id,
-                v.state_name,
-                v.district_name,
-                v.TEHSIL,
-                v.pc11_village_id,
-                v.NAME,
-                coalesce(nf.facility_name, p.nearest_facility_uid) as title,
-                m.class_l1_domain,
-                p.nearest_distance_km as closest_domain_distance_km,
-                m.class_l2_filter_group as selected_filter_group,
-                p.class_l3_facility_class as selected_component_class,
-                p.nearest_facility_uid,
-                nf.facility_name as nearest_facility_name,
-                nf.facility_code as nearest_facility_code,
-                nf.latitude as nearest_facility_latitude,
-                nf.longitude as nearest_facility_longitude,
-                nf.class_l4_facility_subtype as nearest_class_l4_facility_subtype,
-                row_number() over (
-                    partition by v.cs_feature_id, m.class_l1_domain
-                    order by p.nearest_distance_km asc, p.class_l3_facility_class
-                ) as rn
-            from selected_villages v
-            join {_quote_ident(_table("l3"))} p on p.cs_feature_id = v.cs_feature_id
-            join {_quote_ident(_table("class_map"))} m on m.class_l3_facility_class = p.class_l3_facility_class
-            left join {_quote_ident(_table("nearest_facilities"))} nf on nf.facility_uid = p.nearest_facility_uid
-        )
+        with selected_villages as ({_selected_village_sql(village_layer)})
         select
-            geom,
-            cs_feature_id,
-            state_name,
-            district_name,
-            TEHSIL,
-            pc11_village_id,
-            NAME,
-            title,
-            class_l1_domain,
-            closest_domain_distance_km,
-            selected_filter_group,
-            selected_component_class,
-            nearest_facility_uid,
-            nearest_facility_name,
-            nearest_facility_code,
-            nearest_facility_latitude,
-            nearest_facility_longitude,
-            nearest_class_l4_facility_subtype
-        from ranked
-        where rn = 1
-        order by cs_feature_id, class_l1_domain
+            v.geom,
+            v.cs_feature_id,
+            v.state_name,
+            v.district_name,
+            v.TEHSIL,
+            v.pc11_village_id,
+            v.NAME,
+            coalesce(p.nearest_facility_name, p.nearest_facility_uid) as title,
+            p.class_l1_domain,
+            p.closest_domain_distance_km,
+            p.selected_filter_group,
+            p.selected_component_class,
+            p.nearest_facility_uid,
+            p.nearest_facility_name,
+            p.nearest_facility_code,
+            p.nearest_facility_latitude,
+            p.nearest_facility_longitude,
+            p.nearest_class_l4_facility_subtype
+        from selected_villages v
+        join {_quote_ident(_table("l1_materialized"))} p
+          on cast(p.cs_feature_id as text) = cast(v.cs_feature_id as text)
+        order by v.cs_feature_id, p.class_l1_domain
         """,
         (state, district, tehsil),
     ).fetchall()
@@ -859,11 +1040,18 @@ def generate_facilities_proximity(
     district: str,
     block: str,
     sync_to_geoserver: bool = True,
-    overwrite: bool = False,
+    overwrite: bool = True,
 ) -> dict[str, Any]:
     """Export facilities proximity rows for one state/district/TEHSIL."""
     started = time.perf_counter()
+    timings: dict[str, float] = {}
 
+    step_started = time.perf_counter()
+    canonical_source_path = _source_path()
+    source_path = _working_source_path()
+    timings["prepare_working_cache_seconds"] = round(time.perf_counter() - step_started, 3)
+
+    step_started = time.perf_counter()
     resolved_state = _canonical_asset_name(state)
     resolved_district = _canonical_asset_name(district)
     resolved_block = _canonical_asset_name(block)
@@ -879,8 +1067,9 @@ def generate_facilities_proximity(
             district,
             block,
         )
+    timings["resolve_location_seconds"] = round(time.perf_counter() - step_started, 3)
 
-    source_path = _source_path()
+    step_started = time.perf_counter()
     layer_name = _layer_name(resolved_district, resolved_block)
     output_dir = _output_dir(resolved_state, resolved_district, resolved_block)
     gpkg_path, zip_path, row_counts, source_village_layer, source_village_geometry = _write_tehsil_gpkg(
@@ -891,19 +1080,23 @@ def generate_facilities_proximity(
         district=resolved_district,
         tehsil=resolved_block,
     )
+    timings["write_tehsil_gpkg_seconds"] = round(time.perf_counter() - step_started, 3)
 
     geoserver = None
     layer_id = None
     geoserver_url = None
     db_registration = None
     if _bool(sync_to_geoserver):
+        step_started = time.perf_counter()
         geoserver = _publish_to_geoserver(
             gpkg_path,
             zip_path,
             layer_name,
             _bool(overwrite),
         )
+        timings["publish_geoserver_seconds"] = round(time.perf_counter() - step_started, 3)
         if geoserver.get("ok"):
+            step_started = time.perf_counter()
             geoserver_url = (
                 f"{settings.GEOSERVER_URL.rstrip('/')}/{FACILITIES_GEOSERVER_WORKSPACE}/ows"
                 "?service=WFS&version=1.0.0&request=GetFeature"
@@ -925,12 +1118,15 @@ def generate_facilities_proximity(
                 source_village_geometry=source_village_geometry,
                 overwrite=_bool(overwrite),
             )
+            timings["register_db_seconds"] = round(time.perf_counter() - step_started, 3)
 
+    timings["total_seconds"] = round(time.perf_counter() - started, 3)
     return {
         "status": "success",
         "layer_name": layer_name,
         "row_counts": row_counts,
-        "source": source_path.as_posix(),
+        "source": canonical_source_path.as_posix(),
+        "working_source": source_path.as_posix(),
         "source_village_layer": source_village_layer,
         "source_village_geometry": source_village_geometry,
         "gpkg_path": gpkg_path.as_posix(),
@@ -944,7 +1140,8 @@ def generate_facilities_proximity(
         "geoserver_url": geoserver_url,
         "db_registration": db_registration,
         "layer_id": layer_id,
-        "elapsed_seconds": round(time.perf_counter() - started, 3),
+        "timings": timings,
+        "elapsed_seconds": timings["total_seconds"],
     }
 
 
