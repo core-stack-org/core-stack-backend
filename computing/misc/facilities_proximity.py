@@ -17,7 +17,6 @@ from django.conf import settings
 from computing.models import Dataset, LayerType
 from computing.utils import (
     fix_invalid_geometry_in_gdf,
-    push_shape_to_geoserver,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
@@ -110,6 +109,12 @@ def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
     )
 
 
+def _source_connection(source_path: Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(source_path)
+    connection.execute("PRAGMA temp_store = MEMORY")
+    return connection
+
+
 def _require_source_tables(connection: sqlite3.Connection) -> None:
     missing = [
         table
@@ -173,20 +178,50 @@ def _resolve_location(state: str, district: str, block: str) -> tuple[str, str, 
     return block_matches[0]
 
 
+def _gpkg_geometry_to_shape(blob: bytes | memoryview | None):
+    if blob is None:
+        return None
+    from shapely import wkb
+
+    data = bytes(blob)
+    if data[:2] != b"GP":
+        return wkb.loads(data)
+    flags = data[3]
+    if flags & 0b00010000:
+        return None
+    envelope_code = (flags >> 1) & 0b00000111
+    envelope_bytes = {0: 0, 1: 32, 2: 48, 3: 48, 4: 64}.get(envelope_code)
+    if envelope_bytes is None:
+        raise ValueError(f"Unsupported GeoPackage geometry envelope code: {envelope_code}")
+    return wkb.loads(data[8 + envelope_bytes :])
+
+
 def _read_villages(state_name: str, district_name: str, tehsil_name: str):
+    gpd = _gpd()
     source_path = _source_path()
-    where = (
-        f"state_name = '{_quote_sql(state_name)}' AND "
-        f"district_name = '{_quote_sql(district_name)}' AND "
-        f"TEHSIL = '{_quote_sql(tehsil_name)}'"
-    )
-    gdf = _gpd().read_file(source_path, layer=SOURCE_VILLAGE_LAYER, where=where)
-    if gdf.empty:
+    columns = [
+        "fid",
+        *VILLAGE_CONTEXT_COLUMNS,
+        "_village_latitude",
+        "_village_longitude",
+        "geom",
+    ]
+    with _source_connection(source_path) as connection:
+        frame = pd.read_sql_query(
+            f"""
+            SELECT {", ".join(columns)}
+            FROM {SOURCE_VILLAGE_LAYER}
+            WHERE state_name = ?
+              AND district_name = ?
+              AND TEHSIL = ?
+            """,
+            connection,
+            params=(state_name, district_name, tehsil_name),
+        )
+    if frame.empty:
         raise ValueError(f"No village shapes found for {state_name}/{district_name}/{tehsil_name}")
-    if gdf.crs is None:
-        gdf = gdf.set_crs("EPSG:4326")
-    elif gdf.crs.to_epsg() != 4326:
-        gdf = gdf.to_crs("EPSG:4326")
+    geometry = frame.pop("geom").map(_gpkg_geometry_to_shape)
+    gdf = gpd.GeoDataFrame(frame, geometry=geometry, crs="EPSG:4326")
     return fix_invalid_geometry_in_gdf(gdf)
 
 
@@ -200,7 +235,7 @@ def _create_requested_villages(connection: sqlite3.Connection, village_ids: list
 
 
 def _read_l3_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFrame:
-    with sqlite3.connect(source_path) as connection:
+    with _source_connection(source_path) as connection:
         _require_source_tables(connection)
         _create_requested_villages(connection, village_ids)
         return pd.read_sql_query(
@@ -218,19 +253,18 @@ def _read_l3_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
               nf.longitude AS nearest_facility_longitude,
               nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype
             FROM {SOURCE_L3_TABLE} p
-            JOIN requested_villages rv
-              ON rv.cs_feature_id = CAST(p.{VILLAGE_ID_COL} AS TEXT)
             LEFT JOIN {SOURCE_CLASS_MAP_TABLE} m
               ON m.class_l3_facility_class = p.class_l3_facility_class
             LEFT JOIN {SOURCE_NEAREST_TABLE} nf
               ON nf.facility_uid = p.nearest_facility_uid
+            WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
             """,
             connection,
         )
 
 
 def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFrame:
-    with sqlite3.connect(source_path) as connection:
+    with _source_connection(source_path) as connection:
         _require_source_tables(connection)
         _create_requested_villages(connection, village_ids)
         frame = pd.read_sql_query(
@@ -248,10 +282,9 @@ def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
               nf.longitude AS nearest_facility_longitude,
               nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype
             FROM {SOURCE_L2_TABLE} p
-            JOIN requested_villages rv
-              ON rv.cs_feature_id = CAST(p.{VILLAGE_ID_COL} AS TEXT)
             LEFT JOIN {SOURCE_NEAREST_TABLE} nf
               ON nf.facility_uid = p.nearest_facility_uid
+            WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
             """,
             connection,
         )
@@ -265,7 +298,7 @@ def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
 
 def _read_nearest_facilities(source_path: Path, village_ids: list[str]):
     gpd = _gpd()
-    with sqlite3.connect(source_path) as connection:
+    with _source_connection(source_path) as connection:
         _require_source_tables(connection)
         _create_requested_villages(connection, village_ids)
         frame = pd.read_sql_query(
@@ -281,15 +314,13 @@ def _read_nearest_facilities(source_path: Path, village_ids: list[str]):
             JOIN (
               SELECT p.nearest_facility_uid
               FROM {SOURCE_L3_TABLE} p
-              JOIN requested_villages rv
-                ON rv.cs_feature_id = CAST(p.{VILLAGE_ID_COL} AS TEXT)
-              WHERE p.nearest_facility_uid IS NOT NULL
+              WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
+                AND p.nearest_facility_uid IS NOT NULL
               UNION
               SELECT p.nearest_facility_uid
               FROM {SOURCE_L2_TABLE} p
-              JOIN requested_villages rv
-                ON rv.cs_feature_id = CAST(p.{VILLAGE_ID_COL} AS TEXT)
-              WHERE p.nearest_facility_uid IS NOT NULL
+              WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
+                AND p.nearest_facility_uid IS NOT NULL
             ) u
               ON u.nearest_facility_uid = nf.facility_uid
             WHERE nf.latitude IS NOT NULL
@@ -377,12 +408,19 @@ def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> 
                 raise
             geoserver.create_workspace(FACILITIES_GEOSERVER_WORKSPACE)
 
-        response = push_shape_to_geoserver(
-            str(gpkg_path.with_suffix("")),
+        zip_path = gpkg_path.with_suffix(".zip")
+        if not zip_path.exists():
+            _zip_gpkg(gpkg_path)
+        if overwrite:
+            geoserver.delete_vector_store(
+                workspace=FACILITIES_GEOSERVER_WORKSPACE,
+                store=layer_name,
+            )
+        response = geoserver.create_shp_datastore(
+            path=str(zip_path),
             store_name=layer_name,
             workspace=FACILITIES_GEOSERVER_WORKSPACE,
-            layer_name=layer_name if overwrite else None,
-            file_type="gpkg",
+            file_extension="gpkg",
         )
         return {"ok": True, "response": response}
     except Exception as exc:
@@ -445,28 +483,42 @@ def generate_facilities_proximity(
     layer_name = _layer_name(district, block)
     output_dir = _output_dir(state, district, block)
     source_path = _source_path()
+    logger.info("Facilities proximity started: %s/%s/%s", state, district, block)
 
     resolved_state = _canonical_asset_name(state)
     resolved_district = _canonical_asset_name(district)
     resolved_block = _canonical_asset_name(block)
     try:
         t0 = time.perf_counter()
+        logger.info("Facilities proximity reading villages: %s/%s/%s", resolved_state, resolved_district, resolved_block)
         villages = _read_villages(resolved_state, resolved_district, resolved_block)
     except ValueError:
         resolved_state, resolved_district, resolved_block = _resolve_location(state, district, block)
+        logger.info("Facilities proximity resolved location: %s/%s/%s", resolved_state, resolved_district, resolved_block)
         villages = _read_villages(resolved_state, resolved_district, resolved_block)
     timings["read_villages_seconds"] = round(time.perf_counter() - t0, 3)
+    logger.info("Facilities proximity read %d villages in %.3fs", len(villages), timings["read_villages_seconds"])
 
     village_ids = villages[VILLAGE_ID_COL].dropna().astype(str).drop_duplicates().tolist()
     t0 = time.perf_counter()
+    logger.info("Facilities proximity reading L3/L2/nearest rows for %d villages", len(village_ids))
     l3 = _attach_village_geometry(villages, _read_l3_attributes(source_path, village_ids), "l3")
     l2 = _attach_village_geometry(villages, _read_l2_attributes(source_path, village_ids), "l2")
     nearest_facilities = _read_nearest_facilities(source_path, village_ids)
     timings["read_proximity_seconds"] = round(time.perf_counter() - t0, 3)
+    logger.info(
+        "Facilities proximity read proximity rows in %.3fs: l3=%d l2=%d nearest=%d",
+        timings["read_proximity_seconds"],
+        len(l3),
+        len(l2),
+        len(nearest_facilities),
+    )
 
     t0 = time.perf_counter()
+    logger.info("Facilities proximity writing output GPKG: %s", output_dir / f"{layer_name}.gpkg")
     gpkg_path, zip_path, row_counts = _write_tehsil_gpkg(l3=l3, l2=l2, villages=villages, nearest_facilities=nearest_facilities, output_dir=output_dir, layer_name=layer_name)
     timings["write_gpkg_seconds"] = round(time.perf_counter() - t0, 3)
+    logger.info("Facilities proximity wrote GPKG/zip in %.3fs: %s", timings["write_gpkg_seconds"], zip_path)
 
     geoserver = None
     geoserver_url = None
@@ -474,8 +526,10 @@ def generate_facilities_proximity(
     registration_error = None
     if _bool(sync_to_geoserver):
         t0 = time.perf_counter()
+        logger.info("Facilities proximity publishing to GeoServer: %s", layer_name)
         geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
+        logger.info("Facilities proximity GeoServer publish finished in %.3fs: %s", timings["publish_geoserver_seconds"], geoserver)
         if geoserver.get("ok"):
             geoserver_url = (
                 f"{settings.GEOSERVER_URL.rstrip('/')}/{FACILITIES_GEOSERVER_WORKSPACE}/ows"
@@ -505,6 +559,7 @@ def generate_facilities_proximity(
 
     elapsed = round(time.perf_counter() - started, 3)
     timings["total_seconds"] = elapsed
+    logger.info("Facilities proximity completed %s in %.3fs", layer_name, elapsed)
     return {
         "status": "success",
         "layer_name": layer_name,
