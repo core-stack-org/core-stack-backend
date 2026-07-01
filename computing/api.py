@@ -1575,12 +1575,35 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        state = str(request.data.get("state", "")).lower()
+        district = str(request.data.get("district", "")).lower()
+        block = str(request.data.get("block", "")).lower()
+        if not all([state, district, block]):
+            return Response(
+                {"Exception": "state, district and block are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         gee_account_id = request.data.get("gee_account_id")
+        levels = request.data.get("levels")
+        primary_level = request.data.get("primary_level")
+        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
+        overwrite = request.data.get("overwrite", False)
+        include_nearest_facilities = request.data.get(
+            "include_nearest_facilities", True
+        )
         generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            args=[
+                state,
+                district,
+                block,
+                gee_account_id,
+                levels,
+                primary_level,
+                sync_to_geoserver,
+                overwrite,
+                include_nearest_facilities,
+            ],
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
