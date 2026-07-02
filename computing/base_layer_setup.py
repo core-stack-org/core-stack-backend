@@ -132,7 +132,24 @@ def _download_s3_file(source: str, destination: Path):
 
     logger.info("Downloading %s to %s", source, destination)
     try:
-        boto3.client("s3").download_file(
+        client_kwargs = {}
+        try:
+            from django.conf import settings
+
+            if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY:
+                client_kwargs.update(
+                    aws_access_key_id=settings.S3_ACCESS_KEY,
+                    aws_secret_access_key=settings.S3_SECRET_KEY,
+                )
+            if getattr(settings, "S3_REGION", None):
+                client_kwargs["region_name"] = settings.S3_REGION
+        except Exception:
+            logger.debug(
+                "Django S3 settings unavailable; using boto3 credential provider chain.",
+                exc_info=True,
+            )
+
+        boto3.client("s3", **client_kwargs).download_file(
             parsed.netloc,
             parsed.path.lstrip("/"),
             str(temp_destination),
@@ -207,7 +224,7 @@ def ensure_soi_tehsil():
     more data but takes much longer to acquire.
     """
     if SOI_TEHSIL_PATH.exists():
-        logger.info("SOI tehsil layer already exists at %s, skipping.", SOI_TEHSIL_PATH)
+        logger.info("SOI tehsil layer already exists atrestack-da %s, skipping.", SOI_TEHSIL_PATH)
         return
 
     SOI_TEHSIL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -390,7 +407,7 @@ def ensure_tehsil_watersheds():
         output_dir=str(TEHSIL_WATERSHEDS_DIR),
         output_format="gpkg",
         overwrite=False,
-        clip_to_tehsil=False,
+        clip_to_tehsil=False,restack-da
     )
     logger.info("Tehsil watershed files ready at %s", TEHSIL_WATERSHEDS_DIR)
 
