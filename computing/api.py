@@ -28,7 +28,11 @@ from computing.change_detection.change_detection_vector import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
-from computing.layer_dependency.layer_generation_in_order import layer_generate_map
+from computing.layer_dependency.layer_generation_in_order import (
+    layer_generate_map,
+    normalize_compute as _normalize_layer_order_compute,
+    validate_layer_map_request,
+)
 from computing.misc.drainage_lines import (
     clip_drainage_lines as clip_drainage_lines_gee_task,
 )
@@ -148,7 +152,6 @@ from .misc.soge_vector import generate_soge_vector
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
-from computing.layer_dependency.layer_generation_in_order import layer_generate_map
 from .views import (
     check_missing_layers,
     layer_status,
@@ -1538,8 +1541,17 @@ def generate_layer_in_order(request):
         gee_account_id = request.data.get("gee_account_id")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
+        compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
+
+        validation_errors = validate_layer_map_request(map_order, compute=compute)
+        if validation_errors:
+            return Response(
+                {"Exception": "; ".join(validation_errors)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         layer_generate_map.apply_async(
             kwargs={
                 "state": state,
@@ -1549,12 +1561,16 @@ def generate_layer_in_order(request):
                 "gee_account_id": gee_account_id,
                 "start_year": start_year,
                 "end_year": end_year,
+                "compute": compute,
             },
             queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        print("Invalid request in generate_layer_order_first api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_layer_order_first api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

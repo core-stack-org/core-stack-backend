@@ -1,0 +1,101 @@
+{
+    "map_2_1": [
+        {
+            "name": "generate_terrain_raster"
+        },
+        {
+            "name": "generate_terrain_descriptor",
+            "depends_on": ["generate_terrain_raster"]
+        },
+        {
+            "name": "lulc_v3",
+            "use_global_args": true
+        },
+        {
+            "name": "lulc_vector",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "terrain_lulc_slope_cluster",
+            "depends_on": ["generate_terrain_descriptor", "lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "terrain_lulc_plain_cluster",
+            "depends_on": ["generate_terrain_descriptor", "lulc_v3"],
+            "use_global_args": true
+        }
+    ],
+    "map_2_2": [
+        {
+            "name": "generate_ci_layer",
+            "use_global_args": true
+        },
+        {
+            "name": "generate_swb",
+            "use_global_args": true
+        }
+    ],
+    "map_3": [
+        {
+            "name": "change_detection",
+            "use_global_args": true
+        },
+        {
+            "name": "change_detection_vector",
+            "depends_on": ["change_detection"],
+            "use_global_args": true
+        }
+    ],
+    "map_static": [
+        {
+            "name": "generate_drainage_layer"
+        },
+        {
+            "name": "generate_slope_percentage"
+        },
+        {
+            "name": "generate_catchment_area_singleflow"
+        },
+        {
+            "name": "generate_natural_depression"
+        },
+        {
+            "name": "generate_lcw"
+        },
+        {
+            "name": "generate_agroecological"
+        },
+        {
+            "name": "generate_factory_csr"
+        },
+        {
+            "name": "generate_green_credit"
+        },
+        {
+            "name": "generate_mining"
+        },
+        {
+            "name": "soge_vector"
+        },
+        {
+            "name": "aquifer_vector"
+        },
+        {
+            "name": "restoration_opportunity"
+        },
+        {
+            "name": "generate_mws_connectivity"
+        },
+        {
+            "name": "generate_mws_centroid"
+        },
+        {
+            "name": "generate_facilities_proximity"
+        },
+        {
+            "name": "generate_nrega_layer"
+        }
+    ]
+}
