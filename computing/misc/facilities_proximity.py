@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import json
 import re
+import shutil
 import sqlite3
 import time
+import tempfile
 import zipfile
 from functools import lru_cache
 from pathlib import Path
@@ -42,7 +45,8 @@ VILLAGE_ID_COL = "cs_feature_id"
 OUTPUT_DIR = "data/facilities/outputs/tehsil_data"
 LAYER_PREFIX = "facilities"
 ALGORITHM = "local-facilities-proximity-gpkg-export"
-ALGORITHM_VERSION = "2.0"
+ALGORITHM_VERSION = "2.1"
+CACHE_SCHEMA_VERSION = 1
 OUTPUT_INVENTORY = "inventory"
 OUTPUT_NEAREST = "nearest"
 OUTPUT_VILLAGE_SERVICE = "village_service"
@@ -68,6 +72,20 @@ LOCAL_GPKG_LAYER_NAMES = {
     OUTPUT_NEAREST: "facilities_nearest",
     OUTPUT_VILLAGE_SERVICE: "facilities_village_service",
 }
+INVENTORY_EXPORT_COLUMNS = [
+    "facility_uid",
+    "facility_name",
+    "facility_code",
+    "latitude",
+    "longitude",
+    "class_l1_domain",
+    "class_l2_filter_group",
+    "class_l3_facility_class",
+    "class_l4_facility_subtype",
+    "facilities_layer_kind",
+    "title",
+    "geometry",
+]
 VILLAGE_CONTEXT_COLUMNS = [
     "cs_feature_id",
     "state_name",
@@ -135,6 +153,119 @@ def _geoserver_layer_name(output_key: str, district: str, block: str) -> str:
 
 def _output_dir(state: str, district: str, block: str) -> Path:
     return _repo_path(OUTPUT_DIR) / _slug(state) / _slug(district) / _slug(block)
+
+
+def _bundle_stem(layer_name: str, selected_outputs: tuple[str, ...]) -> str:
+    if selected_outputs == ALL_OUTPUTS:
+        return layer_name
+    return f"{layer_name}_{'_'.join(selected_outputs)}"
+
+
+def _bundle_paths(output_dir: Path, bundle_stem: str) -> tuple[Path, Path, Path]:
+    gpkg_path = output_dir / f"{bundle_stem}.gpkg"
+    return gpkg_path, gpkg_path.with_suffix(".zip"), output_dir / f"{bundle_stem}.manifest.json"
+
+
+def _path_signature(path: Path) -> dict[str, Any]:
+    stat = path.stat()
+    return {
+        "path": path.as_posix(),
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def _source_signature(selected_outputs: tuple[str, ...]) -> dict[str, Any]:
+    signature = {"proximity": _path_signature(_source_path())}
+    if OUTPUT_INVENTORY in selected_outputs:
+        signature["facilities"] = _path_signature(_facilities_path())
+    return signature
+
+
+def _read_manifest(manifest_path: Path) -> dict[str, Any] | None:
+    if not manifest_path.exists():
+        return None
+    try:
+        return json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _cache_is_valid(
+    manifest: dict[str, Any] | None,
+    selected_outputs: tuple[str, ...],
+    source_signature: dict[str, Any],
+    gpkg_path: Path,
+) -> bool:
+    if not manifest or not gpkg_path.exists():
+        return False
+    return (
+        manifest.get("cache_schema_version") == CACHE_SCHEMA_VERSION
+        and manifest.get("algorithm_version") == ALGORITHM_VERSION
+        and tuple(manifest.get("selected_outputs", [])) == selected_outputs
+        and manifest.get("source_signature") == source_signature
+    )
+
+
+def _write_manifest(
+    manifest_path: Path,
+    *,
+    selected_outputs: tuple[str, ...],
+    source_signature: dict[str, Any],
+    row_counts: dict[str, int],
+    gpkg_path: Path,
+    zip_path: Path | None,
+    output_dir: Path,
+    resolved_state: str,
+    resolved_district: str,
+    resolved_block: str,
+    source_village_geometry: str,
+) -> dict[str, Any]:
+    manifest = {
+        "cache_schema_version": CACHE_SCHEMA_VERSION,
+        "algorithm": ALGORITHM,
+        "algorithm_version": ALGORITHM_VERSION,
+        "selected_outputs": list(selected_outputs),
+        "source_signature": source_signature,
+        "row_counts": row_counts,
+        "gpkg_path": gpkg_path.as_posix(),
+        "zip_path": zip_path.as_posix() if zip_path else None,
+        "output_dir": output_dir.as_posix(),
+        "state_name": resolved_state,
+        "district_name": resolved_district,
+        "tehsil": resolved_block,
+        "source_village_geometry": source_village_geometry,
+        "created_epoch_seconds": round(time.time(), 3),
+    }
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
+
+
+def _load_bundle_layers(gpkg_path: Path, selected_outputs: tuple[str, ...]) -> dict[str, Any]:
+    gpd = _gpd()
+    return {
+        output_key: gpd.read_file(gpkg_path, layer=LOCAL_GPKG_LAYER_NAMES[output_key])
+        for output_key in selected_outputs
+    }
+
+
+def _output_results_template(
+    selected_outputs: tuple[str, ...],
+    row_counts: dict[str, int],
+    district: str,
+    block: str,
+) -> dict[str, dict[str, Any]]:
+    return {
+        output_key: {
+            "local_layer": LOCAL_GPKG_LAYER_NAMES[output_key],
+            "geoserver_layer_name": _geoserver_layer_name(output_key, district, block),
+            "row_count": row_counts.get(output_key, 0),
+            "geoserver_url": None,
+            "layer_id": None,
+            "registration_error": None,
+        }
+        for output_key in selected_outputs
+    }
 
 
 def _parse_outputs(outputs: Any = None) -> tuple[str, ...]:
@@ -290,19 +421,12 @@ def _read_villages(state_name: str, district_name: str, tehsil_name: str):
     return fix_invalid_geometry_in_gdf(gdf)
 
 
-def _create_requested_villages(connection: sqlite3.Connection, village_ids: list[str]) -> None:
-    connection.execute("DROP TABLE IF EXISTS temp.requested_villages")
-    connection.execute("CREATE TEMP TABLE requested_villages (cs_feature_id TEXT PRIMARY KEY)")
-    connection.executemany(
-        "INSERT OR IGNORE INTO requested_villages (cs_feature_id) VALUES (?)",
-        [(str(village_id),) for village_id in village_ids],
-    )
-
-
 def _read_l3_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFrame:
+    if not village_ids:
+        return pd.DataFrame()
+    placeholders = ", ".join(["?"] * len(village_ids))
     with _source_connection(source_path) as connection:
         _require_source_tables(connection)
-        _create_requested_villages(connection, village_ids)
         return pd.read_sql_query(
             f"""
             SELECT
@@ -315,16 +439,19 @@ def _read_l3_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
             FROM {SOURCE_L3_TABLE} p
             LEFT JOIN {SOURCE_CLASS_MAP_TABLE} m
               ON m.class_l3_facility_class = p.class_l3_facility_class
-            WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
+            WHERE p.{VILLAGE_ID_COL} IN ({placeholders})
             """,
             connection,
+            params=village_ids,
         )
 
 
 def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFrame:
+    if not village_ids:
+        return pd.DataFrame()
+    placeholders = ", ".join(["?"] * len(village_ids))
     with _source_connection(source_path) as connection:
         _require_source_tables(connection)
-        _create_requested_villages(connection, village_ids)
         frame = pd.read_sql_query(
             f"""
             SELECT
@@ -335,9 +462,10 @@ def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
               p.selected_component_class,
               p.nearest_facility_uid
             FROM {SOURCE_L2_TABLE} p
-            WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
+            WHERE p.{VILLAGE_ID_COL} IN ({placeholders})
             """,
             connection,
+            params=village_ids,
         )
     if frame.empty:
         raise RuntimeError(
@@ -405,25 +533,10 @@ def _read_inventory_facilities(villages):
               facility_code,
               latitude,
               longitude,
-              urban_rural,
-              pincode,
-              establishment_year,
-              district_lgd,
-              village_census11,
-              village_name,
               class_l1_domain,
               class_l2_filter_group,
               class_l3_facility_class,
               class_l4_facility_subtype,
-              class_k1,
-              class_k2,
-              class_k3,
-              class_k4,
-              class_k5,
-              class_k6,
-              class_k7,
-              class_k8,
-              membership_count,
               f.geom
             FROM {SOURCE_FACILITIES_TABLE} f
             JOIN rtree_facilities_geom r
@@ -447,32 +560,14 @@ def _read_inventory_facilities(villages):
     frame["facilities_layer_kind"] = OUTPUT_INVENTORY
     frame["title"] = frame["facility_name"].fillna(frame["facility_uid"])
     facilities = gpd.GeoDataFrame(frame, geometry=geometry, crs="EPSG:4326")
-    village_context = villages[
-        [
-            VILLAGE_ID_COL,
-            "state_name",
-            "district_name",
-            "TEHSIL",
-            "pc11_village_id",
-            "NAME",
-            "geometry",
-        ]
-    ].rename(
-        columns={
-            VILLAGE_ID_COL: "containing_cs_feature_id",
-            "state_name": "containing_state_name",
-            "district_name": "containing_district_name",
-            "TEHSIL": "containing_tehsil",
-            "pc11_village_id": "containing_pc11_village_id",
-            "NAME": "containing_village_name",
-        }
-    )
+    village_context = villages[["geometry"]]
     joined = gpd.sjoin(facilities, village_context, how="inner", predicate="intersects")
     if "index_right" in joined.columns:
         joined = joined.drop(columns=["index_right"])
     if "facility_fid" in joined.columns:
         joined = joined.drop_duplicates(subset=["facility_fid"])
-    return gpd.GeoDataFrame(joined, geometry="geometry", crs="EPSG:4326")
+        joined = joined.drop(columns=["facility_fid"])
+    return gpd.GeoDataFrame(joined[INVENTORY_EXPORT_COLUMNS], geometry="geometry", crs="EPSG:4326")
 
 
 def _village_context_frame(villages) -> pd.DataFrame:
@@ -480,14 +575,6 @@ def _village_context_frame(villages) -> pd.DataFrame:
     context = villages[village_cols].copy()
     context[VILLAGE_ID_COL] = context[VILLAGE_ID_COL].astype(str)
     return context
-
-
-def _join_text(values: pd.Series, limit: int = 50) -> str | None:
-    items = sorted({str(value) for value in values.dropna() if str(value)})
-    if not items:
-        return None
-    suffix = "" if len(items) <= limit else f"; +{len(items) - limit} more"
-    return "; ".join(items[:limit]) + suffix
 
 
 def _build_nearest_service(
@@ -524,30 +611,28 @@ def _build_nearest_service(
     if frame.empty:
         return gpd.GeoDataFrame(frame, geometry=[], crs="EPSG:4326")
 
-    coverage = (
-        frame.groupby("nearest_facility_uid")
-        .agg(
-            served_village_count=(VILLAGE_ID_COL, "nunique"),
-            service_row_count=(VILLAGE_ID_COL, "size"),
-            service_purpose_count=("service_purpose", "nunique"),
-            nearest_distance_min_km=("nearest_distance_km", "min"),
-            nearest_distance_mean_km=("nearest_distance_km", "mean"),
-            nearest_distance_max_km=("nearest_distance_km", "max"),
-            service_levels=("service_level", _join_text),
-            service_purposes=("service_purpose", _join_text),
-            selected_l3_facility_classes=("selected_l3_facility_class", _join_text),
-        )
-        .reset_index()
+    coverage = frame.groupby("nearest_facility_uid").agg(
+        served_village_count=(VILLAGE_ID_COL, "nunique"),
+        service_row_count=(VILLAGE_ID_COL, "size"),
+        service_purpose_count=("service_purpose", "nunique"),
+        nearest_distance_min_km=("nearest_distance_km", "min"),
+        nearest_distance_mean_km=("nearest_distance_km", "mean"),
+        nearest_distance_max_km=("nearest_distance_km", "max"),
     )
-    village_names = _village_context_frame(villages)[[VILLAGE_ID_COL, "NAME"]]
-    served_names = frame[[VILLAGE_ID_COL, "nearest_facility_uid"]].drop_duplicates()
-    served_names = served_names.merge(village_names, on=VILLAGE_ID_COL, how="left")
-    served_names = (
-        served_names.groupby("nearest_facility_uid")["NAME"]
-        .agg(lambda values: _join_text(values, limit=50))
-        .reset_index(name="served_villages")
+    level_counts = frame.pivot_table(
+        index="nearest_facility_uid",
+        columns="service_level",
+        values=VILLAGE_ID_COL,
+        aggfunc="size",
+        fill_value=0,
     )
-    coverage = coverage.merge(served_names, on="nearest_facility_uid", how="left")
+    level_counts = level_counts.rename(
+        columns={
+            "l2": "l2_service_row_count",
+            "l3": "l3_service_row_count",
+        }
+    )
+    coverage = coverage.join(level_counts, how="left").fillna(0).reset_index()
 
     if nearest_facilities.empty:
         return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326")
@@ -652,25 +737,6 @@ def _build_village_service(villages, l3_attributes: pd.DataFrame, l2_attributes:
     return _gpd().GeoDataFrame(merged, geometry="geometry", crs=villages.crs)
 
 
-def _attach_village_geometry(villages, attributes: pd.DataFrame, level: str):
-    village_cols = [col for col in VILLAGE_CONTEXT_COLUMNS if col in villages.columns]
-    base = villages[village_cols + ["geometry"]].copy()
-    base[VILLAGE_ID_COL] = base[VILLAGE_ID_COL].astype(str)
-    attributes = attributes.copy()
-    attributes[VILLAGE_ID_COL] = attributes[VILLAGE_ID_COL].astype(str)
-    merged = base.merge(attributes, on=VILLAGE_ID_COL, how="inner")
-    if merged.empty:
-        raise ValueError(f"No {level} proximity rows found for requested villages")
-    merged["proximity_level"] = level
-    merged["title"] = merged["nearest_facility_name"].fillna(
-        merged.get("class_l3_facility_class", merged.get("class_l2_filter_group"))
-    )
-    drop_cols = [col for col in ("_village_latitude", "_village_longitude", "filter_logic") if col in merged.columns]
-    if drop_cols:
-        merged = merged.drop(columns=drop_cols)
-    return _gpd().GeoDataFrame(merged, geometry="geometry", crs=villages.crs)
-
-
 def _write_layer(gdf, gpkg_path: Path, layer: str, mode: str) -> None:
     gdf.to_file(gpkg_path, layer=layer, driver="GPKG", mode=mode)
 
@@ -699,23 +765,26 @@ def _write_tehsil_gpkg(
 
     row_counts: dict[str, int] = {}
     first = True
-    for output_key in ALL_OUTPUTS:
-        gdf = output_layers.get(output_key)
-        if gdf is None:
-            continue
-        row_counts[output_key] = int(len(gdf))
-        if gdf.empty:
-            continue
-        _write_layer(
-            gdf,
-            gpkg_path,
-            LOCAL_GPKG_LAYER_NAMES[output_key],
-            "w" if first else "a",
-        )
-        first = False
+    with tempfile.TemporaryDirectory(prefix="facilities_gpkg_") as temp_dir:
+        temp_gpkg_path = Path(temp_dir) / gpkg_path.name
+        for output_key in ALL_OUTPUTS:
+            gdf = output_layers.get(output_key)
+            if gdf is None:
+                continue
+            row_counts[output_key] = int(len(gdf))
+            if gdf.empty:
+                continue
+            _write_layer(
+                gdf,
+                temp_gpkg_path,
+                LOCAL_GPKG_LAYER_NAMES[output_key],
+                "w" if first else "a",
+            )
+            first = False
 
-    if first:
-        raise ValueError("No non-empty facilities outputs were produced")
+        if first:
+            raise ValueError("No non-empty facilities outputs were produced")
+        shutil.move(str(temp_gpkg_path), gpkg_path)
 
     if zip_output:
         return gpkg_path, _zip_gpkg(gpkg_path), row_counts
@@ -730,7 +799,10 @@ def _write_single_layer_gpkg(gdf, output_dir: Path, layer_name: str) -> Path:
     for path in (gpkg_path, zip_path):
         if path.exists():
             path.unlink()
-    _write_layer(gdf, gpkg_path, layer_name, "w")
+    with tempfile.TemporaryDirectory(prefix="facilities_geoserver_gpkg_") as temp_dir:
+        temp_gpkg_path = Path(temp_dir) / gpkg_path.name
+        _write_layer(gdf, temp_gpkg_path, layer_name, "w")
+        shutil.move(str(temp_gpkg_path), gpkg_path)
     _zip_gpkg(gpkg_path)
     return gpkg_path
 
@@ -859,6 +931,81 @@ def _register_layer(
         return None, {"error_type": exc.__class__.__name__, "error": str(exc)[:500]}
 
 
+def _publish_and_register_outputs(
+    *,
+    output_layers: dict[str, Any],
+    output_dir: Path,
+    district: str,
+    block: str,
+    resolved_state: str,
+    resolved_district: str,
+    resolved_block: str,
+    source_path: Path,
+    facilities_source: str | None,
+    gpkg_path: Path,
+    zip_path: Path | None,
+    row_counts: dict[str, int],
+    output_results: dict[str, dict[str, Any]],
+    overwrite: bool,
+) -> tuple[dict[str, dict[str, Any]], bool]:
+    geoserver = _publish_outputs_to_geoserver(
+        output_layers=output_layers,
+        output_dir=output_dir,
+        district=district,
+        block=block,
+        overwrite=_bool(overwrite),
+    )
+    successful_layers: list[str] = []
+    for output_key, publish_result in geoserver.items():
+        if not publish_result.get("ok"):
+            output_results[output_key]["registration_error"] = publish_result
+            continue
+        geoserver_layer_name = publish_result["layer_name"]
+        geoserver_url = (
+            f"{settings.GEOSERVER_URL.rstrip('/')}/{FACILITIES_GEOSERVER_WORKSPACE}/ows"
+            "?service=WFS&version=1.0.0&request=GetFeature"
+            f"&typeName={FACILITIES_GEOSERVER_WORKSPACE}:{geoserver_layer_name}"
+            "&outputFormat=application/json"
+        )
+        layer_output = {
+            "is_generated_locally": True,
+            "source": source_path.as_posix(),
+            "facilities_source": facilities_source,
+            "gpkg_path": gpkg_path.as_posix(),
+            "zip_path": zip_path.as_posix() if zip_path else None,
+            "output_dir": output_dir.as_posix(),
+            "row_counts": row_counts,
+            "output_key": output_key,
+            "local_gpkg_layer": LOCAL_GPKG_LAYER_NAMES[output_key],
+            "geoserver_workspace": FACILITIES_GEOSERVER_WORKSPACE,
+            "geoserver_layer_name": geoserver_layer_name,
+            "geoserver_url": geoserver_url,
+        }
+        layer_id, registration_error = _register_layer(
+            resolved_state,
+            resolved_district,
+            resolved_block,
+            geoserver_layer_name,
+            geoserver_url,
+            layer_output,
+            _bool(overwrite),
+        )
+        output_results[output_key].update(
+            {
+                "geoserver_url": geoserver_url,
+                "layer_id": layer_id,
+                "registration_error": registration_error,
+            }
+        )
+        successful_layers.append(geoserver_layer_name)
+    layer_group_created = _create_or_refresh_layer_group(
+        successful_layers,
+        district,
+        block,
+    )
+    return geoserver, layer_group_created
+
+
 def generate_facilities_proximity(
     state: str,
     district: str,
@@ -867,13 +1014,17 @@ def generate_facilities_proximity(
     overwrite: bool = False,
     outputs: Any = "all",
     zip_output: bool = False,
+    force_rebuild: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
     layer_name = _layer_name(district, block)
     selected_outputs = _parse_outputs(outputs)
+    bundle_stem = _bundle_stem(layer_name, selected_outputs)
     output_dir = _output_dir(state, district, block)
+    gpkg_path, cached_zip_path, manifest_path = _bundle_paths(output_dir, bundle_stem)
     source_path = _source_path()
+    signature = _source_signature(selected_outputs)
     logger.info(
         "Facilities proximity started: %s/%s/%s outputs=%s",
         state,
@@ -881,6 +1032,67 @@ def generate_facilities_proximity(
         block,
         selected_outputs,
     )
+
+    t0 = time.perf_counter()
+    manifest = _read_manifest(manifest_path)
+    if not _bool(force_rebuild) and _cache_is_valid(manifest, selected_outputs, signature, gpkg_path):
+        row_counts = {key: int(value) for key, value in manifest.get("row_counts", {}).items()}
+        output_results = _output_results_template(selected_outputs, row_counts, district, block)
+        facilities_source = _facilities_path().as_posix() if OUTPUT_INVENTORY in selected_outputs else None
+        zip_path = cached_zip_path if cached_zip_path.exists() else None
+        geoserver: dict[str, dict[str, Any]] | None = None
+        geoserver_layer_group_created = False
+        timings["cache_lookup_seconds"] = round(time.perf_counter() - t0, 3)
+        if _bool(sync_to_geoserver):
+            t0 = time.perf_counter()
+            output_layers = _load_bundle_layers(gpkg_path, selected_outputs)
+            timings["read_cached_layers_seconds"] = round(time.perf_counter() - t0, 3)
+            t0 = time.perf_counter()
+            geoserver, geoserver_layer_group_created = _publish_and_register_outputs(
+                output_layers=output_layers,
+                output_dir=output_dir,
+                district=district,
+                block=block,
+                resolved_state=manifest["state_name"],
+                resolved_district=manifest["district_name"],
+                resolved_block=manifest["tehsil"],
+                source_path=source_path,
+                facilities_source=facilities_source,
+                gpkg_path=gpkg_path,
+                zip_path=zip_path,
+                row_counts=row_counts,
+                output_results=output_results,
+                overwrite=_bool(overwrite),
+            )
+            timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
+        elapsed = round(time.perf_counter() - started, 3)
+        timings["total_seconds"] = elapsed
+        logger.info("Facilities proximity cache hit %s in %.3fs", bundle_stem, elapsed)
+        return {
+            "status": "success",
+            "cache_hit": True,
+            "layer_name": layer_name,
+            "bundle_name": bundle_stem,
+            "selected_outputs": list(selected_outputs),
+            "outputs": output_results,
+            "row_counts": row_counts,
+            "source": source_path.as_posix(),
+            "facilities_source": facilities_source,
+            "source_village_layer": SOURCE_VILLAGE_LAYER,
+            "source_village_geometry": manifest.get("source_village_geometry"),
+            "gpkg_path": gpkg_path.as_posix(),
+            "zip_path": zip_path.as_posix() if zip_path else None,
+            "output_dir": output_dir.as_posix(),
+            "state_name": manifest["state_name"],
+            "district_name": manifest["district_name"],
+            "tehsil": manifest["tehsil"],
+            "sync_to_geoserver": _bool(sync_to_geoserver),
+            "geoserver": geoserver,
+            "geoserver_layer_group_created": geoserver_layer_group_created,
+            "timings": timings,
+            "elapsed_seconds": elapsed,
+        }
+    timings["cache_lookup_seconds"] = round(time.perf_counter() - t0, 3)
 
     resolved_state = _canonical_asset_name(state)
     resolved_district = _canonical_asset_name(district)
@@ -901,7 +1113,6 @@ def generate_facilities_proximity(
     proximity_outputs = {OUTPUT_NEAREST, OUTPUT_VILLAGE_SERVICE}
     l3_attributes = pd.DataFrame()
     l2_attributes = pd.DataFrame()
-    nearest_facilities = None
 
     if OUTPUT_INVENTORY in selected_outputs:
         t0 = time.perf_counter()
@@ -968,104 +1179,71 @@ def generate_facilities_proximity(
         timings["build_village_service_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
-    logger.info("Facilities proximity writing output GPKG: %s", output_dir / f"{layer_name}.gpkg")
+    logger.info("Facilities proximity writing output GPKG: %s", output_dir / f"{bundle_stem}.gpkg")
     gpkg_path, zip_path, row_counts = _write_tehsil_gpkg(
         output_layers=output_layers,
         output_dir=output_dir,
-        layer_name=layer_name,
+        layer_name=bundle_stem,
         zip_output=_bool(zip_output) or _bool(sync_to_geoserver),
     )
     timings["write_gpkg_seconds"] = round(time.perf_counter() - t0, 3)
     logger.info("Facilities proximity wrote GPKG in %.3fs: %s", timings["write_gpkg_seconds"], gpkg_path)
+    source_village_geometry = str(villages.geometry.geom_type.mode().iloc[0])
+    manifest = _write_manifest(
+        manifest_path,
+        selected_outputs=selected_outputs,
+        source_signature=signature,
+        row_counts=row_counts,
+        gpkg_path=gpkg_path,
+        zip_path=zip_path,
+        output_dir=output_dir,
+        resolved_state=resolved_state,
+        resolved_district=resolved_district,
+        resolved_block=resolved_block,
+        source_village_geometry=source_village_geometry,
+    )
 
     geoserver: dict[str, dict[str, Any]] | None = None
     geoserver_layer_group_created = False
     facilities_source = _facilities_path().as_posix() if OUTPUT_INVENTORY in selected_outputs else None
-    output_results: dict[str, dict[str, Any]] = {
-        output_key: {
-            "local_layer": LOCAL_GPKG_LAYER_NAMES[output_key],
-            "geoserver_layer_name": _geoserver_layer_name(output_key, district, block),
-            "row_count": row_counts.get(output_key, 0),
-            "geoserver_url": None,
-            "layer_id": None,
-            "registration_error": None,
-        }
-        for output_key in selected_outputs
-    }
+    output_results = _output_results_template(selected_outputs, row_counts, district, block)
     if _bool(sync_to_geoserver):
         t0 = time.perf_counter()
         logger.info("Facilities proximity publishing selected outputs to GeoServer: %s", selected_outputs)
-        geoserver = _publish_outputs_to_geoserver(
+        geoserver, geoserver_layer_group_created = _publish_and_register_outputs(
             output_layers=output_layers,
             output_dir=output_dir,
             district=district,
             block=block,
+            resolved_state=resolved_state,
+            resolved_district=resolved_district,
+            resolved_block=resolved_block,
+            source_path=source_path,
+            facilities_source=facilities_source,
+            gpkg_path=gpkg_path,
+            zip_path=zip_path,
+            row_counts=row_counts,
+            output_results=output_results,
             overwrite=_bool(overwrite),
         )
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
         logger.info("Facilities proximity GeoServer publish finished in %.3fs: %s", timings["publish_geoserver_seconds"], geoserver)
-        successful_layers: list[str] = []
-        for output_key, publish_result in geoserver.items():
-            if not publish_result.get("ok"):
-                output_results[output_key]["registration_error"] = publish_result
-                continue
-            geoserver_layer_name = publish_result["layer_name"]
-            geoserver_url = (
-                f"{settings.GEOSERVER_URL.rstrip('/')}/{FACILITIES_GEOSERVER_WORKSPACE}/ows"
-                "?service=WFS&version=1.0.0&request=GetFeature"
-                f"&typeName={FACILITIES_GEOSERVER_WORKSPACE}:{geoserver_layer_name}"
-                "&outputFormat=application/json"
-            )
-            layer_output = {
-                "is_generated_locally": True,
-                "source": source_path.as_posix(),
-                "facilities_source": facilities_source,
-                "gpkg_path": gpkg_path.as_posix(),
-                "zip_path": zip_path.as_posix() if zip_path else None,
-                "output_dir": output_dir.as_posix(),
-                "row_counts": row_counts,
-                "output_key": output_key,
-                "local_gpkg_layer": LOCAL_GPKG_LAYER_NAMES[output_key],
-                "geoserver_workspace": FACILITIES_GEOSERVER_WORKSPACE,
-                "geoserver_layer_name": geoserver_layer_name,
-                "geoserver_url": geoserver_url,
-            }
-            layer_id, registration_error = _register_layer(
-                resolved_state,
-                resolved_district,
-                resolved_block,
-                geoserver_layer_name,
-                geoserver_url,
-                layer_output,
-                _bool(overwrite),
-            )
-            output_results[output_key].update(
-                {
-                    "geoserver_url": geoserver_url,
-                    "layer_id": layer_id,
-                    "registration_error": registration_error,
-                }
-            )
-            successful_layers.append(geoserver_layer_name)
-        geoserver_layer_group_created = _create_or_refresh_layer_group(
-            successful_layers,
-            district,
-            block,
-        )
 
     elapsed = round(time.perf_counter() - started, 3)
     timings["total_seconds"] = elapsed
     logger.info("Facilities proximity completed %s in %.3fs", layer_name, elapsed)
     return {
         "status": "success",
+        "cache_hit": False,
         "layer_name": layer_name,
+        "bundle_name": bundle_stem,
         "selected_outputs": list(selected_outputs),
         "outputs": output_results,
         "row_counts": row_counts,
         "source": source_path.as_posix(),
         "facilities_source": facilities_source,
         "source_village_layer": SOURCE_VILLAGE_LAYER,
-        "source_village_geometry": str(villages.geometry.geom_type.mode().iloc[0]),
+        "source_village_geometry": manifest["source_village_geometry"],
         "gpkg_path": gpkg_path.as_posix(),
         "zip_path": zip_path.as_posix() if zip_path else None,
         "output_dir": output_dir.as_posix(),
@@ -1090,6 +1268,7 @@ def generate_facilities_proximity_task(
     overwrite: bool = False,
     outputs: Any = "all",
     zip_output: bool = False,
+    force_rebuild: bool = False,
     **_ignored: Any,
 ) -> dict[str, Any]:
     """Celery wrapper for the local facilities proximity export."""
@@ -1101,4 +1280,5 @@ def generate_facilities_proximity_task(
         overwrite=overwrite,
         outputs=outputs,
         zip_output=zip_output,
+        force_rebuild=force_rebuild,
     )
