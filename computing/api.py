@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import requests
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
@@ -37,7 +38,7 @@ from .utils import (
     Geoserver,
     kml_to_shp,
 )
-from utilities.gee_utils import download_gee_layer, check_gee_task_status, valid_gee_text
+from utilities.gee_utils import download_gee_layer, check_gee_task_status
 from django.core.files.storage import FileSystemStorage
 from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE, KML_PATH
 from .mws.mws import mws_layer
@@ -1582,15 +1583,25 @@ def generate_facilities_proximity(request):
         overwrite = request.data.get("overwrite", False)
         outputs = request.data.get("outputs", request.data.get("output_layers", "all"))
         zip_output = request.data.get("zip_output", False)
-        district_slug = valid_gee_text(district.lower()).replace("-", "_")
-        block_slug = valid_gee_text(block.lower()).replace("-", "_")
+        force_rebuild = request.data.get("force_rebuild", False)
+        district_slug = re.sub(r"[^a-z0-9]+", "_", district.lower()).strip("_")
+        block_slug = re.sub(r"[^a-z0-9]+", "_", block.lower()).strip("_")
         expected_layers = {
             "inventory": f"facilities_inventory_{district_slug}_{block_slug}",
             "nearest": f"facilities_nearest_{district_slug}_{block_slug}",
             "village_service": f"facilities_village_service_{district_slug}_{block_slug}",
         }
         generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite, outputs, zip_output],
+            args=[
+                state,
+                district,
+                block,
+                sync_to_geoserver,
+                overwrite,
+                outputs,
+                zip_output,
+                force_rebuild,
+            ],
             queue="nrm",
         )
         return Response(
@@ -1598,6 +1609,7 @@ def generate_facilities_proximity(request):
                 "Success": "Successfully initiated",
                 "workspace": FACILITIES_GEOSERVER_WORKSPACE,
                 "outputs": outputs,
+                "force_rebuild": force_rebuild,
                 "expected_layers": expected_layers,
                 "expected_layer_group": f"facilities_{district_slug}_{block_slug}",
             },
