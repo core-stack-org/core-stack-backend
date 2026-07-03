@@ -63,14 +63,28 @@ def _expand_periodic_layer(layer: dict) -> list[dict]:
     return expanded_layers
 
 
+def _expand_manifest_layers(layers: list[dict]) -> list[dict]:
+    expanded_layers = []
+    for layer in layers:
+        expanded_layers.extend(_expand_periodic_layer(layer))
+    return expanded_layers
+
+
+def _walk_manifest_layers(node):
+    if isinstance(node, list):
+        yield from _expand_manifest_layers(node)
+        return
+
+    if not isinstance(node, dict):
+        return
+
+    for value in node.values():
+        yield from _walk_manifest_layers(value)
+
+
 def _manifest_base_layers() -> list[dict]:
     base_layers = _cfg.get("base_layers", {})
-    layers = []
-    layers.extend(base_layers.get("static_layers", []))
-    layers.extend(base_layers.get("on_demand_layers", []))
-    for layer in base_layers.get("periodic_layers", []):
-        layers.extend(_expand_periodic_layer(layer))
-    return layers
+    return list(_walk_manifest_layers(base_layers))
 
 
 def _base_layer(name: str, *, required: bool = True) -> dict | None:
