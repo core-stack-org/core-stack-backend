@@ -37,9 +37,9 @@ from .utils import (
     Geoserver,
     kml_to_shp,
 )
-from utilities.gee_utils import download_gee_layer, check_gee_task_status
+from utilities.gee_utils import download_gee_layer, check_gee_task_status, valid_gee_text
 from django.core.files.storage import FileSystemStorage
-from utilities.constants import KML_PATH
+from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE, KML_PATH
 from .mws.mws import mws_layer
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .surface_water_bodies.swb import generate_swb_layer
@@ -1580,12 +1580,28 @@ def generate_facilities_proximity(request):
         block = request.data.get("block").lower()
         sync_to_geoserver = request.data.get("sync_to_geoserver", True)
         overwrite = request.data.get("overwrite", False)
+        outputs = request.data.get("outputs", request.data.get("output_layers", "all"))
+        zip_output = request.data.get("zip_output", False)
+        district_slug = valid_gee_text(district.lower()).replace("-", "_")
+        block_slug = valid_gee_text(block.lower()).replace("-", "_")
+        expected_layers = {
+            "inventory": f"facilities_inventory_{district_slug}_{block_slug}",
+            "nearest": f"facilities_nearest_{district_slug}_{block_slug}",
+            "village_service": f"facilities_village_service_{district_slug}_{block_slug}",
+        }
         generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+            args=[state, district, block, sync_to_geoserver, overwrite, outputs, zip_output],
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "Success": "Successfully initiated",
+                "workspace": FACILITIES_GEOSERVER_WORKSPACE,
+                "outputs": outputs,
+                "expected_layers": expected_layers,
+                "expected_layer_group": f"facilities_{district_slug}_{block_slug}",
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)

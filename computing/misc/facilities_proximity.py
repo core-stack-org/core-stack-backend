@@ -23,6 +23,7 @@ from computing.utils import (
 from nrm_app.celery import app
 from utilities.constants import (
     FACILITIES_DATASET_NAME,
+    FACILITIES_MASTER_GPKG,
     FACILITIES_GEOSERVER_WORKSPACE,
     FACILITIES_PROXIMITY_GPKG,
 )
@@ -36,11 +37,37 @@ SOURCE_L3_TABLE = "proximity_l3"
 SOURCE_L2_TABLE = "proximity_l2_materialized"
 SOURCE_CLASS_MAP_TABLE = "proximity_class_map"
 SOURCE_NEAREST_TABLE = "proximity_nearest_facilities"
+SOURCE_FACILITIES_TABLE = "facilities"
 VILLAGE_ID_COL = "cs_feature_id"
 OUTPUT_DIR = "data/facilities/outputs/tehsil_data"
 LAYER_PREFIX = "facilities"
 ALGORITHM = "local-facilities-proximity-gpkg-export"
 ALGORITHM_VERSION = "2.0"
+OUTPUT_INVENTORY = "inventory"
+OUTPUT_NEAREST = "nearest"
+OUTPUT_VILLAGE_SERVICE = "village_service"
+ALL_OUTPUTS = (OUTPUT_INVENTORY, OUTPUT_NEAREST, OUTPUT_VILLAGE_SERVICE)
+OUTPUT_ALIASES = {
+    "all": "all",
+    "facility": OUTPUT_INVENTORY,
+    "facilities": OUTPUT_INVENTORY,
+    "facility_inventory": OUTPUT_INVENTORY,
+    "inventory": OUTPUT_INVENTORY,
+    "nearest": OUTPUT_NEAREST,
+    "nearest_facilities": OUTPUT_NEAREST,
+    "nearest_service": OUTPUT_NEAREST,
+    "proximity": OUTPUT_NEAREST,
+    "service": OUTPUT_VILLAGE_SERVICE,
+    "service_surface": OUTPUT_VILLAGE_SERVICE,
+    "village": OUTPUT_VILLAGE_SERVICE,
+    "village_service": OUTPUT_VILLAGE_SERVICE,
+    "villages": OUTPUT_VILLAGE_SERVICE,
+}
+LOCAL_GPKG_LAYER_NAMES = {
+    OUTPUT_INVENTORY: "facilities_inventory",
+    OUTPUT_NEAREST: "facilities_nearest",
+    OUTPUT_VILLAGE_SERVICE: "facilities_village_service",
+}
 VILLAGE_CONTEXT_COLUMNS = [
     "cs_feature_id",
     "state_name",
@@ -66,6 +93,13 @@ def _source_path() -> Path:
     path = _repo_path(FACILITIES_PROXIMITY_GPKG)
     if not path.exists():
         raise FileNotFoundError(f"Facilities proximity source not found: {path}")
+    return path
+
+
+def _facilities_path() -> Path:
+    path = _repo_path(FACILITIES_MASTER_GPKG)
+    if not path.exists():
+        raise FileNotFoundError(f"Facilities master source not found: {path}")
     return path
 
 
@@ -95,8 +129,39 @@ def _layer_name(district: str, block: str) -> str:
     return f"{LAYER_PREFIX}_{_slug(district)}_{_slug(block)}"
 
 
+def _geoserver_layer_name(output_key: str, district: str, block: str) -> str:
+    return f"{LAYER_PREFIX}_{output_key}_{_slug(district)}_{_slug(block)}"
+
+
 def _output_dir(state: str, district: str, block: str) -> Path:
     return _repo_path(OUTPUT_DIR) / _slug(state) / _slug(district) / _slug(block)
+
+
+def _parse_outputs(outputs: Any = None) -> tuple[str, ...]:
+    if outputs is None or outputs == "":
+        return ALL_OUTPUTS
+    if isinstance(outputs, str):
+        requested = [part.strip() for part in outputs.split(",")]
+    elif isinstance(outputs, (list, tuple, set)):
+        requested = [str(part).strip() for part in outputs]
+    else:
+        requested = [str(outputs).strip()]
+
+    parsed: list[str] = []
+    for item in requested:
+        if not item:
+            continue
+        key = OUTPUT_ALIASES.get(_slug(item), _slug(item))
+        if key == "all":
+            return ALL_OUTPUTS
+        if key not in ALL_OUTPUTS:
+            raise ValueError(
+                f"Unknown facilities output {item!r}. "
+                f"Choose one of: all, {', '.join(ALL_OUTPUTS)}"
+            )
+        if key not in parsed:
+            parsed.append(key)
+    return tuple(parsed or ALL_OUTPUTS)
 
 
 def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
@@ -335,6 +400,229 @@ def _read_nearest_facilities(source_path: Path, village_ids: list[str]):
     return gpd.GeoDataFrame(frame, geometry=geometry)
 
 
+def _ensure_facility_inventory_indexes(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        f"CREATE INDEX IF NOT EXISTS idx_facilities_village_census11 "
+        f"ON {SOURCE_FACILITIES_TABLE}(village_census11)"
+    )
+
+
+def _create_requested_inventory_villages(connection: sqlite3.Connection, villages) -> None:
+    connection.execute("DROP TABLE IF EXISTS temp.requested_inventory_villages")
+    connection.execute("CREATE TEMP TABLE requested_inventory_villages (village_census11 TEXT PRIMARY KEY)")
+    village_ids = (
+        villages["pc11_village_id"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+    village_ids = village_ids[(village_ids != "") & (village_ids != "0")].drop_duplicates()
+    connection.executemany(
+        "INSERT OR IGNORE INTO requested_inventory_villages (village_census11) VALUES (?)",
+        [(village_id,) for village_id in village_ids.tolist()],
+    )
+
+
+def _read_inventory_facilities(villages):
+    gpd = _gpd()
+    facilities_path = _facilities_path()
+    with _source_connection(facilities_path) as connection:
+        if not _table_exists(connection, SOURCE_FACILITIES_TABLE):
+            raise RuntimeError(f"Facilities source is missing table: {SOURCE_FACILITIES_TABLE}")
+        _ensure_facility_inventory_indexes(connection)
+        _create_requested_inventory_villages(connection, villages)
+        frame = pd.read_sql_query(
+            f"""
+            SELECT
+              facility_uid,
+              facility_name,
+              facility_code,
+              latitude,
+              longitude,
+              urban_rural,
+              pincode,
+              establishment_year,
+              district_lgd,
+              village_census11,
+              village_name,
+              class_l1_domain,
+              class_l2_filter_group,
+              class_l3_facility_class,
+              class_l4_facility_subtype,
+              class_k1,
+              class_k2,
+              class_k3,
+              class_k4,
+              class_k5,
+              class_k6,
+              class_k7,
+              class_k8,
+              membership_count,
+              geom
+            FROM {SOURCE_FACILITIES_TABLE}
+            WHERE village_census11 IN (
+              SELECT village_census11 FROM requested_inventory_villages
+            )
+              AND latitude IS NOT NULL
+              AND longitude IS NOT NULL
+            """,
+            connection,
+        )
+    if frame.empty:
+        return gpd.GeoDataFrame(frame, geometry=[], crs="EPSG:4326")
+    if "geom" in frame.columns:
+        geometry = frame.pop("geom").map(_gpkg_geometry_to_shape)
+    else:
+        geometry = gpd.points_from_xy(frame["longitude"], frame["latitude"], crs="EPSG:4326")
+    frame["facilities_layer_kind"] = OUTPUT_INVENTORY
+    frame["title"] = frame["facility_name"].fillna(frame["facility_uid"])
+    return gpd.GeoDataFrame(frame, geometry=geometry, crs="EPSG:4326")
+
+
+def _village_context_frame(villages) -> pd.DataFrame:
+    village_cols = [col for col in VILLAGE_CONTEXT_COLUMNS if col in villages.columns]
+    context = villages[village_cols].copy()
+    context[VILLAGE_ID_COL] = context[VILLAGE_ID_COL].astype(str)
+    return context
+
+
+def _build_nearest_service(villages, l3_attributes: pd.DataFrame, l2_attributes: pd.DataFrame):
+    gpd = _gpd()
+    context = _village_context_frame(villages)
+    frames: list[pd.DataFrame] = []
+
+    l3 = l3_attributes.copy()
+    if not l3.empty:
+        l3[VILLAGE_ID_COL] = l3[VILLAGE_ID_COL].astype(str)
+        l3["service_level"] = "l3"
+        l3["service_purpose"] = l3["class_l3_facility_class"]
+        l3["selected_l3_facility_class"] = l3["class_l3_facility_class"]
+        frames.append(l3)
+
+    l2 = l2_attributes.copy()
+    if not l2.empty:
+        l2[VILLAGE_ID_COL] = l2[VILLAGE_ID_COL].astype(str)
+        l2["service_level"] = "l2"
+        l2["service_purpose"] = l2["class_l2_filter_group"]
+        l2["class_l3_facility_class"] = l2["selected_component_class"]
+        l2["selected_l3_facility_class"] = l2["selected_component_class"]
+        frames.append(l2)
+
+    if not frames:
+        return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326")
+
+    frame = pd.concat(frames, ignore_index=True, sort=False)
+    frame = context.merge(frame, on=VILLAGE_ID_COL, how="inner")
+    frame = frame[
+        frame["nearest_facility_latitude"].notna()
+        & frame["nearest_facility_longitude"].notna()
+    ].copy()
+    if frame.empty:
+        return gpd.GeoDataFrame(frame, geometry=[], crs="EPSG:4326")
+
+    frame["facilities_layer_kind"] = OUTPUT_NEAREST
+    frame["title"] = frame["service_purpose"].fillna(frame["nearest_facility_name"])
+    geometry = gpd.points_from_xy(
+        frame["nearest_facility_longitude"],
+        frame["nearest_facility_latitude"],
+        crs="EPSG:4326",
+    )
+    return gpd.GeoDataFrame(frame, geometry=geometry)
+
+
+def _wide_metric_frame(
+    attributes: pd.DataFrame,
+    group_column: str,
+    prefix: str,
+    value_columns: dict[str, str],
+) -> pd.DataFrame:
+    if attributes.empty:
+        return pd.DataFrame({VILLAGE_ID_COL: []})
+    frame = attributes.copy()
+    frame[VILLAGE_ID_COL] = frame[VILLAGE_ID_COL].astype(str)
+    frame["_metric_slug"] = frame[group_column].map(_slug)
+    wide_frames: list[pd.DataFrame] = []
+    for source_column, suffix in value_columns.items():
+        pivot = frame.pivot_table(
+            index=VILLAGE_ID_COL,
+            columns="_metric_slug",
+            values=source_column,
+            aggfunc="first",
+        )
+        pivot.columns = [f"{prefix}_{column}_{suffix}" for column in pivot.columns]
+        wide_frames.append(pivot.reset_index())
+
+    out = wide_frames[0]
+    for extra in wide_frames[1:]:
+        out = out.merge(extra, on=VILLAGE_ID_COL, how="outer")
+    return out
+
+
+def _l1_summary_frame(l2_attributes: pd.DataFrame) -> pd.DataFrame:
+    if l2_attributes.empty:
+        return pd.DataFrame({VILLAGE_ID_COL: []})
+    frame = l2_attributes.copy()
+    frame[VILLAGE_ID_COL] = frame[VILLAGE_ID_COL].astype(str)
+    frame = frame[frame["nearest_distance_km"].notna()].copy()
+    if frame.empty:
+        return pd.DataFrame({VILLAGE_ID_COL: []})
+    frame["_rank"] = frame.groupby([VILLAGE_ID_COL, "class_l1_domain"])["nearest_distance_km"].rank(
+        method="first"
+    )
+    best = frame[frame["_rank"] == 1].copy()
+    best["_domain_slug"] = best["class_l1_domain"].map(_slug)
+    distance = best.pivot_table(
+        index=VILLAGE_ID_COL,
+        columns="_domain_slug",
+        values="nearest_distance_km",
+        aggfunc="first",
+    )
+    distance.columns = [f"l1_{column}_nearest_l2_distance_km" for column in distance.columns]
+    group = best.pivot_table(
+        index=VILLAGE_ID_COL,
+        columns="_domain_slug",
+        values="class_l2_filter_group",
+        aggfunc="first",
+    )
+    group.columns = [f"l1_{column}_nearest_l2_group" for column in group.columns]
+    return distance.reset_index().merge(group.reset_index(), on=VILLAGE_ID_COL, how="outer")
+
+
+def _build_village_service(villages, l3_attributes: pd.DataFrame, l2_attributes: pd.DataFrame):
+    base = villages.drop(
+        columns=[col for col in ("_village_latitude", "_village_longitude") if col in villages.columns]
+    ).copy()
+    base[VILLAGE_ID_COL] = base[VILLAGE_ID_COL].astype(str)
+
+    l3_wide = _wide_metric_frame(
+        l3_attributes,
+        "class_l3_facility_class",
+        "l3",
+        {
+            "nearest_distance_km": "distance_km",
+            "nearest_facility_uid": "facility_uid",
+            "nearest_facility_name": "facility_name",
+        },
+    )
+    l2_wide = _wide_metric_frame(
+        l2_attributes,
+        "class_l2_filter_group",
+        "l2",
+        {
+            "nearest_distance_km": "distance_km",
+            "nearest_facility_uid": "facility_uid",
+            "selected_component_class": "selected_l3",
+            "nearest_facility_name": "facility_name",
+        },
+    )
+    merged = base.merge(l3_wide, on=VILLAGE_ID_COL, how="left")
+    merged = merged.merge(l2_wide, on=VILLAGE_ID_COL, how="left")
+    merged = merged.merge(_l1_summary_frame(l2_attributes), on=VILLAGE_ID_COL, how="left")
+    merged["facilities_layer_kind"] = OUTPUT_VILLAGE_SERVICE
+    merged["title"] = merged["NAME"].fillna(merged[VILLAGE_ID_COL])
+    return _gpd().GeoDataFrame(merged, geometry="geometry", crs=villages.crs)
+
+
 def _attach_village_geometry(villages, attributes: pd.DataFrame, level: str):
     village_cols = [col for col in VILLAGE_CONTEXT_COLUMNS if col in villages.columns]
     base = villages[village_cols + ["geometry"]].copy()
@@ -368,13 +656,11 @@ def _zip_gpkg(gpkg_path: Path) -> Path:
 
 
 def _write_tehsil_gpkg(
-    villages,
-    l3,
-    l2,
-    nearest_facilities,
+    output_layers: dict[str, Any],
     output_dir: Path,
     layer_name: str,
-) -> tuple[Path, Path, dict[str, int]]:
+    zip_output: bool,
+) -> tuple[Path, Path | None, dict[str, int]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_path = output_dir / f"{layer_name}.gpkg"
     zip_path = output_dir / f"{layer_name}.zip"
@@ -382,20 +668,42 @@ def _write_tehsil_gpkg(
         if path.exists():
             path.unlink()
 
-    clean_villages = villages.drop(columns=[col for col in ("_village_latitude", "_village_longitude") if col in villages.columns])
-    _write_layer(l3, gpkg_path, layer_name, "w")
-    _write_layer(l2, gpkg_path, "facilities_l2", "a")
-    _write_layer(clean_villages, gpkg_path, "villages", "a")
-    if not nearest_facilities.empty:
-        _write_layer(nearest_facilities, gpkg_path, "nearest_facilities", "a")
-    zip_path = _zip_gpkg(gpkg_path)
+    row_counts: dict[str, int] = {}
+    first = True
+    for output_key in ALL_OUTPUTS:
+        gdf = output_layers.get(output_key)
+        if gdf is None:
+            continue
+        row_counts[output_key] = int(len(gdf))
+        if gdf.empty:
+            continue
+        _write_layer(
+            gdf,
+            gpkg_path,
+            LOCAL_GPKG_LAYER_NAMES[output_key],
+            "w" if first else "a",
+        )
+        first = False
 
-    return gpkg_path, zip_path, {
-        "villages": int(len(clean_villages)),
-        "l3": int(len(l3)),
-        "l2": int(len(l2)),
-        "nearest_facilities": int(len(nearest_facilities)),
-    }
+    if first:
+        raise ValueError("No non-empty facilities outputs were produced")
+
+    if zip_output:
+        return gpkg_path, _zip_gpkg(gpkg_path), row_counts
+    return gpkg_path, None, row_counts
+
+
+def _write_single_layer_gpkg(gdf, output_dir: Path, layer_name: str) -> Path:
+    publish_dir = output_dir / "geoserver_layers"
+    publish_dir.mkdir(parents=True, exist_ok=True)
+    gpkg_path = publish_dir / f"{layer_name}.gpkg"
+    zip_path = gpkg_path.with_suffix(".zip")
+    for path in (gpkg_path, zip_path):
+        if path.exists():
+            path.unlink()
+    _write_layer(gdf, gpkg_path, layer_name, "w")
+    _zip_gpkg(gpkg_path)
+    return gpkg_path
 
 
 def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> dict[str, Any]:
@@ -430,6 +738,57 @@ def _publish_to_geoserver(gpkg_path: Path, layer_name: str, overwrite: bool) -> 
             "error_type": exc.__class__.__name__,
             "error": str(exc)[:500],
         }
+
+
+def _publish_outputs_to_geoserver(
+    output_layers: dict[str, Any],
+    output_dir: Path,
+    district: str,
+    block: str,
+    overwrite: bool,
+) -> dict[str, dict[str, Any]]:
+    results: dict[str, dict[str, Any]] = {}
+    for output_key, gdf in output_layers.items():
+        layer_name = _geoserver_layer_name(output_key, district, block)
+        if gdf.empty:
+            results[output_key] = {
+                "ok": False,
+                "layer_name": layer_name,
+                "error": "Output layer is empty",
+            }
+            continue
+        gpkg_path = _write_single_layer_gpkg(gdf, output_dir, layer_name)
+        result = _publish_to_geoserver(gpkg_path, layer_name, overwrite)
+        result["layer_name"] = layer_name
+        result["gpkg_path"] = gpkg_path.as_posix()
+        results[output_key] = result
+    return results
+
+
+def _create_or_refresh_layer_group(layer_names: list[str], district: str, block: str) -> bool:
+    if len(layer_names) <= 1:
+        return False
+    group_name = _layer_name(district, block)
+    geoserver = Geoserver()
+    try:
+        try:
+            geoserver.delete_layergroup(group_name, workspace=FACILITIES_GEOSERVER_WORKSPACE)
+        except Exception:
+            pass
+        geoserver.create_layergroup(
+            name=group_name,
+            mode="named",
+            title=f"Facilities {district} {block}",
+            abstract_text="Facilities inventory, nearest-service, and village service layers.",
+            layers=layer_names,
+            workspace=FACILITIES_GEOSERVER_WORKSPACE,
+            formats="json",
+            keywords=["facilities", "inventory", "nearest", "village_service"],
+        )
+        return True
+    except Exception:
+        logger.exception("Facilities GeoServer layer group creation failed")
+        return False
 
 
 def _register_layer(
@@ -477,13 +836,22 @@ def generate_facilities_proximity(
     block: str,
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
+    outputs: Any = "all",
+    zip_output: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
     layer_name = _layer_name(district, block)
+    selected_outputs = _parse_outputs(outputs)
     output_dir = _output_dir(state, district, block)
     source_path = _source_path()
-    logger.info("Facilities proximity started: %s/%s/%s", state, district, block)
+    logger.info(
+        "Facilities proximity started: %s/%s/%s outputs=%s",
+        state,
+        district,
+        block,
+        selected_outputs,
+    )
 
     resolved_state = _canonical_asset_name(state)
     resolved_district = _canonical_asset_name(district)
@@ -500,62 +868,138 @@ def generate_facilities_proximity(
     logger.info("Facilities proximity read %d villages in %.3fs", len(villages), timings["read_villages_seconds"])
 
     village_ids = villages[VILLAGE_ID_COL].dropna().astype(str).drop_duplicates().tolist()
-    t0 = time.perf_counter()
-    logger.info("Facilities proximity reading L3/L2/nearest rows for %d villages", len(village_ids))
-    l3 = _attach_village_geometry(villages, _read_l3_attributes(source_path, village_ids), "l3")
-    l2 = _attach_village_geometry(villages, _read_l2_attributes(source_path, village_ids), "l2")
-    nearest_facilities = _read_nearest_facilities(source_path, village_ids)
-    timings["read_proximity_seconds"] = round(time.perf_counter() - t0, 3)
-    logger.info(
-        "Facilities proximity read proximity rows in %.3fs: l3=%d l2=%d nearest=%d",
-        timings["read_proximity_seconds"],
-        len(l3),
-        len(l2),
-        len(nearest_facilities),
-    )
+    output_layers: dict[str, Any] = {}
+    proximity_outputs = {OUTPUT_NEAREST, OUTPUT_VILLAGE_SERVICE}
+    l3_attributes = pd.DataFrame()
+    l2_attributes = pd.DataFrame()
+
+    if OUTPUT_INVENTORY in selected_outputs:
+        t0 = time.perf_counter()
+        logger.info("Facilities proximity reading inventory rows for %d villages", len(village_ids))
+        output_layers[OUTPUT_INVENTORY] = _read_inventory_facilities(villages)
+        timings["read_inventory_seconds"] = round(time.perf_counter() - t0, 3)
+        logger.info(
+            "Facilities proximity read inventory rows in %.3fs: inventory=%d",
+            timings["read_inventory_seconds"],
+            len(output_layers[OUTPUT_INVENTORY]),
+        )
+
+    if proximity_outputs.intersection(selected_outputs):
+        t0 = time.perf_counter()
+        logger.info("Facilities proximity reading L3/L2 rows for %d villages", len(village_ids))
+        l3_attributes = _read_l3_attributes(source_path, village_ids)
+        l2_attributes = _read_l2_attributes(source_path, village_ids)
+        timings["read_proximity_seconds"] = round(time.perf_counter() - t0, 3)
+        logger.info(
+            "Facilities proximity read proximity rows in %.3fs: l3=%d l2=%d",
+            timings["read_proximity_seconds"],
+            len(l3_attributes),
+            len(l2_attributes),
+        )
+
+    if OUTPUT_NEAREST in selected_outputs:
+        t0 = time.perf_counter()
+        output_layers[OUTPUT_NEAREST] = _build_nearest_service(
+            villages,
+            l3_attributes,
+            l2_attributes,
+        )
+        timings["build_nearest_seconds"] = round(time.perf_counter() - t0, 3)
+
+    if OUTPUT_VILLAGE_SERVICE in selected_outputs:
+        t0 = time.perf_counter()
+        output_layers[OUTPUT_VILLAGE_SERVICE] = _build_village_service(
+            villages,
+            l3_attributes,
+            l2_attributes,
+        )
+        timings["build_village_service_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
     logger.info("Facilities proximity writing output GPKG: %s", output_dir / f"{layer_name}.gpkg")
-    gpkg_path, zip_path, row_counts = _write_tehsil_gpkg(l3=l3, l2=l2, villages=villages, nearest_facilities=nearest_facilities, output_dir=output_dir, layer_name=layer_name)
+    gpkg_path, zip_path, row_counts = _write_tehsil_gpkg(
+        output_layers=output_layers,
+        output_dir=output_dir,
+        layer_name=layer_name,
+        zip_output=_bool(zip_output) or _bool(sync_to_geoserver),
+    )
     timings["write_gpkg_seconds"] = round(time.perf_counter() - t0, 3)
-    logger.info("Facilities proximity wrote GPKG/zip in %.3fs: %s", timings["write_gpkg_seconds"], zip_path)
+    logger.info("Facilities proximity wrote GPKG in %.3fs: %s", timings["write_gpkg_seconds"], gpkg_path)
 
-    geoserver = None
-    geoserver_url = None
-    layer_id = None
-    registration_error = None
+    geoserver: dict[str, dict[str, Any]] | None = None
+    geoserver_layer_group_created = False
+    facilities_source = _facilities_path().as_posix() if OUTPUT_INVENTORY in selected_outputs else None
+    output_results: dict[str, dict[str, Any]] = {
+        output_key: {
+            "local_layer": LOCAL_GPKG_LAYER_NAMES[output_key],
+            "geoserver_layer_name": _geoserver_layer_name(output_key, district, block),
+            "row_count": row_counts.get(output_key, 0),
+            "geoserver_url": None,
+            "layer_id": None,
+            "registration_error": None,
+        }
+        for output_key in selected_outputs
+    }
     if _bool(sync_to_geoserver):
         t0 = time.perf_counter()
-        logger.info("Facilities proximity publishing to GeoServer: %s", layer_name)
-        geoserver = _publish_to_geoserver(gpkg_path, layer_name, _bool(overwrite))
+        logger.info("Facilities proximity publishing selected outputs to GeoServer: %s", selected_outputs)
+        geoserver = _publish_outputs_to_geoserver(
+            output_layers=output_layers,
+            output_dir=output_dir,
+            district=district,
+            block=block,
+            overwrite=_bool(overwrite),
+        )
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
         logger.info("Facilities proximity GeoServer publish finished in %.3fs: %s", timings["publish_geoserver_seconds"], geoserver)
-        if geoserver.get("ok"):
+        successful_layers: list[str] = []
+        for output_key, publish_result in geoserver.items():
+            if not publish_result.get("ok"):
+                output_results[output_key]["registration_error"] = publish_result
+                continue
+            geoserver_layer_name = publish_result["layer_name"]
             geoserver_url = (
                 f"{settings.GEOSERVER_URL.rstrip('/')}/{FACILITIES_GEOSERVER_WORKSPACE}/ows"
                 "?service=WFS&version=1.0.0&request=GetFeature"
-                f"&typeName={FACILITIES_GEOSERVER_WORKSPACE}:{layer_name}"
+                f"&typeName={FACILITIES_GEOSERVER_WORKSPACE}:{geoserver_layer_name}"
                 "&outputFormat=application/json"
             )
+            layer_output = {
+                "is_generated_locally": True,
+                "source": source_path.as_posix(),
+                "facilities_source": facilities_source,
+                "gpkg_path": gpkg_path.as_posix(),
+                "zip_path": zip_path.as_posix() if zip_path else None,
+                "output_dir": output_dir.as_posix(),
+                "row_counts": row_counts,
+                "output_key": output_key,
+                "local_gpkg_layer": LOCAL_GPKG_LAYER_NAMES[output_key],
+                "geoserver_workspace": FACILITIES_GEOSERVER_WORKSPACE,
+                "geoserver_layer_name": geoserver_layer_name,
+                "geoserver_url": geoserver_url,
+            }
             layer_id, registration_error = _register_layer(
                 resolved_state,
                 resolved_district,
                 resolved_block,
-                layer_name,
+                geoserver_layer_name,
                 geoserver_url,
-                {
-                    "is_generated_locally": True,
-                    "source": source_path.as_posix(),
-                    "gpkg_path": gpkg_path.as_posix(),
-                    "zip_path": zip_path.as_posix(),
-                    "output_dir": output_dir.as_posix(),
-                    "row_counts": row_counts,
-                    "geoserver_workspace": FACILITIES_GEOSERVER_WORKSPACE,
-                    "geoserver_layer_name": layer_name,
-                    "geoserver_url": geoserver_url,
-                },
+                layer_output,
                 _bool(overwrite),
             )
+            output_results[output_key].update(
+                {
+                    "geoserver_url": geoserver_url,
+                    "layer_id": layer_id,
+                    "registration_error": registration_error,
+                }
+            )
+            successful_layers.append(geoserver_layer_name)
+        geoserver_layer_group_created = _create_or_refresh_layer_group(
+            successful_layers,
+            district,
+            block,
+        )
 
     elapsed = round(time.perf_counter() - started, 3)
     timings["total_seconds"] = elapsed
@@ -563,21 +1007,22 @@ def generate_facilities_proximity(
     return {
         "status": "success",
         "layer_name": layer_name,
+        "selected_outputs": list(selected_outputs),
+        "outputs": output_results,
         "row_counts": row_counts,
         "source": source_path.as_posix(),
+        "facilities_source": facilities_source,
         "source_village_layer": SOURCE_VILLAGE_LAYER,
         "source_village_geometry": str(villages.geometry.geom_type.mode().iloc[0]),
         "gpkg_path": gpkg_path.as_posix(),
-        "zip_path": zip_path.as_posix(),
+        "zip_path": zip_path.as_posix() if zip_path else None,
         "output_dir": output_dir.as_posix(),
         "state_name": resolved_state,
         "district_name": resolved_district,
         "tehsil": resolved_block,
         "sync_to_geoserver": _bool(sync_to_geoserver),
         "geoserver": geoserver,
-        "geoserver_url": geoserver_url,
-        "layer_id": layer_id,
-        "registration_error": registration_error,
+        "geoserver_layer_group_created": geoserver_layer_group_created,
         "timings": timings,
         "elapsed_seconds": elapsed,
     }
@@ -591,6 +1036,8 @@ def generate_facilities_proximity_task(
     block: str,
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
+    outputs: Any = "all",
+    zip_output: bool = False,
     **_ignored: Any,
 ) -> dict[str, Any]:
     """Celery wrapper for the local facilities proximity export."""
@@ -600,4 +1047,6 @@ def generate_facilities_proximity_task(
         block=block,
         sync_to_geoserver=sync_to_geoserver,
         overwrite=overwrite,
+        outputs=outputs,
+        zip_output=zip_output,
     )
