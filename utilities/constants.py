@@ -10,6 +10,7 @@ NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
 ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
 LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
+FACILITIES_MASTER_GPKG = "data/facilities/outputs/pan_india_facilities.gpkg"
 FACILITIES_PROXIMITY_GPKG = "data/facilities/outputs/village_facility_proximity.gpkg"
 
 MERGE_MWS_PATH = "data/merge_mws"
