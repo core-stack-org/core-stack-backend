@@ -87,16 +87,55 @@ def _expand_periodic_layer(layer: dict) -> list[dict]:
     return expanded_layers
 
 
+def _expand_manifest_layers(layers: list[dict]) -> list[dict]:
+    expanded_layers = []
+    for layer in layers:
+        expanded_layers.extend(_expand_periodic_layer(layer))
+    return expanded_layers
+
+
+def _manifest_group_key(path: tuple[str, ...]) -> str:
+    return "_".join(path)
+
+
+def _walk_manifest_groups(node, path: tuple[str, ...] = ()):
+    if isinstance(node, list):
+        yield _manifest_group_key(path), _expand_manifest_layers(node), path
+        return
+
+    if not isinstance(node, dict):
+        return
+
+    descendant_layers = []
+    for key, value in node.items():
+        child_path = (*path, key)
+        if isinstance(value, list):
+            layers = _expand_manifest_layers(value)
+            descendant_layers.extend(layers)
+            yield _manifest_group_key(child_path), layers, child_path
+        elif isinstance(value, dict):
+            child_groups = list(_walk_manifest_groups(value, child_path))
+            for group_name, layers, group_path in child_groups:
+                descendant_layers.extend(layers)
+                yield group_name, layers, group_path
+
+    if path and descendant_layers:
+        yield _manifest_group_key(path), descendant_layers, path
+
+
 def _manifest_layer_groups() -> dict[str, list[dict]]:
     base_layers = _load_new_config().get("base_layers", {})
-    groups = {
-        "static_layers": list(base_layers.get("static_layers", [])),
-        "on_demand_layers": list(base_layers.get("on_demand_layers", [])),
-        "periodic_layers": [],
-    }
+    groups = {}
+    leaf_aliases = {}
 
-    for layer in base_layers.get("periodic_layers", []):
-        groups["periodic_layers"].extend(_expand_periodic_layer(layer))
+    for group_name, layers, group_path in _walk_manifest_groups(base_layers):
+        groups[group_name] = layers
+        leaf_name = group_path[-1]
+        leaf_aliases.setdefault(leaf_name, []).append(group_name)
+
+    for leaf_name, group_names in leaf_aliases.items():
+        if len(group_names) == 1:
+            groups.setdefault(leaf_name, groups[group_names[0]])
 
     return groups
 
@@ -167,7 +206,7 @@ def ensure_manifest_base_layers(*layers):
 
     Accepted selectors:
     - concrete layer names: terrain, mws, lulc_v3, slope_percentage
-    - group names: static_layers, periodic_layers, on_demand_layers
+    - group names: static_layers, periodic_layers, tehsil_level
     - all
     """
     selected_layers = layers or ("static_layers", "periodic_layers")
@@ -224,7 +263,7 @@ def ensure_soi_tehsil():
     more data but takes much longer to acquire.
     """
     if SOI_TEHSIL_PATH.exists():
-        logger.info("SOI tehsil layer already exists atrestack-da %s, skipping.", SOI_TEHSIL_PATH)
+        logger.info("SOI tehsil layer already exists at %s, skipping.", SOI_TEHSIL_PATH)
         return
 
     SOI_TEHSIL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -407,7 +446,7 @@ def ensure_tehsil_watersheds():
         output_dir=str(TEHSIL_WATERSHEDS_DIR),
         output_format="gpkg",
         overwrite=False,
-        clip_to_tehsil=False,restack-da
+        clip_to_tehsil=False,
     )
     logger.info("Tehsil watershed files ready at %s", TEHSIL_WATERSHEDS_DIR)
 

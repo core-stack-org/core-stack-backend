@@ -299,79 +299,79 @@ base_layers:
           source: ""
           type: file
 
-    on_demand_layers:
-        - name: lulc_farm_boundary
-          local_path: data/base_layers/on_demand/lulc_farm_boundary/
-          source: ""
-          type: file
+    tehsil_level:
+        on_demand_layers:
+            - name: lulc_farm_boundary
+              local_path: data/base_layers/on_demand/lulc_farm_boundary/
+              source: ""
+              type: file
 
-        - name: generate_ponds
-          local_path: data/base_layers/on_demand/ponds/
-          source: ""
-          type: file
+            - name: generate_ponds
+              local_path: data/base_layers/on_demand/ponds/
+              source: ""
+              type: file
 
-        - name: generate_wells
-          local_path: data/base_layers/on_demand/wells/
-          source: ""
-          type: file
+            - name: generate_wells
+              local_path: data/base_layers/on_demand/wells/
+              source: ""
+              type: file
 
-        - name: forest additonality
-          aliases:
-              - forest additionality
-          local_path: data/base_layers/on_demand/forest_additionality/
-          source: ""
-          type: file
+            - name: forest additonality
+              aliases:
+                  - forest additionality
+              local_path: data/base_layers/on_demand/forest_additionality/
+              source: ""
+              type: file
+        gee_only:
+            - name: fes_clart_layer
+              local_path: data/base_layers/on_demand/fes_clart_layer/
+              source: ""
+              type: file
 
-        - name: fes_clart_layer
-          local_path: data/base_layers/on_demand/fes_clart_layer/
-          source: ""
-          type: file
+            - name: generate_clart
+              local_path: data/base_layers/on_demand/clart/
+              source: ""
+              type: file
 
-        - name: generate_clart
-          local_path: data/base_layers/on_demand/clart/
-          source: ""
-          type: file
+            - name: generate_ndvi_timeseries
+              local_path: data/base_layers/on_demand/ndvi_timeseries/
+              source: ""
+              type: file
 
-        - name: generate_ndvi_timeseries
-          local_path: data/base_layers/on_demand/ndvi_timeseries/
-          source: ""
-          type: file
+            - name: downscaling et
+              local_path: data/base_layers/on_demand/downscaling_et/
+              source: ""
+              type: file
 
-        - name: downscaling et
-          local_path: data/base_layers/on_demand/downscaling_et/
-          source: ""
-          type: file
+            - name: forest fire
+              local_path: data/base_layers/on_demand/forest_fire/
+              source: ""
+              type: file
 
-        - name: forest fire
-          local_path: data/base_layers/on_demand/forest_fire/
-          source: ""
-          type: file
+            - name: grassland degradation
+              local_path: data/base_layers/on_demand/grassland_degradation/
+              source: ""
+              type: file
 
-        - name: grassland degradation
-          local_path: data/base_layers/on_demand/grassland_degradation/
-          source: ""
-          type: file
+            - name: deforestation on forest fringes core
+              local_path: data/base_layers/on_demand/deforestation_forest_fringes_core/
+              source: ""
+              type: file
 
-        - name: deforestation on forest fringes core
-          local_path: data/base_layers/on_demand/deforestation_forest_fringes_core/
-          source: ""
-          type: file
+            - name: plantation_site_suitability
+              local_path: data/base_layers/on_demand/plantation_site_suitability/
+              source: ""
+              type: file
 
-        - name: plantation_site_suitability
-          local_path: data/base_layers/on_demand/plantation_site_suitability/
-          source: ""
-          type: file
+            - name: temperature and humidity fortnightly timeseries
+              local_path: data/base_layers/on_demand/temperature_humidity_fortnightly/
+              source: ""
+              type: file
 
-        - name: temperature and humidity fortnightly timeseries
-          local_path: data/base_layers/on_demand/temperature_humidity_fortnightly/
-          source: ""
-          type: file
-
-        - name: pollution through satellite measured aerosol density
-          local_path: data/base_layers/on_demand/aerosol_density/
-          source: ""
-          type: file
-
+            - name: pollution through satellite measured aerosol density
+              local_path: data/base_layers/on_demand/aerosol_density/
+              source: ""
+              type: file
 derived_layers:
     - name: generate_mws_layer
 
@@ -414,26 +414,28 @@ derived_layers:
       layer_type: vector
 
     - name: change detection
-      params: [
-        Afforestation,
-        Deforestation,
-        Degradation,
-        Urbanization,
-        CropIntensity
-      ]
+      params:
+          [
+              Afforestation,
+              Deforestation,
+              Degradation,
+              Urbanization,
+              CropIntensity,
+          ]
       filename: change_{district}_{block}_{param_name}_{start_year}_{end_year}.tif
       local_path: data/change_detection/change_detection_local/{state}/{district}/{block}/{filename}
       geoserver_workspace: change_detection
       layer_type: raster
 
     - name: change detection vector
-      params: [
-        Afforestation,
-        Deforestation,
-        Degradation,
-        Urbanization,
-        CropIntensity
-      ]
+      params:
+          [
+              Afforestation,
+              Deforestation,
+              Degradation,
+              Urbanization,
+              CropIntensity,
+          ]
       filename: change_vector_{district}_{block}_{param_name}_{start_year}_{end_year}.gpkg
       local_path: data/change_detection/change_detection_vector_local/{state}/{district}/{block}/{filename}
       geoserver_workspace: change_detection
