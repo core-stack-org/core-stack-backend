@@ -79,7 +79,6 @@ def main() -> None:
                 block=tehsil,
                 sync_to_geoserver=sync_to_geoserver,
                 outputs=outputs,
-                zip_output=False,
             )
         except Exception as exc:
             failure = {

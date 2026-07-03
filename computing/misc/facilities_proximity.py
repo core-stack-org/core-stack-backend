@@ -237,10 +237,8 @@ def _require_source_tables(connection: sqlite3.Connection) -> None:
     if missing:
         raise RuntimeError(
             "Facilities proximity source is missing required table(s): "
-            f"{', '.join(missing)}. Rebuild with "
-            "`uv run --with pandas --with numpy --with pyyaml --with geopandas "
-            "--with shapely --with pyogrio --with scipy python "
-            "utilities/scripts/facilities_utils/facility_pipeline.py proximity --force`."
+            f"{', '.join(missing)}. Rebuild the source proximity GPKG with "
+            "`utilities/scripts/facilities_utils/facility_pipeline.py proximity --force`."
         )
 
 
@@ -675,8 +673,7 @@ def _write_tehsil_gpkg(
     output_layers: dict[str, Any],
     output_dir: Path,
     layer_name: str,
-    zip_output: bool,
-) -> tuple[Path, Path | None, dict[str, int]]:
+) -> tuple[Path, dict[str, int]]:
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_path = output_dir / f"{layer_name}.gpkg"
     zip_path = output_dir / f"{layer_name}.zip"
@@ -711,9 +708,7 @@ def _write_tehsil_gpkg(
             raise ValueError("No non-empty facilities outputs were produced")
         shutil.move(str(temp_gpkg_path), gpkg_path)
 
-    if zip_output:
-        return gpkg_path, _zip_gpkg(gpkg_path), row_counts
-    return gpkg_path, None, row_counts
+    return gpkg_path, row_counts
 
 
 def _write_single_layer_gpkg(gdf, output_dir: Path, layer_name: str) -> Path:
@@ -786,7 +781,6 @@ def _publish_outputs_to_geoserver(
             gpkg_path = _write_single_layer_gpkg(gdf, publish_dir, layer_name)
             result = _publish_to_geoserver(gpkg_path, layer_name, overwrite)
             result["layer_name"] = layer_name
-            result["publish_artifact"] = "temporary_gpkg_zip"
             results[output_key] = result
     return results
 
@@ -868,7 +862,6 @@ def _publish_and_register_outputs(
     source_path: Path,
     facilities_source: str | None,
     gpkg_path: Path,
-    zip_path: Path | None,
     row_counts: dict[str, int],
     output_results: dict[str, dict[str, Any]],
     overwrite: bool,
@@ -896,7 +889,6 @@ def _publish_and_register_outputs(
             "source": source_path.as_posix(),
             "facilities_source": facilities_source,
             "gpkg_path": gpkg_path.as_posix(),
-            "zip_path": zip_path.as_posix() if zip_path else None,
             "output_dir": output_dir.as_posix(),
             "row_counts": row_counts,
             "output_key": output_key,
@@ -937,7 +929,6 @@ def generate_facilities_proximity(
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
     outputs: Any = "all",
-    zip_output: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
@@ -1040,11 +1031,10 @@ def generate_facilities_proximity(
 
     t0 = time.perf_counter()
     logger.info("Facilities proximity writing output GPKG: %s", output_dir / f"{bundle_stem}.gpkg")
-    gpkg_path, zip_path, row_counts = _write_tehsil_gpkg(
+    gpkg_path, row_counts = _write_tehsil_gpkg(
         output_layers=output_layers,
         output_dir=output_dir,
         layer_name=bundle_stem,
-        zip_output=_bool(zip_output),
     )
     timings["write_gpkg_seconds"] = round(time.perf_counter() - t0, 3)
     logger.info("Facilities proximity wrote GPKG in %.3fs: %s", timings["write_gpkg_seconds"], gpkg_path)
@@ -1068,7 +1058,6 @@ def generate_facilities_proximity(
             source_path=source_path,
             facilities_source=facilities_source,
             gpkg_path=gpkg_path,
-            zip_path=zip_path,
             row_counts=row_counts,
             output_results=output_results,
             overwrite=_bool(overwrite),
@@ -1091,7 +1080,6 @@ def generate_facilities_proximity(
         "source_village_layer": SOURCE_VILLAGE_LAYER,
         "source_village_geometry": source_village_geometry,
         "gpkg_path": gpkg_path.as_posix(),
-        "zip_path": zip_path.as_posix() if zip_path else None,
         "output_dir": output_dir.as_posix(),
         "state_name": resolved_state,
         "district_name": resolved_district,
@@ -1113,7 +1101,7 @@ def generate_facilities_proximity_task(
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
     outputs: Any = "all",
-    zip_output: bool = False,
+    *_ignored_args: Any,
     **_ignored: Any,
 ) -> dict[str, Any]:
     """Celery wrapper for the local facilities proximity export."""
@@ -1124,5 +1112,4 @@ def generate_facilities_proximity_task(
         sync_to_geoserver=sync_to_geoserver,
         overwrite=overwrite,
         outputs=outputs,
-        zip_output=zip_output,
     )

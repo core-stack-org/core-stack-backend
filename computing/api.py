@@ -1582,7 +1582,6 @@ def generate_facilities_proximity(request):
         sync_to_geoserver = request.data.get("sync_to_geoserver", True)
         overwrite = request.data.get("overwrite", False)
         outputs = request.data.get("outputs", request.data.get("output_layers", "all"))
-        zip_output = request.data.get("zip_output", False)
         district_slug = re.sub(r"[^a-z0-9]+", "_", district.lower()).strip("_")
         block_slug = re.sub(r"[^a-z0-9]+", "_", block.lower()).strip("_")
         expected_layers = {
@@ -1598,7 +1597,6 @@ def generate_facilities_proximity(request):
                 sync_to_geoserver,
                 overwrite,
                 outputs,
-                zip_output,
             ],
             queue="nrm",
         )
