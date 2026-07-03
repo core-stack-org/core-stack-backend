@@ -193,13 +193,12 @@ AGROECOLOGICAL_PAN_INDIA_DATASET = (
     "projects/ext-datasets/assets/datasets/Agroecological_space_pan_india"
 )
 
-GEE_FACILITIES_INVENTORY_DATASET_PATH = (
+GEE_FACILITIES_DATASET_PATH = (
     "projects/corestack-datasets/assets/datasets/pan_india_facilities_v2"
 )
 GEE_FACILITIES_VILLAGE_PROXIMITY_DATASET_PATH = (
     "projects/corestack-datasets/assets/datasets/village_facility_proximity_v2"
 )
-GEE_FACILITIES_DATASET_PATH = GEE_FACILITIES_INVENTORY_DATASET_PATH
 
 GEE_PATHS = {
     "MWS": {
