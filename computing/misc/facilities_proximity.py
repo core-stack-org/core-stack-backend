@@ -311,17 +311,10 @@ def _read_l3_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
               m.class_l2_filter_group,
               p.class_l3_facility_class,
               p.nearest_distance_km,
-              p.nearest_facility_uid,
-              nf.facility_name AS nearest_facility_name,
-              nf.facility_code AS nearest_facility_code,
-              nf.latitude AS nearest_facility_latitude,
-              nf.longitude AS nearest_facility_longitude,
-              nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype
+              p.nearest_facility_uid
             FROM {SOURCE_L3_TABLE} p
             LEFT JOIN {SOURCE_CLASS_MAP_TABLE} m
               ON m.class_l3_facility_class = p.class_l3_facility_class
-            LEFT JOIN {SOURCE_NEAREST_TABLE} nf
-              ON nf.facility_uid = p.nearest_facility_uid
             WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
             """,
             connection,
@@ -340,15 +333,8 @@ def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
               p.class_l2_filter_group,
               p.logic_distance_km AS nearest_distance_km,
               p.selected_component_class,
-              p.nearest_facility_uid,
-              nf.facility_name AS nearest_facility_name,
-              nf.facility_code AS nearest_facility_code,
-              nf.latitude AS nearest_facility_latitude,
-              nf.longitude AS nearest_facility_longitude,
-              nf.class_l4_facility_subtype AS nearest_class_l4_facility_subtype
+              p.nearest_facility_uid
             FROM {SOURCE_L2_TABLE} p
-            LEFT JOIN {SOURCE_NEAREST_TABLE} nf
-              ON nf.facility_uid = p.nearest_facility_uid
             WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
             """,
             connection,
@@ -361,14 +347,21 @@ def _read_l2_attributes(source_path: Path, village_ids: list[str]) -> pd.DataFra
     return frame
 
 
-def _read_nearest_facilities(source_path: Path, village_ids: list[str]):
+def _read_nearest_facilities(source_path: Path, facility_uids: list[str]):
     gpd = _gpd()
+    if not facility_uids:
+        return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326")
     with _source_connection(source_path) as connection:
         _require_source_tables(connection)
-        _create_requested_villages(connection, village_ids)
+        connection.execute("DROP TABLE IF EXISTS temp.requested_nearest_facilities")
+        connection.execute("CREATE TEMP TABLE requested_nearest_facilities (facility_uid TEXT PRIMARY KEY)")
+        connection.executemany(
+            "INSERT OR IGNORE INTO requested_nearest_facilities (facility_uid) VALUES (?)",
+            [(str(facility_uid),) for facility_uid in facility_uids],
+        )
         frame = pd.read_sql_query(
             f"""
-            SELECT DISTINCT
+            SELECT
               nf.facility_uid,
               nf.facility_name,
               nf.facility_code,
@@ -376,19 +369,10 @@ def _read_nearest_facilities(source_path: Path, village_ids: list[str]):
               nf.longitude,
               nf.class_l4_facility_subtype
             FROM {SOURCE_NEAREST_TABLE} nf
-            JOIN (
-              SELECT p.nearest_facility_uid
-              FROM {SOURCE_L3_TABLE} p
-              WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
-                AND p.nearest_facility_uid IS NOT NULL
-              UNION
-              SELECT p.nearest_facility_uid
-              FROM {SOURCE_L2_TABLE} p
-              WHERE p.{VILLAGE_ID_COL} IN (SELECT cs_feature_id FROM requested_villages)
-                AND p.nearest_facility_uid IS NOT NULL
-            ) u
-              ON u.nearest_facility_uid = nf.facility_uid
-            WHERE nf.latitude IS NOT NULL
+            WHERE nf.facility_uid IN (
+              SELECT facility_uid FROM requested_nearest_facilities
+            )
+              AND nf.latitude IS NOT NULL
               AND nf.longitude IS NOT NULL
             """,
             connection,
@@ -400,40 +384,22 @@ def _read_nearest_facilities(source_path: Path, village_ids: list[str]):
     return gpd.GeoDataFrame(frame, geometry=geometry)
 
 
-def _ensure_facility_inventory_indexes(connection: sqlite3.Connection) -> None:
-    connection.execute(
-        f"CREATE INDEX IF NOT EXISTS idx_facilities_village_census11 "
-        f"ON {SOURCE_FACILITIES_TABLE}(village_census11)"
-    )
-
-
-def _create_requested_inventory_villages(connection: sqlite3.Connection, villages) -> None:
-    connection.execute("DROP TABLE IF EXISTS temp.requested_inventory_villages")
-    connection.execute("CREATE TEMP TABLE requested_inventory_villages (village_census11 TEXT PRIMARY KEY)")
-    village_ids = (
-        villages["pc11_village_id"]
-        .dropna()
-        .astype(str)
-        .str.strip()
-    )
-    village_ids = village_ids[(village_ids != "") & (village_ids != "0")].drop_duplicates()
-    connection.executemany(
-        "INSERT OR IGNORE INTO requested_inventory_villages (village_census11) VALUES (?)",
-        [(village_id,) for village_id in village_ids.tolist()],
-    )
-
-
 def _read_inventory_facilities(villages):
     gpd = _gpd()
     facilities_path = _facilities_path()
+    minx, miny, maxx, maxy = villages.total_bounds
     with _source_connection(facilities_path) as connection:
         if not _table_exists(connection, SOURCE_FACILITIES_TABLE):
             raise RuntimeError(f"Facilities source is missing table: {SOURCE_FACILITIES_TABLE}")
-        _ensure_facility_inventory_indexes(connection)
-        _create_requested_inventory_villages(connection, villages)
+        if not _table_exists(connection, "rtree_facilities_geom"):
+            raise RuntimeError(
+                "Facilities source is missing rtree_facilities_geom. "
+                "Rebuild the master facilities GPKG with its spatial index."
+            )
         frame = pd.read_sql_query(
             f"""
             SELECT
+              f.fid AS facility_fid,
               facility_uid,
               facility_name,
               facility_code,
@@ -458,15 +424,19 @@ def _read_inventory_facilities(villages):
               class_k7,
               class_k8,
               membership_count,
-              geom
-            FROM {SOURCE_FACILITIES_TABLE}
-            WHERE village_census11 IN (
-              SELECT village_census11 FROM requested_inventory_villages
-            )
+              f.geom
+            FROM {SOURCE_FACILITIES_TABLE} f
+            JOIN rtree_facilities_geom r
+              ON r.id = f.fid
+            WHERE r.maxx >= ?
+              AND r.minx <= ?
+              AND r.maxy >= ?
+              AND r.miny <= ?
               AND latitude IS NOT NULL
               AND longitude IS NOT NULL
             """,
             connection,
+            params=(minx, maxx, miny, maxy),
         )
     if frame.empty:
         return gpd.GeoDataFrame(frame, geometry=[], crs="EPSG:4326")
@@ -476,7 +446,33 @@ def _read_inventory_facilities(villages):
         geometry = gpd.points_from_xy(frame["longitude"], frame["latitude"], crs="EPSG:4326")
     frame["facilities_layer_kind"] = OUTPUT_INVENTORY
     frame["title"] = frame["facility_name"].fillna(frame["facility_uid"])
-    return gpd.GeoDataFrame(frame, geometry=geometry, crs="EPSG:4326")
+    facilities = gpd.GeoDataFrame(frame, geometry=geometry, crs="EPSG:4326")
+    village_context = villages[
+        [
+            VILLAGE_ID_COL,
+            "state_name",
+            "district_name",
+            "TEHSIL",
+            "pc11_village_id",
+            "NAME",
+            "geometry",
+        ]
+    ].rename(
+        columns={
+            VILLAGE_ID_COL: "containing_cs_feature_id",
+            "state_name": "containing_state_name",
+            "district_name": "containing_district_name",
+            "TEHSIL": "containing_tehsil",
+            "pc11_village_id": "containing_pc11_village_id",
+            "NAME": "containing_village_name",
+        }
+    )
+    joined = gpd.sjoin(facilities, village_context, how="inner", predicate="intersects")
+    if "index_right" in joined.columns:
+        joined = joined.drop(columns=["index_right"])
+    if "facility_fid" in joined.columns:
+        joined = joined.drop_duplicates(subset=["facility_fid"])
+    return gpd.GeoDataFrame(joined, geometry="geometry", crs="EPSG:4326")
 
 
 def _village_context_frame(villages) -> pd.DataFrame:
@@ -486,9 +482,21 @@ def _village_context_frame(villages) -> pd.DataFrame:
     return context
 
 
-def _build_nearest_service(villages, l3_attributes: pd.DataFrame, l2_attributes: pd.DataFrame):
+def _join_text(values: pd.Series, limit: int = 50) -> str | None:
+    items = sorted({str(value) for value in values.dropna() if str(value)})
+    if not items:
+        return None
+    suffix = "" if len(items) <= limit else f"; +{len(items) - limit} more"
+    return "; ".join(items[:limit]) + suffix
+
+
+def _build_nearest_service(
+    villages,
+    l3_attributes: pd.DataFrame,
+    l2_attributes: pd.DataFrame,
+    nearest_facilities,
+):
     gpd = _gpd()
-    context = _village_context_frame(villages)
     frames: list[pd.DataFrame] = []
 
     l3 = l3_attributes.copy()
@@ -512,22 +520,45 @@ def _build_nearest_service(villages, l3_attributes: pd.DataFrame, l2_attributes:
         return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326")
 
     frame = pd.concat(frames, ignore_index=True, sort=False)
-    frame = context.merge(frame, on=VILLAGE_ID_COL, how="inner")
-    frame = frame[
-        frame["nearest_facility_latitude"].notna()
-        & frame["nearest_facility_longitude"].notna()
-    ].copy()
+    frame = frame[frame["nearest_facility_uid"].notna()].copy()
     if frame.empty:
         return gpd.GeoDataFrame(frame, geometry=[], crs="EPSG:4326")
 
-    frame["facilities_layer_kind"] = OUTPUT_NEAREST
-    frame["title"] = frame["service_purpose"].fillna(frame["nearest_facility_name"])
-    geometry = gpd.points_from_xy(
-        frame["nearest_facility_longitude"],
-        frame["nearest_facility_latitude"],
-        crs="EPSG:4326",
+    coverage = (
+        frame.groupby("nearest_facility_uid")
+        .agg(
+            served_village_count=(VILLAGE_ID_COL, "nunique"),
+            service_row_count=(VILLAGE_ID_COL, "size"),
+            service_purpose_count=("service_purpose", "nunique"),
+            nearest_distance_min_km=("nearest_distance_km", "min"),
+            nearest_distance_mean_km=("nearest_distance_km", "mean"),
+            nearest_distance_max_km=("nearest_distance_km", "max"),
+            service_levels=("service_level", _join_text),
+            service_purposes=("service_purpose", _join_text),
+            selected_l3_facility_classes=("selected_l3_facility_class", _join_text),
+        )
+        .reset_index()
     )
-    return gpd.GeoDataFrame(frame, geometry=geometry)
+    village_names = _village_context_frame(villages)[[VILLAGE_ID_COL, "NAME"]]
+    served_names = frame[[VILLAGE_ID_COL, "nearest_facility_uid"]].drop_duplicates()
+    served_names = served_names.merge(village_names, on=VILLAGE_ID_COL, how="left")
+    served_names = (
+        served_names.groupby("nearest_facility_uid")["NAME"]
+        .agg(lambda values: _join_text(values, limit=50))
+        .reset_index(name="served_villages")
+    )
+    coverage = coverage.merge(served_names, on="nearest_facility_uid", how="left")
+
+    if nearest_facilities.empty:
+        return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326")
+    nearest = nearest_facilities.rename(columns={"facility_uid": "nearest_facility_uid"})
+    nearest = nearest.merge(coverage, on="nearest_facility_uid", how="inner")
+    if nearest.empty:
+        return gpd.GeoDataFrame(nearest, geometry=[], crs="EPSG:4326")
+    nearest["facility_uid"] = nearest["nearest_facility_uid"]
+    nearest["facilities_layer_kind"] = OUTPUT_NEAREST
+    nearest["title"] = nearest["facility_name"].fillna(nearest["facility_uid"])
+    return gpd.GeoDataFrame(nearest, geometry="geometry", crs="EPSG:4326")
 
 
 def _wide_metric_frame(
@@ -601,7 +632,6 @@ def _build_village_service(villages, l3_attributes: pd.DataFrame, l2_attributes:
         {
             "nearest_distance_km": "distance_km",
             "nearest_facility_uid": "facility_uid",
-            "nearest_facility_name": "facility_name",
         },
     )
     l2_wide = _wide_metric_frame(
@@ -612,7 +642,6 @@ def _build_village_service(villages, l3_attributes: pd.DataFrame, l2_attributes:
             "nearest_distance_km": "distance_km",
             "nearest_facility_uid": "facility_uid",
             "selected_component_class": "selected_l3",
-            "nearest_facility_name": "facility_name",
         },
     )
     merged = base.merge(l3_wide, on=VILLAGE_ID_COL, how="left")
@@ -872,6 +901,7 @@ def generate_facilities_proximity(
     proximity_outputs = {OUTPUT_NEAREST, OUTPUT_VILLAGE_SERVICE}
     l3_attributes = pd.DataFrame()
     l2_attributes = pd.DataFrame()
+    nearest_facilities = None
 
     if OUTPUT_INVENTORY in selected_outputs:
         t0 = time.perf_counter()
@@ -899,10 +929,32 @@ def generate_facilities_proximity(
 
     if OUTPUT_NEAREST in selected_outputs:
         t0 = time.perf_counter()
+        nearest_facility_uids = (
+            pd.concat(
+                [
+                    l3_attributes["nearest_facility_uid"],
+                    l2_attributes["nearest_facility_uid"],
+                ],
+                ignore_index=True,
+            )
+            .dropna()
+            .astype(str)
+            .drop_duplicates()
+            .tolist()
+        )
+        nearest_facilities = _read_nearest_facilities(source_path, nearest_facility_uids)
+        timings["read_nearest_facilities_seconds"] = round(time.perf_counter() - t0, 3)
+        logger.info(
+            "Facilities proximity read distinct nearest facilities in %.3fs: nearest=%d",
+            timings["read_nearest_facilities_seconds"],
+            len(nearest_facilities),
+        )
+        t0 = time.perf_counter()
         output_layers[OUTPUT_NEAREST] = _build_nearest_service(
             villages,
             l3_attributes,
             l2_attributes,
+            nearest_facilities,
         )
         timings["build_nearest_seconds"] = round(time.perf_counter() - t0, 3)
 
