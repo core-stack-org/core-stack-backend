@@ -6,7 +6,6 @@ Usage:
 Optional environment variables:
   FACILITIES_TEST_LIMIT=100
   FACILITIES_TEST_SEED=20260703
-  FACILITIES_TEST_FORCE_CACHE=0
   FACILITIES_TEST_OUTPUTS=all
   FACILITIES_TEST_SYNC_GEOSERVER=0
 """
@@ -59,7 +58,6 @@ def main() -> None:
     limit = int(os.environ.get("FACILITIES_TEST_LIMIT", "100"))
     seed = int(os.environ.get("FACILITIES_TEST_SEED", "20260703"))
     outputs = os.environ.get("FACILITIES_TEST_OUTPUTS", "all")
-    force_cache = _bool_env("FACILITIES_TEST_FORCE_CACHE")
     sync_to_geoserver = _bool_env("FACILITIES_TEST_SYNC_GEOSERVER")
 
     source_path = Path(FACILITIES_PROXIMITY_GPKG)
@@ -82,7 +80,6 @@ def main() -> None:
                 sync_to_geoserver=sync_to_geoserver,
                 outputs=outputs,
                 zip_output=False,
-                force_cache=force_cache,
             )
         except Exception as exc:
             failure = {
@@ -102,7 +99,6 @@ def main() -> None:
             "state": state,
             "district": district,
             "tehsil": tehsil,
-            "cache_hit": result["cache_hit"],
             "elapsed_seconds": result["elapsed_seconds"],
             "row_counts": result["row_counts"],
             "gpkg_path": result["gpkg_path"],
@@ -118,7 +114,6 @@ def main() -> None:
         "limit": limit,
         "seed": seed,
         "outputs": outputs,
-        "force_cache": force_cache,
         "sync_to_geoserver": sync_to_geoserver,
         "successes": len(rows),
         "failures": len(failures),
