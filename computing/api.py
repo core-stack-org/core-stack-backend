@@ -1583,7 +1583,7 @@ def generate_facilities_proximity(request):
         overwrite = request.data.get("overwrite", False)
         outputs = request.data.get("outputs", request.data.get("output_layers", "all"))
         zip_output = request.data.get("zip_output", False)
-        force_rebuild = request.data.get("force_rebuild", False)
+        force_cache = request.data.get("force_cache", False)
         district_slug = re.sub(r"[^a-z0-9]+", "_", district.lower()).strip("_")
         block_slug = re.sub(r"[^a-z0-9]+", "_", block.lower()).strip("_")
         expected_layers = {
@@ -1600,7 +1600,7 @@ def generate_facilities_proximity(request):
                 overwrite,
                 outputs,
                 zip_output,
-                force_rebuild,
+                force_cache,
             ],
             queue="nrm",
         )
@@ -1609,7 +1609,7 @@ def generate_facilities_proximity(request):
                 "Success": "Successfully initiated",
                 "workspace": FACILITIES_GEOSERVER_WORKSPACE,
                 "outputs": outputs,
-                "force_rebuild": force_rebuild,
+                "force_cache": force_cache,
                 "expected_layers": expected_layers,
                 "expected_layer_group": f"facilities_{district_slug}_{block_slug}",
             },

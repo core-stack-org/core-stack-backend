@@ -42,7 +42,7 @@ SOURCE_CLASS_MAP_TABLE = "proximity_class_map"
 SOURCE_NEAREST_TABLE = "proximity_nearest_facilities"
 SOURCE_FACILITIES_TABLE = "facilities"
 VILLAGE_ID_COL = "cs_feature_id"
-OUTPUT_DIR = "data/facilities/outputs/tehsil_data"
+CACHE_DIR = "data/facilities/outputs/cache"
 LAYER_PREFIX = "facilities"
 ALGORITHM = "local-facilities-proximity-gpkg-export"
 ALGORITHM_VERSION = "2.1"
@@ -152,7 +152,7 @@ def _geoserver_layer_name(output_key: str, district: str, block: str) -> str:
 
 
 def _output_dir(state: str, district: str, block: str) -> Path:
-    return _repo_path(OUTPUT_DIR) / _slug(state) / _slug(district) / _slug(block)
+    return _repo_path(CACHE_DIR) / _slug(state) / _slug(district) / _slug(block)
 
 
 def _bundle_stem(layer_name: str, selected_outputs: tuple[str, ...]) -> str:
@@ -577,6 +577,11 @@ def _village_context_frame(villages) -> pd.DataFrame:
     return context
 
 
+def _join_unique(values: pd.Series) -> str | None:
+    items = sorted({str(value).strip() for value in values.dropna() if str(value).strip()})
+    return "|".join(items) if items else None
+
+
 def _build_nearest_service(
     villages,
     l3_attributes: pd.DataFrame,
@@ -610,29 +615,25 @@ def _build_nearest_service(
     frame = frame[frame["nearest_facility_uid"].notna()].copy()
     if frame.empty:
         return gpd.GeoDataFrame(frame, geometry=[], crs="EPSG:4326")
+    frame = frame.merge(
+        _village_context_frame(villages)[[VILLAGE_ID_COL, "pc11_village_id", "NAME"]],
+        on=VILLAGE_ID_COL,
+        how="left",
+    )
 
     coverage = frame.groupby("nearest_facility_uid").agg(
-        served_village_count=(VILLAGE_ID_COL, "nunique"),
-        service_row_count=(VILLAGE_ID_COL, "size"),
-        service_purpose_count=("service_purpose", "nunique"),
+        nearest_for_cs_feature_ids=(VILLAGE_ID_COL, _join_unique),
+        nearest_for_pc11_village_ids=("pc11_village_id", _join_unique),
+        nearest_for_village_names=("NAME", _join_unique),
+        nearest_for_l1_domains=("class_l1_domain", _join_unique),
+        nearest_for_l2_filter_groups=("class_l2_filter_group", _join_unique),
+        nearest_for_l3_facility_classes=("selected_l3_facility_class", _join_unique),
+        nearest_for_service_purposes=("service_purpose", _join_unique),
         nearest_distance_min_km=("nearest_distance_km", "min"),
         nearest_distance_mean_km=("nearest_distance_km", "mean"),
         nearest_distance_max_km=("nearest_distance_km", "max"),
     )
-    level_counts = frame.pivot_table(
-        index="nearest_facility_uid",
-        columns="service_level",
-        values=VILLAGE_ID_COL,
-        aggfunc="size",
-        fill_value=0,
-    )
-    level_counts = level_counts.rename(
-        columns={
-            "l2": "l2_service_row_count",
-            "l3": "l3_service_row_count",
-        }
-    )
-    coverage = coverage.join(level_counts, how="left").fillna(0).reset_index()
+    coverage = coverage.reset_index()
 
     if nearest_facilities.empty:
         return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326")
@@ -1014,7 +1015,7 @@ def generate_facilities_proximity(
     overwrite: bool = False,
     outputs: Any = "all",
     zip_output: bool = False,
-    force_rebuild: bool = False,
+    force_cache: bool = False,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
@@ -1035,7 +1036,7 @@ def generate_facilities_proximity(
 
     t0 = time.perf_counter()
     manifest = _read_manifest(manifest_path)
-    if not _bool(force_rebuild) and _cache_is_valid(manifest, selected_outputs, signature, gpkg_path):
+    if not _bool(force_cache) and _cache_is_valid(manifest, selected_outputs, signature, gpkg_path):
         row_counts = {key: int(value) for key, value in manifest.get("row_counts", {}).items()}
         output_results = _output_results_template(selected_outputs, row_counts, district, block)
         facilities_source = _facilities_path().as_posix() if OUTPUT_INVENTORY in selected_outputs else None
@@ -1083,6 +1084,7 @@ def generate_facilities_proximity(
             "gpkg_path": gpkg_path.as_posix(),
             "zip_path": zip_path.as_posix() if zip_path else None,
             "output_dir": output_dir.as_posix(),
+            "cache_dir": output_dir.as_posix(),
             "state_name": manifest["state_name"],
             "district_name": manifest["district_name"],
             "tehsil": manifest["tehsil"],
@@ -1184,7 +1186,7 @@ def generate_facilities_proximity(
         output_layers=output_layers,
         output_dir=output_dir,
         layer_name=bundle_stem,
-        zip_output=_bool(zip_output) or _bool(sync_to_geoserver),
+        zip_output=_bool(zip_output),
     )
     timings["write_gpkg_seconds"] = round(time.perf_counter() - t0, 3)
     logger.info("Facilities proximity wrote GPKG in %.3fs: %s", timings["write_gpkg_seconds"], gpkg_path)
@@ -1247,6 +1249,7 @@ def generate_facilities_proximity(
         "gpkg_path": gpkg_path.as_posix(),
         "zip_path": zip_path.as_posix() if zip_path else None,
         "output_dir": output_dir.as_posix(),
+        "cache_dir": output_dir.as_posix(),
         "state_name": resolved_state,
         "district_name": resolved_district,
         "tehsil": resolved_block,
@@ -1268,7 +1271,7 @@ def generate_facilities_proximity_task(
     overwrite: bool = False,
     outputs: Any = "all",
     zip_output: bool = False,
-    force_rebuild: bool = False,
+    force_cache: bool = False,
     **_ignored: Any,
 ) -> dict[str, Any]:
     """Celery wrapper for the local facilities proximity export."""
@@ -1280,5 +1283,5 @@ def generate_facilities_proximity_task(
         overwrite=overwrite,
         outputs=outputs,
         zip_output=zip_output,
-        force_rebuild=force_rebuild,
+        force_cache=force_cache,
     )
