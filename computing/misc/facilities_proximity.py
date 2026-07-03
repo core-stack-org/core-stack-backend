@@ -865,6 +865,7 @@ def _publish_and_register_outputs(
     row_counts: dict[str, int],
     output_results: dict[str, dict[str, Any]],
     overwrite: bool,
+    register_layers: bool,
 ) -> tuple[dict[str, dict[str, Any]], bool]:
     geoserver = _publish_outputs_to_geoserver(
         output_layers=output_layers,
@@ -897,15 +898,18 @@ def _publish_and_register_outputs(
             "geoserver_layer_name": geoserver_layer_name,
             "geoserver_url": geoserver_url,
         }
-        layer_id, registration_error = _register_layer(
-            resolved_state,
-            resolved_district,
-            resolved_block,
-            geoserver_layer_name,
-            geoserver_url,
-            layer_output,
-            _bool(overwrite),
-        )
+        layer_id = None
+        registration_error = None
+        if register_layers:
+            layer_id, registration_error = _register_layer(
+                resolved_state,
+                resolved_district,
+                resolved_block,
+                geoserver_layer_name,
+                geoserver_url,
+                layer_output,
+                _bool(overwrite),
+            )
         output_results[output_key].update(
             {
                 "geoserver_url": geoserver_url,
@@ -929,6 +933,7 @@ def generate_facilities_proximity(
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
     outputs: Any = "all",
+    register_layers: bool = True,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
@@ -1061,6 +1066,7 @@ def generate_facilities_proximity(
             row_counts=row_counts,
             output_results=output_results,
             overwrite=_bool(overwrite),
+            register_layers=_bool(register_layers),
         )
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
         logger.info("Facilities proximity GeoServer publish finished in %.3fs: %s", timings["publish_geoserver_seconds"], geoserver)
@@ -1085,6 +1091,7 @@ def generate_facilities_proximity(
         "district_name": resolved_district,
         "tehsil": resolved_block,
         "sync_to_geoserver": _bool(sync_to_geoserver),
+        "register_layers": _bool(register_layers),
         "geoserver": geoserver,
         "geoserver_layer_group_created": geoserver_layer_group_created,
         "timings": timings,
@@ -1101,6 +1108,7 @@ def generate_facilities_proximity_task(
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
     outputs: Any = "all",
+    register_layers: bool = True,
     *_ignored_args: Any,
     **_ignored: Any,
 ) -> dict[str, Any]:
@@ -1112,4 +1120,5 @@ def generate_facilities_proximity_task(
         sync_to_geoserver=sync_to_geoserver,
         overwrite=overwrite,
         outputs=outputs,
+        register_layers=register_layers,
     )

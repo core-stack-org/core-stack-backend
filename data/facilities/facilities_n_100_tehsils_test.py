@@ -1,4 +1,5 @@
-"""Run the facilities proximity pipeline for up to 100 source tehsils.
+"""
+Run the facilities proximity pipeline for up to 100 source tehsils.
 
 Usage:
   python data/facilities/facilities_n_100_tehsils_test.py
@@ -8,7 +9,12 @@ Optional environment variables:
   FACILITIES_TEST_LIMIT=100
   FACILITIES_TEST_SEED=20260703
   FACILITIES_TEST_OUTPUTS=all
-  FACILITIES_TEST_SYNC_GEOSERVER=0
+  FACILITIES_TEST_SYNC_GEOSERVER=1
+  FACILITIES_TEST_OVERWRITE_GEOSERVER=1
+  FACILITIES_TEST_VERIFY_GEOSERVER=1
+  FACILITIES_TEST_REGISTER_DB=0
+  FACILITIES_TEST_DELAY=0.0          # Seconds to sleep between tehsils to avoid GeoServer exhaustion
+  FACILITIES_TEST_CLEANUP_GEOSERVER=0 # Set 1 to delete existing facilities_* layers before running
   FACILITIES_TEST_REPORT_DIR=data/facilities/outputs/tehsil_data
 """
 
@@ -21,6 +27,9 @@ import sqlite3
 import statistics
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,6 +49,13 @@ def _ensure_django() -> None:
 
 def _bool_env(name: str, default: str = "0") -> bool:
     return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _float_env(name: str, default: float = 0.0) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
 
 
 def _slug(value: str) -> str:
@@ -70,13 +86,169 @@ def _geoserver_wfs_url(base_url: str, workspace: str, layer_name: str) -> str:
     )
 
 
+def _geoserver_wfs_probe_url(base_url: str, workspace: str, layer_name: str) -> str:
+    base = base_url.rstrip("/") if base_url else "<GEOSERVER_URL>"
+    params = urllib.parse.urlencode(
+        {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": f"{workspace}:{layer_name}",
+            "outputFormat": "application/json",
+            "maxFeatures": "1",
+        }
+    )
+    return f"{base}/{workspace}/ows?{params}"
+
+
+def _geoserver_rest_url(base_url: str, workspace: str, endpoint: str) -> str:
+    base = base_url.rstrip("/") if base_url else ""
+    return f"{base}/rest/workspaces/{workspace}/{endpoint}"
+
+
+def _geoserver_request(url: str, method: str = "GET", username: str = "", password: str = "") -> dict | None:
+    """Make a basic GeoServer REST request and return parsed JSON or None."""
+    try:
+        pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+        if username and password:
+            pwd_mgr.add_password(None, url, username, password)
+        handler = urllib.request.HTTPBasicAuthHandler(pwd_mgr)
+        opener = urllib.request.build_opener(handler)
+        req = urllib.request.Request(url, method=method)
+        req.add_header("Accept", "application/json")
+        with opener.open(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+
+def _verify_wfs_layer(base_url: str, workspace: str, layer_name: str) -> dict:
+    url = _geoserver_wfs_probe_url(base_url, workspace, layer_name)
+    if not base_url:
+        return {
+            "ok": False,
+            "url": url,
+            "status_code": None,
+            "feature_count": None,
+            "error": "GEOSERVER_URL is not configured",
+        }
+    try:
+        req = urllib.request.Request(url)
+        req.add_header("Accept", "application/json")
+        with urllib.request.urlopen(req, timeout=30) as response:
+            body = response.read().decode("utf-8", errors="replace")
+            content_type = response.headers.get("Content-Type", "")
+            status_code = getattr(response, "status", None)
+        if "json" not in content_type.lower():
+            return {
+                "ok": False,
+                "url": url,
+                "status_code": status_code,
+                "feature_count": None,
+                "error": body[:500],
+            }
+        payload = json.loads(body)
+        features = payload.get("features", [])
+        return {
+            "ok": True,
+            "url": url,
+            "status_code": status_code,
+            "feature_count": len(features),
+            "error": None,
+        }
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        return {
+            "ok": False,
+            "url": url,
+            "status_code": exc.code,
+            "feature_count": None,
+            "error": body[:500],
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "url": url,
+            "status_code": None,
+            "feature_count": None,
+            "error": str(exc)[:500],
+        }
+
+
+def _cleanup_geoserver_layers(base_url: str, workspace: str, username: str, password: str, dry_run: bool = False) -> int:
+    """Delete all layers starting with 'facilities_' in the workspace. Returns count deleted."""
+    layers_url = _geoserver_rest_url(base_url, workspace, "layers.json")
+    data = _geoserver_request(layers_url, username=username, password=password)
+    if not data or "layers" not in data or "layer" not in data["layers"]:
+        print("CLEANUP No layers found or could not list layers.", flush=True)
+        return 0
+
+    to_delete = [l["name"] for l in data["layers"]["layer"] if l["name"].startswith("facilities_")]
+    if not to_delete:
+        print("CLEANUP No facilities_* layers to remove.", flush=True)
+        return 0
+
+    print(f"CLEANUP Found {len(to_delete)} facilities_* layer(s) to remove.", flush=True)
+    deleted = 0
+    pwd_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
+    if username and password:
+        pwd_mgr.add_password(None, base_url, username, password)
+    handler = urllib.request.HTTPBasicAuthHandler(pwd_mgr)
+    opener = urllib.request.build_opener(handler)
+
+    for name in to_delete:
+        del_url = _geoserver_rest_url(base_url, workspace, f"layers/{name}?recurse=true")
+        if dry_run:
+            print(f"CLEANUP [DRY RUN] Would DELETE {name}", flush=True)
+            deleted += 1
+            continue
+        try:
+            req = urllib.request.Request(del_url, method="DELETE")
+            opener.open(req, timeout=30)
+            deleted += 1
+            print(f"CLEANUP Deleted layer: {name}", flush=True)
+        except urllib.error.HTTPError as e:
+            print(f"CLEANUP Failed to delete {name}: HTTP {e.code} {e.reason}", flush=True)
+        except Exception as e:
+            print(f"CLEANUP Failed to delete {name}: {e}", flush=True)
+        time.sleep(0.2)  # Brief pause between deletes
+
+    # Clean up layer groups
+    lg_url = _geoserver_rest_url(base_url, workspace, "layergroups.json")
+    lg_data = _geoserver_request(lg_url, username=username, password=password)
+    if lg_data and "layerGroups" in lg_data and "layerGroup" in lg_data["layerGroups"]:
+        lg_to_delete = [lg["name"] for lg in lg_data["layerGroups"]["layerGroup"] if lg["name"].startswith("facilities_")]
+        for name in lg_to_delete:
+            del_url = _geoserver_rest_url(base_url, workspace, f"layergroups/{name}?recurse=true")
+            if dry_run:
+                print(f"CLEANUP [DRY RUN] Would DELETE layer group: {name}", flush=True)
+                continue
+            try:
+                req = urllib.request.Request(del_url, method="DELETE")
+                opener.open(req, timeout=30)
+                print(f"CLEANUP Deleted layer group: {name}", flush=True)
+            except Exception as e:
+                print(f"CLEANUP Failed to delete layer group {name}: {e}", flush=True)
+            time.sleep(0.2)
+
+    print(f"CLEANUP Done. Removed {deleted} layer(s).", flush=True)
+    return deleted
+
+
 def _report_paths(report_dir: Path, selected_count: int, seed: int) -> tuple[Path, Path]:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     stem = f"facilities_n_{selected_count}_tehsils_test_{stamp}_seed_{seed}"
     return report_dir / f"{stem}.md", report_dir / f"{stem}.json"
 
 
+def _safe_get(d: dict, key: str, default=None):
+    return d.get(key, default) if isinstance(d, dict) else default
+
+
 def _brief_row(row: dict) -> dict:
+    verification = [output.get("wfs_verification") for output in row.get("outputs", [])]
+    verified = sum(1 for item in verification if item and item.get("ok"))
+    failed = sum(1 for item in verification if item and not item.get("ok"))
     return {
         "index": row["index"],
         "state": row["state"],
@@ -86,6 +258,8 @@ def _brief_row(row: dict) -> dict:
         "row_counts": row["row_counts"],
         "gpkg_path": row["gpkg_path"],
         "timings": row["timings"],
+        "geoserver_verified": verified,
+        "geoserver_verify_failed": failed,
     }
 
 
@@ -121,8 +295,13 @@ def _write_report(
         f"Source GPKG: `{source_path.as_posix()}`",
         f"Requested outputs: `{summary['outputs']}`",
         f"GeoServer sync attempted: `{summary['sync_to_geoserver']}`",
+        f"GeoServer overwrite enabled: `{summary['overwrite_geoserver']}`",
+        f"GeoServer WFS verification attempted: `{summary['verify_geoserver']}`",
+        f"Django DB layer registration attempted: `{summary['register_db']}`",
         f"GeoServer workspace: `{workspace}`",
         f"GeoServer base URL: `{geoserver_url or '<GEOSERVER_URL not configured>'}`",
+        f"Inter-tehsil delay: `{summary['delay_seconds']}s`",
+        f"Pre-run GeoServer cleanup: `{summary['cleanup_geoserver']}`",
         "",
         "## What This Run Did",
         "",
@@ -134,6 +313,8 @@ def _write_report(
     ]
     if summary["sync_to_geoserver"]:
         lines.append("- Attempted to publish each requested output as a separate GeoServer layer.")
+        if summary["cleanup_geoserver"]:
+            lines.append("- Pre-run cleanup: deleted all existing `facilities_*` layers and layer groups from the workspace.")
     else:
         lines.append(
             "- Did not publish to GeoServer. Set `FACILITIES_TEST_SYNC_GEOSERVER=1` to publish; expected layer names and WFS URLs are listed below."
@@ -151,6 +332,11 @@ def _write_report(
             f"- Mean seconds: `{summary['mean_seconds']}`",
             f"- Median seconds: `{summary['median_seconds']}`",
             f"- Max seconds: `{summary['max_seconds']}`",
+            f"- P95 seconds: `{summary.get('p95_seconds', 'N/A')}`",
+            f"- Expected GeoServer layers: `{summary['expected_geoserver_layers']}`",
+            f"- Published GeoServer URLs returned: `{summary['published_geoserver_urls']}`",
+            f"- WFS verified layers: `{summary['verified_geoserver_layers']}`",
+            f"- WFS verification failures: `{summary['failed_geoserver_verifications']}`",
             f"- JSON details: `{json_path.as_posix()}`",
             "",
             "## Selected Tehsils",
@@ -171,8 +357,15 @@ def _write_report(
         row = row_by_key.get((state, district, tehsil))
         failure = failure_by_key.get((state, district, tehsil))
         if row:
+            reg_errors = [o["registration_error"] for o in row["outputs"] if o["registration_error"]]
+            wfs_errors = [
+                o.get("wfs_verification")
+                for o in row["outputs"]
+                if o.get("wfs_verification") and not o["wfs_verification"].get("ok")
+            ]
+            status = "ok" if not reg_errors and not wfs_errors else f"partial ({len(reg_errors) + len(wfs_errors)} err)"
             lines.append(
-                f"| {index} | ok | {state} | {district} | {tehsil} | {row['elapsed_seconds']} | `{row['gpkg_path']}` |"
+                f"| {index} | {status} | {state} | {district} | {tehsil} | {row['elapsed_seconds']} | `{row['gpkg_path']}` |"
             )
         elif failure:
             lines.append(
@@ -193,13 +386,21 @@ def _write_report(
                 f"### {row['index']}. {row['state']} / {row['district']} / {row['tehsil']}",
                 "",
                 f"- Local GPKG: `{row['gpkg_path']}`",
-                f"- Layer group: `{workspace}:{group_name}`",
+                f"- Layer group: `{workspace}:{group_name}` (created: `{row['geoserver_layer_group_created']}`)",
             ]
         )
         for output in row["outputs"]:
             url = output["geoserver_url"] or output["expected_wfs_url"]
+            verify = output.get("wfs_verification")
+            verify_str = ""
+            if verify:
+                if verify.get("ok"):
+                    verify_str = f", WFS verified: `true`, probe features: `{verify.get('feature_count')}`"
+                else:
+                    verify_str = f", WFS verified: `false`, error: `{verify.get('error')}`"
+            err_str = f", registration error: `{output['registration_error']}`" if output["registration_error"] else ""
             lines.append(
-                f"- `{output['output_key']}`: local layer `{output['local_layer']}`, GeoServer layer `{workspace}:{output['geoserver_layer_name']}`, WFS `{url}`"
+                f"- `{output['output_key']}`: local layer `{output['local_layer']}`, GeoServer layer `{workspace}:{output['geoserver_layer_name']}`, WFS `{url}`{verify_str}{err_str}"
             )
         lines.append("")
 
@@ -223,7 +424,12 @@ def main() -> None:
     limit = int(os.environ.get("FACILITIES_TEST_LIMIT", "100"))
     seed = int(os.environ.get("FACILITIES_TEST_SEED", "20260703"))
     outputs = os.environ.get("FACILITIES_TEST_OUTPUTS", "all")
-    sync_to_geoserver = _bool_env("FACILITIES_TEST_SYNC_GEOSERVER")
+    sync_to_geoserver = _bool_env("FACILITIES_TEST_SYNC_GEOSERVER", "1")
+    overwrite_geoserver = _bool_env("FACILITIES_TEST_OVERWRITE_GEOSERVER", "1")
+    verify_geoserver = _bool_env("FACILITIES_TEST_VERIFY_GEOSERVER", "1")
+    register_db = _bool_env("FACILITIES_TEST_REGISTER_DB", "0")
+    delay_seconds = _float_env("FACILITIES_TEST_DELAY", 0.0)
+    cleanup_geoserver = _bool_env("FACILITIES_TEST_CLEANUP_GEOSERVER")
     report_dir = Path(
         os.environ.get("FACILITIES_TEST_REPORT_DIR", "data/facilities/outputs/tehsil_data")
     )
@@ -234,21 +440,47 @@ def main() -> None:
     if not source_path.is_absolute():
         source_path = Path(settings.BASE_DIR) / source_path
 
+    geoserver_url = getattr(settings, "GEOSERVER_URL", "")
+    geoserver_user = getattr(settings, "GEOSERVER_USERNAME", "")
+    geoserver_pass = getattr(settings, "GEOSERVER_PASSWORD", "")
+    workspace = FACILITIES_GEOSERVER_WORKSPACE
+
+    # --- Pre-run cleanup ---
+    if sync_to_geoserver and cleanup_geoserver and geoserver_url:
+        print(f"PRE-RUN Cleaning up existing facilities_* layers in workspace '{workspace}'...", flush=True)
+        _cleanup_geoserver_layers(geoserver_url, workspace, geoserver_user, geoserver_pass)
+
     tehsils = _source_tehsils(source_path)
     random.Random(seed).shuffle(tehsils)
     selected = tehsils[: max(1, min(limit, len(tehsils)))]
 
+    print(
+        "START Processing "
+        f"{len(selected)} tehsil(s), sync_to_geoserver={sync_to_geoserver}, "
+        f"overwrite_geoserver={overwrite_geoserver}, verify_geoserver={verify_geoserver}, "
+        f"register_db={register_db}, "
+        f"delay={delay_seconds}s",
+        flush=True,
+    )
+
     rows: list[dict] = []
     failures: list[dict] = []
     started = time.perf_counter()
+
     for index, (state, district, tehsil) in enumerate(selected, 1):
+        # Inter-tehsil delay (skip before the first one)
+        if index > 1 and delay_seconds > 0:
+            time.sleep(delay_seconds)
+
         try:
             result = generate_facilities_proximity(
                 state=state,
                 district=district,
                 block=tehsil,
                 sync_to_geoserver=sync_to_geoserver,
+                overwrite=overwrite_geoserver,
                 outputs=outputs,
+                register_layers=register_db,
             )
         except Exception as exc:
             failure = {
@@ -257,60 +489,101 @@ def main() -> None:
                 "district": district,
                 "tehsil": tehsil,
                 "error_type": exc.__class__.__name__,
-                "error": str(exc)[:300],
+                "error": str(exc)[:500],
             }
             failures.append(failure)
             print("FAIL", json.dumps(failure), flush=True)
             continue
 
+        result_outputs = _safe_get(result, "outputs", {})
+        output_rows = []
+        for output_key, output in result_outputs.items():
+            geoserver_layer_name = _safe_get(output, "geoserver_layer_name", "")
+            verification = None
+            if sync_to_geoserver and verify_geoserver:
+                verification = _verify_wfs_layer(
+                    geoserver_url,
+                    workspace,
+                    geoserver_layer_name,
+                )
+            output_rows.append(
+                {
+                    "output_key": output_key,
+                    "local_layer": _safe_get(output, "local_layer", ""),
+                    "geoserver_layer_name": geoserver_layer_name,
+                    "geoserver_url": _safe_get(output, "geoserver_url"),
+                    "expected_wfs_url": _geoserver_wfs_url(
+                        geoserver_url,
+                        workspace,
+                        geoserver_layer_name,
+                    ),
+                    "row_count": _safe_get(output, "row_count"),
+                    "layer_id": _safe_get(output, "layer_id"),
+                    "registration_error": _safe_get(output, "registration_error"),
+                    "wfs_verification": verification,
+                }
+            )
         row = {
             "index": index,
             "state": state,
             "district": district,
             "tehsil": tehsil,
-            "elapsed_seconds": result["elapsed_seconds"],
-            "row_counts": result["row_counts"],
-            "gpkg_path": result["gpkg_path"],
-            "timings": result["timings"],
-            "selected_outputs": result["selected_outputs"],
-            "outputs": [
-                {
-                    "output_key": output_key,
-                    "local_layer": output["local_layer"],
-                    "geoserver_layer_name": output["geoserver_layer_name"],
-                    "geoserver_url": output["geoserver_url"],
-                    "expected_wfs_url": _geoserver_wfs_url(
-                        settings.GEOSERVER_URL,
-                        FACILITIES_GEOSERVER_WORKSPACE,
-                        output["geoserver_layer_name"],
-                    ),
-                    "row_count": output["row_count"],
-                    "layer_id": output["layer_id"],
-                    "registration_error": output["registration_error"],
-                }
-                for output_key, output in result["outputs"].items()
-            ],
-            "geoserver_layer_group_created": result["geoserver_layer_group_created"],
+            "elapsed_seconds": _safe_get(result, "elapsed_seconds", 0),
+            "row_counts": _safe_get(result, "row_counts", {}),
+            "gpkg_path": _safe_get(result, "gpkg_path", ""),
+            "timings": _safe_get(result, "timings", {}),
+            "selected_outputs": _safe_get(result, "selected_outputs", []),
+            "outputs": output_rows,
+            "geoserver_layer_group_created": _safe_get(result, "geoserver_layer_group_created", False),
         }
         rows.append(row)
-        if index <= 3 or index % 10 == 0:
-            print("OK", json.dumps(_brief_row(row)), flush=True)
+
+        # Log progress
+        reg_errors = [o["registration_error"] for o in row["outputs"] if o["registration_error"]]
+        wfs_errors = [
+            o["wfs_verification"]
+            for o in row["outputs"]
+            if o.get("wfs_verification") and not o["wfs_verification"].get("ok")
+        ]
+        status_tag = "OK" if not reg_errors and not wfs_errors else "PARTIAL"
+        if index <= 5 or index % 10 == 0 or reg_errors or wfs_errors:
+            print(f"{status_tag} [{index}/{len(selected)}]", json.dumps(_brief_row(row)), flush=True)
 
     times = [row["elapsed_seconds"] for row in rows]
+    all_outputs = [output for row in rows for output in row["outputs"]]
+    verified_outputs = [
+        output
+        for output in all_outputs
+        if output.get("wfs_verification") and output["wfs_verification"].get("ok")
+    ]
+    failed_verifications = [
+        output
+        for output in all_outputs
+        if output.get("wfs_verification") and not output["wfs_verification"].get("ok")
+    ]
     summary = {
         "source": source_path.as_posix(),
         "limit": limit,
         "seed": seed,
         "outputs": outputs,
         "sync_to_geoserver": sync_to_geoserver,
+        "overwrite_geoserver": overwrite_geoserver,
+        "verify_geoserver": verify_geoserver and sync_to_geoserver,
+        "register_db": register_db and sync_to_geoserver,
+        "delay_seconds": delay_seconds,
+        "cleanup_geoserver": cleanup_geoserver and sync_to_geoserver,
         "successes": len(rows),
         "failures": len(failures),
+        "expected_geoserver_layers": len(all_outputs) if sync_to_geoserver else 0,
+        "published_geoserver_urls": sum(1 for output in all_outputs if output.get("geoserver_url")),
+        "verified_geoserver_layers": len(verified_outputs),
+        "failed_geoserver_verifications": len(failed_verifications),
         "wall_seconds": round(time.perf_counter() - started, 3),
-        "subsecond_count": sum(value < 1 for value in times),
+        "subsecond_count": sum(1 for v in times if v < 1),
         "max_seconds": max(times) if times else None,
-        "mean_seconds": statistics.mean(times) if times else None,
-        "median_seconds": statistics.median(times) if times else None,
-        "p95_seconds": statistics.quantiles(times, n=20)[18] if len(times) >= 20 else None,
+        "mean_seconds": round(statistics.mean(times), 3) if times else None,
+        "median_seconds": round(statistics.median(times), 3) if times else None,
+        "p95_seconds": round(statistics.quantiles(times, n=20)[18], 3) if len(times) >= 20 else None,
         "slowest": [
             _brief_row(row)
             for row in sorted(rows, key=lambda item: item["elapsed_seconds"], reverse=True)[:10]
@@ -327,8 +600,8 @@ def main() -> None:
         rows=rows,
         failures=failures,
         selected=selected,
-        workspace=FACILITIES_GEOSERVER_WORKSPACE,
-        geoserver_url=settings.GEOSERVER_URL,
+        workspace=workspace,
+        geoserver_url=geoserver_url,
         source_path=source_path,
     )
     print("SUMMARY", json.dumps(summary, indent=2), flush=True)
