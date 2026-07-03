@@ -56,20 +56,22 @@ After installation, download the local base layers into `data/` before running l
 
 ```bash
 conda activate corestack-backend
-python manage.py base_layer_setup
+python manage.py local_compute_layer_setup
 ```
 
 To inspect available layer selectors:
 
 ```bash
-python manage.py base_layer_setup --list
+python manage.py local_compute_layer_setup --list
 ```
 
 To download only specific layers or groups:
 
 ```bash
-python manage.py base_layer_setup terrain mws lulc_v3
-python manage.py base_layer_setup static_layers
+python manage.py local_compute_layer_setup terrain mws lulc_v3
+python manage.py local_compute_layer_setup static_layers
+python manage.py local_compute_layer_setup tehsil_level
+python manage.py local_compute_layer_setup --ensure-soi-tehsil --ensure-tehsil-watersheds
 ```
 
 - **Running celery:**
