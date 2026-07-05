@@ -1961,7 +1961,7 @@ def generate_facilities_proximity(request):
             generate_facilities_proximity_task,
             generate_facilities_proximity_local_task,
         )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )

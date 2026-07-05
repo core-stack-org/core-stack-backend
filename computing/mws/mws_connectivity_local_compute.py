@@ -32,23 +32,15 @@ from shapely.ops import unary_union
 
 
 def _compute_mws_connectivity_for_watersheds(watersheds_gdf, mws_gdf):
-    mws_in_roi = mws_gdf.copy()
-
-    if mws_in_roi.empty:
+    if mws_gdf.empty:
         print("No MWS connectivity found within the outer boundary.")
-        return mws_in_roi
+        return mws_gdf
 
-    print(f"MWS connectivity within outer boundary: {len(mws_in_roi)}")
+    # Step 1: Clip to the outer boundary of watersheds
+    outer_boundary = watersheds_gdf.geometry.unary_union
+    mws_in_roi = gpd.clip(mws_gdf, outer_boundary).copy()
 
-    # Step 2: Spatial join to clip results to individual watersheds
-    mws_in_roi = gpd.sjoin(
-        mws_in_roi,
-        watersheds_gdf[["geometry"]],  # no uid, no collision
-        how="inner",
-        predicate="intersects",
-    ).drop(columns=["index_right"], errors="ignore")
-
-    # Step 3: Drop empty/invalid geometries
+    # Step 2: Drop empty/invalid geometries
     mws_in_roi = fix_invalid_geometry_in_gdf(mws_in_roi)
     mws_in_roi = mws_in_roi[
         mws_in_roi.geometry.notna()

@@ -26,7 +26,7 @@ from computing.utils import (
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    load_precomputed_panchayat,
     read_validated_vector_file,
     write_vector_output,
     validate_geometry,
@@ -39,20 +39,14 @@ from computing.config_loader import (
 GEOSERVER_WORKSPACE = "antyodaya_2020"
 
 
-def _compute_antyodaya_for_watersheds(watersheds_gdf, antyodaya_gdf):
-    """
-    Spatially filters Antyodaya features with watershed/ROI boundaries.
-    """
+def _compute_antyodaya_for_panchayat(panchayat_gdf, antyodaya_gdf):
     if antyodaya_gdf.empty:
         return antyodaya_gdf
-        
-    if watersheds_gdf.crs and antyodaya_gdf.crs and watersheds_gdf.crs != antyodaya_gdf.crs:
-        antyodaya_gdf = antyodaya_gdf.to_crs(watersheds_gdf.crs)
 
-    outer_boundary = watersheds_gdf.geometry.unary_union
+    outer_boundary = panchayat_gdf.geometry.unary_union
 
-    # Precise intersection check
-    antyodaya_in_roi = antyodaya_gdf[antyodaya_gdf.intersects(outer_boundary)].copy()
+    # Clip Antyodaya geometries to the panchayat boundary
+    antyodaya_in_roi = gpd.clip(antyodaya_gdf, outer_boundary).copy()
 
     # Final cleanup
     antyodaya_in_roi = antyodaya_in_roi[~antyodaya_in_roi.geometry.is_empty]
@@ -77,7 +71,7 @@ def generate_antyodaya_data_local(
 ):
     if state and district and block:
         layer_name = f"antyodaya20_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
+        panchayat_gdf, watershed_source = load_precomputed_panchayat(
             state=state,
             district=district,
             block=block,
@@ -88,22 +82,22 @@ def generate_antyodaya_data_local(
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
         layer_name = f"antyodaya20_{valid_gee_text(asset_suffix).lower()}"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        panchayat_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
         print(f"ROI source: {roi_path}")
 
     if not os.path.exists(PAN_INDIA_ANTYODAYA_2020):
         raise FileNotFoundError(f"PAN INDIA Antyodaya file not found at {PAN_INDIA_ANTYODAYA_2020}")
 
     print("Loading Antyodaya data overlapping ROI...")
-    antyodaya_gdf = gpd.read_file(PAN_INDIA_ANTYODAYA_2020, mask=watersheds_gdf)
+    antyodaya_gdf = gpd.read_file(PAN_INDIA_ANTYODAYA_2020, mask=panchayat_gdf)
     antyodaya_gdf = validate_geometry(antyodaya_gdf)
     if antyodaya_gdf.empty:
         print("Warning: PAN INDIA Antyodaya file has no valid geometries overlapping ROI")
     else:
         print(f"Loaded {len(antyodaya_gdf)} Antyodaya features")
 
-    result_gdf = _compute_antyodaya_for_watersheds(
-        watersheds_gdf=watersheds_gdf,
+    result_gdf = _compute_antyodaya_for_panchayat(
+        panchayat_gdf=panchayat_gdf,
         antyodaya_gdf=antyodaya_gdf,
     )
     print(f"Final valid Antyodaya features after spatial filter: {len(result_gdf)}")
