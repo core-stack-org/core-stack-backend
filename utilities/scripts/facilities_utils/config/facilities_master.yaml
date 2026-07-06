@@ -78,15 +78,15 @@ outputs:
   source_summary_csv: data/facilities/outputs/source_summary.csv
   invalid_coordinates_csv: data/facilities/outputs/invalid_coordinates.csv
   facilities_gpkg: data/facilities/outputs/pan_india_facilities.gpkg
-  proximity_gpkg: data/facilities/outputs/village_facility_proximity.gpkg
+  proximity_gpkg: data/facilities/outputs/cs_village_facility_proximity.gpkg
   metadata_monitor_yaml: utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
 
 references:
   pincode_centroids: data/facilities/reference/india_pincodes_centroid.csv
 
 proximity:
-  village_gpkg: data/admin-boundary/cs_admin_sanitised.gpkg
-  village_layer: cs_admin_sanitised
+  village_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  village_layer: cs_admin_standard
   village_id_col: cs_feature_id
   village_context_cols:
     - state_name
@@ -99,12 +99,12 @@ proximity:
   derive_l2_from_l3: true
   derive_l1_from_l3: false
   create_derived_views: true
-  materialize_l2_table: true
-  l2_materialize_chunksize: 1000000
-  materialize_derived_tables: false
-  output_mode: l3_base_with_materialized_l2
+  materialize_derived_tables: true
+  write_village_shapes: true
+  output_mode: l3_base_with_derived_views
   tables:
     village_shapes: village_shapes
+    village_points: village_shapes
     class_map: proximity_class_map
     nearest_facilities: proximity_nearest_facilities
     l3: proximity_l3

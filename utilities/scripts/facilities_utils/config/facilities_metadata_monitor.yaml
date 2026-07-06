@@ -1,9 +1,9 @@
 metadata_name: pan_india_facilities_metadata_monitor
 schema_version: generated_1.0
 status: generated_from_current_config_and_assets
-generated_at_utc: '2026-07-01T20:40:01+00:00'
+generated_at_utc: '2026-07-06T02:03:43+00:00'
 source_of_truth:
-  master_yaml: /mnt/y/core-stack-org/core-stack-backend/utilities/scripts/facilities_utils/config/facilities_master.yaml
+  master_yaml: utilities/scripts/facilities_utils/config/facilities_master.yaml
   raw_dir: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw
   reference_files:
     pincode_centroids:
@@ -21,7 +21,7 @@ pipeline_design:
     derived outputs.
 paths:
   facilities_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
-  proximity_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
+  proximity_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
   metadata_monitor_yaml: /mnt/y/core-stack-org/core-stack-backend/utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
 outputs:
   facilities_csv:
@@ -67,22 +67,22 @@ outputs:
   facilities_gpkg:
     path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
     exists: true
-    size_bytes: 2094641152
-    size_mb: 1997.605
-    modified_utc: '2026-07-01T03:12:35+00:00'
+    size_bytes: 2138836992
+    size_mb: 2039.754
+    modified_utc: '2026-07-03T07:23:36+00:00'
   proximity_gpkg:
-    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
     exists: true
-    size_bytes: 5914288128
-    size_mb: 5640.305
-    modified_utc: '2026-07-01T20:38:57+00:00'
+    size_bytes: 7412461568
+    size_mb: 7069.074
+    modified_utc: '2026-07-06T01:49:42+00:00'
 asset_layers:
   facilities_gpkg:
     path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
     exists: true
-    size_bytes: 2094641152
-    size_mb: 1997.605
-    modified_utc: '2026-07-01T03:12:35+00:00'
+    size_bytes: 2138836992
+    size_mb: 2039.754
+    modified_utc: '2026-07-03T07:23:36+00:00'
     layers:
     - name: facilities
       type: features
@@ -184,11 +184,11 @@ asset_layers:
       - sample_rows
     views: []
   proximity_gpkg:
-    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
     exists: true
-    size_bytes: 5914288128
-    size_mb: 5640.305
-    modified_utc: '2026-07-01T20:38:57+00:00'
+    size_bytes: 7412461568
+    size_mb: 7069.074
+    modified_utc: '2026-07-06T01:49:42+00:00'
     layers:
     - name: proximity_class_map
       type: attributes
@@ -198,19 +198,50 @@ asset_layers:
       - class_l2_filter_group
       - class_l1_domain
       - filter_logic
-    - name: proximity_l2_materialized
+    - name: proximity_l1_materialized
       type: attributes
-      rows: 6978323
+      rows: 3154490
       columns:
       - cs_feature_id
+      - state_name
+      - district_name
+      - TEHSIL
+      - pc11_village_id
+      - NAME
+      - class_l1_domain
+      - closest_domain_distance_km
+      - selected_filter_group
+      - selected_component_class
+      - nearest_facility_uid
+      - nearest_facility_name
+      - nearest_facility_code
+      - nearest_facility_latitude
+      - nearest_facility_longitude
+      - nearest_class_l4_facility_subtype
+    - name: proximity_l2_materialized
+      type: attributes
+      rows: 6939878
+      columns:
+      - cs_feature_id
+      - state_name
+      - district_name
+      - TEHSIL
+      - pc11_village_id
+      - NAME
       - class_l1_domain
       - class_l2_filter_group
+      - filter_logic
       - logic_distance_km
       - selected_component_class
       - nearest_facility_uid
+      - nearest_facility_name
+      - nearest_facility_code
+      - nearest_facility_latitude
+      - nearest_facility_longitude
+      - nearest_class_l4_facility_subtype
     - name: proximity_l3
       type: attributes
-      rows: 15859825
+      rows: 15772450
       columns:
       - cs_feature_id
       - class_l3_facility_class
@@ -224,7 +255,7 @@ asset_layers:
       - value
     - name: proximity_nearest_facilities
       type: attributes
-      rows: 1712910
+      rows: 1711631
       columns:
       - facility_uid
       - facility_name
@@ -234,7 +265,7 @@ asset_layers:
       - class_l4_facility_subtype
     - name: village_shapes
       type: features
-      rows: 634393
+      rows: 630898
       columns:
       - fid
       - geom
@@ -1153,7 +1184,7 @@ nested_taxonomy:
               membership_rows: 1160528
               unique_facilities: 1155605
               primary_facility_rows: 1160320
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1281,7 +1312,7 @@ nested_taxonomy:
               membership_rows: 616648
               unique_facilities: 614799
               primary_facility_rows: 160196
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1411,7 +1442,7 @@ nested_taxonomy:
               membership_rows: 260523
               unique_facilities: 259456
               primary_facility_rows: 48605
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1545,7 +1576,7 @@ nested_taxonomy:
               membership_rows: 138229
               unique_facilities: 137858
               primary_facility_rows: 14821
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1680,7 +1711,7 @@ nested_taxonomy:
               membership_rows: 11763
               unique_facilities: 11763
               primary_facility_rows: 11763
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1795,7 +1826,7 @@ nested_taxonomy:
               membership_rows: 14178
               unique_facilities: 14178
               primary_facility_rows: 14178
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1902,7 +1933,7 @@ nested_taxonomy:
               membership_rows: 124889
               unique_facilities: 124889
               primary_facility_rows: 124889
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1932,7 +1963,7 @@ nested_taxonomy:
               membership_rows: 19454
               unique_facilities: 19454
               primary_facility_rows: 19454
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1968,7 +1999,7 @@ nested_taxonomy:
               membership_rows: 3180
               unique_facilities: 3180
               primary_facility_rows: 3180
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -1998,7 +2029,7 @@ nested_taxonomy:
               membership_rows: 158
               unique_facilities: 158
               primary_facility_rows: 158
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2028,7 +2059,7 @@ nested_taxonomy:
               membership_rows: 276
               unique_facilities: 276
               primary_facility_rows: 276
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2077,7 +2108,7 @@ nested_taxonomy:
               membership_rows: 312507
               unique_facilities: 312507
               primary_facility_rows: 312507
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2122,7 +2153,7 @@ nested_taxonomy:
               membership_rows: 39340
               unique_facilities: 39340
               primary_facility_rows: 39340
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2158,7 +2189,7 @@ nested_taxonomy:
               membership_rows: 1799682
               unique_facilities: 1799682
               primary_facility_rows: 1799682
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2194,7 +2225,7 @@ nested_taxonomy:
               membership_rows: 168893
               unique_facilities: 168893
               primary_facility_rows: 168893
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2230,7 +2261,7 @@ nested_taxonomy:
               membership_rows: 210135
               unique_facilities: 210135
               primary_facility_rows: 210135
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2278,7 +2309,7 @@ nested_taxonomy:
               membership_rows: 2902
               unique_facilities: 2902
               primary_facility_rows: 2902
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2323,7 +2354,7 @@ nested_taxonomy:
               membership_rows: 64698
               unique_facilities: 60594
               primary_facility_rows: 64698
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2386,7 +2417,7 @@ nested_taxonomy:
               membership_rows: 13819
               unique_facilities: 13318
               primary_facility_rows: 13819
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2431,7 +2462,7 @@ nested_taxonomy:
               membership_rows: 580
               unique_facilities: 578
               primary_facility_rows: 580
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2474,7 +2505,7 @@ nested_taxonomy:
               membership_rows: 17842
               unique_facilities: 17325
               primary_facility_rows: 17842
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2529,7 +2560,7 @@ nested_taxonomy:
               membership_rows: 1548
               unique_facilities: 1545
               primary_facility_rows: 1548
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2592,7 +2623,7 @@ nested_taxonomy:
               membership_rows: 3976
               unique_facilities: 3830
               primary_facility_rows: 3976
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2639,7 +2670,7 @@ nested_taxonomy:
               membership_rows: 14308
               unique_facilities: 14254
               primary_facility_rows: 14308
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -2714,7 +2745,7 @@ nested_taxonomy:
               membership_rows: 1308
               unique_facilities: 1287
               primary_facility_rows: 1308
-              proximity_l3_rows: 634393
+              proximity_l3_rows: 630898
               proximity_complete_for_all_villages: true
             level_4_subtype:
               output_column: class_l4_facility_subtype
@@ -3352,117 +3383,119 @@ class_k_catalog:
     status: no_current_source_mapping
 proximity_status:
   available: true
-  path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/village_facility_proximity.gpkg
-  village_shapes: 634393
-  l3_rows: 15859825
+  path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
+  village_layer: village_shapes
+  village_shapes: 630898
+  l3_rows: 15772450
   l3_classes_complete: 25
   l3_classes_configured: 25
-  nearest_facility_lookup_rows: 1712910
+  nearest_facility_lookup_rows: 1711631
   class_map_rows: 25
   views:
   - proximity_l2
   materialized_tables:
-    l2_materialized: 6978323
+    l2_materialized: 6939878
+    l1_materialized: 3154490
   by_l3_class:
     agri_industry_agri_processing:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_agri_support_infrastructure:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_co_operatives_societies:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_dairy_animal_husbandry:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_distribution_utilities:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_industrial_manufacturing:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_markets_trading:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     agri_industry_storage_warehousing:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     apmc:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     bank_atm:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     bank_branch:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     bank_mitra:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     college:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     csc:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     health_chc:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     health_dis_h:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     health_phc:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     health_s_t_h:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     health_sub_cen:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     pds:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     school_higher_secondary:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     school_primary:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     school_secondary:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     school_upper_primary:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
     universities:
-      rows: 634393
-      expected_rows_if_complete: 634393
+      rows: 630898
+      expected_rows_if_complete: 630898
       complete_for_all_villages: true
 editing_guidance:
   safe_to_edit: Edit facilities_master.yaml, not this generated monitor.
