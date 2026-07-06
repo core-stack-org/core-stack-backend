@@ -18,7 +18,7 @@ from computing.tree_health.ccd_local import LOCAL_OUTPUT_BASE_DIR as CCD_RASTER_
 
 
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
-GEOSERVER_WORKSPACE = "ccd"
+GEOSERVER_WORKSPACE = "tree_ccd_vector"
 
 CCD_CLASSES = [
     {"value": 0, "label_prefix": "Low_Density_"},

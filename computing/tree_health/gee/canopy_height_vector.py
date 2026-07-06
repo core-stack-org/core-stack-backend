@@ -100,7 +100,7 @@ def tree_health_ch_vector(
     merged_fc = ee.FeatureCollection(asset_id)
 
     # Sync to GeoServer
-    sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height")
+    sync_res = sync_fc_to_geoserver(merged_fc, state, description, "tree_ch_vector")
 
     # Save layer info if asset exists
     if is_gee_asset_exists(asset_id):

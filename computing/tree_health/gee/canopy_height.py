@@ -128,7 +128,7 @@ def tree_health_ch_raster(
 
             # Sync raster from GCS to GeoServer
             res = sync_raster_gcs_to_geoserver(
-                "canopy_height", description, description, "ch_style"
+                "tree_ch_raster", description, description, "tree_ch_style"
             )
 
             if res and layer_id:

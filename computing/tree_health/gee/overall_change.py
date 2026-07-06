@@ -105,7 +105,7 @@ def tree_health_overall_change_raster(
         print("task_id_list sync to GCS", task_id_list)
 
         res = sync_raster_gcs_to_geoserver(
-            "tree_overall_ch", description, description, "tree_overall_ch_style"
+            "tree_overall_raster", description, description, "tree_overall_style"
         )
         layer_at_geoserver = True
 
