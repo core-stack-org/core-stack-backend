@@ -26,26 +26,29 @@ GEOSERVER_WORKSPACE = "facilities_proximity"
 
 
 def _compute_proximity_for_panchayat(panchayat_gdf, facilities_gdf):
-    """
-    Filters facilities to strictly those intersecting the panchayat boundaries,
-    without altering/clipping their geometries.
-    """
     if facilities_gdf.empty:
         return facilities_gdf
-
-    # Ensure CRS matches
-    if panchayat_gdf.crs and facilities_gdf.crs and panchayat_gdf.crs != facilities_gdf.crs:
-        facilities_gdf = facilities_gdf.to_crs(panchayat_gdf.crs)
 
     outer_boundary = panchayat_gdf.geometry.unary_union
 
     # Keep facilities that intersect the boundary, geometries unchanged
-    facilities_in_roi = facilities_gdf[facilities_gdf.intersects(outer_boundary)].copy()
+    facilities_in_roi = gpd.clip(facilities_gdf, outer_boundary).copy()
 
     # Final cleanup
     facilities_in_roi = facilities_in_roi[~facilities_in_roi.geometry.is_empty]
     facilities_in_roi = facilities_in_roi[facilities_in_roi.geometry.is_valid]
     facilities_in_roi = facilities_in_roi[facilities_in_roi.geometry.notna()]
+
+    # Rename NAME to censusname
+    if "NAME" in facilities_in_roi.columns:
+        facilities_in_roi = facilities_in_roi.rename(columns={"NAME": "censusname"})
+
+    # Add state, district, tehsil from panchayat_gdf
+    for col in ["state", "district", "tehsil"]:
+        if col in panchayat_gdf.columns:
+            # Assign the value for the tehsil (taking the first valid row)
+            first_val = panchayat_gdf[col].dropna().iloc[0] if not panchayat_gdf[col].dropna().empty else None
+            facilities_in_roi[col] = first_val
 
     return facilities_in_roi
 
