@@ -65,7 +65,7 @@ assets:
   village_facility_proximity_v2:
     asset_id: projects/corestack-datasets/assets/datasets/village_facility_proximity_v2
     kind: village_proximity_wide
-    source_gpkg: data/facilities/outputs/village_facility_proximity.gpkg
+    source_gpkg: data/facilities/outputs/cs_village_facility_proximity.gpkg
     output_tsv: data/facilities/gee/village_facility_proximity_v2.tsv
     geometry_column: geometry
     description: >
