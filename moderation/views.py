@@ -77,14 +77,25 @@ class SubmissionsOfPlan:
                 model.objects.filter(plan_id=plan_id)
                 .exclude(is_deleted=True)
                 .order_by("-submission_time")
-                .values(field_name, "is_moderated", "uuid", "latitude", "longitude")
+                .values(
+                    field_name,
+                    "is_moderated",
+                    "uuid",
+                    "latitude",
+                    "longitude",
+                    "submission_time",
+                )
             )
             qs = [
                 [
                     row[field_name],
                     row["is_moderated"],
                     row["uuid"],
-                    {"latitude": row["latitude"], "longitude": row["longitude"]},
+                    {
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "submission_time": row["submission_time"],
+                    },
                 ]
                 for row in rows
             ]
@@ -108,13 +119,23 @@ class SubmissionsOfPlan:
                 model.objects.filter(plan_id=plan_id)
                 .exclude(is_deleted=True)
                 .order_by("-submission_time")
-                .values(field_name, "is_moderated", "latitude", "longitude")
+                .values(
+                    field_name,
+                    "is_moderated",
+                    "latitude",
+                    "longitude",
+                    "submission_time",
+                )
             )
             qs = [
                 [
                     row[field_name],
                     row["is_moderated"],
-                    {"latitude": row["latitude"], "longitude": row["longitude"]},
+                    {
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "submission_time": row["submission_time"],
+                    },
                 ]
                 for row in rows
             ]
