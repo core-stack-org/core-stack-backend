@@ -133,12 +133,19 @@ from .terrain_descriptor.terrain_raster_fabdem import (
 from .terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as generate_terrain_raster_clip_local_task,
 )
-from .tree_health.canopy_height import tree_health_ch_raster
-from .tree_health.canopy_height_vector import tree_health_ch_vector
-from .tree_health.ccd import tree_health_ccd_raster
-from .tree_health.ccd_vector import tree_health_ccd_vector
-from .tree_health.overall_change import tree_health_overall_change_raster
-from .tree_health.overall_change_vector import tree_health_overall_change_vector
+from .tree_health.gee.canopy_height import tree_health_ch_raster
+from .tree_health.gee.canopy_height_vector import tree_health_ch_vector
+from .tree_health.gee.ccd import tree_health_ccd_raster
+from .tree_health.gee.ccd_vector import tree_health_ccd_vector
+from .tree_health.gee.overall_change import tree_health_overall_change_raster
+from .tree_health.gee.overall_change_vector import tree_health_overall_change_vector
+from .tree_health.local.canopy_height_local import tree_health_ch_raster_local
+from .tree_health.local.canopy_height_vector_local import tree_health_ch_vector_local
+from .tree_health.local.ccd_local import tree_health_ccd_raster_local
+from .tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
+from .tree_health.local.overall_change_local import tree_health_overall_change_raster_local
+from .tree_health.local.overall_change_vector_local import tree_health_overall_change_vector_local
+
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -1083,7 +1090,16 @@ def tree_health_raster(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        tree_health_ccd_raster.apply_async(
+
+        compute = _get_compute_mode(request)
+        ccd_task = _select_compute_task(
+            compute,
+            tree_health_ccd_raster,
+            tree_health_ccd_raster_local,
+        )
+        print("What is task? ", ccd_task)
+
+        ccd_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1094,7 +1110,14 @@ def tree_health_raster(request):
             },
             queue="nrm",
         )
-        tree_health_ch_raster.apply_async(
+
+        ch_task = _select_compute_task(
+            compute,
+            tree_health_ch_raster,
+            tree_health_ch_raster_local,
+        )
+        print("What is task? ", ch_task)
+        ch_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1105,7 +1128,13 @@ def tree_health_raster(request):
             },
             queue="nrm",
         )
-        tree_health_overall_change_raster.apply_async(
+        overall_task = _select_compute_task(
+            compute,
+            tree_health_overall_change_raster,
+            tree_health_overall_change_raster_local,
+        )
+        print("What is task? ", overall_task)
+        overall_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1116,6 +1145,7 @@ def tree_health_raster(request):
             },
             queue="nrm",
         )
+
 
         return Response(
             {"Success": "tree_health task initiated"},
@@ -1138,7 +1168,15 @@ def tree_health_vector(request):
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
 
-        tree_health_ch_vector.apply_async(
+        compute = _get_compute_mode(request)
+        ccd_task = _select_compute_task(
+            compute,
+            tree_health_ccd_vector,
+            tree_health_ccd_vector_local,
+        )
+        print("What is task? ", ccd_task)
+
+        ccd_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1150,7 +1188,14 @@ def tree_health_vector(request):
             queue="nrm",
         )
 
-        tree_health_ccd_vector.apply_async(
+        ch_task = _select_compute_task(
+            compute,
+            tree_health_ch_vector,
+            tree_health_ch_vector_local,
+        )
+        print("What is task? ", ch_task)
+
+        ch_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1162,7 +1207,14 @@ def tree_health_vector(request):
             queue="nrm",
         )
 
-        tree_health_overall_change_vector.apply_async(
+        overall_task = _select_compute_task(
+            compute,
+            tree_health_overall_change_vector,
+            tree_health_overall_change_vector_local,
+        )
+        print("What is task? ", overall_task)
+
+        overall_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1171,6 +1223,7 @@ def tree_health_vector(request):
             },
             queue="nrm",
         )
+
         return Response(
             {"Success": "Overall_change_vector task initiated"},
             status=status.HTTP_200_OK,

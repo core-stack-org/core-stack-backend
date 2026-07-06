@@ -26,20 +26,20 @@ def generate_spei_pipeline(
     start_date = f"{str(start_year)}-01-01"
     end_date = f"{str(end_year)}-12-31"
 
-    download_data_locally(
-        aez=aez,
-        start_date=start_date,
-        end_date=end_date,
-        frequency="monthly",
-        datasets=None,
-        overwrite=overwrite,
-    )
+    # download_data_locally(
+    #     aez=aez,
+    #     start_date=start_date,
+    #     end_date=end_date,
+    #     frequency="monthly",
+    #     datasets=None,
+    #     overwrite=overwrite,
+    # )
 
-    ppet_multiband(
-        aez=aez,
-        start=start_year,
-        end=end_year,
-    )
+    # ppet_multiband(
+    #     aez=aez,
+    #     start=start_year,
+    #     end=end_year,
+    # )
 
     run_spei(aez, start_year, end_year)
 

@@ -123,7 +123,7 @@ def tree_health_ccd_vector(
         merged_fc = ee.FeatureCollection(asset_id)
 
         # Sync to GeoServer
-        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "ccd")
+        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "tree_ccd_vector")
 
         # Update DB sync status
         if sync_res["status_code"] == 201 and layer_id:

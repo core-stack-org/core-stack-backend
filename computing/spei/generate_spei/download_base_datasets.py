@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import ee
@@ -163,6 +164,64 @@ def download_image(
             time.sleep(2 * attempt)
 
 
+def get_last_downloaded_date(
+    output_dir: Path, aez: int, frequency: str, dataset: str
+) -> str | None:
+    """
+    Check the output directory and find the last downloaded date.
+    Returns the latest date as a string (YYYYMMDD or YYYYMM format).
+    """
+    dataset_output_dir = output_dir / str(aez) / frequency / dataset
+    
+    if not dataset_output_dir.exists():
+        return None
+    
+    # Get all .tif files in the directory
+    tif_files = list(dataset_output_dir.glob("*.tif"))
+    
+    if not tif_files:
+        return None
+    
+    # Extract dates from filenames (e.g., "CHIRPS_20240101.tif" or "CHIRPS_202401.tif")
+    dates = []
+    for file_path in tif_files:
+        # Extract the date part from filename (last part before .tif)
+        filename = file_path.stem  # e.g., "CHIRPS_20240101"
+        parts = filename.split("_")
+        if len(parts) >= 2:
+            date_str = parts[-1]  # e.g., "20240101"
+            try:
+                # Validate it's a proper date format
+                if len(date_str) in (8, 6):  # YYYYMMDD or YYYYMM
+                    dates.append(date_str)
+            except (ValueError, IndexError):
+                continue
+    
+    if not dates:
+        return None
+    
+    # Sort and return the latest date
+    return sorted(dates)[-1]
+
+
+def get_next_date(current_date: str, frequency: str) -> str:
+    """
+    Given a downloaded-date label, return the next start date in the format
+    expected by Earth Engine's ee.Date parsing.
+    """
+    if frequency in ("daily", "native"):
+        date_obj = datetime.strptime(current_date, "%Y%m%d")
+        next_date_obj = date_obj + timedelta(days=1)
+        return next_date_obj.strftime("%Y-%m-%d")
+
+    date_obj = datetime.strptime(current_date, "%Y%m")
+    if date_obj.month == 12:
+        next_date_obj = date_obj.replace(year=date_obj.year + 1, month=1)
+    else:
+        next_date_obj = date_obj.replace(month=date_obj.month + 1)
+    return next_date_obj.strftime("%Y-%m-01")
+
+
 def validate_inputs(aoi: str, datasets: list[str] | str, frequency: str) -> None:
     # Keep validation near main() so notebook calls fail early and clearly.
     print("Inside validate_inputs")
@@ -253,7 +312,17 @@ def download_dataset_images(
     name = dataset_label(dataset)
     print(output_dir, aez, frequency, dataset)
     dataset_output_dir = Path(output_dir) / str(aez) / frequency / dataset
-
+    print("start_date",start_date)
+    # Check if files already exist and find the last downloaded date
+    last_downloaded = get_last_downloaded_date(Path(output_dir), aez, frequency, dataset)
+    
+    if last_downloaded and not overwrite:
+        # Convert last downloaded date to next date
+        next_date_str = get_next_date(last_downloaded, frequency)
+        print(f"Last downloaded date: {last_downloaded}")
+        print(f"Resuming downloads from: {next_date_str}")
+        start_date = next_date_str
+    
     collection, region, _, labeled_dates = build_dataset_image(
         aez=aez,
         dataset=dataset,
@@ -261,6 +330,11 @@ def download_dataset_images(
         end_date=end_date,
         frequency=frequency,
     )
+
+    # If no dates to download, skip processing
+    if not labeled_dates:
+        print(f"No new {name} image(s) to download for aez {aez}")
+        return
 
     download_jobs = []
     target_projection = None
@@ -333,9 +407,9 @@ def download_data_locally(
     aez: int,
     datasets: list[str] | str | None = None,
     start_date: str = "2004-01-01",
-    end_date: str = "2023-12-31",
+    end_date: str = "2025-12-31",
     frequency: str = "monthly",
-    output_dir: str = "data/drought_inputs",
+    output_dir: str = "data/base_layers/spei/inputs",
     sleep: float = 0.2,
     max_workers: int = 4,
     overwrite: bool = False,
