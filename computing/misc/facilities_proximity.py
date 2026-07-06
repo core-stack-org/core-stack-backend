@@ -9,6 +9,7 @@ import sqlite3
 import time
 import tempfile
 import zipfile
+from datetime import datetime, timezone
 from functools import lru_cache
 from numbers import Integral, Real
 from pathlib import Path
@@ -711,6 +712,47 @@ def _write_tehsil_gpkg(
     return gpkg_path, row_counts
 
 
+def _write_tehsil_summary_csv(
+    *,
+    output_dir: Path,
+    bundle_stem: str,
+    selected_outputs: tuple[str, ...],
+    output_results: dict[str, dict[str, Any]],
+    row_counts: dict[str, int],
+    source_path: Path,
+    facilities_source: str | None,
+    gpkg_path: Path,
+    resolved_state: str,
+    resolved_district: str,
+    resolved_block: str,
+    source_village_geometry: str,
+) -> Path:
+    generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    rows = []
+    for output_key in selected_outputs:
+        result = output_results[output_key]
+        rows.append(
+            {
+                "output_key": output_key,
+                "local_gpkg_layer": result["local_layer"],
+                "row_count": row_counts.get(output_key, 0),
+                "geoserver_layer_name": result["geoserver_layer_name"],
+                "local_gpkg_path": gpkg_path.as_posix(),
+                "source_proximity_gpkg": source_path.as_posix(),
+                "facilities_source": facilities_source,
+                "source_village_layer": SOURCE_VILLAGE_LAYER,
+                "source_village_geometry": source_village_geometry,
+                "state_name": resolved_state,
+                "district_name": resolved_district,
+                "tehsil": resolved_block,
+                "generated_at_utc": generated_at,
+            }
+        )
+    csv_path = output_dir / f"{bundle_stem}.summary.csv"
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
+    return csv_path
+
+
 def _write_single_layer_gpkg(gdf, output_dir: Path, layer_name: str) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     gpkg_path = output_dir / f"{layer_name}.gpkg"
@@ -1049,6 +1091,22 @@ def generate_facilities_proximity(
     geoserver_layer_group_created = False
     facilities_source = _facilities_path().as_posix() if OUTPUT_INVENTORY in selected_outputs else None
     output_results = _output_results_template(selected_outputs, row_counts, district, block)
+    summary_csv_path = _write_tehsil_summary_csv(
+        output_dir=output_dir,
+        bundle_stem=bundle_stem,
+        selected_outputs=selected_outputs,
+        output_results=output_results,
+        row_counts=row_counts,
+        source_path=source_path,
+        facilities_source=facilities_source,
+        gpkg_path=gpkg_path,
+        resolved_state=resolved_state,
+        resolved_district=resolved_district,
+        resolved_block=resolved_block,
+        source_village_geometry=source_village_geometry,
+    )
+    for output in output_results.values():
+        output["local_summary_csv"] = summary_csv_path.as_posix()
     if _bool(sync_to_geoserver):
         t0 = time.perf_counter()
         logger.info("Facilities proximity publishing selected outputs to GeoServer: %s", selected_outputs)
@@ -1086,6 +1144,7 @@ def generate_facilities_proximity(
         "source_village_layer": SOURCE_VILLAGE_LAYER,
         "source_village_geometry": source_village_geometry,
         "gpkg_path": gpkg_path.as_posix(),
+        "summary_csv_path": summary_csv_path.as_posix(),
         "output_dir": output_dir.as_posix(),
         "state_name": resolved_state,
         "district_name": resolved_district,
