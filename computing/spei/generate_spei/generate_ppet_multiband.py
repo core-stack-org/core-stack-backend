@@ -84,7 +84,7 @@ def reproject_modis_to_chirps_grid(
 def ppet_multiband(
     aez=None,
     start: int = 2004,
-    end: int = 2023,
+    end: int = 2024,
 ) -> Path:
     """
     SPEI Pipeline - Step 1 (Local P-PET)
@@ -97,12 +97,12 @@ def ppet_multiband(
     Band names follow the original script: y{year}_m{month}, e.g. y2015_m06.
 
     """
-    data_root = Path("data/drought_inputs")
+    data_root = Path("data/base_layers/spei/inputs")
     chirps_dir = data_root / str(aez) / "monthly" / "chirps"
     modis_dir = data_root / str(aez) / "monthly" / "modis_pet"
 
     # input_root = Path("data/drought_inputs")
-    output_dir = Path("data/drought_inputs") / str(aez) / "monthly"
+    output_dir = data_root / str(aez) / "monthly"
     output = output_dir / f"P_PET_AEZ_{str(aez)}_monthly_multiband.tif"
     OUTPUT_NODATA = -9999.0
 

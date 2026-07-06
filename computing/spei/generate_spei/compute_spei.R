@@ -1,22 +1,36 @@
-"""
-    SPEI Pipeline
-    Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
-    write 3 multiband output GeoTIFFs with named bands.
-    Here the reference baseline period is taken as 2004-2023.
-    Change the end_year variable to whatever year you wanna extend the pipeline to.
-    If it is not intentional, don't touch the ref_start and ref_end variables for
-    extending the pipeline as it will change the SPEI values for all previous years too.
-"""
+
+# SPEI Pipeline
+# Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
+# write 3 multiband output GeoTIFFs with named bands.
+# Here the reference baseline period is taken as 2004-2023.
+# Change the end_year variable to whatever year you wanna extend the pipeline to.
+# If it is not intentional, don't touch the ref_start and ref_end variables for
+# extending the pipeline as it will change the SPEI values for all previous years too.
+# Run below commands for installing the dependencies if not already installed:
+# sudo apt install r-base-core
+# conda install -c conda-forge r-spei r-raster
+# Rscript -e "install.packages('terra', repos='https://cloud.r-project.org')"
+# Rscript -e "install.packages('raster', repos='https://cloud.r-project.org')"
 
 library(SPEI)
 library(raster)
 
 run_spei_pipeline <- function(aez, start_year, end_year) {
 
-    input_file <- paste0("data/drought_inputs/", aez, "/monthly/P_PET_AEZ_", aez, "_monthly_multiband.tif")
-    output_dir <- paste0("data/drought_inputs/", aez, "/monthly")
+    input_file <- paste0("data/base_layers/spei/inputs/", aez, "/monthly/P_PET_AEZ_", aez, "_monthly_multiband.tif")
+    # output_dir <- paste0("data/base_layers/spei/outputs")
 
-    if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+    # if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+
+    output_base <- "data/base_layers/spei/outputs"
+
+    output_dir1  <- file.path(output_base, "SPEI_1")
+    output_dir3  <- file.path(output_base, "SPEI_3")
+    output_dir12 <- file.path(output_base, "SPEI_12")
+
+    dir.create(output_dir1, recursive = TRUE, showWarnings = FALSE)
+    dir.create(output_dir3, recursive = TRUE, showWarnings = FALSE)
+    dir.create(output_dir12, recursive = TRUE, showWarnings = FALSE)
 
     # --- YEAR RANGE ---
     ref_start  <- 2004   # baseline period start — distribution fitted on this range
@@ -29,10 +43,10 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     n_output   <- n_monthly + n_seasonal + n_annual
 
     # --- Resume check ---
-    out_check <- file.path(output_dir, paste0("SPEI12_", aez, ".tif"))
-    if (file.exists(out_check)) {
-      stop(paste("Already processed:", aez, "— delete output files to rerun."))
-    }
+    # out_check <- file.path(output_dir, paste0("SPEI12_", aez, ".tif"))
+    # if (file.exists(out_check)) {
+    #   stop(paste("Already processed:", aez, "— delete output files to rerun."))
+    # }
 
     # =============================================================================
     # SPEI FUNCTION — do not modify
@@ -85,7 +99,7 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
 
     # --- Compute block by block ---
     cat("Running SPEI computation...\n")
-    temp_file    <- file.path(output_dir, paste0(aez, "_temp.tif"))
+    temp_file    <- file.path(output_base, paste0(aez, "_temp.tif"))
     result_brick <- brick(p_pet_brick, nl = n_output)
     result_brick <- writeStart(result_brick, filename = temp_file, overwrite = TRUE)
 
@@ -114,19 +128,33 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     names(spei3_b)  <- spei3_names
     names(spei12_b) <- spei12_names
 
+    spei1_file  <- file.path(output_dir1,  paste0("SPEI1_",  aez, ".tif"))
+    spei3_file  <- file.path(output_dir3,  paste0("SPEI3_",  aez, ".tif"))
+    spei12_file <- file.path(output_dir12, paste0("SPEI12_", aez, ".tif"))
+
+    if (file.exists(spei1_file))  file.remove(spei1_file)
+    if (file.exists(spei3_file))  file.remove(spei3_file)
+    if (file.exists(spei12_file)) file.remove(spei12_file)
+
     writeRaster(spei1_b,
-                file.path(output_dir, paste0("SPEI1_",  aez, ".tif")),
-                format = "GTiff", overwrite = TRUE, NAflag = -9999)
+            spei1_file,
+            format = "GTiff", overwrite = TRUE, NAflag = -9999)
+
     writeRaster(spei3_b,
-                file.path(output_dir, paste0("SPEI3_",  aez, ".tif")),
+                spei3_file,
                 format = "GTiff", overwrite = TRUE, NAflag = -9999)
+
     writeRaster(spei12_b,
-                file.path(output_dir, paste0("SPEI12_", aez, ".tif")),
+                spei12_file,
                 format = "GTiff", overwrite = TRUE, NAflag = -9999)
 
     file.remove(temp_file)
 
-    cat(paste0("\n Done. Output files saved to: ", output_dir, "\n"))
+    cat("\nDone.\n")
+    cat(paste0("SPEI-1  : ", spei1_file, "\n"))
+    cat(paste0("SPEI-3  : ", spei3_file, "\n"))
+    cat(paste0("SPEI-12 : ", spei12_file, "\n"))
+
     cat(paste0("  SPEI1_",  aez, ".tif  — ", nlayers(spei1_b),  " bands\n"))
     cat(paste0("  SPEI3_",  aez, ".tif  — ", nlayers(spei3_b),  " bands\n"))
     cat(paste0("  SPEI12_", aez, ".tif  — ", nlayers(spei12_b), " bands\n"))

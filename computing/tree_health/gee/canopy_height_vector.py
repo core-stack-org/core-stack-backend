@@ -3,7 +3,6 @@ from nrm_app.celery import app
 from computing.utils import (
     sync_fc_to_geoserver,
     save_layer_info_to_db,
-    geoserver_sync_succeeded,
     update_layer_sync_status,
 )
 from utilities.constants import GEE_PATHS
@@ -101,7 +100,7 @@ def tree_health_ch_vector(
     merged_fc = ee.FeatureCollection(asset_id)
 
     # Sync to GeoServer
-    sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height_vector")
+    sync_res = sync_fc_to_geoserver(merged_fc, state, description, "tree_ch_vector")
 
     # Save layer info if asset exists
     if is_gee_asset_exists(asset_id):
@@ -122,9 +121,9 @@ def tree_health_ch_vector(
         layer_at_geoserver = False
         merged_fc = ee.FeatureCollection(asset_id)
 
-        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height_vector")
+        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height")
 
-        if geoserver_sync_succeeded(sync_res) and layer_id:
+        if sync_res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             layer_at_geoserver = True
 
