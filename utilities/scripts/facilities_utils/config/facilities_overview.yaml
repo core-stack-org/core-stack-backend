@@ -8,7 +8,7 @@ source_of_truth:
 
 main_outputs:
   facilities_gpkg: data/facilities/outputs/pan_india_facilities.gpkg
-  proximity_gpkg: data/facilities/outputs/village_facility_proximity.gpkg
+  proximity_gpkg: data/facilities/outputs/cs_village_facility_proximity.gpkg
   audit_state: data/facilities/state/pipeline_state.json
 
 facility_gpkg_structure:
@@ -48,7 +48,7 @@ facility_gpkg_structure:
 
 proximity_gpkg_structure:
   village_shapes:
-    description: Village polygon geometries and key admin context columns used as the primary village geometry for exports.
+    description: Actual village polygons from cs_admin_standard with representative-point latitude/longitude helper columns.
   proximity_l3:
     description: Lean durable base table with village id, L3 facility class, nearest distance, and nearest facility uid.
     intentionally_not_kept:
@@ -70,7 +70,7 @@ proximity_gpkg_structure:
   proximity_l1:
     description: Optional view only; L1/domain proximity is not part of the default export path.
   materialized_derived_tables:
-    description: L2 is materialized in the source GPKG during proximity build; L1 is reserved for future low-compute domain metrics.
+    description: L1/L2 physical tables kept for API export and frontend performance; SQL views are also retained as rebuildable derivations.
 
 proximity_policy:
   stored_level: class_l3_facility_class
@@ -78,8 +78,8 @@ proximity_policy:
   reason: L3 classes already cover all facilities; L4 is retained as nearest-facility metadata.
   incremental_update:
     - Compute or recompute affected L3 classes.
-    - Refresh proximity_class_map and the materialized L2 table from YAML after all configured L3 classes are complete.
-    - Keep runtime exports as simple GPKG table reads against village_shapes, proximity_l3, proximity_l2_materialized, and proximity_nearest_facilities.
+    - Refresh proximity_class_map and L2/L1 derived views from YAML after all configured L3 classes are complete.
+    - Materialize L2/L1 for the API/GeoServer source asset.
 
 adding_a_dataset:
   steps:
