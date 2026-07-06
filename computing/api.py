@@ -2014,7 +2014,7 @@ def generate_facilities_proximity(request):
             generate_facilities_proximity_task,
             generate_facilities_proximity_local_task,
         )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm1")
+        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
@@ -2475,7 +2475,7 @@ def rainfall_resilience_resistance(request):
     except Exception as e:
         print("Exception in rainfall_resilience_resistance api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 
 @api_view(["POST"])
 @schema(None)
@@ -2584,7 +2584,7 @@ def generate_drainage_density_data(request):
     except Exception as e:
         print("Exception in river data api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 
 @api_view(["POST"])
 @schema(None)
