@@ -1092,6 +1092,19 @@ def tree_health_raster(request):
         gee_account_id = request.data.get("gee_account_id")
 
         compute = _get_compute_mode(request)
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "start_year": start_year,
+            "end_year": end_year,
+        }
+        if not compute == "local":
+            task_kwargs.update(
+                {
+                    "gee_account_id": gee_account_id,
+                }
+            )
         ccd_task = _select_compute_task(
             compute,
             tree_health_ccd_raster,
@@ -1100,14 +1113,7 @@ def tree_health_raster(request):
         print("What is task? ", ccd_task)
 
         ccd_task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
@@ -1118,14 +1124,7 @@ def tree_health_raster(request):
         )
         print("What is task? ", ch_task)
         ch_task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+            kwargs=task_kwargs,
             queue="nrm",
         )
         overall_task = _select_compute_task(
@@ -1135,14 +1134,7 @@ def tree_health_raster(request):
         )
         print("What is task? ", overall_task)
         overall_task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
@@ -1169,6 +1161,21 @@ def tree_health_vector(request):
         gee_account_id = request.data.get("gee_account_id")
 
         compute = _get_compute_mode(request)
+
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "start_year": start_year,
+            "end_year": end_year,
+        }
+        if not compute == "local":
+            task_kwargs.update(
+                {
+                    "gee_account_id": gee_account_id,
+                }
+            )
+
         ccd_task = _select_compute_task(
             compute,
             tree_health_ccd_vector,
@@ -1177,14 +1184,7 @@ def tree_health_vector(request):
         print("What is task? ", ccd_task)
 
         ccd_task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
@@ -1196,14 +1196,7 @@ def tree_health_vector(request):
         print("What is task? ", ch_task)
 
         ch_task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
@@ -1214,13 +1207,20 @@ def tree_health_vector(request):
         )
         print("What is task? ", overall_task)
 
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block
+        }
+        if not compute == "local":
+            task_kwargs.update(
+                {
+                    "gee_account_id": gee_account_id,
+                }
+            )
+
         overall_task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-            },
+            kwargs=task_kwargs,
             queue="nrm",
         )
 
