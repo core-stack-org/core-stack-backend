@@ -24,12 +24,12 @@ from computing.misc.soge_vector import generate_soge_vector
 from computing.misc.stream_order import generate_stream_order
 from computing.misc.drainage_lines import clip_drainage_lines
 from computing.clart.clart import generate_clart_layer
-from computing.tree_health.canopy_height import tree_health_ch_raster
-from computing.tree_health.canopy_height_vector import tree_health_ch_vector
-from computing.tree_health.ccd import tree_health_ccd_raster
-from computing.tree_health.ccd_vector import tree_health_ccd_vector
-from computing.tree_health.overall_change import tree_health_overall_change_raster
-from computing.tree_health.overall_change_vector import (
+from computing.tree_health.gee.canopy_height import tree_health_ch_raster
+from computing.tree_health.gee.canopy_height_vector import tree_health_ch_vector
+from computing.tree_health.gee.ccd import tree_health_ccd_raster
+from computing.tree_health.gee.ccd_vector import tree_health_ccd_vector
+from computing.tree_health.gee.overall_change import tree_health_overall_change_raster
+from computing.tree_health.gee.overall_change_vector import (
     tree_health_overall_change_vector,
 )
 from computing.misc.naturaldepression import generate_natural_depression_data

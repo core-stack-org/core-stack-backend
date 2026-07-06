@@ -14,7 +14,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
-from computing.tree_health.canopy_height_local import (
+from computing.tree_health.local.canopy_height_local import (
     LOCAL_OUTPUT_BASE_DIR as CH_RASTER_DIR,
 )
 
