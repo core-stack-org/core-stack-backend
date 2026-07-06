@@ -26,10 +26,10 @@ uv run --with pandas --with numpy --with pyyaml \
 uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely --with pyogrio \
   python utilities/scripts/facilities_utils/facility_pipeline.py build
 
-# Build data/facilities/outputs/village_facility_proximity.gpkg.
-# This stores L3 proximity as the durable base and materializes L2 from L3.
+# Build data/facilities/outputs/cs_village_facility_proximity.gpkg.
+# This stores L3 proximity as the durable base and derives L2/L1 from L3.
 uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely --with pyogrio --with scipy \
-  python utilities/scripts/facilities_utils/facility_pipeline.py proximity
+  python utilities/scripts/facilities_utils/facility_pipeline.py proximity --materialize-derived
 ```
 
 ## Outputs
@@ -42,45 +42,19 @@ uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely 
 - `source_summary`: non-spatial source QA table.
 - `invalid_coordinates`: non-spatial invalid-coordinate audit table.
 
-`data/facilities/outputs/village_facility_proximity.gpkg`
+`data/facilities/outputs/cs_village_facility_proximity.gpkg`
 
-- `village_shapes`: village polygon geometries and key admin context columns.
+- `village_shapes`: actual village polygons from `cs_admin_standard` with representative-point latitude/longitude helper columns.
 - `proximity_l3`: lean durable base table with village id, L3 class, distance, and nearest facility uid.
 - `proximity_l2_materialized`: lean physical L2 table derived from L3 using the configured min/max group logic.
 - `proximity_nearest_facilities`: deduplicated facility detail lookup for nearest facilities referenced by L3.
 - `proximity_class_map`: small YAML-derived class map from L3 to L2/L1/filter logic.
-- `proximity_l2`: optional SQL view derived from L3 plus `proximity_class_map` for inspection.
+- `proximity_l2`: SQL view derived from L3 plus `proximity_class_map`.
+- `proximity_l1`: SQL view derived from L3 plus `proximity_class_map`.
+- Materialized L1/L2 tables for API and GeoServer export after all L3 classes are complete.
 
-L2 is materialized during the proximity build so runtime API requests do not
-create working copies or evaluate derived views. L1/domain summaries are not
-exported by the API; if a domain metric is needed later, add it as a cheap
-derived table in this build step rather than in `computing/misc`.
-The proximity source intentionally does not create or maintain a village point
-layer; representative coordinates are stored as attributes on `village_shapes`
-for bounds and distance traceability.
-
-`computing/misc/facilities_proximity.py` exports tehsil GeoPackages from this
-source asset. By default, those GeoPackages include a primary
-`facilities_<district>_<block>` L3 proximity polygon layer, L2 proximity
-polygons, village polygons, and nearest-facility point layers.
-Exported feature layers carry map-facing fields such as `title`, class names,
-distances, and nearest-facility details; pipeline metadata columns such as
-`filter_logic` remain internal to the source tables/views.
-The API does not accept level selection parameters for this layer; each request
-exports the full tehsil facility package and uploads the zipped GeoPackage to
-GeoServer when `sync_to_geoserver` is true.
-
-API payload:
-
-```json
-{
-  "state": "uttar pradesh",
-  "district": "lucknow",
-  "block": "lucknow",
-  "sync_to_geoserver": true,
-  "overwrite": true
-}
-```
+The L1/L2 views are retained as rebuildable derivations. The API source asset
+also keeps physical L1/L2 tables for repeated local reads.
 
 ## Adding Data
 
@@ -142,5 +116,5 @@ uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely 
 uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely --with pyogrio --with scipy \
   python utilities/scripts/facilities_utils/facility_pipeline.py proximity \
   --sample-villages 5 --sample-classes 3 \
-  --output-gpkg /tmp/village_facility_proximity.gpkg
+  --output-gpkg /tmp/cs_village_facility_proximity.gpkg
 ```
