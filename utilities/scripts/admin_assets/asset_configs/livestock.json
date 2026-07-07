@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "name": "livestock",
-  "description": "Pan-India village livestock totals joined to the sanitised admin boundaries.",
+  "description": "Pan-India village livestock totals joined to the standardized Core Stack village admin boundaries.",
   "admin": {
-    "gpkg": "data/admin-boundary/cs_admin_sanitised.gpkg",
-    "layer": "cs_admin_sanitised",
+    "gpkg": "data/admin-boundary/cs_admin_standard.gpkg",
+    "layer": "cs_admin_standard",
     "left_key": "pc11_village_id"
   },
   "source": {
@@ -29,14 +29,14 @@
     ]
   },
   "output": {
-    "gpkg": "data/livestock/livestock_asset.gpkg",
-    "geojson": "data/livestock/livestock_asset.geojson",
-    "layer": "livestock",
+    "gpkg": "data/livestock/cs_village_livestock_census_20.gpkg",
+    "geojson": "data/livestock/cs_village_livestock_census_20.geojson",
+    "layer": "cs_village_livestock_census_20",
     "formats": [
       "gpkg",
       "geojson"
     ],
-    "reports_dir": "data/livestock/livestock_asset_reports",
+    "reports_dir": "data/livestock/cs_village_livestock_census_20_reports",
     "admin_columns": [
       "state_name",
       "district_name",
