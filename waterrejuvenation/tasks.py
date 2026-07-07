@@ -75,10 +75,18 @@ def _gee_safe_property(value):
         return float(value)
     if isinstance(value, bool):
         return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped and stripped.upper() not in ("N/A", "NAN", "NONE"):
+            try:
+                return float(stripped)
+            except ValueError:
+                pass
     return str(value)
 
 
 def _gdf_to_ee_feature_collection(gdf):
+    gdf = _normalize_uid_in_gdf(gdf)
     features = []
     for _, row in gdf.iterrows():
         geom = row.geometry
@@ -89,8 +97,38 @@ def _gdf_to_ee_feature_collection(gdf):
             for col in gdf.columns
             if col != "geometry"
         }
+        # Never let a stray geometry property override the row geometry column.
+        props.pop("geometry", None)
         features.append(ee.Feature(ee.Geometry(geom.__geo_interface__), props))
     return ee.FeatureCollection(features)
+
+
+def _extract_uid(row):
+    """Read waterbody UID from a GeoDataFrame row (handles casing / aliases)."""
+    if row is None:
+        return None
+    for key in ("UID", "uid", "Uid", "MWS_UID", "mws_uid"):
+        if key not in row.index:
+            continue
+        val = row[key]
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            continue
+        text = str(val).strip()
+        if text and text.upper() not in ("N/A", "NAN", "NONE"):
+            return text
+    return None
+
+
+def _normalize_uid_in_gdf(gdf):
+    """Ensure a canonical UID column exists for downstream ZOI / API merges."""
+    if gdf.empty or "UID" in gdf.columns:
+        return gdf
+    for key in ("uid", "Uid", "MWS_UID", "mws_uid"):
+        if key in gdf.columns:
+            gdf = gdf.copy()
+            gdf["UID"] = gdf[key]
+            return gdf
+    return gdf
 
 
 def _fc_to_gdf(feature_collection):
@@ -100,7 +138,51 @@ def _fc_to_gdf(feature_collection):
         return gpd.GeoDataFrame(
             columns=["geometry"], geometry="geometry", crs="EPSG:4326"
         )
-    return gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
+    return _normalize_uid_in_gdf(gdf)
+
+
+def _swb_polygon_geometry(wb_row):
+    """Return SWB polygon geometry for matched water-rejuvenation exports."""
+    geom = wb_row.geometry
+    if geom is None or geom.is_empty:
+        return None
+    if geom.geom_type in ("Polygon", "MultiPolygon"):
+        return geom
+    logger.warning(
+        "SWB feature %s has geometry type %s; expected Polygon/MultiPolygon.",
+        wb_row.name,
+        geom.geom_type,
+    )
+    return geom
+
+
+def _merge_matched_desilt_with_swb(desilt_row, wb_row):
+    """Matched export: SWB polygon geometry + SWB and desilting properties."""
+    geometry = _swb_polygon_geometry(wb_row)
+    if geometry is None:
+        return None
+
+    wb_props = {
+        col: wb_row[col]
+        for col in wb_row.index
+        if col != "geometry"
+    }
+    desilt_props = {
+        col: desilt_row[col]
+        for col in desilt_row.index
+        if col != "geometry" and col.lower() not in ("uid", "mws_uid")
+    }
+    props = {**wb_props, **desilt_props, "matched": True}
+    uid = _extract_uid(wb_row) or _extract_uid(desilt_row)
+    if uid:
+        props["UID"] = uid
+    elif "UID" not in props:
+        logger.warning(
+            "Matched waterbody has no UID (wb_index=%s); ZOI merge may fail.",
+            wb_row.name,
+        )
+    return {**props, "geometry": geometry}
 
 
 def _match_desilting_points_to_waterbodies(desilt_gdf, wb_gdf, max_distance_m=100):
@@ -122,28 +204,29 @@ def _match_desilting_points_to_waterbodies(desilt_gdf, wb_gdf, max_distance_m=10
 
     for idx, point_row in desilt_gdf.iterrows():
         point_metric = desilt_metric.loc[idx].geometry
-        props = {col: point_row[col] for col in desilt_gdf.columns if col != "geometry"}
+        desilt_props = {
+            col: point_row[col] for col in desilt_gdf.columns if col != "geometry"
+        }
 
         intersect_hits = wb_metric[wb_metric.intersects(point_metric)]
         if not intersect_hits.empty:
-            wb_idx = intersect_hits.index[0]
-            out_geom = wb_gdf.loc[wb_idx].geometry
-            props["matched"] = True
-            props["match_type"] = "intersect"
-            matched_rows.append({**props, "geometry": out_geom})
+            wb_row = wb_gdf.loc[intersect_hits.index[0]]
+            row = _merge_matched_desilt_with_swb(point_row, wb_row)
+            if row:
+                row["match_type"] = "intersect"
+                matched_rows.append(row)
             continue
 
         near_hits = wb_metric[wb_metric.intersects(point_metric.buffer(max_distance_m))]
         if not near_hits.empty:
-            wb_idx = near_hits.index[0]
-            out_geom = wb_gdf.loc[wb_idx].geometry
-            props["matched"] = True
-            props["match_type"] = "near"
-            matched_rows.append({**props, "geometry": out_geom})
+            wb_row = wb_gdf.loc[near_hits.index[0]]
+            row = _merge_matched_desilt_with_swb(point_row, wb_row)
+            if row:
+                row["match_type"] = "near"
+                matched_rows.append(row)
             continue
 
-        props["matched"] = False
-        props["match_type"] = "none"
+        props = {**desilt_props, "matched": False, "match_type": "none"}
         unmatched_rows.append({**props, "geometry": point_row.geometry})
 
     matched_gdf = (
@@ -983,6 +1066,10 @@ def BuildWaterBodyLayer(
     matched_gdf, unmatched_gdf = _match_desilting_points_to_waterbodies(
         desilt_gdf, wb_gdf, max_distance_m=100
     )
+    matched_gdf = _normalize_uid_in_gdf(matched_gdf)
+    if len(matched_gdf) > 0:
+        geom_types = matched_gdf.geometry.geom_type.value_counts().to_dict()
+        logger.info("BuildWaterBodyLayer matched geometry types: %s", geom_types)
     matched_fc = _gdf_to_ee_feature_collection(matched_gdf)
     unmatched_fc = _gdf_to_ee_feature_collection(unmatched_gdf)
 

@@ -340,7 +340,15 @@ def create_ring(feature):
     zoi = ee.Number(feature.get("zoi_wb"))
     waterbody_name = feature.get("waterbody_name")
     impactfull = feature.get("impactful")
-    uid = feature.get("UID")
+    uid = ee.Algorithms.If(
+        feature.get("UID"),
+        feature.get("UID"),
+        ee.Algorithms.If(
+            feature.get("uid"),
+            feature.get("uid"),
+            feature.get("MWS_UID"),
+        ),
+    )
 
     # Make circle buffer from centroid
     centroid = geom.centroid()
@@ -403,6 +411,72 @@ def calculate_zoi_area(zoi):
     return ee.Number.parse(area_hectares.format("%.2f"))
 
 
+def ensure_uid_on_fc(fc):
+    """Ensure every feature has a canonical UID for NDVI / merge steps."""
+
+    def ensure_uid(feature):
+        uid = ee.Algorithms.If(
+            feature.get("UID"),
+            feature.get("UID"),
+            ee.Algorithms.If(
+                feature.get("uid"),
+                feature.get("uid"),
+                ee.Algorithms.If(
+                    feature.get("MWS_UID"),
+                    feature.get("MWS_UID"),
+                    feature.get("system:index"),
+                ),
+            ),
+        )
+        return feature.set("UID", uid)
+
+    return fc.map(ensure_uid)
+
+
+def resolve_zoi_ndvi_input(
+    asset_folder_list, app_type, asset_suffix, zoi_roi=None
+):
+    """
+    Pick polygons for ZOI NDVI: prefer cropping_intensity_zoi, else zoi_ rings.
+    """
+    if zoi_roi:
+        fc = ee.FeatureCollection(zoi_roi)
+        count = fc.size().getInfo()
+        logger.info("NDVI input: explicit roi (%s features)", count)
+        if count == 0:
+            raise ValueError(f"NDVI input roi is empty: {zoi_roi}")
+        return ensure_uid_on_fc(fc)
+
+    base = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    ci_asset = base + f"cropping_intensity_zoi_{asset_suffix}"
+    zoi_asset = base + f"zoi_{asset_suffix}"
+
+    ci_fc = ee.FeatureCollection(ci_asset)
+    ci_size = ci_fc.size().getInfo()
+    if ci_size > 0:
+        logger.info(
+            "NDVI input: cropping_intensity_zoi (%s features) from %s",
+            ci_size,
+            ci_asset,
+        )
+        return ensure_uid_on_fc(ci_fc)
+
+    zoi_fc = ee.FeatureCollection(zoi_asset)
+    zoi_size = zoi_fc.size().getInfo()
+    logger.info(
+        "NDVI input: fallback zoi_ (%s features) from %s",
+        zoi_size,
+        zoi_asset,
+    )
+    if zoi_size == 0:
+        raise ValueError(
+            f"No ZOI features for NDVI (tried {ci_asset} and {zoi_asset})"
+        )
+    return ensure_uid_on_fc(zoi_fc)
+
+
 def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
     """
     Extracts and exports NDVI data for a set of features by aggregating NDVI values
@@ -421,6 +495,13 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
     Returns:
         ee.FeatureCollection: Merged NDVI time series across years.
     """
+    suitability_vector = ensure_uid_on_fc(suitability_vector)
+    feature_count = suitability_vector.size().getInfo()
+    print("total")
+    print(feature_count)
+    if feature_count == 0:
+        raise ValueError("Cannot generate NDVI: suitability vector has 0 features")
+
     task_ids = []
     asset_ids = []
     # Loop over each year
@@ -465,39 +546,18 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
         # Map image-wise extraction and flatten to a single FeatureCollection
         all_ndvi = ndvi.map(map_image).flatten()
 
-        # Extract all unique UIDs from the input feature collection
-        uids = suitability_vector.aggregate_array("UID")
-        count = uids.size()  # Server-side count
-        print("total")
-        print(count.getInfo())
-
-        # For each UID, filter NDVI features and aggregate to dict
-        def build_feature(uid):
-            """
-            Reconstruct a single feature by merging its NDVI values across all images
-            into one property NDVI_<year> as a JSON dictionary {date: value}.
-            """
-            # Get the geometry and properties of the original feature
-            feature_geom = ee.Feature(
-                suitability_vector.filter(ee.Filter.eq("UID", uid)).first()
-            )
-
-            # Filter all NDVI records related to this UID
+        # Reconstruct one row per input polygon with NDVI_<year> JSON property
+        def build_feature(input_feature):
+            uid = input_feature.get("UID")
             filtered = all_ndvi.filter(ee.Filter.eq("UID", uid))
-
-            # Create dictionary: {date: ndvi}
             date_ndvi_list = filtered.aggregate_array("ndvi_date").zip(
                 filtered.aggregate_array("ndvi")
             )
-
-            # Convert to dictionary and encode as JSON string
             ndvi_dict = ee.Dictionary(date_ndvi_list.flatten())
             ndvi_json = ee.String.encodeJSON(ndvi_dict)
+            return input_feature.set(f"NDVI_{start_year}", ndvi_json)
 
-            return feature_geom.set(f"NDVI_{start_year}", ndvi_json)
-
-        # Apply feature-wise aggregation
-        merged_fc = ee.FeatureCollection(uids.map(build_feature))
+        merged_fc = suitability_vector.map(build_feature)
 
         # Export as single-row-per-feature collection
         try:
@@ -562,7 +622,9 @@ def get_ndvi_for_zoi(
         + asset_suffix_ndvi
     )
 
-    zoi_collections = ee.FeatureCollection(zoi_asset_path)
+    zoi_collections = resolve_zoi_ndvi_input(
+        asset_folder, app_type, f"{proj_obj.name}_{proj_obj.id}".lower(), zoi_roi=zoi_asset_path
+    )
 
     fc = get_ndvi_data(zoi_collections, 2017, 2024, asset_suffix_ndvi, ndvi_asset_path)
     task = ee.batch.Export.table.toAsset(
@@ -607,10 +669,17 @@ def generate_draught_with_mws(draught_asset_id, mws_fc, proj_id):
 
 
 def _waterbody_area_ha(feature):
-    """Area in hectares; use geometry when area_ored is missing (e.g. water rej layers)."""
+    """Area in hectares; use geometry when area_ored is missing or non-numeric."""
     geom_area_ha = ee.Number(feature.geometry().area(maxError=1)).divide(10000)
-    stored_area = feature.get("area_ored")
-    return ee.Number(ee.Algorithms.If(stored_area, stored_area, geom_area_ha))
+    raw_area = feature.get("area_ored")
+    # Water-rej exports may store area_ored as a string; coerce before numeric ops.
+    stored_str = ee.String(ee.Algorithms.If(raw_area, raw_area, "0"))
+    is_na = stored_str.compareTo("N/A").eq(0)
+    safe_str = ee.String(ee.Algorithms.If(is_na, "0", stored_str))
+    stored_numeric = ee.Number.parse(safe_str)
+    return ee.Number(
+        ee.Algorithms.If(stored_numeric.gt(0), stored_numeric, geom_area_ha)
+    )
 
 
 def compute_zoi(feature):

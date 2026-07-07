@@ -9,7 +9,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
 )
-from waterrejuvenation.utils import wait_for_task_completion
+from waterrejuvenation.utils import wait_for_task_completion, resolve_zoi_ndvi_input
 import ee
 
 
@@ -20,7 +20,10 @@ def get_ndvi_for_zoi(
     zoi_roi=None,
     asset_suffix=None,
     asset_folder_list=None,
-    start_year="2017-23",
+    start_date="2017-07-01",
+    end_date="2025-06-30",
+    start_year=2017,
+    end_year=2024,
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
@@ -29,23 +32,9 @@ def get_ndvi_for_zoi(
     ee_initialize(gee_account_id)
     from waterrejuvenation.utils import get_ndvi_data
 
-    if not proj_id:
-        description_zoi = "cropping_intensity_zoi_" + asset_suffix
-        asset_id_zoi = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + description_zoi
-        )
-    else:
-
-        description_zoi = "cropping_intensity_zoi_" + asset_suffix
-        asset_id_zoi = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + description_zoi
-        )
+    zoi_collections = resolve_zoi_ndvi_input(
+        asset_folder_list, app_type, asset_suffix, zoi_roi=zoi_roi
+    )
 
     description_ndvi = asset_suffix
     ndvi_asset_path = (
@@ -55,15 +44,14 @@ def get_ndvi_for_zoi(
         + description_ndvi
     )
 
-    zoi_collections = ee.FeatureCollection(asset_id_zoi)
-    fc = get_ndvi_data(zoi_collections, 2017, 2024, description_ndvi, ndvi_asset_path)
+    fc = get_ndvi_data(
+        zoi_collections, start_year, end_year, description_ndvi, ndvi_asset_path
+    )
     task = ee.batch.Export.table.toAsset(
         collection=fc, description=description_ndvi, assetId=ndvi_asset_path
     )
     task.start()
     wait_for_task_completion(task)
-    start_date = "30-06-2017"
-    end_date = "01-07-2024"
     if state and district and block:
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         layer_at_geoserver = sync_asset_to_db_and_geoserver(
