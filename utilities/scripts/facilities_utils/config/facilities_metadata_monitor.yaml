@@ -1,0 +1,3504 @@
+metadata_name: pan_india_facilities_metadata_monitor
+schema_version: generated_1.0
+status: generated_from_current_config_and_assets
+generated_at_utc: '2026-07-06T02:03:43+00:00'
+source_of_truth:
+  master_yaml: utilities/scripts/facilities_utils/config/facilities_master.yaml
+  raw_dir: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw
+  reference_files:
+    pincode_centroids:
+      path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/reference/india_pincodes_centroid.csv
+      exists: true
+      size_bytes: 1158553
+      size_mb: 1.105
+      modified_utc: '2026-02-11T04:02:01+00:00'
+pipeline_design:
+  facility_asset: One valid point per facility; multi-class facilities are represented by facility_memberships.
+  stored_proximity_level: class_l3_facility_class
+  l4_policy: class_l4_facility_subtype is scanned and retained as metadata, but proximity is not traversed at L4.
+  class_k_policy: class_k1..class_k8 hold source-specific categorical parameters with source trace and EDA.
+  derived_levels: L2 proximity is materialized from L3 rows plus proximity_class_map; L1/domain metrics are optional future
+    derived outputs.
+paths:
+  facilities_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
+  proximity_gpkg: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
+  metadata_monitor_yaml: /mnt/y/core-stack-org/core-stack-backend/utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
+outputs:
+  facilities_csv:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.csv
+    exists: true
+    size_bytes: 612569393
+    size_mb: 584.192
+    modified_utc: '2026-07-01T02:28:23+00:00'
+    csv_rows: null
+    csv_rows_status: not_scanned_larger_than_52428800_bytes
+  memberships_csv:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/facility_memberships.csv
+    exists: true
+    size_bytes: 454443767
+    size_mb: 433.391
+    modified_utc: '2026-07-01T02:26:06+00:00'
+    csv_rows: null
+    csv_rows_status: not_scanned_larger_than_52428800_bytes
+  taxonomy_csv:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/facility_taxonomy.csv
+    exists: true
+    size_bytes: 2413
+    size_mb: 0.002
+    modified_utc: '2026-07-01T02:28:24+00:00'
+    csv_rows: 25
+    csv_rows_status: counted
+  source_summary_csv:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/source_summary.csv
+    exists: true
+    size_bytes: 1466
+    size_mb: 0.001
+    modified_utc: '2026-07-01T02:25:25+00:00'
+    csv_rows: 11
+    csv_rows_status: counted
+  invalid_coordinates_csv:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/invalid_coordinates.csv
+    exists: true
+    size_bytes: 225137
+    size_mb: 0.215
+    modified_utc: '2026-07-01T02:28:24+00:00'
+    csv_rows: 1554
+    csv_rows_status: counted
+  facilities_gpkg:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
+    exists: true
+    size_bytes: 2138836992
+    size_mb: 2039.754
+    modified_utc: '2026-07-03T07:23:36+00:00'
+  proximity_gpkg:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
+    exists: true
+    size_bytes: 7412461568
+    size_mb: 7069.074
+    modified_utc: '2026-07-06T01:49:42+00:00'
+asset_layers:
+  facilities_gpkg:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/pan_india_facilities.gpkg
+    exists: true
+    size_bytes: 2138836992
+    size_mb: 2039.754
+    modified_utc: '2026-07-03T07:23:36+00:00'
+    layers:
+    - name: facilities
+      type: features
+      rows: 4209378
+      columns:
+      - fid
+      - geom
+      - facility_uid
+      - latitude
+      - longitude
+      - facility_name
+      - facility_code
+      - class_l1_domain
+      - class_l2_filter_group
+      - class_l3_facility_class
+      - class_l4_facility_subtype
+      - class_k1
+      - class_k2
+      - class_k3
+      - class_k4
+      - class_k5
+      - class_k6
+      - class_k7
+      - class_k8
+      - urban_rural
+      - pincode
+      - establishment_year
+      - district_lgd
+      - village_census11
+      - village_name
+      - membership_count
+    - name: facility_memberships
+      type: attributes
+      rows: 5001364
+      columns:
+      - facility_uid
+      - class_l1_domain
+      - class_l2_filter_group
+      - class_l3_facility_class
+      - class_l4_facility_subtype
+      - class_k1
+      - class_k2
+      - class_k3
+      - class_k4
+      - class_k5
+      - class_k6
+      - class_k7
+      - class_k8
+    - name: facility_taxonomy
+      type: attributes
+      rows: 25
+      columns:
+      - class_l1_domain
+      - class_l2_filter_group
+      - class_l3_facility_class
+      - configured_subtypes
+      - filter_logic
+      - sort_order
+    - name: invalid_coordinates
+      type: attributes
+      rows: 1554
+      columns:
+      - facility_uid
+      - source_id
+      - latitude
+      - longitude
+      - facility_name
+      - facility_code
+      - class_l1_domain
+      - class_l2_filter_group
+      - class_l3_facility_class
+      - class_l4_facility_subtype
+      - class_k1
+      - class_k2
+      - class_k3
+      - class_k4
+      - class_k5
+      - class_k6
+      - class_k7
+      - class_k8
+      - urban_rural
+      - pincode
+      - establishment_year
+      - district_lgd
+      - village_census11
+      - village_name
+      - coordinate_status
+    - name: source_summary
+      type: attributes
+      rows: 11
+      columns:
+      - source_key
+      - input_rows
+      - valid_rows
+      - membership_rows
+      - invalid_rows
+      - fingerprint
+      - processed_at_utc
+      - sample_rows
+    views: []
+  proximity_gpkg:
+    path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
+    exists: true
+    size_bytes: 7412461568
+    size_mb: 7069.074
+    modified_utc: '2026-07-06T01:49:42+00:00'
+    layers:
+    - name: proximity_class_map
+      type: attributes
+      rows: 25
+      columns:
+      - class_l3_facility_class
+      - class_l2_filter_group
+      - class_l1_domain
+      - filter_logic
+    - name: proximity_l1_materialized
+      type: attributes
+      rows: 3154490
+      columns:
+      - cs_feature_id
+      - state_name
+      - district_name
+      - TEHSIL
+      - pc11_village_id
+      - NAME
+      - class_l1_domain
+      - closest_domain_distance_km
+      - selected_filter_group
+      - selected_component_class
+      - nearest_facility_uid
+      - nearest_facility_name
+      - nearest_facility_code
+      - nearest_facility_latitude
+      - nearest_facility_longitude
+      - nearest_class_l4_facility_subtype
+    - name: proximity_l2_materialized
+      type: attributes
+      rows: 6939878
+      columns:
+      - cs_feature_id
+      - state_name
+      - district_name
+      - TEHSIL
+      - pc11_village_id
+      - NAME
+      - class_l1_domain
+      - class_l2_filter_group
+      - filter_logic
+      - logic_distance_km
+      - selected_component_class
+      - nearest_facility_uid
+      - nearest_facility_name
+      - nearest_facility_code
+      - nearest_facility_latitude
+      - nearest_facility_longitude
+      - nearest_class_l4_facility_subtype
+    - name: proximity_l3
+      type: attributes
+      rows: 15772450
+      columns:
+      - cs_feature_id
+      - class_l3_facility_class
+      - nearest_distance_km
+      - nearest_facility_uid
+    - name: proximity_metadata
+      type: attributes
+      rows: 8
+      columns:
+      - key
+      - value
+    - name: proximity_nearest_facilities
+      type: attributes
+      rows: 1711631
+      columns:
+      - facility_uid
+      - facility_name
+      - facility_code
+      - latitude
+      - longitude
+      - class_l4_facility_subtype
+    - name: village_shapes
+      type: features
+      rows: 630898
+      columns:
+      - fid
+      - geom
+      - cs_feature_id
+      - state_name
+      - district_name
+      - TEHSIL
+      - pc11_village_id
+      - NAME
+      - _village_latitude
+      - _village_longitude
+    views:
+    - proximity_l2
+schema:
+  crs: EPSG:4326
+  facility_layer: facilities
+  membership_table: facility_memberships
+  facility_columns:
+  - facility_uid
+  - latitude
+  - longitude
+  - facility_name
+  - facility_code
+  - class_l1_domain
+  - class_l2_filter_group
+  - class_l3_facility_class
+  - class_l4_facility_subtype
+  - class_k1
+  - class_k2
+  - class_k3
+  - class_k4
+  - class_k5
+  - class_k6
+  - class_k7
+  - class_k8
+  - urban_rural
+  - pincode
+  - establishment_year
+  - district_lgd
+  - village_census11
+  - village_name
+  - membership_count
+  membership_columns:
+  - facility_uid
+  - class_l1_domain
+  - class_l2_filter_group
+  - class_l3_facility_class
+  - class_l4_facility_subtype
+  - class_k1
+  - class_k2
+  - class_k3
+  - class_k4
+  - class_k5
+  - class_k6
+  - class_k7
+  - class_k8
+  dropped_from_facility_layer:
+  - source_dataset
+  - source_clean_file
+  - source_clean_file_list
+  - coordinate_status
+  - class_l1_domain_list
+  - class_l2_filter_group_list
+  - class_l3_facility_class_list
+  - class_l4_facility_subtype_list
+  - class_k_list_columns
+  - facility_type
+  - facility_type_code
+  - source_category_detail
+  - management
+  - management_code
+  - ownership
+  column_catalog:
+    facility_uid:
+      group: identity
+      description: Stable facility identifier. The facility point layer keeps one row per valid facility uid.
+      required: true
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: not_scanned_in_column_catalog
+    latitude:
+      group: geometry
+      description: Facility latitude in EPSG:4326.
+      required: true
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+    longitude:
+      group: geometry
+      description: Facility longitude in EPSG:4326.
+      required: true
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+    facility_name:
+      group: facility_metadata
+      description: Best available display name for the facility.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+    facility_code:
+      group: facility_metadata
+      description: Useful source code such as school code, IFSC, mandi code, or AISHE code.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+    class_l1_domain:
+      group: classification
+      description: Broad facility domain.
+      required: true
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: not_scanned_in_column_catalog
+    class_l2_filter_group:
+      group: classification
+      description: Access/filter group used for proximity logic.
+      required: true
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: not_scanned_in_column_catalog
+    class_l3_facility_class:
+      group: classification
+      description: Canonical facility class. This is the stored proximity search level.
+      required: true
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: not_scanned_in_column_catalog
+    class_l4_facility_subtype:
+      group: classification
+      description: Source-derived subtype retained as metadata; it is not traversed for nearest search.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: l4_subtype_catalog
+    class_k1:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+    class_k2:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+    class_k3:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+      status: configured_column_but_no_current_source_mapping
+    class_k4:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+      status: configured_column_but_no_current_source_mapping
+    class_k5:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+      status: configured_column_but_no_current_source_mapping
+    class_k6:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+      status: configured_column_but_no_current_source_mapping
+    class_k7:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+      status: configured_column_but_no_current_source_mapping
+    class_k8:
+      group: class_k_parameters
+      description: Source-specific categorical parameter retained for filtering, audit, or later schema promotion.
+      include_in_facility_layer: true
+      include_in_membership_table: true
+      available_in_facility_layer: true
+      available_in_membership_table: true
+      eda_location: class_k_catalog
+      status: configured_column_but_no_current_source_mapping
+    urban_rural:
+      group: facility_metadata
+      description: Urban/rural marker where available.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+      facility_layer_eda:
+        available: true
+        rows_scanned: 4209378
+        non_null_rows: 25937
+        null_or_blank_rows: 4183441
+        coverage: 0.006162
+        unique_values: 2
+        top_values:
+        - value: R
+          count: 15734
+        - value: U
+          count: 10203
+        value_list_is_complete: true
+    pincode:
+      group: admin_reference
+      description: Pincode where available and valid.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+      facility_layer_eda:
+        available: true
+        rows_scanned: 4209378
+        non_null_rows: 197087
+        null_or_blank_rows: 4012291
+        coverage: 0.046821
+        unique_values: 21473
+        top_values:
+        - value: '248001.0'
+          count: 419
+        - value: '122001.0'
+          count: 385
+        - value: '143001.0'
+          count: 348
+        - value: '201301.0'
+          count: 339
+        - value: '244001.0'
+          count: 272
+        - value: '492001.0'
+          count: 267
+        - value: '141001.0'
+          count: 262
+        - value: '110001.0'
+          count: 242
+        - value: '800001.0'
+          count: 242
+        - value: '250001.0'
+          count: 227
+        - value: '452001.0'
+          count: 223
+        - value: '482001.0'
+          count: 220
+        value_list_is_complete: false
+    establishment_year:
+      group: facility_metadata
+      description: Facility establishment year where available and plausible.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+      facility_layer_eda:
+        available: true
+        rows_scanned: 4209378
+        non_null_rows: 22400
+        null_or_blank_rows: 4186978
+        coverage: 0.005321
+        unique_values: 171
+        top_values:
+        - value: '2008.0'
+          count: 1272
+        - value: '2007.0'
+          count: 991
+        - value: '2009.0'
+          count: 952
+        - value: '2010.0'
+          count: 950
+        - value: '2019.0'
+          count: 926
+        - value: '2012.0'
+          count: 910
+        - value: '2006.0'
+          count: 880
+        - value: '2011.0'
+          count: 849
+        - value: '2014.0'
+          count: 814
+        - value: '2005.0'
+          count: 795
+        - value: '2016.0'
+          count: 771
+        - value: '2015.0'
+          count: 766
+        value_list_is_complete: false
+    district_lgd:
+      group: admin_reference
+      description: Source district LGD reference where available.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+      facility_layer_eda:
+        available: true
+        rows_scanned: 4209378
+        non_null_rows: 1527962
+        null_or_blank_rows: 2681416
+        coverage: 0.36299
+        unique_values: 1278
+        top_values:
+        - value: '102'
+          count: 8978
+        - value: '490'
+          count: 7405
+        - value: '319.0'
+          count: 6575
+        - value: '304'
+          count: 6345
+        - value: '318'
+          count: 6104
+        - value: '123.0'
+          count: 6098
+        - value: '107'
+          count: 5848
+        - value: '146.0'
+          count: 5813
+        - value: '317'
+          count: 5747
+        - value: '90'
+          count: 5738
+        - value: '183'
+          count: 5568
+        - value: '487'
+          count: 5559
+        value_list_is_complete: false
+    village_census11:
+      group: admin_reference
+      description: Source Census 2011 village code where available.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+    village_name:
+      group: admin_reference
+      description: Source village or local place name where available.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+    membership_count:
+      group: classification
+      description: Number of L3 memberships attached to the facility.
+      include_in_facility_layer: true
+      include_in_membership_table: false
+      available_in_facility_layer: true
+      available_in_membership_table: false
+      eda_location: not_scanned_in_column_catalog
+      facility_layer_eda:
+        available: true
+        rows_scanned: 4209378
+        non_null_rows: 4209378
+        null_or_blank_rows: 0
+        coverage: 1.0
+        unique_values: 5
+        top_values:
+        - value: '1'
+          count: 3655379
+        - value: '2'
+          count: 383396
+        - value: '3'
+          count: 103765
+        - value: '4'
+          count: 66834
+        - value: '8'
+          count: 4
+        value_list_is_complete: true
+    geometry:
+      group: geometry
+      description: Point geometry generated from longitude/latitude in EPSG:4326.
+      include_in_facility_layer: true
+      available_in_facility_layer: true
+  standard_parameter_catalog:
+    urban_rural:
+      available: true
+      rows_scanned: 4209378
+      non_null_rows: 25937
+      null_or_blank_rows: 4183441
+      coverage: 0.006162
+      unique_values: 2
+      top_values:
+      - value: R
+        count: 15734
+      - value: U
+        count: 10203
+      value_list_is_complete: true
+    pincode:
+      available: true
+      rows_scanned: 4209378
+      non_null_rows: 197087
+      null_or_blank_rows: 4012291
+      coverage: 0.046821
+      unique_values: 21473
+      top_values:
+      - value: '248001.0'
+        count: 419
+      - value: '122001.0'
+        count: 385
+      - value: '143001.0'
+        count: 348
+      - value: '201301.0'
+        count: 339
+      - value: '244001.0'
+        count: 272
+      - value: '492001.0'
+        count: 267
+      - value: '141001.0'
+        count: 262
+      - value: '110001.0'
+        count: 242
+      - value: '800001.0'
+        count: 242
+      - value: '250001.0'
+        count: 227
+      - value: '452001.0'
+        count: 223
+      - value: '482001.0'
+        count: 220
+      value_list_is_complete: false
+    establishment_year:
+      available: true
+      rows_scanned: 4209378
+      non_null_rows: 22400
+      null_or_blank_rows: 4186978
+      coverage: 0.005321
+      unique_values: 171
+      top_values:
+      - value: '2008.0'
+        count: 1272
+      - value: '2007.0'
+        count: 991
+      - value: '2009.0'
+        count: 952
+      - value: '2010.0'
+        count: 950
+      - value: '2019.0'
+        count: 926
+      - value: '2012.0'
+        count: 910
+      - value: '2006.0'
+        count: 880
+      - value: '2011.0'
+        count: 849
+      - value: '2014.0'
+        count: 814
+      - value: '2005.0'
+        count: 795
+      - value: '2016.0'
+        count: 771
+      - value: '2015.0'
+        count: 766
+      value_list_is_complete: false
+    district_lgd:
+      available: true
+      rows_scanned: 4209378
+      non_null_rows: 1527962
+      null_or_blank_rows: 2681416
+      coverage: 0.36299
+      unique_values: 1278
+      top_values:
+      - value: '102'
+        count: 8978
+      - value: '490'
+        count: 7405
+      - value: '319.0'
+        count: 6575
+      - value: '304'
+        count: 6345
+      - value: '318'
+        count: 6104
+      - value: '123.0'
+        count: 6098
+      - value: '107'
+        count: 5848
+      - value: '146.0'
+        count: 5813
+      - value: '317'
+        count: 5747
+      - value: '90'
+        count: 5738
+      - value: '183'
+        count: 5568
+      - value: '487'
+        count: 5559
+      value_list_is_complete: false
+    membership_count:
+      available: true
+      rows_scanned: 4209378
+      non_null_rows: 4209378
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 5
+      top_values:
+      - value: '1'
+        count: 3655379
+      - value: '2'
+        count: 383396
+      - value: '3'
+        count: 103765
+      - value: '4'
+        count: 66834
+      - value: '8'
+        count: 4
+      value_list_is_complete: true
+source_catalog:
+  school:
+    active: true
+    processor: school_mhrd
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/School__Source___MHRD_2023__4.csv
+      exists: true
+      size_bytes: 415584044
+      size_mb: 396.332
+      modified_utc: '2026-02-10T18:59:32+00:00'
+    classes_supplied:
+    - school_higher_secondary
+    - school_primary
+    - school_secondary
+    - school_upper_primary
+    raw_to_standard_columns: {}
+    class_k_mapping:
+      class_k1:
+        source: management
+        label: school_management
+      class_k2:
+        source: schmgt
+        label: school_management_code
+    last_run_summary:
+      fingerprint: 2cd15c956284177be4020d8dc25eb7abece7fdcc6ba7e92ce1805578ad69e1b0
+      input_rows: 1384178
+      invalid_rows: 0
+      membership_rows: 2175928
+      processed_at_utc: '2026-07-01T02:24:29+00:00'
+      sample_rows: null
+      source_key: school
+      valid_rows: 1384178
+  college:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/college.csv
+      exists: true
+      size_bytes: 7361875
+      size_mb: 7.021
+      modified_utc: '2026-02-10T15:45:56+00:00'
+    classes_supplied:
+    - college
+    raw_to_standard_columns:
+      id_col: aishecode
+      name_col: collegeins
+      lat_col: latitude
+      lon_col: longitude
+      subtype_col: collegetyp
+      facility_code_col: affiliatin
+      urban_rural_col: locationid
+      pincode_col: pincode
+      establishment_year_col: yearofesta
+      district_lgd_col: districtlg
+    class_k_mapping:
+      class_k1:
+        source: management
+        label: management
+      class_k2:
+        source: ownerships
+        label: ownership
+    last_run_summary:
+      fingerprint: 087514edf1dd9c29305133e9f4b38d2e10126483c4678c75e624cece7ee9fdaa
+      input_rows: 11763
+      invalid_rows: 0
+      membership_rows: 11763
+      processed_at_utc: '2026-07-01T02:24:30+00:00'
+      sample_rows: null
+      source_key: college
+      valid_rows: 11763
+  universities:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/universities.csv
+      exists: true
+      size_bytes: 7412375
+      size_mb: 7.069
+      modified_utc: '2026-02-10T13:53:54+00:00'
+    classes_supplied:
+    - universities
+    raw_to_standard_columns:
+      id_col: aishecode
+      name_col: name
+      lat_col: latitude
+      lon_col: longitude
+      subtype_col: typeofinst
+      facility_code_col: aishe_code
+      urban_rural_col: locationid
+      pincode_col: pincode
+      establishment_year_col: yearofesta
+      district_lgd_col: districtlg
+    class_k_mapping:
+      class_k1:
+        source: management
+        label: management
+      class_k2:
+        source: ownerships
+        label: ownership
+    last_run_summary:
+      fingerprint: 12b91e145c53f816f5f649d6795cff71dd49d7c633b878a6e29eab02be308dbc
+      input_rows: 14494
+      invalid_rows: 316
+      membership_rows: 14178
+      processed_at_utc: '2026-07-01T02:24:30+00:00'
+      sample_rows: null
+      source_key: universities
+      valid_rows: 14178
+  health_center:
+    active: true
+    processor: health_center_split
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/Health_Center_Source___Data_gov_2022__6.csv
+      exists: true
+      size_bytes: 22487565
+      size_mb: 21.446
+      modified_utc: '2026-02-10T20:24:08+00:00'
+    classes_supplied:
+    - health_chc
+    - health_dis_h
+    - health_phc
+    - health_s_t_h
+    - health_sub_cen
+    raw_to_standard_columns: {}
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: e64ae64e72c2ae9e4ecd527e5c07be681f35b0d27077c423a33d5be2781ef7a5
+      input_rows: 147957
+      invalid_rows: 0
+      membership_rows: 147957
+      processed_at_utc: '2026-07-01T02:24:36+00:00'
+      sample_rows: null
+      source_key: health_center
+      valid_rows: 147957
+  pds:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/PDS__Sources___DoFD_2023__7.csv
+      exists: true
+      size_bytes: 79601356
+      size_mb: 75.914
+      modified_utc: '2026-02-10T22:40:57+00:00'
+    classes_supplied:
+    - pds
+    raw_to_standard_columns:
+      id_col: fps_code
+      name_col: fpsname
+      lat_col: latitude
+      lon_col: longitude
+      facility_code_col: fps_code
+      village_census11_col: villagecod
+      village_name_col: villagenam
+      uid_strategy: id_coord
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: 8882f1ce6a3dd067dc881479b93178664a2cdcc84a9b81525f0b5c8e914cfab6
+      input_rows: 312507
+      invalid_rows: 0
+      membership_rows: 312507
+      processed_at_utc: '2026-07-01T02:24:42+00:00'
+      sample_rows: null
+      source_key: pds
+      valid_rows: 312507
+  csc:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/CSC-MeitY-2022.csv
+      exists: true
+      size_bytes: 2434738
+      size_mb: 2.322
+      modified_utc: '2026-02-05T19:18:24+00:00'
+    classes_supplied:
+    - csc
+    raw_to_standard_columns:
+      id_col: csc_id
+      lat_col: latitude
+      lon_col: longitude
+      uid_strategy: id_coord
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: cd053bd34423ecea8ae551f4aea144e9997da541df338396a9a7ab3182ca4464
+      input_rows: 39340
+      invalid_rows: 0
+      membership_rows: 39340
+      processed_at_utc: '2026-07-01T02:24:42+00:00'
+      sample_rows: null
+      source_key: csc
+      valid_rows: 39340
+  bank_mitra:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/bank_mitra.csv
+      exists: true
+      size_bytes: 531910613
+      size_mb: 507.269
+      modified_utc: '2026-02-16T09:04:31+00:00'
+    classes_supplied:
+    - bank_mitra
+    raw_to_standard_columns:
+      id_col: objectid
+      name_col: bank_name
+      lat_col: bk_m_lat
+      lon_col: bk_m_long
+      facility_code_col: bk_mitr_cd
+      coord_fallback_col: coordinates
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: 787c6a1ac774311358e30e4b399bccca4ae7f3a2eed989d1e3dacf472185be9d
+      input_rows: 1799682
+      invalid_rows: 0
+      membership_rows: 1799682
+      processed_at_utc: '2026-07-01T02:25:17+00:00'
+      sample_rows: null
+      source_key: bank_mitra
+      valid_rows: 1799682
+  bank_branch:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/bank_branch.csv
+      exists: true
+      size_bytes: 84673952
+      size_mb: 80.751
+      modified_utc: '2026-02-16T08:27:51+00:00'
+    classes_supplied:
+    - bank_branch
+    raw_to_standard_columns:
+      id_col: objectid
+      name_col: bank_name
+      lat_col: br_lat
+      lon_col: br_long
+      facility_code_col: br_ifsc_cd
+      pincode_col: br_pin_cod
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: 3675753402e1dab53e73c77f58a5d58c221b45f3e4ee04e3d807e98e5ce2e750
+      input_rows: 168955
+      invalid_rows: 62
+      membership_rows: 168893
+      processed_at_utc: '2026-07-01T02:25:20+00:00'
+      sample_rows: null
+      source_key: bank_branch
+      valid_rows: 168893
+  bank_atm:
+    active: true
+    processor: table
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/bank_atm.csv
+      exists: true
+      size_bytes: 82569184
+      size_mb: 78.744
+      modified_utc: '2026-02-16T08:37:15+00:00'
+    classes_supplied:
+    - bank_atm
+    raw_to_standard_columns:
+      id_col: objectid
+      name_col: bank_name
+      lat_col: atm_lat
+      lon_col: atm_long
+      facility_code_col: atm_cd
+      pincode_col: atm_pin_cd
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: a7af9992f123d514a0635ae9ef4126259217149e1a8692afcd691eab5a05c2af
+      input_rows: 211311
+      invalid_rows: 1176
+      membership_rows: 210135
+      processed_at_utc: '2026-07-01T02:25:25+00:00'
+      sample_rows: null
+      source_key: bank_atm
+      valid_rows: 210135
+  apmc:
+    active: true
+    processor: apmc
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/apmc.csv
+      exists: true
+      size_bytes: 604545
+      size_mb: 0.577
+      modified_utc: '2026-02-09T05:27:28+00:00'
+    classes_supplied:
+    - apmc
+    raw_to_standard_columns: {}
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: 02bdab818a9cb3ece12a036db9d57a33fa26b495e19b454e1ada5ecdcb91da23
+      input_rows: 2902
+      invalid_rows: 0
+      membership_rows: 2902
+      processed_at_utc: '2026-07-01T02:25:25+00:00'
+      sample_rows: null
+      source_key: apmc
+      valid_rows: 2902
+  agri_industry:
+    active: true
+    processor: agri_industry_reclassified
+    raw_files:
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/Industries__Sources___PMGSY_2023__11.csv
+      exists: true
+      size_bytes: 20532302
+      size_mb: 19.581
+      modified_utc: '2026-06-29T10:46:34+00:00'
+    - path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/raw/Agri_Resources__Sources___PMGSY_2023__10.csv
+      exists: true
+      size_bytes: 14016468
+      size_mb: 13.367
+      modified_utc: '2026-02-10T21:49:38+00:00'
+    classes_supplied:
+    - agri_industry_agri_processing
+    - agri_industry_agri_support_infrastructure
+    - agri_industry_co_operatives_societies
+    - agri_industry_dairy_animal_husbandry
+    - agri_industry_distribution_utilities
+    - agri_industry_industrial_manufacturing
+    - agri_industry_markets_trading
+    - agri_industry_storage_warehousing
+    raw_to_standard_columns: {}
+    class_k_mapping: {}
+    last_run_summary:
+      fingerprint: 63bc9f8a061bb6a1023e28b07e4f96810fbcb2a45bdd61237d10f494cafa6af0
+      input_rows: 118079
+      invalid_rows: 0
+      membership_rows: 118079
+      processed_at_utc: '2026-07-01T02:25:27+00:00'
+      sample_rows: null
+      source_key: agri_industry
+      valid_rows: 118079
+classification_summary:
+  domain_count: 5
+  filter_group_count: 11
+  facility_class_count: 25
+  class_k_count: 8
+nested_taxonomy:
+  education:
+    summary:
+      facility_classes: 6
+      membership_rows: 2201869
+    filter_groups:
+      essential_education:
+        filter_logic: max
+        summary:
+          facility_classes: 3
+          membership_rows: 2037699
+        classes:
+          school_primary:
+            decision: keep
+            filter_logic: max
+            configured_subtypes:
+            - Primary
+            - Primary with Upper Primary
+            - Pr. Up Pr. and Secondary Only
+            - Pr. with Up.Pr. Sec. and H.Sec.
+            - Pre-Primary Only
+            source_trace:
+              school:
+                processor: school_mhrd
+                raw_files:
+                - School__Source___MHRD_2023__4.csv
+                raw_to_standard_columns: {}
+                class_k_mapping:
+                  class_k1:
+                    source: management
+                    label: school_management
+                  class_k2:
+                    source: schmgt
+                    label: school_management_code
+            counts:
+              membership_rows: 1160528
+              unique_facilities: 1155605
+              primary_facility_rows: 1160320
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 1160528
+                non_null_rows: 1160528
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 5
+                top_values:
+                - value: Primary
+                  count: 703836
+                - value: Primary with Upper Primary
+                  count: 320578
+                - value: Pr. Up Pr. and Secondary Only
+                  count: 68936
+                - value: Pr. with Up.Pr. Sec. and H.Sec.
+                  count: 66911
+                - value: Pre-Primary Only
+                  count: 267
+                value_list_is_complete: true
+            class_k_parameters:
+              class_k1:
+                labels_from_sources:
+                - school_management
+                source_columns:
+                - management
+                eda:
+                  available: true
+                  rows_scanned: 1160528
+                  non_null_rows: 1098416
+                  null_or_blank_rows: 62112
+                  coverage: 0.94648
+                  unique_values: 19
+                  top_values:
+                  - value: Department of Education
+                    count: 571302
+                  - value: Pvt. Unaided (Recognized)
+                    count: 231586
+                  - value: Local Body
+                    count: 182082
+                  - value: Government Aided
+                    count: 37480
+                  - value: Tribal Welfare Department
+                    count: 33433
+                  - value: Unrecognized
+                    count: 20533
+                  - value: Madarsa Private Unaided (Recognized)
+                    count: 16478
+                  - value: Madarsa Unrecognized
+                    count: 2755
+                  - value: Kendriya Vidyalaya(KV)
+                    count: 1046
+                  - value: Social Welfare Dept.
+                    count: 1041
+                  - value: Other Govt. Managed schools
+                    count: 443
+                  - value: Other Central Govt. Schools
+                    count: 76
+                  value_list_is_complete: false
+              class_k2:
+                labels_from_sources:
+                - school_management_code
+                source_columns:
+                - schmgt
+                eda:
+                  available: true
+                  rows_scanned: 1160528
+                  non_null_rows: 1160528
+                  null_or_blank_rows: 0
+                  coverage: 1.0
+                  unique_values: 19
+                  top_values:
+                  - value: '1'
+                    count: 617546
+                  - value: '5'
+                    count: 243277
+                  - value: '3'
+                    count: 182498
+                  - value: '4'
+                    count: 39484
+                  - value: '2'
+                    count: 34289
+                  - value: '8'
+                    count: 21195
+                  - value: '97'
+                    count: 16560
+                  - value: '98'
+                    count: 2763
+                  - value: '92'
+                    count: 1157
+                  - value: '90'
+                    count: 1050
+                  - value: '6'
+                    count: 457
+                  - value: '101'
+                    count: 85
+                  value_list_is_complete: false
+          school_upper_primary:
+            decision: keep
+            filter_logic: max
+            configured_subtypes:
+            - Primary with Upper Primary
+            - Upper Primary only
+            - Pr. Up Pr. and Secondary Only
+            - Pr. with Up.Pr. Sec. and H.Sec.
+            - Upper Pr. and Secondary
+            - Up. Pr. Secondary and Higher Sec
+            source_trace:
+              school:
+                processor: school_mhrd
+                raw_files:
+                - School__Source___MHRD_2023__4.csv
+                raw_to_standard_columns: {}
+                class_k_mapping:
+                  class_k1:
+                    source: management
+                    label: school_management
+                  class_k2:
+                    source: schmgt
+                    label: school_management_code
+            counts:
+              membership_rows: 616648
+              unique_facilities: 614799
+              primary_facility_rows: 160196
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 616648
+                non_null_rows: 616648
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 6
+                top_values:
+                - value: Primary with Upper Primary
+                  count: 320578
+                - value: Upper Primary only
+                  count: 84153
+                - value: Pr. Up Pr. and Secondary Only
+                  count: 68936
+                - value: Pr. with Up.Pr. Sec. and H.Sec.
+                  count: 66911
+                - value: Upper Pr. and Secondary
+                  count: 41217
+                - value: Up. Pr. Secondary and Higher Sec
+                  count: 34853
+                value_list_is_complete: true
+            class_k_parameters:
+              class_k1:
+                labels_from_sources:
+                - school_management
+                source_columns:
+                - management
+                eda:
+                  available: true
+                  rows_scanned: 616648
+                  non_null_rows: 585973
+                  null_or_blank_rows: 30675
+                  coverage: 0.950255
+                  unique_values: 19
+                  top_values:
+                  - value: Department of Education
+                    count: 255973
+                  - value: Pvt. Unaided (Recognized)
+                    count: 192818
+                  - value: Local Body
+                    count: 56341
+                  - value: Government Aided
+                    count: 44976
+                  - value: Tribal Welfare Department
+                    count: 11513
+                  - value: Unrecognized
+                    count: 11429
+                  - value: Madarsa Private Unaided (Recognized)
+                    count: 7499
+                  - value: Madarsa Unrecognized
+                    count: 1324
+                  - value: Social Welfare Dept.
+                    count: 1280
+                  - value: Kendriya Vidyalaya(KV)
+                    count: 1048
+                  - value: Other Govt. Managed schools
+                    count: 998
+                  - value: Jawahar Navodaya Vidhyalaya
+                    count: 506
+                  value_list_is_complete: false
+              class_k2:
+                labels_from_sources:
+                - school_management_code
+                source_columns:
+                - schmgt
+                eda:
+                  available: true
+                  rows_scanned: 616648
+                  non_null_rows: 616648
+                  null_or_blank_rows: 0
+                  coverage: 1.0
+                  unique_values: 19
+                  top_values:
+                  - value: '1'
+                    count: 276304
+                  - value: '5'
+                    count: 201239
+                  - value: '3'
+                    count: 56439
+                  - value: '4'
+                    count: 46210
+                  - value: '8'
+                    count: 11684
+                  - value: '2'
+                    count: 11577
+                  - value: '97'
+                    count: 7538
+                  - value: '98'
+                    count: 1328
+                  - value: '90'
+                    count: 1285
+                  - value: '92'
+                    count: 1157
+                  - value: '6'
+                    count: 1002
+                  - value: '93'
+                    count: 593
+                  value_list_is_complete: false
+          school_secondary:
+            decision: keep
+            filter_logic: max
+            configured_subtypes:
+            - Pr. Up Pr. and Secondary Only
+            - Pr. with Up.Pr. Sec. and H.Sec.
+            - Upper Pr. and Secondary
+            - Up. Pr. Secondary and Higher Sec
+            - Secondary Only
+            - Secondary with Higher Secondary
+            source_trace:
+              school:
+                processor: school_mhrd
+                raw_files:
+                - School__Source___MHRD_2023__4.csv
+                raw_to_standard_columns: {}
+                class_k_mapping:
+                  class_k1:
+                    source: management
+                    label: school_management
+                  class_k2:
+                    source: schmgt
+                    label: school_management_code
+            counts:
+              membership_rows: 260523
+              unique_facilities: 259456
+              primary_facility_rows: 48605
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 260523
+                non_null_rows: 260523
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 6
+                top_values:
+                - value: Pr. Up Pr. and Secondary Only
+                  count: 68936
+                - value: Pr. with Up.Pr. Sec. and H.Sec.
+                  count: 66911
+                - value: Upper Pr. and Secondary
+                  count: 41217
+                - value: Up. Pr. Secondary and Higher Sec
+                  count: 34853
+                - value: Secondary Only
+                  count: 26962
+                - value: Secondary with Higher Secondary
+                  count: 21644
+                value_list_is_complete: true
+            class_k_parameters:
+              class_k1:
+                labels_from_sources:
+                - school_management
+                source_columns:
+                - management
+                eda:
+                  available: true
+                  rows_scanned: 260523
+                  non_null_rows: 246860
+                  null_or_blank_rows: 13663
+                  coverage: 0.947555
+                  unique_values: 19
+                  top_values:
+                  - value: Pvt. Unaided (Recognized)
+                    count: 100706
+                  - value: Department of Education
+                    count: 85563
+                  - value: Government Aided
+                    count: 37254
+                  - value: Local Body
+                    count: 10575
+                  - value: Tribal Welfare Department
+                    count: 5183
+                  - value: Madarsa Private Unaided (Recognized)
+                    count: 2035
+                  - value: Unrecognized
+                    count: 1407
+                  - value: Social Welfare Dept.
+                    count: 1167
+                  - value: Kendriya Vidyalaya(KV)
+                    count: 1008
+                  - value: Other Govt. Managed schools
+                    count: 790
+                  - value: Jawahar Navodaya Vidhyalaya
+                    count: 505
+                  - value: Madarsa Unrecognized
+                    count: 425
+                  value_list_is_complete: false
+              class_k2:
+                labels_from_sources:
+                - school_management_code
+                source_columns:
+                - schmgt
+                eda:
+                  available: true
+                  rows_scanned: 260523
+                  non_null_rows: 260523
+                  null_or_blank_rows: 0
+                  coverage: 1.0
+                  unique_values: 19
+                  top_values:
+                  - value: '5'
+                    count: 105783
+                  - value: '1'
+                    count: 92897
+                  - value: '4'
+                    count: 38046
+                  - value: '3'
+                    count: 10581
+                  - value: '2'
+                    count: 5201
+                  - value: '97'
+                    count: 2047
+                  - value: '8'
+                    count: 1613
+                  - value: '90'
+                    count: 1171
+                  - value: '92'
+                    count: 1112
+                  - value: '6'
+                    count: 792
+                  - value: '93'
+                    count: 592
+                  - value: '98'
+                    count: 426
+                  value_list_is_complete: false
+      higher_education:
+        filter_logic: min
+        summary:
+          facility_classes: 3
+          membership_rows: 164170
+        classes:
+          school_higher_secondary:
+            decision: keep
+            filter_logic: min
+            configured_subtypes:
+            - Pr. with Up.Pr. Sec. and H.Sec.
+            - Up. Pr. Secondary and Higher Sec
+            - Secondary with Higher Secondary
+            - Higher Secondary only/Jr. College
+            source_trace:
+              school:
+                processor: school_mhrd
+                raw_files:
+                - School__Source___MHRD_2023__4.csv
+                raw_to_standard_columns: {}
+                class_k_mapping:
+                  class_k1:
+                    source: management
+                    label: school_management
+                  class_k2:
+                    source: schmgt
+                    label: school_management_code
+            counts:
+              membership_rows: 138229
+              unique_facilities: 137858
+              primary_facility_rows: 14821
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 138229
+                non_null_rows: 138229
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 4
+                top_values:
+                - value: Pr. with Up.Pr. Sec. and H.Sec.
+                  count: 66911
+                - value: Up. Pr. Secondary and Higher Sec
+                  count: 34853
+                - value: Secondary with Higher Secondary
+                  count: 21644
+                - value: Higher Secondary only/Jr. College
+                  count: 14821
+                value_list_is_complete: true
+            class_k_parameters:
+              class_k1:
+                labels_from_sources:
+                - school_management
+                source_columns:
+                - management
+                eda:
+                  available: true
+                  rows_scanned: 138229
+                  non_null_rows: 132973
+                  null_or_blank_rows: 5256
+                  coverage: 0.961976
+                  unique_values: 19
+                  top_values:
+                  - value: Pvt. Unaided (Recognized)
+                    count: 56007
+                  - value: Department of Education
+                    count: 53205
+                  - value: Government Aided
+                    count: 17572
+                  - value: Tribal Welfare Department
+                    count: 1974
+                  - value: Kendriya Vidyalaya(KV)
+                    count: 871
+                  - value: Madarsa Private Unaided (Recognized)
+                    count: 642
+                  - value: Local Body
+                    count: 638
+                  - value: Social Welfare Dept.
+                    count: 559
+                  - value: Jawahar Navodaya Vidhyalaya
+                    count: 469
+                  - value: Other Govt. Managed schools
+                    count: 466
+                  - value: Unrecognized
+                    count: 276
+                  - value: Madarsa Unrecognized
+                    count: 114
+                  value_list_is_complete: false
+              class_k2:
+                labels_from_sources:
+                - school_management_code
+                source_columns:
+                - schmgt
+                eda:
+                  available: true
+                  rows_scanned: 138229
+                  non_null_rows: 138229
+                  null_or_blank_rows: 0
+                  coverage: 1.0
+                  unique_values: 19
+                  top_values:
+                  - value: '5'
+                    count: 57656
+                  - value: '1'
+                    count: 56416
+                  - value: '4'
+                    count: 17728
+                  - value: '2'
+                    count: 1984
+                  - value: '92'
+                    count: 953
+                  - value: '97'
+                    count: 644
+                  - value: '3'
+                    count: 640
+                  - value: '90'
+                    count: 560
+                  - value: '93'
+                    count: 537
+                  - value: '6'
+                    count: 466
+                  - value: '8'
+                    count: 336
+                  - value: '98'
+                    count: 114
+                  value_list_is_complete: false
+          college:
+            decision: keep
+            filter_logic: min
+            configured_subtypes:
+            - Affiliated College
+            - Constituent / University College
+            - Recognized Center
+            - PG Center / Off-Campus Center
+            - Autonomous College
+            source_trace:
+              college:
+                processor: table
+                raw_files:
+                - college.csv
+                raw_to_standard_columns:
+                  id_col: aishecode
+                  name_col: collegeins
+                  lat_col: latitude
+                  lon_col: longitude
+                  subtype_col: collegetyp
+                  facility_code_col: affiliatin
+                  urban_rural_col: locationid
+                  pincode_col: pincode
+                  establishment_year_col: yearofesta
+                  district_lgd_col: districtlg
+                class_k_mapping:
+                  class_k1:
+                    source: management
+                    label: management
+                  class_k2:
+                    source: ownerships
+                    label: ownership
+            counts:
+              membership_rows: 11763
+              unique_facilities: 11763
+              primary_facility_rows: 11763
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 11763
+                non_null_rows: 11722
+                null_or_blank_rows: 41
+                coverage: 0.996514
+                unique_values: 5
+                top_values:
+                - value: Affiliated College
+                  count: 10951
+                - value: Constituent / University College
+                  count: 537
+                - value: Recognized Center
+                  count: 176
+                - value: PG Center / Off-Campus Center
+                  count: 55
+                - value: Autonomous College
+                  count: 3
+                value_list_is_complete: true
+            class_k_parameters:
+              class_k1:
+                labels_from_sources:
+                - management
+                source_columns:
+                - management
+                eda:
+                  available: true
+                  rows_scanned: 11763
+                  non_null_rows: 11761
+                  null_or_blank_rows: 2
+                  coverage: 0.99983
+                  unique_values: 6
+                  top_values:
+                  - value: Society
+                    count: 5344
+                  - value: Trust
+                    count: 4014
+                  - value: Government
+                    count: 1697
+                  - value: Others
+                    count: 632
+                  - value: Section 8 Company
+                    count: 52
+                  - value: Section 25 Company
+                    count: 22
+                  value_list_is_complete: true
+              class_k2:
+                labels_from_sources:
+                - ownership
+                source_columns:
+                - ownerships
+                eda:
+                  available: true
+                  rows_scanned: 11763
+                  non_null_rows: 11760
+                  null_or_blank_rows: 3
+                  coverage: 0.999745
+                  unique_values: 6
+                  top_values:
+                  - value: Private Un-Aided
+                    count: 7901
+                  - value: State Government
+                    count: 1435
+                  - value: Private Aided (Government Aided)
+                    count: 1394
+                  - value: University
+                    count: 561
+                  - value: Local Body
+                    count: 351
+                  - value: Central Government
+                    count: 118
+                  value_list_is_complete: true
+          universities:
+            decision: keep
+            filter_logic: min
+            configured_subtypes:
+            - Technical/Polytechnic
+            - Nursing
+            - Teacher Training
+            - Paramedical
+            - PGDM Institutes
+            - Institutes under Ministries
+            - Hotel Management and Catering
+            source_trace:
+              universities:
+                processor: table
+                raw_files:
+                - universities.csv
+                raw_to_standard_columns:
+                  id_col: aishecode
+                  name_col: name
+                  lat_col: latitude
+                  lon_col: longitude
+                  subtype_col: typeofinst
+                  facility_code_col: aishe_code
+                  urban_rural_col: locationid
+                  pincode_col: pincode
+                  establishment_year_col: yearofesta
+                  district_lgd_col: districtlg
+                class_k_mapping:
+                  class_k1:
+                    source: management
+                    label: management
+                  class_k2:
+                    source: ownerships
+                    label: ownership
+            counts:
+              membership_rows: 14178
+              unique_facilities: 14178
+              primary_facility_rows: 14178
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 14178
+                non_null_rows: 13195
+                null_or_blank_rows: 983
+                coverage: 0.930667
+                unique_values: 7
+                top_values:
+                - value: Technical/Polytechnic
+                  count: 4183
+                - value: Nursing
+                  count: 4007
+                - value: Teacher Training
+                  count: 3499
+                - value: Paramedical
+                  count: 966
+                - value: PGDM Institutes
+                  count: 347
+                - value: Institutes under Ministries
+                  count: 112
+                - value: Hotel Management and Catering
+                  count: 81
+                value_list_is_complete: true
+            class_k_parameters:
+              class_k1:
+                labels_from_sources:
+                - management
+                source_columns:
+                - management
+                eda:
+                  available: true
+                  rows_scanned: 14178
+                  non_null_rows: 11212
+                  null_or_blank_rows: 2966
+                  coverage: 0.790803
+                  unique_values: 6
+                  top_values:
+                  - value: Trust
+                    count: 4643
+                  - value: Society
+                    count: 3936
+                  - value: Government
+                    count: 2208
+                  - value: Others
+                    count: 336
+                  - value: Section 8 Company
+                    count: 52
+                  - value: Section 25 Company
+                    count: 37
+                  value_list_is_complete: true
+              class_k2:
+                labels_from_sources:
+                - ownership
+                source_columns:
+                - ownerships
+                eda:
+                  available: true
+                  rows_scanned: 14178
+                  non_null_rows: 14178
+                  null_or_blank_rows: 0
+                  coverage: 1.0
+                  unique_values: 6
+                  top_values:
+                  - value: Private Un-Aided
+                    count: 10163
+                  - value: State Government
+                    count: 2428
+                  - value: Private Aided (Government Aided)
+                    count: 1131
+                  - value: Local Body
+                    count: 258
+                  - value: Central Government
+                    count: 191
+                  - value: University
+                    count: 7
+                  value_list_is_complete: true
+  health:
+    summary:
+      facility_classes: 5
+      membership_rows: 147957
+    filter_groups:
+      essential_health:
+        filter_logic: max
+        summary:
+          facility_classes: 2
+          membership_rows: 144343
+        classes:
+          health_sub_cen:
+            decision: keep
+            filter_logic: max
+            configured_subtypes: []
+            source_trace:
+              health_center:
+                processor: health_center_split
+                raw_files:
+                - Health_Center_Source___Data_gov_2022__6.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 124889
+              unique_facilities: 124889
+              primary_facility_rows: 124889
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 124889
+                non_null_rows: 0
+                null_or_blank_rows: 124889
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+          health_phc:
+            decision: keep
+            filter_logic: max
+            configured_subtypes: []
+            source_trace:
+              health_center:
+                processor: health_center_split
+                raw_files:
+                - Health_Center_Source___Data_gov_2022__6.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 19454
+              unique_facilities: 19454
+              primary_facility_rows: 19454
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 19454
+                non_null_rows: 0
+                null_or_blank_rows: 19454
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+      advanced_health:
+        filter_logic: min
+        summary:
+          facility_classes: 3
+          membership_rows: 3614
+        classes:
+          health_chc:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              health_center:
+                processor: health_center_split
+                raw_files:
+                - Health_Center_Source___Data_gov_2022__6.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 3180
+              unique_facilities: 3180
+              primary_facility_rows: 3180
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 3180
+                non_null_rows: 0
+                null_or_blank_rows: 3180
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+          health_dis_h:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              health_center:
+                processor: health_center_split
+                raw_files:
+                - Health_Center_Source___Data_gov_2022__6.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 158
+              unique_facilities: 158
+              primary_facility_rows: 158
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 158
+                non_null_rows: 0
+                null_or_blank_rows: 158
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+          health_s_t_h:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              health_center:
+                processor: health_center_split
+                raw_files:
+                - Health_Center_Source___Data_gov_2022__6.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 276
+              unique_facilities: 276
+              primary_facility_rows: 276
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 276
+                non_null_rows: 0
+                null_or_blank_rows: 276
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+  food_security:
+    summary:
+      facility_classes: 1
+      membership_rows: 312507
+    filter_groups:
+      essential_services:
+        filter_logic: direct
+        summary:
+          facility_classes: 1
+          membership_rows: 312507
+        classes:
+          pds:
+            decision: keep
+            filter_logic: direct
+            configured_subtypes: []
+            source_trace:
+              pds:
+                processor: table
+                raw_files:
+                - PDS__Sources___DoFD_2023__7.csv
+                raw_to_standard_columns:
+                  id_col: fps_code
+                  name_col: fpsname
+                  lat_col: latitude
+                  lon_col: longitude
+                  facility_code_col: fps_code
+                  village_census11_col: villagecod
+                  village_name_col: villagenam
+                  uid_strategy: id_coord
+                class_k_mapping: {}
+            counts:
+              membership_rows: 312507
+              unique_facilities: 312507
+              primary_facility_rows: 312507
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 312507
+                non_null_rows: 0
+                null_or_blank_rows: 312507
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+  finance:
+    summary:
+      facility_classes: 4
+      membership_rows: 2218050
+    filter_groups:
+      financial_inclusion:
+        filter_logic: max
+        summary:
+          facility_classes: 4
+          membership_rows: 2218050
+        classes:
+          csc:
+            decision: keep
+            filter_logic: max
+            configured_subtypes: []
+            source_trace:
+              csc:
+                processor: table
+                raw_files:
+                - CSC-MeitY-2022.csv
+                raw_to_standard_columns:
+                  id_col: csc_id
+                  lat_col: latitude
+                  lon_col: longitude
+                  uid_strategy: id_coord
+                class_k_mapping: {}
+            counts:
+              membership_rows: 39340
+              unique_facilities: 39340
+              primary_facility_rows: 39340
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 39340
+                non_null_rows: 0
+                null_or_blank_rows: 39340
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+          bank_mitra:
+            decision: keep
+            filter_logic: max
+            configured_subtypes: []
+            source_trace:
+              bank_mitra:
+                processor: table
+                raw_files:
+                - bank_mitra.csv
+                raw_to_standard_columns:
+                  id_col: objectid
+                  name_col: bank_name
+                  lat_col: bk_m_lat
+                  lon_col: bk_m_long
+                  facility_code_col: bk_mitr_cd
+                  coord_fallback_col: coordinates
+                class_k_mapping: {}
+            counts:
+              membership_rows: 1799682
+              unique_facilities: 1799682
+              primary_facility_rows: 1799682
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 1799682
+                non_null_rows: 0
+                null_or_blank_rows: 1799682
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+          bank_branch:
+            decision: keep
+            filter_logic: max
+            configured_subtypes: []
+            source_trace:
+              bank_branch:
+                processor: table
+                raw_files:
+                - bank_branch.csv
+                raw_to_standard_columns:
+                  id_col: objectid
+                  name_col: bank_name
+                  lat_col: br_lat
+                  lon_col: br_long
+                  facility_code_col: br_ifsc_cd
+                  pincode_col: br_pin_cod
+                class_k_mapping: {}
+            counts:
+              membership_rows: 168893
+              unique_facilities: 168893
+              primary_facility_rows: 168893
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 168893
+                non_null_rows: 0
+                null_or_blank_rows: 168893
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+          bank_atm:
+            decision: keep
+            filter_logic: max
+            configured_subtypes: []
+            source_trace:
+              bank_atm:
+                processor: table
+                raw_files:
+                - bank_atm.csv
+                raw_to_standard_columns:
+                  id_col: objectid
+                  name_col: bank_name
+                  lat_col: atm_lat
+                  lon_col: atm_long
+                  facility_code_col: atm_cd
+                  pincode_col: atm_pin_cd
+                class_k_mapping: {}
+            counts:
+              membership_rows: 210135
+              unique_facilities: 210135
+              primary_facility_rows: 210135
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 210135
+                non_null_rows: 0
+                null_or_blank_rows: 210135
+                coverage: 0.0
+                unique_values: 0
+                top_values: []
+                value_list_is_complete: true
+            class_k_parameters: {}
+  agriculture:
+    summary:
+      facility_classes: 9
+      membership_rows: 120981
+    filter_groups:
+      apmc_access:
+        filter_logic: min
+        summary:
+          facility_classes: 2
+          membership_rows: 67600
+        classes:
+          apmc:
+            decision: keep
+            filter_logic: min
+            configured_subtypes:
+            - Primary Market Yard
+            - Sub Market Yard
+            - Other
+            - Regulated Primary Market
+            - Regulated Sub Market
+            - Farmers Consumer Market
+            - Non-Regulated Market
+            source_trace:
+              apmc:
+                processor: apmc
+                raw_files:
+                - apmc.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 2902
+              unique_facilities: 2902
+              primary_facility_rows: 2902
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 2902
+                non_null_rows: 2902
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 7
+                top_values:
+                - value: Primary Market Yard
+                  count: 1892
+                - value: Sub Market Yard
+                  count: 468
+                - value: Other
+                  count: 328
+                - value: Regulated Primary Market
+                  count: 123
+                - value: Regulated Sub Market
+                  count: 49
+                - value: Farmers Consumer Market
+                  count: 33
+                - value: Non-Regulated Market
+                  count: 9
+                value_list_is_complete: true
+            class_k_parameters: {}
+          agri_industry_markets_trading:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 64698
+              unique_facilities: 60594
+              primary_facility_rows: 64698
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 64698
+                non_null_rows: 64698
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 13
+                top_values:
+                - value: Collection Centre
+                  count: 24466
+                - value: Market
+                  count: 15631
+                - value: Mandi
+                  count: 12346
+                - value: Bazaar
+                  count: 10110
+                - value: GRaM (Notified)
+                  count: 686
+                - value: Vegetable /fruit store and Shop
+                  count: 676
+                - value: Mandi (Notified)
+                  count: 369
+                - value: Dhan Kharidi Kendra
+                  count: 160
+                - value: APMC
+                  count: 102
+                - value: Direct Purchase Centre
+                  count: 61
+                - value: Fish Mart
+                  count: 59
+                - value: PACCS GRaM
+                  count: 29
+                - value: GRaM
+                  count: 3
+                value_list_is_complete: true
+            class_k_parameters: {}
+      post_harvest:
+        filter_logic: min
+        summary:
+          facility_classes: 4
+          membership_rows: 33789
+        classes:
+          agri_industry_storage_warehousing:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 13819
+              unique_facilities: 13318
+              primary_facility_rows: 13819
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 13819
+                non_null_rows: 13819
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 7
+                top_values:
+                - value: Warehouse
+                  count: 7613
+                - value: Cold Storage
+                  count: 2985
+                - value: Godown
+                  count: 2657
+                - value: LPG Godown
+                  count: 457
+                - value: FCI Godown
+                  count: 55
+                - value: GSSS Godown
+                  count: 44
+                - value: Fish Storage
+                  count: 8
+                value_list_is_complete: true
+            class_k_parameters: {}
+          agri_industry_distribution_utilities:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 580
+              unique_facilities: 578
+              primary_facility_rows: 580
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 580
+                non_null_rows: 580
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 6
+                top_values:
+                - value: Distribution Centre
+                  count: 276
+                - value: Civil supply Corporation
+                  count: 275
+                - value: Food Corporation of India
+                  count: 20
+                - value: Echoshop
+                  count: 5
+                - value: Electricity Distribution Cent*
+                  count: 3
+                - value: Indian Gas Distribution
+                  count: 1
+                value_list_is_complete: true
+            class_k_parameters: {}
+          agri_industry_agri_processing:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 17842
+              unique_facilities: 17325
+              primary_facility_rows: 17842
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 17842
+                non_null_rows: 17842
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 12
+                top_values:
+                - value: Rice/Flour/Oil Mill
+                  count: 9637
+                - value: Agro Industry
+                  count: 6924
+                - value: Sugar Mill
+                  count: 513
+                - value: Tea Industry
+                  count: 325
+                - value: Cashew Industry
+                  count: 184
+                - value: Bakery
+                  count: 101
+                - value: Aqua Industry
+                  count: 45
+                - value: Dal Mill
+                  count: 40
+                - value: Coconut Industry
+                  count: 36
+                - value: Lamon grass oil production ce*
+                  count: 24
+                - value: Paraboiled Industries
+                  count: 11
+                - value: Maize Milling Unit
+                  count: 2
+                value_list_is_complete: true
+            class_k_parameters: {}
+          agri_industry_industrial_manufacturing:
+            decision: keep
+            filter_logic: min
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 1548
+              unique_facilities: 1545
+              primary_facility_rows: 1548
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 1548
+                non_null_rows: 1548
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 13
+                top_values:
+                - value: Brick Industry
+                  count: 506
+                - value: Rubber Industry
+                  count: 283
+                - value: Cotton Industry
+                  count: 235
+                - value: Saw Mill
+                  count: 161
+                - value: Wood Industry
+                  count: 131
+                - value: Tobaco Industry
+                  count: 93
+                - value: Coir Industry
+                  count: 35
+                - value: Jute Industry
+                  count: 33
+                - value: Silk Farm
+                  count: 26
+                - value: Rubber Processing Unit
+                  count: 19
+                - value: Resham Farm
+                  count: 17
+                - value: Latex Industry
+                  count: 8
+                - value: Camphor Manufacturing Unit
+                  count: 1
+                value_list_is_complete: true
+            class_k_parameters: {}
+      cooperative:
+        filter_logic: direct
+        summary:
+          facility_classes: 1
+          membership_rows: 3976
+        classes:
+          agri_industry_co_operatives_societies:
+            decision: keep
+            filter_logic: direct
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 3976
+              unique_facilities: 3830
+              primary_facility_rows: 3976
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 3976
+                non_null_rows: 3976
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 5
+                top_values:
+                - value: Co operative Society
+                  count: 2245
+                - value: MPCS
+                  count: 1108
+                - value: Primary Agricultural Cooperat
+                  count: 339
+                - value: Agricultural Co operative Soc*
+                  count: 225
+                - value: Farmer Welfare Society
+                  count: 59
+                value_list_is_complete: true
+            class_k_parameters: {}
+      livestock:
+        filter_logic: direct
+        summary:
+          facility_classes: 1
+          membership_rows: 14308
+        classes:
+          agri_industry_dairy_animal_husbandry:
+            decision: keep
+            filter_logic: direct
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 14308
+              unique_facilities: 14254
+              primary_facility_rows: 14308
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 14308
+                non_null_rows: 14308
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 19
+                top_values:
+                - value: Dairy Farm
+                  count: 7239
+                - value: Milk Centre
+                  count: 3984
+                - value: Poultry Farm
+                  count: 1634
+                - value: Milk Co Operative Society
+                  count: 614
+                - value: Animal Husbandry
+                  count: 328
+                - value: Kshreera Bhavan
+                  count: 230
+                - value: Fisheries
+                  count: 59
+                - value: Milk Chilling Centre
+                  count: 56
+                - value: Chicken Center
+                  count: 46
+                - value: Cattle Farm
+                  count: 21
+                - value: Goat Farm
+                  count: 20
+                - value: Cattle Feed
+                  count: 14
+                - value: Cow Farm
+                  count: 14
+                - value: Fish Farm
+                  count: 14
+                - value: Animal Epicenter
+                  count: 12
+                - value: Pig Farm
+                  count: 11
+                - value: Honey Farm
+                  count: 5
+                - value: Pultry Farm
+                  count: 5
+                - value: Sheep Farm
+                  count: 2
+                value_list_is_complete: true
+            class_k_parameters: {}
+      agri_support_infra:
+        filter_logic: direct
+        summary:
+          facility_classes: 1
+          membership_rows: 1308
+        classes:
+          agri_industry_agri_support_infrastructure:
+            decision: keep
+            filter_logic: direct
+            configured_subtypes: []
+            source_trace:
+              agri_industry:
+                processor: agri_industry_reclassified
+                raw_files:
+                - Industries__Sources___PMGSY_2023__11.csv
+                - Agri_Resources__Sources___PMGSY_2023__10.csv
+                raw_to_standard_columns: {}
+                class_k_mapping: {}
+            counts:
+              membership_rows: 1308
+              unique_facilities: 1287
+              primary_facility_rows: 1308
+              proximity_l3_rows: 630898
+              proximity_complete_for_all_villages: true
+            level_4_subtype:
+              output_column: class_l4_facility_subtype
+              role: deeper source subtype retained as metadata; not used as a proximity traversal level
+              actual_values:
+                available: true
+                rows_scanned: 1308
+                non_null_rows: 1308
+                null_or_blank_rows: 0
+                coverage: 1.0
+                unique_values: 8
+                top_values:
+                - value: Krishi Bhavan
+                  count: 860
+                - value: Fertilizer Depot
+                  count: 133
+                - value: IFFCO Centre
+                  count: 93
+                - value: Sugar Cane Centre
+                  count: 81
+                - value: Green House
+                  count: 75
+                - value: Pesticide Depot
+                  count: 63
+                - value: Soil Testing Lab
+                  count: 2
+                - value: Rice Research Centre
+                  count: 1
+                value_list_is_complete: true
+            class_k_parameters: {}
+l4_subtype_catalog:
+  output_column: class_l4_facility_subtype
+  by_l3_class:
+    school_primary:
+      available: true
+      rows_scanned: 1160528
+      non_null_rows: 1160528
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 5
+      top_values:
+      - value: Primary
+        count: 703836
+      - value: Primary with Upper Primary
+        count: 320578
+      - value: Pr. Up Pr. and Secondary Only
+        count: 68936
+      - value: Pr. with Up.Pr. Sec. and H.Sec.
+        count: 66911
+      - value: Pre-Primary Only
+        count: 267
+      value_list_is_complete: true
+    school_upper_primary:
+      available: true
+      rows_scanned: 616648
+      non_null_rows: 616648
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 6
+      top_values:
+      - value: Primary with Upper Primary
+        count: 320578
+      - value: Upper Primary only
+        count: 84153
+      - value: Pr. Up Pr. and Secondary Only
+        count: 68936
+      - value: Pr. with Up.Pr. Sec. and H.Sec.
+        count: 66911
+      - value: Upper Pr. and Secondary
+        count: 41217
+      - value: Up. Pr. Secondary and Higher Sec
+        count: 34853
+      value_list_is_complete: true
+    school_secondary:
+      available: true
+      rows_scanned: 260523
+      non_null_rows: 260523
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 6
+      top_values:
+      - value: Pr. Up Pr. and Secondary Only
+        count: 68936
+      - value: Pr. with Up.Pr. Sec. and H.Sec.
+        count: 66911
+      - value: Upper Pr. and Secondary
+        count: 41217
+      - value: Up. Pr. Secondary and Higher Sec
+        count: 34853
+      - value: Secondary Only
+        count: 26962
+      - value: Secondary with Higher Secondary
+        count: 21644
+      value_list_is_complete: true
+    school_higher_secondary:
+      available: true
+      rows_scanned: 138229
+      non_null_rows: 138229
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 4
+      top_values:
+      - value: Pr. with Up.Pr. Sec. and H.Sec.
+        count: 66911
+      - value: Up. Pr. Secondary and Higher Sec
+        count: 34853
+      - value: Secondary with Higher Secondary
+        count: 21644
+      - value: Higher Secondary only/Jr. College
+        count: 14821
+      value_list_is_complete: true
+    college:
+      available: true
+      rows_scanned: 11763
+      non_null_rows: 11722
+      null_or_blank_rows: 41
+      coverage: 0.996514
+      unique_values: 5
+      top_values:
+      - value: Affiliated College
+        count: 10951
+      - value: Constituent / University College
+        count: 537
+      - value: Recognized Center
+        count: 176
+      - value: PG Center / Off-Campus Center
+        count: 55
+      - value: Autonomous College
+        count: 3
+      value_list_is_complete: true
+    universities:
+      available: true
+      rows_scanned: 14178
+      non_null_rows: 13195
+      null_or_blank_rows: 983
+      coverage: 0.930667
+      unique_values: 7
+      top_values:
+      - value: Technical/Polytechnic
+        count: 4183
+      - value: Nursing
+        count: 4007
+      - value: Teacher Training
+        count: 3499
+      - value: Paramedical
+        count: 966
+      - value: PGDM Institutes
+        count: 347
+      - value: Institutes under Ministries
+        count: 112
+      - value: Hotel Management and Catering
+        count: 81
+      value_list_is_complete: true
+    health_sub_cen:
+      available: true
+      rows_scanned: 124889
+      non_null_rows: 0
+      null_or_blank_rows: 124889
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    health_phc:
+      available: true
+      rows_scanned: 19454
+      non_null_rows: 0
+      null_or_blank_rows: 19454
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    health_chc:
+      available: true
+      rows_scanned: 3180
+      non_null_rows: 0
+      null_or_blank_rows: 3180
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    health_dis_h:
+      available: true
+      rows_scanned: 158
+      non_null_rows: 0
+      null_or_blank_rows: 158
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    health_s_t_h:
+      available: true
+      rows_scanned: 276
+      non_null_rows: 0
+      null_or_blank_rows: 276
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    pds:
+      available: true
+      rows_scanned: 312507
+      non_null_rows: 0
+      null_or_blank_rows: 312507
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    csc:
+      available: true
+      rows_scanned: 39340
+      non_null_rows: 0
+      null_or_blank_rows: 39340
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    bank_mitra:
+      available: true
+      rows_scanned: 1799682
+      non_null_rows: 0
+      null_or_blank_rows: 1799682
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    bank_branch:
+      available: true
+      rows_scanned: 168893
+      non_null_rows: 0
+      null_or_blank_rows: 168893
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    bank_atm:
+      available: true
+      rows_scanned: 210135
+      non_null_rows: 0
+      null_or_blank_rows: 210135
+      coverage: 0.0
+      unique_values: 0
+      top_values: []
+      value_list_is_complete: true
+    apmc:
+      available: true
+      rows_scanned: 2902
+      non_null_rows: 2902
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 7
+      top_values:
+      - value: Primary Market Yard
+        count: 1892
+      - value: Sub Market Yard
+        count: 468
+      - value: Other
+        count: 328
+      - value: Regulated Primary Market
+        count: 123
+      - value: Regulated Sub Market
+        count: 49
+      - value: Farmers Consumer Market
+        count: 33
+      - value: Non-Regulated Market
+        count: 9
+      value_list_is_complete: true
+    agri_industry_markets_trading:
+      available: true
+      rows_scanned: 64698
+      non_null_rows: 64698
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 13
+      top_values:
+      - value: Collection Centre
+        count: 24466
+      - value: Market
+        count: 15631
+      - value: Mandi
+        count: 12346
+      - value: Bazaar
+        count: 10110
+      - value: GRaM (Notified)
+        count: 686
+      - value: Vegetable /fruit store and Shop
+        count: 676
+      - value: Mandi (Notified)
+        count: 369
+      - value: Dhan Kharidi Kendra
+        count: 160
+      - value: APMC
+        count: 102
+      - value: Direct Purchase Centre
+        count: 61
+      - value: Fish Mart
+        count: 59
+      - value: PACCS GRaM
+        count: 29
+      - value: GRaM
+        count: 3
+      value_list_is_complete: true
+    agri_industry_storage_warehousing:
+      available: true
+      rows_scanned: 13819
+      non_null_rows: 13819
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 7
+      top_values:
+      - value: Warehouse
+        count: 7613
+      - value: Cold Storage
+        count: 2985
+      - value: Godown
+        count: 2657
+      - value: LPG Godown
+        count: 457
+      - value: FCI Godown
+        count: 55
+      - value: GSSS Godown
+        count: 44
+      - value: Fish Storage
+        count: 8
+      value_list_is_complete: true
+    agri_industry_distribution_utilities:
+      available: true
+      rows_scanned: 580
+      non_null_rows: 580
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 6
+      top_values:
+      - value: Distribution Centre
+        count: 276
+      - value: Civil supply Corporation
+        count: 275
+      - value: Food Corporation of India
+        count: 20
+      - value: Echoshop
+        count: 5
+      - value: Electricity Distribution Cent*
+        count: 3
+      - value: Indian Gas Distribution
+        count: 1
+      value_list_is_complete: true
+    agri_industry_agri_processing:
+      available: true
+      rows_scanned: 17842
+      non_null_rows: 17842
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 12
+      top_values:
+      - value: Rice/Flour/Oil Mill
+        count: 9637
+      - value: Agro Industry
+        count: 6924
+      - value: Sugar Mill
+        count: 513
+      - value: Tea Industry
+        count: 325
+      - value: Cashew Industry
+        count: 184
+      - value: Bakery
+        count: 101
+      - value: Aqua Industry
+        count: 45
+      - value: Dal Mill
+        count: 40
+      - value: Coconut Industry
+        count: 36
+      - value: Lamon grass oil production ce*
+        count: 24
+      - value: Paraboiled Industries
+        count: 11
+      - value: Maize Milling Unit
+        count: 2
+      value_list_is_complete: true
+    agri_industry_industrial_manufacturing:
+      available: true
+      rows_scanned: 1548
+      non_null_rows: 1548
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 13
+      top_values:
+      - value: Brick Industry
+        count: 506
+      - value: Rubber Industry
+        count: 283
+      - value: Cotton Industry
+        count: 235
+      - value: Saw Mill
+        count: 161
+      - value: Wood Industry
+        count: 131
+      - value: Tobaco Industry
+        count: 93
+      - value: Coir Industry
+        count: 35
+      - value: Jute Industry
+        count: 33
+      - value: Silk Farm
+        count: 26
+      - value: Rubber Processing Unit
+        count: 19
+      - value: Resham Farm
+        count: 17
+      - value: Latex Industry
+        count: 8
+      - value: Camphor Manufacturing Unit
+        count: 1
+      value_list_is_complete: true
+    agri_industry_co_operatives_societies:
+      available: true
+      rows_scanned: 3976
+      non_null_rows: 3976
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 5
+      top_values:
+      - value: Co operative Society
+        count: 2245
+      - value: MPCS
+        count: 1108
+      - value: Primary Agricultural Cooperat
+        count: 339
+      - value: Agricultural Co operative Soc*
+        count: 225
+      - value: Farmer Welfare Society
+        count: 59
+      value_list_is_complete: true
+    agri_industry_dairy_animal_husbandry:
+      available: true
+      rows_scanned: 14308
+      non_null_rows: 14308
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 19
+      top_values:
+      - value: Dairy Farm
+        count: 7239
+      - value: Milk Centre
+        count: 3984
+      - value: Poultry Farm
+        count: 1634
+      - value: Milk Co Operative Society
+        count: 614
+      - value: Animal Husbandry
+        count: 328
+      - value: Kshreera Bhavan
+        count: 230
+      - value: Fisheries
+        count: 59
+      - value: Milk Chilling Centre
+        count: 56
+      - value: Chicken Center
+        count: 46
+      - value: Cattle Farm
+        count: 21
+      - value: Goat Farm
+        count: 20
+      - value: Cattle Feed
+        count: 14
+      - value: Cow Farm
+        count: 14
+      - value: Fish Farm
+        count: 14
+      - value: Animal Epicenter
+        count: 12
+      - value: Pig Farm
+        count: 11
+      - value: Honey Farm
+        count: 5
+      - value: Pultry Farm
+        count: 5
+      - value: Sheep Farm
+        count: 2
+      value_list_is_complete: true
+    agri_industry_agri_support_infrastructure:
+      available: true
+      rows_scanned: 1308
+      non_null_rows: 1308
+      null_or_blank_rows: 0
+      coverage: 1.0
+      unique_values: 8
+      top_values:
+      - value: Krishi Bhavan
+        count: 860
+      - value: Fertilizer Depot
+        count: 133
+      - value: IFFCO Centre
+        count: 93
+      - value: Sugar Cane Centre
+        count: 81
+      - value: Green House
+        count: 75
+      - value: Pesticide Depot
+        count: 63
+      - value: Soil Testing Lab
+        count: 2
+      - value: Rice Research Centre
+        count: 1
+      value_list_is_complete: true
+  unique_values_seen_in_listed_catalog: 113
+class_k_catalog:
+  class_k1:
+    configured_labels:
+    - management
+    - school_management
+    configured_source_columns:
+    - management
+    source_usage:
+      school:
+        source: management
+        label: school_management
+      college:
+        source: management
+        label: management
+      universities:
+        source: management
+        label: management
+    membership_table_eda:
+      available: true
+      rows_scanned: 5001364
+      non_null_rows: 2087195
+      null_or_blank_rows: 2914169
+      coverage: 0.417325
+      unique_values: 25
+      top_values:
+      - value: Department of Education
+        count: 966043
+      - value: Pvt. Unaided (Recognized)
+        count: 581117
+      - value: Local Body
+        count: 249636
+      - value: Government Aided
+        count: 137282
+      - value: Tribal Welfare Department
+        count: 52103
+      - value: Unrecognized
+        count: 33645
+      - value: Madarsa Private Unaided (Recognized)
+        count: 26654
+      - value: Society
+        count: 9280
+      - value: Trust
+        count: 8657
+      - value: Madarsa Unrecognized
+        count: 4618
+      - value: Social Welfare Dept.
+        count: 4047
+      - value: Kendriya Vidyalaya(KV)
+        count: 3973
+      value_list_is_complete: false
+  class_k2:
+    configured_labels:
+    - ownership
+    - school_management_code
+    configured_source_columns:
+    - ownerships
+    - schmgt
+    source_usage:
+      school:
+        source: schmgt
+        label: school_management_code
+      college:
+        source: ownerships
+        label: ownership
+      universities:
+        source: ownerships
+        label: ownership
+    membership_table_eda:
+      available: true
+      rows_scanned: 5001364
+      non_null_rows: 2201866
+      null_or_blank_rows: 2799498
+      coverage: 0.440253
+      unique_values: 25
+      top_values:
+      - value: '1'
+        count: 1043163
+      - value: '5'
+        count: 607955
+      - value: '3'
+        count: 250158
+      - value: '4'
+        count: 141468
+      - value: '2'
+        count: 53051
+      - value: '8'
+        count: 34828
+      - value: '97'
+        count: 26789
+      - value: Private Un-Aided
+        count: 18064
+      - value: '98'
+        count: 4631
+      - value: '92'
+        count: 4379
+      - value: '90'
+        count: 4066
+      - value: State Government
+        count: 3863
+      value_list_is_complete: false
+  class_k3:
+    configured_labels: []
+    configured_source_columns: []
+    source_usage: {}
+    status: no_current_source_mapping
+  class_k4:
+    configured_labels: []
+    configured_source_columns: []
+    source_usage: {}
+    status: no_current_source_mapping
+  class_k5:
+    configured_labels: []
+    configured_source_columns: []
+    source_usage: {}
+    status: no_current_source_mapping
+  class_k6:
+    configured_labels: []
+    configured_source_columns: []
+    source_usage: {}
+    status: no_current_source_mapping
+  class_k7:
+    configured_labels: []
+    configured_source_columns: []
+    source_usage: {}
+    status: no_current_source_mapping
+  class_k8:
+    configured_labels: []
+    configured_source_columns: []
+    source_usage: {}
+    status: no_current_source_mapping
+proximity_status:
+  available: true
+  path: /mnt/y/core-stack-org/core-stack-backend/data/facilities/outputs/cs_village_facility_proximity.gpkg
+  village_layer: village_shapes
+  village_shapes: 630898
+  l3_rows: 15772450
+  l3_classes_complete: 25
+  l3_classes_configured: 25
+  nearest_facility_lookup_rows: 1711631
+  class_map_rows: 25
+  views:
+  - proximity_l2
+  materialized_tables:
+    l2_materialized: 6939878
+    l1_materialized: 3154490
+  by_l3_class:
+    agri_industry_agri_processing:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_agri_support_infrastructure:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_co_operatives_societies:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_dairy_animal_husbandry:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_distribution_utilities:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_industrial_manufacturing:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_markets_trading:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    agri_industry_storage_warehousing:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    apmc:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    bank_atm:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    bank_branch:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    bank_mitra:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    college:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    csc:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    health_chc:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    health_dis_h:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    health_phc:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    health_s_t_h:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    health_sub_cen:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    pds:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    school_higher_secondary:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    school_primary:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    school_secondary:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    school_upper_primary:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+    universities:
+      rows: 630898
+      expected_rows_if_complete: 630898
+      complete_for_all_villages: true
+editing_guidance:
+  safe_to_edit: Edit facilities_master.yaml, not this generated monitor.
+  regenerate_command: uv run --with pandas --with numpy --with pyyaml python utilities/scripts/facilities_utils/facility_pipeline.py
+    monitor
+  new_dataset_template: utilities/scripts/facilities_utils/config/new_dataset_schema_template.yaml
