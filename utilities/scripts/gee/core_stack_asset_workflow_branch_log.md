@@ -7,38 +7,42 @@ This file records the scripts/configs created or revised during the standard
 asset rebuild, which branch each logical group should go to, and reviewable git
 commands the maintainer can run manually.
 
-## Actual Split Branches Created
+## Requested PR Branch Map
 
-These branches were created after the first handoff attempt so every affected
-file can be reviewed as its own commit. The earlier branches
-`feat/cs-admin-standard-assets` and `feat/facilities_data_processing` are still
-present locally/remotely, but they contain bundled commits and should be treated
-as superseded by the split branches below.
+These are the current branch names to use for review. The older
+`feat/*-split` branches were intermediate preservation branches and are
+superseded by this map.
 
-- `feat/cs-admin-standard-assets-split`
-  - `7ed68ede` Add CS admin standard builder
-  - `9bfca12b` Add CS admin asset join builder
-  - `3f710ef6` Document CS admin standard workflow
-  - `42c48039` Point livestock asset config to CS admin standard
-  - `90345ca4` Point Antyodaya asset config to CS admin standard
-- `feat/facilities-data-processing-cs-proximity-split`
-  - `12a46cf6` Write facilities proximity village polygons
-  - `06efcfb7` Point facilities master config to CS proximity outputs
-  - `14788d8c` Document facilities CS proximity output
-  - `abe5b130` Refresh facilities metadata monitor config
-  - `814b57c0` Report facilities village shapes metadata
-  - `c8d1cf18` Document facilities CS proximity workflow
-- `feat/facilities_v2`
-  - `6daec292` Write facilities proximity API summary CSV
-  - `08a427da` Use CS facilities proximity source constant
-- `feat/facilities_gee_assets`
-  - `dc29fda6` Point facilities GEE proximity source to CS output
-  - `127525ad` Document facilities GEE ingestion workflow
-- `feat/core-stack-gee-ingestion-split`
-  - `2d07c316` Add Core Stack GEE ingestion script
-  - `e7035b52` Add Core Stack GEE asset config
-  - `4f1dcebf` Document Core Stack GEE ingestion
-  - `3b4d882c` Record Core Stack asset workflow branches
+- `create-admin-std-resource`
+  - `utilities/scripts/admin_assets/build_cs_admin_boundary_standard.py`
+  - `utilities/scripts/admin_assets/cs_admin_boundary_standard_workplan.md`
+- `build-admin-constrained-dataset`
+  - `utilities/scripts/admin_assets/build_cs_admin_boundary_assets.py`
+  - `utilities/scripts/gee/core_stack_gee_ingest.py`
+  - `utilities/scripts/gee/core_stack_gee_assets.yaml`
+  - `utilities/scripts/gee/core_stack_gee_ingest.md`
+  - `utilities/scripts/gee/core_stack_asset_workflow_branch_log.md`
+- `implement-facilities-pipeline`
+  - `utilities/scripts/facilities_utils/facility_proximity_finder.py`
+  - `utilities/scripts/facilities_utils/config/facilities_master.yaml`
+  - `utilities/scripts/facilities_utils/config/facilities_overview.yaml`
+  - `utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml`
+  - `utilities/scripts/facilities_utils/facility_metadata_monitor.py`
+  - `utilities/scripts/facilities_utils/README.md`
+  - `computing/misc/facilities_proximity.py`
+  - `utilities/constants.py`
+  - `utilities/scripts/facilities_utils/facilities_gee_assets.py`
+  - `utilities/scripts/facilities_utils/facilities_gee_assets.yaml`
+  - `utilities/scripts/facilities_utils/GEE_INGESTION_README.md`
+- `build-antyodaya-dataset`
+  - `utilities/scripts/admin_assets/asset_configs/antyodaya.json`
+- `revised-antyodaya-local-pipeline`
+  - `computing/misc/antyodaya.py`
+  - `utilities/constants.py`
+- `revised-livestocks-pipeline`
+  - `utilities/scripts/admin_assets/asset_configs/livestock.json`
+  - `computing/misc/livestocks.py`
+  - `utilities/constants.py`
 
 ## Created Scripts
 
