@@ -69,13 +69,7 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from .views import (
-    layer_status,
-    get_layers_of_workspace,
-    missing_layer_for_all_workspace,
-    clear_layer_cache,
-    check_missing_excel_files,
-)
+from .views import layer_status, get_layers_of_workspace, check_missing_layers
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
@@ -90,10 +84,67 @@ from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
-from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
+from .farm_boundaries.farm_boundary import build_farm_boundary_map
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_farm_boundaries(request):
+    """
+    Trigger the farm boundary pipeline for a tehsil.
+
+    Request body (JSON):
+        state      (str)  – e.g. "rajasthan"
+        district   (str)  – e.g. "jaipur"
+        block      (str)  – e.g. "sanganer"
+        api_key    (str)  – AnthroKrishi API key
+        year       (int)  – optional, e.g. 2017. Enables Phase 3 (ET intersection).
+
+    The task runs asynchronously on the Celery 'nrm' queue.
+    Phase 1 fetches raw S2-cell data; Phase 2 converts to GeoParquet.
+    Phase 3 (optional) intersects farm polygons with AET raster data.
+    """
+    print("Inside generate_farm_boundaries API.")
+    try:
+        state = request.data.get("state", "").lower().strip()
+        district = request.data.get("district", "").lower().strip()
+        block = request.data.get("block", "").lower().strip()
+        api_key = request.data.get("api_key", "").strip()
+        year = request.data.get("year", None)
+
+        if not all([state, district, block, api_key]):
+            return Response(
+                {"Error": "state, district, block, and api_key are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate year if provided
+        if year is not None:
+            year = int(year)
+            if year < 2017 or year > 2024:
+                return Response(
+                    {"Error": "year must be between 2017 and 2024."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        build_farm_boundary_map.apply_async(
+            args=[state, district, block, api_key, year],
+            queue="nrm",
+        )
+
+        msg = "Farm boundary pipeline initiated."
+        if year:
+            msg += f" ET intersection enabled for year {year}."
+
+        return Response(
+            {"Success": msg},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_farm_boundaries api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_security_check(allowed_methods="POST")
@@ -1614,28 +1665,6 @@ def generate_antyodaya(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_livestocks(request):
-    print("Inside generate_livestocks API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
-        generate_livestocks_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
-    except Exception as e:
-        print("Exception in generate_livestocks api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
 def generate_stac_collection(request):
     try:
         state = request.data.get("state")
@@ -1906,18 +1935,12 @@ def sync_layer_remote(request):
 @schema(None)
 def missing_layers(request):
     try:
-        result = missing_layer_for_all_workspace()
+        workspace = request.query_params.get("workspace").lower()
+        result = check_missing_layers(workspace)
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in missing_layers api :: ", e)
+        print("Exception in get_layers_for_workspace api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["GET"])
-@schema(None)
-def refresh_layer_cache(request, workspace=None):
-    clear_layer_cache(workspace)
-    return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
 
 
 @api_view(["POST"])
@@ -1962,15 +1985,4 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["GET"])
-@schema(None)
-def missing_excel(request):
-    try:
-        result = check_missing_excel_files()
-        return Response({"result": result}, status=status.HTTP_200_OK)
-    except Exception as e:
-        print("Exception in missing_excel api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

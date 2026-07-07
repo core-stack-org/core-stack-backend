@@ -63,6 +63,11 @@ urlpatterns = [
         name="change_detection_vector",
     ),
     path("crop_grid/", api.crop_grid, name="crop_grid"),
+    path(
+        "generate_farm_boundaries/",
+        api.generate_farm_boundaries,
+        name="generate_farm_boundaries",
+    ),
     path("tree_health_raster/", api.tree_health_raster, name="tree_health_raster"),
     path("tree_health_vector/", api.tree_health_vector, name="tree_health_vector"),
     path("stream_order/", api.stream_order, name="stream_order"),
@@ -187,11 +192,6 @@ urlpatterns = [
         name="generate_antyodaya",
     ),
     path(
-        "generate_livestocks/",
-        api.generate_livestocks,
-        name="generate_livestocks",
-    ),
-    path(
         "generate_stac_collection/",
         api.generate_stac_collection,
         name="generate_stac_collection",
@@ -243,9 +243,4 @@ urlpatterns = [
         api.generate_canal_vector,
         name="generate-canal-vector",
     ),
-    path("refresh_cache/", api.refresh_layer_cache, name="refresh_cache"),
-    path(
-        "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
-    ),
-    path("missing_excel/", api.missing_excel, name="missing_excel"),
 ]

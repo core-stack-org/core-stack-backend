@@ -9,12 +9,12 @@ NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
 ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
-LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
 
 MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
 CROP_GRID_PATH = "data/crop_grid"
+FARM_BOUNDARIES_PATH = "data/farm_boundaries"
 
 KML_PATH = "data/kml/"
 SHAPEFILE_DIR = "data/kml/shapefiles"
