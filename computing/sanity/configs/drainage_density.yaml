@@ -5,16 +5,19 @@ sheet_names:
 rules:
   # Source: Pan India STAC drainage metadata and stats-generator drainage density export.
   - name: drainage_density_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: drainage_density_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "drainage_density_weighted_in_km_per_km2"
       - "stream_order_length_in_km"
 
   - name: drainage_density_numeric_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -23,6 +26,7 @@ rules:
       - "geometry"
 
   - name: drainage_density_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*"
     value: 0

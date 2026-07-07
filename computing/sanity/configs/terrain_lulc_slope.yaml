@@ -5,21 +5,25 @@ sheet_names:
 rules:
   # Source: terrain and LULC cross-tab stats-generator export.
   - name: terrain_lulc_slope_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: terrain_lulc_slope_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "terrain_cluster_id"
       - "*_area_percent"
 
   - name: terrain_lulc_slope_percent_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*_area_percent"
     value: 0
 
   - name: terrain_lulc_slope_percent_max
+    applies_to: [excel, vector]
     type: max_value
     field_pattern: "*_area_percent"
     value: 100

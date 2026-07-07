@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: STAC hydrological boundary / microwatershed metadata.
   - name: mws_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: mws_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "watershed_code"
@@ -16,6 +18,7 @@ rules:
       - "sub_basin_code"
 
   - name: mws_area_min
+    applies_to: [excel, vector]
     type: min_value
     field: area_in_ha
     value: 0

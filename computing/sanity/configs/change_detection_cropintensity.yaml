@@ -1,35 +1,72 @@
-layer_name: change_detection_cropintensity
+﻿layer_name: change_detection_cropintensity
 sheet_names:
   - change_detection_cropintensity
 
 rules:
-  # Source: STAC Land Use Change: Cropping intensity vector table:columns.
+  # Common identifier check. Vector uses uid; Excel export uses UID.
   - name: cropintensity_change_uid_not_null
     type: not_null
     field_pattern: "*uid*"
+    applies_to: [excel, vector]
 
-  - name: cropintensity_change_schema_present
+  # Vector schema from STAC Land Use Change: Cropping intensity table:columns.
+  - name: cropintensity_change_vector_schema_present
     type: required_any_field_pattern
     value:
-      - "total_chan*"
-      - "total_change_crop_intensity_area_in_ha"
+      - "si_do"
+      - "si_si"
+      - "si_tr"
+      - "do_si"
+      - "do_do"
+      - "do_tr"
+      - "tr_si"
+      - "tr_do"
+      - "tr_tr"
+      - "total_chan"
+    applies_to: [vector]
 
-  - name: cropintensity_change_numeric_type
+  # Excel schema from stats-generator change_detection_cropintensity sheet.
+  - name: cropintensity_change_excel_schema_present
+    type: required_any_field_pattern
+    value:
+      - "single_to_single_area_in_ha"
+      - "single_to_double_area_in_ha"
+      - "single_to_triple_area_in_ha"
+      - "double_to_single_area_in_ha"
+      - "double_to_double_area_in_ha"
+      - "double_to_triple_area_in_ha"
+      - "triple_to_single_area_in_ha"
+      - "triple_to_double_area_in_ha"
+      - "triple_to_triple_area_in_ha"
+      - "total_change_crop_intensity_area_in_ha"
+    applies_to: [excel]
+
+  - name: cropintensity_change_vector_numeric_type
     type: data_type
     field_pattern: "*"
     expected_type: numeric
-    exclude_field_patterns:
-      - "*uid*"
-      - "the_geom"
-      - "geometry"
+    exclude_field_patterns: ["*uid*", "the_geom", "geometry"]
     allow_missing_fields: true
+    applies_to: [vector]
 
-  - name: cropintensity_change_area_min
+  - name: cropintensity_change_excel_numeric_type
+    type: data_type
+    field_pattern: "*_area_in_ha"
+    expected_type: numeric
+    allow_missing_fields: true
+    applies_to: [excel]
+
+  - name: cropintensity_change_vector_area_min
     type: min_value
     field_pattern: "*"
     value: 0
-    exclude_field_patterns:
-      - "*uid*"
-      - "the_geom"
-      - "geometry"
+    exclude_field_patterns: ["*uid*", "the_geom", "geometry"]
     allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: cropintensity_change_excel_area_min
+    type: min_value
+    field_pattern: "*_area_in_ha"
+    value: 0
+    allow_missing_fields: true
+    applies_to: [excel]

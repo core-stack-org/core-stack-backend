@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: Pan India STAC drainage/irrigation-adjacent vector metadata.
   - name: canal_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: canal_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "project_name"

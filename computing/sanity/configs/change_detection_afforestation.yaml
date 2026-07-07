@@ -1,35 +1,64 @@
-layer_name: change_detection_afforestation
+﻿layer_name: change_detection_afforestation
 sheet_names:
   - change_detection_afforestation
 
 rules:
-  # Source: STAC Land Use Change: Tree cover gain vector table:columns.
+  # Common identifier check. Vector uses uid; Excel export uses UID.
   - name: afforestation_uid_not_null
     type: not_null
     field_pattern: "*uid*"
+    applies_to: [excel, vector]
 
-  - name: afforestation_schema_present
+  # Vector schema from STAC Land Use Change: Tree cover gain table:columns.
+  - name: afforestation_vector_schema_present
     type: required_any_field_pattern
     value:
-      - "total_aff*"
-      - "total_afforestation_area_in_ha"
+      - "ba_fo"
+      - "bu_fo"
+      - "fa_fo"
+      - "fo_fo"
+      - "sc_fo"
+      - "total_aff"
+    applies_to: [vector]
 
-  - name: afforestation_area_type
+  # Excel schema from stats-generator change_detection_afforestation sheet.
+  - name: afforestation_excel_schema_present
+    type: required_any_field_pattern
+    value:
+      - "barren_to_forest_area_in_ha"
+      - "built_up_to_forest_area_in_ha"
+      - "farm_to_forest_area_in_ha"
+      - "forest_to_forest_area_in_ha"
+      - "scrub_land_to_forest_area_in_ha"
+      - "total_afforestation_area_in_ha"
+    applies_to: [excel]
+
+  - name: afforestation_vector_numeric_type
     type: data_type
     field_pattern: "*"
     expected_type: numeric
-    exclude_field_patterns:
-      - "*uid*"
-      - "the_geom"
-      - "geometry"
+    exclude_field_patterns: ["*uid*", "the_geom", "geometry"]
     allow_missing_fields: true
+    applies_to: [vector]
 
-  - name: afforestation_area_min
+  - name: afforestation_excel_numeric_type
+    type: data_type
+    field_pattern: "*_area_in_ha"
+    expected_type: numeric
+    allow_missing_fields: true
+    applies_to: [excel]
+
+  - name: afforestation_vector_area_min
     type: min_value
     field_pattern: "*"
     value: 0
-    exclude_field_patterns:
-      - "*uid*"
-      - "the_geom"
-      - "geometry"
+    exclude_field_patterns: ["*uid*", "the_geom", "geometry"]
     allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: afforestation_excel_area_min
+    type: min_value
+    field_pattern: "*_area_in_ha"
+    value: 0
+    allow_missing_fields: true
+    applies_to: [excel]

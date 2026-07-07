@@ -7,23 +7,28 @@ rules:
   - name: stream_order_uid_not_null
     type: not_null
     field_pattern: "*uid*"
+    applies_to: [excel, vector]
 
   - name: stream_order_schema_present
     type: required_any_field_pattern
     value:
       - "order_*_area_percent"
+    applies_to: [excel, vector]
 
   - name: stream_order_percent_type
     type: data_type
     field_pattern: "order_*_area_percent"
     expected_type: numeric
+    applies_to: [excel, vector]
 
   - name: stream_order_percent_min
     type: min_value
     field_pattern: "order_*_area_percent"
     value: 0
+    applies_to: [excel, vector]
 
   - name: stream_order_percent_max
     type: max_value
     field_pattern: "order_*_area_percent"
     value: 100
+    applies_to: [excel, vector]

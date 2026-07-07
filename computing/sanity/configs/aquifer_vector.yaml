@@ -1,15 +1,17 @@
-layer_name: aquifer_vector
+﻿layer_name: aquifer_vector
 sheet_names:
   - aquifer_vector
 
 rules:
   # Source: STAC Aquifer vector table:columns.
   - name: aquifer_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
     allow_missing_fields: true
 
   - name: aquifer_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "aquifer_class"
@@ -18,6 +20,7 @@ rules:
       - "Major_Aq*"
 
   - name: aquifer_numeric_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -48,18 +51,21 @@ rules:
     allow_missing_fields: true
 
   - name: aquifer_area_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*area*"
     value: 0
     allow_missing_fields: true
 
   - name: aquifer_percent_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*percent"
     value: 0
     allow_missing_fields: true
 
   - name: aquifer_percent_max
+    applies_to: [excel, vector]
     type: max_value
     field_pattern: "*percent"
     value: 100

@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: STAC Surface Water Bodies vector metadata and MWS-SWB intersection export.
   - name: mws_swb_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: mws_swb_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "SWB_UID"
@@ -17,36 +19,42 @@ rules:
       - "Longitude"
 
   - name: mws_swb_latitude_type
+    applies_to: [excel, vector]
     type: data_type
     field: Latitude
     expected_type: numeric
     allow_missing_fields: true
 
   - name: mws_swb_longitude_type
+    applies_to: [excel, vector]
     type: data_type
     field: Longitude
     expected_type: numeric
     allow_missing_fields: true
 
   - name: mws_swb_latitude_min
+    applies_to: [excel, vector]
     type: min_value
     field: Latitude
     value: -90
     allow_missing_fields: true
 
   - name: mws_swb_latitude_max
+    applies_to: [excel, vector]
     type: max_value
     field: Latitude
     value: 90
     allow_missing_fields: true
 
   - name: mws_swb_longitude_min
+    applies_to: [excel, vector]
     type: min_value
     field: Longitude
     value: -180
     allow_missing_fields: true
 
   - name: mws_swb_longitude_max
+    applies_to: [excel, vector]
     type: max_value
     field: Longitude
     value: 180

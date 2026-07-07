@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: stats-generator village-level livestock export.
   - name: livestock_village_id_not_null
+    applies_to: [excel, vector]
     type: not_null
     field: pc11_village_id
 
   - name: livestock_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "cattle_total"
@@ -16,6 +18,7 @@ rules:
       - "goat_total"
 
   - name: livestock_count_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*"
     value: 0

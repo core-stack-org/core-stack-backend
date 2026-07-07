@@ -1,14 +1,16 @@
-layer_name: hydrological_seasonal
+﻿layer_name: hydrological_seasonal
 sheet_names:
   - hydrological_seasonal
 
 rules:
   # Source: STAC Water balance fortnightly vector table:columns.
   - name: hydrological_seasonal_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: hydrological_seasonal_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "precipitation_*"
@@ -17,6 +19,7 @@ rules:
       - "delta g_*"
 
   - name: hydrological_seasonal_numeric_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -27,6 +30,7 @@ rules:
     allow_missing_fields: true
 
   - name: hydrological_seasonal_area_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*area*"
     value: 0

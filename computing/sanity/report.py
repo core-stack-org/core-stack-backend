@@ -6,7 +6,17 @@ logger = logging.getLogger(__name__)
 
 
 def summarize(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Convert detailed rule results into a compact pass/fail report."""
+    """
+    Convert detailed rule results into a compact pass/fail report.
+
+    Args:
+        results: List of rule-level result dictionaries returned by the validator.
+
+    Returns:
+        Summary dictionary with a top-level status and an errors list. Each error
+        includes the failed rule name, field name, invalid count, invalid row IDs,
+        and optional message.
+    """
     errors = []
 
     # Preserve invalid row identifiers in the summary so callers can inspect data.

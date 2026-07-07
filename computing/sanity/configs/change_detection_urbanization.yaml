@@ -1,20 +1,37 @@
-layer_name: change_detection_urbanization
+﻿layer_name: change_detection_urbanization
 sheet_names:
   - change_detection_urbanization
 
 rules:
-  # Source: STAC Land Use Change: Urbanization vector table:columns.
+  # Common identifier check. Vector uses uid; Excel export uses UID.
   - name: urbanization_uid_not_null
     type: not_null
     field_pattern: "*uid*"
+    applies_to: [excel, vector]
 
-  - name: urbanization_schema_present
+  # Vector schema from STAC Land Use Change: Urbanization table:columns.
+  - name: urbanization_vector_schema_present
     type: required_any_field_pattern
     value:
-      - "total_urb*"
-      - "total_urbanization_area_in_ha"
+      - "b_bu"
+      - "bu_bu"
+      - "tr_bu"
+      - "w_bu"
+      - "total_urb"
+    applies_to: [vector]
 
-  - name: urbanization_numeric_type
+  # Excel schema from stats-generator change_detection_urbanization sheet.
+  - name: urbanization_excel_schema_present
+    type: required_any_field_pattern
+    value:
+      - "barren_shrub_to_built_up_area_in_ha"
+      - "built_up_to_built_up_area_in_ha"
+      - "tree_farm_to_built_up_area_in_ha"
+      - "water_to_built_up_area_in_ha"
+      - "total_urbanization_area_in_ha"
+    applies_to: [excel]
+
+  - name: urbanization_vector_numeric_type
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -23,8 +40,16 @@ rules:
       - "the_geom"
       - "geometry"
     allow_missing_fields: true
+    applies_to: [vector]
 
-  - name: urbanization_area_min
+  - name: urbanization_excel_numeric_type
+    type: data_type
+    field_pattern: "*_area_in_ha"
+    expected_type: numeric
+    allow_missing_fields: true
+    applies_to: [excel]
+
+  - name: urbanization_vector_area_min
     type: min_value
     field_pattern: "*"
     value: 0
@@ -33,3 +58,11 @@ rules:
       - "the_geom"
       - "geometry"
     allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: urbanization_excel_area_min
+    type: min_value
+    field_pattern: "*_area_in_ha"
+    value: 0
+    allow_missing_fields: true
+    applies_to: [excel]

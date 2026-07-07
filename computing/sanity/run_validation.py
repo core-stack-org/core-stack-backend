@@ -20,11 +20,22 @@ ID_COLUMNS = ("UID", "uid", "MWS UID", "mws_id", "vill_id", "village_id")
 
 
 def _config_path(rule_name: str) -> Path:
-    """Return the YAML config path for a rule, layer, or configured sheet name."""
+    """
+    Resolve a validation config path from a rule name, layer name, or sheet name.
+
+    Args:
+        rule_name: Config stem, config layer_name, or one of the configured
+            Excel sheet_names.
+
+    Returns:
+        Path to the matching YAML config file.
+    """
     direct_path = CONFIG_DIR / f"{rule_name}.yaml"
     if direct_path.exists():
         return direct_path
 
+    # Configs can be invoked by Excel sheet name, so inspect aliases if the
+    # direct filename lookup does not match.
     normalized_rule_name = rule_name.lower()
     for config_path in CONFIG_DIR.glob("*.yaml"):
         with open(config_path) as f:
@@ -44,17 +55,43 @@ def _config_path(rule_name: str) -> Path:
 
 
 def _load_config(rule_name: str) -> Dict[str, Any]:
-    """Load a validation rule config from disk."""
+    """
+    Load a validation config from disk.
+
+    Args:
+        rule_name: Config stem, layer name, or sheet name.
+
+    Returns:
+        Parsed YAML config dictionary.
+    """
     logger.debug("Loading validation config for rule '%s'", rule_name)
     with open(_config_path(rule_name)) as f:
         return yaml.safe_load(f)
 
 
-def _summarize_frame(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-    """Run configured rules on a DataFrame and return the compact summary."""
-    validator = VectorValidator(config=config)
+def _summarize_frame(
+    df: pd.DataFrame,
+    config: Dict[str, Any],
+    validation_context: str,
+) -> Dict[str, Any]:
+    """
+    Run context-applicable configured rules on a DataFrame.
+
+    Args:
+        df: The pandas/geopandas dataframe to validate.
+        config: Parsed YAML config dictionary.
+        validation_context: Either "excel" or "vector"; controls rule filtering.
+
+    Returns:
+        Compact validation summary with status and error list.
+    """
+    validator = VectorValidator(
+        config=config,
+        validation_context=validation_context,
+    )
     logger.debug(
-        "Running validation for layer '%s' with %d rows and %d columns",
+        "Running %s validation for layer '%s' with %d rows and %d columns",
+        validation_context,
         config.get("layer_name"),
         len(df),
         len(df.columns),
@@ -74,7 +111,18 @@ def _resolve_sheet_name(
     config: Dict[str, Any],
     sheet_name: Optional[str] = None,
 ) -> str:
-    """Resolve the worksheet to validate using explicit input and config aliases."""
+    """
+    Resolve which Excel worksheet should be read for a config.
+
+    Args:
+        xls: Open pandas ExcelFile object.
+        rule_name: User-provided rule/config/sheet name.
+        config: Parsed YAML config.
+        sheet_name: Optional explicit sheet name override.
+
+    Returns:
+        The workbook sheet name with original workbook casing.
+    """
     if sheet_name:
         candidates = [sheet_name]
     else:
@@ -103,7 +151,16 @@ def _resolve_sheet_name(
 
 
 def _generic_excel_config(sheet_name: str, df: pd.DataFrame) -> Dict[str, Any]:
-    """Build basic ID and numeric sanity rules for sheets without domain configs."""
+    """
+    Build fallback Excel-only sanity rules for sheets without a domain config.
+
+    Args:
+        sheet_name: Name of the workbook sheet being validated.
+        df: The sheet data as a pandas DataFrame.
+
+    Returns:
+        An in-memory config that checks ID nulls and numeric-column sanity.
+    """
     rules = []
     id_column = next((column for column in ID_COLUMNS if column in df.columns), None)
     if id_column:
@@ -112,6 +169,7 @@ def _generic_excel_config(sheet_name: str, df: pd.DataFrame) -> Dict[str, Any]:
                 "name": f"{sheet_name}_id_not_null",
                 "type": "not_null",
                 "field": id_column,
+                "applies_to": ["excel"],
             }
         )
 
@@ -128,11 +186,13 @@ def _generic_excel_config(sheet_name: str, df: pd.DataFrame) -> Dict[str, Any]:
                     "type": "data_type",
                     "fields": numeric_fields,
                     "expected_type": "numeric",
+                    "applies_to": ["excel"],
                 },
                 {
                     "name": f"{sheet_name}_numeric_not_null",
                     "type": "not_null",
                     "fields": numeric_fields,
+                    "applies_to": ["excel"],
                 },
             ]
         )
@@ -150,14 +210,21 @@ def run_layer_validation(
     rule_name: str,
 ) -> Dict[str, Any]:
     """
-    Validate a vector layer (GeoJSON/Shapefile/etc.)
+    Validate a vector layer (GeoJSON/Shapefile/etc.) with vector-only rules.
+
+    Args:
+        layer_path: Path to the local vector layer file.
+        rule_name: Config stem, layer_name, or alias for the layer.
+
+    Returns:
+        Compact validation summary for the vector layer.
     """
     import geopandas as gpd
 
     logger.info("Reading vector layer '%s' for rule '%s'", layer_path, rule_name)
     gdf = gpd.read_file(layer_path)
 
-    report = _summarize_frame(gdf, _load_config(rule_name))
+    report = _summarize_frame(gdf, _load_config(rule_name), "vector")
     print(report)
     return report
 
@@ -171,10 +238,15 @@ def run_excel_validation(
     sheet_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Validate data from an Excel workbook.
+    Validate one sheet from an Excel workbook with Excel-only rules.
 
-    Looks for a configured sheet name first, then a sheet whose name matches
-    rule_name (case-insensitive).
+    Args:
+        excel_path: Path to the workbook generated by stats_generator.
+        rule_name: Config stem, layer_name, or sheet alias.
+        sheet_name: Optional explicit sheet name override.
+
+    Returns:
+        Compact validation summary for the resolved workbook sheet.
     """
 
     logger.info("Opening Excel workbook '%s' for rule '%s'", excel_path, rule_name)
@@ -185,7 +257,7 @@ def run_excel_validation(
     logger.info("Reading sheet '%s' from workbook '%s'", resolved_sheet_name, excel_path)
     df = pd.read_excel(excel_path, sheet_name=resolved_sheet_name)
 
-    return _summarize_frame(df, config)
+    return _summarize_frame(df, config, "excel")
 
 
 def run_excel_workbook_validation(
@@ -193,10 +265,16 @@ def run_excel_workbook_validation(
     rule_names: Optional[Iterable[str]] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """
-    Validate all sheets in a stats-generator workbook.
+    Validate every sheet in a stats-generator workbook with Excel-only rules.
 
-    Sheets with explicit configs use those domain rules. Other sheets get a
-    conservative generic sanity pass for ID/null/numeric-type checks.
+    Args:
+        excel_path: Path to the workbook generated by stats_generator.
+        rule_names: Optional iterable of config names to consider. When omitted,
+            all YAML configs in CONFIG_DIR are considered.
+
+    Returns:
+        Dictionary keyed by sheet name. Each value contains the config/rule name
+        used and the compact validation report for that sheet.
     """
     logger.info("Opening Excel workbook '%s' for workbook validation", excel_path)
     xls = pd.ExcelFile(excel_path)
@@ -227,7 +305,7 @@ def run_excel_workbook_validation(
         )
         workbook_report[sheet_name] = {
             "rule_name": rule_name,
-            "report": _summarize_frame(df, config),
+            "report": _summarize_frame(df, config, "excel"),
         }
 
     logger.info("Workbook validation finished for '%s'", excel_path)

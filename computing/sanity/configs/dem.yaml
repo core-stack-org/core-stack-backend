@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: Pan India STAC terrain DEM items and stats-generator DEM export.
   - name: dem_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: dem_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "min_elevation_in_m"
@@ -16,16 +18,19 @@ rules:
       - "mean_elevation_in_m"
 
   - name: dem_elevation_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*elevation_in_m"
     expected_type: numeric
 
   - name: dem_elevation_reasonable_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*elevation_in_m"
     value: -500
 
   - name: dem_elevation_reasonable_max
+    applies_to: [excel, vector]
     type: max_value
     field_pattern: "*elevation_in_m"
     value: 9000

@@ -1,14 +1,16 @@
-layer_name: terrain
+﻿layer_name: terrain
 sheet_names:
   - terrain
 
 rules:
   # Source: STAC Terrain Clusters vector table:columns.
   - name: terrain_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: terrain_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "terrain_cluster_id"
@@ -16,18 +18,21 @@ rules:
       - "*_area_percent"
 
   - name: terrain_percent_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*_area_percent"
     expected_type: numeric
     allow_missing_fields: true
 
   - name: terrain_percent_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*_area_percent"
     value: 0
     allow_missing_fields: true
 
   - name: terrain_percent_max
+    applies_to: [excel, vector]
     type: max_value
     field_pattern: "*_area_percent"
     value: 100

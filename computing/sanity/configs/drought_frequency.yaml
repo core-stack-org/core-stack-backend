@@ -1,21 +1,40 @@
-layer_name: drought_frequency
+﻿layer_name: drought_frequency
 sheet_names:
   - croppingDrought_kharif
 
 rules:
-  # Source: STAC Drought frequency vector table:columns.
+  # Common identifier check. STAC vector data uses uid; the Excel export uses UID.
   - name: drought_uid_not_null
     type: not_null
     field_pattern: "*uid*"
+    applies_to: [excel, vector]
 
-  - name: drought_schema_present
+  # Vector schema check from STAC Drought frequency vector table:columns.
+  - name: drought_vector_schema_present
     type: required_any_field_pattern
     value:
       - "drlb_*"
+      - "drysp_*"
+      - "frth*"
+      - "inth*"
+      - "kh_cr_*"
+      - "pcr_k_*"
+    applies_to: [vector]
+
+  # Excel schema check from stats-generator croppingDrought_kharif export.
+  - name: drought_excel_schema_present
+    type: required_any_field_pattern
+    value:
       - "No_Drought_in_weeks_*"
       - "Mild_in_weeks_*"
+      - "Moderate_in_weeks_*"
+      - "Severe_in_weeks_*"
+      - "drysp_unit_4_weeks_*"
+      - "kharif_cropped_area_percent_*"
+    applies_to: [excel]
 
-  - name: drought_numeric_type
+  # Vector numeric columns include frequency/intensity/count/crop metrics.
+  - name: drought_vector_numeric_type
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -24,11 +43,23 @@ rules:
       - "id"
       - "drlb_*"
       - "m_ons_*"
-      - "monsoon_onset_*"
       - "geometry"
     allow_missing_fields: true
+    applies_to: [vector]
 
-  - name: drought_non_negative
+  # Excel numeric columns include weekly class counts and crop-area metrics.
+  - name: drought_excel_numeric_type
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "monsoon_onset_*"
+    allow_missing_fields: true
+    applies_to: [excel]
+
+  # Drought counts and crop metrics should not be negative.
+  - name: drought_vector_non_negative
     type: min_value
     field_pattern: "*"
     value: 0
@@ -37,13 +68,32 @@ rules:
       - "id"
       - "drlb_*"
       - "m_ons_*"
-      - "monsoon_onset_*"
       - "rd*"
       - "geometry"
     allow_missing_fields: true
+    applies_to: [vector]
 
-  - name: drought_percent_max
+  - name: drought_excel_non_negative
+    type: min_value
+    field_pattern: "*"
+    value: 0
+    exclude_field_patterns:
+      - "*uid*"
+      - "monsoon_onset_*"
+    allow_missing_fields: true
+    applies_to: [excel]
+
+  # Percent columns are bounded; rainfall-deviation columns are excluded above.
+  - name: drought_vector_percent_max
     type: max_value
-    field_pattern: "*percent*"
+    field_pattern: "pcr_k_*"
     value: 100
     allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: drought_excel_percent_max
+    type: max_value
+    field_pattern: "*percent_*"
+    value: 100
+    allow_missing_fields: true
+    applies_to: [excel]

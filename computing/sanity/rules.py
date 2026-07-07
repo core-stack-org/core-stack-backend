@@ -29,7 +29,23 @@ class Rule(ABC):
         exclude_field_patterns: Optional[List[str]] = None,
         allow_missing_fields: bool = False,
     ) -> None:
-        """Store common rule configuration used by all concrete rules."""
+        """
+        Store common rule configuration used by all concrete rules.
+
+        Args:
+            name: Human-readable rule name used in reports.
+            field: Exact field name to validate.
+            field_pattern: Wildcard field pattern to validate.
+            value: Rule-specific comparison value or allowed-values list.
+            expected_type: Expected data type for data_type rules.
+            severity: Severity label reserved for future report filtering.
+            fields: Explicit list of fields to validate.
+            exclude_field_patterns: Wildcard patterns to remove from matches.
+            allow_missing_fields: Whether no matching fields should pass.
+
+        Returns:
+            None. The normalized rule configuration is stored on self.
+        """
         self.name = name
         self.field = field
         self.field_pattern = field_pattern
@@ -41,7 +57,15 @@ class Rule(ABC):
         self.allow_missing_fields = allow_missing_fields
 
     def get_fields(self, gdf: pd.DataFrame) -> List[str]:
-        """Resolve configured field names or patterns against input columns."""
+        """
+        Resolve configured field names or wildcard patterns against columns.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing the layer data.
+
+        Returns:
+            List of field names this rule should validate.
+        """
         if self.field:
             return [self.field]
 
@@ -68,21 +92,47 @@ class Rule(ABC):
         return []
 
     def get_uid_column(self, gdf: pd.DataFrame) -> Optional[str]:
-        """Find the identifier column used to report invalid rows."""
+        """
+        Find the identifier column used to report invalid rows.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing the layer data.
+
+        Returns:
+            Name of the first known ID column, or None when no ID column exists.
+        """
         for uid_column in ("UID", "uid", "MWS UID", "mws_id", "vill_id", "village_id"):
             if uid_column in gdf.columns:
                 return uid_column
         return None
 
     def get_uids(self, gdf: pd.DataFrame) -> List[Any]:
-        """Return row identifiers for failed records when an ID column exists."""
+        """
+        Return row identifiers for failed records when an ID column exists.
+
+        Args:
+            gdf: Filtered DataFrame containing invalid rows.
+
+        Returns:
+            List of invalid row identifiers. Returns an empty list when no known
+            ID column is present.
+        """
         uid_column = self.get_uid_column(gdf)
         if uid_column is None:
             return []
         return gdf[uid_column].tolist()
 
     def no_fields_result(self) -> Dict[str, Any]:
-        """Return a consistent result when a rule matches no columns."""
+        """
+        Build a consistent result when a rule matches no columns.
+
+        Args:
+            None. Uses the rule's configured field, fields, or field_pattern.
+
+        Returns:
+            Rule result dictionary. The result passes only when
+            allow_missing_fields is true.
+        """
         label = self.field or self.field_pattern or ", ".join(self.fields)
         if self.allow_missing_fields:
             logger.debug(
@@ -117,7 +167,15 @@ class Rule(ABC):
 
     @abstractmethod
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate the input frame and return rule-level results."""
+        """
+        Validate the input frame and return rule-level results.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with field-level pass/fail details.
+        """
         pass
 
 
@@ -131,7 +189,15 @@ class DataTypeRule(Rule):
     }
 
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that each matched field has the configured pandas dtype."""
+        """
+        Validate that each matched field has the configured pandas dtype.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with actual and expected type details.
+        """
         fields = self.get_fields(gdf)
 
         if not fields:
@@ -186,7 +252,15 @@ class DataTypeRule(Rule):
 
 class MaxValueRule(Rule):
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that matched numeric fields do not exceed the max value."""
+        """
+        Validate that matched numeric fields do not exceed the configured maximum.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with invalid counts and row identifiers.
+        """
         results = []
         fields = self.get_fields(gdf)
 
@@ -233,7 +307,15 @@ class MaxValueRule(Rule):
 
 class MinValueRule(Rule):
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that matched numeric fields are not below the min value."""
+        """
+        Validate that matched numeric fields are not below the configured minimum.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with invalid counts and row identifiers.
+        """
         results = []
         fields = self.get_fields(gdf)
 
@@ -280,7 +362,15 @@ class MinValueRule(Rule):
 
 class NotNullRule(Rule):
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that matched fields do not contain null values."""
+        """
+        Validate that matched fields do not contain null values.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with null counts and row identifiers.
+        """
         results = []
         fields = self.get_fields(gdf)
 
@@ -325,7 +415,15 @@ class NotNullRule(Rule):
 
 class AllowedValuesRule(Rule):
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that matched fields only contain configured allowed values."""
+        """
+        Validate that matched fields only contain configured allowed values.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with disallowed-value counts and row IDs.
+        """
         results = []
         fields = self.get_fields(gdf)
 
@@ -370,7 +468,15 @@ class AllowedValuesRule(Rule):
 
 class RequiredFieldsRule(Rule):
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that all configured field names are present."""
+        """
+        Validate that all configured field names are present.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary containing one failure per missing field.
+        """
         required_fields = self.value or self.fields
         missing = [field for field in required_fields if field not in gdf.columns]
         if missing:
@@ -397,7 +503,16 @@ class RequiredFieldsRule(Rule):
 
 class RequiredAnyFieldPatternRule(Rule):
     def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
-        """Validate that at least one configured field pattern is present."""
+        """
+        Validate that at least one configured field pattern is present.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary. It fails when none of the configured wildcard
+            patterns match any input column.
+        """
         patterns = self.value or []
         matched_fields = [
             col

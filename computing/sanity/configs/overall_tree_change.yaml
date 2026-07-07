@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: STAC tree-cover change vectors and stats-generator summary export.
   - name: tree_change_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: tree_change_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "afforestation_area_in_ha"
@@ -16,12 +18,14 @@ rules:
       - "degradation_area_in_ha"
 
   - name: tree_change_numeric_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*_area_in_ha"
     expected_type: numeric
     allow_missing_fields: true
 
   - name: tree_change_area_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*_area_in_ha"
     value: 0

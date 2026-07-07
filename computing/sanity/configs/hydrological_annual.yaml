@@ -1,14 +1,16 @@
-layer_name: hydrological_annual
+﻿layer_name: hydrological_annual
 sheet_names:
   - hydrological_annual
 
 rules:
   # Source: STAC Annual water balance / change in well depth vector table:columns.
   - name: hydrological_annual_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
   - name: hydrological_annual_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "ET_in_mm_*"
@@ -17,6 +19,7 @@ rules:
       - "Net*"
 
   - name: hydrological_annual_numeric_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -27,6 +30,7 @@ rules:
     allow_missing_fields: true
 
   - name: hydrological_annual_area_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*area*"
     value: 0

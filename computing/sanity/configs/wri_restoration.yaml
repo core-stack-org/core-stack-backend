@@ -5,11 +5,13 @@ sheet_names:
 rules:
   # Source: STAC WRI restoration opportunities atlas metadata.
   - name: restoration_uid_not_null
+    applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
     allow_missing_fields: true
 
   - name: restoration_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "wide_scale_restoration_area_in_ha"
@@ -17,11 +19,13 @@ rules:
       - "protection_area_in_ha"
 
   - name: restoration_area_type
+    applies_to: [excel, vector]
     type: data_type
     field_pattern: "*area_in_ha"
     expected_type: numeric
 
   - name: restoration_area_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "*area_in_ha"
     value: 0

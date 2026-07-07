@@ -5,10 +5,12 @@ sheet_names:
 rules:
   # Source: stats-generator village-level Antyodaya export.
   - name: antyodaya_village_id_not_null
+    applies_to: [excel, vector]
     type: not_null
     field: village_id
 
   - name: antyodaya_schema_present
+    applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "*_cluster"
@@ -16,6 +18,7 @@ rules:
       - "total_hhd"
 
   - name: antyodaya_numeric_min
+    applies_to: [excel, vector]
     type: min_value
     field_pattern: "total*"
     value: 0
