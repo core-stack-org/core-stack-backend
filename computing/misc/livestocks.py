@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import pyogrio
+import geopandas as gpd
 from django.conf import settings
 
 from computing.models import Dataset, LayerType
@@ -28,7 +28,7 @@ from utilities.constants import LIVESTOCKS
 from utilities.geoserver_utils import Geoserver, GeoserverException
 
 
-SOURCE_LAYER = "livestock"
+SOURCE_LAYER = "cs_village_livestock_census_20"
 LOCATION_INDEX = "idx_livestock_location"
 OUTPUT_DIR = "data/livestock/output/tehsil_data"
 GEOSERVER_WORKSPACE = "livestocks"
@@ -110,18 +110,14 @@ def _ensure_source_index(source_path: Path) -> None:
 def _location_rows() -> tuple[tuple[str, str, str], ...]:
     source_path = _repo_path(LIVESTOCKS)
     _ensure_source_index(source_path)
-    rows = pyogrio.read_dataframe(
-        source_path,
-        sql=(
-            "SELECT DISTINCT state_name, district_name, TEHSIL "
-            f"FROM {SOURCE_LAYER}"
-        ),
-        read_geometry=False,
-    )
-    return tuple(
-        (row.state_name, row.district_name, row.TEHSIL)
-        for row in rows.itertuples(index=False)
-    )
+    with sqlite3.connect(source_path) as connection:
+        rows = connection.execute(
+            f"""
+            SELECT DISTINCT state_name, district_name, TEHSIL
+            FROM {SOURCE_LAYER}
+            """
+        ).fetchall()
+    return tuple((state, district, tehsil) for state, district, tehsil in rows)
 
 
 def _resolve_location(state: str, district: str, block: str) -> tuple[str, str, str]:
@@ -158,7 +154,12 @@ def _read_clip(state_name: str, district_name: str, tehsil_name: str):
         f"district_name = '{_quote_sql(district_name)}' AND "
         f"TEHSIL = '{_quote_sql(tehsil_name)}'"
     )
-    gdf = pyogrio.read_dataframe(source_path, layer=SOURCE_LAYER, where=where)
+    gdf = gpd.read_file(
+        source_path,
+        layer=SOURCE_LAYER,
+        where=where,
+        engine="fiona",
+    )
     if gdf.empty:
         raise ValueError(f"No livestock rows found for {state_name}/{district_name}/{tehsil_name}")
     if gdf.crs is None:
@@ -182,7 +183,7 @@ def _write_clip(gdf, output_dir: Path, layer_name: str) -> Path:
     for path in (gpkg_path, zip_path):
         if path.exists():
             path.unlink()
-    pyogrio.write_dataframe(gdf, gpkg_path, layer=layer_name, driver="GPKG")
+    gdf.to_file(gpkg_path, layer=layer_name, driver="GPKG", engine="fiona")
     return gpkg_path
 
 
