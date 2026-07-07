@@ -8,7 +8,7 @@ ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
-ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
+ANTYODAYA_2020 = "data/antyodaya/output/cs_antyodaya_2020.gpkg"
 LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
 
 MERGE_MWS_PATH = "data/merge_mws"
