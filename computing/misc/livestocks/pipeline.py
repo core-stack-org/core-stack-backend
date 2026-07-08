@@ -13,7 +13,7 @@ import pandas as pd
 from django.conf import settings
 
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
-from computing.misc.local_pipeline.admin import admin_presentation_frame
+from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
 from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
@@ -24,7 +24,7 @@ from nrm_app.celery import app
 
 CONFIG_PATH = Path(__file__).with_name("livestocks_pipeline.yaml")
 ALGORITHM = "local-livestock-csv-admin-join"
-ALGORITHM_VERSION = "1.0"
+ALGORITHM_VERSION = "1.2"
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -134,7 +134,6 @@ def _merge_admin_livestock(admin_rows, source_rows: pd.DataFrame, config: Mappin
 
 def _ordered_columns(frame: pd.DataFrame, config: Mapping[str, Any], columns: Mapping[str, list[str]]) -> list[str]:
     ordered = []
-    ordered.extend(config["standard_admin_columns"])
     ordered.extend([col for col in columns["location"] if col not in ordered])
     ordered.extend([col for col in columns["metrics"] if col not in ordered])
     ordered.extend([col for col in columns["raw"] if col not in ordered])
@@ -143,13 +142,13 @@ def _ordered_columns(frame: pd.DataFrame, config: Mapping[str, Any], columns: Ma
 
 def _focused_frame(frame: pd.DataFrame, schema: Mapping[str, Any]) -> pd.DataFrame:
     focused = admin_presentation_frame(frame.drop(columns=["geometry"], errors="ignore"))
-    source = frame.set_index("cs_feature_id", drop=False)
+    source = frame.set_index("fid", drop=False) if "fid" in frame.columns else frame
     output_rows: list[dict[str, Any]] = []
     value_columns = schema.get("focused_columns", [])
     for _, admin_row in focused.iterrows():
         row = admin_row.to_dict()
-        cs_feature_id = row.get("cs_feature_id")
-        values = source.loc[cs_feature_id] if cs_feature_id in source.index else pd.Series(dtype=object)
+        admin_index = row.get("index")
+        values = source.loc[admin_index] if admin_index in source.index else pd.Series(dtype=object)
         has_village_id = pd.notna(row.get("village_id"))
         has_livestock = pd.notna(values.get("village_code")) if not values.empty else False
         if not has_village_id:
@@ -160,9 +159,12 @@ def _focused_frame(frame: pd.DataFrame, schema: Mapping[str, Any]) -> pd.DataFra
             row["livestock_status"] = "matched"
             for column in value_columns:
                 row[column] = values.get(column)
-        row.pop("cs_feature_id", None)
         output_rows.append(row)
-    return pd.DataFrame(output_rows)
+    output = pd.DataFrame(output_rows)
+    ordered = list(focused.columns)
+    ordered.append("livestock_status")
+    ordered.extend(column for column in value_columns if column in output.columns)
+    return output.reindex(columns=list(dict.fromkeys(ordered)))
 
 
 def _overview(frame: pd.DataFrame, group_columns: list[str], config: Mapping[str, Any]) -> pd.DataFrame:
@@ -289,7 +291,7 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("readme_path")
     if outputs.stac:
         required.append("stac_fragment_path")
-    if request.publish.sync_to_geoserver and outputs.geoserver:
+    if outputs.geoserver:
         required.append("geoserver_links_path")
     return tuple(dict.fromkeys(required))
 
@@ -341,10 +343,11 @@ def run_livestocks_pipeline(
     joined = _merge_admin_livestock(admin_selection.rows, source_rows, config)
     joined = _derive_livestock_metrics(joined, schema)
     ordered = _ordered_columns(joined, config, columns)
-    csv_frame = pd.DataFrame(joined.drop(columns=["geometry"], errors="ignore"))[ordered]
+    csv_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered)
     focused_frame = _focused_frame(joined, schema)
-    overview = _overview(csv_frame, ["state_name", "district_name", "TEHSIL"], config)
+    overview = _overview(csv_frame, ["state_name", "district_name", "tehsil_name"], config)
     matched_rows = int(csv_frame["village_code"].notna().sum()) if "village_code" in csv_frame else 0
+    gpkg_frame = admin_output_frame(joined, value_columns=ordered, include_geometry=True)
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     paths: dict[str, str] = {}
@@ -359,7 +362,7 @@ def run_livestocks_pipeline(
     if outputs.excel_ready_csv:
         paths["excel_ready_csv_path"] = bundle.write_csv(focused_frame, ".excel_ready.csv").as_posix()
     if outputs.gpkg:
-        paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: joined}).as_posix()
+        paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
     if outputs.eda:
         paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
     if outputs.readme:
@@ -400,23 +403,44 @@ def run_livestocks_pipeline(
         result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()
 
     geoserver = None
-    if request.publish.sync_to_geoserver and outputs.geoserver:
+    if outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        if not gpkg_path:
-            gpkg_path = bundle.write_gpkg({output_config["village_layer"]: joined}).as_posix()
-            result["gpkg_path"] = gpkg_path
-        try:
-            geoserver_result = publish_gpkg_layer(
-                gpkg_path,
-                workspace=output_config["geoserver_workspace"],
-                layer_name=layer_name,
-                overwrite=request.publish.overwrite,
-            )
-            geoserver = asdict(geoserver_result)
-            result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
-        except Exception as exc:
-            geoserver = {"ok": False, "error_type": exc.__class__.__name__, "error": str(exc)[:500]}
+        if not request.publish.sync_to_geoserver:
+            geoserver = {
+                "ok": False,
+                "status": "not_requested",
+                "workspace": output_config["geoserver_workspace"],
+                "layer_name": layer_name,
+            }
+        elif not gpkg_path:
+            geoserver = {
+                "ok": False,
+                "status": "missing_gpkg",
+                "workspace": output_config["geoserver_workspace"],
+                "layer_name": layer_name,
+                "error": "GeoPackage output is required for GeoServer publishing.",
+            }
+        else:
+            try:
+                geoserver_result = publish_gpkg_layer(
+                    gpkg_path,
+                    workspace=output_config["geoserver_workspace"],
+                    layer_name=layer_name,
+                    overwrite=request.publish.overwrite,
+                )
+                geoserver = asdict(geoserver_result)
+                geoserver.setdefault("status", "published" if geoserver.get("ok") else "publish_failed")
+            except Exception as exc:
+                geoserver = {
+                    "ok": False,
+                    "status": "publish_failed",
+                    "workspace": output_config["geoserver_workspace"],
+                    "layer_name": layer_name,
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc)[:500],
+                }
+        result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
     result["timings"] = timings

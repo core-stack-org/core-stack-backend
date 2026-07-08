@@ -43,11 +43,11 @@ derived_metrics:
     sources: [large_animals_total, small_animals_total]
 
 focused_columns:
+  - all_livestock_total
+  - large_animals_total
   - cattle_total
   - buffalo_total
-  - large_animals_total
+  - small_animals_total
   - sheep_total
   - goat_total
   - pig_total
-  - small_animals_total
-  - all_livestock_total
