@@ -196,59 +196,59 @@ def extract_antyodaya(df_antyodaya, v_id):
 
     return {
         "road_connectivity": data_map.get(
-            village_row["road_connectivity_cat_cluster"].iloc[0]
+            village_row["road_connectivity_cat_cluster"].iloc[0], -9999
         ),
         "electricity_supply": data_map.get(
-            village_row["electricity_supply_to_msme_feat_cluster"].iloc[0]
+            village_row["electricity_supply_to_msme_feat_cluster"].iloc[0], -9999
         ),
         "housing_quality": data_map.get(
-            village_row["housing_quality_cat_cluster"].iloc[0]
+            village_row["housing_quality_cat_cluster"].iloc[0], -9999
         ),
         "maternal_and_child_health_service_access": data_map.get(
-            village_row["maternal_child_health_cat_cluster"].iloc[0]
+            village_row["maternal_child_health_cat_cluster"].iloc[0], -9999
         ),
         "water_and_sanitation_infrastructure": data_map.get(
-            village_row["water_sanitation_cat_cluster"].iloc[0]
+            village_row["water_sanitation_cat_cluster"].iloc[0], -9999
         ),
         "access_to_formal_banking_services": data_map.get(
-            village_row["bank_feat_cluster"].iloc[0]
+            village_row["bank_feat_cluster"].iloc[0], -9999
         ),
         "coverage_across_PDS_NFSA_BPL_and_Pension": coverage_across_PDS_NFSA_BPL_and_Pension,
         "institutionalization_strength": data_map.get(
-            village_row["institutionalization_cat_cluster"].iloc[0]
+            village_row["institutionalization_cat_cluster"].iloc[0], -9999
         ),
         "civic_infrastructure": data_map.get(
-            village_row["civic_infrastructure_cat_cluster"].iloc[0]
+            village_row["civic_infrastructure_cat_cluster"].iloc[0], -9999
         ),
         "farm_employment": data_map.get(
-            village_row["farm_employment_feat_cluster"].iloc[0]
+            village_row["farm_employment_feat_cluster"].iloc[0], -9999
         ),
         "forest-based_livelihood": data_map.get(
-            village_row["livelihoods_forest_resources_cat_cluster"].iloc[0]
+            village_row["livelihoods_forest_resources_cat_cluster"].iloc[0], -9999
         ),
         "alternate_farming": data_map.get(
-            village_row["livelihoods_alternative_farming_cat_cluster"].iloc[0]
+            village_row["livelihoods_alternative_farming_cat_cluster"].iloc[0], -9999
         ),
         "fisheries_adoption": data_map.get(
-            village_row["livelihoods_fisheries_cat_cluster"].iloc[0]
+            village_row["livelihoods_fisheries_cat_cluster"].iloc[0], -9999
         ),
         "cottage_industry": data_map.get(
-            village_row["livelihoods_cottage_traditional_industry_cat_cluster"].iloc[0]
+            village_row["livelihoods_cottage_traditional_industry_cat_cluster"].iloc[0], -9999
         ),
         "livestock_management_service_quality": data_map.get(
-            village_row["electricity_supply_to_msme_feat_cluster"].iloc[0]
+            village_row["electricity_supply_to_msme_feat_cluster"].iloc[0], -9999
         ),
         "common_pasture_access": data_map.get(
-            village_row["common_pastures_feat_cluster"].iloc[0]
+            village_row["common_pastures_feat_cluster"].iloc[0], -9999
         ),
         "watershed_infrastructure_and_modern_irrigation": data_map.get(
-            village_row["irrigation_infra_watershed_dev_feat_cluster"].iloc[0]
+            village_row["irrigation_infra_watershed_dev_feat_cluster"].iloc[0], -9999
         ),
         "organic_farming_adoption": data_map.get(
-            village_row["agriculture_organic_farming_cat_cluster"].iloc[0]
+            village_row["agriculture_organic_farming_cat_cluster"].iloc[0], -9999
         ),
         "pension_coverage_and_soil_testing_services_adoption": data_map.get(
-            village_row["pension_cov_feat_cluster"].iloc[0]
+            village_row["pension_cov_feat_cluster"].iloc[0], -9999
         ),
     }
 
