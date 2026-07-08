@@ -1,0 +1,68 @@
+name: facilities
+title: Facilities and Village Service Proximity
+description: >
+  Live local facilities inventory and nearest-service pipeline built from
+  cs_pan_india_facilities.gpkg and cs_admin_standard.gpkg.
+
+sources:
+  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  facilities_gpkg: data/facilities/outputs/cs_pan_india_facilities.gpkg
+  facilities_layer: facilities
+  taxonomy_table: facility_taxonomy
+
+output:
+  root: data/facilities/outputs/local_pipeline
+  layer_prefix: facilities
+  inventory_layer: facilities_inventory
+  nearest_layer: facilities_nearest
+  village_service_layer: facilities_village_service
+  geoserver_workspace: facilities_proximity
+
+search:
+  base_expansion_degrees: 0.25
+  supplemental_expansion_degrees: 2.0
+  earth_radius_km: 6371.0088
+
+standard_admin_columns:
+  - cs_feature_id
+  - cs_admin_uid
+  - core_admin_uid
+  - state_name
+  - district_name
+  - TEHSIL
+  - pc11_village_id
+  - village_id
+  - NAME
+
+facility_columns:
+  - facility_uid
+  - facility_name
+  - facility_code
+  - latitude
+  - longitude
+  - class_l1_domain
+  - class_l2_filter_group
+  - class_l3_facility_class
+  - class_l4_facility_subtype
+  - class_k1
+  - class_k2
+  - class_k3
+  - class_k4
+  - class_k5
+  - class_k6
+  - class_k7
+  - class_k8
+  - urban_rural
+  - pincode
+  - establishment_year
+  - district_lgd
+  - village_census11
+  - village_name
+  - membership_count
+
+readme:
+  cautions:
+    - Nearest-service outputs are computed from facility points and village representative points.
+    - Facilities outside the requested geography may appear in nearest-service outputs when they are the closest service for a selected village.
+    - Distance values are great-circle approximations in kilometers.
