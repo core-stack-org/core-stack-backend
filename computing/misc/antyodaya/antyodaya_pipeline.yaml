@@ -1,0 +1,69 @@
+name: antyodaya_2020
+title: Mission Antyodaya 2020
+description: >
+  Village-level Mission Antyodaya category, feature, and raw indicator pipeline
+  joined at runtime to the Core Stack standard admin boundary.
+
+sources:
+  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  csv: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv
+  mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
+  sidecar_sqlite: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv.sqlite
+
+keys:
+  admin_join_key: village_id
+  source_join_key: village_id
+  source_unique_key: village_key
+
+output:
+  root: data/antyodaya/output/local_pipeline
+  layer_prefix: antyodaya20
+  village_layer: antyodaya_villages
+  overview_layer: antyodaya_overview
+  geoserver_workspace: antyodaya_2020
+
+standard_admin_columns:
+  - cs_feature_id
+  - cs_admin_uid
+  - core_admin_uid
+  - state_name
+  - district_name
+  - TEHSIL
+  - pc11_village_id
+  - village_id
+  - NAME
+
+source_location_columns:
+  - village_key
+  - state_code
+  - district_code
+  - sub_district_code
+  - village_id
+  - village_name
+  - block_code_nunique
+  - block_name
+  - gp_code_nunique
+  - gp_name
+
+validation:
+  category_cluster_suffix: _cat_cluster
+  category_cluster_values:
+    - HIGH
+    - MEDIUM
+    - LOW
+  category_value_suffix: _cat_value
+  feature_value_suffix: _feat_value
+  value_min: 0
+  value_max: 1
+
+readme:
+  audience:
+    - local stewards
+    - Core Stack platform users
+    - Know Your Landscape reports
+    - data analysts preparing Excel handoffs
+  cautions:
+    - Villages without a matching Antyodaya village_id remain in spatial outputs with null Antyodaya metrics.
+    - Category clusters are normalized to HIGH, MEDIUM, LOW in runtime outputs.
+    - Aggregated overviews summarize selected village rows and should not be treated as a replacement for village-level evidence.
