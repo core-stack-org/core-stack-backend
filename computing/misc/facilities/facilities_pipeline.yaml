@@ -10,6 +10,7 @@ sources:
   facilities_gpkg: data/facilities/outputs/cs_pan_india_facilities.gpkg
   facilities_layer: facilities
   taxonomy_table: facility_taxonomy
+  classification_yaml: computing/misc/facilities/facility_classifications.yaml
 
 output:
   root: data/facilities/outputs/local_pipeline
@@ -18,6 +19,18 @@ output:
   nearest_layer: facilities_nearest
   village_service_layer: facilities_village_service
   geoserver_workspace: facilities_proximity
+
+default_outputs:
+  mode: focused
+  gpkg: true
+  csv: false
+  focused_csv: true
+  verbose_csv: false
+  excel_ready_csv: true
+  readme: true
+  eda: true
+  stac: true
+  geoserver: true
 
 search:
   base_expansion_degrees: 0.25
