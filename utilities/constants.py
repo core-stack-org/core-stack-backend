@@ -15,6 +15,7 @@ MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
 CROP_GRID_PATH = "data/crop_grid"
+FARM_BOUNDARIES_PATH = "data/farm_boundaries"
 
 KML_PATH = "data/kml/"
 SHAPEFILE_DIR = "data/kml/shapefiles"

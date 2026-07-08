@@ -63,6 +63,11 @@ urlpatterns = [
         name="change_detection_vector",
     ),
     path("crop_grid/", api.crop_grid, name="crop_grid"),
+    path(
+        "generate_farm_boundaries/",
+        api.generate_farm_boundaries,
+        name="generate_farm_boundaries",
+    ),
     path("tree_health_raster/", api.tree_health_raster, name="tree_health_raster"),
     path("tree_health_vector/", api.tree_health_vector, name="tree_health_vector"),
     path("stream_order/", api.stream_order, name="stream_order"),
