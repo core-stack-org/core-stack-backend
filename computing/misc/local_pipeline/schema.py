@@ -85,6 +85,7 @@ class PublishOptions:
     overwrite: bool = True
     register_layers: bool = False
     use_pregenerated: bool = False
+    geoserver_workspace: str | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> "PublishOptions":
@@ -94,6 +95,7 @@ class PublishOptions:
             overwrite=coerce_bool(values.get("overwrite"), True),
             register_layers=coerce_bool(values.get("register_layers"), False),
             use_pregenerated=coerce_bool(values.get("use_pregenerated"), False),
+            geoserver_workspace=str(values["geoserver_workspace"]) if values.get("geoserver_workspace") else None,
         )
 
 
