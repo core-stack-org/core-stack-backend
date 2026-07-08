@@ -52,9 +52,6 @@ ADMIN_PRESENTATION_COLUMNS = (
 )
 INTERNAL_ADMIN_COLUMNS = (
     "fid",
-    "cs_feature_id",
-    "cs_admin_uid",
-    "core_admin_uid",
     "pc11_state_id",
     "pc11_district_id",
     "pc11_subdistrict_id",
@@ -62,6 +59,19 @@ INTERNAL_ADMIN_COLUMNS = (
     "TEHSIL",
     "NAME",
 )
+
+
+def is_internal_admin_column(column: Any) -> bool:
+    """Return true for source admin fields that should not leak to outputs."""
+
+    name = str(column)
+    return (
+        name in INTERNAL_ADMIN_COLUMNS
+        or name.startswith("_")
+        or name.startswith("pc11_")
+        or name.startswith("cs_")
+        or name.startswith("core_")
+    )
 
 
 def normalize_key(value: Any) -> str:
@@ -134,8 +144,7 @@ def admin_output_frame(
         if (
             column in frame.columns
             and column not in ordered
-            and column not in INTERNAL_ADMIN_COLUMNS
-            and not str(column).startswith("_")
+            and not is_internal_admin_column(column)
         ):
             ordered.append(column)
     output = frame.rename(
