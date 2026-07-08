@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -414,6 +415,17 @@ def _useful_value(value: Any) -> str | None:
     return text
 
 
+def _clean_facility_text(value: Any) -> str | None:
+    """Clean compact labels for report-facing nearest-facility cells."""
+
+    text = _useful_value(value)
+    if not text:
+        return None
+    text = re.sub(r"(?<=[A-Za-z])[.,](?=[A-Za-z])", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or None
+
+
 def _facility_detail(row: pd.Series | None) -> str | None:
     """Build a compact human-readable facility detail for report CSVs."""
 
@@ -421,7 +433,7 @@ def _facility_detail(row: pd.Series | None) -> str | None:
         return None
     parts: list[str] = []
     for column in ("facility_name", "class_l4_facility_subtype", "class_l3_label", "facility_code"):
-        value = _useful_value(row.get(column))
+        value = _clean_facility_text(row.get(column)) if column != "facility_code" else _useful_value(row.get(column))
         if value:
             parts.append(value if column != "facility_code" else f"code {value}")
     scope_value = row.get("inside_requested_scope")
@@ -440,7 +452,7 @@ def _l2_output_column(group: Mapping[str, Any], config: Mapping[str, Any]) -> st
     if key in configured:
         return str(configured[key])
     suffix_by_rollup = {
-        "max": "comprehensive_baseline_distance",
+        "max": "baseline_bundle_distance",
         "min": "nearest_gateway_distance",
         "direct": "direct_access_distance",
     }
@@ -535,7 +547,7 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         "",
         "## How To Read The Distance Columns",
         "",
-        "- Columns ending in `comprehensive_baseline_distance` use the maximum distance across a basic service bundle. For example, essential education needs primary, upper-primary, and secondary access. The farthest of the required services is the bottleneck, so a low value means the full baseline bundle is nearby.",
+        "- Columns ending in `baseline_bundle_distance` use the maximum distance across a basic service bundle. For example, essential education needs primary, upper-primary, and secondary access. The farthest of the required services is the bottleneck, so a low value means the full baseline bundle is nearby.",
         "- Columns ending in `nearest_gateway_distance` use the minimum distance across advanced opportunity options. For example, reaching any one college or higher-secondary institution can open the higher-education gateway, so the nearest suitable option is the useful measure.",
         "- Columns ending in `direct_access_distance` use the nearest point for a single service type, such as PDS, cooperative societies, or dairy/livestock support.",
         "",
@@ -543,9 +555,19 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         "",
         "The Excel-ready CSV keeps only the columns needed for report ingestion: standard admin identifiers, L2 access distances, and the nearest L3 facility details in a stable order. The GeoPackage keeps the village geometry so the same result can be mapped without another join.",
         "",
-        "## Cautions",
-        "",
     ]
+    geoserver = result.get("geoserver") or {}
+    if geoserver.get("wfs_url") or geoserver.get("wms_url"):
+        lines.extend(
+            [
+                "## GeoServer Layer",
+                "",
+                f"- WFS GeoJSON: {geoserver.get('wfs_url')}",
+                f"- WMS layer: {geoserver.get('wms_url')}",
+                "",
+            ]
+        )
+    lines.extend(["## Cautions", ""])
     lines.extend([f"- {item}" for item in config.get("readme", {}).get("cautions", [])])
     return lines
 
@@ -667,7 +689,7 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("methodology_path")
     if outputs.stac:
         required.append("stac_fragment_path")
-    if outputs.geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         required.append("geoserver_links_path")
     return tuple(dict.fromkeys(required))
 
@@ -806,8 +828,6 @@ def run_facilities_pipeline(
                 "excel_services": excel_services,
             }
         ).as_posix()
-    if outputs.readme:
-        paths["readme_path"] = bundle.write_readme(_readme_lines(request, config, layer_name, result)).as_posix()
     if outputs.methodology:
         methodology_path = bundle.output_path(".methodology.md")
         methodology_path.write_text("\n".join(_methodology_lines(config, classification)).rstrip() + "\n")
@@ -818,18 +838,10 @@ def run_facilities_pipeline(
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     geoserver = None
-    if outputs.geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        if not request.publish.sync_to_geoserver:
-            geoserver = {
-                "ok": False,
-                "status": "not_requested",
-                "workspace": output_config["geoserver_workspace"],
-                "layer_name": layer_name,
-                "gpkg_path": gpkg_path,
-            }
-        elif gpkg_path:
+        if gpkg_path:
             try:
                 geoserver_result = publish_gpkg_layer(
                     gpkg_path,
@@ -838,6 +850,9 @@ def run_facilities_pipeline(
                     overwrite=request.publish.overwrite,
                 )
                 geoserver = asdict(geoserver_result)
+                geoserver["ok"] = True
+                geoserver["status"] = "published"
+                result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -856,9 +871,14 @@ def run_facilities_pipeline(
                 "layer_name": layer_name,
                 "gpkg_path": None,
             }
-        result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if outputs.geoserver and "geoserver_links_path" not in result:
+        stale_links = bundle.output_path(".geoserver_links.csv")
+        if stale_links.exists():
+            stale_links.unlink()
+    if outputs.readme:
+        result["readme_path"] = bundle.write_readme(_readme_lines(request, config, layer_name, result)).as_posix()
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     result["run_metadata_path"] = bundle.write_metadata(
