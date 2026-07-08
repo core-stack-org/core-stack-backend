@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
@@ -38,12 +39,73 @@ ADMIN_DEFAULT_COLUMNS = (
     "village_id",
     "NAME",
 )
+ADMIN_PRESENTATION_COLUMNS = (
+    "index",
+    "cs_feature_id",
+    "state_id",
+    "district_id",
+    "tehsil_id",
+    "village_id",
+    "state_name",
+    "district_name",
+    "tehsil_name",
+    "village_name",
+)
 
 
 def normalize_key(value: Any) -> str:
     """Normalize an admin name for consistent lowercase lookup."""
 
     return " ".join(str(value or "").strip().lower().split())
+
+
+def format_admin_name(value: Any) -> str | None:
+    """Return a readable title-case admin name without changing lookup keys."""
+
+    if value is None or value != value:
+        return None
+    text = re.sub(r"\s+", " ", str(value).strip())
+    if not text:
+        return None
+    text = re.sub(r"\s*-\s*", " - ", text)
+    text = re.sub(r"(?<=\b[A-Za-z])\.(?=[A-Za-z]\b)", ". ", text)
+    text = re.sub(r"(?<=\b[A-Za-z])\.(?=[A-Za-z]\.)", ". ", text)
+    text = re.sub(r"\s+", " ", text)
+
+    words: list[str] = []
+    for word in text.split(" "):
+        if word == "-":
+            words.append(word)
+            continue
+        pieces = word.split(".")
+        if len(pieces) > 1:
+            formatted = ".".join(piece.upper() if len(piece) == 1 else piece.title() for piece in pieces)
+            words.append(formatted)
+            continue
+        words.append(f"{word.upper()}." if len(word) == 1 and word.isalpha() else word.title())
+    return " ".join(words)
+
+
+def admin_presentation_frame(rows: Any, *, include_geometry: bool = False):
+    """Return standard, compact admin columns for user-facing outputs."""
+
+    frame = rows.copy()
+    rename_map = {
+        "fid": "index",
+        "pc11_state_id": "state_id",
+        "pc11_district_id": "district_id",
+        "pc11_subdistrict_id": "tehsil_id",
+        "TEHSIL": "tehsil_name",
+        "NAME": "village_name",
+    }
+    frame = frame.rename(columns={src: dst for src, dst in rename_map.items() if src in frame.columns})
+    for column in ("state_name", "district_name", "tehsil_name", "village_name"):
+        if column in frame.columns:
+            frame[column] = frame[column].map(format_admin_name)
+    columns = [column for column in ADMIN_PRESENTATION_COLUMNS if column in frame.columns]
+    if include_geometry and "geometry" in frame.columns:
+        columns.append("geometry")
+    return frame[columns].copy()
 
 
 def _repo_path(path: str | Path, base_dir: str | Path | None = None) -> Path:

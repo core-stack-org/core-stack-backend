@@ -25,6 +25,7 @@ def load_config(path: str | Path) -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class OutputOptions:
+    mode: str = "default"
     gpkg: bool = True
     csv: bool = True
     readme: bool = True
@@ -32,11 +33,32 @@ class OutputOptions:
     stac: bool = True
     geoserver: bool = True
     excel_ready_csv: bool = False
+    focused_csv: bool = True
+    verbose_csv: bool = False
+    metadata_json: bool = True
+    methodology: bool = False
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> "OutputOptions":
         values = dict(data or {})
-        return cls(**{field.name: bool(values.get(field.name, getattr(cls, field.name))) for field in cls.__dataclass_fields__.values()})
+        mode = str(values.get("mode") or values.get("output_mode") or "default").lower()
+        presets: dict[str, dict[str, Any]] = {
+            "default": {},
+            "focused": {"csv": False, "focused_csv": True, "verbose_csv": False, "excel_ready_csv": True},
+            "all": {"gpkg": True, "csv": True, "readme": True, "eda": True, "stac": True, "focused_csv": True, "verbose_csv": True, "excel_ready_csv": True, "methodology": True},
+            "metadata": {"gpkg": False, "csv": False, "readme": False, "eda": False, "stac": False, "geoserver": False, "focused_csv": False, "verbose_csv": False, "excel_ready_csv": False, "metadata_json": True},
+            "methodology": {"gpkg": False, "csv": False, "readme": True, "eda": False, "stac": False, "geoserver": False, "focused_csv": False, "verbose_csv": False, "excel_ready_csv": False, "methodology": True},
+            "excel": {"gpkg": False, "csv": False, "readme": False, "eda": False, "stac": False, "geoserver": False, "focused_csv": True, "verbose_csv": False, "excel_ready_csv": True},
+        }
+        merged = {field.name: getattr(cls, field.name) for field in cls.__dataclass_fields__.values()}
+        merged.update(presets.get(mode, {}))
+        merged.update(values)
+        merged["mode"] = mode
+        for field in cls.__dataclass_fields__.values():
+            if field.name == "mode":
+                continue
+            merged[field.name] = bool(merged[field.name])
+        return cls(**{field.name: merged[field.name] for field in cls.__dataclass_fields__.values()})
 
 
 @dataclass(frozen=True)
@@ -80,9 +102,12 @@ class StandardRequest:
     def from_mapping(cls, data: Mapping[str, Any]) -> "StandardRequest":
         raw = dict(data)
         scope_data = raw.get("scope") if isinstance(raw.get("scope"), Mapping) else raw
+        output_data = dict(raw.get("outputs") or {})
+        if "output_mode" in raw and "mode" not in output_data:
+            output_data["mode"] = raw["output_mode"]
         return cls(
             scope=AdminScope.from_mapping(dict(scope_data)),
-            outputs=OutputOptions.from_mapping(raw.get("outputs")),
+            outputs=OutputOptions.from_mapping(output_data),
             publish=PublishOptions.from_mapping(raw.get("publish")),
             batch=BatchOptions.from_mapping(raw.get("batch")),
             raw=raw,
