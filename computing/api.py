@@ -1634,6 +1634,7 @@ def generate_livestocks(request):
                     "sync_to_geoserver": payload.get("sync_to_geoserver", True),
                     "overwrite": payload.get("overwrite", False),
                     "register_layers": payload.get("register_layers", False),
+                    "use_pregenerated": payload.get("use_pregenerated", False),
                 },
             }
         else:
@@ -1645,6 +1646,7 @@ def generate_livestocks(request):
             payload["publish"].setdefault("sync_to_geoserver", True)
             payload["publish"].setdefault("overwrite", False)
             payload["publish"].setdefault("register_layers", False)
+            payload["publish"].setdefault("use_pregenerated", False)
         generate_livestocks_layer_task.apply_async(
             kwargs={"payload": payload},
             queue="nrm",
