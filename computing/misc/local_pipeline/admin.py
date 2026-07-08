@@ -29,9 +29,6 @@ ADMIN_TABLE = "cs_admin_standard"
 ADMIN_GEOMETRY_COLUMN = "geom"
 ADMIN_DEFAULT_COLUMNS = (
     "fid",
-    "cs_feature_id",
-    "cs_admin_uid",
-    "core_admin_uid",
     "state_name",
     "district_name",
     "TEHSIL",
@@ -214,12 +211,6 @@ class AdminSelection:
             return []
         return self.rows["pc11_village_id"].dropna().drop_duplicates().tolist()
 
-    @property
-    def cs_feature_ids(self) -> list[str]:
-        if "cs_feature_id" not in self.rows.columns:
-            return []
-        return self.rows["cs_feature_id"].dropna().astype(str).drop_duplicates().tolist()
-
     def id_frame(self) -> pd.DataFrame:
         """Return the standard identifier columns for joins and QA."""
 
@@ -265,11 +256,6 @@ class CSAdminSource:
                 table=table,
                 expressions=(column_expression("pc11_village_id"),),
             ),
-            IndexSpec(
-                name=f"idx_{table}_cs_feature_id",
-                table=table,
-                expressions=(column_expression("cs_feature_id"),),
-            ),
         )
 
     def ensure_indexes(self) -> list[str]:
@@ -307,12 +293,10 @@ class CSAdminSource:
             clauses.append(
                 "("
                 f"{quote_identifier('village_id')} IN ({placeholders}) OR "
-                f"{quote_identifier('pc11_village_id')} IN ({placeholders}) OR "
-                f"{quote_identifier('cs_feature_id')} IN ({placeholders})"
+                f"{quote_identifier('pc11_village_id')} IN ({placeholders})"
                 ")"
             )
             values = list(scope.village_ids)
-            params.extend(values)
             params.extend(values)
             params.extend(values)
 
