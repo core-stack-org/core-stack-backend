@@ -72,7 +72,7 @@ class CSVSQLiteSidecar:
         columns_match = True
         if expected_columns:
             materialized_columns = tuple((row[2] or "").split(",")) if row and row[2] else ()
-            columns_match = materialized_columns == expected_columns
+            columns_match = set(expected_columns).issubset(materialized_columns)
         return bool(row and int(row[0]) == source_size and int(row[1]) == source_mtime_ns and columns_match)
 
     def materialize(self, *, force: bool = False) -> dict[str, Any]:
