@@ -194,6 +194,7 @@ def _readme_lines(
     row_count: int,
     matched_rows: int,
     issues: list[ValidationIssue],
+    geoserver: Mapping[str, Any] | None = None,
 ) -> list[str]:
     lines = [
         f"# {result_name}",
@@ -223,9 +224,18 @@ def _readme_lines(
         "- Matching livestock rows are fetched from a generated SQLite sidecar for the source CSV.",
         "- Village geometries are joined only after keyed livestock rows are selected.",
         "",
-        "## Cautions",
-        "",
     ]
+    if geoserver and (geoserver.get("wfs_url") or geoserver.get("wms_url")):
+        lines.extend(
+            [
+                "## GeoServer Layer",
+                "",
+                f"- WFS GeoJSON: {geoserver.get('wfs_url')}",
+                f"- WMS layer: {geoserver.get('wms_url')}",
+                "",
+            ]
+        )
+    lines.extend(["## Cautions", ""])
     lines.extend([f"- {item}" for item in config.get("readme", {}).get("cautions", [])])
     return lines
 
@@ -291,7 +301,7 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("readme_path")
     if outputs.stac:
         required.append("stac_fragment_path")
-    if outputs.geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         required.append("geoserver_links_path")
     return tuple(dict.fromkeys(required))
 
@@ -365,17 +375,6 @@ def run_livestocks_pipeline(
         paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
     if outputs.eda:
         paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
-    if outputs.readme:
-        paths["readme_path"] = bundle.write_readme(
-            _readme_lines(
-                request=request,
-                config=config,
-                result_name=layer_name,
-                row_count=len(csv_frame),
-                matched_rows=matched_rows,
-                issues=validation_issues,
-            )
-        ).as_posix()
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     result: dict[str, Any] = {
@@ -403,17 +402,10 @@ def run_livestocks_pipeline(
         result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()
 
     geoserver = None
-    if outputs.geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        if not request.publish.sync_to_geoserver:
-            geoserver = {
-                "ok": False,
-                "status": "not_requested",
-                "workspace": output_config["geoserver_workspace"],
-                "layer_name": layer_name,
-            }
-        elif not gpkg_path:
+        if not gpkg_path:
             geoserver = {
                 "ok": False,
                 "status": "missing_gpkg",
@@ -430,7 +422,9 @@ def run_livestocks_pipeline(
                     overwrite=request.publish.overwrite,
                 )
                 geoserver = asdict(geoserver_result)
-                geoserver.setdefault("status", "published" if geoserver.get("ok") else "publish_failed")
+                geoserver["ok"] = True
+                geoserver["status"] = "published"
+                result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -440,9 +434,24 @@ def run_livestocks_pipeline(
                     "error_type": exc.__class__.__name__,
                     "error": str(exc)[:500],
                 }
-        result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if outputs.geoserver and "geoserver_links_path" not in result:
+        stale_links = bundle.output_path(".geoserver_links.csv")
+        if stale_links.exists():
+            stale_links.unlink()
+    if outputs.readme:
+        result["readme_path"] = bundle.write_readme(
+            _readme_lines(
+                request=request,
+                config=config,
+                result_name=layer_name,
+                row_count=len(csv_frame),
+                matched_rows=matched_rows,
+                issues=validation_issues,
+                geoserver=geoserver,
+            )
+        ).as_posix()
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     result["run_metadata_path"] = bundle.write_metadata(
