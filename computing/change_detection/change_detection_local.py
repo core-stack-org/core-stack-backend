@@ -1,4 +1,5 @@
 import os
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
@@ -279,6 +280,8 @@ def _load_masked_lulc_arrays(roi_gdf, raster_paths):
 
 
 def _write_change_raster(array, output_path, output_meta):
+    output_path = os.fspath(output_path)
+    temp_output_path = f"{output_path}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
     raster = np.asarray(array, dtype=np.uint8)
     meta = output_meta.copy()
     meta.update(
@@ -290,8 +293,13 @@ def _write_change_raster(array, output_path, output_meta):
             "compress": "lzw",
         }
     )
-    with rasterio.open(output_path, "w", **meta) as dst:
-        dst.write(raster, 1)
+    try:
+        with rasterio.open(temp_output_path, "w", **meta) as dst:
+            dst.write(raster, 1)
+        os.replace(temp_output_path, output_path)
+    finally:
+        if os.path.exists(temp_output_path):
+            os.remove(temp_output_path)
     return str(output_path)
 
 
