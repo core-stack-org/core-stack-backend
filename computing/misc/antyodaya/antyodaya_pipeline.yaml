@@ -10,6 +10,9 @@ sources:
   csv: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv
   mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
   sidecar_sqlite: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv.sqlite
+  report_pdf: data/antyodaya/report/antyodaya_cluster_analysis_report.pdf
+  blog_pdf: data/antyodaya/report/antyodaya_cluster_analysis_blog.pdf
+  gee_explorer_url: https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer
 
 keys:
   admin_join_key: village_id
@@ -22,6 +25,18 @@ output:
   village_layer: antyodaya_villages
   overview_layer: antyodaya_overview
   geoserver_workspace: antyodaya_2020
+
+default_outputs:
+  mode: focused
+  gpkg: true
+  csv: false
+  focused_csv: true
+  verbose_csv: false
+  excel_ready_csv: true
+  readme: true
+  eda: true
+  stac: true
+  geoserver: true
 
 standard_admin_columns:
   - cs_feature_id

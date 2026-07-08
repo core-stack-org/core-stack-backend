@@ -15,10 +15,12 @@ import pandas as pd
 from django.conf import settings
 
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
+from computing.misc.local_pipeline.admin import admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
-from computing.misc.local_pipeline.outputs import OutputBundle, slug, utc_now_text
+from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
 from computing.misc.local_pipeline.schema import (
+    OutputOptions,
     ValidationIssue,
     columns_ending_with,
     validate_numeric_range,
@@ -57,6 +59,7 @@ def _request_from_legacy_args(
     block: str,
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
+    output_mode: str = "focused",
 ) -> StandardRequest:
     return StandardRequest.from_mapping(
         {
@@ -72,13 +75,8 @@ def _request_from_legacy_args(
                 "register_layers": False,
             },
             "outputs": {
-                "gpkg": True,
-                "csv": True,
-                "readme": True,
-                "eda": True,
-                "stac": True,
+                "mode": output_mode,
                 "geoserver": sync_to_geoserver,
-                "excel_ready_csv": True,
             },
         }
     )
@@ -104,12 +102,21 @@ def _source_columns(config: Mapping[str, Any]) -> dict[str, list[str]]:
     }
 
 
-def _sidecar(config: Mapping[str, Any]) -> CSVSQLiteSidecar:
+def _sidecar(config: Mapping[str, Any], columns: Mapping[str, list[str]]) -> CSVSQLiteSidecar:
+    source_columns = [
+        config["keys"]["source_join_key"],
+        config["keys"]["source_unique_key"],
+        *columns["category_cluster"],
+        *columns["category_value"],
+        *columns["feature_value"],
+        *columns["raw"],
+    ]
     return CSVSQLiteSidecar(
         _repo_path(config["sources"]["csv"]),
         table_name=config["name"],
         key_columns=(config["keys"]["source_join_key"],),
         sidecar_path=_repo_path(config["sources"]["sidecar_sqlite"]),
+        source_columns=tuple(dict.fromkeys(source_columns)),
     )
 
 
@@ -168,6 +175,36 @@ def _ordered_tabular_columns(frame: pd.DataFrame, config: Mapping[str, Any], col
     ordered.extend([col for col in columns["feature_value"] if col in frame.columns])
     ordered.extend([col for col in columns["raw"] if col in frame.columns and col not in ordered])
     return [col for col in ordered if col in frame.columns]
+
+
+def _focused_frame(frame: pd.DataFrame, columns: Mapping[str, list[str]]) -> pd.DataFrame:
+    focused = admin_presentation_frame(frame.drop(columns=["geometry"], errors="ignore"))
+    source = frame.set_index("cs_feature_id", drop=False)
+    metric_columns = [
+        *columns["category_cluster"],
+        *columns["category_value"],
+        *columns["feature_value"],
+        *columns["raw"],
+    ]
+    output_rows: list[dict[str, Any]] = []
+    for _, admin_row in focused.iterrows():
+        row = admin_row.to_dict()
+        cs_feature_id = row.get("cs_feature_id")
+        values = source.loc[cs_feature_id] if cs_feature_id in source.index else pd.Series(dtype=object)
+        has_village_id = pd.notna(row.get("village_id"))
+        has_antyodaya = pd.notna(values.get("village_key")) if not values.empty else False
+        if not has_village_id:
+            row["antyodaya_status"] = "no village id"
+        elif not has_antyodaya:
+            row["antyodaya_status"] = "no antyodaya row"
+        else:
+            row["antyodaya_status"] = "matched"
+            for column in metric_columns:
+                if column in values:
+                    row[column] = values.get(column)
+        row.pop("cs_feature_id", None)
+        output_rows.append(row)
+    return pd.DataFrame(output_rows)
 
 
 def _overview(frame: pd.DataFrame, group_columns: list[str], columns: Mapping[str, list[str]]) -> pd.DataFrame:
@@ -232,6 +269,13 @@ def _readme_lines(
         "- Matching Antyodaya rows are fetched from a generated SQLite sidecar for the source CSV.",
         "- Village geometries are joined only after keyed Antyodaya rows are selected.",
         "- Category clusters are normalized to `HIGH`, `MEDIUM`, and `LOW`.",
+        "- Feature-level cluster columns are intentionally excluded; category-level clusters carry the standard cluster interpretation.",
+        "",
+        "## Reports And Explorer",
+        "",
+        f"- Full report PDF: `{config['sources'].get('report_pdf')}`",
+        f"- Blog/short PDF: `{config['sources'].get('blog_pdf')}`",
+        f"- GEE explorer: {config['sources'].get('gee_explorer_url')}",
         "",
         "## Audience",
         "",
@@ -263,6 +307,53 @@ def _stac_fragment(config: Mapping[str, Any], result: Mapping[str, Any]) -> dict
     }
 
 
+def _cache_input_signatures(config: Mapping[str, Any], config_path: str | Path) -> dict[str, dict[str, Any]]:
+    sources = config.get("sources", {})
+    paths: dict[str, str | Path] = {
+        "pipeline_config": _repo_path(config_path),
+        "admin_gpkg": _repo_path(sources["admin_gpkg"]),
+        "antyodaya_csv": _repo_path(sources["csv"]),
+        "mapping_yaml": _repo_path(sources["mapping_yaml"]),
+    }
+    for key in ("report_pdf", "blog_pdf"):
+        if sources.get(key):
+            paths[key] = _repo_path(sources[key])
+    return input_signatures(paths)
+
+
+def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
+    publish_options = asdict(request.publish)
+    publish_options.pop("use_pregenerated", None)
+    return stable_hash(
+        {
+            "algorithm": ALGORITHM,
+            "algorithm_version": ALGORITHM_VERSION,
+            "scope": asdict(request.scope),
+            "outputs": asdict(outputs),
+            "publish": publish_options,
+        }
+    )
+
+
+def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
+    required: list[str] = ["run_metadata_path", "mapping_yaml_path"]
+    if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
+        required.append("gpkg_path")
+    if outputs.focused_csv:
+        required.append("focused_csv_path")
+    if outputs.excel_ready_csv:
+        required.append("excel_ready_csv_path")
+    if outputs.eda:
+        required.append("eda_path")
+    if outputs.readme:
+        required.append("readme_path")
+    if outputs.stac:
+        required.append("stac_fragment_path")
+    if request.publish.sync_to_geoserver and outputs.geoserver:
+        required.append("geoserver_links_path")
+    return tuple(dict.fromkeys(required))
+
+
 def run_antyodaya_pipeline(
     request: StandardRequest,
     *,
@@ -273,21 +364,36 @@ def run_antyodaya_pipeline(
     started = time.perf_counter()
     timings: dict[str, float] = {}
     config = load_config(config_path)
+    outputs = request.outputs
+    if outputs.mode == "default" and config.get("default_outputs"):
+        outputs = OutputOptions.from_mapping(config["default_outputs"])
     columns = _source_columns(config)
     output_config = config["output"]
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
     result_name = layer_name or f"{output_config['layer_prefix']}_{slug(request.scope.level)}"
     output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
     bundle = OutputBundle(output_root, result_name)
+    cache_key = _cache_key(request, outputs)
+    cache_signatures = _cache_input_signatures(config, config_path)
+    required_result_paths = _required_result_paths(outputs, request)
+    if request.publish.use_pregenerated:
+        cached = bundle.cached_result(
+            cache_key=cache_key,
+            signatures=cache_signatures,
+            required_result_paths=required_result_paths,
+        )
+        if cached:
+            cached["cache_hit"] = True
+            return cached
 
     t0 = time.perf_counter()
     admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
-    include_geometry = request.outputs.gpkg or request.publish.sync_to_geoserver
+    include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
     admin_selection = admin_source.read_scope(AdminScope.from_mapping(asdict(request.scope)), include_geometry=include_geometry)
     timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
-    sidecar = _sidecar(config)
+    sidecar = _sidecar(config, columns)
     sidecar_status = sidecar.materialize()
     source_rows = sidecar.fetch_by_values(
         config["keys"]["source_join_key"],
@@ -301,23 +407,27 @@ def run_antyodaya_pipeline(
     joined = _merge_admin_antyodaya(admin_selection.rows, source_rows, config)
     ordered_columns = _ordered_tabular_columns(joined, config, columns)
     csv_frame = pd.DataFrame(joined.drop(columns=["geometry"], errors="ignore"))[ordered_columns]
+    focused_frame = _focused_frame(joined, columns)
     overview = _overview(csv_frame, ["state_name", "district_name", "TEHSIL"], columns)
     matched_rows = int(csv_frame["village_key"].notna().sum()) if "village_key" in csv_frame else 0
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     paths: dict[str, str] = {}
     t0 = time.perf_counter()
-    if request.outputs.csv:
-        paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
+    if outputs.csv or outputs.verbose_csv:
+        if outputs.verbose_csv:
+            paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
         if not overview.empty:
             paths["overview_csv_path"] = bundle.write_csv(overview, ".overview.csv").as_posix()
-    if request.outputs.excel_ready_csv:
-        paths["excel_ready_csv_path"] = bundle.write_csv(csv_frame, ".excel_ready.csv").as_posix()
-    if request.outputs.gpkg:
+    if outputs.focused_csv:
+        paths["focused_csv_path"] = bundle.write_csv(focused_frame, ".focused.csv").as_posix()
+    if outputs.excel_ready_csv:
+        paths["excel_ready_csv_path"] = bundle.write_csv(focused_frame, ".excel_ready.csv").as_posix()
+    if outputs.gpkg:
         paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: joined}).as_posix()
-    if request.outputs.eda:
-        paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "overview": overview}).as_posix()
-    if request.outputs.readme:
+    if outputs.eda:
+        paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
+    if outputs.readme:
         paths["readme_path"] = bundle.write_readme(
             _readme_lines(
                 request=request,
@@ -340,8 +450,10 @@ def run_antyodaya_pipeline(
         "algorithm_version": ALGORITHM_VERSION,
         "layer_name": result_name,
         "rows": int(len(csv_frame)),
+        "focused_rows": int(len(focused_frame)),
         "matched_rows": matched_rows,
         "join_coverage": round(matched_rows / len(csv_frame), 6) if len(csv_frame) else 0,
+        "output_mode": outputs.mode,
         "validation_issues": [asdict(issue) for issue in validation_issues],
         "sidecar": sidecar_status,
         "admin_created_indexes": admin_selection.created_indexes,
@@ -353,12 +465,12 @@ def run_antyodaya_pipeline(
         **paths,
     }
 
-    if request.outputs.stac:
+    if outputs.stac:
         paths["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result | paths), ".stac_fragment.json").as_posix()
         result["stac_fragment_path"] = paths["stac_fragment_path"]
 
     geoserver = None
-    if request.publish.sync_to_geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
         if not gpkg_path:
@@ -384,8 +496,17 @@ def run_antyodaya_pipeline(
     result["run_metadata_path"] = bundle.write_metadata(
         {
             "request": asdict(request),
+            "effective_outputs": asdict(outputs),
             "result": result,
             "config_path": str(config_path),
+        }
+    ).as_posix()
+    result["cache_manifest_path"] = bundle.write_cache_manifest(
+        {
+            "cache_key": cache_key,
+            "input_signatures": cache_signatures,
+            "required_result_paths": required_result_paths,
+            "result": result,
         }
     ).as_posix()
     return result
@@ -400,15 +521,21 @@ def run_antyodaya_request(payload: Mapping[str, Any]) -> dict[str, Any]:
 @app.task(bind=True)
 def generate_antyodaya_layer_task(
     self,
-    state: str,
-    district: str,
-    block: str,
+    state: str | None = None,
+    district: str | None = None,
+    block: str | None = None,
     sync_to_geoserver: bool = True,
     overwrite: bool = False,
+    output_mode: str = "focused",
+    payload: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Generate Mission Antyodaya outputs for one state/district/tehsil."""
 
-    request = _request_from_legacy_args(state, district, block, sync_to_geoserver, overwrite)
+    if payload is not None:
+        return run_antyodaya_request(payload)
+    if not (state and district and block):
+        raise ValueError("state, district, and block are required when payload is not provided")
+    request = _request_from_legacy_args(state, district, block, sync_to_geoserver, overwrite, output_mode)
     return run_antyodaya_pipeline(request)
 
 
