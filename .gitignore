@@ -10,6 +10,9 @@ venv/
 .idea/
 .DS_Store
 .cursor/
+.agents/
+.codex/
+.installation_state/
 
 # Django
 *.log
