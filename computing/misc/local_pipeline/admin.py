@@ -44,7 +44,6 @@ ADMIN_DEFAULT_COLUMNS = (
 )
 ADMIN_PRESENTATION_COLUMNS = (
     "index",
-    "cs_feature_id",
     "state_id",
     "district_id",
     "tehsil_id",
