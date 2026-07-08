@@ -46,13 +46,13 @@ from .forest_fringe_utils import (
 
 
 @app.task(bind=True)
-def generate_forest_fringe_layer(
-    self,
-    state,
-    district,
-    block,
-    gee_account_id=None,
-    app_type="MWS",
+def generate_forest_fringe_degradation(
+        self,
+        state,
+        district,
+        block,
+        gee_account_id=None,
+        app_type="MWS",
 ):
     """
     Generate forest-fringe metrics as a vector layer.
@@ -83,7 +83,7 @@ def generate_forest_fringe_layer(
     ee_initialize(gee_account_id)
 
     asset_suffix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
     )
     asset_folder_list = [state, district, block]
 
@@ -91,11 +91,11 @@ def generate_forest_fringe_layer(
     layer_name = f"{asset_suffix}_forest_fringe"
 
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + description
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + description
     )
 
     print(f"Forest Fringe pipeline started: {asset_id=}")
@@ -104,12 +104,12 @@ def generate_forest_fringe_layer(
     # STEP 2: Set up ROI (MWS boundaries from GEE)
     # ------------------------------------------------------------------
     roi_path = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + f"filtered_mws_{valid_gee_text(district.lower())}"
-        + f"_{valid_gee_text(block.lower())}_uid"
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + f"filtered_mws_{valid_gee_text(district.lower())}"
+            + f"_{valid_gee_text(block.lower())}_uid"
     )
     mws_fc = ee.FeatureCollection(roi_path)
 
@@ -232,14 +232,14 @@ def generate_forest_fringe_layer(
             return ee.Feature(f.geometry()).set(
                 {
                     "uid": f.get("uid"),
-                    "mws_area_m2": mws_area, # TODO Change to hectares
-                    "forest_fringe_area_m2": fringe_area, # TODO Change to hectares
+                    "mws_area_m2": mws_area,  # TODO Change to hectares
+                    "forest_fringe_area_m2": fringe_area,  # TODO Change to hectares
                     "forest_fringe_ratio": fringe_to_mws_ratio,
-                    "tree_degradation_mws_area_m2": degr_mws_area, # TODO Change to hectares
-                    "tree_degradation_fringe_area_m2": degr_fringe_area, # TODO Change to hectares
+                    "tree_degradation_mws_area_m2": degr_mws_area,  # TODO Change to hectares
+                    "tree_degradation_fringe_area_m2": degr_fringe_area,  # TODO Change to hectares
                     "tree_degradation_fringe_ratio": degr_fringe_ratio,
-                    "tree_deforestation_mws_area_m2": defo_mws_area, # TODO Change to hectares
-                    "tree_deforestation_fringe_area_m2": defo_fringe_area, # TODO Change to hectares
+                    "tree_deforestation_mws_area_m2": defo_mws_area,  # TODO Change to hectares
+                    "tree_deforestation_fringe_area_m2": defo_fringe_area,  # TODO Change to hectares
                     "tree_deforestation_fringe_ratio": defo_fringe_ratio,
                 }
             )
@@ -291,12 +291,12 @@ def generate_forest_fringe_layer(
 
 
 def _save_to_db_and_sync_to_geoserver(
-    layer_name=None,
-    asset_id=None,
-    asset_suffix=None,
-    state=None,
-    district=None,
-    block=None,
+        layer_name=None,
+        asset_id=None,
+        asset_suffix=None,
+        state=None,
+        district=None,
+        block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fringe: save_to_db_and_sync_to_geoserver")
@@ -315,7 +315,7 @@ def _save_to_db_and_sync_to_geoserver(
     make_asset_public(asset_id)
 
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fringe")
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fringes")
     print(res)
 
     layer_at_geoserver = False

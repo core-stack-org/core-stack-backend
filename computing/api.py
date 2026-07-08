@@ -94,8 +94,7 @@ from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
 from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
-from .forest_fringe.forest_fringe import generate_forest_fringe_layer
-from .forest_fire.forest_fire import generate_forest_fire_layer
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 
 
 @api_security_check(allowed_methods="POST")
@@ -1945,7 +1944,6 @@ def generate_canal_vector(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 @api_view(["POST"])
 @schema(None)
 def generate_tree_in_grassland(request):
@@ -1979,14 +1977,14 @@ def generate_tree_in_grassland(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_forest_fringe(request):
-    print("Inside generate_forest_fringe API.")
+def forest_fringe_degradation(request):
+    print("Inside forest_fringe_degradation API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fringe_layer.apply_async(
+        generate_forest_fringe_degradation.apply_async(
             kwargs={
                 "state": state,
                 "district": district,

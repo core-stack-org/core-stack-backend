@@ -19,13 +19,10 @@ MAXPIX = 1e12
 
 PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
 
-LTP_CHANGE_PATH = (
-    "projects/corestack-datasets/assets/datasets/"
-    "tree_health/final_ltp_stp_change_2017_2021"
-)
+LTP_CHANGE_PATH = "projects/corestack-datasets/assets/datasets/tree_health/final_ltp_stp_change_2017_2021"
 
 OVERALL_CHANGE_PATH = (
-    "projects/corestack-trees/assets/tree_characteristics/" "overall_change_2017_2023"
+    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2023"
 )
 
 # LULC years used by the forest fringe pipeline
