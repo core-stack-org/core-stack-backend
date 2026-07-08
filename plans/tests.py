@@ -471,6 +471,30 @@ class FetchDbDataTest(TestCase):
 
         self.assertTrue(result)
 
+    def test_block_name_with_parentheses_matches_normalized_block_param(self):
+        _create_settlement(plan_id="42", block_name="Keonjhar (Kendujhar)")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "keonjhar_kendujhar", "42")
+
+        self.assertTrue(result)
+
+    def test_block_name_with_extra_spaces_matches_normalized_block_param(self):
+        _create_settlement(plan_id="42", block_name="Keonjhar  (Kendujhar)")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "keonjhar_kendujhar", "42")
+
+        self.assertTrue(result)
+
+    def test_block_name_with_multiple_parenthesized_segments_matches_normalized_block_param(self):
+        _create_settlement(plan_id="42", block_name="(Keonjhar) (Kendujhar)")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "keonjhar_kendujhar", "42")
+
+        self.assertTrue(result)
+
     def test_only_matching_plan_id_returned(self):
         _create_settlement(plan_id="42", block_name="test block", settlement_id="S1")
         _create_settlement(plan_id="99", block_name="test block", settlement_id="S2")

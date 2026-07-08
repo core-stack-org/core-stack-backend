@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+
+    <style>
+
+        body {
+            font-size: 12px;
+            line-height: 1.5;
+            margin: 24px;
+            font-family: "NotoSansDevanagari", sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .date {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 30px;
+            margin-bottom: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            table-layout: fixed;
+        }
+
+        td, th {
+            border: 1px solid #000;
+            padding: 8px;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+        }
+
+        th:nth-child(6),
+        td:nth-child(6) {
+            width: 22%;
+        }
+
+        .label {
+            font-weight: bold;
+            width: 35%;
+        }
+
+        tbody tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .nested-table {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin: 0;
+        }
+
+        .nested-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+
+        @font-face {
+            font-family: "NotoSansDevanagari";
+            src:   url("{{ font_regular }}");
+            font-weight: normal;
+        }
+
+        @font-face {
+            font-family: "NotoSansDevanagari";
+            src: url("{{ font_bold }}");
+            font-weight: bold;
+        }
+
+        .socio-table {
+            page-break-inside: auto;
+        }
+
+        .socio-table tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .footnote {
+            margin-top: 30px;
+            font-size: 10pt;
+            color: #555;
+            text-align: center;
+        }
+
+        .footnote hr {
+            margin-bottom: 10px;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <h1>
+        {{ t.common.dpr_title }}
+    </h1>
+
+    <div class="date">
+        {{ current_date }}
+    </div>
+
+    {% include "dpr/section_a.html" %}
+    {% include "dpr/section_b.html" %}
+    {% include "dpr/section_c_socio_economic.html" %}
+    {% include "dpr/section_c_mgnrega.html" %}
+    {% include "dpr/section_c_crop.html" %}
+    {% include "dpr/section_c_livelihood.html" %}
+    {% include "dpr/section_d_base.html" %}
+    {% include "dpr/section_d_mws_information.html" %}
+    {% include "dpr/section_d_well_summary.html" %}
+    {% include "dpr/section_d_detail_well_info.html" %}
+    {% include "dpr/section_d_water_structure_summary.html" %}
+    {% include "dpr/section_d_detail_water_structure.html" %}
+    {% include "dpr/section_e_base.html" %}
+    {% include "dpr/section_e_maintenance_work_by_asset_type.html" %}
+    {% include "dpr/section_e_recharge_structure.html" %}
+    {% include "dpr/section_e_irrigation_structure.html" %}
+    {% include "dpr/section_e_water_structure.html" %}
+    {% include "dpr/section_e_rs_swb.html" %}
+    {% include "dpr/section_f.html" %}
+    {% include "dpr/section_g.html" %}
+
+    <div class="footnote">
+        <hr>
+        <p>{{ footnote }}</p>
+    </div>
+
+
+</body>
+</html>

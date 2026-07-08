@@ -100,8 +100,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             "gender",
             "profile_picture",
             "account_type",
+            "user_consent",
         ]
         read_only_fields = ["id"]
+        extra_kwargs = {"user_consent": {"required": False, "default": False}}
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
@@ -169,6 +171,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             gender=validated_data.get("gender", ""),
             profile_picture=validated_data.get("profile_picture"),
             account_type=validated_data.get("account_type"),
+            user_consent=validated_data.get("user_consent", False),
         )
 
         if org_obj:

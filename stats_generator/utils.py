@@ -49,10 +49,10 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
 
     # Use append mode with if_sheet_exists='replace'
     with pd.ExcelWriter(
-        xlsx_file,
-        engine="openpyxl",
-        mode=mode,
-        if_sheet_exists="replace" if mode == "a" else None,
+            xlsx_file,
+            engine="openpyxl",
+            mode=mode,
+            if_sheet_exists="replace" if mode == "a" else None,
     ) as writer:
         for layer in fetch_layers_for_excel_generation():
             workspace = layer["workspace"]
@@ -88,13 +88,13 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             if workspace == "terrain":
                 create_excel_for_terrain(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "terrain_lulc"
-                and layer_name == f"{district}_{block}_lulc_slope"
+                    workspace == "terrain_lulc"
+                    and layer_name == f"{district}_{block}_lulc_slope"
             ):
                 create_excel_for_terrain_lulc_slope(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "terrain_lulc"
-                and layer_name == f"{district}_{block}_lulc_plain"
+                    workspace == "terrain_lulc"
+                    and layer_name == f"{district}_{block}_lulc_plain"
             ):
                 create_excel_for_terrain_lulc_plain(geojson_data, xlsx_file, writer)
             elif workspace == "swb":
@@ -140,8 +140,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
             elif (
-                workspace == "mws_layers"
-                and layer_name == f"deltaG_well_depth_{district}_{block}"
+                    workspace == "mws_layers"
+                    and layer_name == f"deltaG_well_depth_{district}_{block}"
             ):
                 parsed_data_annual_mws = parse_geojson_annual_mws(geojson_data)
                 create_excel_annual_mws(parsed_data_annual_mws, xlsx_file, writer)
@@ -152,8 +152,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 except Exception as e:
                     print("Exception", str(e))
             elif (
-                workspace == "mws_layers"
-                and layer_name == f"deltaG_fortnight_{district}_{block}"
+                    workspace == "mws_layers"
+                    and layer_name == f"deltaG_fortnight_{district}_{block}"
             ):
                 processed_data = [
                     process_feature(feature) for feature in geojson_data["features"]
@@ -178,34 +178,34 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "tree_overall_ch":
                 create_excel_for_overall_tree_change(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Afforestation"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Afforestation"
             ):
                 create_excel_chan_detection_afforestation(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_CropIntensity"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_CropIntensity"
             ):
                 create_excel_chan_detection_cropintensity(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Deforestation"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Deforestation"
             ):
                 create_excel_chan_detection_deforestation(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Degradation"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Degradation"
             ):
                 create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
             elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Urbanization"
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Urbanization"
             ):
                 create_excel_chan_detection_urbanization(
                     geojson_data, xlsx_file, writer
@@ -244,8 +244,10 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
             elif workspace == "drainage_density":
                 create_excel_for_drainage_density(geojson_data, writer)
-            elif workspace == "antyodaya_analysis":
+            elif workspace == "antyodaya_2020":
                 create_excel_for_antyodaya_20(geojson_data, writer)
+            elif workspace == "livestocks":
+                create_excel_for_livestock(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
@@ -254,24 +256,56 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     return results
 
 
+def create_excel_for_livestock(data, writer):
+    try:
+        features = data.get("features", [])
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+
+        # Columns to exclude
+        exclude_cols = ["state_name", "district_name", "TEHSIL"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+
+        if "pc11_village_id" in df.columns:
+            df = df[df["pc11_village_id"].notna() &(df["pc11_village_id"].astype(str).str.strip() != "") &(df["pc11_village_id"] != 0)]
+
+        # Keep important columns first if they exist
+        first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
+        other_cols = [c for c in df.columns if c not in first_cols]
+        df = df[first_cols + other_cols]
+
+        df.to_excel(writer, sheet_name="livestock", index=False)
+        print("Excel file created for livestock")
+    except Exception as e:
+        print(f"Error in getting livestock data: {e}")
+
+
 def create_excel_for_antyodaya_20(data, writer):
-    features = data.get("features", [])
-    df_data = [feature.get("properties", {}) for feature in features]
-    df = pd.DataFrame(df_data)
+    try:
+        features = data.get("features", [])
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
 
-    # Keep important columns first if they exist
-    first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
-    other_cols = [c for c in df.columns if c not in first_cols]
-    df = df[first_cols + other_cols]
+        if "village_id" in df.columns:
+            df = df[df["village_id"].notna() &(df["village_id"].astype(str).str.strip() != "") &(df["village_id"] != 0)]
 
-    # Round numeric columns
-    numeric_cols = df.select_dtypes(include=["number"]).columns
-    df[numeric_cols] = df[numeric_cols].round(2)
-    df.to_excel(writer, sheet_name="antyodaya", index=False)
-    print("Excel file created for antyodaya")
+        # Keep important columns first if they exist
+        first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
+        other_cols = [c for c in df.columns if c not in first_cols]
+        df = df[first_cols + other_cols]
+
+        # Round numeric columns
+        numeric_cols = df.select_dtypes(include=["number"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="antyodaya", index=False)
+        print("Excel file created for antyodaya")
+    except Exception as e:
+        print(f"Error in getting antyodaya data: {e}")
 
 
 def create_excel_for_drainage_density(data, writer):
+    import ast
+
     print("Inside create_excel_for Drainage Density")
     df_data = []
     features = data["features"]
@@ -281,7 +315,15 @@ def create_excel_for_drainage_density(data, writer):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "drainage_density": properties.get("drainage_density", ""),
+            "drainage_density_weighted_in_km_per_km2": properties.get(
+                "drainage_density_weighted", ""
+            ),
+            "drainage_density_std_in_km_per_km2": properties.get(
+                "drainage_density_std", ""
+            ),
+            "stream_order_length_in_km": sum(
+                ast.literal_eval(properties.get("stream_length_km", ""))
+            ),
         }
 
         df_data.append(row)
@@ -346,44 +388,50 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
 
 def create_excel_for_canal(data, writer):
     print("Inside create_excel_for Canal")
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties.get("uid", ""),
-            "project_name": properties.get("prjname", ""),
-            "canal_code": properties.get("cancode", ""),
-            "canal_name": properties.get("canname", ""),
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties.get("uid", ""),
+                "project_name": properties.get("prjname", ""),
+                "canal_code": properties.get("cancode", ""),
+                "canal_name": properties.get("canname", ""),
+            }
 
-        df_data.append(row)
+            df_data.append(row)
 
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="canal", index=False)
-    print("Excel file created for canal")
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="canal", index=False)
+        print("Excel file created for canal")
+    except Exception as e:
+        print("Canal Layer not found :: ", e)
 
 
 def create_excel_for_river(data, writer):
     print("Inside create_excel_for River")
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties.get("uid", ""),
-            "river_name": properties.get("rivname", ""),
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties.get("uid", ""),
+                "river_name": properties.get("rivname", ""),
+            }
 
-        df_data.append(row)
+            df_data.append(row)
 
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="river", index=False)
-    print("Excel file created for river")
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="river", index=False)
+        print("Excel file created for river")
+    except Exception as e:
+        print("River Layer not found :: ", e)
 
 
 def create_excel_for_dem(data, writer):
@@ -397,9 +445,9 @@ def create_excel_for_dem(data, writer):
 
         row = {
             "UID": properties.get("uid", ""),
-            "min_elevation": properties.get("min_elevation", ""),
-            "max_elevation": properties.get("max_elevation", ""),
-            "mean_elevation": properties.get("mean_elevation", ""),
+            "min_elevation_in_m": properties.get("min_elevation", ""),
+            "max_elevation_in_m": properties.get("max_elevation", ""),
+            "mean_elevation_in_m": properties.get("mean_elevation", ""),
         }
 
         df_data.append(row)
@@ -470,19 +518,43 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
 
 
 def create_excel_for_facilities(data, writer):
-    features = data["features"]
-    df_data = [feature["properties"] for feature in features]
+    try:
+        features = data["features"]
+        df_data = [feature["properties"] for feature in features]
 
-    df = pd.DataFrame(df_data)
+        df = pd.DataFrame(df_data)
+        if "censuscode2011" in df.columns:
+            df = df[df["censuscode2011"].notna() &(df["censuscode2011"].astype(str).str.strip() != "") &(df["censuscode2011"] != 0)]
 
-    # keep first columns
-    first_cols = ["censuscode2011", "censusname"]
-    other_cols = [c for c in df.columns if c not in first_cols]
-    df = df[first_cols + other_cols]
-    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-    df[numeric_cols] = df[numeric_cols].round(2)
-    df.to_excel(writer, sheet_name="facilities_proximity", index=False)
-    print("Excel file created for facilities_proximity")
+        first_cols = ["censuscode2011", "censusname"]
+        other_cols = [c for c in df.columns if c not in first_cols]
+        df = df[first_cols + other_cols]
+
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+
+        exclude_cols = [
+            "censuscode2011",
+            "censusname",
+            "district",
+            "core_admin_uid",
+            "shrid2",
+            "state",
+            "tehsil",
+        ]
+        df.rename(
+            columns={
+                col: f"{col}_in_km" for col in df.columns if col not in exclude_cols
+            },
+            inplace=True,
+        )
+
+        # Write to Excel
+        df.to_excel(writer, sheet_name="facilities_proximity", index=False)
+
+        print("Excel file created for facilities_proximity")
+    except Exception as e:
+        print("facilities_proximity Layer not found :: ", e)
 
 
 def create_excel_for_mws(data, writer):
@@ -571,108 +643,123 @@ def create_excel_for_stream_order(data, writer):
 
 
 def create_excel_for_mining(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "division": properties["company_na"],
-            "proposal": properties["proposal"],
-            "sector_moefcc": properties["sector_moe"],
-            "village": properties["village"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "division": properties["company_na"],
+                "proposal": properties["proposal"],
+                "sector_moefcc": properties["sector_moe"],
+                "village": properties["village"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df.replace("", "unknown", inplace=True)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="mining", index=False)
-    print("Excel file created for mining")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df.replace("", "unknown", inplace=True)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="mining", index=False)
+        print("Excel file created for mining")
+    except Exception as e:
+        print("Mining Layer not found :: ", e)
 
 
 def create_excel_for_green_credit(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "division": properties["division"],
-            # "parcel_id": properties["parcel_id"],
-            "land_info": properties["land_info"],
-            "kml_url": properties["kml_url"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "division": properties["division"],
+                # "parcel_id": properties["parcel_id"],
+                "land_info": properties["land_info"],
+                "kml_url": properties["kml_url"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="green_credit", index=False)
-    print("Excel file created for green_credit")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="green_credit", index=False)
+        print("Excel file created for green_credit")
+    except Exception as e:
+        print("green credit Layer not found :: ", e)
 
 
 def create_excel_for_factory_csr(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "Company_Name": properties["COMPANY NA"],
-            "ADDRESS": properties["ADDRESS"],
-            "LOCATION T": properties["LOCATION T"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "Company_Name": properties["COMPANY NA"],
+                "ADDRESS": properties["ADDRESS"],
+                "LOCATION T": properties["LOCATION T"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="factory_csr", index=False)
-    print("Excel file created for factory_csr")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="factory_csr", index=False)
+        print("Excel file created for factory_csr")
+    except Exception as e:
+        print("factory csr Layer not found :: ", e)
 
 
 def create_excel_for_agroecological(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "organization_name": properties["organization_name"],
-            "organization_type": properties["organization_type"],
-            "created_at": properties["created_at"],
-            "contact_person": properties["contact_person"],
-            "email": properties["email"],
-            "domains": properties["domains"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "organization_name": properties["organization_name"],
+                "organization_type": properties["organization_type"],
+                "created_at": properties["created_at"],
+                "contact_person": properties["contact_person"],
+                "email": properties["email"],
+                "domains": properties["domains"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="agroecological", index=False)
-    print("Excel file created for agroecological")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="agroecological", index=False)
+        print("Excel file created for agroecological")
+    except Exception as e:
+        print("agroecological Layer not found :: ", e)
 
 
 def create_excel_for_lcw(data, writer):
-    df_data = []
-    features = data["features"]
+    try:
+        df_data = []
+        features = data["features"]
 
-    for feature in features:
-        properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "title_of_conflict": properties["Title of Conflict"],
-            "link_to_conflict": properties["Link to conflict"],
-        }
+        for feature in features:
+            properties = feature["properties"]
+            row = {
+                "UID": properties["uid"],
+                "title_of_conflict": properties["Title of Conflict"],
+                "link_to_conflict": properties["Link to conflict"],
+            }
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
-    df = df.sort_values(["UID"])
-    df.to_excel(writer, sheet_name="lcw_conflict", index=False)
-    print("Excel file created for lcw_conflict")
+            df_data.append(row)
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(["UID"])
+        df.to_excel(writer, sheet_name="lcw_conflict", index=False)
+        print("Excel file created for lcw_conflict")
+    except Exception as e:
+        print("lcw Layer not found :: ", e)
 
 
 def create_excel_for_soge(data, xlsx_file, writer):
@@ -1382,7 +1469,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
         parts = uid.split("_")
         num_uid_parts_is = [
-            f"{parts[i]}_{parts[i+1]}" for i in range(0, len(parts) - 1, 2)
+            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
         ]
         if len(parts) % 2 == 1:  # Check for an unpaired last part
             num_uid_parts_is.append(parts[-1])
@@ -1394,7 +1481,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             row = {"UID": num_uid_part}
 
             for year in years:
-                short_year = f"{str(year)[-2:]}-{str(year+1)[-2:]}"
+                short_year = f"{str(year)[-2:]}-{str(year + 1)[-2:]}"
 
                 # Construct keys dynamically using the shortened year format
                 total_area_key = f"area_{short_year}"
@@ -1409,16 +1496,16 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
                 zaid_percentage = properties.get(zaid_key, 0)
 
                 # Calculate areas
-                row[f"total_area_in_ha_{year}-{year+1}"] = total_area / len(
+                row[f"total_area_in_ha_{year}-{year + 1}"] = total_area / len(
                     num_uid_parts_is
                 )
-                row[f"kharif_area_in_ha_{year}-{year+1}"] = calculate_area(
+                row[f"kharif_area_in_ha_{year}-{year + 1}"] = calculate_area(
                     total_area, kharif_percentage
                 ) / len(num_uid_parts_is)
-                row[f"rabi_area_in_ha_{year}-{year+1}"] = calculate_area(
+                row[f"rabi_area_in_ha_{year}-{year + 1}"] = calculate_area(
                     total_area, rabi_percentage
                 ) / len(num_uid_parts_is)
-                row[f"zaid_area_in_ha_{year}-{year+1}"] = calculate_area(
+                row[f"zaid_area_in_ha_{year}-{year + 1}"] = calculate_area(
                     total_area, zaid_percentage
                 ) / len(num_uid_parts_is)
 
@@ -1442,7 +1529,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
 
 def create_excel_for_nrega_assets(
-    nrega_data, mws_data, output_file, writer, start_year, end_year
+        nrega_data, mws_data, output_file, writer, start_year, end_year
 ):
     workCategoryMapping = {
         "SWC - Landscape level impact": "Soil and water conservation",
@@ -1546,7 +1633,7 @@ def create_excel_for_nrega_assets(
 
 
 def create_excel_village_nrega_assets(
-    result_df, output_file, writer, all_villages_df, start_year, end_year
+        result_df, output_file, writer, all_villages_df, start_year, end_year
 ):
     workCategoryMapping = {
         "SWC - Landscape level impact": "Soil and water conservation",
@@ -1591,7 +1678,7 @@ def create_excel_village_nrega_assets(
             continue
 
         mask = (final_df["vill_id"] == row["vill_ID"]) & (
-            final_df["vill_name"] == row["vill_name"]
+                final_df["vill_name"] == row["vill_name"]
         )
         col_name = f"{category}_count_{year}"
         final_df.loc[mask, col_name] += 1
@@ -1611,7 +1698,7 @@ def create_excel_village_nrega_assets(
 
 
 def fetch_village_asset_count(
-    state, district, block, writer, output_file, start_year, end_year
+        state, district, block, writer, output_file, start_year, end_year
 ):
     # 1. Read village data
     village_gdf = gpd.read_file(get_url("panchayat_boundaries", f"{district}_{block}"))[

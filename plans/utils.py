@@ -30,12 +30,17 @@ def normalize_name(name):
     """
     Normalize names for comparison by:
     - Converting to lowercase
-    - Replacing spaces with underscores
-    - Removing extra whitespace
+    - Removing punctuation such as parentheses
+    - Collapsing separators to underscores
+    - Canonicalizing known spelling variants
     """
     if not name:
         return ""
-    return name.lower().replace(" ", "_").strip()
+    normalized = re.sub(r"[()]", " ", str(name).lower())
+    normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
+    normalized = re.sub(r"_+", "_", normalized).strip("_")
+
+    return normalized
 
 _RESOURCE_TYPES_FLAT_HEADER = frozenset({
     "settlement", "well", "waterbody", "cropping",
@@ -590,7 +595,7 @@ def fetch_db_data(csv_path, resource_type, block, plan_id) -> int:
         f"fetch_db_data: querying {model.__name__}.{data_field} "
         f"with plan_id={plan_id}, is_deleted=False"
         + (
-            f", block_name icontains '{block}'"
+            ", block_name filtered in Python via normalize_name(...)"
             if has_block_col
             else " (no block_name column, skipping DB block filter)"
         )
@@ -602,8 +607,6 @@ def fetch_db_data(csv_path, resource_type, block, plan_id) -> int:
     )
 
     qs = model.objects.filter(plan_id=str(plan_id), is_deleted=False)
-    if has_block_col:
-        qs = qs.filter(block_name__icontains=block.replace("_", " ").strip())
 
     raw_rows = list(qs.values(data_field, *projection_fields))
     logger.info(

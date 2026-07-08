@@ -190,9 +190,9 @@ def initialize_document():
     doc = Document()
     heading = doc.add_heading("Detailed Project Report", 0)
     heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
-    doc.add_paragraph(
-        date.today().strftime("%B %d, %Y")
-    ).alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    doc.add_paragraph(date.today().strftime("%B %d, %Y")).alignment = (
+        WD_PARAGRAPH_ALIGNMENT.CENTER
+    )
     return doc
 
 

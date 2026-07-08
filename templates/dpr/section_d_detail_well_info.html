@@ -1,0 +1,87 @@
+<div class="section">
+
+    <h3>{{ t.section_d_detail_well.title }}</h3>
+
+    {% for well in section_d.wells %}
+
+    <h4>
+        {{ well.settlement|default:t.common.na }}
+    </h4>
+
+    <table>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.mws_id }}</td>
+            <td>{{ well.mws_id|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.beneficiary_settlement }}</td>
+            <td>{{ well.settlement|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.well_type }}</td>
+            <td>{{ well.well_type|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.well_owner }}</td>
+            <td>{{ well.owner|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.beneficiary_name }}</td>
+            <td>{{ well.beneficiary_name|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.beneficiary_father_name }}</td>
+            <td>{{ well.father_name|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.water_availability }}</td>
+            <td>{{ well.water_availability|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.households_benefitted }}</td>
+            <td>{{ well.households_benefitted|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.caste_use }}</td>
+            <td>{{ well.caste_uses|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.well_usage }}</td>
+            <td>{{ well.well_usage|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.need_maintenance }}</td>
+            <td>{{ well.need_maintenance|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.repair_activities }}</td>
+            <td>{{ well.repair_activities|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.latitude }}</td>
+            <td>{{ well.latitude|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_well.longitude }}</td>
+            <td>{{ well.longitude|default:t.common.na }}</td>
+        </tr>
+
+    </table>
+
+    {% endfor %}
+
+</div>

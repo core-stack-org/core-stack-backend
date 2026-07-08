@@ -75,6 +75,7 @@ from .views import (
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
     clear_layer_cache,
+    check_missing_excel_files,
 )
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
@@ -90,6 +91,7 @@ from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
@@ -2030,4 +2032,15 @@ def generate_forest_fire(request):
         )
     except Exception as e:
         print("Exception in generate_forest_fire api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_excel(request):
+    try:
+        result = check_missing_excel_files()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in missing_excel api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

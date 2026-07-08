@@ -17,7 +17,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 def get_change_detection(
-    self, state, district, block, start_year, end_year, gee_account_id
+        self, state, district, block, start_year, end_year, gee_account_id
 ):
     """
     This function will generate change detection raster for urbanization, Degradation,
@@ -134,7 +134,7 @@ def built_up(roi_boundary, l1_asset):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -174,7 +174,7 @@ def change_degradation(roi_boundary, l1_asset):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -338,7 +338,7 @@ def change_deforestation_afforestation(roi_boundary, l1_asset, lulc_projection):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -415,7 +415,7 @@ def change_cropping_intensity(roi_boundary, l1_asset):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -458,7 +458,7 @@ def change_cropping_intensity(roi_boundary, l1_asset):
 
 
 def sync_to_gcs_geoserver(
-    state, district, block, description, param_list, layer_ids, start_year, end_year
+        state, district, block, description, param_list, layer_ids, start_year, end_year
 ):
     task_list = []
 

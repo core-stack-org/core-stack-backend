@@ -36,9 +36,11 @@ from utilities.constants import (
 logger = logging.getLogger(__name__)
 
 from .build_layer import build_layer
-from .models import ODKSyncLog, Plan
+from .models import ODKSyncLog, PlanApp, Plan
 from .serializers import PlanAppSerializer
 from .utils import fetch_bearer_token, fetch_db_data
+from geoadmin.models import GramPanchayat
+from django.db.models import Q
 
 _COMMON_REQUIRED_FIELDS: Tuple[str, ...] = (
     "layer_name",
