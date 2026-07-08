@@ -87,7 +87,7 @@ def generate_forest_fringe_degradation(
     )
     asset_folder_list = [state, district, block]
 
-    description = f"forest_fringe_{asset_suffix}_1"
+    description = f"forest_fringe_{asset_suffix}"
     layer_name = f"{asset_suffix}_forest_fringe"
 
     asset_id = (

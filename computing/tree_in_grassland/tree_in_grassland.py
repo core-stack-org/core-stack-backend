@@ -87,7 +87,7 @@ def generate_tree_in_grassland_layer(
     )
     asset_folder_list = [state, district, block]
 
-    description = f"tree_in_grassland_{asset_suffix}_{start_year}_{end_year}_1"
+    description = f"tree_in_grassland_{asset_suffix}_{start_year}_{end_year}"
     layer_name = f"{asset_suffix}_tree_in_grassland"
 
     asset_id = (
