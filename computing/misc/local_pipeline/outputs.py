@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,38 @@ def stable_hash(data: Any) -> str:
 
     payload = json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def scope_output_identity(prefix: str, scope: Any) -> tuple[tuple[str, ...], str]:
+    """Return output directory parts and a stable layer/result name for a scope."""
+
+    level = str(getattr(scope, "level", "") or "").lower()
+    state = slug(getattr(scope, "state_name", None))
+    district = slug(getattr(scope, "district_name", None))
+    tehsil = slug(getattr(scope, "tehsil_name", None))
+    if level == "state":
+        parts = tuple(part for part in (state,) if part)
+        return parts, "_".join(part for part in (prefix, state) if part)
+    if level == "district":
+        parts = tuple(part for part in (state, district) if part)
+        return parts, "_".join(part for part in (prefix, district) if part)
+    if level == "village":
+        village_ids = tuple(str(value) for value in (getattr(scope, "village_ids", None) or ()))
+        digest = stable_hash({"village_ids": village_ids})[:10] if village_ids else "unknown"
+        return ("village", digest), f"{prefix}_village_{digest}"
+    parts = tuple(part for part in (state, district, tehsil) if part)
+    return parts, "_".join(part for part in (prefix, district, tehsil) if part)
+
+
+def mark_cached_result(result: Mapping[str, Any], started: float) -> dict[str, Any]:
+    """Annotate a cached result with current lookup timing and original timing."""
+
+    cached = dict(result)
+    cached["cache_hit"] = True
+    cached["cached_result_elapsed_seconds"] = cached.get("elapsed_seconds")
+    cached["cache_lookup_seconds"] = round(time.perf_counter() - started, 3)
+    cached["elapsed_seconds"] = cached["cache_lookup_seconds"]
+    return cached
 
 
 def file_signature(path: str | Path) -> dict[str, Any]:
@@ -64,19 +97,35 @@ def input_signatures(paths: Mapping[str, str | Path]) -> dict[str, dict[str, Any
 def dataframe_eda(frame: pd.DataFrame, *, max_numeric_columns: int = 80) -> dict[str, Any]:
     """Build a compact EDA summary for a tabular or geospatial output."""
 
+    column_names = [str(column) for column in frame.columns]
+    seen: dict[str, int] = {}
+    summary_names: list[str] = []
+    null_counts: dict[str, int] = {}
+    for position, column in enumerate(frame.columns):
+        name = str(column)
+        seen[name] = seen.get(name, 0) + 1
+        summary_name = name if seen[name] == 1 else f"{name}__{seen[name]}"
+        summary_names.append(summary_name)
+        null_counts[summary_name] = int(frame.iloc[:, position].isna().sum())
+
     summary: dict[str, Any] = {
         "row_count": int(len(frame)),
         "column_count": int(len(frame.columns)),
-        "columns": [str(column) for column in frame.columns],
-        "null_counts": {str(column): int(frame[column].isna().sum()) for column in frame.columns},
+        "columns": column_names,
+        "null_counts": null_counts,
     }
     if "geometry" in frame.columns:
-        summary["null_geometry_count"] = int(frame["geometry"].isna().sum())
+        geometry_position = column_names.index("geometry")
+        summary["null_geometry_count"] = int(frame.iloc[:, geometry_position].isna().sum())
     numeric = frame.select_dtypes(include="number")
     numeric_summary: dict[str, dict[str, float | int | None]] = {}
-    for column in list(numeric.columns)[:max_numeric_columns]:
-        series = numeric[column].dropna()
-        numeric_summary[str(column)] = {
+    numeric_seen: dict[str, int] = {}
+    for position, column in enumerate(list(numeric.columns)[:max_numeric_columns]):
+        name = str(column)
+        numeric_seen[name] = numeric_seen.get(name, 0) + 1
+        summary_name = name if numeric_seen[name] == 1 else f"{name}__{numeric_seen[name]}"
+        series = numeric.iloc[:, position].dropna()
+        numeric_summary[summary_name] = {
             "count": int(series.count()),
             "min": None if series.empty else float(series.min()),
             "mean": None if series.empty else float(series.mean()),
