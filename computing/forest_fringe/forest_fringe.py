@@ -87,7 +87,7 @@ def generate_forest_fringe_degradation(
     )
     asset_folder_list = [state, district, block]
 
-    description = f"forest_fringe_{asset_suffix}"
+    description = f"forest_fringe_{asset_suffix}_1"
     layer_name = f"{asset_suffix}_forest_fringe"
 
     asset_id = (
@@ -232,14 +232,22 @@ def generate_forest_fringe_degradation(
             return ee.Feature(f.geometry()).set(
                 {
                     "uid": f.get("uid"),
-                    "mws_area_m2": mws_area,  # TODO Change to hectares
-                    "forest_fringe_area_m2": fringe_area,  # TODO Change to hectares
+                    "mws_area_in_ha": mws_area.multiply(0.0001),
+                    "forest_fringe_area_in_ha": fringe_area.multiply(0.0001),
                     "forest_fringe_ratio": fringe_to_mws_ratio,
-                    "tree_degradation_mws_area_m2": degr_mws_area,  # TODO Change to hectares
-                    "tree_degradation_fringe_area_m2": degr_fringe_area,  # TODO Change to hectares
+                    "tree_degradation_mws_area_in_ha": ee.Number(
+                        degr_mws_area
+                    ).multiply(0.0001),
+                    "tree_degradation_fringe_area_in_ha": ee.Number(
+                        degr_fringe_area
+                    ).multiply(0.0001),
                     "tree_degradation_fringe_ratio": degr_fringe_ratio,
-                    "tree_deforestation_mws_area_m2": defo_mws_area,  # TODO Change to hectares
-                    "tree_deforestation_fringe_area_m2": defo_fringe_area,  # TODO Change to hectares
+                    "tree_deforestation_mws_area_in_ha": ee.Number(
+                        defo_mws_area
+                    ).multiply(0.0001),
+                    "tree_deforestation_fringe_area_in_ha": ee.Number(
+                        defo_fringe_area
+                    ).multiply(0.0001),
                     "tree_deforestation_fringe_ratio": defo_fringe_ratio,
                 }
             )
@@ -250,14 +258,14 @@ def generate_forest_fringe_degradation(
         fc = results_fc.select(
             [
                 "uid",
-                "mws_area_m2",
-                "forest_fringe_area_m2",
+                "mws_area_in_ha",
+                "forest_fringe_area_in_ha",
                 "forest_fringe_ratio",
-                "tree_degradation_mws_area_m2",
-                "tree_degradation_fringe_area_m2",
+                "tree_degradation_mws_area_in_ha",
+                "tree_degradation_fringe_area_in_ha",
                 "tree_degradation_fringe_ratio",
-                "tree_deforestation_mws_area_m2",
-                "tree_deforestation_fringe_area_m2",
+                "tree_deforestation_mws_area_in_ha",
+                "tree_deforestation_fringe_area_in_ha",
                 "tree_deforestation_fringe_ratio",
             ]
         )
