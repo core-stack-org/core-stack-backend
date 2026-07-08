@@ -4,14 +4,26 @@ from nrm_app.settings import GEE_STORAGE_PROJECT, GEE_STORAGE_PROJECT_HELPER
 # Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
+ADMIN_BOUNDARY_GPKG = "data/admin-boundary/cs_admin_standard.gpkg"
 
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
-ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
-LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
-FACILITIES_MASTER_GPKG = "data/facilities/outputs/pan_india_facilities.gpkg"
+ANTYODAYA_2020_GPKG = "data/antyodaya/output/cs_antyodaya_2020.gpkg"
+LIVESTOCKS_GPKG = "data/livestock/cs_village_livestock_census_20.gpkg"
+FACILITY_POINTS_GPKG = "data/facilities/outputs/cs_pan_india_facilities.gpkg"
 FACILITIES_PROXIMITY_GPKG = "data/facilities/outputs/cs_village_facility_proximity.gpkg"
+
+ANTYODAYA_2020_DATA = "data/base_resources/cs_antyodaya_2020_cluster_analysis.csv"
+LIVESTOCKS_DATA = "data/base_resources/cs_livestock_census_20.csv"
+
+
+# geoserver workspace
+TEST_GEOSERVER_WORKSPACE = "pipelines_testing_v2"
+FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
+ANTYODAYA_GEOSERVER_WORKSPACE = "antyodaya"
+LIVESTOCKS_GEOSERVER_WORKSPACE = "livestock"
+
 
 MERGE_MWS_PATH = "data/merge_mws"
 
@@ -193,13 +205,6 @@ AGROECOLOGICAL_PAN_INDIA_DATASET = (
     "projects/ext-datasets/assets/datasets/Agroecological_space_pan_india"
 )
 
-GEE_FACILITIES_DATASET_PATH = (
-    "projects/corestack-datasets/assets/datasets/pan_india_facilities_v2"
-)
-GEE_FACILITIES_VILLAGE_PROXIMITY_DATASET_PATH = (
-    "projects/corestack-datasets/assets/datasets/village_facility_proximity_v2"
-)
-
 GEE_PATHS = {
     "MWS": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/mws/",
@@ -336,9 +341,6 @@ CRS_4326 = "EPSG:4326"
 
 # Algorithm
 DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
-
-# workspace
-FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity_test_v2"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"

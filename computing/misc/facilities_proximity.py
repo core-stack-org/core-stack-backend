@@ -27,9 +27,9 @@ from computing.utils import (
 from nrm_app.celery import app
 from utilities.constants import (
     FACILITIES_DATASET_NAME,
-    FACILITIES_MASTER_GPKG,
-    FACILITIES_GEOSERVER_WORKSPACE,
+    FACILITY_POINTS_GPKG,
     FACILITIES_PROXIMITY_GPKG,
+    FACILITIES_GEOSERVER_WORKSPACE,
 )
 from utilities.geoserver_utils import Geoserver, GeoserverException
 
@@ -42,6 +42,14 @@ SOURCE_L2_TABLE = "proximity_l2_materialized"
 SOURCE_CLASS_MAP_TABLE = "proximity_class_map"
 SOURCE_NEAREST_TABLE = "proximity_nearest_facilities"
 SOURCE_FACILITIES_TABLE = "facilities"
+SOURCE_REQUIRED_INDEXES = (
+    (
+        "idx_village_shapes_location_lookup",
+        SOURCE_VILLAGE_LAYER,
+        f'CREATE INDEX idx_village_shapes_location_lookup '
+        f'ON "{SOURCE_VILLAGE_LAYER}" ("state_name", "district_name", "TEHSIL")',
+    ),
+)
 VILLAGE_ID_COL = "cs_feature_id"
 OUTPUT_DIR = "data/facilities/outputs/tehsil_data"
 LAYER_PREFIX = "facilities"
@@ -115,7 +123,7 @@ def _source_path() -> Path:
 
 
 def _facilities_path() -> Path:
-    path = _repo_path(FACILITIES_MASTER_GPKG)
+    path = _repo_path(FACILITY_POINTS_GPKG)
     if not path.exists():
         raise FileNotFoundError(f"Facilities master source not found: {path}")
     return path
@@ -243,9 +251,50 @@ def _require_source_tables(connection: sqlite3.Connection) -> None:
         )
 
 
+def _index_exists(connection: sqlite3.Connection, index_name: str) -> bool:
+    return (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?",
+            (index_name,),
+        ).fetchone()
+        is not None
+    )
+
+
+@lru_cache(maxsize=4)
+def _ensure_source_indexes(source_path_text: str) -> None:
+    source_path = Path(source_path_text)
+    with _source_connection(source_path) as connection:
+        _require_source_tables(connection)
+        missing = [
+            (index_name, table_name, create_sql)
+            for index_name, table_name, create_sql in SOURCE_REQUIRED_INDEXES
+            if not _index_exists(connection, index_name)
+        ]
+        if not missing:
+            return
+
+        for index_name, table_name, create_sql in missing:
+            logger.warning(
+                "Facilities proximity source missing index %s on %s; creating it once for fast tehsil lookup.",
+                index_name,
+                table_name,
+            )
+            try:
+                connection.execute(create_sql)
+            except sqlite3.Error as exc:
+                raise RuntimeError(
+                    "Facilities proximity source is missing required lookup index "
+                    f"{index_name} and it could not be created on {source_path}. "
+                    "Rebuild the source asset with this index, or make the local GPKG writable."
+                ) from exc
+        connection.commit()
+
+
 @lru_cache(maxsize=1)
 def _location_rows() -> tuple[tuple[str, str, str], ...]:
     source_path = _source_path()
+    _ensure_source_indexes(source_path.as_posix())
     with sqlite3.connect(source_path) as connection:
         _require_source_tables(connection)
         rows = connection.execute(
@@ -305,6 +354,7 @@ def _gpkg_geometry_to_shape(blob: bytes | memoryview | None):
 def _read_villages(state_name: str, district_name: str, tehsil_name: str):
     gpd = _gpd()
     source_path = _source_path()
+    _ensure_source_indexes(source_path.as_posix())
     columns = [
         "fid",
         *VILLAGE_CONTEXT_COLUMNS,
@@ -992,9 +1042,9 @@ def generate_facilities_proximity(
         selected_outputs,
     )
 
-    resolved_state = _canonical_asset_name(state)
-    resolved_district = _canonical_asset_name(district)
-    resolved_block = _canonical_asset_name(block)
+    resolved_state = str(state or "").strip()
+    resolved_district = str(district or "").strip()
+    resolved_block = str(block or "").strip()
     try:
         t0 = time.perf_counter()
         logger.info("Facilities proximity reading villages: %s/%s/%s", resolved_state, resolved_district, resolved_block)
