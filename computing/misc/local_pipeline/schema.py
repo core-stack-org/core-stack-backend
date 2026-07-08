@@ -13,6 +13,24 @@ import yaml
 from .admin import AdminScope
 
 
+def coerce_bool(value: Any, default: bool = False) -> bool:
+    """Parse booleans from API, YAML, and form-style string values."""
+
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"1", "true", "t", "yes", "y", "on"}:
+            return True
+        if text in {"0", "false", "f", "no", "n", "off"}:
+            return False
+    return bool(value)
+
+
 def load_config(path: str | Path) -> dict[str, Any]:
     """Load a YAML or JSON config file."""
 
@@ -57,7 +75,7 @@ class OutputOptions:
         for field in cls.__dataclass_fields__.values():
             if field.name == "mode":
                 continue
-            merged[field.name] = bool(merged[field.name])
+            merged[field.name] = coerce_bool(merged[field.name], bool(getattr(cls, field.name)))
         return cls(**{field.name: merged[field.name] for field in cls.__dataclass_fields__.values()})
 
 
@@ -72,10 +90,10 @@ class PublishOptions:
     def from_mapping(cls, data: Mapping[str, Any] | None) -> "PublishOptions":
         values = dict(data or {})
         return cls(
-            sync_to_geoserver=bool(values.get("sync_to_geoserver", True)),
-            overwrite=bool(values.get("overwrite", True)),
-            register_layers=bool(values.get("register_layers", False)),
-            use_pregenerated=bool(values.get("use_pregenerated", False)),
+            sync_to_geoserver=coerce_bool(values.get("sync_to_geoserver"), True),
+            overwrite=coerce_bool(values.get("overwrite"), True),
+            register_layers=coerce_bool(values.get("register_layers"), False),
+            use_pregenerated=coerce_bool(values.get("use_pregenerated"), False),
         )
 
 
