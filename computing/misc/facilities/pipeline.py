@@ -16,7 +16,9 @@ from django.conf import settings
 from scipy.spatial import cKDTree
 
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
+from computing.misc.local_pipeline.admin import admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
+from computing.misc.local_pipeline.schema import OutputOptions
 from computing.misc.local_pipeline.gpkg import (
     IndexSpec,
     column_expression,
@@ -55,6 +57,7 @@ def _request_from_legacy_args(
     gee_account_id: str | None = None,
     sync_to_geoserver: bool = True,
     overwrite: bool = True,
+    output_mode: str = "focused",
 ) -> StandardRequest:
     return StandardRequest.from_mapping(
         {
@@ -70,13 +73,8 @@ def _request_from_legacy_args(
                 "register_layers": False,
             },
             "outputs": {
-                "gpkg": True,
-                "csv": True,
-                "readme": True,
-                "eda": True,
-                "stac": True,
+                "mode": output_mode,
                 "geoserver": sync_to_geoserver,
-                "excel_ready_csv": False,
             },
             "legacy": {"gee_account_id": gee_account_id},
         }
@@ -100,6 +98,30 @@ def _ensure_facility_indexes(config: Mapping[str, Any]) -> list[str]:
 
 
 def _taxonomy(config: Mapping[str, Any]) -> pd.DataFrame:
+    classification_path = config.get("sources", {}).get("classification_yaml")
+    if classification_path:
+        classification = load_config(_repo_path(classification_path))
+        rows: list[dict[str, Any]] = []
+        l2_rollups = {
+            item["key"]: item.get("rollup", "direct")
+            for item in classification.get("l2_groups", [])
+        }
+        for sort_order, item in enumerate(classification.get("l3_classes", [])):
+            rows.append(
+                {
+                    "class_l1_domain": item.get("class_l1_domain"),
+                    "class_l2_filter_group": item.get("class_l2_filter_group"),
+                    "class_l3_facility_class": item.get("key"),
+                    "class_l3_label": item.get("label"),
+                    "configured_subtypes": ";".join(item.get("configured_subtypes", []) or []),
+                    "filter_logic": l2_rollups.get(item.get("class_l2_filter_group"), "direct"),
+                    "sort_order": sort_order,
+                }
+            )
+        taxonomy = pd.DataFrame(rows)
+        if not taxonomy.empty:
+            return taxonomy
+
     taxonomy = read_table(
         _repo_path(config["sources"]["facilities_gpkg"]),
         config["sources"]["taxonomy_table"],
@@ -107,6 +129,37 @@ def _taxonomy(config: Mapping[str, Any]) -> pd.DataFrame:
     if "sort_order" in taxonomy.columns:
         taxonomy = taxonomy.sort_values("sort_order")
     return taxonomy
+
+
+def _classification(config: Mapping[str, Any]) -> dict[str, Any]:
+    path = config.get("sources", {}).get("classification_yaml")
+    if path:
+        return load_config(_repo_path(path))
+    taxonomy = _taxonomy(config)
+    l2_groups: list[dict[str, Any]] = []
+    for group, rows in taxonomy.groupby("class_l2_filter_group", sort=False):
+        logic_values = [value for value in rows.get("filter_logic", pd.Series(dtype=str)).dropna().astype(str).unique() if value]
+        l2_groups.append(
+            {
+                "key": group,
+                "label": str(group).replace("_", " ").title(),
+                "rollup": logic_values[0] if logic_values else "direct",
+                "class_l1_domain": rows["class_l1_domain"].dropna().iloc[0] if "class_l1_domain" in rows and not rows["class_l1_domain"].dropna().empty else None,
+            }
+        )
+    return {
+        "access_rollup_notes": {},
+        "l2_groups": l2_groups,
+        "l3_classes": [
+            {
+                "key": row.class_l3_facility_class,
+                "label": str(row.class_l3_facility_class).replace("_", " ").title(),
+                "class_l1_domain": getattr(row, "class_l1_domain", None),
+                "class_l2_filter_group": getattr(row, "class_l2_filter_group", None),
+            }
+            for row in taxonomy.itertuples(index=False)
+        ],
+    }
 
 
 def _bbox(admin_rows) -> tuple[float, float, float, float]:
@@ -235,12 +288,12 @@ def _nearest(
     pool: gpd.GeoDataFrame,
     village_points: pd.DataFrame,
     taxonomy: pd.DataFrame,
-    admin_rows,
+    classification: Mapping[str, Any],
+    inside_facility_ids: set[Any],
     radius_km: float,
 ) -> tuple[gpd.GeoDataFrame, pd.DataFrame]:
     if pool.empty or village_points.empty:
         return gpd.GeoDataFrame(pd.DataFrame(), geometry=[], crs="EPSG:4326"), pd.DataFrame()
-    inside_ids = set(_inventory(pool, admin_rows)["facility_uid"]) if not pool.empty else set()
     nearest_rows: list[dict[str, Any]] = []
     point_xy = village_points[["_village_lon", "_village_lat"]].to_numpy()
     for tax in taxonomy.itertuples(index=False):
@@ -272,8 +325,9 @@ def _nearest(
                 "class_l1_domain": getattr(tax, "class_l1_domain"),
                 "class_l2_filter_group": getattr(tax, "class_l2_filter_group"),
                 "class_l3_facility_class": class_l3,
+                "class_l3_label": getattr(tax, "class_l3_label", class_l3.replace("_", " ").title()),
                 "nearest_distance_km": round(distance_km, 6),
-                "inside_requested_scope": bool(facility["facility_uid"] in inside_ids),
+                "inside_requested_scope": bool(facility["facility_uid"] in inside_facility_ids),
                 "facilities_layer_kind": "nearest",
                 "title": facility.get("facility_name") or facility.get("facility_uid"),
             }
@@ -292,11 +346,11 @@ def _nearest(
             row["geometry"] = facility.geometry
             nearest_rows.append(row)
     nearest = gpd.GeoDataFrame(nearest_rows, geometry="geometry", crs="EPSG:4326")
-    village_service = _village_service(village_points, nearest)
+    village_service = _village_service(village_points, nearest, classification)
     return nearest, village_service
 
 
-def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame) -> pd.DataFrame:
+def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame, classification: Mapping[str, Any]) -> pd.DataFrame:
     base = village_points.drop(columns=["_village_lon", "_village_lat"]).copy()
     if nearest.empty:
         return base
@@ -310,12 +364,29 @@ def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame) -> pd.
         pivot = l3.pivot_table(index="cs_feature_id", columns="_slug", values=metric, aggfunc="first")
         pivot.columns = [f"l3_{col}_{suffix}" for col in pivot.columns]
         base = base.merge(pivot.reset_index(), on="cs_feature_id", how="left")
-    l2 = l3.sort_values("nearest_distance_km").drop_duplicates(["cs_feature_id", "class_l2_filter_group"])
+    l2_rollups = {
+        item["key"]: str(item.get("rollup") or "direct").lower()
+        for item in classification.get("l2_groups", [])
+    }
+    selected_l2_rows: list[pd.Series] = []
+    for _, group in l3.groupby(["cs_feature_id", "class_l2_filter_group"], dropna=False):
+        distances = pd.to_numeric(group["nearest_distance_km"], errors="coerce")
+        if distances.dropna().empty:
+            continue
+        rollup = l2_rollups.get(str(group["class_l2_filter_group"].iloc[0]), "direct")
+        selected_index = distances.idxmax() if rollup == "max" else distances.idxmin()
+        selected_l2_rows.append(l3.loc[selected_index])
+    l2 = pd.DataFrame(selected_l2_rows)
+    if l2.empty:
+        base["facilities_layer_kind"] = "village_service"
+        base["title"] = base["NAME"].fillna(base["cs_feature_id"])
+        return base
     l2["_slug"] = l2["class_l2_filter_group"].map(slug)
     for metric, suffix in (
         ("nearest_distance_km", "distance_km"),
         ("facility_uid", "facility_uid"),
         ("class_l3_facility_class", "selected_l3"),
+        ("class_l3_label", "selected_l3_label"),
     ):
         pivot = l2.pivot_table(index="cs_feature_id", columns="_slug", values=metric, aggfunc="first")
         pivot.columns = [f"l2_{col}_{suffix}" for col in pivot.columns]
@@ -323,6 +394,81 @@ def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame) -> pd.
     base["facilities_layer_kind"] = "village_service"
     base["title"] = base["NAME"].fillna(base["cs_feature_id"])
     return base
+
+
+def _useful_value(value: Any) -> str | None:
+    if value is None or value != value:
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "null", "0.0"}:
+        return None
+    return text
+
+
+def _facility_detail(row: pd.Series | None) -> str | None:
+    """Build a compact human-readable facility detail for report CSVs."""
+
+    if row is None:
+        return None
+    parts: list[str] = []
+    for column in ("facility_name", "class_l4_facility_subtype", "class_l3_label", "facility_code"):
+        value = _useful_value(row.get(column))
+        if value:
+            parts.append(value if column != "facility_code" else f"code {value}")
+    scope_value = row.get("inside_requested_scope")
+    if scope_value is not None and scope_value == scope_value:
+        parts.append("inside scope" if bool(scope_value) else "outside scope")
+    return " | ".join(dict.fromkeys(parts)) or None
+
+
+def _focused_service_frame(
+    village_service_gdf: gpd.GeoDataFrame,
+    nearest: pd.DataFrame,
+    classification: Mapping[str, Any],
+) -> pd.DataFrame:
+    """Return the compact village x service matrix for Excel/report ingestion."""
+
+    frame = admin_presentation_frame(village_service_gdf.drop(columns=["geometry"], errors="ignore"))
+    service_rows = village_service_gdf.drop(columns=["geometry"], errors="ignore").set_index("cs_feature_id", drop=False)
+    nearest_by_village_l3: dict[tuple[Any, str], pd.Series] = {}
+    if not nearest.empty:
+        for row in nearest.itertuples(index=False):
+            nearest_by_village_l3[(getattr(row, "cs_feature_id"), getattr(row, "class_l3_facility_class"))] = pd.Series(row._asdict())
+
+    rows: list[dict[str, Any]] = []
+    l3_by_l2: dict[str, list[Mapping[str, Any]]] = {}
+    for item in classification.get("l3_classes", []):
+        l3_by_l2.setdefault(item["class_l2_filter_group"], []).append(item)
+
+    for _, source in frame.iterrows():
+        row = source.to_dict()
+        cs_feature_id = row.get("cs_feature_id")
+        service = service_rows.loc[cs_feature_id] if cs_feature_id in service_rows.index else pd.Series(dtype=object)
+        has_village_id = pd.notna(row.get("village_id"))
+        row["facilities_status"] = "computed" if has_village_id else "no village id"
+        if nearest.empty:
+            row["facilities_status"] = "no candidates"
+        if not has_village_id or nearest.empty:
+            rows.append(row)
+            continue
+
+        for group in classification.get("l2_groups", []):
+            group_key = group["key"]
+            group_slug = slug(group_key)
+            access_column = group_slug if group_slug.endswith("_access") else f"{group_slug}_access"
+            row[access_column] = service.get(f"l2_{group_slug}_distance_km")
+            selected_l3 = service.get(f"l2_{group_slug}_selected_l3")
+            selected_nearest = nearest_by_village_l3.get((cs_feature_id, selected_l3))
+            row[f"{group_slug}_facility_details"] = _facility_detail(selected_nearest)
+
+            for item in l3_by_l2.get(group_key, []):
+                l3_key = item["key"]
+                l3_slug = slug(l3_key)
+                nearest_row = nearest_by_village_l3.get((cs_feature_id, l3_key))
+                row[f"nearest_{l3_slug}"] = _facility_detail(nearest_row)
+                row[f"nearest_{l3_slug}_distance_km"] = None if nearest_row is None else nearest_row.get("nearest_distance_km")
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_name: str, result: Mapping[str, Any]) -> list[str]:
@@ -348,11 +494,71 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         f"- Inventory facilities: `{result.get('inventory_rows')}`",
         f"- Nearest rows: `{result.get('nearest_rows')}`",
         f"- Candidate pool rows: `{result.get('candidate_pool')}`",
+        f"- Output mode: `{result.get('output_mode')}`",
+        f"- Focused service rows: `{result.get('focused_service_rows')}`",
+        "",
+        "## Focused CSV",
+        "",
+        "The focused CSV keeps compact admin identifiers, one row-level status marker, L2 access distances, and ordered nearest L3 facility details for Excel/report use.",
         "",
         "## Cautions",
         "",
     ]
     lines.extend([f"- {item}" for item in config.get("readme", {}).get("cautions", [])])
+    return lines
+
+
+def _methodology_lines(config: Mapping[str, Any], classification: Mapping[str, Any]) -> list[str]:
+    lines = [
+        "# Facilities Pipeline Methodology",
+        "",
+        "## Source Workflow",
+        "",
+        "Facility points were compiled from public GIS facility sources, including Gram Manchitra/PMGSY-facing public facility layers, into a standard pan-India Core Stack GeoPackage.",
+        "",
+        "The runtime pipeline reads only the requested admin scope from `cs_admin_standard.gpkg`, reads nearby facility candidates from `cs_pan_india_facilities.gpkg`, assigns in-scope inventory facilities by spatial intersection, and computes nearest services with KD-tree search over candidate points.",
+        "",
+        "```mermaid",
+        "flowchart TD",
+        "    A[API or CLI request] --> B[Resolve state/district/tehsil/village scope]",
+        "    B --> C[Read selected village polygons]",
+        "    C --> D[Read facility candidates with SQLite indexes and R-tree]",
+        "    D --> E[Assign in-scope inventory facilities]",
+        "    D --> F[Find nearest L3 service for each village]",
+        "    F --> G[Collapse L3 services to L2 access groups]",
+        "    G --> H[Write focused CSV, GPKG, README, EDA, STAC]",
+        "```",
+        "",
+        "## L2 Access Rollup Decisions",
+        "",
+    ]
+    notes = classification.get("access_rollup_notes", {})
+    for key in ("max", "min", "direct"):
+        if notes.get(key):
+            lines.append(f"- `{key}`: {notes[key].strip()}")
+    lines.extend(["", "## L2 Groups", ""])
+    for group in classification.get("l2_groups", []):
+        lines.append(
+            f"- `{group['key']}` uses `{group.get('rollup', 'direct')}`: {group.get('explanation', '').strip()}"
+        )
+    lines.extend(
+        [
+            "",
+            "## Public Access Links",
+            "",
+            "- Pan-India facilities GEE asset: https://code.earthengine.google.com/?asset=projects/corestack-datasets/assets/facilities",
+            "- Village facility proximity GEE asset: https://code.earthengine.google.com/?asset=projects/corestack-datasets/assets/facilities",
+            "- Google Drive sheet: https://docs.google.com/spreadsheets/d/1xS5d7vgyjyoqqnmmajKDZBx9qS6GqyAdSbNDR62ot2Y/edit?gid=0#gid=0&range=A138",
+            "",
+            "## Output Modes",
+            "",
+            "- `focused`: default API mode. Writes compact village-service GPKG and Excel/report CSVs.",
+            "- `all`: writes verbose inventory, nearest L3, village-service outputs, full docs, and diagnostics.",
+            "- `metadata`: writes run metadata only after computation.",
+            "- `methodology`: writes documentation without heavy data artifacts.",
+            "- `excel`: writes only the focused Excel/report CSV.",
+        ]
+    )
     return lines
 
 
@@ -385,6 +591,9 @@ def run_facilities_pipeline(
     started = time.perf_counter()
     timings: dict[str, float] = {}
     config = load_config(config_path)
+    outputs = request.outputs
+    if outputs.mode == "default" and config.get("default_outputs"):
+        outputs = OutputOptions.from_mapping(config["default_outputs"])
     output_config = config["output"]
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
     output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
@@ -403,6 +612,7 @@ def run_facilities_pipeline(
     timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
+    classification = _classification(config)
     taxonomy = _taxonomy(config)
     inventory_candidates = _read_facilities_bbox(config, bounds, expansion_degrees=0)
     inventory = _inventory(inventory_candidates, admin_rows)
@@ -414,13 +624,15 @@ def run_facilities_pipeline(
         pool,
         village_points,
         taxonomy,
-        admin_rows,
+        classification,
+        set(inventory["facility_uid"]) if not inventory.empty else set(),
         float(config["search"]["earth_radius_km"]),
     )
     timings["build_nearest_seconds"] = round(time.perf_counter() - t0, 3)
 
     village_service_gdf = admin_rows[["cs_feature_id", "geometry"]].merge(village_service, on="cs_feature_id", how="left")
     village_service_gdf = gpd.GeoDataFrame(village_service_gdf, geometry="geometry", crs=admin_rows.crs)
+    focused_services = _focused_service_frame(village_service_gdf, nearest, classification)
 
     result: dict[str, Any] = {
         "status": "success",
@@ -431,6 +643,8 @@ def run_facilities_pipeline(
         "inventory_rows": int(len(inventory)),
         "nearest_rows": int(len(nearest)),
         "village_service_rows": int(len(village_service_gdf)),
+        "focused_service_rows": int(len(focused_services)),
+        "output_mode": outputs.mode,
         "created_facility_indexes": created_facility_indexes,
         "admin_created_indexes": admin_selection.created_indexes,
         "state_name": request.scope.state_name,
@@ -443,37 +657,50 @@ def run_facilities_pipeline(
 
     t0 = time.perf_counter()
     paths: dict[str, str] = {}
-    if request.outputs.csv:
-        if not inventory.empty:
+    if outputs.csv or outputs.verbose_csv:
+        if not inventory.empty and outputs.verbose_csv:
             paths["inventory_csv_path"] = bundle.write_csv(pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore")), ".inventory.csv").as_posix()
-        if not nearest.empty:
+        if not nearest.empty and outputs.verbose_csv:
             paths["nearest_csv_path"] = bundle.write_csv(pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore")), ".nearest.csv").as_posix()
-        paths["village_service_csv_path"] = bundle.write_csv(pd.DataFrame(village_service_gdf.drop(columns=["geometry"], errors="ignore")), ".village_service.csv").as_posix()
-    if request.outputs.gpkg:
-        paths["gpkg_path"] = bundle.write_gpkg(
-            {
+        if outputs.verbose_csv:
+            paths["village_service_csv_path"] = bundle.write_csv(pd.DataFrame(village_service_gdf.drop(columns=["geometry"], errors="ignore")), ".village_service.csv").as_posix()
+    if outputs.focused_csv:
+        paths["focused_csv_path"] = bundle.write_csv(focused_services, ".focused.csv").as_posix()
+    if outputs.excel_ready_csv:
+        paths["excel_ready_csv_path"] = bundle.write_csv(focused_services, ".excel_ready.csv").as_posix()
+    if outputs.gpkg:
+        gpkg_layers = {output_config["village_service_layer"]: village_service_gdf}
+        if outputs.mode == "all" or outputs.verbose_csv:
+            gpkg_layers = {
                 output_config["inventory_layer"]: inventory,
                 output_config["nearest_layer"]: nearest,
                 output_config["village_service_layer"]: village_service_gdf,
             }
+        paths["gpkg_path"] = bundle.write_gpkg(
+            gpkg_layers
         ).as_posix()
-    if request.outputs.eda:
+    if outputs.eda:
         paths["eda_path"] = bundle.write_eda(
             {
                 "inventory": pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore")),
                 "nearest": pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore")),
                 "village_service": pd.DataFrame(village_service_gdf.drop(columns=["geometry"], errors="ignore")),
+                "focused_services": focused_services,
             }
         ).as_posix()
-    if request.outputs.readme:
+    if outputs.readme:
         paths["readme_path"] = bundle.write_readme(_readme_lines(request, config, layer_name, result)).as_posix()
+    if outputs.methodology:
+        methodology_path = bundle.output_path(".methodology.md")
+        methodology_path.write_text("\n".join(_methodology_lines(config, classification)).rstrip() + "\n")
+        paths["methodology_path"] = methodology_path.as_posix()
     result.update(paths)
-    if request.outputs.stac:
+    if outputs.stac:
         result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     geoserver = None
-    if request.publish.sync_to_geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
         if gpkg_path:
@@ -493,7 +720,7 @@ def run_facilities_pipeline(
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     result["run_metadata_path"] = bundle.write_metadata(
-        {"request": asdict(request), "result": result, "config_path": str(config_path)}
+        {"request": asdict(request), "effective_outputs": asdict(outputs), "result": result, "config_path": str(config_path)}
     ).as_posix()
     return result
 
@@ -502,14 +729,32 @@ def run_facilities_request(payload: Mapping[str, Any]) -> dict[str, Any]:
     return run_facilities_pipeline(StandardRequest.from_mapping(payload))
 
 
-def generate_facilities_proximity(state: str, district: str, block: str, gee_account_id: str | None = None):
-    request = _request_from_legacy_args(state, district, block, gee_account_id)
+def generate_facilities_proximity(
+    state: str,
+    district: str,
+    block: str,
+    gee_account_id: str | None = None,
+    output_mode: str = "focused",
+):
+    request = _request_from_legacy_args(state, district, block, gee_account_id, output_mode=output_mode)
     return run_facilities_pipeline(request)
 
 
 @app.task(bind=True, max_retries=3, default_retry_delay=60)
-def generate_facilities_proximity_task(self, state, district, block, gee_account_id=None):
-    return generate_facilities_proximity(state, district, block, gee_account_id)
+def generate_facilities_proximity_task(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    gee_account_id=None,
+    output_mode="focused",
+    payload=None,
+):
+    if payload is not None:
+        return run_facilities_request(payload)
+    if not (state and district and block):
+        raise ValueError("state, district, and block are required when payload is not provided")
+    return generate_facilities_proximity(state, district, block, gee_account_id, output_mode)
 
 
 def _run_batch(path: str | Path) -> list[dict[str, Any]]:
