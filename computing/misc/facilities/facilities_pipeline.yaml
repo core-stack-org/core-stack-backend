@@ -122,15 +122,6 @@ search:
   supplemental_expansion_degrees: 2.0
   earth_radius_km: 6371.0088
 
-standard_admin_columns:
-  - fid
-  - state_name
-  - district_name
-  - TEHSIL
-  - pc11_village_id
-  - village_id
-  - NAME
-
 facility_columns:
   - facility_uid
   - facility_name
