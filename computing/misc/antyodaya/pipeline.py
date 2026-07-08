@@ -15,7 +15,7 @@ import pandas as pd
 from django.conf import settings
 
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
-from computing.misc.local_pipeline.admin import admin_presentation_frame
+from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
 from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
@@ -32,7 +32,7 @@ from nrm_app.celery import app
 
 CONFIG_PATH = Path(__file__).with_name("antyodaya_pipeline.yaml")
 ALGORITHM = "local-antyodaya-csv-admin-join"
-ALGORITHM_VERSION = "1.0"
+ALGORITHM_VERSION = "1.2"
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -166,9 +166,8 @@ def _merge_admin_antyodaya(admin_rows, source_rows: pd.DataFrame, config: Mappin
     return admin.merge(attrs, left_on=admin_key, right_on=source_key, how="left", suffixes=("", "_antyodaya"))
 
 
-def _ordered_tabular_columns(frame: pd.DataFrame, config: Mapping[str, Any], columns: Mapping[str, list[str]]) -> list[str]:
+def _ordered_tabular_columns(frame: pd.DataFrame, columns: Mapping[str, list[str]]) -> list[str]:
     ordered = []
-    ordered.extend(config["standard_admin_columns"])
     ordered.extend([col for col in columns["location"] if col not in ordered and col in frame.columns])
     ordered.extend([col for col in columns["category_cluster"] if col in frame.columns])
     ordered.extend([col for col in columns["category_value"] if col in frame.columns])
@@ -177,20 +176,29 @@ def _ordered_tabular_columns(frame: pd.DataFrame, config: Mapping[str, Any], col
     return [col for col in ordered if col in frame.columns]
 
 
+def _focused_value_columns(frame: pd.DataFrame, columns: Mapping[str, list[str]]) -> list[str]:
+    """Return Antyodaya columns for report/Excel outputs."""
+
+    ordered = ["antyodaya_status"]
+    ordered.extend([col for col in columns["category_cluster"] if col in frame.columns])
+    ordered.extend([col for col in columns["category_value"] if col in frame.columns])
+    ordered.extend([col for col in columns["raw"] if col in frame.columns])
+    return [col for col in ordered if col in frame.columns or col == "antyodaya_status"]
+
+
 def _focused_frame(frame: pd.DataFrame, columns: Mapping[str, list[str]]) -> pd.DataFrame:
     focused = admin_presentation_frame(frame.drop(columns=["geometry"], errors="ignore"))
-    source = frame.set_index("cs_feature_id", drop=False)
+    source = frame.set_index("fid", drop=False) if "fid" in frame.columns else frame
     metric_columns = [
         *columns["category_cluster"],
         *columns["category_value"],
-        *columns["feature_value"],
         *columns["raw"],
     ]
     output_rows: list[dict[str, Any]] = []
     for _, admin_row in focused.iterrows():
         row = admin_row.to_dict()
-        cs_feature_id = row.get("cs_feature_id")
-        values = source.loc[cs_feature_id] if cs_feature_id in source.index else pd.Series(dtype=object)
+        admin_index = row.get("index")
+        values = source.loc[admin_index] if admin_index in source.index else pd.Series(dtype=object)
         has_village_id = pd.notna(row.get("village_id"))
         has_antyodaya = pd.notna(values.get("village_key")) if not values.empty else False
         if not has_village_id:
@@ -202,9 +210,11 @@ def _focused_frame(frame: pd.DataFrame, columns: Mapping[str, list[str]]) -> pd.
             for column in metric_columns:
                 if column in values:
                     row[column] = values.get(column)
-        row.pop("cs_feature_id", None)
         output_rows.append(row)
-    return pd.DataFrame(output_rows)
+    output = pd.DataFrame(output_rows)
+    ordered = list(focused.columns)
+    ordered.extend(column for column in _focused_value_columns(output, columns) if column not in ordered)
+    return output.reindex(columns=ordered)
 
 
 def _overview(frame: pd.DataFrame, group_columns: list[str], columns: Mapping[str, list[str]]) -> pd.DataFrame:
@@ -349,7 +359,7 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("readme_path")
     if outputs.stac:
         required.append("stac_fragment_path")
-    if request.publish.sync_to_geoserver and outputs.geoserver:
+    if outputs.geoserver:
         required.append("geoserver_links_path")
     return tuple(dict.fromkeys(required))
 
@@ -405,11 +415,12 @@ def run_antyodaya_pipeline(
     _normalize_category_clusters(source_rows, columns["category_cluster"])
     validation_issues = _validate_antyodaya(source_rows, config)
     joined = _merge_admin_antyodaya(admin_selection.rows, source_rows, config)
-    ordered_columns = _ordered_tabular_columns(joined, config, columns)
-    csv_frame = pd.DataFrame(joined.drop(columns=["geometry"], errors="ignore"))[ordered_columns]
+    ordered_columns = _ordered_tabular_columns(joined, columns)
+    csv_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered_columns)
     focused_frame = _focused_frame(joined, columns)
-    overview = _overview(csv_frame, ["state_name", "district_name", "TEHSIL"], columns)
+    overview = _overview(csv_frame, ["state_name", "district_name", "tehsil_name"], columns)
     matched_rows = int(csv_frame["village_key"].notna().sum()) if "village_key" in csv_frame else 0
+    gpkg_frame = admin_output_frame(joined, value_columns=ordered_columns, include_geometry=True)
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     paths: dict[str, str] = {}
@@ -424,7 +435,7 @@ def run_antyodaya_pipeline(
     if outputs.excel_ready_csv:
         paths["excel_ready_csv_path"] = bundle.write_csv(focused_frame, ".excel_ready.csv").as_posix()
     if outputs.gpkg:
-        paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: joined}).as_posix()
+        paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
     if outputs.eda:
         paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
     if outputs.readme:
@@ -470,24 +481,45 @@ def run_antyodaya_pipeline(
         result["stac_fragment_path"] = paths["stac_fragment_path"]
 
     geoserver = None
-    if request.publish.sync_to_geoserver and outputs.geoserver:
+    if outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        if not gpkg_path:
-            gpkg_path = bundle.write_gpkg({output_config["village_layer"]: joined}).as_posix()
-            result["gpkg_path"] = gpkg_path
-        try:
-            geoserver_result = publish_gpkg_layer(
-                gpkg_path,
-                workspace=output_config["geoserver_workspace"],
-                layer_name=result_name,
-                overwrite=request.publish.overwrite,
-            )
-            geoserver = asdict(geoserver_result)
-            links_path = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv")
-            result["geoserver_links_path"] = links_path.as_posix()
-        except Exception as exc:
-            geoserver = {"ok": False, "error_type": exc.__class__.__name__, "error": str(exc)[:500]}
+        if not request.publish.sync_to_geoserver:
+            geoserver = {
+                "ok": False,
+                "status": "not_requested",
+                "workspace": output_config["geoserver_workspace"],
+                "layer_name": result_name,
+            }
+        elif not gpkg_path:
+            geoserver = {
+                "ok": False,
+                "status": "missing_gpkg",
+                "workspace": output_config["geoserver_workspace"],
+                "layer_name": result_name,
+                "error": "GeoPackage output is required for GeoServer publishing.",
+            }
+        else:
+            try:
+                geoserver_result = publish_gpkg_layer(
+                    gpkg_path,
+                    workspace=output_config["geoserver_workspace"],
+                    layer_name=result_name,
+                    overwrite=request.publish.overwrite,
+                )
+                geoserver = asdict(geoserver_result)
+                geoserver.setdefault("status", "published" if geoserver.get("ok") else "publish_failed")
+            except Exception as exc:
+                geoserver = {
+                    "ok": False,
+                    "status": "publish_failed",
+                    "workspace": output_config["geoserver_workspace"],
+                    "layer_name": result_name,
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc)[:500],
+                }
+        links_path = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv")
+        result["geoserver_links_path"] = links_path.as_posix()
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
 
