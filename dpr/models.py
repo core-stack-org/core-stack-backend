@@ -38,7 +38,7 @@ class ODK_settlement(models.Model):
     settlement_status = models.TextField()
     plan_id = models.TextField()
     plan_name = models.TextField()
-    uuid = models.TextField()
+    uuid = models.TextField(unique=True)
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     farmer_family = models.JSONField()
@@ -86,7 +86,7 @@ class ODK_settlement(models.Model):
 
 class ODK_well(models.Model):
     well_id = models.CharField(max_length=255, primary_key=True)
-    uuid = models.TextField()
+    uuid = models.TextField(unique=True)
     submission_time = models.DateTimeField()
     beneficiary_settlement = models.TextField()
     block_name = models.TextField()
@@ -135,7 +135,7 @@ class ODK_well(models.Model):
 
 class ODK_waterbody(models.Model):
     waterbody_id = models.CharField(max_length=255, primary_key=True)
-    uuid = models.TextField()
+    uuid = models.TextField(unique=True)
     submission_time = models.DateTimeField()
     block_name = models.TextField()
     beneficiary_settlement = models.TextField()
@@ -190,7 +190,7 @@ class ODK_waterbody(models.Model):
 
 class ODK_groundwater(models.Model):
     recharge_structure_id = models.CharField(max_length=255, primary_key=True)
-    uuid = models.TextField()
+    uuid = models.TextField(unique=True)
     submission_time = models.DateTimeField()
     beneficiary_settlement = models.TextField()
     block_name = models.TextField()
@@ -242,7 +242,7 @@ class ODK_groundwater(models.Model):
 
 class ODK_agri(models.Model):
     irrigation_work_id = models.CharField(max_length=255, primary_key=True)
-    uuid = models.TextField()
+    uuid = models.TextField(unique=True)
     submission_time = models.DateTimeField()
     beneficiary_settlement = models.TextField()
     block_name = models.TextField()
@@ -294,7 +294,7 @@ class ODK_agri(models.Model):
 
 class ODK_crop(models.Model):
     crop_grid_id = models.CharField(max_length=255, primary_key=True)
-    uuid = models.TextField(max_length=255)
+    uuid = models.TextField(max_length=255, unique=True)
     beneficiary_settlement = models.TextField()
     irrigation_source = models.TextField()
     submission_time = models.DateTimeField()
@@ -343,7 +343,7 @@ class ODK_crop(models.Model):
 
 class ODK_livelihood(models.Model):
     livelihood_id = models.AutoField(primary_key=True)
-    uuid = models.CharField(max_length=42)
+    uuid = models.CharField(max_length=255, unique=True)
     beneficiary_settlement = models.TextField()
     block_name = models.TextField()
     beneficiary_contact = models.TextField()
@@ -400,7 +400,7 @@ class ODK_livelihood(models.Model):
 
 class GW_maintenance(models.Model):
     gw_maintenance_id = models.AutoField(primary_key=True)
-    uuid = models.CharField(max_length=255)
+    uuid = models.CharField(max_length=255, unique=True)
     plan_id = models.TextField()
     plan_name = models.TextField()
     latitude = models.FloatField()
@@ -442,7 +442,7 @@ class GW_maintenance(models.Model):
 
 class SWB_RS_maintenance(models.Model):
     swb_rs_maintenance_id = models.AutoField(primary_key=True)
-    uuid = models.CharField(max_length=255)
+    uuid = models.CharField(max_length=255, unique=True)
     plan_id = models.TextField()
     plan_name = models.TextField()
     latitude = models.FloatField()
@@ -484,7 +484,7 @@ class SWB_RS_maintenance(models.Model):
 
 class SWB_maintenance(models.Model):
     swb_maintenance_id = models.AutoField(primary_key=True)
-    uuid = models.CharField(max_length=255)
+    uuid = models.CharField(max_length=255, unique=True)
     plan_id = models.TextField()
     plan_name = models.TextField()
     latitude = models.FloatField()
@@ -526,7 +526,7 @@ class SWB_maintenance(models.Model):
 
 class Agri_maintenance(models.Model):
     agri_maintenance_id = models.AutoField(primary_key=True)
-    uuid = models.CharField(max_length=255)
+    uuid = models.CharField(max_length=255, unique=True)
     plan_id = models.TextField()
     plan_name = models.TextField()
     latitude = models.FloatField()
@@ -568,7 +568,7 @@ class Agri_maintenance(models.Model):
 
 class ODK_agrohorticulture(models.Model):
     agrohorticulture_id = models.AutoField(primary_key=True)
-    uuid = models.CharField(max_length=255)
+    uuid = models.CharField(max_length=255, unique=True)
     plan_id = models.TextField()
     plan_name = models.TextField()
     latitude = models.FloatField()
