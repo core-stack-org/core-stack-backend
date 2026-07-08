@@ -1595,6 +1595,7 @@ def generate_facilities_proximity(request):
                     "sync_to_geoserver": payload.get("sync_to_geoserver", True),
                     "overwrite": payload.get("overwrite", True),
                     "register_layers": payload.get("register_layers", False),
+                    "use_pregenerated": payload.get("use_pregenerated", False),
                 },
                 "legacy": {"gee_account_id": payload.get("gee_account_id")},
             }
@@ -1607,6 +1608,7 @@ def generate_facilities_proximity(request):
             payload["publish"].setdefault("sync_to_geoserver", True)
             payload["publish"].setdefault("overwrite", True)
             payload["publish"].setdefault("register_layers", False)
+            payload["publish"].setdefault("use_pregenerated", False)
         generate_facilities_proximity_task.apply_async(
             kwargs={"payload": payload},
             queue="nrm",
