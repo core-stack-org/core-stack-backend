@@ -53,6 +53,12 @@ ADMIN_PRESENTATION_COLUMNS = (
     "tehsil_name",
     "village_name",
 )
+INTERNAL_ADMIN_COLUMNS = (
+    "cs_feature_id",
+    "cs_admin_uid",
+    "core_admin_uid",
+    "pc11_village_id",
+)
 
 
 def normalize_key(value: Any) -> str:
@@ -108,6 +114,38 @@ def admin_presentation_frame(rows: Any, *, include_geometry: bool = False):
     if include_geometry and "geometry" in frame.columns:
         columns.append("geometry")
     return frame[columns].copy()
+
+
+def admin_output_frame(
+    rows: Any,
+    *,
+    value_columns: Sequence[str] = (),
+    include_geometry: bool = False,
+):
+    """Return a user-facing frame with standard admin columns and configured values."""
+
+    frame = rows.copy()
+    presentation = admin_presentation_frame(frame, include_geometry=False)
+    ordered = list(presentation.columns)
+    for column in value_columns:
+        if column in frame.columns and column not in ordered and column not in INTERNAL_ADMIN_COLUMNS:
+            ordered.append(column)
+    output = frame.rename(
+        columns={
+            "fid": "index",
+            "pc11_state_id": "state_id",
+            "pc11_district_id": "district_id",
+            "pc11_subdistrict_id": "tehsil_id",
+            "TEHSIL": "tehsil_name",
+            "NAME": "village_name",
+        }
+    )
+    for column in ("state_name", "district_name", "tehsil_name", "village_name"):
+        if column in output.columns:
+            output[column] = output[column].map(format_admin_name)
+    if include_geometry and "geometry" in frame.columns:
+        ordered.append("geometry")
+    return output.reindex(columns=ordered)
 
 
 def _repo_path(path: str | Path, base_dir: str | Path | None = None) -> Path:
