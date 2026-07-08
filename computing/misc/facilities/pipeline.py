@@ -16,7 +16,7 @@ from django.conf import settings
 from scipy.spatial import cKDTree
 
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
-from computing.misc.local_pipeline.admin import admin_presentation_frame
+from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
 from computing.misc.local_pipeline.schema import OutputOptions
 from computing.misc.local_pipeline.gpkg import (
@@ -28,14 +28,22 @@ from computing.misc.local_pipeline.gpkg import (
     quote_identifier,
     read_table,
 )
-from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
+from computing.misc.local_pipeline.outputs import (
+    OutputBundle,
+    input_signatures,
+    mark_cached_result,
+    scope_output_identity,
+    slug,
+    stable_hash,
+    utc_now_text,
+)
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
 from nrm_app.celery import app
 
 
 CONFIG_PATH = Path(__file__).with_name("facilities_pipeline.yaml")
 ALGORITHM = "local-facilities-live-proximity"
-ALGORITHM_VERSION = "1.0"
+ALGORITHM_VERSION = "1.2"
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -219,22 +227,22 @@ def _read_facilities_bbox(
 def _inventory(candidates: gpd.GeoDataFrame, admin_rows) -> gpd.GeoDataFrame:
     if candidates.empty:
         return candidates
-    admin_context = admin_rows[
-        ["cs_feature_id", "pc11_village_id", "village_id", "NAME", "state_name", "district_name", "TEHSIL", "geometry"]
-    ].copy()
+    admin_context = admin_rows[["fid", "pc11_village_id", "village_id", "NAME", "state_name", "district_name", "TEHSIL", "geometry"]].copy()
+    admin_context["_admin_key"] = admin_context["fid"]
     joined = gpd.sjoin(candidates, admin_context, how="inner", predicate="intersects")
     if "index_right" in joined.columns:
         joined = joined.drop(columns=["index_right"])
     joined["inside_requested_scope"] = True
     joined["facilities_layer_kind"] = "inventory"
     joined["title"] = joined["facility_name"].fillna(joined["facility_uid"])
-    return joined.drop_duplicates(subset=["facility_uid", "cs_feature_id"])
+    return joined.drop_duplicates(subset=["facility_uid", "_admin_key"])
 
 
 def _village_points(admin_rows) -> pd.DataFrame:
     rows = admin_rows.copy()
     points = rows.geometry.representative_point()
     frame = pd.DataFrame(rows.drop(columns=["geometry"]))
+    frame["_admin_key"] = frame["fid"]
     frame["_village_lon"] = points.x
     frame["_village_lat"] = points.y
     return frame
@@ -314,7 +322,8 @@ def _nearest(
                 radius_km,
             )
             row = {
-                "cs_feature_id": village.get("cs_feature_id"),
+                "_admin_key": village.get("_admin_key"),
+                "fid": village.get("fid"),
                 "pc11_village_id": village.get("pc11_village_id"),
                 "village_id": village.get("village_id"),
                 "village_name": village.get("NAME"),
@@ -361,15 +370,15 @@ def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame, classi
         ("facility_uid", "facility_uid"),
         ("inside_requested_scope", "inside_scope"),
     ):
-        pivot = l3.pivot_table(index="cs_feature_id", columns="_slug", values=metric, aggfunc="first")
+        pivot = l3.pivot_table(index="_admin_key", columns="_slug", values=metric, aggfunc="first")
         pivot.columns = [f"l3_{col}_{suffix}" for col in pivot.columns]
-        base = base.merge(pivot.reset_index(), on="cs_feature_id", how="left")
+        base = base.merge(pivot.reset_index(), on="_admin_key", how="left")
     l2_rollups = {
         item["key"]: str(item.get("rollup") or "direct").lower()
         for item in classification.get("l2_groups", [])
     }
     selected_l2_rows: list[pd.Series] = []
-    for _, group in l3.groupby(["cs_feature_id", "class_l2_filter_group"], dropna=False):
+    for _, group in l3.groupby(["_admin_key", "class_l2_filter_group"], dropna=False):
         distances = pd.to_numeric(group["nearest_distance_km"], errors="coerce")
         if distances.dropna().empty:
             continue
@@ -379,7 +388,7 @@ def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame, classi
     l2 = pd.DataFrame(selected_l2_rows)
     if l2.empty:
         base["facilities_layer_kind"] = "village_service"
-        base["title"] = base["NAME"].fillna(base["cs_feature_id"])
+        base["title"] = base["NAME"].fillna(base["fid"])
         return base
     l2["_slug"] = l2["class_l2_filter_group"].map(slug)
     for metric, suffix in (
@@ -388,11 +397,11 @@ def _village_service(village_points: pd.DataFrame, nearest: pd.DataFrame, classi
         ("class_l3_facility_class", "selected_l3"),
         ("class_l3_label", "selected_l3_label"),
     ):
-        pivot = l2.pivot_table(index="cs_feature_id", columns="_slug", values=metric, aggfunc="first")
+        pivot = l2.pivot_table(index="_admin_key", columns="_slug", values=metric, aggfunc="first")
         pivot.columns = [f"l2_{col}_{suffix}" for col in pivot.columns]
-        base = base.merge(pivot.reset_index(), on="cs_feature_id", how="left")
+        base = base.merge(pivot.reset_index(), on="_admin_key", how="left")
     base["facilities_layer_kind"] = "village_service"
-    base["title"] = base["NAME"].fillna(base["cs_feature_id"])
+    base["title"] = base["NAME"].fillna(base["fid"])
     return base
 
 
@@ -421,19 +430,44 @@ def _facility_detail(row: pd.Series | None) -> str | None:
     return " | ".join(dict.fromkeys(parts)) or None
 
 
+def _output_contract(config: Mapping[str, Any]) -> Mapping[str, Any]:
+    return config.get("output_contract", {})
+
+
+def _l2_output_column(group: Mapping[str, Any], config: Mapping[str, Any]) -> str:
+    key = str(group["key"])
+    configured = _output_contract(config).get("l2_distance_columns", {})
+    if key in configured:
+        return str(configured[key])
+    suffix_by_rollup = {
+        "max": "comprehensive_baseline_distance",
+        "min": "nearest_gateway_distance",
+        "direct": "direct_access_distance",
+    }
+    rollup = str(group.get("rollup") or "direct").lower()
+    return f"{slug(key)}_{suffix_by_rollup.get(rollup, 'access_distance')}"
+
+
+def _excel_ready_service_frame(frame: pd.DataFrame, config: Mapping[str, Any]) -> pd.DataFrame:
+    return frame.reindex(columns=list(_output_contract(config).get("excel_ready_columns", [])))
+
+
 def _focused_service_frame(
     village_service_gdf: gpd.GeoDataFrame,
     nearest: pd.DataFrame,
     classification: Mapping[str, Any],
+    config: Mapping[str, Any],
 ) -> pd.DataFrame:
     """Return the compact village x service matrix for Excel/report ingestion."""
 
-    frame = admin_presentation_frame(village_service_gdf.drop(columns=["geometry"], errors="ignore"))
-    service_rows = village_service_gdf.drop(columns=["geometry"], errors="ignore").set_index("cs_feature_id", drop=False)
+    raw_frame = village_service_gdf.drop(columns=["geometry"], errors="ignore")
+    frame = admin_presentation_frame(raw_frame)
+    frame["_admin_key"] = raw_frame["_admin_key"].to_numpy()
+    service_rows = raw_frame.set_index("_admin_key", drop=False)
     nearest_by_village_l3: dict[tuple[Any, str], pd.Series] = {}
     if not nearest.empty:
-        for row in nearest.itertuples(index=False):
-            nearest_by_village_l3[(getattr(row, "cs_feature_id"), getattr(row, "class_l3_facility_class"))] = pd.Series(row._asdict())
+        for _, row in nearest.iterrows():
+            nearest_by_village_l3[(row.get("_admin_key"), row.get("class_l3_facility_class"))] = row
 
     rows: list[dict[str, Any]] = []
     l3_by_l2: dict[str, list[Mapping[str, Any]]] = {}
@@ -442,33 +476,31 @@ def _focused_service_frame(
 
     for _, source in frame.iterrows():
         row = source.to_dict()
-        cs_feature_id = row.get("cs_feature_id")
-        service = service_rows.loc[cs_feature_id] if cs_feature_id in service_rows.index else pd.Series(dtype=object)
+        admin_key = row.pop("_admin_key", None)
+        service = service_rows.loc[admin_key] if admin_key in service_rows.index else pd.Series(dtype=object)
         has_village_id = pd.notna(row.get("village_id"))
         row["facilities_status"] = "computed" if has_village_id else "no village id"
         if nearest.empty:
             row["facilities_status"] = "no candidates"
         if not has_village_id or nearest.empty:
-            row.pop("cs_feature_id", None)
             rows.append(row)
             continue
 
         for group in classification.get("l2_groups", []):
             group_key = group["key"]
             group_slug = slug(group_key)
-            access_column = group_slug if group_slug.endswith("_access") else f"{group_slug}_access"
+            access_column = _l2_output_column(group, config)
             row[access_column] = service.get(f"l2_{group_slug}_distance_km")
             selected_l3 = service.get(f"l2_{group_slug}_selected_l3")
-            selected_nearest = nearest_by_village_l3.get((cs_feature_id, selected_l3))
+            selected_nearest = nearest_by_village_l3.get((admin_key, selected_l3))
             row[f"{group_slug}_facility_details"] = _facility_detail(selected_nearest)
 
             for item in l3_by_l2.get(group_key, []):
                 l3_key = item["key"]
                 l3_slug = slug(l3_key)
-                nearest_row = nearest_by_village_l3.get((cs_feature_id, l3_key))
+                nearest_row = nearest_by_village_l3.get((admin_key, l3_key))
                 row[f"nearest_{l3_slug}"] = _facility_detail(nearest_row)
                 row[f"nearest_{l3_slug}_distance_km"] = None if nearest_row is None else nearest_row.get("nearest_distance_km")
-        row.pop("cs_feature_id", None)
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -479,9 +511,11 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         "",
         f"Generated at: `{utc_now_text()}`",
         "",
-        "## What This Contains",
+        "## What This Dataset Is For",
         "",
-        "This output creates local facilities inventory and nearest-service outputs for the requested Core Stack admin geography.",
+        "This dataset helps a village, tehsil, or district understand how far people are from important public services and rural infrastructure. It is designed for Core Stack reports, local planning conversations, and quick Excel-based review.",
+        "",
+        "The source facility points were cleaned into the Core Stack pan-India facilities GeoPackage. At runtime, this pipeline selects only the requested geography from `cs_admin_standard.gpkg`, finds nearby facilities from `cs_pan_india_facilities.gpkg`, and writes the result back with village boundaries so the data can be opened directly in GIS or published to GeoServer.",
         "",
         "## Request",
         "",
@@ -499,9 +533,15 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         f"- Output mode: `{result.get('output_mode')}`",
         f"- Focused service rows: `{result.get('focused_service_rows')}`",
         "",
-        "## Focused CSV",
+        "## How To Read The Distance Columns",
         "",
-        "The focused CSV keeps compact admin identifiers, one row-level status marker, L2 access distances, and ordered nearest L3 facility details for Excel/report use.",
+        "- Columns ending in `comprehensive_baseline_distance` use the maximum distance across a basic service bundle. For example, essential education needs primary, upper-primary, and secondary access. The farthest of the required services is the bottleneck, so a low value means the full baseline bundle is nearby.",
+        "- Columns ending in `nearest_gateway_distance` use the minimum distance across advanced opportunity options. For example, reaching any one college or higher-secondary institution can open the higher-education gateway, so the nearest suitable option is the useful measure.",
+        "- Columns ending in `direct_access_distance` use the nearest point for a single service type, such as PDS, cooperative societies, or dairy/livestock support.",
+        "",
+        "## Excel And GIS Outputs",
+        "",
+        "The Excel-ready CSV keeps only the columns needed for report ingestion: standard admin identifiers, L2 access distances, and the nearest L3 facility details in a stable order. The GeoPackage keeps the village geometry so the same result can be mapped without another join.",
         "",
         "## Cautions",
         "",
@@ -627,7 +667,7 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("methodology_path")
     if outputs.stac:
         required.append("stac_fragment_path")
-    if request.publish.sync_to_geoserver and outputs.geoserver:
+    if outputs.geoserver:
         required.append("geoserver_links_path")
     return tuple(dict.fromkeys(required))
 
@@ -644,8 +684,8 @@ def run_facilities_pipeline(
     if outputs.mode == "default" and config.get("default_outputs"):
         outputs = OutputOptions.from_mapping(config["default_outputs"])
     output_config = config["output"]
-    layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
-    output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
+    output_parts, layer_name = scope_output_identity(output_config["layer_prefix"], request.scope)
+    output_root = _repo_path(output_config["root"]).joinpath(*output_parts)
     bundle = OutputBundle(output_root, layer_name)
     cache_key = _cache_key(request, outputs)
     cache_signatures = _cache_input_signatures(config, config_path)
@@ -657,8 +697,7 @@ def run_facilities_pipeline(
             required_result_paths=required_result_paths,
         )
         if cached:
-            cached["cache_hit"] = True
-            return cached
+            return mark_cached_result(cached, started)
 
     t0 = time.perf_counter()
     created_facility_indexes = _ensure_facility_indexes(config)
@@ -691,9 +730,26 @@ def run_facilities_pipeline(
     )
     timings["build_nearest_seconds"] = round(time.perf_counter() - t0, 3)
 
-    village_service_gdf = admin_rows[["cs_feature_id", "geometry"]].merge(village_service, on="cs_feature_id", how="left")
+    village_service_values = village_service.drop(columns=["fid"], errors="ignore")
+    village_service_gdf = admin_rows[["fid", "geometry"]].copy()
+    village_service_gdf["_admin_key"] = village_service_gdf["fid"]
+    village_service_gdf = village_service_gdf.merge(village_service_values, on="_admin_key", how="left")
     village_service_gdf = gpd.GeoDataFrame(village_service_gdf, geometry="geometry", crs=admin_rows.crs)
-    focused_services = _focused_service_frame(village_service_gdf, nearest, classification)
+    focused_services = _focused_service_frame(village_service_gdf, nearest, classification, config)
+    excel_services = _excel_ready_service_frame(focused_services, config)
+    village_service_output_gdf = gpd.GeoDataFrame(
+        admin_output_frame(
+            village_service_gdf,
+            value_columns=[
+                column
+                for column in village_service_gdf.columns
+                if column not in {"geometry"}
+            ],
+            include_geometry=True,
+        ),
+        geometry="geometry",
+        crs=village_service_gdf.crs,
+    )
 
     result: dict[str, Any] = {
         "status": "success",
@@ -703,7 +759,7 @@ def run_facilities_pipeline(
         "village_rows": int(len(admin_rows)),
         "inventory_rows": int(len(inventory)),
         "nearest_rows": int(len(nearest)),
-        "village_service_rows": int(len(village_service_gdf)),
+        "village_service_rows": int(len(village_service_output_gdf)),
         "focused_service_rows": int(len(focused_services)),
         "output_mode": outputs.mode,
         "created_facility_indexes": created_facility_indexes,
@@ -724,18 +780,18 @@ def run_facilities_pipeline(
         if not nearest.empty and outputs.verbose_csv:
             paths["nearest_csv_path"] = bundle.write_csv(pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore")), ".nearest.csv").as_posix()
         if outputs.verbose_csv:
-            paths["village_service_csv_path"] = bundle.write_csv(pd.DataFrame(village_service_gdf.drop(columns=["geometry"], errors="ignore")), ".village_service.csv").as_posix()
+            paths["village_service_csv_path"] = bundle.write_csv(pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")), ".village_service.csv").as_posix()
     if outputs.focused_csv:
         paths["focused_csv_path"] = bundle.write_csv(focused_services, ".focused.csv").as_posix()
     if outputs.excel_ready_csv:
-        paths["excel_ready_csv_path"] = bundle.write_csv(focused_services, ".excel_ready.csv").as_posix()
+        paths["excel_ready_csv_path"] = bundle.write_csv(excel_services, ".excel_ready.csv").as_posix()
     if outputs.gpkg:
-        gpkg_layers = {output_config["village_service_layer"]: village_service_gdf}
+        gpkg_layers = {output_config["village_service_layer"]: village_service_output_gdf}
         if outputs.mode == "all" or outputs.verbose_csv:
             gpkg_layers = {
                 output_config["inventory_layer"]: inventory,
                 output_config["nearest_layer"]: nearest,
-                output_config["village_service_layer"]: village_service_gdf,
+                output_config["village_service_layer"]: village_service_output_gdf,
             }
         paths["gpkg_path"] = bundle.write_gpkg(
             gpkg_layers
@@ -745,8 +801,9 @@ def run_facilities_pipeline(
             {
                 "inventory": pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore")),
                 "nearest": pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore")),
-                "village_service": pd.DataFrame(village_service_gdf.drop(columns=["geometry"], errors="ignore")),
+                "village_service": pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")),
                 "focused_services": focused_services,
+                "excel_services": excel_services,
             }
         ).as_posix()
     if outputs.readme:
@@ -761,10 +818,18 @@ def run_facilities_pipeline(
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     geoserver = None
-    if request.publish.sync_to_geoserver and outputs.geoserver:
+    if outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        if gpkg_path:
+        if not request.publish.sync_to_geoserver:
+            geoserver = {
+                "ok": False,
+                "status": "not_requested",
+                "workspace": output_config["geoserver_workspace"],
+                "layer_name": layer_name,
+                "gpkg_path": gpkg_path,
+            }
+        elif gpkg_path:
             try:
                 geoserver_result = publish_gpkg_layer(
                     gpkg_path,
@@ -773,9 +838,25 @@ def run_facilities_pipeline(
                     overwrite=request.publish.overwrite,
                 )
                 geoserver = asdict(geoserver_result)
-                result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
             except Exception as exc:
-                geoserver = {"ok": False, "error_type": exc.__class__.__name__, "error": str(exc)[:500]}
+                geoserver = {
+                    "ok": False,
+                    "status": "publish_failed",
+                    "workspace": output_config["geoserver_workspace"],
+                    "layer_name": layer_name,
+                    "gpkg_path": gpkg_path,
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc)[:500],
+                }
+        else:
+            geoserver = {
+                "ok": False,
+                "status": "missing_gpkg",
+                "workspace": output_config["geoserver_workspace"],
+                "layer_name": layer_name,
+                "gpkg_path": None,
+            }
+        result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
     result["timings"] = timings
