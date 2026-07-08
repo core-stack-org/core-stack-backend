@@ -131,7 +131,12 @@ def admin_output_frame(
     presentation = admin_presentation_frame(frame, include_geometry=False)
     ordered = list(presentation.columns)
     for column in value_columns:
-        if column in frame.columns and column not in ordered and column not in INTERNAL_ADMIN_COLUMNS:
+        if (
+            column in frame.columns
+            and column not in ordered
+            and column not in INTERNAL_ADMIN_COLUMNS
+            and not str(column).startswith("_")
+        ):
             ordered.append(column)
     output = frame.rename(
         columns={
