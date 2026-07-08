@@ -483,11 +483,12 @@ def run_antyodaya_pipeline(
     if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
+        geoserver_workspace = request.publish.geoserver_workspace or output_config["geoserver_workspace"]
         if not gpkg_path:
             geoserver = {
                 "ok": False,
                 "status": "missing_gpkg",
-                "workspace": output_config["geoserver_workspace"],
+                "workspace": geoserver_workspace,
                 "layer_name": result_name,
                 "error": "GeoPackage output is required for GeoServer publishing.",
             }
@@ -495,7 +496,7 @@ def run_antyodaya_pipeline(
             try:
                 geoserver_result = publish_gpkg_layer(
                     gpkg_path,
-                    workspace=output_config["geoserver_workspace"],
+                    workspace=geoserver_workspace,
                     layer_name=result_name,
                     overwrite=request.publish.overwrite,
                 )
@@ -508,7 +509,7 @@ def run_antyodaya_pipeline(
                 geoserver = {
                     "ok": False,
                     "status": "publish_failed",
-                    "workspace": output_config["geoserver_workspace"],
+                    "workspace": geoserver_workspace,
                     "layer_name": result_name,
                     "error_type": exc.__class__.__name__,
                     "error": str(exc)[:500],
