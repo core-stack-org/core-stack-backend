@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -23,6 +24,41 @@ def utc_now_text() -> str:
     """Return an ISO UTC timestamp without microseconds."""
 
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def stable_hash(data: Any) -> str:
+    """Return a stable SHA1 hash for JSON-serializable cache metadata."""
+
+    payload = json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def file_signature(path: str | Path) -> dict[str, Any]:
+    """Return a fast file signature and optional tracked SHA1 sidecar value."""
+
+    file_path = Path(path)
+    stat = file_path.stat()
+    sha1_path = Path(f"{file_path.as_posix()}.sha1")
+    sha1 = None
+    if sha1_path.exists():
+        sha1 = sha1_path.read_text().strip().split()[0] or None
+    return {
+        "path": file_path.as_posix(),
+        "size": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+        "sha1": sha1,
+    }
+
+
+def input_signatures(paths: Mapping[str, str | Path]) -> dict[str, dict[str, Any]]:
+    """Return signatures for named input files that exist."""
+
+    signatures: dict[str, dict[str, Any]] = {}
+    for name, path in paths.items():
+        file_path = Path(path)
+        if file_path.exists():
+            signatures[name] = file_signature(file_path)
+    return signatures
 
 
 def dataframe_eda(frame: pd.DataFrame, *, max_numeric_columns: int = 80) -> dict[str, Any]:
@@ -119,6 +155,46 @@ class OutputBundle:
     def write_metadata(self, data: Mapping[str, Any]) -> Path:
         payload = {"generated_at_utc": utc_now_text(), **dict(data)}
         return self.write_json(payload, ".run_metadata.json")
+
+    def cache_manifest_path(self) -> Path:
+        return self.output_path(".cache_manifest.json")
+
+    def read_cache_manifest(self) -> dict[str, Any] | None:
+        path = self.cache_manifest_path()
+        if not path.exists():
+            return None
+        return json.loads(path.read_text())
+
+    def write_cache_manifest(self, data: Mapping[str, Any]) -> Path:
+        payload = {"generated_at_utc": utc_now_text(), **dict(data)}
+        path = self.cache_manifest_path()
+        path.write_text(json.dumps(payload, indent=2, default=str) + "\n")
+        return path
+
+    def cached_result(
+        self,
+        *,
+        cache_key: str,
+        signatures: Mapping[str, Any],
+        required_result_paths: tuple[str, ...],
+    ) -> dict[str, Any] | None:
+        """Return a cached result only when request, inputs, and files match."""
+
+        manifest = self.read_cache_manifest()
+        if not manifest:
+            return None
+        if manifest.get("cache_key") != cache_key:
+            return None
+        if manifest.get("input_signatures") != dict(signatures):
+            return None
+        result = dict(manifest.get("result") or {})
+        for key in required_result_paths:
+            path = result.get(key)
+            if not path or not Path(path).exists():
+                return None
+        result["status"] = "cached"
+        result["cache_manifest_path"] = self.cache_manifest_path().as_posix()
+        return result
 
     def write_eda(self, frames: Mapping[str, pd.DataFrame]) -> Path:
         payload = {name: dataframe_eda(frame) for name, frame in frames.items()}
