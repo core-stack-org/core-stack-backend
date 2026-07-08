@@ -2041,15 +2041,11 @@
                             <span style="font-size: 10px; color: #6b7280;">Contour lines</span>
                         </div>
                     </div>
-                        </div>
-                    </div>
                 </div>
 
             <p style="text-align: center; margin-top: 5px; margin-bottom: 20px; font-size: 0.9em; font-weight: bold;">
                 The microwatershed relief is {{ dem_relief }}m and the mean elevation is {{ mean_elev }}m.
             </p>
-
-            <p>{{terrain_mws}}</p>
 
             <div class="map-group">
                 <div id="terrainMap" class="map"></div>
@@ -2091,40 +2087,27 @@
                 </div>
             </div>
 
+            <p>{{terrain_mws|safe}}</p>
+
             <p class="legend-note">
-                Note: We used NASA's SRTM Digital Elevation Model at 30m resolution to generate landform classification.
+                Note: Data used for land use land cover classification is remotely sensed from satellites including LandSat-7, LandSat-8, Sentinel-2, Sentinel-1, MODIS and Dynamic World.
             </p>
         </section>
 
         <section class="section">
-            <h4>Terrain Comparison for Block and MWS</h4>
-            <p>{{terrain_comp}}</p>
-
-            <p>The chart illustrates the distribution of different terrain types across the total block. It highlights
-                the percentage of each terrain type to the total block while also showcasing the specific percentage of
-                a single MWS to the overall percentage.</p>
+            <h3>Cropping Intensity</h3>
 
             <div class="chart-container">
-                <canvas id="barChart"></canvas>
-            </div>
-            <br />
-
-        </section>
-
-        <section class="section">
-            <h4>Land use on slopes and plains</h4>
-            <p>{{terrain_land_use}}</p>
-
-            <div class="chart-container" id="slopeChartContainer">
-                <canvas id="barChart-terrain-lulc-slope"></canvas>
+                <canvas id="barChart-intensity"></canvas>
             </div>
 
-            <div class="chart-container" id="plainChartContainer">
-                <canvas id="barChart-terrain-lulc-plain"></canvas>
-            </div>
+            <p>{{inten_desc1}}</p>
+            <p>{{inten_desc2}}</p>
 
-            <p class="legend-note">Note: Data remotely sensed from satellites including LandSat-7, LandSat-8,
-                Sentinel-2, Sentinel-1, MODIS and Dynamic World.</p>
+            <p class="legend-note">Note: We use annual land use land cover (LULC), to identify areas under single
+                cropping, double cropping and triple cropping using pixels which are classified as single kharif, single
+                non-kharif, double and triple classes of LULC classifier to determine cropping intensity. The data used
+                is from {{year_range_text}}.</p>
         </section>
 
         {% if land_degrad or tree_degrad %}
@@ -2133,6 +2116,7 @@
 
             {% if land_degrad %}
             <h4>Degradation of land</h4>
+            <h5>Cropping degradation</h5>
             <p>{{land_degrad}}</p>
 
             <div class="map-group">
@@ -2159,12 +2143,20 @@
                 </div>
             </div>
 
+            {% if crop_intensity_sankey %}
+            <div id="cropIntensitySankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Cropping Intensity Change (Single / Double / Triple)
+            </div>
+            {% endif %}
+
             <p class="legend-note">Note: The degradation in cropping is computed using the IndiaSAT Land Use Land Cover
                 outputs. Transitions from farmland to barren land, shrubs, human settlements (built-up) are computed</p>
             {% endif %}
 
             {% if tree_degrad %}
             <h4>Reduction in Tree-Cover</h4>
+            <h5>Reduction in tree cover</h5>
             <p>{{tree_degrad}}</p>
 
             <div class="map-group">
@@ -2194,6 +2186,14 @@
                     <span>Trees - Shrubs and Scrubs</span>
                 </div>
             </div>
+
+            {% if tree_reduction_sankey %}
+            <div id="treeReductionSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Forest Cover Change (Sankey)
+            </div>
+            {% endif %}
+
             <p class="legend-note">Note: The reduction in tree cover is computed using the IndiaSAT Land Use Land Cover
                 outputs. Transitions from tree cover to barren land, shrubs, human settlements (built-up) or farmland
                 are computed.</p>
@@ -2206,6 +2206,7 @@
         {% if urbanization %}
         <section class="section">
             <h4>Urbanization</h4>
+            <h5>Urbanization</h5>
             <p>{{urbanization}}</p>
 
             <div class="map-group">
@@ -2230,6 +2231,14 @@
                     <span>Barren/Shrubs and Scrubs - Built Up</span>
                 </div>
             </div>
+
+            {% if urbanization_sankey %}
+            <div id="urbanizationSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Urbanization Change (Sankey)
+            </div>
+            {% endif %}
+
             <p class="legend-note">Note: Urbanization is computed using the IndiaSAT Land Use Land Cover outputs.
                 Transitions from tree cover, farmland, and barren land to human settlements (built-up) are computed.</p>
 
@@ -2359,8 +2368,7 @@
                     Show More ({{ mining_desc|length|add:"-10" }} more)
                 </button>
                 {% endif %}
-                <p class="legend-note">Note: The dataset is sourced from environmental clearance applications compiled
-                    by Rohini Pande and Anant Sudarshan (2019).</p>
+                <p class="legend-note">Note: The dataset is sourced from environmental clearance applications compiled under the Rohini Pande research project on environmental governance and mining in India.</p>
             </div>
             {% endif %}
         </section>
@@ -2434,21 +2442,6 @@
         {% endif %}
 
         <section class="section">
-            <h3>Cropping Intensity</h3>
-            <p>{{inten_desc1}}</p>
-            <p>{{inten_desc2}}</p>
-
-            <div class="chart-container">
-                <canvas id="barChart-intensity"></canvas>
-            </div>
-
-            <p class="legend-note">Note: We use annual land use land cover (LULC), to identify areas under single
-                cropping, double cropping and triple cropping using pixels which are classified as single kharif, single
-                non-kharif, double and triple classes of LULC classifier to determine cropping intensity. The data used
-                is from {{year_range_text}}.</p>
-        </section>
-
-        <section class="section">
             <h3>Average percentage of double cropped area</h3>
             <p>{{double_crop_des}}</p>
 
@@ -2488,7 +2481,13 @@
         </section>
 
         <section class="section">
-            <h3>Surface Water Availability</h3>
+            <h3>Water availability in this microwatershed</h3>
+
+            <div id="swbVillageMap" class="map" style="position: relative;"></div>
+            <p class="legend-note" style="margin-bottom: 20px;">Fig: Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color).</p>
+
+            <p>{{swb_intro_desc}}</p>
+
             <p>{{swb_desc}}</p>
 
             <p>{{trend_desc}}</p>
@@ -2499,7 +2498,17 @@
                 <canvas id="barChart-swb"></canvas>
             </div>
 
-            <div id="swbMap" class="map"></div>
+            <p>{{swb_season_avg_desc}}</p>
+
+            <div class="map-group">
+                <div id="swbMap" class="map"></div>
+                <div id="swbVillageMap2" class="map"></div>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
+                <div style="width: 48%; text-align: center;">MWS, Village Boundaries and Waterbodies</div>
+            </div>
 
             <div class="legend">
                 <div class="legend-item">
@@ -2722,7 +2731,16 @@
         // ============================================================================
         // HELPER FUNCTION: Add village boundaries with spatial filtering
         // ============================================================================
-        const addVillageBoundariesToMap = async (map, mwsFeature) => {
+        const getVillageLabelName = feature => {
+            const candidates = ['village_name', 'VILLAGE_NA', 'vill_name', 'name', 'NAME', 'panchayat_n'];
+            for (const key of candidates) {
+                const val = feature.get(key);
+                if (val) return String(val);
+            }
+            return '';
+        };
+
+        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false) => {
             try {
                 const mwsGeometry = mwsFeature.getGeometry();
                 const mwsUid = mwsFeature.get('uid');
@@ -2777,14 +2795,18 @@
                 // Create and style the village layer
                 const villageLayer = new ol.layer.Vector({
                     source: villageSource,
-                    style: new ol.style.Style({
+                    style: feature => new ol.style.Style({
                         stroke: new ol.style.Stroke({
                             color: 'yellow',
                             width: 1.5,
                         }),
-                        // fill: new ol.style.Fill({
-                        //     color: 'rgba(255, 255, 0, 0.1)',
-                        // }),
+                        text: showLabels ? new ol.style.Text({
+                            text: getVillageLabelName(feature),
+                            font: '11px sans-serif',
+                            fill: new ol.style.Fill({ color: '#ffffff' }),
+                            stroke: new ol.style.Stroke({ color: '#000000', width: 3 }),
+                            overflow: true,
+                        }) : undefined,
                     }),
                     zIndex: 5,
                 });
@@ -3740,6 +3762,46 @@
             ])
         })
 
+        const swbVillageMapView = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const swbVillageMap = new ol.Map({
+            target: 'swbVillageMap',
+            layers: [getBaseLayer()],
+            view: swbVillageMapView,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const swbVillageMap2View = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const swbVillageMap2 = new ol.Map({
+            target: 'swbVillageMap2',
+            layers: [getBaseLayer()],
+            view: swbVillageMap2View,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
         const sogeMap = new ol.Map({
             target: 'sogeMap',
             layers: [
@@ -3875,8 +3937,9 @@
                         addVillageBoundariesToMap(ComparisonMap3, feature);
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
-                        addVillageBoundariesToMap(swbMap, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
+                        addVillageBoundariesToMap(swbVillageMap, feature, true);
+                        addVillageBoundariesToMap(swbVillageMap2, feature, true);
                         addDemographicBoundariesToMap(feature);
 
                     }
@@ -3907,6 +3970,8 @@
                     addMwsBoundaryToMap(ComparisonMap4);
                     addMwsBoundaryToMap(ComparisonMap5);
                     addMwsBoundaryToMap(swbMap);
+                    addMwsBoundaryToMap(swbVillageMap);
+                    addMwsBoundaryToMap(swbVillageMap2);
 
                     addMwsBoundaryToMap(demMap);
                     addMwsBoundaryToMap(demMapTerrain);
@@ -3942,6 +4007,8 @@
                     demographicLitMap.getView().fit(arr, fitOptions);
                     demographicMargMap.getView().fit(arr, fitOptions);
                     swbMap.getView().fit(arr, fitOptions);
+                    swbVillageMap.getView().fit(arr, fitOptions);
+                    swbVillageMap2.getView().fit(arr, fitOptions);
                     sogeMap.getView().fit(arr, fitOptions);
                 })
                 .catch(error => {
@@ -3956,25 +4023,35 @@
         fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
             .then(response => response.json())
             .then(data => {
-                const vectorSource = new ol.source.Vector({
-                    features: new ol.format.GeoJSON().readFeatures(data),
-                });
+                swbMap.addLayer(waterRaster);
+            })
+            .catch(error => {
+                // Silently handle fetch errors
+            });
 
-                const vectorLayer = new ol.layer.Vector({
-                    source: vectorSource,
-                    style: new ol.style.Style({
+        // Waterbodies for this MWS, colored by type (river vs other), for the village maps
+        fetch(`https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=MWS_UID='{{mws_id}}'`)
+            .then(response => response.json())
+            .then(data => {
+                const waterbodyStyleFunction = feature => {
+                    const isRiver = (feature.get('waterbody_type') || '').toLowerCase() === 'river';
+                    return new ol.style.Style({
                         stroke: new ol.style.Stroke({
-                            color: 'rgb(0, 150, 255)',
+                            color: isRiver ? 'rgb(255, 140, 0)' : 'rgb(0, 150, 255)',
                             width: 2,
                         }),
                         fill: new ol.style.Fill({
-                            color: 'rgba(137, 207, 240, 0.4)',
+                            color: isRiver ? 'rgba(255, 140, 0, 0.4)' : 'rgba(137, 207, 240, 0.4)',
                         }),
-                    })
+                    });
+                };
+
+                const swbVillageSource = new ol.source.Vector({
+                    features: new ol.format.GeoJSON().readFeatures(data),
                 });
 
-                swbMap.addLayer(vectorLayer);
-                swbMap.addLayer(waterRaster);
+                swbVillageMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
+                swbVillageMap2.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
             })
             .catch(error => {
                 // Silently handle fetch errors
@@ -4106,11 +4183,13 @@
 
 
             if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
+            if (typeof swbVillageMap !== 'undefined') addVisualScaleBar(swbVillageMap);
+            if (typeof swbVillageMap2 !== 'undefined') addVisualScaleBar(swbVillageMap2);
             if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['mainMap', 'compMap1', 'compMap2', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'sogeMap'];
+            const boundaryMaps = ['mainMap', 'compMap1', 'compMap2', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'swbVillageMap2', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
@@ -4122,123 +4201,6 @@
 
         // Initialize after page loads
         setTimeout(initializeMapControls, 1000);
-
-        // Terrain Bar Chart
-        const mwsTerrain = JSON.parse('{{mws_areas|safe}}')
-        const blockTerrain = JSON.parse('{{block_areas|safe}}')
-        const barChart = new Chart(document.getElementById('barChart'), {
-            type: 'bar',
-            data: {
-                labels: ['Plain Area', 'Ridge Area', 'Slopy Area', 'Valley Area', 'Hill Slopes'],
-                datasets: [{
-                    label: '% Block Terrain Area',
-                    data: blockTerrain,
-                    backgroundColor: '#3498db'
-                }, {
-                    label: '% MWS Terrain Area',
-                    data: mwsTerrain,
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Percent'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
-
-        const lulc_mws_slope = JSON.parse('{{lulc_mws_slope|safe}}')
-        const lulc_block_slope = JSON.parse('{{lulc_block_slope|safe}}')
-
-        const lulc_mws_plain = JSON.parse('{{lulc_mws_plain|safe}}')
-        const lulc_block_plain = JSON.parse('{{lulc_block_plain|safe}}')
-
-        const slopeContainer = document.getElementById('slopeChartContainer');
-        const plainContainer = document.getElementById('plainChartContainer');
-
-        if (lulc_mws_slope.some(v => v > 0)) {
-            const barChart_lulc_slope = new Chart(document.getElementById('barChart-terrain-lulc-slope'), {
-                type: 'bar',
-                data: {
-                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                    datasets: [{
-                        label: '% Tehsil Terrain Area under Slope',
-                        data: lulc_block_slope,
-                        backgroundColor: '#3498db'
-                    }, {
-                        label: '% MWS Terrain Area under Slope',
-                        data: lulc_mws_slope,
-                        backgroundColor: '#2ecc71'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Percent'
-                            }
-                        }
-                    },
-                    animation: {
-                        duration: 0 // Disable animation for better print support
-                    }
-                }
-            });
-        } else {
-            slopeContainer.style.display = 'none';
-        }
-
-
-        if (lulc_mws_plain.some(v => v > 0)) {
-            const barChart_lulc_plain = new Chart(document.getElementById('barChart-terrain-lulc-plain'), {
-                type: 'bar',
-                data: {
-                    labels: ['Shrubs', 'Barren Areas', 'Trees', 'Farmlands'],
-                    datasets: [{
-                        label: '% Tehsil Terrain Area under Plain',
-                        data: lulc_block_plain,
-                        backgroundColor: '#3498db'
-                    }, {
-                        label: '% MWS Terrain Area under Plain',
-                        data: lulc_mws_plain,
-                        backgroundColor: '#2ecc71'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Percent'
-                            }
-                        }
-                    },
-                    animation: {
-                        duration: 0 // Disable animation for better print support
-                    }
-                }
-            });
-        } else {
-            plainContainer.style.display = 'none';
-        }
 
         // Waterbody Graphs
         const kharifData = JSON.parse('{{kharif_data|safe}}')
@@ -4629,6 +4591,86 @@
         }
         );
 
+        // Sankey chart helper (used for cropping-intensity and tree-cover change diagrams)
+        const renderSankeyChart = (elId, sankeyData, colorMap) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+
+            if (!sankeyData || sankeyData.length === 0) {
+                el.style.display = 'none';
+                return;
+            }
+
+            const getColor = name => {
+                const key = Object.keys(colorMap).find(k => name.startsWith(k));
+                return key ? colorMap[key] : '#cccccc';
+            };
+
+            const roundVal = v => Math.round(v * 100) / 100;
+
+            const nodeNames = new Set();
+            sankeyData.forEach(link => {
+                nodeNames.add(link.source);
+                nodeNames.add(link.target);
+            });
+
+            const chart = echarts.init(el);
+            chart.setOption({
+                tooltip: {
+                    trigger: 'item',
+                    triggerOn: 'mousemove',
+                    formatter: params => params.dataType === 'edge'
+                        ? `${params.data.source} → ${params.data.target}<br/>${roundVal(params.data.value)} ha`
+                        : params.name
+                },
+                series: [{
+                    type: 'sankey',
+                    layout: 'none',
+                    emphasis: { focus: 'adjacency' },
+                    data: Array.from(nodeNames).map(name => ({
+                        name,
+                        itemStyle: { color: getColor(name) }
+                    })),
+                    links: sankeyData,
+                    label: {
+                        fontSize: 11,
+                        formatter: params => `${params.name}\n(${roundVal(params.value)} ha)`
+                    },
+                    edgeLabel: {
+                        show: true,
+                        fontSize: 10,
+                        formatter: params => `${roundVal(params.data.value)} ha`
+                    },
+                    lineStyle: { color: 'gradient', curveness: 0.5 }
+                }]
+            });
+
+            window.addEventListener('resize', () => chart.resize());
+        };
+
+        // Cropping Intensity Change Sankey
+        renderSankeyChart('cropIntensitySankey', JSON.parse('{{crop_intensity_sankey|safe}}'), {
+            'Single': '#F0F4A3',
+            'Double': '#B7D43A',
+            'Triple': '#7FAF2E',
+        });
+
+        // Tree Cover Change Sankey
+        renderSankeyChart('treeReductionSankey', JSON.parse('{{tree_reduction_sankey|safe}}'), {
+            'Forest': '#73bb53',
+            'Built Up': '#ff0000',
+            'Farm': '#eee05d',
+            'Barren': '#a9a9a9',
+            'Scrub Land': '#eaa4f0',
+        });
+
+        // Urbanization Change Sankey
+        renderSankeyChart('urbanizationSankey', JSON.parse('{{urbanization_sankey|safe}}'), {
+            'Built Up': '#ff0000',
+            'Water': '#1ca3ec',
+            'Tree/Farm': '#73bb53',
+            'Barren/Shrub': '#a9a9a9',
+        });
 
         //Village Profile section
         const villageNames = JSON.parse('{{ villages_name|safe }}')
@@ -4722,7 +4764,7 @@
         window.addEventListener('beforeprint', function () {
             const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, sogeMap];
+                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, swbVillageMap2, sogeMap];
 
             allMaps.forEach(function (map) {
                 if (map) {
@@ -4740,7 +4782,7 @@
 
             const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, sogeMap, demMapTerrain];
+                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, sogeMap, demMapTerrain];
 
             setTimeout(function () {
                 allMaps.forEach(function (map) {
@@ -4789,7 +4831,7 @@
 
             [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2]
                 .filter(Boolean)
                 .forEach(m => m.once('rendercomplete', afterRender));
 
@@ -4803,7 +4845,7 @@
                         try {
                             [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap]
+                                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2]
                                 .filter(Boolean)
                                 .forEach(m => m.renderSync());
                         } catch (e) { }

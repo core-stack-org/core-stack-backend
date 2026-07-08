@@ -238,7 +238,7 @@ def generate_mws_report(request):
         ) = get_terrain_data(state, district, block, uid)
 
         # ? Degradation Description generation
-        land_degrad, tree_degrad, urbanization, restore_desc = (
+        land_degrad, tree_degrad, urbanization, restore_desc, crop_intensity_sankey, tree_reduction_sankey, urbanization_sankey = (
             get_change_detection_data(state, district, block, uid)
         )
 
@@ -249,9 +249,11 @@ def generate_mws_report(request):
 
         # ? Surface Waterbody Description
         (
+            swb_intro_desc,
             swb_desc,
             trend_desc,
             final_desc,
+            swb_season_avg_desc,
             kharif_data,
             rabi_data,
             zaid_data,
@@ -328,11 +330,16 @@ def generate_mws_report(request):
             "tree_degrad": tree_degrad,
             "urbanization": urbanization,
             "restore_desc": restore_desc,
+            "crop_intensity_sankey": json.dumps(crop_intensity_sankey),
+            "tree_reduction_sankey": json.dumps(tree_reduction_sankey),
+            "urbanization_sankey": json.dumps(urbanization_sankey),
             "double_crop_des": double_crop_des,
             "year_range_text": year_range_text,
+            "swb_intro_desc": swb_intro_desc,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,
+            "swb_season_avg_desc": swb_season_avg_desc,
             "water_balance_trend": water_balance_trend,
             "wb_desc": wb_desc,
             "good_rainfall": good_rainfall,
