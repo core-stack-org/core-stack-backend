@@ -32,15 +32,98 @@ default_outputs:
   stac: true
   geoserver: true
 
+output_contract:
+  l2_distance_columns:
+    essential_education: essential_education_comprehensive_baseline_distance
+    higher_education: higher_education_nearest_gateway_distance
+    essential_health: essential_health_comprehensive_baseline_distance
+    advanced_health: advanced_health_nearest_gateway_distance
+    essential_services: essential_services_pds_baseline_distance
+    financial_inclusion: financial_inclusion_comprehensive_baseline_distance
+    apmc_access: apmc_market_nearest_gateway_distance
+    post_harvest: post_harvest_value_chain_nearest_gateway_distance
+    cooperative: cooperative_societies_direct_access_distance
+    livestock: dairy_livestock_direct_access_distance
+    agri_support_infra: agri_support_infra_direct_access_distance
+  excel_ready_columns:
+    - index
+    - state_id
+    - district_id
+    - tehsil_id
+    - village_id
+    - state_name
+    - district_name
+    - tehsil_name
+    - village_name
+    - essential_education_comprehensive_baseline_distance
+    - nearest_school_primary
+    - nearest_school_primary_distance_km
+    - nearest_school_upper_primary
+    - nearest_school_upper_primary_distance_km
+    - nearest_school_secondary
+    - nearest_school_secondary_distance_km
+    - higher_education_nearest_gateway_distance
+    - nearest_school_higher_secondary
+    - nearest_school_higher_secondary_distance_km
+    - nearest_college
+    - nearest_college_distance_km
+    - nearest_universities
+    - nearest_universities_distance_km
+    - essential_health_comprehensive_baseline_distance
+    - nearest_health_sub_cen
+    - nearest_health_sub_cen_distance_km
+    - nearest_health_phc
+    - nearest_health_phc_distance_km
+    - advanced_health_nearest_gateway_distance
+    - nearest_health_chc
+    - nearest_health_chc_distance_km
+    - nearest_health_dis_h
+    - nearest_health_dis_h_distance_km
+    - nearest_health_s_t_h
+    - nearest_health_s_t_h_distance_km
+    - essential_services_pds_baseline_distance
+    - nearest_pds
+    - nearest_pds_distance_km
+    - financial_inclusion_comprehensive_baseline_distance
+    - nearest_csc
+    - nearest_csc_distance_km
+    - nearest_bank_mitra
+    - nearest_bank_mitra_distance_km
+    - nearest_bank_branch
+    - nearest_bank_branch_distance_km
+    - nearest_bank_atm
+    - nearest_bank_atm_distance_km
+    - apmc_market_nearest_gateway_distance
+    - nearest_apmc
+    - nearest_apmc_distance_km
+    - nearest_agri_industry_markets_trading
+    - nearest_agri_industry_markets_trading_distance_km
+    - post_harvest_value_chain_nearest_gateway_distance
+    - nearest_agri_industry_storage_warehousing
+    - nearest_agri_industry_storage_warehousing_distance_km
+    - nearest_agri_industry_distribution_utilities
+    - nearest_agri_industry_distribution_utilities_distance_km
+    - nearest_agri_industry_agri_processing
+    - nearest_agri_industry_agri_processing_distance_km
+    - nearest_agri_industry_industrial_manufacturing
+    - nearest_agri_industry_industrial_manufacturing_distance_km
+    - cooperative_societies_direct_access_distance
+    - nearest_agri_industry_co_operatives_societies
+    - nearest_agri_industry_co_operatives_societies_distance_km
+    - dairy_livestock_direct_access_distance
+    - nearest_agri_industry_dairy_animal_husbandry
+    - nearest_agri_industry_dairy_animal_husbandry_distance_km
+    - agri_support_infra_direct_access_distance
+    - nearest_agri_industry_agri_support_infrastructure
+    - nearest_agri_industry_agri_support_infrastructure_distance_km
+
 search:
   base_expansion_degrees: 0.25
   supplemental_expansion_degrees: 2.0
   earth_radius_km: 6371.0088
 
 standard_admin_columns:
-  - cs_feature_id
-  - cs_admin_uid
-  - core_admin_uid
+  - fid
   - state_name
   - district_name
   - TEHSIL
