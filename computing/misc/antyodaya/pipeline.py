@@ -249,6 +249,7 @@ def _readme_lines(
     row_count: int,
     matched_rows: int,
     issues: list[ValidationIssue],
+    geoserver: Mapping[str, Any] | None = None,
 ) -> list[str]:
     readme = config.get("readme", {})
     lines = [
@@ -287,9 +288,18 @@ def _readme_lines(
         f"- Blog/short PDF: `{config['sources'].get('blog_pdf')}`",
         f"- GEE explorer: {config['sources'].get('gee_explorer_url')}",
         "",
-        "## Audience",
-        "",
     ]
+    if geoserver and (geoserver.get("wfs_url") or geoserver.get("wms_url")):
+        lines.extend(
+            [
+                "## GeoServer Layer",
+                "",
+                f"- WFS GeoJSON: {geoserver.get('wfs_url')}",
+                f"- WMS layer: {geoserver.get('wms_url')}",
+                "",
+            ]
+        )
+    lines.extend(["## Audience", ""])
     lines.extend([f"- {item}" for item in readme.get("audience", [])])
     lines.extend(["", "## Cautions", ""])
     lines.extend([f"- {item}" for item in readme.get("cautions", [])])
@@ -359,7 +369,7 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("readme_path")
     if outputs.stac:
         required.append("stac_fragment_path")
-    if outputs.geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         required.append("geoserver_links_path")
     return tuple(dict.fromkeys(required))
 
@@ -438,17 +448,6 @@ def run_antyodaya_pipeline(
         paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
     if outputs.eda:
         paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
-    if outputs.readme:
-        paths["readme_path"] = bundle.write_readme(
-            _readme_lines(
-                request=request,
-                config=config,
-                result_name=result_name,
-                row_count=len(csv_frame),
-                matched_rows=matched_rows,
-                issues=validation_issues,
-            )
-        ).as_posix()
     mapping_output = bundle.path / "antyodaya_2020_mapping.yaml"
     bundle.ensure()
     shutil.copyfile(_repo_path(config["sources"]["mapping_yaml"]), mapping_output)
@@ -481,17 +480,10 @@ def run_antyodaya_pipeline(
         result["stac_fragment_path"] = paths["stac_fragment_path"]
 
     geoserver = None
-    if outputs.geoserver:
+    if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        if not request.publish.sync_to_geoserver:
-            geoserver = {
-                "ok": False,
-                "status": "not_requested",
-                "workspace": output_config["geoserver_workspace"],
-                "layer_name": result_name,
-            }
-        elif not gpkg_path:
+        if not gpkg_path:
             geoserver = {
                 "ok": False,
                 "status": "missing_gpkg",
@@ -508,7 +500,10 @@ def run_antyodaya_pipeline(
                     overwrite=request.publish.overwrite,
                 )
                 geoserver = asdict(geoserver_result)
-                geoserver.setdefault("status", "published" if geoserver.get("ok") else "publish_failed")
+                geoserver["ok"] = True
+                geoserver["status"] = "published"
+                links_path = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv")
+                result["geoserver_links_path"] = links_path.as_posix()
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -518,10 +513,24 @@ def run_antyodaya_pipeline(
                     "error_type": exc.__class__.__name__,
                     "error": str(exc)[:500],
                 }
-        links_path = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv")
-        result["geoserver_links_path"] = links_path.as_posix()
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if outputs.geoserver and "geoserver_links_path" not in result:
+        stale_links = bundle.output_path(".geoserver_links.csv")
+        if stale_links.exists():
+            stale_links.unlink()
+    if outputs.readme:
+        result["readme_path"] = bundle.write_readme(
+            _readme_lines(
+                request=request,
+                config=config,
+                result_name=result_name,
+                row_count=len(csv_frame),
+                matched_rows=matched_rows,
+                issues=validation_issues,
+                geoserver=geoserver,
+            )
+        ).as_posix()
 
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
