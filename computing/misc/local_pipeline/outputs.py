@@ -50,6 +50,40 @@ def dataframe_eda(frame: pd.DataFrame, *, max_numeric_columns: int = 80) -> dict
     return summary
 
 
+def _safe_field_value(value: Any) -> Any:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, (str, int, float)):
+        return value
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (dict, list, tuple, set)):
+        return json.dumps(value, default=str)
+    return str(value)
+
+
+def _prepare_gdf_for_file(gdf):
+    """Coerce columns to Fiona-friendly scalar field values."""
+
+    prepared = gdf.copy()
+    geometry_name = prepared.geometry.name
+    if "fid" in prepared.columns and "source_fid" not in prepared.columns:
+        prepared = prepared.rename(columns={"fid": "source_fid"})
+    for column in prepared.columns:
+        if column == geometry_name:
+            continue
+        if str(prepared[column].dtype) == "bool":
+            prepared[column] = prepared[column].astype("int8")
+        elif str(prepared[column].dtype) in {"object", "string"}:
+            prepared[column] = prepared[column].map(_safe_field_value)
+    return prepared
+
+
 @dataclass
 class OutputBundle:
     """Writer for a standard local pipeline output directory."""
@@ -102,18 +136,20 @@ class OutputBundle:
         gpkg_path = self.output_path(".gpkg")
         if gpkg_path.exists():
             gpkg_path.unlink()
-        first = True
         for layer_name, gdf in layers.items():
             if gdf is None or len(gdf) == 0:
                 continue
+            gdf = _prepare_gdf_for_file(gdf)
+            # Fiona append mode is brittle with GeoPackage in some local GDAL builds.
+            # Since the output file is unlinked above, writing each named layer in
+            # create/replace mode preserves earlier layers while avoiding append mode.
             gdf.to_file(
                 gpkg_path,
                 layer=layer_name,
                 driver="GPKG",
-                mode="w" if first else "a",
+                mode="w",
                 engine="fiona",
             )
-            first = False
-        if first:
+        if not gpkg_path.exists():
             raise ValueError("No non-empty layers were provided for GeoPackage output")
         return gpkg_path
