@@ -9,6 +9,7 @@ sources:
   admin_layer: cs_admin_standard
   csv: data/base_resources/cs_livestock_census_20.csv
   sidecar_sqlite: data/base_resources/cs_livestock_census_20.csv.sqlite
+  schema_yaml: computing/misc/livestocks/livestocks_schema.yaml
 
 keys:
   admin_join_key: pc11_village_id
@@ -19,6 +20,18 @@ output:
   layer_prefix: livestocks
   village_layer: livestock_villages
   geoserver_workspace: livestocks
+
+default_outputs:
+  mode: focused
+  gpkg: true
+  csv: false
+  focused_csv: true
+  verbose_csv: false
+  excel_ready_csv: true
+  readme: true
+  eda: true
+  stac: true
+  geoserver: true
 
 standard_admin_columns:
   - cs_feature_id
@@ -46,6 +59,18 @@ source_location_columns:
   - ward_name
 
 metrics:
+  sidecar_columns:
+    - village_code
+    - cattle_male
+    - cattle_female
+    - buffalo_male
+    - buffalo_female
+    - sheep_male
+    - sheep_female
+    - goat_male
+    - goat_female
+    - pig_male
+    - pig_female
   count_columns:
     - cattle_male
     - cattle_female

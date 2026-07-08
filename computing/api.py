@@ -1620,17 +1620,40 @@ def generate_antyodaya(request):
 def generate_livestocks(request):
     print("Inside generate_livestocks API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
+        payload = request.data.dict() if hasattr(request.data, "dict") else dict(request.data)
+        if "scope" not in payload:
+            payload = {
+                "scope": {
+                    "level": payload.get("level", "tehsil"),
+                    "state_name": payload.get("state_name") or payload.get("state"),
+                    "district_name": payload.get("district_name") or payload.get("district"),
+                    "tehsil_name": payload.get("tehsil_name") or payload.get("block_name") or payload.get("block"),
+                    "village_ids": payload.get("village_ids") or payload.get("village_id"),
+                },
+                "outputs": {
+                    "mode": payload.get("output_mode") or payload.get("mode") or "focused",
+                },
+                "publish": {
+                    "sync_to_geoserver": payload.get("sync_to_geoserver", True),
+                    "overwrite": payload.get("overwrite", False),
+                    "register_layers": payload.get("register_layers", False),
+                },
+            }
+        else:
+            payload.setdefault("outputs", {})
+            payload.setdefault("publish", {})
+            if "output_mode" in payload and "mode" not in payload["outputs"]:
+                payload["outputs"]["mode"] = payload["output_mode"]
+            payload["outputs"].setdefault("mode", "focused")
+            payload["publish"].setdefault("sync_to_geoserver", True)
+            payload["publish"].setdefault("overwrite", False)
+            payload["publish"].setdefault("register_layers", False)
         generate_livestocks_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+            kwargs={"payload": payload},
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
     except Exception as e:
         print("Exception in generate_livestocks api :: ", e)
