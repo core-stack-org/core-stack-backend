@@ -41,6 +41,7 @@ class CSVSQLiteSidecar:
     table_name: str
     key_columns: tuple[str, ...]
     sidecar_path: str | Path | None = None
+    source_columns: tuple[str, ...] | None = None
     chunksize: int = 50_000
 
     def __post_init__(self) -> None:
@@ -56,15 +57,23 @@ class CSVSQLiteSidecar:
         with sqlite3.connect(self.sidecar_path) as connection:
             if not self._metadata_table_exists(connection):
                 return False
-            row = connection.execute(
-                """
-                SELECT source_size, source_mtime_ns
-                FROM local_pipeline_sidecar_metadata
-                WHERE source_path = ?
-                """,
-                (self.csv_path.as_posix(),),
-            ).fetchone()
-        return bool(row and int(row[0]) == source_size and int(row[1]) == source_mtime_ns)
+            try:
+                row = connection.execute(
+                    """
+                    SELECT source_size, source_mtime_ns, materialized_columns
+                    FROM local_pipeline_sidecar_metadata
+                    WHERE source_path = ?
+                    """,
+                    (self.csv_path.as_posix(),),
+                ).fetchone()
+            except sqlite3.OperationalError:
+                return False
+        expected_columns = tuple(dict.fromkeys([*(self.source_columns or ()), *self.key_columns]))
+        columns_match = True
+        if expected_columns:
+            materialized_columns = tuple((row[2] or "").split(",")) if row and row[2] else ()
+            columns_match = materialized_columns == expected_columns
+        return bool(row and int(row[0]) == source_size and int(row[1]) == source_mtime_ns and columns_match)
 
     def materialize(self, *, force: bool = False) -> dict[str, Any]:
         """Create or refresh the SQLite sidecar table from CSV chunks."""
@@ -81,7 +90,13 @@ class CSVSQLiteSidecar:
         with sqlite3.connect(self.sidecar_path) as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("PRAGMA temp_store = MEMORY")
-            for chunk in pd.read_csv(self.csv_path, chunksize=self.chunksize, low_memory=False):
+            read_columns = list(dict.fromkeys([*(self.source_columns or ()), *self.key_columns]))
+            for chunk in pd.read_csv(
+                self.csv_path,
+                chunksize=self.chunksize,
+                low_memory=False,
+                usecols=read_columns or None,
+            ):
                 if first_chunk:
                     missing = [column for column in self.key_columns if column not in chunk.columns]
                     if missing:
@@ -90,7 +105,7 @@ class CSVSQLiteSidecar:
                 rows += len(chunk)
                 first_chunk = False
 
-            self._write_metadata(connection, rows)
+            self._write_metadata(connection, rows, tuple(chunk.columns) if rows else tuple(read_columns))
             connection.commit()
 
         self.ensure_key_indexes()
@@ -154,7 +169,7 @@ class CSVSQLiteSidecar:
             is not None
         )
 
-    def _write_metadata(self, connection: sqlite3.Connection, rows: int) -> None:
+    def _write_metadata(self, connection: sqlite3.Connection, rows: int, materialized_columns: tuple[str, ...]) -> None:
         source_size, source_mtime_ns = _source_signature(self.csv_path)
         connection.execute(
             """
@@ -164,6 +179,7 @@ class CSVSQLiteSidecar:
                 source_mtime_ns INTEGER NOT NULL,
                 table_name TEXT NOT NULL,
                 row_count INTEGER NOT NULL,
+                materialized_columns TEXT,
                 created_at_utc TEXT NOT NULL
             )
             """
@@ -171,8 +187,8 @@ class CSVSQLiteSidecar:
         connection.execute(
             """
             INSERT OR REPLACE INTO local_pipeline_sidecar_metadata
-            (source_path, source_size, source_mtime_ns, table_name, row_count, created_at_utc)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (source_path, source_size, source_mtime_ns, table_name, row_count, materialized_columns, created_at_utc)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 self.csv_path.as_posix(),
@@ -180,6 +196,7 @@ class CSVSQLiteSidecar:
                 source_mtime_ns,
                 self.table_name,
                 int(rows),
+                ",".join(materialized_columns),
                 datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
             ),
         )
