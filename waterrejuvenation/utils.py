@@ -411,6 +411,65 @@ def calculate_zoi_area(zoi):
     return ee.Number.parse(area_hectares.format("%.2f"))
 
 
+def is_nan_value(value):
+    return (
+        value is None
+        or (isinstance(value, float) and math.isnan(value))
+        or pd.isna(value)
+    )
+
+
+def id_text(value):
+    """Normalize an identifier value to a clean string."""
+    if is_nan_value(value):
+        return None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, int):
+        text = str(value)
+    else:
+        text = str(value).strip()
+    if not text or text.upper() in ("N/A", "NAN", "NONE"):
+        return None
+    if text.endswith(".0"):
+        stem = text[:-2]
+        if stem.replace("_", "").isdigit():
+            text = stem
+    if "e" in text.lower():
+        try:
+            as_float = float(text)
+            if as_float.is_integer():
+                text = str(int(as_float))
+        except ValueError:
+            pass
+    return text
+
+
+def format_waterbody_uid_value(mws_uid, uid):
+    """
+    Restore SWB UID format: <MWS_UID>_<index>, e.g. 25_34833_101.
+
+    GEE/pandas may coerce this to a number (12129065580), dropping the underscore
+    before the per-waterbody index (12129065_580).
+    """
+    mws_str = id_text(mws_uid)
+    uid_str = id_text(uid)
+    if not uid_str:
+        return None, mws_str
+    if "_" in uid_str:
+        return uid_str, mws_str
+    if not mws_str:
+        return uid_str, mws_str
+
+    mws_digits = mws_str.replace("_", "")
+    uid_digits = uid_str.replace("_", "")
+    if uid_digits.startswith(mws_digits) and len(uid_digits) > len(mws_digits):
+        suffix = uid_digits[len(mws_digits) :]
+        if suffix.isdigit():
+            return f"{mws_str}_{suffix}", mws_str
+    return uid_str, mws_str
+
+
 def ensure_uid_on_fc(fc):
     """Ensure every feature has a canonical UID for NDVI / merge steps."""
 

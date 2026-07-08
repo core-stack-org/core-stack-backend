@@ -40,6 +40,8 @@ from waterrejuvenation.utils import (
     wait_for_task_completion,
     delete_asset_on_GEE,
     find_nearest_water_pixel,
+    format_waterbody_uid_value,
+    id_text,
 )
 from computing.surface_water_bodies.swb import generate_swb_layer
 
@@ -64,70 +66,185 @@ def is_nan(value):
     )
 
 
-def _gee_safe_property(value):
+def _is_string_id_property(prop_name):
+    """Identifier / label fields must stay strings in GEE + GeoServer exports."""
+    lowered = str(prop_name).lower()
+    if lowered in {
+        "uid",
+        "mws_uid",
+        "desilt_id",
+        "pond_id",
+        "village_id",
+        "waterbody_name",
+        "village",
+        "state",
+        "district",
+        "taluka",
+        "tehsil",
+        "block",
+    }:
+        return True
+    return lowered.endswith("_uid") or lowered.endswith("_id")
+
+
+def _gee_safe_property(value, prop_name=None):
+    import json
     import numpy as np
+    from datetime import date, datetime
+    from shapely.geometry.base import BaseGeometry
 
     if is_nan(value):
-        return "N/A"
+        return None
+    if prop_name and _is_string_id_property(prop_name):
+        text = id_text(value)
+        return text
+    if isinstance(value, BaseGeometry):
+        return value.wkt
+    if isinstance(value, (np.bool_,)):
+        return bool(value)
     if isinstance(value, (np.integer,)):
         return int(value)
     if isinstance(value, (np.floating,)):
         return float(value)
     if isinstance(value, bool):
         return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return value
+    if isinstance(value, (datetime, date, pd.Timestamp)):
+        return value.isoformat()
+    if isinstance(value, (list, tuple, set)):
+        return json.dumps(
+            [_gee_safe_property(item) for item in value],
+            default=str,
+        )
+    if isinstance(value, dict):
+        # GeoJSON Feature/Geometry dicts cannot be stored as table properties.
+        if value.get("type") in {
+            "Feature",
+            "FeatureCollection",
+            "Point",
+            "MultiPoint",
+            "LineString",
+            "MultiLineString",
+            "Polygon",
+            "MultiPolygon",
+            "GeometryCollection",
+        }:
+            return json.dumps(value)
+        return json.dumps(
+            {str(k): _gee_safe_property(v) for k, v in value.items()},
+            default=str,
+        )
     if isinstance(value, str):
         stripped = value.strip()
-        if stripped and stripped.upper() not in ("N/A", "NAN", "NONE"):
+        if not stripped or stripped.upper() in ("N/A", "NAN", "NONE"):
+            return None
+        if prop_name and prop_name.lower() in {"area_ored", "zoi", "zoi_wb", "zoi_area"}:
             try:
                 return float(stripped)
             except ValueError:
-                pass
+                return stripped
+        return stripped
     return str(value)
+
+
+def _sync_gdf_to_project_geoserver(gdf, project_name, layer_name, workspace):
+    """Push a local GeoDataFrame to GeoServer without an EE getInfo round-trip."""
+    import os
+
+    import geopandas as gpd
+
+    from computing.utils import fix_invalid_geometry_in_gdf, push_shape_to_geoserver
+
+    if gdf is None or gdf.empty:
+        logger.warning("No features to sync for layer %s", layer_name)
+        return None
+
+    state_dir = os.path.join("data/fc_to_shape", project_name)
+    os.makedirs(state_dir, exist_ok=True)
+    path = os.path.join(state_dir, layer_name)
+    out_gdf = gpd.GeoDataFrame(gdf.copy(), geometry="geometry", crs="EPSG:4326")
+    out_gdf = fix_invalid_geometry_in_gdf(out_gdf)
+    out_gdf.to_file(path + ".gpkg", driver="GPKG")
+    return push_shape_to_geoserver(
+        path, workspace=workspace, layer_name=layer_name, file_type="gpkg"
+    )
 
 
 def _gdf_to_ee_feature_collection(gdf):
     gdf = _normalize_uid_in_gdf(gdf)
-    features = []
+    geojson_features = []
     for _, row in gdf.iterrows():
         geom = row.geometry
         if geom is None or geom.is_empty:
             continue
-        props = {
-            col: _gee_safe_property(row[col])
-            for col in gdf.columns
-            if col != "geometry"
-        }
-        # Never let a stray geometry property override the row geometry column.
-        props.pop("geometry", None)
-        features.append(ee.Feature(ee.Geometry(geom.__geo_interface__), props))
-    return ee.FeatureCollection(features)
+        props = {}
+        for col in gdf.columns:
+            if col == "geometry":
+                continue
+            safe_val = _gee_safe_property(row[col], prop_name=col)
+            if safe_val is not None:
+                props[col] = safe_val
+        geojson_features.append(
+            {
+                "type": "Feature",
+                "geometry": geom.__geo_interface__,
+                "properties": props,
+            }
+        )
+    if not geojson_features:
+        return ee.FeatureCollection([])
+    return ee.FeatureCollection(geojson_features)
 
 
 def _extract_uid(row):
     """Read waterbody UID from a GeoDataFrame row (handles casing / aliases)."""
     if row is None:
         return None
-    for key in ("UID", "uid", "Uid", "MWS_UID", "mws_uid"):
-        if key not in row.index:
-            continue
-        val = row[key]
-        if val is None or (isinstance(val, float) and pd.isna(val)):
-            continue
-        text = str(val).strip()
-        if text and text.upper() not in ("N/A", "NAN", "NONE"):
-            return text
-    return None
+    mws_val = None
+    uid_val = None
+    for key in ("MWS_UID", "mws_uid"):
+        if key in row.index:
+            mws_val = row[key]
+            break
+    for key in ("UID", "uid", "Uid"):
+        if key in row.index:
+            uid_val = row[key]
+            break
+    uid, _ = format_waterbody_uid_value(mws_val, uid_val)
+    return uid
 
 
 def _normalize_uid_in_gdf(gdf):
-    """Ensure a canonical UID column exists for downstream ZOI / API merges."""
-    if gdf.empty or "UID" in gdf.columns:
+    """Ensure canonical UID / MWS_UID columns exist with underscore format."""
+    if gdf.empty:
         return gdf
+    gdf = gdf.copy()
     for key in ("uid", "Uid", "MWS_UID", "mws_uid"):
-        if key in gdf.columns:
-            gdf = gdf.copy()
+        if key in gdf.columns and "UID" not in gdf.columns:
             gdf["UID"] = gdf[key]
-            return gdf
+            break
+    if "UID" not in gdf.columns:
+        return gdf
+
+    mws_col = next(
+        (col for col in ("MWS_UID", "mws_uid") if col in gdf.columns),
+        None,
+    )
+
+    def _normalize_row(row):
+        mws_val = row[mws_col] if mws_col else None
+        uid, mws_val = format_waterbody_uid_value(mws_val, row["UID"])
+        row = row.copy()
+        if uid is not None:
+            row["UID"] = uid
+        if mws_val is not None and mws_col:
+            row[mws_col] = mws_val
+        return row
+
+    gdf = gdf.apply(_normalize_row, axis=1)
     return gdf
 
 
@@ -174,7 +291,13 @@ def _merge_matched_desilt_with_swb(desilt_row, wb_row):
         if col != "geometry" and col.lower() not in ("uid", "mws_uid")
     }
     props = {**wb_props, **desilt_props, "matched": True}
-    uid = _extract_uid(wb_row) or _extract_uid(desilt_row)
+    mws_val = wb_row["MWS_UID"] if "MWS_UID" in wb_row.index else None
+    if mws_val is None and "mws_uid" in wb_row.index:
+        mws_val = wb_row["mws_uid"]
+    uid_val = wb_row["UID"] if "UID" in wb_row.index else None
+    uid, mws_val = format_waterbody_uid_value(mws_val, uid_val)
+    if mws_val is not None:
+        props["MWS_UID"] = mws_val
     if uid:
         props["UID"] = uid
     elif "UID" not in props:
@@ -1135,8 +1258,8 @@ def BuildWaterBodyLayer(
     # ------------------------------------------------------------------
     layer_name = f"waterbodies_{proj_obj.name}_{proj_obj.id}".lower()
     if len(matched_gdf) > 0:
-        sync_project_fc_to_geoserver(
-            matched_fc,
+        _sync_gdf_to_project_geoserver(
+            matched_gdf,
             proj_obj.name,
             layer_name,
             "swb",
