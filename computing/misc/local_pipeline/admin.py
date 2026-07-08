@@ -54,10 +54,16 @@ ADMIN_PRESENTATION_COLUMNS = (
     "village_name",
 )
 INTERNAL_ADMIN_COLUMNS = (
+    "fid",
     "cs_feature_id",
     "cs_admin_uid",
     "core_admin_uid",
+    "pc11_state_id",
+    "pc11_district_id",
+    "pc11_subdistrict_id",
     "pc11_village_id",
+    "TEHSIL",
+    "NAME",
 )
 
 
