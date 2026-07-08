@@ -15,7 +15,7 @@ from django.conf import settings
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
 from computing.misc.local_pipeline.admin import admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
-from computing.misc.local_pipeline.outputs import OutputBundle, slug, utc_now_text
+from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
 from computing.misc.local_pipeline.schema import OutputOptions, ValidationIssue, validate_numeric_range
 from computing.misc.local_pipeline.tabular import CSVSQLiteSidecar, csv_header
@@ -160,6 +160,7 @@ def _focused_frame(frame: pd.DataFrame, schema: Mapping[str, Any]) -> pd.DataFra
             row["livestock_status"] = "matched"
             for column in value_columns:
                 row[column] = values.get(column)
+        row.pop("cs_feature_id", None)
         output_rows.append(row)
     return pd.DataFrame(output_rows)
 
@@ -248,6 +249,51 @@ def _stac_fragment(config: Mapping[str, Any], result: Mapping[str, Any]) -> dict
     }
 
 
+def _cache_input_signatures(config: Mapping[str, Any], config_path: str | Path) -> dict[str, dict[str, Any]]:
+    sources = config.get("sources", {})
+    paths: dict[str, str | Path] = {
+        "pipeline_config": _repo_path(config_path),
+        "admin_gpkg": _repo_path(sources["admin_gpkg"]),
+        "livestock_csv": _repo_path(sources["csv"]),
+    }
+    if sources.get("schema_yaml"):
+        paths["schema_yaml"] = _repo_path(sources["schema_yaml"])
+    return input_signatures(paths)
+
+
+def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
+    publish_options = asdict(request.publish)
+    publish_options.pop("use_pregenerated", None)
+    return stable_hash(
+        {
+            "algorithm": ALGORITHM,
+            "algorithm_version": ALGORITHM_VERSION,
+            "scope": asdict(request.scope),
+            "outputs": asdict(outputs),
+            "publish": publish_options,
+        }
+    )
+
+
+def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
+    required: list[str] = ["run_metadata_path"]
+    if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
+        required.append("gpkg_path")
+    if outputs.focused_csv:
+        required.append("focused_csv_path")
+    if outputs.excel_ready_csv:
+        required.append("excel_ready_csv_path")
+    if outputs.eda:
+        required.append("eda_path")
+    if outputs.readme:
+        required.append("readme_path")
+    if outputs.stac:
+        required.append("stac_fragment_path")
+    if request.publish.sync_to_geoserver and outputs.geoserver:
+        required.append("geoserver_links_path")
+    return tuple(dict.fromkeys(required))
+
+
 def run_livestocks_pipeline(
     request: StandardRequest,
     *,
@@ -265,6 +311,18 @@ def run_livestocks_pipeline(
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
     output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
     bundle = OutputBundle(output_root, layer_name)
+    cache_key = _cache_key(request, outputs)
+    cache_signatures = _cache_input_signatures(config, config_path)
+    required_result_paths = _required_result_paths(outputs, request)
+    if request.publish.use_pregenerated:
+        cached = bundle.cached_result(
+            cache_key=cache_key,
+            signatures=cache_signatures,
+            required_result_paths=required_result_paths,
+        )
+        if cached:
+            cached["cache_hit"] = True
+            return cached
 
     t0 = time.perf_counter()
     admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
@@ -365,6 +423,14 @@ def run_livestocks_pipeline(
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     result["run_metadata_path"] = bundle.write_metadata(
         {"request": asdict(request), "result": result, "config_path": str(config_path)}
+    ).as_posix()
+    result["cache_manifest_path"] = bundle.write_cache_manifest(
+        {
+            "cache_key": cache_key,
+            "input_signatures": cache_signatures,
+            "required_result_paths": required_result_paths,
+            "result": result,
+        }
     ).as_posix()
     return result
 
