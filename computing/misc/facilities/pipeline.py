@@ -19,7 +19,7 @@ from scipy.spatial import cKDTree
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
 from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
-from computing.misc.local_pipeline.schema import OutputOptions
+from computing.misc.local_pipeline.schema import OutputOptions, resolve_output_options
 from computing.misc.local_pipeline.gpkg import (
     IndexSpec,
     column_expression,
@@ -31,6 +31,7 @@ from computing.misc.local_pipeline.gpkg import (
 )
 from computing.misc.local_pipeline.outputs import (
     OutputBundle,
+    dataframe_eda,
     input_signatures,
     mark_cached_result,
     scope_output_identity,
@@ -83,7 +84,6 @@ def _request_from_legacy_args(
                 "register_layers": False,
             },
             "outputs": {
-                "mode": output_mode,
                 "geoserver": sync_to_geoserver,
             },
             "legacy": {"gee_account_id": gee_account_id},
@@ -461,10 +461,6 @@ def _l2_output_column(group: Mapping[str, Any], config: Mapping[str, Any]) -> st
     return f"{slug(key)}_{suffix_by_rollup.get(rollup, 'access_distance')}"
 
 
-def _excel_ready_service_frame(frame: pd.DataFrame, config: Mapping[str, Any]) -> pd.DataFrame:
-    return frame.reindex(columns=list(_output_contract(config).get("excel_ready_columns", [])))
-
-
 def _focused_service_frame(
     village_service_gdf: gpd.GeoDataFrame,
     nearest: pd.DataFrame,
@@ -543,7 +539,6 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         f"- Inventory facilities: `{result.get('inventory_rows')}`",
         f"- Nearest rows: `{result.get('nearest_rows')}`",
         f"- Candidate pool rows: `{result.get('candidate_pool')}`",
-        f"- Output mode: `{result.get('output_mode')}`",
         f"- Focused service rows: `{result.get('focused_service_rows')}`",
         "",
         "## How To Read The Distance Columns",
@@ -552,9 +547,9 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         "- Columns ending in `nearest_gateway_distance` use the minimum distance across advanced opportunity options. For example, reaching any one college or higher-secondary institution can open the higher-education gateway, so the nearest suitable option is the useful measure.",
         "- Columns ending in `direct_access_distance` use the nearest point for a single service type, such as PDS, cooperative societies, or dairy/livestock support.",
         "",
-        "## Excel And GIS Outputs",
+        "## CSV And GIS Outputs",
         "",
-        "The Excel-ready CSV keeps only the columns needed for report ingestion: standard admin identifiers, L2 access distances, and the nearest L3 facility details in a stable order. The GeoPackage keeps the village geometry so the same result can be mapped without another join.",
+        "The CSV holds the village service attributes without geometry so it can be opened directly in Excel or report tooling. The GeoPackage holds the same data with village geometry so the result can be mapped without another join.",
         "",
     ]
     geoserver = result.get("geoserver") or {}
@@ -570,60 +565,6 @@ def _readme_lines(request: StandardRequest, config: Mapping[str, Any], result_na
         )
     lines.extend(["## Cautions", ""])
     lines.extend([f"- {item}" for item in config.get("readme", {}).get("cautions", [])])
-    return lines
-
-
-def _methodology_lines(config: Mapping[str, Any], classification: Mapping[str, Any]) -> list[str]:
-    lines = [
-        "# Facilities Pipeline Methodology",
-        "",
-        "## Source Workflow",
-        "",
-        "Facility points were compiled from public GIS facility sources, including Gram Manchitra/PMGSY-facing public facility layers, into a standard pan-India Core Stack GeoPackage.",
-        "",
-        "The runtime pipeline reads only the requested admin scope from `cs_admin_standard.gpkg`, reads nearby facility candidates from `cs_pan_india_facilities.gpkg`, assigns in-scope inventory facilities by spatial intersection, and computes nearest services with KD-tree search over candidate points.",
-        "",
-        "```mermaid",
-        "flowchart TD",
-        "    A[API or CLI request] --> B[Resolve state/district/tehsil/village scope]",
-        "    B --> C[Read selected village polygons]",
-        "    C --> D[Read facility candidates with SQLite indexes and R-tree]",
-        "    D --> E[Assign in-scope inventory facilities]",
-        "    D --> F[Find nearest L3 service for each village]",
-        "    F --> G[Collapse L3 services to L2 access groups]",
-        "    G --> H[Write focused CSV, GPKG, README, EDA, STAC]",
-        "```",
-        "",
-        "## L2 Access Rollup Decisions",
-        "",
-    ]
-    notes = classification.get("access_rollup_notes", {})
-    for key in ("max", "min", "direct"):
-        if notes.get(key):
-            lines.append(f"- `{key}`: {notes[key].strip()}")
-    lines.extend(["", "## L2 Groups", ""])
-    for group in classification.get("l2_groups", []):
-        lines.append(
-            f"- `{group['key']}` uses `{group.get('rollup', 'direct')}`: {group.get('explanation', '').strip()}"
-        )
-    lines.extend(
-        [
-            "",
-            "## Public Access Links",
-            "",
-            "- Pan-India facilities GEE asset: https://code.earthengine.google.com/?asset=projects/corestack-datasets/assets/facilities",
-            "- Village facility proximity GEE asset: https://code.earthengine.google.com/?asset=projects/corestack-datasets/assets/facilities",
-            "- Google Drive sheet: https://docs.google.com/spreadsheets/d/1xS5d7vgyjyoqqnmmajKDZBx9qS6GqyAdSbNDR62ot2Y/edit?gid=0#gid=0&range=A138",
-            "",
-            "## Output Modes",
-            "",
-            "- `focused`: default API mode. Writes compact village-service GPKG and Excel/report CSVs.",
-            "- `all`: writes verbose inventory, nearest L3, village-service outputs, full docs, and diagnostics.",
-            "- `metadata`: writes run metadata only after computation.",
-            "- `methodology`: writes documentation without heavy data artifacts.",
-            "- `excel`: writes only the focused Excel/report CSV.",
-        ]
-    )
     return lines
 
 
@@ -675,19 +616,15 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
 
 
 def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
-    required: list[str] = ["run_metadata_path"]
+    required: list[str] = []
+    if outputs.metadata:
+        required.append("run_metadata_path")
     if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
         required.append("gpkg_path")
-    if outputs.focused_csv:
-        required.append("focused_csv_path")
-    if outputs.excel_ready_csv:
-        required.append("excel_ready_csv_path")
-    if outputs.eda:
-        required.append("eda_path")
+    if outputs.csv:
+        required.append("village_service_csv_path")
     if outputs.readme:
         required.append("readme_path")
-    if outputs.methodology:
-        required.append("methodology_path")
     if outputs.stac:
         required.append("stac_fragment_path")
     if request.publish.sync_to_geoserver and outputs.geoserver:
@@ -703,9 +640,7 @@ def run_facilities_pipeline(
     started = time.perf_counter()
     timings: dict[str, float] = {}
     config = load_config(config_path)
-    outputs = request.outputs
-    if outputs.mode == "default" and config.get("default_outputs"):
-        outputs = OutputOptions.from_mapping(config["default_outputs"])
+    outputs = resolve_output_options(request, config)
     output_config = config["output"]
     output_parts, layer_name = scope_output_identity(output_config["layer_prefix"], request.scope)
     output_root = _repo_path(output_config["root"]).joinpath(*output_parts)
@@ -759,7 +694,6 @@ def run_facilities_pipeline(
     village_service_gdf = village_service_gdf.merge(village_service_values, on="_admin_key", how="left")
     village_service_gdf = gpd.GeoDataFrame(village_service_gdf, geometry="geometry", crs=admin_rows.crs)
     focused_services = _focused_service_frame(village_service_gdf, nearest, classification, config)
-    excel_services = _excel_ready_service_frame(focused_services, config)
     village_service_output_gdf = gpd.GeoDataFrame(
         admin_output_frame(
             village_service_gdf,
@@ -784,7 +718,6 @@ def run_facilities_pipeline(
         "nearest_rows": int(len(nearest)),
         "village_service_rows": int(len(village_service_output_gdf)),
         "focused_service_rows": int(len(focused_services)),
-        "output_mode": outputs.mode,
         "created_facility_indexes": created_facility_indexes,
         "admin_created_indexes": admin_selection.created_indexes,
         "state_name": request.scope.state_name,
@@ -797,42 +730,12 @@ def run_facilities_pipeline(
 
     t0 = time.perf_counter()
     paths: dict[str, str] = {}
-    if outputs.csv or outputs.verbose_csv:
-        if not inventory.empty and outputs.verbose_csv:
-            paths["inventory_csv_path"] = bundle.write_csv(pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore")), ".inventory.csv").as_posix()
-        if not nearest.empty and outputs.verbose_csv:
-            paths["nearest_csv_path"] = bundle.write_csv(pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore")), ".nearest.csv").as_posix()
-        if outputs.verbose_csv:
-            paths["village_service_csv_path"] = bundle.write_csv(pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")), ".village_service.csv").as_posix()
-    if outputs.focused_csv:
-        paths["focused_csv_path"] = bundle.write_csv(focused_services, ".focused.csv").as_posix()
-    if outputs.excel_ready_csv:
-        paths["excel_ready_csv_path"] = bundle.write_csv(excel_services, ".excel_ready.csv").as_posix()
+    if outputs.csv:
+        paths["village_service_csv_path"] = bundle.write_csv(pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")), ".village_service.csv").as_posix()
     if outputs.gpkg:
-        gpkg_layers = {output_config["village_service_layer"]: village_service_output_gdf}
-        if outputs.mode == "all" or outputs.verbose_csv:
-            gpkg_layers = {
-                output_config["inventory_layer"]: inventory,
-                output_config["nearest_layer"]: nearest,
-                output_config["village_service_layer"]: village_service_output_gdf,
-            }
         paths["gpkg_path"] = bundle.write_gpkg(
-            gpkg_layers
+            {output_config["village_service_layer"]: village_service_output_gdf}
         ).as_posix()
-    if outputs.eda:
-        paths["eda_path"] = bundle.write_eda(
-            {
-                "inventory": pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore")),
-                "nearest": pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore")),
-                "village_service": pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")),
-                "focused_services": focused_services,
-                "excel_services": excel_services,
-            }
-        ).as_posix()
-    if outputs.methodology:
-        methodology_path = bundle.output_path(".methodology.md")
-        methodology_path.write_text("\n".join(_methodology_lines(config, classification)).rstrip() + "\n")
-        paths["methodology_path"] = methodology_path.as_posix()
     result.update(paths)
     if outputs.stac:
         result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()
@@ -887,9 +790,21 @@ def run_facilities_pipeline(
         result["readme_path"] = bundle.write_readme(_readme_lines(request, config, layer_name, result)).as_posix()
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
-    result["run_metadata_path"] = bundle.write_metadata(
-        {"request": asdict(request), "effective_outputs": asdict(outputs), "result": result, "config_path": str(config_path)}
-    ).as_posix()
+    if outputs.metadata:
+        result["run_metadata_path"] = bundle.write_metadata(
+            {
+                "request": asdict(request),
+                "effective_outputs": asdict(outputs),
+                "result": result,
+                "config_path": str(config_path),
+                "eda": {
+                    "inventory": dataframe_eda(pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore"))),
+                    "nearest": dataframe_eda(pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore"))),
+                    "village_service": dataframe_eda(pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore"))),
+                    "focused_services": dataframe_eda(focused_services),
+                },
+            }
+        ).as_posix()
     result["cache_manifest_path"] = bundle.write_cache_manifest(
         {
             "cache_key": cache_key,
