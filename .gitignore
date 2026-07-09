@@ -9,7 +9,7 @@ venv/
 *.pyc
 .idea/
 .DS_Store
-.cursor/
+.installation_state/
 
 # Django
 *.log
@@ -48,3 +48,10 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
+
+
+# ai
+AGENTS.md
+CLAUDE.md
+.codex/
+.cursor/
