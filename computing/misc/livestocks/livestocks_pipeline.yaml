@@ -16,20 +16,16 @@ keys:
   source_join_key: village_code
 
 output:
-  root: data/livestock/output/local_pipeline
+  root: data/tests/outputs/livestock20
   layer_prefix: livestocks
   village_layer: livestock_villages
   geoserver_workspace: test_workspace
 
 default_outputs:
-  mode: focused
   gpkg: true
-  csv: false
-  focused_csv: true
-  verbose_csv: false
-  excel_ready_csv: true
+  csv: true
   readme: true
-  eda: true
+  metadata: true
   stac: true
   geoserver: true
 

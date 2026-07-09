@@ -15,9 +15,9 @@ from django.conf import settings
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
 from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
-from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
+from computing.misc.local_pipeline.outputs import OutputBundle, dataframe_eda, input_signatures, slug, stable_hash, utc_now_text
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
-from computing.misc.local_pipeline.schema import OutputOptions, ValidationIssue, validate_numeric_range
+from computing.misc.local_pipeline.schema import OutputOptions, ValidationIssue, resolve_output_options, validate_numeric_range
 from computing.misc.local_pipeline.tabular import CSVSQLiteSidecar, csv_header
 from nrm_app.celery import app
 from utilities.constants import LIVESTOCK_GEOSERVER_WORKSPACE
@@ -62,7 +62,6 @@ def _request_from_legacy_args(
                 "register_layers": False,
             },
             "outputs": {
-                "mode": output_mode,
                 "geoserver": sync_to_geoserver,
             },
         }
@@ -289,15 +288,13 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
 
 
 def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
-    required: list[str] = ["run_metadata_path"]
+    required: list[str] = []
+    if outputs.metadata:
+        required.append("run_metadata_path")
     if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
         required.append("gpkg_path")
-    if outputs.focused_csv:
-        required.append("focused_csv_path")
-    if outputs.excel_ready_csv:
-        required.append("excel_ready_csv_path")
-    if outputs.eda:
-        required.append("eda_path")
+    if outputs.csv:
+        required.append("csv_path")
     if outputs.readme:
         required.append("readme_path")
     if outputs.stac:
@@ -315,9 +312,7 @@ def run_livestocks_pipeline(
     started = time.perf_counter()
     timings: dict[str, float] = {}
     config = load_config(config_path)
-    outputs = request.outputs
-    if outputs.mode == "default" and config.get("default_outputs"):
-        outputs = OutputOptions.from_mapping(config["default_outputs"])
+    outputs = resolve_output_options(request, config)
     schema = _schema(config)
     columns = _source_columns(config)
     output_config = config["output"]
@@ -363,19 +358,10 @@ def run_livestocks_pipeline(
 
     paths: dict[str, str] = {}
     t0 = time.perf_counter()
-    if outputs.csv or outputs.verbose_csv:
-        if outputs.verbose_csv:
-            paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
-        if not overview.empty:
-            paths["overview_csv_path"] = bundle.write_csv(overview, ".overview.csv").as_posix()
-    if outputs.focused_csv:
-        paths["focused_csv_path"] = bundle.write_csv(focused_frame, ".focused.csv").as_posix()
-    if outputs.excel_ready_csv:
-        paths["excel_ready_csv_path"] = bundle.write_csv(focused_frame, ".excel_ready.csv").as_posix()
+    if outputs.csv:
+        paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
     if outputs.gpkg:
         paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
-    if outputs.eda:
-        paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     result: dict[str, Any] = {
@@ -387,7 +373,6 @@ def run_livestocks_pipeline(
         "focused_rows": int(len(focused_frame)),
         "matched_rows": matched_rows,
         "join_coverage": round(matched_rows / len(csv_frame), 6) if len(csv_frame) else 0,
-        "output_mode": outputs.mode,
         "validation_issues": [asdict(issue) for issue in validation_issues],
         "sidecar": sidecar_status,
         "admin_created_indexes": admin_selection.created_indexes,
@@ -460,9 +445,20 @@ def run_livestocks_pipeline(
         ).as_posix()
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
-    result["run_metadata_path"] = bundle.write_metadata(
-        {"request": asdict(request), "result": result, "config_path": str(config_path)}
-    ).as_posix()
+    if outputs.metadata:
+        result["run_metadata_path"] = bundle.write_metadata(
+            {
+                "request": asdict(request),
+                "effective_outputs": asdict(outputs),
+                "result": result,
+                "config_path": str(config_path),
+                "eda": {
+                    "villages": dataframe_eda(csv_frame),
+                    "focused": dataframe_eda(focused_frame),
+                    "overview": dataframe_eda(overview),
+                },
+            }
+        ).as_posix()
     result["cache_manifest_path"] = bundle.write_cache_manifest(
         {
             "cache_key": cache_key,
