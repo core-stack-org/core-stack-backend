@@ -34,17 +34,17 @@ default_outputs:
 
 output_contract:
   l2_distance_columns:
-    essential_education: essential_education_baseline_bundle_distance
-    higher_education: higher_education_nearest_gateway_distance
-    essential_health: essential_health_baseline_bundle_distance
-    advanced_health: advanced_health_nearest_gateway_distance
-    essential_services: essential_services_pds_baseline_distance
-    financial_inclusion: financial_inclusion_baseline_bundle_distance
-    apmc_access: apmc_market_nearest_gateway_distance
-    post_harvest: post_harvest_value_chain_nearest_gateway_distance
-    cooperative: cooperative_societies_direct_access_distance
-    livestock: dairy_livestock_direct_access_distance
-    agri_support_infra: agri_support_infra_direct_access_distance
+    essential_education: essential_education_cat_distance_km
+    higher_education: higher_education_cat_distance_km
+    essential_health: essential_health_cat_distance_km
+    advanced_health: advanced_health_cat_distance_km
+    essential_services: essential_services_cat_distance_km
+    financial_inclusion: financial_inclusion_cat_distance_km
+    apmc_access: apmc_market_cat_distance_km
+    post_harvest: post_harvest_cat_distance_km
+    cooperative: cooperative_societies_cat_distance_km
+    livestock: dairy_livestock_cat_distance_km
+    agri_support_infra: agri_support_infra_cat_distance_km
   excel_ready_columns:
     - index
     - state_id
@@ -55,36 +55,36 @@ output_contract:
     - district_name
     - tehsil_name
     - village_name
-    - essential_education_baseline_bundle_distance
+    - essential_education_cat_distance_km
     - nearest_school_primary
     - nearest_school_primary_distance_km
     - nearest_school_upper_primary
     - nearest_school_upper_primary_distance_km
     - nearest_school_secondary
     - nearest_school_secondary_distance_km
-    - higher_education_nearest_gateway_distance
+    - higher_education_cat_distance_km
     - nearest_school_higher_secondary
     - nearest_school_higher_secondary_distance_km
     - nearest_college
     - nearest_college_distance_km
     - nearest_universities
     - nearest_universities_distance_km
-    - essential_health_baseline_bundle_distance
+    - essential_health_cat_distance_km
     - nearest_health_sub_cen
     - nearest_health_sub_cen_distance_km
     - nearest_health_phc
     - nearest_health_phc_distance_km
-    - advanced_health_nearest_gateway_distance
+    - advanced_health_cat_distance_km
     - nearest_health_chc
     - nearest_health_chc_distance_km
     - nearest_health_dis_h
     - nearest_health_dis_h_distance_km
     - nearest_health_s_t_h
     - nearest_health_s_t_h_distance_km
-    - essential_services_pds_baseline_distance
+    - essential_services_cat_distance_km
     - nearest_pds
     - nearest_pds_distance_km
-    - financial_inclusion_baseline_bundle_distance
+    - financial_inclusion_cat_distance_km
     - nearest_csc
     - nearest_csc_distance_km
     - nearest_bank_mitra
@@ -93,12 +93,12 @@ output_contract:
     - nearest_bank_branch_distance_km
     - nearest_bank_atm
     - nearest_bank_atm_distance_km
-    - apmc_market_nearest_gateway_distance
+    - apmc_market_cat_distance_km
     - nearest_apmc
     - nearest_apmc_distance_km
     - nearest_agri_industry_markets_trading
     - nearest_agri_industry_markets_trading_distance_km
-    - post_harvest_value_chain_nearest_gateway_distance
+    - post_harvest_cat_distance_km
     - nearest_agri_industry_storage_warehousing
     - nearest_agri_industry_storage_warehousing_distance_km
     - nearest_agri_industry_distribution_utilities
@@ -107,13 +107,13 @@ output_contract:
     - nearest_agri_industry_agri_processing_distance_km
     - nearest_agri_industry_industrial_manufacturing
     - nearest_agri_industry_industrial_manufacturing_distance_km
-    - cooperative_societies_direct_access_distance
+    - cooperative_societies_cat_distance_km
     - nearest_agri_industry_co_operatives_societies
     - nearest_agri_industry_co_operatives_societies_distance_km
-    - dairy_livestock_direct_access_distance
+    - dairy_livestock_cat_distance_km
     - nearest_agri_industry_dairy_animal_husbandry
     - nearest_agri_industry_dairy_animal_husbandry_distance_km
-    - agri_support_infra_direct_access_distance
+    - agri_support_infra_cat_distance_km
     - nearest_agri_industry_agri_support_infrastructure
     - nearest_agri_industry_agri_support_infrastructure_distance_km
 
