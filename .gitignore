@@ -9,9 +9,12 @@ venv/
 *.pyc
 .idea/
 .DS_Store
+<<<<<<< HEAD
 .cursor/
 .agents/
 .codex/
+=======
+>>>>>>> hotfix/agents
 .installation_state/
 
 # Django
