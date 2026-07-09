@@ -1588,9 +1588,7 @@ def generate_facilities_proximity(request):
                     "tehsil_name": payload.get("tehsil_name") or payload.get("block_name") or payload.get("block"),
                     "village_ids": payload.get("village_ids") or payload.get("village_id"),
                 },
-                "outputs": {
-                    "mode": payload.get("output_mode") or payload.get("mode") or "focused",
-                },
+                "outputs": dict(payload.get("outputs") or {}),
                 "publish": {
                     "sync_to_geoserver": payload.get("sync_to_geoserver", True),
                     "overwrite": payload.get("overwrite", True),
@@ -1602,9 +1600,6 @@ def generate_facilities_proximity(request):
         else:
             payload.setdefault("outputs", {})
             payload.setdefault("publish", {})
-            if "output_mode" in payload and "mode" not in payload["outputs"]:
-                payload["outputs"]["mode"] = payload["output_mode"]
-            payload["outputs"].setdefault("mode", "focused")
             payload["publish"].setdefault("sync_to_geoserver", True)
             payload["publish"].setdefault("overwrite", True)
             payload["publish"].setdefault("register_layers", False)
