@@ -128,7 +128,7 @@ def tree_health_ccd_raster(
 
             # Sync raster from GCS to GeoServer
             res = sync_raster_gcs_to_geoserver(
-                "ccd", description, description, "ccd_style"
+                "tree_ccd_raster", description, description, "tree_ccd_style"
             )
 
             if res and layer_id:
