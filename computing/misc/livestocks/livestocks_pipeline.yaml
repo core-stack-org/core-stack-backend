@@ -19,7 +19,7 @@ output:
   root: data/livestock/output/local_pipeline
   layer_prefix: livestocks
   village_layer: livestock_villages
-  geoserver_workspace: livestocks
+  geoserver_workspace: test_workspace
 
 default_outputs:
   mode: focused
