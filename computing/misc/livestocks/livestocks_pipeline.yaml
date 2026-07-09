@@ -29,6 +29,15 @@ default_outputs:
   stac: true
   geoserver: true
 
+# `status_column` places a per-village data-availability marker right after
+# the admin columns in every listed output. Remove an entry from `outputs`
+# to drop the column from that artifact (the GeoServer layer is published
+# from the GeoPackage, so `gpkg` and `geoserver` share one frame).
+output_contract:
+  status_column:
+    name: livestock_status
+    outputs: [csv, gpkg, geoserver]
+
 source_location_columns:
   - village_code
   - row_index

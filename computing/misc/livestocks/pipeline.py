@@ -13,11 +13,32 @@ import pandas as pd
 from django.conf import settings
 
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
-from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
+from computing.misc.local_pipeline.admin import (
+    ADMIN_COLUMN_DESCRIPTIONS,
+    admin_output_frame,
+    admin_presentation_frame,
+)
 from computing.misc.local_pipeline.batch import load_request_file
-from computing.misc.local_pipeline.outputs import OutputBundle, dataframe_eda, input_signatures, slug, stable_hash, utc_now_text
+from computing.misc.local_pipeline.outputs import (
+    OutputBundle,
+    column_dictionary,
+    frame_profile,
+    input_signatures,
+    slug,
+    stable_hash,
+    utc_now_text,
+)
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
-from computing.misc.local_pipeline.schema import OutputOptions, ValidationIssue, resolve_output_options, validate_numeric_range
+from computing.misc.local_pipeline.schema import (
+    STATUS_MATCHED,
+    STATUS_NO_DATA,
+    STATUS_NO_VILLAGE_ID,
+    OutputOptions,
+    ValidationIssue,
+    resolve_output_options,
+    status_column_config,
+    validate_numeric_range,
+)
 from computing.misc.local_pipeline.tabular import CSVSQLiteSidecar, csv_header
 from nrm_app.celery import app
 from utilities.constants import LIVESTOCK_GEOSERVER_WORKSPACE
@@ -40,30 +61,17 @@ def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
     return f"{prefix}_{slug(district)}_{slug(tehsil)}".strip("_")
 
 
-def _request_from_legacy_args(
-    state: str,
-    district: str,
-    block: str,
-    sync_to_geoserver: bool = True,
-    overwrite: bool = False,
-    output_mode: str = "focused",
-) -> StandardRequest:
+def _cli_request(state: str, district: str, tehsil: str, sync_to_geoserver: bool = True) -> StandardRequest:
     return StandardRequest.from_mapping(
         {
             "scope": {
                 "level": "tehsil",
                 "state_name": state,
                 "district_name": district,
-                "tehsil_name": block,
+                "tehsil_name": tehsil,
             },
-            "publish": {
-                "sync_to_geoserver": sync_to_geoserver,
-                "overwrite": overwrite,
-                "register_layers": False,
-            },
-            "outputs": {
-                "geoserver": sync_to_geoserver,
-            },
+            "publish": {"sync_to_geoserver": sync_to_geoserver, "overwrite": False},
+            "outputs": {"geoserver": sync_to_geoserver},
         }
     )
 
@@ -140,31 +148,67 @@ def _ordered_columns(frame: pd.DataFrame, config: Mapping[str, Any], columns: Ma
     return [col for col in ordered if col in frame.columns]
 
 
-def _focused_frame(frame: pd.DataFrame, schema: Mapping[str, Any]) -> pd.DataFrame:
+def _focused_frame(frame: pd.DataFrame, value_columns: list[str], status_name: str | None) -> pd.DataFrame:
+    """Return the report CSV frame: admin columns, the status column, then the
+    configured value columns for matched villages."""
+
     focused = admin_presentation_frame(frame.drop(columns=["geometry"], errors="ignore"))
     source = frame.set_index("fid", drop=False) if "fid" in frame.columns else frame
     output_rows: list[dict[str, Any]] = []
-    value_columns = schema.get("focused_columns", [])
     for _, admin_row in focused.iterrows():
         row = admin_row.to_dict()
         admin_index = row.get("index")
         values = source.loc[admin_index] if admin_index in source.index else pd.Series(dtype=object)
         has_village_id = pd.notna(row.get("village_id"))
         has_livestock = pd.notna(values.get("village_code")) if not values.empty else False
+        status = STATUS_MATCHED
         if not has_village_id:
-            row["livestock_status"] = "no village id"
+            status = STATUS_NO_VILLAGE_ID
         elif not has_livestock:
-            row["livestock_status"] = "no livestock row"
+            status = STATUS_NO_DATA
         else:
-            row["livestock_status"] = "matched"
             for column in value_columns:
                 row[column] = values.get(column)
+        if status_name:
+            row[status_name] = status
         output_rows.append(row)
     output = pd.DataFrame(output_rows)
     ordered = list(focused.columns)
-    ordered.append("livestock_status")
+    if status_name:
+        ordered.append(status_name)
     ordered.extend(column for column in value_columns if column in output.columns)
     return output.reindex(columns=list(dict.fromkeys(ordered)))
+
+
+def _column_describer(schema: Mapping[str, Any], config: Mapping[str, Any]):
+    """Describe livestock output columns from the runtime schema YAML."""
+
+    status_name, _ = status_column_config(config)
+    descriptions = dict(ADMIN_COLUMN_DESCRIPTIONS)
+    if status_name:
+        descriptions[status_name] = (
+            "Row data availability: `matched` when a 20th Livestock Census record was joined, "
+            f"`{STATUS_NO_VILLAGE_ID}` when the admin row lacks a village identifier, and "
+            f"`{STATUS_NO_DATA}` when no census record matched this village."
+        )
+    for group_key, animals in (schema.get("livestock") or {}).items():
+        group_label = str(group_key).replace("_", " ")
+        for animal, fields in animals.items():
+            if fields.get("total"):
+                descriptions[fields["total"]] = (
+                    f"Total {animal} count (female + male) for the village, "
+                    f"20th Livestock Census (2019), {group_label} group."
+                )
+            if fields.get("female"):
+                descriptions[fields["female"]] = f"Female {animal} count for the village, 20th Livestock Census (2019)."
+            if fields.get("male"):
+                descriptions[fields["male"]] = f"Male {animal} count for the village, 20th Livestock Census (2019)."
+    for metric, spec in (schema.get("derived_metrics") or {}).items():
+        sources = ", ".join(spec.get("sources", []))
+        label = spec.get("label", metric.replace("_", " ").title())
+        descriptions[metric] = f"{label}: sum of {sources}."
+    descriptions["village_code"] = "Census village code used to join livestock census records."
+    return descriptions
 
 
 def _overview(frame: pd.DataFrame, group_columns: list[str], config: Mapping[str, Any]) -> pd.DataFrame:
@@ -186,6 +230,20 @@ def _overview(frame: pd.DataFrame, group_columns: list[str], config: Mapping[str
     return pd.DataFrame(rows)
 
 
+def _column_reference_lines(column_entries: list[Mapping[str, Any]]) -> list[str]:
+    lines = [
+        "## Column Reference",
+        "",
+        "| Column | Type | Description |",
+        "| --- | --- | --- |",
+    ]
+    for entry in column_entries:
+        description = str(entry.get("description") or "").replace("|", "\\|").replace("\n", " ")
+        lines.append(f"| `{entry['column']}` | {entry.get('datatype', '')} | {description} |")
+    lines.append("")
+    return lines
+
+
 def _readme_lines(
     *,
     request: StandardRequest,
@@ -195,6 +253,7 @@ def _readme_lines(
     matched_rows: int,
     issues: list[ValidationIssue],
     geoserver: Mapping[str, Any] | None = None,
+    column_entries: list[Mapping[str, Any]] | None = None,
 ) -> list[str]:
     lines = [
         f"# {result_name}",
@@ -223,8 +282,11 @@ def _readme_lines(
         "- The requested admin scope is selected from `cs_admin_standard.gpkg` using SQLite indexes.",
         "- Matching livestock rows are fetched from a generated SQLite sidecar for the source CSV.",
         "- Village geometries are joined only after keyed livestock rows are selected.",
+        "- The report CSV keeps animal totals for direct reading; the GeoPackage keeps the female and male counts alongside each total in the same order.",
         "",
     ]
+    if column_entries:
+        lines.extend(_column_reference_lines(column_entries))
     if geoserver and (geoserver.get("wfs_url") or geoserver.get("wms_url")):
         lines.extend(
             [
@@ -348,18 +410,35 @@ def run_livestocks_pipeline(
     validation_issues = _validate_livestock(source_rows, config)
     joined = _merge_admin_livestock(admin_selection.rows, source_rows, config)
     joined = _derive_livestock_metrics(joined, schema)
+    status_name, status_outputs = status_column_config(config)
+    if status_name:
+        village_codes = joined["village_code"] if "village_code" in joined.columns else pd.Series([None] * len(joined), index=joined.index)
+        joined[status_name] = [
+            STATUS_NO_VILLAGE_ID
+            if pd.isna(village_id)
+            else (STATUS_MATCHED if pd.notna(village_code) else STATUS_NO_DATA)
+            for village_id, village_code in zip(joined["village_id"], village_codes)
+        ]
     ordered = _ordered_columns(joined, config, columns)
-    csv_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered)
-    focused_frame = _focused_frame(joined, schema)
-    overview = _overview(csv_frame, ["state_name", "district_name", "tehsil_name"], config)
-    matched_rows = int(csv_frame["village_code"].notna().sum()) if "village_code" in csv_frame else 0
-    gpkg_frame = admin_output_frame(joined, value_columns=ordered, include_geometry=True)
+    villages_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered)
+    focused_frame = _focused_frame(
+        joined,
+        list(schema.get("focused_columns", [])),
+        status_name if status_name and "csv" in status_outputs else None,
+    )
+    overview = _overview(villages_frame, ["state_name", "district_name", "tehsil_name"], config)
+    matched_rows = int(villages_frame["village_code"].notna().sum()) if "village_code" in villages_frame else 0
+    gpkg_value_columns = [column for column in schema.get("gpkg_columns", []) if column in joined.columns] or ordered
+    if status_name and {"gpkg", "geoserver"} & status_outputs:
+        gpkg_value_columns = [status_name, *gpkg_value_columns]
+    gpkg_frame = admin_output_frame(joined, value_columns=gpkg_value_columns, include_geometry=True)
+    describe = _column_describer(schema, config)
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     paths: dict[str, str] = {}
     t0 = time.perf_counter()
     if outputs.csv:
-        paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
+        paths["csv_path"] = bundle.write_csv(focused_frame, ".csv").as_posix()
     if outputs.gpkg:
         paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
@@ -369,10 +448,10 @@ def run_livestocks_pipeline(
         "algorithm": ALGORITHM,
         "algorithm_version": ALGORITHM_VERSION,
         "layer_name": layer_name,
-        "rows": int(len(csv_frame)),
+        "rows": int(len(villages_frame)),
         "focused_rows": int(len(focused_frame)),
         "matched_rows": matched_rows,
-        "join_coverage": round(matched_rows / len(csv_frame), 6) if len(csv_frame) else 0,
+        "join_coverage": round(matched_rows / len(villages_frame), 6) if len(villages_frame) else 0,
         "validation_issues": [asdict(issue) for issue in validation_issues],
         "sidecar": sidecar_status,
         "admin_created_indexes": admin_selection.created_indexes,
@@ -437,10 +516,11 @@ def run_livestocks_pipeline(
                 request=request,
                 config=config,
                 result_name=layer_name,
-                row_count=len(csv_frame),
+                row_count=len(villages_frame),
                 matched_rows=matched_rows,
                 issues=validation_issues,
                 geoserver=geoserver,
+                column_entries=column_dictionary(focused_frame, describe),
             )
         ).as_posix()
     result["timings"] = timings
@@ -452,10 +532,10 @@ def run_livestocks_pipeline(
                 "effective_outputs": asdict(outputs),
                 "result": result,
                 "config_path": str(config_path),
-                "eda": {
-                    "villages": dataframe_eda(csv_frame),
-                    "focused": dataframe_eda(focused_frame),
-                    "overview": dataframe_eda(overview),
+                "outputs": {
+                    "csv": frame_profile(focused_frame, describe),
+                    "gpkg_villages": frame_profile(pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")), describe),
+                    "overview": frame_profile(overview, describe),
                 },
             }
         ).as_posix()
@@ -475,22 +555,10 @@ def run_livestocks_request(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 @app.task(bind=True)
-def generate_livestocks_layer_task(
-    self,
-    state: str | None = None,
-    district: str | None = None,
-    block: str | None = None,
-    sync_to_geoserver: bool = True,
-    overwrite: bool = False,
-    output_mode: str = "focused",
-    payload: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    if payload is not None:
-        return run_livestocks_request(payload)
-    if not (state and district and block):
-        raise ValueError("state, district, and block are required when payload is not provided")
-    request = _request_from_legacy_args(state, district, block, sync_to_geoserver, overwrite, output_mode)
-    return run_livestocks_pipeline(request)
+def generate_livestocks_layer_task(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Generate livestock census outputs for a standard request payload."""
+
+    return run_livestocks_request(payload)
 
 
 def _run_batch(path: str | Path) -> list[dict[str, Any]]:
@@ -511,7 +579,7 @@ def main() -> None:
         if not (args.state and args.district and args.tehsil):
             parser.error("--state, --district, and --tehsil are required without --request-file")
         result = run_livestocks_pipeline(
-            _request_from_legacy_args(args.state, args.district, args.tehsil, not args.no_geoserver)
+            _cli_request(args.state, args.district, args.tehsil, not args.no_geoserver)
         )
     print(json.dumps(result, indent=2, default=str))
 

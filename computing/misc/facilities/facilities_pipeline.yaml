@@ -28,19 +28,24 @@ default_outputs:
   stac: true
   geoserver: true
 
+# The report CSV column list is derived from the classification structure:
+# for each L2 group (in order) the category distance column, then for each of
+# its L3 classes the `nearest_<class>` detail and `nearest_<class>_distance_km`
+# pair. Category distance columns default to `<group>_cat_distance_km`;
+# `l2_distance_columns` overrides the generated name where reports expect a
+# different one.
+# `status_column` places a per-village data-availability marker right after
+# the admin columns in every listed output. Remove an entry from `outputs`
+# to drop the column from that artifact (the GeoServer layer is published
+# from the GeoPackage, so `gpkg` and `geoserver` share one frame).
 output_contract:
+  status_column:
+    name: facilities_status
+    outputs: [csv, gpkg, geoserver]
   l2_distance_columns:
-    essential_education: essential_education_cat_distance_km
-    higher_education: higher_education_cat_distance_km
-    essential_health: essential_health_cat_distance_km
-    advanced_health: advanced_health_cat_distance_km
-    essential_services: essential_services_cat_distance_km
-    financial_inclusion: financial_inclusion_cat_distance_km
     apmc_access: market_cat_distance_km
-    post_harvest: post_harvest_cat_distance_km
     cooperative: cooperative_societies_cat_distance_km
     livestock: dairy_livestock_cat_distance_km
-    agri_support_infra: agri_support_infra_cat_distance_km
 
 search:
   base_expansion_degrees: 0.25

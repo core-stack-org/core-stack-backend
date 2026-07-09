@@ -1577,30 +1577,16 @@ def generate_facilities_proximity(request):
     try:
         payload = request.data.dict() if hasattr(request.data, "dict") else dict(request.data)
         if "scope" not in payload:
-            payload = {
-                "scope": {
-                    "level": payload.get("level", "tehsil"),
-                    "state_name": payload.get("state_name") or payload.get("state"),
-                    "district_name": payload.get("district_name") or payload.get("district"),
-                    "tehsil_name": payload.get("tehsil_name") or payload.get("block_name") or payload.get("block"),
-                    "village_ids": payload.get("village_ids") or payload.get("village_id"),
-                },
-                "outputs": dict(payload.get("outputs") or {}),
-                "publish": {
-                    "sync_to_geoserver": payload.get("sync_to_geoserver", True),
-                    "overwrite": payload.get("overwrite", True),
-                    "register_layers": payload.get("register_layers", False),
-                    "use_pregenerated": payload.get("use_pregenerated", False),
-                },
-                "legacy": {"gee_account_id": payload.get("gee_account_id")},
-            }
-        else:
-            payload.setdefault("outputs", {})
-            payload.setdefault("publish", {})
-            payload["publish"].setdefault("sync_to_geoserver", True)
-            payload["publish"].setdefault("overwrite", True)
-            payload["publish"].setdefault("register_layers", False)
-            payload["publish"].setdefault("use_pregenerated", False)
+            return Response(
+                {"error": "Request must include a 'scope' object with level, state_name, district_name, tehsil_name, or village_ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload.setdefault("outputs", {})
+        payload.setdefault("publish", {})
+        payload["publish"].setdefault("sync_to_geoserver", True)
+        payload["publish"].setdefault("overwrite", True)
+        payload["publish"].setdefault("register_layers", False)
+        payload["publish"].setdefault("use_pregenerated", False)
         generate_facilities_proximity_task.apply_async(
             kwargs={"payload": payload},
             queue="nrm",
@@ -1620,29 +1606,16 @@ def generate_antyodaya(request):
     try:
         payload = request.data.dict() if hasattr(request.data, "dict") else dict(request.data)
         if "scope" not in payload:
-            payload = {
-                "scope": {
-                    "level": payload.get("level", "tehsil"),
-                    "state_name": payload.get("state_name") or payload.get("state"),
-                    "district_name": payload.get("district_name") or payload.get("district"),
-                    "tehsil_name": payload.get("tehsil_name") or payload.get("block_name") or payload.get("block"),
-                    "village_ids": payload.get("village_ids") or payload.get("village_id"),
-                },
-                "outputs": dict(payload.get("outputs") or {}),
-                "publish": {
-                    "sync_to_geoserver": payload.get("sync_to_geoserver", True),
-                    "overwrite": payload.get("overwrite", False),
-                    "register_layers": payload.get("register_layers", False),
-                    "use_pregenerated": payload.get("use_pregenerated", False),
-                },
-            }
-        else:
-            payload.setdefault("outputs", {})
-            payload.setdefault("publish", {})
-            payload["publish"].setdefault("sync_to_geoserver", True)
-            payload["publish"].setdefault("overwrite", False)
-            payload["publish"].setdefault("register_layers", False)
-            payload["publish"].setdefault("use_pregenerated", False)
+            return Response(
+                {"error": "Request must include a 'scope' object with level, state_name, district_name, tehsil_name, or village_ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload.setdefault("outputs", {})
+        payload.setdefault("publish", {})
+        payload["publish"].setdefault("sync_to_geoserver", True)
+        payload["publish"].setdefault("overwrite", False)
+        payload["publish"].setdefault("register_layers", False)
+        payload["publish"].setdefault("use_pregenerated", False)
         generate_antyodaya_layer_task.apply_async(
             kwargs={"payload": payload},
             queue="nrm",
@@ -1662,29 +1635,16 @@ def generate_livestocks(request):
     try:
         payload = request.data.dict() if hasattr(request.data, "dict") else dict(request.data)
         if "scope" not in payload:
-            payload = {
-                "scope": {
-                    "level": payload.get("level", "tehsil"),
-                    "state_name": payload.get("state_name") or payload.get("state"),
-                    "district_name": payload.get("district_name") or payload.get("district"),
-                    "tehsil_name": payload.get("tehsil_name") or payload.get("block_name") or payload.get("block"),
-                    "village_ids": payload.get("village_ids") or payload.get("village_id"),
-                },
-                "outputs": dict(payload.get("outputs") or {}),
-                "publish": {
-                    "sync_to_geoserver": payload.get("sync_to_geoserver", True),
-                    "overwrite": payload.get("overwrite", False),
-                    "register_layers": payload.get("register_layers", False),
-                    "use_pregenerated": payload.get("use_pregenerated", False),
-                },
-            }
-        else:
-            payload.setdefault("outputs", {})
-            payload.setdefault("publish", {})
-            payload["publish"].setdefault("sync_to_geoserver", True)
-            payload["publish"].setdefault("overwrite", False)
-            payload["publish"].setdefault("register_layers", False)
-            payload["publish"].setdefault("use_pregenerated", False)
+            return Response(
+                {"error": "Request must include a 'scope' object with level, state_name, district_name, tehsil_name, or village_ids."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        payload.setdefault("outputs", {})
+        payload.setdefault("publish", {})
+        payload["publish"].setdefault("sync_to_geoserver", True)
+        payload["publish"].setdefault("overwrite", False)
+        payload["publish"].setdefault("register_layers", False)
+        payload["publish"].setdefault("use_pregenerated", False)
         generate_livestocks_layer_task.apply_async(
             kwargs={"payload": payload},
             queue="nrm",

@@ -42,6 +42,8 @@ derived_metrics:
     label: All Livestock Total
     sources: [large_animals_total, small_animals_total]
 
+# Report CSV value columns, in presentation order after the admin and status
+# columns. Totals only: the CSV is meant for direct human reading.
 focused_columns:
   - all_livestock_total
   - large_animals_total
@@ -51,3 +53,25 @@ focused_columns:
   - sheep_total
   - goat_total
   - pig_total
+
+# GeoPackage/GeoServer value columns: the same order as the report CSV, with
+# the female and male counts kept alongside each animal total.
+gpkg_columns:
+  - all_livestock_total
+  - large_animals_total
+  - cattle_total
+  - cattle_female
+  - cattle_male
+  - buffalo_total
+  - buffalo_female
+  - buffalo_male
+  - small_animals_total
+  - sheep_total
+  - sheep_female
+  - sheep_male
+  - goat_total
+  - goat_female
+  - goat_male
+  - pig_total
+  - pig_female
+  - pig_male
