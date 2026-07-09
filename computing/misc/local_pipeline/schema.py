@@ -41,42 +41,61 @@ def load_config(path: str | Path) -> dict[str, Any]:
     return yaml.safe_load(text) or {}
 
 
+#: Legacy request/config keys accepted for compatibility and folded into the
+#: simple output flags. Keys mapping to None are accepted and ignored.
+LEGACY_OUTPUT_KEY_ALIASES: dict[str, str | None] = {
+    "focused_csv": "csv",
+    "excel_ready_csv": "csv",
+    "verbose_csv": None,
+    "eda": None,
+    "metadata_json": "metadata",
+    "methodology": None,
+    "mode": None,
+    "output_mode": None,
+}
+
+
 @dataclass(frozen=True)
 class OutputOptions:
-    mode: str = "default"
+    """Which artifacts a pipeline run writes.
+
+    The default mode writes the full standard bundle: one GeoPackage, one CSV
+    derived from the same data, a README, a metadata JSON (which includes the
+    EDA summary), a STAC item, and a GeoServer layer published from the same
+    GeoPackage. Each artifact can be turned off per request or per pipeline
+    YAML (`default_outputs`).
+    """
+
     gpkg: bool = True
     csv: bool = True
     readme: bool = True
-    eda: bool = True
+    metadata: bool = True
     stac: bool = True
     geoserver: bool = True
-    excel_ready_csv: bool = False
-    focused_csv: bool = True
-    verbose_csv: bool = False
-    metadata_json: bool = True
-    methodology: bool = False
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> "OutputOptions":
-        values = dict(data or {})
-        mode = str(values.get("mode") or values.get("output_mode") or "default").lower()
-        presets: dict[str, dict[str, Any]] = {
-            "default": {},
-            "focused": {"csv": False, "focused_csv": True, "verbose_csv": False, "excel_ready_csv": True},
-            "all": {"gpkg": True, "csv": True, "readme": True, "eda": True, "stac": True, "focused_csv": True, "verbose_csv": True, "excel_ready_csv": True, "methodology": True},
-            "metadata": {"gpkg": False, "csv": False, "readme": False, "eda": False, "stac": False, "geoserver": False, "focused_csv": False, "verbose_csv": False, "excel_ready_csv": False, "metadata_json": True},
-            "methodology": {"gpkg": False, "csv": False, "readme": True, "eda": False, "stac": False, "geoserver": False, "focused_csv": False, "verbose_csv": False, "excel_ready_csv": False, "methodology": True},
-            "excel": {"gpkg": False, "csv": False, "readme": False, "eda": False, "stac": False, "geoserver": False, "focused_csv": True, "verbose_csv": False, "excel_ready_csv": True},
-        }
         merged = {field.name: getattr(cls, field.name) for field in cls.__dataclass_fields__.values()}
-        merged.update(presets.get(mode, {}))
-        merged.update(values)
-        merged["mode"] = mode
-        for field in cls.__dataclass_fields__.values():
-            if field.name == "mode":
-                continue
-            merged[field.name] = coerce_bool(merged[field.name], bool(getattr(cls, field.name)))
-        return cls(**{field.name: merged[field.name] for field in cls.__dataclass_fields__.values()})
+        for key, value in dict(data or {}).items():
+            name = str(key)
+            if name in LEGACY_OUTPUT_KEY_ALIASES:
+                name = LEGACY_OUTPUT_KEY_ALIASES[name]
+                if name is None or not coerce_bool(value):
+                    continue
+            if name in merged:
+                merged[name] = coerce_bool(value, merged[name])
+        return cls(**merged)
+
+
+def resolve_output_options(request: "StandardRequest", config: Mapping[str, Any]) -> OutputOptions:
+    """Resolve effective output flags: dataclass defaults, then the pipeline
+    YAML `default_outputs`, then per-request `outputs` overrides."""
+
+    merged: dict[str, Any] = dict(config.get("default_outputs") or {})
+    request_outputs = request.raw.get("outputs")
+    if isinstance(request_outputs, Mapping):
+        merged.update(request_outputs)
+    return OutputOptions.from_mapping(merged)
 
 
 @dataclass(frozen=True)
@@ -123,8 +142,6 @@ class StandardRequest:
         raw = dict(data)
         scope_data = raw.get("scope") if isinstance(raw.get("scope"), Mapping) else raw
         output_data = dict(raw.get("outputs") or {})
-        if "output_mode" in raw and "mode" not in output_data:
-            output_data["mode"] = raw["output_mode"]
         return cls(
             scope=AdminScope.from_mapping(dict(scope_data)),
             outputs=OutputOptions.from_mapping(output_data),

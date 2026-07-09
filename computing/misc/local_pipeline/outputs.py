@@ -245,10 +245,6 @@ class OutputBundle:
         result["cache_manifest_path"] = self.cache_manifest_path().as_posix()
         return result
 
-    def write_eda(self, frames: Mapping[str, pd.DataFrame]) -> Path:
-        payload = {name: dataframe_eda(frame) for name, frame in frames.items()}
-        return self.write_json(payload, ".eda.json")
-
     def write_readme(self, lines: list[str]) -> Path:
         self.ensure()
         path = self.path / "README.md"
