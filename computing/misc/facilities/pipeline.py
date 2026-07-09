@@ -40,6 +40,7 @@ from computing.misc.local_pipeline.outputs import (
 )
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
 from nrm_app.celery import app
+from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE
 
 
 CONFIG_PATH = Path(__file__).with_name("facilities_pipeline.yaml")
@@ -841,7 +842,11 @@ def run_facilities_pipeline(
     if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
-        geoserver_workspace = request.publish.geoserver_workspace or output_config["geoserver_workspace"]
+        geoserver_workspace = (
+            request.publish.geoserver_workspace
+            or output_config.get("geoserver_workspace")
+            or FACILITIES_GEOSERVER_WORKSPACE
+        )
         if gpkg_path:
             try:
                 geoserver_result = publish_gpkg_layer(
