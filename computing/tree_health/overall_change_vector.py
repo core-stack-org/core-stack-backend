@@ -89,7 +89,7 @@ def tree_health_overall_change_vector(
 
         # Sync to GeoServer
         sync_res = sync_fc_to_geoserver(
-            merged_fc, state, description, "tree_overall_ch"
+            merged_fc, state, description, "tree_overall_vector"
         )
 
         # Update sync status
