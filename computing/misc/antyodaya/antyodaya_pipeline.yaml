@@ -10,8 +10,10 @@ sources:
   csv: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv
   mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
   sidecar_sqlite: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv.sqlite
-  report_pdf: data/antyodaya/report/antyodaya_cluster_analysis_report.pdf
-  blog_pdf: data/antyodaya/report/antyodaya_cluster_analysis_blog.pdf
+  report_pdf: docs/reports/antyodaya_cluster_analysis_report.pdf
+  blog_pdf: docs/reports/antyodaya_cluster_analysis_blog.pdf
+  report_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_report.pdf
+  blog_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_blog.pdf
   gee_explorer_url: https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer
 
 keys:
@@ -20,21 +22,17 @@ keys:
   source_unique_key: village_key
 
 output:
-  root: data/antyodaya/output/local_pipeline
+  root: data/tests/outputs/antyodaya20
   layer_prefix: antyodaya20
   village_layer: antyodaya_villages
   overview_layer: antyodaya_overview
   geoserver_workspace: test_workspace
 
 default_outputs:
-  mode: focused
   gpkg: true
-  csv: false
-  focused_csv: true
-  verbose_csv: false
-  excel_ready_csv: true
+  csv: true
   readme: true
-  eda: true
+  metadata: true
   stac: true
   geoserver: true
 
@@ -66,8 +64,6 @@ readme:
     - local stewards
     - Core Stack platform users
     - Know Your Landscape reports
-    - data analysts preparing Excel handoffs
   cautions:
-    - Villages without a matching Antyodaya village_id remain in spatial outputs with null Antyodaya metrics.
     - Category clusters are normalized to HIGH, MEDIUM, LOW in runtime outputs.
-    - Aggregated overviews summarize selected village rows and should not be treated as a replacement for village-level evidence.
+    - Aggregated overviews summarize selected village rows and should be treated as a signal and not a replacement for village-level evidence.

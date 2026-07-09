@@ -17,12 +17,13 @@ from django.conf import settings
 from computing.misc.local_pipeline import AdminScope, CSAdminSource, StandardRequest, load_config
 from computing.misc.local_pipeline.admin import admin_output_frame, admin_presentation_frame
 from computing.misc.local_pipeline.batch import load_request_file
-from computing.misc.local_pipeline.outputs import OutputBundle, input_signatures, slug, stable_hash, utc_now_text
+from computing.misc.local_pipeline.outputs import OutputBundle, dataframe_eda, input_signatures, slug, stable_hash, utc_now_text
 from computing.misc.local_pipeline.publish import publish_gpkg_layer
 from computing.misc.local_pipeline.schema import (
     OutputOptions,
     ValidationIssue,
     columns_ending_with,
+    resolve_output_options,
     validate_numeric_range,
     validate_value_set,
 )
@@ -76,7 +77,6 @@ def _request_from_legacy_args(
                 "register_layers": False,
             },
             "outputs": {
-                "mode": output_mode,
                 "geoserver": sync_to_geoserver,
             },
         }
@@ -357,15 +357,13 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
 
 
 def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
-    required: list[str] = ["run_metadata_path", "mapping_yaml_path"]
+    required: list[str] = ["mapping_yaml_path"]
+    if outputs.metadata:
+        required.append("run_metadata_path")
     if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
         required.append("gpkg_path")
-    if outputs.focused_csv:
-        required.append("focused_csv_path")
-    if outputs.excel_ready_csv:
-        required.append("excel_ready_csv_path")
-    if outputs.eda:
-        required.append("eda_path")
+    if outputs.csv:
+        required.append("csv_path")
     if outputs.readme:
         required.append("readme_path")
     if outputs.stac:
@@ -385,9 +383,7 @@ def run_antyodaya_pipeline(
     started = time.perf_counter()
     timings: dict[str, float] = {}
     config = load_config(config_path)
-    outputs = request.outputs
-    if outputs.mode == "default" and config.get("default_outputs"):
-        outputs = OutputOptions.from_mapping(config["default_outputs"])
+    outputs = resolve_output_options(request, config)
     columns = _source_columns(config)
     output_config = config["output"]
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
@@ -436,19 +432,10 @@ def run_antyodaya_pipeline(
 
     paths: dict[str, str] = {}
     t0 = time.perf_counter()
-    if outputs.csv or outputs.verbose_csv:
-        if outputs.verbose_csv:
-            paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
-        if not overview.empty:
-            paths["overview_csv_path"] = bundle.write_csv(overview, ".overview.csv").as_posix()
-    if outputs.focused_csv:
-        paths["focused_csv_path"] = bundle.write_csv(focused_frame, ".focused.csv").as_posix()
-    if outputs.excel_ready_csv:
-        paths["excel_ready_csv_path"] = bundle.write_csv(focused_frame, ".excel_ready.csv").as_posix()
+    if outputs.csv:
+        paths["csv_path"] = bundle.write_csv(csv_frame, ".csv").as_posix()
     if outputs.gpkg:
         paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
-    if outputs.eda:
-        paths["eda_path"] = bundle.write_eda({"villages": csv_frame, "focused": focused_frame, "overview": overview}).as_posix()
     mapping_output = bundle.path / "antyodaya_2020_mapping.yaml"
     bundle.ensure()
     shutil.copyfile(_repo_path(config["sources"]["mapping_yaml"]), mapping_output)
@@ -464,7 +451,6 @@ def run_antyodaya_pipeline(
         "focused_rows": int(len(focused_frame)),
         "matched_rows": matched_rows,
         "join_coverage": round(matched_rows / len(csv_frame), 6) if len(csv_frame) else 0,
-        "output_mode": outputs.mode,
         "validation_issues": [asdict(issue) for issue in validation_issues],
         "sidecar": sidecar_status,
         "admin_created_indexes": admin_selection.created_indexes,
@@ -540,14 +526,20 @@ def run_antyodaya_pipeline(
 
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
-    result["run_metadata_path"] = bundle.write_metadata(
-        {
-            "request": asdict(request),
-            "effective_outputs": asdict(outputs),
-            "result": result,
-            "config_path": str(config_path),
-        }
-    ).as_posix()
+    if outputs.metadata:
+        result["run_metadata_path"] = bundle.write_metadata(
+            {
+                "request": asdict(request),
+                "effective_outputs": asdict(outputs),
+                "result": result,
+                "config_path": str(config_path),
+                "eda": {
+                    "villages": dataframe_eda(csv_frame),
+                    "focused": dataframe_eda(focused_frame),
+                    "overview": dataframe_eda(overview),
+                },
+            }
+        ).as_posix()
     result["cache_manifest_path"] = bundle.write_cache_manifest(
         {
             "cache_key": cache_key,
