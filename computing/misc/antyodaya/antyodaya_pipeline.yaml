@@ -24,7 +24,7 @@ output:
   layer_prefix: antyodaya20
   village_layer: antyodaya_villages
   overview_layer: antyodaya_overview
-  geoserver_workspace: antyodaya_2020
+  geoserver_workspace: test_workspace
 
 default_outputs:
   mode: focused
