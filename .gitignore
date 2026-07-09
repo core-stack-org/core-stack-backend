@@ -9,12 +9,9 @@ venv/
 *.pyc
 .idea/
 .DS_Store
-<<<<<<< HEAD
 .cursor/
 .agents/
 .codex/
-=======
->>>>>>> 23bb89dd (gitignore modification)
 .installation_state/
 
 # Django
