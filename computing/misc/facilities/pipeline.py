@@ -36,7 +36,6 @@ from computing.misc.local_pipeline.gpkg import (
     column_expression,
     connect_gpkg,
     ensure_indexes,
-    gpkg_geometry_to_shape,
     quote_identifier,
     read_table,
 )

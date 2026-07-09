@@ -9,8 +9,9 @@ pipelines:
 - Standard admin scope resolution from `cs_admin_standard.gpkg`.
 - CSV-to-SQLite sidecars for repeated keyed lookups.
 - Standard request parsing for API, CLI, and batch execution.
-- Standard output bundle writers for GPKG, CSV, README, EDA, metadata, and
-  GeoServer link outputs.
+- Standard output bundle writers for GPKG, CSV, README, run metadata (with
+  per-output column dictionary and EDA), STAC fragments, and GeoServer link
+  outputs.
 
 ```mermaid
 flowchart TD
