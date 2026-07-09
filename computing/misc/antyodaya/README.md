@@ -238,11 +238,10 @@ without a matching Antyodaya row keep admin fields and leave metric fields blank
 
 ## Reports And Explorer
 
-- Full report PDF: `data/antyodaya/report/antyodaya_cluster_analysis_report.pdf`
-- Blog/short PDF: `data/antyodaya/report/antyodaya_cluster_analysis_blog.pdf`
+- Full report PDF: `docs/reports/antyodaya_cluster_analysis_report.pdf`
+- Blog/short PDF: `docs/reports/antyodaya_cluster_analysis_blog.pdf`
 - GEE explorer: https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer
 
 These reports explain the clustering and category interpretation. The runtime
 README links to them so users can read the CSV/GPKG outputs without needing to
 inspect the code.
-
