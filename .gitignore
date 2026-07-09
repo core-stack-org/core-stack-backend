@@ -9,9 +9,6 @@ venv/
 *.pyc
 .idea/
 .DS_Store
-.cursor/
-.agents/
-.codex/
 .installation_state/
 
 # Django
