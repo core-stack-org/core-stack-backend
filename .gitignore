@@ -9,9 +9,12 @@ venv/
 *.pyc
 .idea/
 .DS_Store
+<<<<<<< HEAD
 .cursor/
 .agents/
 .codex/
+=======
+>>>>>>> 23bb89dd (gitignore modification)
 .installation_state/
 
 # Django
@@ -51,3 +54,10 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
+
+
+# ai
+AGENTS.md
+CLAUDE.md
+.codex/
+.cursor/
