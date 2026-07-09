@@ -1,0 +1,73 @@
+name: antyodaya_2020
+title: Mission Antyodaya 2020
+description: >
+  Village-level Mission Antyodaya category, feature, and raw indicator pipeline
+  joined at runtime to the Core Stack standard admin boundary.
+
+sources:
+  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  csv: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv
+  mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
+  sidecar_sqlite: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv.sqlite
+  report_pdf: data/antyodaya/report/antyodaya_cluster_analysis_report.pdf
+  blog_pdf: data/antyodaya/report/antyodaya_cluster_analysis_blog.pdf
+  gee_explorer_url: https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer
+
+keys:
+  admin_join_key: village_id
+  source_join_key: village_id
+  source_unique_key: village_key
+
+output:
+  root: data/antyodaya/output/local_pipeline
+  layer_prefix: antyodaya20
+  village_layer: antyodaya_villages
+  overview_layer: antyodaya_overview
+  geoserver_workspace: test_workspace
+
+default_outputs:
+  mode: focused
+  gpkg: true
+  csv: false
+  focused_csv: true
+  verbose_csv: false
+  excel_ready_csv: true
+  readme: true
+  eda: true
+  stac: true
+  geoserver: true
+
+source_location_columns:
+  - village_key
+  - state_code
+  - district_code
+  - sub_district_code
+  - village_id
+  - village_name
+  - block_code_nunique
+  - block_name
+  - gp_code_nunique
+  - gp_name
+
+validation:
+  category_cluster_suffix: _cat_cluster
+  category_cluster_values:
+    - HIGH
+    - MEDIUM
+    - LOW
+  category_value_suffix: _cat_value
+  feature_value_suffix: _feat_value
+  value_min: 0
+  value_max: 1
+
+readme:
+  audience:
+    - local stewards
+    - Core Stack platform users
+    - Know Your Landscape reports
+    - data analysts preparing Excel handoffs
+  cautions:
+    - Villages without a matching Antyodaya village_id remain in spatial outputs with null Antyodaya metrics.
+    - Category clusters are normalized to HIGH, MEDIUM, LOW in runtime outputs.
+    - Aggregated overviews summarize selected village rows and should not be treated as a replacement for village-level evidence.
