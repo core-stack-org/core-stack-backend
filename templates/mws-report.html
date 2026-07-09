@@ -209,7 +209,7 @@
             margin-top: 20px;
         }
 
-        .conflict-section h3 {
+        .conflict-section h4 {
             font-size: 1.3em;
             color: #34495e;
             margin-bottom: 10px;
@@ -292,7 +292,7 @@
             margin-top: 40px;
         }
 
-        .factory-section h3 {
+        .factory-section h4 {
             font-size: 1.3em;
             color: #34495e;
             margin-bottom: 10px;
@@ -387,7 +387,7 @@
             margin-top: 40px;
         }
 
-        .mining-section h3 {
+        .mining-section h4 {
             font-size: 1.3em;
             color: #34495e;
             margin-bottom: 10px;
@@ -1063,22 +1063,6 @@
                 min-height: 400px !important;
             }
 
-            #lulcMap,
-            #compMap2,
-            #lulcMap .ol-viewport,
-            #compMap2 .ol-viewport {
-                width: 100% !important;
-                height: 400px !important;
-                min-height: 400px !important;
-            }
-
-            #lulcMap canvas,
-            #compMap2 canvas {
-                width: 100% !important;
-                height: 400px !important;
-                min-height: 400px !important;
-            }
-
             #degradLandMap,
             #compMap3,
             #degradLandMap .ol-viewport,
@@ -1257,7 +1241,7 @@
             }
 
             /* Rest of print styles */
-            .conflict-section h3 {
+            .conflict-section h4 {
                 border-bottom: 2px solid #e74c3c !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -1283,7 +1267,7 @@
                 color: #3498db !important;
             }
 
-            .factory-section h3 {
+            .factory-section h4 {
                 border-bottom: 2px solid #3498db !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -1305,7 +1289,7 @@
                 print-color-adjust: exact !important;
             }
 
-            .mining-section h3 {
+            .mining-section h4 {
                 border-bottom: 2px solid #f39c12 !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -1526,8 +1510,7 @@
                 <div style="width: 32%; text-align: center;">Terrain Raster</div>
             </div>
 
-            <div class="map-group">
-                <div id="landscapeLulcMap" class="map" style="flex: 1 1 48%; position: relative;">
+            <div id="landscapeLulcMap" class="map" style="position: relative;">
                     <div
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
                         <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes
@@ -1604,13 +1587,9 @@
                         </div>
                     </div>
                 </div>
-                <div id="croppingIntensityMap" class="map" style="flex: 1 1 48%;"></div>
-            </div>
 
-            <div
-                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 48%; text-align: center;">LULC Raster</div>
-                <div style="width: 48%; text-align: center;">Cropping intensity raster</div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                LULC Raster
             </div>
 
             <div class="map-group">
@@ -1797,7 +1776,7 @@
                 <tbody>
                     <tr style="font-weight: bold;">
                         <td colspan="2" style="padding: 10px; border: 1px solid black;">Aquifer</td>
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">SOGE (2020)</td>
+                        <td colspan="2" style="padding: 10px; border: 1px solid black;">State of Groundwater Extraction (2020)</td>
                         <td colspan="2" style="padding: 10px; border: 1px solid black;">Water Balance Trend</td>
                     </tr>
                     <tr>
@@ -1942,12 +1921,12 @@
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping Area</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping Area (Hec)</td>
                         <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Surface water
-                            availability</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rainfall</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">ET</td>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Run off</td>
+                            availability (Hec)</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rainfall (mm)</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">ET (mm)</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Run off (mm)</td>
                     </tr>
                     <tr>
                         <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Kharif</td>
@@ -1978,7 +1957,8 @@
         </section>
 
         <section class="section">
-            <h2>Terrain Comparison Map</h2>
+            <h2>Land Use Land Cover</h2>
+            <h3>Terrain</h3>
 
             <div id="demMapTerrain" class="map" style="position: relative;">
                     <div
@@ -2112,11 +2092,8 @@
 
         {% if land_degrad or tree_degrad %}
         <section class="section">
-            <h3>Degradation</h3>
-
             {% if land_degrad %}
-            <h4>Degradation of land</h4>
-            <h5>Cropping degradation</h5>
+            <h3>Cropping degradation</h3>
             <p>{{land_degrad}}</p>
 
             <div class="map-group">
@@ -2155,8 +2132,7 @@
             {% endif %}
 
             {% if tree_degrad %}
-            <h4>Reduction in Tree-Cover</h4>
-            <h5>Reduction in tree cover</h5>
+            <h3>Reduction in tree cover</h3>
             <p>{{tree_degrad}}</p>
 
             <div class="map-group">
@@ -2205,8 +2181,7 @@
 
         {% if urbanization %}
         <section class="section">
-            <h4>Urbanization</h4>
-            <h5>Urbanization</h5>
+            <h3>Urbanization</h3>
             <p>{{urbanization}}</p>
 
             <div class="map-group">
@@ -2247,11 +2222,11 @@
 
         {% if lcw_desc or factory_desc or mining_desc %}
         <section class="section">
-            <h2>Land Conflicts and Industrialization</h2>
+            <h3>Land Conflicts and Industrialization</h3>
 
             {% if lcw_desc %}
             <div class="conflict-section">
-                <h3>Land Conflicts</h3>
+                <h4>Land Conflicts</h4>
                 <p>The following land conflict{{ lcw_desc|length|pluralize }} {{ lcw_desc|length|pluralize:"has,have" }}
                     been observed in this micro watershed:</p>
 
@@ -2286,7 +2261,7 @@
 
             {% if factory_desc %}
             <div class="factory-section">
-                <h3>Industries in this Microwatershed</h3>
+                <h4>Industries in this Microwatershed</h4>
                 <p>The following {{ factory_desc|length }} Industr{{ factory_desc|length|pluralize:"y,ies" }}
                     {{factory_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
 
@@ -2331,7 +2306,7 @@
 
             {% if mining_desc %}
             <div class="mining-section">
-                <h3>Mining Sites in this Microwatershed</h3>
+                <h4>Mining Sites in this Microwatershed</h4>
                 <p>The following {{ mining_desc|length }} mining site{{ mining_desc|length|pluralize }}
                     {{mining_desc|length|pluralize:"is,are" }} located in this micro watershed:</p>
 
@@ -2442,45 +2417,6 @@
         {% endif %}
 
         <section class="section">
-            <h3>Average percentage of double cropped area</h3>
-            <p>{{double_crop_des}}</p>
-
-            <div class="map-group">
-                <div id="lulcMap" class="map"></div>
-                <div id="compMap2" class="map"></div>
-            </div>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
-                    <span>Barren Lands</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #F0F4A3;"></div>
-                    <span>Single Kharif</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #D6E96B;"></div>
-                    <span>Single Non-Kharif</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #B7D43A;"></div>
-                    <span>Double Cropping</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #7FAF2E;"></div>
-                    <span>Triple Cropping</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color" style="background-color: #8C7A4F;"></div>
-                    <span>Shrubs and Scrubs</span>
-                </div>
-            </div>
-            <p class="legend-note">
-                Note: The Resolution of LULC image is 10 meter. The data used is from {{year_range_text}}.
-            </p>
-        </section>
-
-        <section class="section">
             <h3>Water availability in this microwatershed</h3>
 
             <div id="swbVillageMap" class="map" style="position: relative;"></div>
@@ -2493,6 +2429,8 @@
             <p>{{trend_desc}}</p>
 
             <p>{{final_desc}}</p>
+
+            <p>{{swb_season_desc}}</p>
 
             <div class="chart-container">
                 <canvas id="barChart-swb"></canvas>
@@ -2529,12 +2467,42 @@
                 Note: We use Sentinel-1 (SAR data) VV band for water pixel detection in Kharif season and Dynamic World
                 to detect water pixels in Rabi and Zaid seasons.
             </p>
-
-            <p>{{swb_season_desc}}</p>
         </section>
 
         <section class="section">
-            <h3>Water Balance</h3>
+            <h3>Hydrological cycle</h3>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <div class="chart-container" style="flex: 1 1 32%; min-width: 250px;">
+                    <canvas id="lineChart-rainfall-fn"></canvas>
+                </div>
+                <div class="chart-container" style="flex: 1 1 32%; min-width: 250px;">
+                    <canvas id="lineChart-et-fn"></canvas>
+                </div>
+                <div class="chart-container" style="flex: 1 1 32%; min-width: 250px;">
+                    <canvas id="lineChart-runoff-fn"></canvas>
+                </div>
+            </div>
+
+            <p class="legend-note">
+                Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP)
+                dataset available on Google Earth Engine's data catalogue. GSMaP provides a global precipitation in
+                mm/hr at spatial resolution of approximately 11km.
+                Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m
+                dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m
+                resolution). For further information on the computation, refer our <a
+                    href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view"
+                    target="_blank">technical manual</a>.
+            </p>
+
+            <div class="chart-container">
+                <canvas id="lineChart-gw"></canvas>
+            </div>
+            <p class="legend-note">
+                Note: Computed by subtracting outgoing fluxes (runoff and evaporatranspiration) from incoming water
+                (precipitation).
+            </p>
+
             <p>A water balance study of the microwatershed indicates whether it is helping conserve water or deplete
                 water from the underlying aquifer. Incoming water into a microwatershed is predominantly through
                 rainfall. Some of this is lost as runoff while the rest percolates into the ground. Crops pull some of
@@ -2548,34 +2516,11 @@
 
             <p>Do note that currently we only consider the vertical flux in the microwatershed. We are working on how to
                 model incoming runoff into the microwatershed, as well as sub-surface flow from adjacent areas.</p>
-            <div class="chart-container">
-                <canvas id="lineChart-water"></canvas>
-            </div>
-            <p class="legend-note">
-                Note: Precipitation data is calculated from the Global Satellite Mapping of Precipitation (GSMaP)
-                dataset available on Google Earth Engine's data catalogue. GSMaP provides a global precipitation in
-                mm/hr at spatial resolution of approximately 11km.
-                Runoff is calculated using precipitation data (GSMaP at 11 km resolution), soil type (HYSOGs250m
-                dataset), slope (NASA SRTM DEM dataset at 30 m resolution) and land cover (Dynamic World dataset at 10m
-                resolution). For further information on the computation, refer our <a
-                    href="https://drive.google.com/file/d/1ZxovdpPThkN09cB1TcUYSE2BImI7M3k_/view"
-                    target="_blank">technical manual</a>.
-            </p>
-            <div class="chart-container">
-                <canvas id="lineChart-evp"></canvas>
-            </div>
-            <div class="chart-container">
-                <canvas id="lineChart-gw"></canvas>
-            </div>
-            <p class="legend-note">
-                Note: Computed by subtracting outgoing fluxes (runoff and evaporatranspiration) from incoming water
-                (precipitation).
-            </p>
         </section>
 
         {% if soge_desc %}
         <section class="section">
-            <h3>State of groundwater extraction</h3>
+            <h3>Groundwater Extraction</h3>
 
             <p>The state of groundwater extraction refers to the current level or intensity at which groundwater is
                 being withdrawn from aquifers compared to its natural replenishment rate. Based on this ratio, agencies
@@ -2646,6 +2591,10 @@
                 <h2>Village Profile</h2>
                 <p>These are <span id="vilage-count"></span> villages intersecting with this microwatershed:</p>
                 <ul id="village-names"></ul>
+
+                <div id="villageIntersectMap" class="map" style="position: relative;"></div>
+                <p class="legend-note" style="margin-bottom: 20px;">Fig: Click on a village to see how much of the
+                    MWS area falls within it.</p>
 
                 <h4>MGNREGA works</h4>
                 <p>MGNREGA works of soil and water conservation, such as trench cum bunds, irrigation structures like
@@ -2927,7 +2876,6 @@
                 const mwsSource = new ol.source.Vector({ features: [mwsFeature] });
                 const mwsStyle = new ol.style.Style({
                     stroke: new ol.style.Stroke({ color: 'skyblue', width: 2 }),
-                    fill: new ol.style.Fill({ color: 'rgba(135, 206, 235, 0.4)' })
                 });
 
                 demographicPopMap.addLayer(new ol.layer.Vector({ source: mwsSource, style: mwsStyle, zIndex: 10 }));
@@ -3175,20 +3123,6 @@
             }),
             visible: true,
             name: 'degrad_raster'
-        })
-
-        const lulcRaster = new ol.layer.Image({
-            source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
-                params: {
-                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
-                    'STYLES': "lulc_level_3_style"
-                },
-                ratio: 1,
-                serverType: 'geoserver',
-            }),
-            visible: true,
-            name: 'lulc_raster'
         })
 
         const waterRaster = new ol.layer.Image({
@@ -3530,24 +3464,6 @@
             ])
         });
 
-        const croppingIntensityMap = new ol.Map({
-            target: 'croppingIntensityMap',
-            layers: [getBaseLayer()],
-            view: new ol.View({
-                center: [78.9, 23.6],
-                zoom: 10,
-                projection: "EPSG:4326",
-                constrainResolution: true,
-                smoothExtentConstraint: true,
-                smoothResolutionConstraint: true,
-            }),
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
         const hydroVectorMap = new ol.Map({
             target: 'hydroVectorMap',
             layers: [getBaseLayer(), waterbodiesLayer, riverLayer, canalLayer],
@@ -3586,34 +3502,6 @@
             ])
         })
 
-        const tempView2 = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const ComparisonMap2 = new ol.Map({
-            target: 'compMap2',
-            layers: [
-                new ol.layer.Tile({
-                    source: new ol.source.XYZ({
-                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
-                        maxZoom: 30,
-                        transition: 500,
-                    }),
-                    preload: 4,
-                })
-            ],
-            view: tempView2,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
 
         const tempView3_2 = new ol.View({
             center: [78.9, 23.6],
@@ -3695,17 +3583,6 @@
                 })
             ],
             view: tempView5,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const lulcMap = new ol.Map({
-            target: 'lulcMap',
-            layers: [getBaseLayer(), lulcRaster],
-            view: tempView2,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
                 new ol.interaction.KeyboardPan(),
@@ -3795,6 +3672,26 @@
             target: 'swbVillageMap2',
             layers: [getBaseLayer()],
             view: swbVillageMap2View,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const villageIntersectMapView = new ol.View({
+            center: [78.9, 23.6],
+            zoom: 10,
+            projection: "EPSG:4326",
+            constrainResolution: true,
+            smoothExtentConstraint: true,
+            smoothResolutionConstraint: true,
+        })
+
+        const villageIntersectMap = new ol.Map({
+            target: 'villageIntersectMap',
+            layers: [getBaseLayer()],
+            view: villageIntersectMapView,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
                 new ol.interaction.KeyboardPan(),
@@ -3893,7 +3790,7 @@
 
 
 
-        const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, lulcRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
+        const fetchFeatureByUid = async (uid, wmsLayer1, degradRaster1, treeReduceRaster1, urbanRaster1, waterRaster1) => {
             await fetch("https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=mws_layers:deltaG_well_depth_{{district}}_{{block}}&outputFormat=application/json")
                 .then(response => response.json())
                 .then(data => {
@@ -3913,7 +3810,6 @@
                         })
                         wmsLayer1.addFilter(crop);
                         degradRaster1.addFilter(crop);
-                        lulcRaster1.addFilter(crop);
                         treeReduceRaster1.addFilter(crop);
                         urbanRaster1.addFilter(crop);
 
@@ -3933,13 +3829,13 @@
 
                         // Add village boundaries to all comparison maps with spatial filter
                         addVillageBoundariesToMap(ComparisonMap1, feature);
-                        addVillageBoundariesToMap(ComparisonMap2, feature);
                         addVillageBoundariesToMap(ComparisonMap3, feature);
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature, true);
                         addVillageBoundariesToMap(swbVillageMap2, feature, true);
+                        addVillageBoundariesToMap(villageIntersectMap, feature, true);
                         addDemographicBoundariesToMap(feature);
 
                     }
@@ -3965,20 +3861,19 @@
                     };
 
                     addMwsBoundaryToMap(ComparisonMap1);
-                    addMwsBoundaryToMap(ComparisonMap2);
                     addMwsBoundaryToMap(ComparisonMap3);
                     addMwsBoundaryToMap(ComparisonMap4);
                     addMwsBoundaryToMap(ComparisonMap5);
                     addMwsBoundaryToMap(swbMap);
                     addMwsBoundaryToMap(swbVillageMap);
                     addMwsBoundaryToMap(swbVillageMap2);
+                    addMwsBoundaryToMap(villageIntersectMap);
 
                     addMwsBoundaryToMap(demMap);
                     addMwsBoundaryToMap(demMapTerrain);
                     addMwsBoundaryToMap(drainageMap);
                     addMwsBoundaryToMap(terrainRasterMap);
                     addMwsBoundaryToMap(landscapeLulcMap);
-                    addMwsBoundaryToMap(croppingIntensityMap);
                     addMwsBoundaryToMap(hydroVectorMap);
 
                     const arr = vectorSource.getExtent();
@@ -3990,13 +3885,10 @@
                     drainageMap.getView().fit(arr, fitOptions);
                     terrainRasterMap.getView().fit(arr, fitOptions);
                     landscapeLulcMap.getView().fit(arr, fitOptions);
-                    croppingIntensityMap.getView().fit(arr, fitOptions);
                     hydroVectorMap.getView().fit(arr, fitOptions);
                     DegradMap.getView().fit(arr, fitOptions);
-                    lulcMap.getView().fit(arr, fitOptions);
                     treeReduceMap.getView().fit(arr, fitOptions);
                     ComparisonMap1.getView().fit(arr, fitOptions);
-                    ComparisonMap2.getView().fit(arr, fitOptions);
                     ComparisonMap3.getView().fit(arr, fitOptions);
                     ComparisonMap4.getView().fit(arr, fitOptions);
                     ComparisonMap5.getView().fit(arr, fitOptions);
@@ -4009,6 +3901,7 @@
                     swbMap.getView().fit(arr, fitOptions);
                     swbVillageMap.getView().fit(arr, fitOptions);
                     swbVillageMap2.getView().fit(arr, fitOptions);
+                    villageIntersectMap.getView().fit(arr, fitOptions);
                     sogeMap.getView().fit(arr, fitOptions);
                 })
                 .catch(error => {
@@ -4119,7 +4012,7 @@
         // EXTRACT FEATURE AND APPLY FILTERING
         // ============================================================================
 
-        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster, waterRaster);
+        fetchFeatureByUid('{{mws_id}}', wmsLayer, degradRaster, treeReduceRaster, urbanRaster, waterRaster);
         // Function to add scale control to a map
         const addVisualScaleBar = (map) => {
             const scaleControl = new ol.control.ScaleLine({
@@ -4176,7 +4069,6 @@
             if (typeof terrainRasterMap !== 'undefined') addVisualScaleBar(terrainRasterMap);
 
             if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
-            if (typeof ComparisonMap2 !== 'undefined') addVisualScaleBar(ComparisonMap2);
             if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
             if (typeof ComparisonMap4 !== 'undefined') addVisualScaleBar(ComparisonMap4);
             if (typeof ComparisonMap5 !== 'undefined') addVisualScaleBar(ComparisonMap5);
@@ -4185,11 +4077,12 @@
             if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
             if (typeof swbVillageMap !== 'undefined') addVisualScaleBar(swbVillageMap);
             if (typeof swbVillageMap2 !== 'undefined') addVisualScaleBar(swbVillageMap2);
+            if (typeof villageIntersectMap !== 'undefined') addVisualScaleBar(villageIntersectMap);
             if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['mainMap', 'compMap1', 'compMap2', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'swbVillageMap2', 'sogeMap'];
+            const boundaryMaps = ['mainMap', 'compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'swbVillageMap2', 'villageIntersectMap', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
@@ -4266,7 +4159,6 @@
         const triple = JSON.parse('{{triple|safe}}')
         const uncrop = JSON.parse('{{uncrop|safe}}')
         const cropYears = JSON.parse('{{crop_years|safe}}')
-        const precipData = JSON.parse('{{precip_data|safe}}')
 
         const barChart_cropping = new Chart(document.getElementById('barChart-intensity'), {
             type: 'bar',
@@ -4331,102 +4223,54 @@
         });
 
         // WaterBalance Graphs and descriptions
-        const runoffData = JSON.parse('{{runoff_data|safe}}')
-        const etData = JSON.parse('{{et_data|safe}}')
         const dgData = JSON.parse('{{dg_data|safe}}')
         const wbYears = JSON.parse('{{wb_years|safe}}')
 
-        const lineChart = new Chart(document.getElementById('lineChart-water'), {
-            type: 'bar',
-            data: {
-                labels: wbYears,
-                datasets: [
-                    {
-                        label: 'Runoff',
-                        data: runoffData,
-                        type: 'line',
-                        fill: true,
-                        borderColor: '#FF6EF4',
-                        backgroundColor: 'rgba(	255, 110, 244, 0.2)',
-                        borderWidth: 2,
-                        pointRadius: 5,
-                        tension: 0.3, // Adds curve to the line
-                        order: 0 // Lower order means it's drawn last (in front)
-                    }, {
-                        label: 'Precipitation',
-                        data: precipData,
-                        backgroundColor: '#413ea0',
-                        tension: 0.3,
-                        fill: false,
-                        order: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Precipitation & Runoff(mm)'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Year'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
-                }
-            }
-        });
+        // Fortnightly Hydrological Cycle Graphs
+        const fortnightLabels = JSON.parse('{{fortnight_labels|safe}}')
+        const fortnightPrecipData = JSON.parse('{{fortnight_precip_data|safe}}')
+        const fortnightEtData = JSON.parse('{{fortnight_et_data|safe}}')
+        const fortnightRunoffData = JSON.parse('{{fortnight_runoff_data|safe}}')
 
-        const areaChartEvp = new Chart(document.getElementById('lineChart-evp'), {
-            type: 'bar',
-            data: {
-                labels: wbYears,
-                datasets: [{
-                    label: 'Evapotranspiration',
-                    data: etData,
-                    type: 'line',
-                    fill: true,
-                    borderColor: '#90ee90',
-                    backgroundColor: 'rgba(	144, 238, 144, 0.2)',
-                    borderWidth: 2,
-                    pointRadius: 5,
-                    tension: 0.3, // Adds curve to the line
-                    order: 1 // Lower order means it's drawn last (in front)
-                }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Evapotranspiration(mm)'
+        const makeFortnightLineChart = (elId, label, data, borderColor, backgroundColor, yTitle) => {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            new Chart(el, {
+                type: 'line',
+                data: {
+                    labels: fortnightLabels,
+                    datasets: [{
+                        label: label,
+                        data: data,
+                        fill: true,
+                        borderColor: borderColor,
+                        backgroundColor: backgroundColor,
+                        borderWidth: 2,
+                        pointRadius: 1,
+                        tension: 0.3,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: yTitle }
+                        },
+                        x: {
+                            title: { display: true, text: 'Fortnight' },
+                            ticks: { maxTicksLimit: 8 }
                         }
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Year'
-                        }
-                    }
-                },
-                animation: {
-                    duration: 0 // Disable animation for better print support
+                    animation: { duration: 0 }
                 }
-            }
-        });
+            });
+        };
+
+        makeFortnightLineChart('lineChart-rainfall-fn', 'Rainfall', fortnightPrecipData, '#413ea0', 'rgba(65, 62, 160, 0.2)', 'Rainfall (mm)');
+        makeFortnightLineChart('lineChart-et-fn', 'Evapotranspiration', fortnightEtData, '#90ee90', 'rgba(144, 238, 144, 0.2)', 'Evapotranspiration (mm)');
+        makeFortnightLineChart('lineChart-runoff-fn', 'Runoff', fortnightRunoffData, '#FF6EF4', 'rgba(255, 110, 244, 0.2)', 'Runoff (mm)');
 
         const areaChartGW = new Chart(document.getElementById('lineChart-gw'), {
             type: 'bar',
@@ -4692,6 +4536,7 @@
         const sc_pop = JSON.parse('{{ villages_sc|safe }}')
         const st_pop = JSON.parse('{{ villages_st|safe }}')
         const tot_pop = JSON.parse('{{ villages_pop|safe }}')
+        const villagesIntersectPct = JSON.parse('{{ villages_intersect_pct|safe }}')
 
         // Iterate and append villages as list items
         villageNames.forEach(function (village) {
@@ -4721,6 +4566,44 @@
 
             tableBody.appendChild(row);
         })
+
+        // Village intersection click popup
+        (function () {
+            const mapEl = document.getElementById('villageIntersectMap');
+            if (!mapEl || typeof villageIntersectMap === 'undefined') return;
+
+            const popupEl = document.createElement('div');
+            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; pointer-events: none;';
+            mapEl.appendChild(popupEl);
+
+            const popupOverlay = new ol.Overlay({
+                element: popupEl,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+            });
+            villageIntersectMap.addOverlay(popupOverlay);
+
+            villageIntersectMap.on('click', function (evt) {
+                const feature = villageIntersectMap.forEachFeatureAtPixel(evt.pixel, f => f);
+                if (!feature) {
+                    popupEl.style.display = 'none';
+                    return;
+                }
+
+                const clickedName = getVillageLabelName(feature);
+                const idx = villageNames.findIndex(name => name && clickedName && name.toLowerCase() === clickedName.toLowerCase());
+
+                if (idx === -1) {
+                    popupEl.style.display = 'none';
+                    return;
+                }
+
+                const pct = villagesIntersectPct[idx];
+                popupEl.innerHTML = `<strong>${villageNames[idx]}</strong><br/>${pct}% of this MWS's area falls within this village.`;
+                popupEl.style.display = 'block';
+                popupOverlay.setPosition(evt.coordinate);
+            });
+        })();
 
         // Toggle show more/less for collapsible lists
         function toggleList(listId, button) {
@@ -4762,9 +4645,9 @@
 
         // Beforeprint event handler
         window.addEventListener('beforeprint', function () {
-            const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
-                urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, swbVillageMap2, sogeMap];
+            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                urbanMap, ComparisonMap1, ComparisonMap3,
+                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap, sogeMap];
 
             allMaps.forEach(function (map) {
                 if (map) {
@@ -4780,9 +4663,9 @@
                 item.classList.remove('print-visible');
             });
 
-            const allMaps = [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
-                urbanMap, ComparisonMap1, ComparisonMap2, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, sogeMap, demMapTerrain];
+            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                urbanMap, ComparisonMap1, ComparisonMap3,
+                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap, sogeMap, demMapTerrain];
 
             setTimeout(function () {
                 allMaps.forEach(function (map) {
@@ -4799,7 +4682,7 @@
         (function () {
             const layersToWatch = [
                 baseLayer,
-                wmsLayer, degradRaster, lulcRaster, treeReduceRaster, urbanRaster
+                wmsLayer, degradRaster, treeReduceRaster, urbanRaster
             ].filter(Boolean);
 
             let pending = 0;
@@ -4829,9 +4712,9 @@
                 check();
             }
 
-            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+            [mainMap, TerrainMap, DegradMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2]
+                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap]
                 .filter(Boolean)
                 .forEach(m => m.once('rendercomplete', afterRender));
 
@@ -4843,9 +4726,9 @@
                     clearTimeout(settleTimer);
                     settleTimer = setTimeout(() => {
                         try {
-                            [mainMap, TerrainMap, DegradMap, lulcMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+                            [mainMap, TerrainMap, DegradMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                                ComparisonMap1, ComparisonMap2, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2]
+                                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap]
                                 .filter(Boolean)
                                 .forEach(m => m.renderSync());
                         } catch (e) { }

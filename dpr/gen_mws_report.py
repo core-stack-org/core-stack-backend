@@ -1672,7 +1672,7 @@ def get_cropping_intensity(state, district, block, uid):
         return "", "", [],[],[],[],[]
 
 
-def get_double_cropping_area(state, district, block, uid):
+def get_cropping_year_range(state, district, block, uid):
     try:
         df = pd.read_excel(
             DATA_DIR_TEMP
@@ -1690,62 +1690,12 @@ def get_double_cropping_area(state, district, block, uid):
         selected_columns_single = [
             col for col in df.columns if col.startswith("single_cropped_area_")
         ]
-        df[selected_columns_single] = df[selected_columns_single].apply(
-            pd.to_numeric, errors="coerce"
-        )
-
-        selected_columns_double = [
-            col for col in df.columns if col.startswith("doubly_cropped_area")
-        ]
-        df[selected_columns_double] = df[selected_columns_double].apply(
-            pd.to_numeric, errors="coerce"
-        )
-
-        selected_columns_triple = [
-            col for col in df.columns if col.startswith("triply_cropped_area")
-        ]
-        df[selected_columns_triple] = df[selected_columns_triple].apply(
-            pd.to_numeric, errors="coerce"
-        )
-
-        filtered_df_single = df.loc[df["UID"] == uid, selected_columns_single].values[0]
-        filtered_df_double = df.loc[df["UID"] == uid, selected_columns_double].values[0]
-        filtered_df_triple = df.loc[df["UID"] == uid, selected_columns_triple].values[0]
 
         current_years = extract_years(selected_columns_single)
 
         if current_years and len(current_years) > 0:
-            year_range_text = f"{current_years[0]} to {current_years[-1]}"
-        else:
-            year_range_text = ""
-
-        double_cropping_percent = []
-
-        for index, area in enumerate(filtered_df_single):
-            total_cropped_area = (
-                filtered_df_single[index]
-                + filtered_df_double[index]
-                + filtered_df_triple[index]
-            )
-            
-            double_cropping_percent.append(
-                (filtered_df_double[index] / total_cropped_area) * 100
-            )
-
-        double_cropping_percent_avg = sum(double_cropping_percent) / len(double_cropping_percent)
-
-        double_cropping_avg = sum(filtered_df_double) / len(filtered_df_double)
-
-        parameter_double_crop = f""
-
-        if double_cropping_percent_avg < 30:
-            parameter_double_crop += f"This microwatershed area has a low percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is less than 30% of the total agricultural land being cultivated twice a year."
-        elif double_cropping_percent_avg >= 30 and double_cropping_percent_avg < 60:
-            parameter_double_crop += f"This microwatershed area has a moderate percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is about {round(double_cropping_percent_avg, 2)}% of the total agricultural land being cultivated twice a year."
-        else:
-            parameter_double_crop += f"This microwatershed area has a high percentage of double-cropped land ({round(double_cropping_avg, 2)} hectares), which is more than 60% of the total agricultural land being cultivated twice a year."
-
-        return parameter_double_crop, year_range_text
+            return f"{current_years[0]} to {current_years[-1]}"
+        return ""
 
     except Exception as e:
         logger.info(
@@ -1753,7 +1703,7 @@ def get_double_cropping_area(state, district, block, uid):
             district,
             block
         )
-        return "", ""
+        return ""
 
 
 def get_mws_area_from_cropping_sheet(state, district, block, uid):
@@ -2098,6 +2048,41 @@ def get_surface_Water_bodies_data(state, district, block, uid):
         print(e)
         logger.info("Not able to access excel for %s state, %s district, %s block for Waterbodies",state.upper(),district.upper(),block.upper())
         return "", "-", "", "", "", [], [], [], []
+
+
+def get_fortnightly_water_balance_data(state, district, block, uid):
+    """Fortnightly Precipitation/ET/RunOff series for the MWS, fetched live from the geoserver deltaG_fortnight layer."""
+    labels = []
+    precip_data = []
+    et_data = []
+    runoff_data = []
+    try:
+        url = (
+            f"https://geoserver.core-stack.org:8443/geoserver/mws_layers/ows?service=WFS&version=1.0.0"
+            f"&request=GetFeature&typeName=mws_layers:deltaG_fortnight_{district.lower()}_{block.lower()}"
+            f"&outputFormat=application/json&CQL_FILTER=uid='{uid}'"
+        )
+        res = requests.get(url, verify=False, timeout=60)
+        if res.status_code == 200:
+            features = res.json().get("features", [])
+            if features:
+                props = features[0]["properties"]
+                date_keys = sorted([k for k in props.keys() if re.match(r"^\d{4}-\d{2}-\d{2}$", k)])
+
+                for date_key in date_keys:
+                    try:
+                        raw_val = props[date_key]
+                        val = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                        labels.append(date_key)
+                        precip_data.append(round(float(val.get("Precipitation") or 0), 2))
+                        et_data.append(round(float(val.get("ET") or 0), 2))
+                        runoff_data.append(round(float(val.get("RunOff") or 0), 2))
+                    except (ValueError, TypeError, json.JSONDecodeError):
+                        continue
+    except Exception as e:
+        logger.info(f"Failed to fetch fortnightly water balance data for {uid}: {e}")
+
+    return labels, precip_data, et_data, runoff_data
 
 
 def get_water_balance_data(state, district, block, uid):
@@ -2930,8 +2915,8 @@ def get_village_data(state, district, block, uid):
                 district,
                 block
             )
-            return [], [], [], [], [], [], [], [], [], [], []
-        
+            return [], [], [], [], [], [], [], [], [], [], [], []
+
         # Load the main sheet
         df = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
         
@@ -2959,10 +2944,25 @@ def get_village_data(state, district, block, uid):
         else:
             villages = matching.iloc[0].tolist()
 
+        selected_columns_details = [
+            col for col in df.columns if col.startswith("Village Details")
+        ]
+        matching_details = df.loc[df["MWS UID"] == uid, selected_columns_details]
+
+        village_details = {}
+        if not matching_details.empty:
+            details_raw = matching_details.iloc[0].tolist()
+            if details_raw:
+                try:
+                    village_details = eval(details_raw[0])
+                except Exception:
+                    village_details = {}
+
         villages_name = []
         villages_sc = []
         villages_st = []
         villages_pop = []
+        villages_intersect_pct = []
 
         swc_works = []
         lr_works = []
@@ -3000,6 +3000,9 @@ def get_village_data(state, district, block, uid):
                             village_name = name[0] if name else None
                 
                 villages_name.append(village_name)
+
+                detail = village_details.get(id) or village_details.get(str(id)) or {}
+                villages_intersect_pct.append(detail.get("percentage_of_area", 0))
 
                 # Process NREGA data if available
                 if has_nrega and df_village is not None:
@@ -3199,6 +3202,7 @@ def get_village_data(state, district, block, uid):
             ofl_works,
             ca_works,
             ofw_works,
+            villages_intersect_pct,
         )
 
     except Exception as e:
@@ -3207,4 +3211,4 @@ def get_village_data(state, district, block, uid):
             district,
             block,
         )
-        return [], [], [], [], [], [], [], [], [], [], []
+        return [], [], [], [], [], [], [], [], [], [], [], []
