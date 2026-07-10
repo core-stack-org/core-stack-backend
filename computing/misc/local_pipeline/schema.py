@@ -41,18 +41,31 @@ def load_config(path: str | Path) -> dict[str, Any]:
     return yaml.safe_load(text) or {}
 
 
-#: Legacy request/config keys accepted for compatibility and folded into the
-#: simple output flags. Keys mapping to None are accepted and ignored.
-LEGACY_OUTPUT_KEY_ALIASES: dict[str, str | None] = {
-    "focused_csv": "csv",
-    "excel_ready_csv": "csv",
-    "verbose_csv": None,
-    "eda": None,
-    "metadata_json": "metadata",
-    "methodology": None,
-    "mode": None,
-    "output_mode": None,
-}
+#: Standard values for the per-village `*_status` columns that every dataset
+#: pipeline writes right after the admin columns. They explain data
+#: availability to end users without needing the run metadata.
+STATUS_NO_VILLAGE_ID = "no village id available"
+STATUS_NO_DATA = "no data available for this village"
+STATUS_MATCHED = "matched"
+STATUS_COMPUTED = "computed"
+
+
+def status_column_config(config: Mapping[str, Any]) -> tuple[str | None, frozenset[str]]:
+    """Return the configured `*_status` column name and the outputs keeping it.
+
+    Pipelines configure this under `output_contract.status_column` with a
+    `name` and an `outputs` list (any of `csv`, `gpkg`, `geoserver`). Removing
+    an entry from `outputs` drops the column from that artifact. The GeoServer
+    layer is published from the GeoPackage, so `gpkg` and `geoserver` share
+    one frame; the column is kept when either is listed.
+    """
+
+    contract = config.get("output_contract") or {}
+    spec = contract.get("status_column") or {}
+    name = spec.get("name")
+    if not name:
+        return None, frozenset()
+    return str(name), frozenset(str(item).lower() for item in spec.get("outputs") or ())
 
 
 @dataclass(frozen=True)
@@ -78,10 +91,6 @@ class OutputOptions:
         merged = {field.name: getattr(cls, field.name) for field in cls.__dataclass_fields__.values()}
         for key, value in dict(data or {}).items():
             name = str(key)
-            if name in LEGACY_OUTPUT_KEY_ALIASES:
-                name = LEGACY_OUTPUT_KEY_ALIASES[name]
-                if name is None or not coerce_bool(value):
-                    continue
             if name in merged:
                 merged[name] = coerce_bool(value, merged[name])
         return cls(**merged)
