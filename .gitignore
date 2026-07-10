@@ -1,6 +1,4 @@
-# Ignore dataset payloads under data/ but keep the tracked documentation pack.
-data/*
-!data/docs/
+data/
 app_controller/migrations/__pycache__/
 computing/lulc/__pycache__
 computing/mws/__pycache__
