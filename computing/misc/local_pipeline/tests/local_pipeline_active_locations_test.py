@@ -307,6 +307,37 @@ def build_cases(
     return cases
 
 
+def gpkg_column_order(path: str | None, pipeline: str | None) -> dict[str, Any]:
+    """Check that the GeoPackage keeps the admin columns first, the status
+    column next, and the value columns in schema order (not alphabetical)."""
+
+    if not path or not Path(path).exists():
+        return {"checked": False}
+    with sqlite3.connect(path) as connection:
+        names = [
+            row[0]
+            for row in connection.execute(
+                "SELECT table_name FROM gpkg_contents WHERE data_type IN ('features','attributes')"
+            ).fetchall()
+        ]
+        if not names:
+            return {"checked": False}
+        columns = [row[1] for row in connection.execute(f'PRAGMA table_info("{names[0]}")')]
+    # `fid` and the geometry column are GeoPackage bookkeeping and lead the table.
+    value_columns = [c for c in columns if c not in {"fid", "geom", "geometry"}]
+    info: dict[str, Any] = {
+        "checked": True,
+        "admin_prefix_ok": value_columns[: len(ADMIN_PREFIX)] == ADMIN_PREFIX,
+        "status_after_admin": len(value_columns) > len(ADMIN_PREFIX)
+        and value_columns[len(ADMIN_PREFIX)] in STATUS_COLUMNS,
+    }
+    if pipeline == "facilities":
+        machine = [c for c in value_columns if c.startswith(MACHINE_COLUMN_MARKERS)]
+        # Alphabetical order is the signature of the un-ordered pivot output.
+        info["machine_columns_schema_ordered"] = bool(machine) and machine != sorted(machine)
+    return info
+
+
 def gpkg_layers(path: str | None) -> dict[str, int]:
     if not path or not Path(path).exists():
         return {}
@@ -419,6 +450,8 @@ def validate_result(result: dict[str, Any], pipeline: str | None = None) -> dict
         "csv_feature_columns": csv_info.get("feature_columns_in_csv"),
         "csv_contract_ok": csv_info.get("contract_ok"),
         "metadata": metadata_check(result.get("run_metadata_path")),
+        "gpkg_column_order": gpkg_column_order(result.get("gpkg_path"), pipeline),
+        "layer_registration": (result.get("layer_registration") or {}).get("status"),
         "gpkg_layers": layers,
         "missing_result_paths": missing_paths,
     }
