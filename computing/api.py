@@ -91,6 +91,7 @@ from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.local_pipeline import api_request_payload
 from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
@@ -1598,18 +1599,10 @@ def generate_facilities_proximity(request):
 def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
-        payload = request.data.dict() if hasattr(request.data, "dict") else dict(request.data)
-        if "scope" not in payload:
-            return Response(
-                {"error": "Request must include a 'scope' object with level, state_name, district_name, tehsil_name, or village_ids."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        payload.setdefault("outputs", {})
-        payload.setdefault("publish", {})
-        payload["publish"].setdefault("sync_to_geoserver", True)
-        payload["publish"].setdefault("overwrite", False)
-        payload["publish"].setdefault("register_layers", False)
-        payload["publish"].setdefault("use_pregenerated", False)
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
         generate_antyodaya_layer_task.apply_async(
             kwargs={"payload": payload},
             queue="nrm",
@@ -1617,6 +1610,8 @@ def generate_antyodaya(request):
         return Response(
             {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_antyodaya api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
