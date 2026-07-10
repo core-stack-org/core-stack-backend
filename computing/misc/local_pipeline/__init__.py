@@ -7,11 +7,12 @@ API, GeoServer, STAC, EDA, and Excel handoff use.
 """
 
 from .admin import AdminScope, CSAdminSource
-from .schema import StandardRequest, load_config
+from .schema import StandardRequest, api_request_payload, load_config
 
 __all__ = [
     "AdminScope",
     "CSAdminSource",
     "StandardRequest",
+    "api_request_payload",
     "load_config",
 ]
