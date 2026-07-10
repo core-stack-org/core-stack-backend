@@ -68,6 +68,9 @@
             "name": "generate_agroecological"
         },
         {
+            "name": "generate_soil_type"
+        },
+        {
             "name": "generate_factory_csr"
         },
         {

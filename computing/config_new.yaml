@@ -69,6 +69,14 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/hydrological_soil_group/hydrological_soil_group.geojson
           type: file
 
+        - name: soil type
+          aliases:
+              - india subsoil texture
+              - india_subsoil_texture
+          local_path: data/base_layers/india_subsoil_texture.tif
+          source: ""
+          type: file
+
         - name: mission antyodaya
           local_path: data/base_layers/mission_antyodaya/mission_antyodaya.gpkg
           source: ""
@@ -473,6 +481,16 @@ derived_layers:
     - name: generate_river_data
       local_path: data/river/river_local/
       geoserver_workspace: river
+      layer_type: vector
+
+    - name: generate_soil_type
+      local_path: data/layers/soil_type/raster/
+      geoserver_workspace: soil_type
+      layer_type: raster
+
+    - name: soil_type_vector
+      local_path: data/layers/soil_type/vector/
+      geoserver_workspace: soil_type
       layer_type: vector
 
     - name: run_off_daily_and_fortnightly

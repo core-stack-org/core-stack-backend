@@ -104,6 +104,7 @@ from computing.mws.mws_connectivity_local_compute import mws_connectivity_vector
 from computing.surface_water_bodies.swb_local import (
     generate_swb_layer as generate_swb_layer_local,
 )
+from computing.soil_type.soil_type_local_compute import generate_soil_type_local
 from computing.terrain_descriptor.terrain_clusters_local import (
     generate_terrain_clusters as generate_terrain_clusters_local,
 )
@@ -271,6 +272,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_facilities_proximity": generate_facilities_proximity_local,
     "generate_mws_centroid_data": generate_mws_centroid_data_local,
     "generate_mws_centroid": generate_mws_centroid_data_local,
+    "generate_soil_type": generate_soil_type_local,
+    "soil_type": generate_soil_type_local,
 }
 
 TASK_REGISTRIES = {

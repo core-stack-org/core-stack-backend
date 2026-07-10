@@ -179,6 +179,11 @@ SOI_TEHSIL_PATH: Path = PROJECT_ROOT / _find_legacy_input(
     "data/admin-boundary/input/soi_tehsil.geojson"
 )["path"]
 
+INDIA_SUBSOIL_TEXTURE_PATH: Path = _base_layer_path(
+    "soil type",
+    allowed_suffixes=(".tif", ".tiff"),
+)
+
 ADMIN_BOUNDARY_INPUT_DIR: Path = PROJECT_ROOT / "data/admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR: Path = PROJECT_ROOT / "data/admin-boundary/output"
 VILLAGE_BOUNDARIES_DIR: Path = PROJECT_ROOT / "data/base_layers/village_boundaries"
@@ -244,6 +249,13 @@ PAN_INDIA_AGROECOLOGICAL_PATH = _base_layer_path(
     fallback="data/base_layers/Pan_India_agroecological_farming.geojson",
 )
 LOCAL_AGROECOLOGICAL_OUTPUT = PROJECT_ROOT / "data/layers/agroecological"
+
+LOCAL_SOIL_TYPE_RASTER_OUTPUT: Path = _derived_output_dir(
+    "generate_soil_type", "misc", 0
+)
+LOCAL_SOIL_TYPE_VECTOR_OUTPUT: Path = _derived_output_dir(
+    "soil_type_vector", "misc", 0
+)
 
 PAN_INDIA_LCW_PATH = _base_layer_path(
     "lcw", fallback="data/base_layers/Pan_India_lcw_conflict.geojson"
