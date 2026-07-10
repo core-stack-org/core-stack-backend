@@ -26,7 +26,7 @@ output:
   layer_prefix: antyodaya20
   village_layer: antyodaya_villages
   overview_layer: antyodaya_overview
-  geoserver_workspace: test_workspace
+  geoserver_workspace: testworkspace
 
 default_outputs:
   gpkg: true
