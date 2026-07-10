@@ -1,0 +1,187 @@
+name: facilities_service_classification
+version: 1
+description: >
+  Classification and access-rollup schema for the Core Stack facilities
+  runtime pipeline. L3 classes identify the nearest concrete facility type.
+  L2 groups collapse related L3 classes into a simpler access measure for
+  reports, Excel exports, and village-level interpretation.
+
+access_rollup_notes:
+  min: >
+    Use the nearest available L3 class when any one member of the group can
+    satisfy the access question. This is used for groups such as advanced
+    health, higher education, market access, and post-harvest infrastructure.
+  max: >
+    Use the farthest required L3 class when a village should have access to all
+    member services to be considered fully covered. This is used for grouped
+    essentials such as primary/upper-primary/secondary schooling, basic health,
+    and financial inclusion.
+  direct: >
+    Use the only configured L3 class directly. This is used when the L2 group
+    has one concrete service class.
+
+l2_groups:
+  - key: essential_education
+    label: Essential Education Access
+    class_l1_domain: education
+    rollup: max
+    explanation: Distance to the farthest required school tier among primary, upper-primary, and secondary access.
+  - key: higher_education
+    label: Higher Education Access
+    class_l1_domain: education
+    rollup: min
+    explanation: Distance to the nearest higher-education option among higher-secondary school, college, and university-type institutions.
+  - key: essential_health
+    label: Essential Health Access
+    class_l1_domain: health
+    rollup: max
+    explanation: Distance to the farthest required basic health tier among sub-centre and PHC access.
+  - key: advanced_health
+    label: Advanced Health Access
+    class_l1_domain: health
+    rollup: min
+    explanation: Distance to the nearest advanced health option among CHC, district hospital, and specialist/tertiary hospitals.
+  - key: essential_services
+    label: Essential Services Access
+    class_l1_domain: food_security
+    rollup: direct
+    explanation: Distance to the nearest public distribution system point.
+  - key: financial_inclusion
+    label: Financial Inclusion Access
+    class_l1_domain: finance
+    rollup: max
+    explanation: Distance to the farthest required financial inclusion service among CSC, bank mitra, branch, and ATM access.
+  - key: apmc_access
+    label: APMC And Market Access
+    class_l1_domain: agriculture
+    rollup: min
+    explanation: Distance to the nearest market or trading access point.
+  - key: post_harvest
+    label: Post-Harvest Infrastructure Access
+    class_l1_domain: agriculture
+    rollup: min
+    explanation: Distance to the nearest post-harvest infrastructure option across storage, distribution, processing, and industrial manufacturing.
+  - key: cooperative
+    label: Cooperative Access
+    class_l1_domain: agriculture
+    rollup: direct
+    explanation: Distance to the nearest cooperative or society.
+  - key: livestock
+    label: Livestock Support Access
+    class_l1_domain: agriculture
+    rollup: direct
+    explanation: Distance to the nearest dairy or animal husbandry support point.
+  - key: agri_support_infra
+    label: Agriculture Support Infrastructure Access
+    class_l1_domain: agriculture
+    rollup: direct
+    explanation: Distance to the nearest agriculture support infrastructure point.
+
+l3_classes:
+  - key: school_primary
+    label: Primary School
+    class_l1_domain: education
+    class_l2_filter_group: essential_education
+    configured_subtypes: [Primary, Primary with Upper Primary, Pr. Up Pr. and Secondary Only, Pr. with Up.Pr. Sec. and H.Sec., Pre-Primary Only]
+  - key: school_upper_primary
+    label: Upper Primary School
+    class_l1_domain: education
+    class_l2_filter_group: essential_education
+    configured_subtypes: [Primary with Upper Primary, Upper Primary only, Pr. Up Pr. and Secondary Only, Pr. with Up.Pr. Sec. and H.Sec., Upper Pr. and Secondary, Up. Pr. Secondary and Higher Sec]
+  - key: school_secondary
+    label: Secondary School
+    class_l1_domain: education
+    class_l2_filter_group: essential_education
+    configured_subtypes: [Pr. Up Pr. and Secondary Only, Pr. with Up.Pr. Sec. and H.Sec., Upper Pr. and Secondary, Up. Pr. Secondary and Higher Sec, Secondary Only, Secondary with Higher Secondary]
+  - key: school_higher_secondary
+    label: Higher Secondary School
+    class_l1_domain: education
+    class_l2_filter_group: higher_education
+    configured_subtypes: [Pr. with Up.Pr. Sec. and H.Sec., Up. Pr. Secondary and Higher Sec, Secondary with Higher Secondary, Higher Secondary only/Jr. College]
+  - key: college
+    label: College
+    class_l1_domain: education
+    class_l2_filter_group: higher_education
+    configured_subtypes: [Affiliated College, Constituent / University College, Recognized Center, PG Center / Off-Campus Center, Autonomous College]
+  - key: universities
+    label: University-Type Institution
+    class_l1_domain: education
+    class_l2_filter_group: higher_education
+    configured_subtypes: [Technical/Polytechnic, Nursing, Teacher Training, Paramedical, PGDM Institutes, Institutes under Ministries, Hotel Management and Catering]
+  - key: health_sub_cen
+    label: Health Sub-Centre
+    class_l1_domain: health
+    class_l2_filter_group: essential_health
+  - key: health_phc
+    label: Primary Health Centre
+    class_l1_domain: health
+    class_l2_filter_group: essential_health
+  - key: health_chc
+    label: Community Health Centre
+    class_l1_domain: health
+    class_l2_filter_group: advanced_health
+  - key: health_dis_h
+    label: District Hospital
+    class_l1_domain: health
+    class_l2_filter_group: advanced_health
+  - key: health_s_t_h
+    label: Specialist Or Tertiary Hospital
+    class_l1_domain: health
+    class_l2_filter_group: advanced_health
+  - key: pds
+    label: Public Distribution System
+    class_l1_domain: food_security
+    class_l2_filter_group: essential_services
+  - key: csc
+    label: Common Service Centre
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+  - key: bank_mitra
+    label: Bank Mitra
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+  - key: bank_branch
+    label: Bank Branch
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+  - key: bank_atm
+    label: Bank ATM
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+  - key: apmc
+    label: APMC
+    class_l1_domain: agriculture
+    class_l2_filter_group: apmc_access
+    configured_subtypes: [Primary Market Yard, Sub Market Yard, Other, Regulated Primary Market, Regulated Sub Market, Farmers Consumer Market, Non-Regulated Market]
+  - key: agri_industry_markets_trading
+    label: Agriculture Markets And Trading
+    class_l1_domain: agriculture
+    class_l2_filter_group: apmc_access
+  - key: agri_industry_storage_warehousing
+    label: Storage And Warehousing
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+  - key: agri_industry_distribution_utilities
+    label: Distribution Utilities
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+  - key: agri_industry_agri_processing
+    label: Agriculture Processing
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+  - key: agri_industry_industrial_manufacturing
+    label: Industrial Manufacturing
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+  - key: agri_industry_co_operatives_societies
+    label: Cooperatives And Societies
+    class_l1_domain: agriculture
+    class_l2_filter_group: cooperative
+  - key: agri_industry_dairy_animal_husbandry
+    label: Dairy And Animal Husbandry
+    class_l1_domain: agriculture
+    class_l2_filter_group: livestock
+  - key: agri_industry_agri_support_infrastructure
+    label: Agriculture Support Infrastructure
+    class_l1_domain: agriculture
+    class_l2_filter_group: agri_support_infra
