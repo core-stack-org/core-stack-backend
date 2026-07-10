@@ -549,7 +549,10 @@ def run_api_normalization_smoke(
                     ok = 200 <= response.status_code < 300 and queued
                     if queued:
                         # The task must always receive a resolved tehsil scope.
-                        scope = (captured[-1]["kwargs"]["payload"]).get("scope") or {}
+                        # captured entries hold apply_async's own kwargs, so the
+                        # task payload sits under kwargs["kwargs"]["payload"].
+                        task_kwargs = captured[-1]["kwargs"].get("kwargs") or {}
+                        scope = (task_kwargs.get("payload") or {}).get("scope") or {}
                         scope_ok = (
                             scope.get("level") == "tehsil"
                             and scope.get("state_name") == location.state_name
