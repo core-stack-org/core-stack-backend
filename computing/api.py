@@ -92,9 +92,7 @@ from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities import generate_facilities_proximity_task
 from .misc.local_pipeline import api_request_payload
 from .misc.antyodaya import generate_antyodaya_layer_task
-from .misc.local_pipeline import api_request_payload
 from .misc.livestocks import generate_livestocks_layer_task
-from .misc.local_pipeline import api_request_payload
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task

@@ -510,13 +510,15 @@ def run_api_normalization_smoke(
             captured.append({"args": args, "kwargs": kwargs})
             return type("FakeAsyncResult", (), {"id": "local-test"})()
 
-        # Flat legacy bodies were removed: the API must reject them with 400
-        # and must not queue a task. Structured bodies must queue.
-        legacy_body = {
+        # Both request shapes must queue a task: the simple state/district/block
+        # body (normalized to a tehsil scope) and the structured scope body.
+        # Only a body naming no geography is rejected, with 400.
+        simple_body = {
             "state": location.state_name,
             "district": location.district_name,
             "block": location.tehsil_name,
             "sync_to_geoserver": False,
+            "overwrite": True,
         }
         structured_body = {
             "scope": {
@@ -528,20 +530,33 @@ def run_api_normalization_smoke(
             "outputs": {"metadata": False, "stac": False},
             "publish": {"sync_to_geoserver": False, "use_pregenerated": True},
         }
+        empty_body = {"sync_to_geoserver": False}
         view = getattr(api_module, view_name)
         task = getattr(api_module, task_name)
         with patch.object(task, "apply_async", side_effect=fake_apply_async):
             for label, body, expect_queued in (
-                ("legacy_rejected", legacy_body, False),
+                ("simple", simple_body, True),
                 ("structured", structured_body, True),
+                ("no_geography_rejected", empty_body, False),
             ):
                 queued_before = len(captured)
                 request = factory.post(f"/api/v1/{view_name}/", body, format="json")
                 force_authenticate(request, user=dummy_user)
                 response = view(request)
                 queued = len(captured) > queued_before
+                scope_ok = True
                 if expect_queued:
                     ok = 200 <= response.status_code < 300 and queued
+                    if queued:
+                        # The task must always receive a resolved tehsil scope.
+                        scope = (captured[-1]["kwargs"]["payload"]).get("scope") or {}
+                        scope_ok = (
+                            scope.get("level") == "tehsil"
+                            and scope.get("state_name") == location.state_name
+                            and scope.get("district_name") == location.district_name
+                            and scope.get("tehsil_name") == location.tehsil_name
+                        )
+                        ok = ok and scope_ok
                 else:
                     ok = response.status_code == 400 and not queued
                 records.append(
@@ -549,6 +564,7 @@ def run_api_normalization_smoke(
                         "pipeline": pipeline,
                         "body_type": label,
                         "ok": ok,
+                        "normalized_scope_ok": scope_ok,
                         "status_code": response.status_code,
                         "response": getattr(response, "data", None),
                         "captured_apply_async": captured[-1] if captured else None,
