@@ -50,7 +50,7 @@ from computing.misc.local_pipeline.outputs import (
     stable_hash,
     utc_now_text,
 )
-from computing.misc.local_pipeline.publish import publish_gpkg_layer
+from computing.misc.local_pipeline.publish import publish_gpkg_layer, register_layer
 from nrm_app.celery import app
 from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE
 
@@ -474,6 +474,39 @@ def _service_output_columns(classification: Mapping[str, Any], config: Mapping[s
     return columns
 
 
+def _machine_output_columns(classification: Mapping[str, Any]) -> list[str]:
+    """GeoPackage value columns in classification order.
+
+    The `l2_*`/`l3_*` columns are produced by pivot tables, which sort their
+    columns alphabetically. Ordering them here keeps the GeoPackage (and the
+    GeoServer feature type built from it) in the same group-then-member order
+    as the report CSV.
+    """
+
+    l3_by_l2 = _l3_classes_by_group(classification)
+    columns: list[str] = []
+    for group in classification.get("l2_groups", []):
+        group_slug = slug(group["key"])
+        columns.extend(
+            [
+                f"l2_{group_slug}_distance_km",
+                f"l2_{group_slug}_selected_l3",
+                f"l2_{group_slug}_selected_l3_label",
+                f"l2_{group_slug}_facility_uid",
+            ]
+        )
+        for item in l3_by_l2.get(group["key"], []):
+            l3_slug = slug(item["key"])
+            columns.extend(
+                [
+                    f"l3_{l3_slug}_distance_km",
+                    f"l3_{l3_slug}_facility_uid",
+                    f"l3_{l3_slug}_inside_scope",
+                ]
+            )
+    return columns
+
+
 def _column_descriptions(classification: Mapping[str, Any], config: Mapping[str, Any]) -> dict[str, str]:
     """Human-readable descriptions for report columns, driven by the
     classification YAML description templates."""
@@ -801,11 +834,17 @@ def run_facilities_pipeline(
     report_frame = focused_services
     if status_name and "csv" not in status_outputs:
         report_frame = focused_services.drop(columns=[status_name], errors="ignore")
-    gpkg_value_columns = [column for column in village_service_gdf.columns if column not in {"geometry", "_admin_key"}]
-    if status_name:
-        gpkg_value_columns = [column for column in gpkg_value_columns if column != status_name]
-        if {"gpkg", "geoserver"} & status_outputs:
-            gpkg_value_columns.insert(0, status_name)
+    # Order the GeoPackage columns by the classification schema, then append any
+    # remaining columns (title, layer kind) so nothing is silently dropped.
+    present = set(village_service_gdf.columns)
+    gpkg_value_columns = [column for column in _machine_output_columns(classification) if column in present]
+    gpkg_value_columns.extend(
+        column
+        for column in village_service_gdf.columns
+        if column not in set(gpkg_value_columns) | {"geometry", "_admin_key", status_name}
+    )
+    if status_name and {"gpkg", "geoserver"} & status_outputs:
+        gpkg_value_columns.insert(0, status_name)
     village_service_output_gdf = gpd.GeoDataFrame(
         admin_output_frame(
             village_service_gdf,
@@ -870,6 +909,29 @@ def run_facilities_pipeline(
                 geoserver["ok"] = True
                 geoserver["status"] = "published"
                 result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
+                if request.publish.register_layers:
+                    result["layer_registration"] = register_layer(
+                        dataset_name=output_config.get("dataset_name", "Facilities Proximity"),
+                        layer_name=layer_name,
+                        scope=request.scope,
+                        workspace=geoserver_workspace,
+                        geoserver_url=geoserver.get("wfs_url"),
+                        algorithm=ALGORITHM,
+                        algorithm_version=ALGORITHM_VERSION,
+                        misc={
+                            "source_facilities_gpkg": config["sources"]["facilities_gpkg"],
+                            "gpkg_path": result.get("gpkg_path"),
+                            "csv_path": result.get("csv_path"),
+                            "output_dir": bundle.path.as_posix(),
+                            "geoserver_layer_name": layer_name,
+                            "geoserver_url": geoserver.get("wfs_url"),
+                            "village_rows": result.get("village_rows"),
+                            "nearest_rows": result.get("nearest_rows"),
+                            "inventory_rows": result.get("inventory_rows"),
+                        },
+                        overwrite=request.publish.overwrite,
+                    )
+                    result["layer_id"] = (result["layer_registration"] or {}).get("layer_id")
             except Exception as exc:
                 geoserver = {
                     "ok": False,
