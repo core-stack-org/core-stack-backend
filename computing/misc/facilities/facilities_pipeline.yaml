@@ -18,7 +18,7 @@ output:
   inventory_layer: facilities_inventory
   nearest_layer: facilities_nearest
   village_service_layer: facilities_village_service
-  geoserver_workspace: test_workspace
+  geoserver_workspace: testworkspace
 
 default_outputs:
   gpkg: true
