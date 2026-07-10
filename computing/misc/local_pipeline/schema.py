@@ -136,6 +136,52 @@ class BatchOptions:
         return cls(mode=str((data or {}).get("mode", "single")))
 
 
+def api_request_payload(data: Mapping[str, Any], *, overwrite: bool = True) -> dict[str, Any]:
+    """Normalize an API body into the standard request payload.
+
+    Two request shapes are supported. The simple shape matches the other
+    Core Stack layer APIs and implies a tehsil scope:
+
+        {"state": "jharkhand", "district": "dumka", "block": "masalia",
+         "sync_to_geoserver": true, "overwrite": true}
+
+    The structured shape addresses any scope level and toggles artifacts:
+
+        {"scope": {"level": "district", "state_name": ..., "district_name": ...},
+         "outputs": {"stac": false}, "publish": {"sync_to_geoserver": false}}
+
+    `overwrite` is the pipeline's default when the body does not set it.
+    Raises ValueError when the body names no resolvable geography.
+    """
+
+    body = dict(data)
+    scope = body.get("scope")
+    if not isinstance(scope, Mapping):
+        scope = {
+            "level": body.get("level") or body.get("scope_level") or "tehsil",
+            "state_name": body.get("state_name") or body.get("state"),
+            "district_name": body.get("district_name") or body.get("district"),
+            "tehsil_name": body.get("tehsil_name") or body.get("block_name") or body.get("block"),
+            "village_ids": body.get("village_ids") or body.get("village_id"),
+        }
+    scope = {key: value for key, value in dict(scope).items() if value is not None}
+    scope.setdefault("level", "tehsil")
+    if not scope.get("state_name") and not scope.get("village_ids"):
+        raise ValueError("Provide state/district/block (or a scope object with state_name or village_ids).")
+
+    publish = dict(body.get("publish") or {})
+    for key, default in (
+        ("sync_to_geoserver", True),
+        ("overwrite", overwrite),
+        ("register_layers", False),
+        ("use_pregenerated", False),
+    ):
+        # Simple bodies carry publish flags at the top level.
+        publish.setdefault(key, body.get(key, default))
+
+    return {"scope": scope, "outputs": dict(body.get("outputs") or {}), "publish": publish}
+
+
 @dataclass(frozen=True)
 class StandardRequest:
     """Standard request object accepted by local pipeline implementations."""
