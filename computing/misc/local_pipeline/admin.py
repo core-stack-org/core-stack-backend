@@ -50,6 +50,20 @@ ADMIN_PRESENTATION_COLUMNS = (
     "tehsil_name",
     "village_name",
 )
+#: Shared descriptions for the standard admin columns emitted by every local
+#: pipeline output, used to build column dictionaries and README references.
+ADMIN_COLUMN_DESCRIPTIONS = {
+    "index": "Stable row index of the village in the Core Stack standard admin boundary.",
+    "state_id": "Census 2011 (PC11) state code.",
+    "district_id": "Census 2011 (PC11) district code.",
+    "tehsil_id": "Census 2011 (PC11) sub-district (tehsil/block) code.",
+    "village_id": "Core Stack village identifier used for keyed dataset joins.",
+    "state_name": "State name.",
+    "district_name": "District name.",
+    "tehsil_name": "Tehsil/block name.",
+    "village_name": "Village name.",
+}
+
 INTERNAL_ADMIN_COLUMNS = (
     "fid",
     "cs_feature_id",
