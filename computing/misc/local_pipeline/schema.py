@@ -111,7 +111,7 @@ def resolve_output_options(request: "StandardRequest", config: Mapping[str, Any]
 class PublishOptions:
     sync_to_geoserver: bool = True
     overwrite: bool = True
-    register_layers: bool = False
+    register_layers: bool = True
     use_pregenerated: bool = False
     geoserver_workspace: str | None = None
 
@@ -121,7 +121,7 @@ class PublishOptions:
         return cls(
             sync_to_geoserver=coerce_bool(values.get("sync_to_geoserver"), True),
             overwrite=coerce_bool(values.get("overwrite"), True),
-            register_layers=coerce_bool(values.get("register_layers"), False),
+            register_layers=coerce_bool(values.get("register_layers"), True),
             use_pregenerated=coerce_bool(values.get("use_pregenerated"), False),
             geoserver_workspace=str(values["geoserver_workspace"]) if values.get("geoserver_workspace") else None,
         )
@@ -173,7 +173,7 @@ def api_request_payload(data: Mapping[str, Any], *, overwrite: bool = True) -> d
     for key, default in (
         ("sync_to_geoserver", True),
         ("overwrite", overwrite),
-        ("register_layers", False),
+        ("register_layers", True),
         ("use_pregenerated", False),
     ):
         # Simple bodies carry publish flags at the top level.
