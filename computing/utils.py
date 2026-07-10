@@ -1036,6 +1036,23 @@ def save_layer_info_to_db(
     return layer_obj.id
 
 
+def geoserver_sync_succeeded(sync_result):
+    """Return True when a GeoServer push response indicates success."""
+    if not sync_result:
+        return False
+    if isinstance(sync_result, dict):
+        return sync_result.get("status_code") in (200, 201)
+    return True
+
+
+def mark_layer_synced_to_geoserver(layer_id, sync_result):
+    """Persist GeoServer sync flag and fire STAC auto-trigger signal."""
+    if geoserver_sync_succeeded(sync_result) and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        return True
+    return False
+
+
 def update_layer_sync_status(
     layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
