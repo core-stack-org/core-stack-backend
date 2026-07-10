@@ -218,10 +218,15 @@ Category clusters are normalized to `HIGH`, `MEDIUM`, `LOW` at runtime, and
 ## Running It
 
 ```bash
-# API (Django + celery running)
+# Simple body, same as the other Core Stack layer APIs (implies tehsil scope)
 POST /api/v1/generate_antyodaya/
-{"scope": {"level": "tehsil", "state_name": "Jharkhand",
-           "district_name": "Ranchi", "tehsil_name": "Angara"},
+{"state": "jharkhand", "district": "ranchi", "block": "angara",
+ "sync_to_geoserver": false}
+
+# Structured body, for any scope level and per-artifact output control
+POST /api/v1/generate_antyodaya/
+{"scope": {"level": "district", "state_name": "Jharkhand", "district_name": "Ranchi"},
+ "outputs": {"stac": false},
  "publish": {"sync_to_geoserver": false}}
 
 # CLI
