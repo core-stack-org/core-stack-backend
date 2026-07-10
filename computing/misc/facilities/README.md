@@ -163,9 +163,16 @@ be dropped from any artifact by removing that output from its `outputs` list.
 
 ```bash
 # API (Django + celery running)
+# Simple body, same as the other Core Stack layer APIs (implies tehsil scope)
 POST /api/v1/generate_facilities_proximity/
-{"scope": {"level": "tehsil", "state_name": "MADHYA PRADESH",
-           "district_name": "DAMOH", "tehsil_name": "HATTA"},
+{"state": "madhya pradesh", "district": "damoh", "block": "hatta",
+ "sync_to_geoserver": true, "overwrite": true}
+
+# Structured body, for any scope level and per-artifact output control
+POST /api/v1/generate_facilities_proximity/
+{"scope": {"level": "district", "state_name": "MADHYA PRADESH",
+           "district_name": "DAMOH"},
+ "outputs": {"stac": false},
  "publish": {"sync_to_geoserver": true}}
 
 # CLI
