@@ -135,6 +135,58 @@ def dataframe_eda(frame: pd.DataFrame, *, max_numeric_columns: int = 80) -> dict
     return summary
 
 
+def friendly_datatype(series: pd.Series) -> str:
+    """Return a human-readable datatype name for column documentation."""
+
+    dtype = series.dtype
+    if str(dtype) == "geometry":
+        return "geometry"
+    if pd.api.types.is_bool_dtype(dtype):
+        return "boolean"
+    if pd.api.types.is_integer_dtype(dtype):
+        return "integer"
+    if pd.api.types.is_float_dtype(dtype):
+        return "number"
+    if pd.api.types.is_datetime64_any_dtype(dtype):
+        return "datetime"
+    return "text"
+
+
+def column_dictionary(
+    frame: pd.DataFrame,
+    describe: Mapping[str, str] | Any = None,
+) -> list[dict[str, Any]]:
+    """Return `column`/`description`/`datatype` entries for an output frame.
+
+    `describe` may be a mapping of column name to description or a callable
+    returning a description (or None) for a column name.
+    """
+
+    entries: list[dict[str, Any]] = []
+    for position, column in enumerate(frame.columns):
+        name = str(column)
+        if callable(describe):
+            description = describe(name)
+        elif describe:
+            description = describe.get(name)
+        else:
+            description = None
+        entries.append(
+            {
+                "column": name,
+                "description": description,
+                "datatype": friendly_datatype(frame.iloc[:, position]),
+            }
+        )
+    return entries
+
+
+def frame_profile(frame: pd.DataFrame, describe: Mapping[str, str] | Any = None) -> dict[str, Any]:
+    """Return the standard per-output metadata block: column dictionary + EDA."""
+
+    return {"columns": column_dictionary(frame, describe), "eda": dataframe_eda(frame)}
+
+
 def _safe_field_value(value: Any) -> Any:
     if value is None:
         return None
