@@ -136,14 +136,14 @@ def build_payload(location: dict[str, str]) -> dict[str, Any]:
         for flag in ("gpkg", "csv", "readme", "metadata", "stac", "geoserver"):
             outputs[flag] = _ask_bool(f"  outputs.{flag}", True)
 
-    sync = _ask_bool("Publish to GeoServer (test_workspace)?", False)
+    sync = _ask_bool("Publish to GeoServer (testworkspace)?", False)
     publish: dict[str, Any] = {
         "sync_to_geoserver": sync,
         "overwrite": _ask_bool("Overwrite existing outputs/layers?", True),
         "use_pregenerated": _ask_bool("Allow cached result (use_pregenerated)?", False),
     }
     if sync:
-        publish["geoserver_workspace"] = _ask("GeoServer workspace", "test_workspace")
+        publish["geoserver_workspace"] = _ask("GeoServer workspace", "testworkspace")
     return {"scope": scope, "outputs": outputs, "publish": publish}
 
 

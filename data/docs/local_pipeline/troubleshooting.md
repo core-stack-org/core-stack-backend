@@ -117,7 +117,7 @@ fixing; with `overwrite: true` to replace an existing layer.
 ### Layer published to the wrong workspace
 Resolution order: request `publish.geoserver_workspace` → pipeline YAML
 `output.geoserver_workspace` → constant in `utilities/constants.py`. Test
-branches pin the YAML to `test_workspace` on purpose.
+branches pin the YAML to `testworkspace` on purpose.
 
 ## Celery / API
 

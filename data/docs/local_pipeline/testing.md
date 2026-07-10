@@ -17,7 +17,7 @@ mode expects Django (`python manage.py runserver`) and a Celery worker
 
 Test configuration is deliberately branch-pinned: test branches point
 `output.root` at `data/tests/outputs/...` and `geoserver_workspace` at
-`test_workspace` in the pipeline YAMLs. The intended workflow is one test
+`testworkspace` in the pipeline YAMLs. The intended workflow is one test
 branch per concern (core-module testing, pipeline testing) rebased on their
 feature branches, merged together into an integration test branch (like
 `test/local-pipeline-v3-integration`) for combined end-to-end runs. Before
@@ -34,7 +34,7 @@ What it gives you, menu-driven:
 - **Pick a pipeline** (facilities / antyodaya / livestocks) and a location —
   search the 414 active blocks, take a random one, or type any names.
 - **Shape the request**: scope level (tehsil/district/state/village), each
-  output flag, GeoServer on/off (defaults to `test_workspace`), overwrite,
+  output flag, GeoServer on/off (defaults to `testworkspace`), overwrite,
   and cache (`use_pregenerated`).
 - **Run it in-process** (no server needed) or **through the live API**: it
   POSTs with your JWT (set `LOCAL_PIPELINE_JWT`, base URL via

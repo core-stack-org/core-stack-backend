@@ -18,8 +18,7 @@ keys:
 output:
   root: data/tests/outputs/livestock20
   layer_prefix: livestocks
-  village_layer: livestock_villages
-  geoserver_workspace: test_workspace
+  geoserver_workspace: testworkspace
 
 default_outputs:
   gpkg: true

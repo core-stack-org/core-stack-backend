@@ -440,7 +440,9 @@ def run_livestocks_pipeline(
     if outputs.csv:
         paths["csv_path"] = bundle.write_csv(focused_frame, ".csv").as_posix()
     if outputs.gpkg:
-        paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
+        # The GPKG table name becomes the GeoServer feature-type name, so it
+        # must be the scoped layer name rather than a generic table name.
+        paths["gpkg_path"] = bundle.write_gpkg({layer_name: gpkg_frame}).as_posix()
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     result: dict[str, Any] = {

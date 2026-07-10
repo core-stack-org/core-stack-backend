@@ -541,7 +541,9 @@ def run_antyodaya_pipeline(
     if outputs.csv:
         paths["csv_path"] = bundle.write_csv(focused_frame, ".csv").as_posix()
     if outputs.gpkg:
-        paths["gpkg_path"] = bundle.write_gpkg({output_config["village_layer"]: gpkg_frame}).as_posix()
+        # The GPKG table name becomes the GeoServer feature-type name, so it
+        # must be the scoped layer name rather than a generic table name.
+        paths["gpkg_path"] = bundle.write_gpkg({result_name: gpkg_frame}).as_posix()
     mapping_output = bundle.path / "antyodaya_2020_mapping.yaml"
     bundle.ensure()
     shutil.copyfile(_repo_path(config["sources"]["mapping_yaml"]), mapping_output)

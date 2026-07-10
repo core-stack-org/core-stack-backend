@@ -841,9 +841,9 @@ def run_facilities_pipeline(
     if outputs.csv:
         paths["csv_path"] = bundle.write_csv(report_frame, ".csv").as_posix()
     if outputs.gpkg:
-        paths["gpkg_path"] = bundle.write_gpkg(
-            {output_config["village_service_layer"]: village_service_output_gdf}
-        ).as_posix()
+        # The GPKG table name becomes the GeoServer feature-type name, so it
+        # must be the scoped layer name rather than a generic table name.
+        paths["gpkg_path"] = bundle.write_gpkg({layer_name: village_service_output_gdf}).as_posix()
     result.update(paths)
     if outputs.stac:
         result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()

@@ -31,7 +31,7 @@ Every API body, CLI invocation, and batch row is normalised into a
     "overwrite": false,
     "register_layers": false,
     "use_pregenerated": false,       // enable the cache manifest check
-    "geoserver_workspace": "test_workspace"
+    "geoserver_workspace": "testworkspace"
   },
   "batch": {"mode": "single"}
 }
