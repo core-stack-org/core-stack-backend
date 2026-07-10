@@ -1,0 +1,53 @@
+name: livestock_census_20_schema
+version: 1
+description: >
+  Runtime schema for village-level 20th Livestock Census outputs. The SQLite
+  sidecar stores only the village key and male/female count columns; totals and
+  grouped metrics are derived during each local pipeline run.
+
+livestock:
+  large_animals:
+    cattle:
+      male: cattle_male
+      female: cattle_female
+      total: cattle_total
+    buffalo:
+      male: buffalo_male
+      female: buffalo_female
+      total: buffalo_total
+  small_animals:
+    sheep:
+      male: sheep_male
+      female: sheep_female
+      total: sheep_total
+    goat:
+      male: goat_male
+      female: goat_female
+      total: goat_total
+    pig:
+      male: pig_male
+      female: pig_female
+      total: pig_total
+
+derived_metrics:
+  large_animals_total:
+    label: Large Animals Total
+    sources: [cattle_total, buffalo_total]
+    binning_recommendation: Use state/district contextual quantiles rather than all-India fixed breaks for local reports.
+  small_animals_total:
+    label: Small Animals Total
+    sources: [sheep_total, goat_total, pig_total]
+    binning_recommendation: Use state/district contextual quantiles and inspect high-end outliers before map styling.
+  all_livestock_total:
+    label: All Livestock Total
+    sources: [large_animals_total, small_animals_total]
+
+focused_columns:
+  - all_livestock_total
+  - large_animals_total
+  - cattle_total
+  - buffalo_total
+  - small_animals_total
+  - sheep_total
+  - goat_total
+  - pig_total

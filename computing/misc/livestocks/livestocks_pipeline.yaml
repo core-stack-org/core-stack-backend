@@ -1,0 +1,84 @@
+name: livestock_census_20
+title: Livestock Census 2020
+description: >
+  Village-level livestock census counts joined at runtime to the Core Stack
+  standard admin boundary.
+
+sources:
+  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  csv: data/base_resources/cs_livestock_census_20.csv
+  sidecar_sqlite: data/base_resources/cs_livestock_census_20.csv.sqlite
+  schema_yaml: computing/misc/livestocks/livestocks_schema.yaml
+
+keys:
+  admin_join_key: pc11_village_id
+  source_join_key: village_code
+
+output:
+  root: data/tests/outputs/livestock20
+  layer_prefix: livestocks
+  village_layer: livestock_villages
+  geoserver_workspace: testworkspace
+
+default_outputs:
+  gpkg: true
+  csv: true
+  readme: true
+  metadata: true
+  stac: true
+  geoserver: true
+
+source_location_columns:
+  - village_code
+  - row_index
+  - location_type
+  - state_code
+  - district_code
+  - subdistrict_code
+  - subdistrict_name
+  - village_name
+  - town_name
+  - ward_code
+  - ward_number
+  - ward_name
+
+metrics:
+  sidecar_columns:
+    - village_code
+    - cattle_male
+    - cattle_female
+    - buffalo_male
+    - buffalo_female
+    - sheep_male
+    - sheep_female
+    - goat_male
+    - goat_female
+    - pig_male
+    - pig_female
+  count_columns:
+    - cattle_male
+    - cattle_female
+    - cattle_total
+    - buffalo_male
+    - buffalo_female
+    - buffalo_total
+    - sheep_male
+    - sheep_female
+    - sheep_total
+    - goat_male
+    - goat_female
+    - goat_total
+    - pig_male
+    - pig_female
+    - pig_total
+
+readme:
+  audience:
+    - local stewards
+    - Core Stack platform users
+    - Know Your Landscape reports
+    - data analysts preparing Excel handoffs
+  cautions:
+    - Villages without a matching livestock village_code remain in spatial outputs with null livestock metrics.
+    - Aggregated overviews sum matched village rows and should be interpreted with join coverage.
