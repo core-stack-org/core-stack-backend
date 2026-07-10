@@ -16,6 +16,8 @@ output:
   root: data/tests/outputs/facilities
   layer_prefix: facilities
   geoserver_workspace: testworkspace
+  # Dataset row used when registering published layers in the Layer database.
+  dataset_name: Facilities Proximity
 
 default_outputs:
   gpkg: true
