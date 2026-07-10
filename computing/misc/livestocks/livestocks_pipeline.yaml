@@ -19,6 +19,8 @@ output:
   root: data/tests/outputs/livestock20
   layer_prefix: livestocks
   geoserver_workspace: testworkspace
+  # Dataset row used when registering published layers in the Layer database.
+  dataset_name: Livestock Census
 
 default_outputs:
   gpkg: true
