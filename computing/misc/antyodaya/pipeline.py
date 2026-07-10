@@ -29,7 +29,7 @@ from computing.misc.local_pipeline.outputs import (
     stable_hash,
     utc_now_text,
 )
-from computing.misc.local_pipeline.publish import publish_gpkg_layer
+from computing.misc.local_pipeline.publish import publish_gpkg_layer, register_layer
 from computing.misc.local_pipeline.schema import (
     STATUS_MATCHED,
     STATUS_NO_DATA,
@@ -604,6 +604,29 @@ def run_antyodaya_pipeline(
                 geoserver["status"] = "published"
                 links_path = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv")
                 result["geoserver_links_path"] = links_path.as_posix()
+                if request.publish.register_layers:
+                    result["layer_registration"] = register_layer(
+                        dataset_name=output_config.get("dataset_name", "Antyodaya 2020"),
+                        layer_name=result_name,
+                        scope=request.scope,
+                        workspace=geoserver_workspace,
+                        geoserver_url=geoserver.get("wfs_url"),
+                        algorithm=ALGORITHM,
+                        algorithm_version=ALGORITHM_VERSION,
+                        misc={
+                            "source_csv": config["sources"]["csv"],
+                            "gpkg_path": result.get("gpkg_path"),
+                            "csv_path": result.get("csv_path"),
+                            "output_dir": bundle.path.as_posix(),
+                            "geoserver_layer_name": result_name,
+                            "geoserver_url": geoserver.get("wfs_url"),
+                            "rows": result.get("rows"),
+                            "matched_rows": result.get("matched_rows"),
+                            "join_coverage": result.get("join_coverage"),
+                        },
+                        overwrite=request.publish.overwrite,
+                    )
+                    result["layer_id"] = (result["layer_registration"] or {}).get("layer_id")
             except Exception as exc:
                 geoserver = {
                     "ok": False,
