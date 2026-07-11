@@ -263,4 +263,9 @@ urlpatterns = [
         api.generate_forest_fire,
         name="generate_forest_fire",
     ),
+    path(
+        "generate_et_downscale/",
+        api.et_downscale,
+        name="et_downscale",
+    ),
 ]

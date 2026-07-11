@@ -18,6 +18,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
+from .et_downscale.et_downscale import generate_et_downscale
 from .utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
@@ -1634,6 +1635,39 @@ def generate_livestocks(request):
         )
     except Exception as e:
         print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def et_downscale(request):
+    print("Inside generate_et_downscale API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        tehsil = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        application = request.data.get("application") or "all"
+
+        generate_et_downscale.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "tehsil": tehsil,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+                "application": application,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_mws_centroid api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
