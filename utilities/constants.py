@@ -8,6 +8,9 @@ ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
 
+ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
+LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
+
 MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
@@ -331,6 +334,8 @@ DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 
 # workspace
 FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
+ANTYODAYA_GEOSERVER_WORKSPACE = "antyodaya_2020"
+LIVESTOCK_GEOSERVER_WORKSPACE = "livestocks"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
@@ -360,7 +365,7 @@ PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
 CCD_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ccd_"
 CH_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ch_"
 TREE_OVERALL_CHANGE = (
-    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2023"
+    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2022"
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"

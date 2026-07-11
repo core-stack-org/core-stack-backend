@@ -1,0 +1,282 @@
+{
+  "source_url": "https://geoserver.core-stack.org:8443/geoserver",
+  "fetched_at": "2026-05-22T10:21:50.016965+00:00",
+  "style_count": 55,
+  "styles": [
+    {
+      "name": "burg",
+      "workspace": null,
+      "file": "burg.sld"
+    },
+    {
+      "name": "capitals",
+      "workspace": null,
+      "file": "capitals.sld"
+    },
+    {
+      "name": "cite_lakes",
+      "workspace": null,
+      "file": "cite_lakes.sld"
+    },
+    {
+      "name": "dem",
+      "workspace": null,
+      "file": "dem.sld"
+    },
+    {
+      "name": "dem_contours",
+      "workspace": null,
+      "file": "dem_contours.sld"
+    },
+    {
+      "name": "dem_grayscale",
+      "workspace": null,
+      "file": "dem_grayscale.sld"
+    },
+    {
+      "name": "generic",
+      "workspace": null,
+      "file": "generic.sld"
+    },
+    {
+      "name": "giant_polygon",
+      "workspace": null,
+      "file": "giant_polygon.sld"
+    },
+    {
+      "name": "grass",
+      "workspace": null,
+      "file": "grass.sld"
+    },
+    {
+      "name": "green",
+      "workspace": null,
+      "file": "green.sld"
+    },
+    {
+      "name": "line",
+      "workspace": null,
+      "file": "line.sld"
+    },
+    {
+      "name": "poi",
+      "workspace": null,
+      "file": "poi.sld"
+    },
+    {
+      "name": "point",
+      "workspace": null,
+      "file": "point.sld"
+    },
+    {
+      "name": "poly_landmarks",
+      "workspace": null,
+      "file": "poly_landmarks.sld"
+    },
+    {
+      "name": "polygon",
+      "workspace": null,
+      "file": "polygon.sld"
+    },
+    {
+      "name": "pophatch",
+      "workspace": null,
+      "file": "pophatch.sld"
+    },
+    {
+      "name": "population",
+      "workspace": null,
+      "file": "population.sld"
+    },
+    {
+      "name": "rain",
+      "workspace": null,
+      "file": "rain.sld"
+    },
+    {
+      "name": "raster",
+      "workspace": null,
+      "file": "raster.sld"
+    },
+    {
+      "name": "restricted",
+      "workspace": null,
+      "file": "restricted.sld"
+    },
+    {
+      "name": "simple_roads",
+      "workspace": null,
+      "file": "simple_roads.sld"
+    },
+    {
+      "name": "simple_streams",
+      "workspace": null,
+      "file": "simple_streams.sld"
+    },
+    {
+      "name": "tiger_roads",
+      "workspace": null,
+      "file": "tiger_roads.sld"
+    },
+    {
+      "name": "lulc_level_1_style",
+      "workspace": "LULC_level_1",
+      "file": "workspaces/LULC_level_1/lulc_level_1_style.sld"
+    },
+    {
+      "name": "lulc_level_2_style",
+      "workspace": "LULC_level_2",
+      "file": "workspaces/LULC_level_2/lulc_level_2_style.sld"
+    },
+    {
+      "name": "lulc_RWB",
+      "workspace": "LULC_level_3",
+      "file": "workspaces/LULC_level_3/lulc_RWB.sld"
+    },
+    {
+      "name": "lulc_all_pixels",
+      "workspace": "LULC_level_3",
+      "file": "workspaces/LULC_level_3/lulc_all_pixels.sld"
+    },
+    {
+      "name": "lulc_level_3_style",
+      "workspace": "LULC_level_3",
+      "file": "workspaces/LULC_level_3/lulc_level_3_style.sld"
+    },
+    {
+      "name": "lulc_resource_report",
+      "workspace": "LULC_level_3",
+      "file": "workspaces/LULC_level_3/lulc_resource_report.sld"
+    },
+    {
+      "name": "lulc_water_pixels",
+      "workspace": "LULC_level_3",
+      "file": "workspaces/LULC_level_3/lulc_water_pixels.sld"
+    },
+    {
+      "name": "waterrej_lulc",
+      "workspace": "LULC_level_3",
+      "file": "workspaces/LULC_level_3/waterrej_lulc.sld"
+    },
+    {
+      "name": "ch_style",
+      "workspace": "canopy_height",
+      "file": "workspaces/canopy_height/ch_style.sld"
+    },
+    {
+      "name": "catchment_area_singleflow",
+      "workspace": "catchment_area_singleflow",
+      "file": "workspaces/catchment_area_singleflow/catchment_area_singleflow.sld"
+    },
+    {
+      "name": "ccd_style",
+      "workspace": "ccd",
+      "file": "workspaces/ccd/ccd_style.sld"
+    },
+    {
+      "name": "KYL_Crop_Degradation",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/KYL_Crop_Degradation.sld"
+    },
+    {
+      "name": "afforestation",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/afforestation.sld"
+    },
+    {
+      "name": "cropintensity",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/cropintensity.sld"
+    },
+    {
+      "name": "cropping_intensity_kyl",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/cropping_intensity_kyl.sld"
+    },
+    {
+      "name": "deforestation",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/deforestation.sld"
+    },
+    {
+      "name": "degradation",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/degradation.sld"
+    },
+    {
+      "name": "urbanization",
+      "workspace": "change_detection",
+      "file": "workspaces/change_detection/urbanization.sld"
+    },
+    {
+      "name": "testClart",
+      "workspace": "clart",
+      "file": "workspaces/clart/testClart.sld"
+    },
+    {
+      "name": "distance_nearest_upstream_DL",
+      "workspace": "distance_nearest_upstream_DL",
+      "file": "workspaces/distance_nearest_upstream_DL/distance_nearest_upstream_DL.sld"
+    },
+    {
+      "name": "natural_depression",
+      "workspace": "natural_depression",
+      "file": "workspaces/natural_depression/natural_depression.sld"
+    },
+    {
+      "name": "site_suitability",
+      "workspace": "plantation",
+      "file": "workspaces/plantation/site_suitability.sld"
+    },
+    {
+      "name": "potential-protection",
+      "workspace": "restoration",
+      "file": "workspaces/restoration/potential-protection.sld"
+    },
+    {
+      "name": "restoration_style",
+      "workspace": "restoration",
+      "file": "workspaces/restoration/restoration_style.sld"
+    },
+    {
+      "name": "wide-scale-restoration",
+      "workspace": "restoration",
+      "file": "workspaces/restoration/wide-scale-restoration.sld"
+    },
+    {
+      "name": "slope_percentage",
+      "workspace": "slope_percentage",
+      "file": "workspaces/slope_percentage/slope_percentage.sld"
+    },
+    {
+      "name": "stream_order",
+      "workspace": "stream_order",
+      "file": "workspaces/stream_order/stream_order.sld"
+    },
+    {
+      "name": "Terrain_Cutout_Mask_4567",
+      "workspace": "terrain",
+      "file": "workspaces/terrain/Terrain_Cutout_Mask_4567.sld"
+    },
+    {
+      "name": "Terrain_Style_11_Classes",
+      "workspace": "terrain",
+      "file": "workspaces/terrain/Terrain_Style_11_Classes.sld"
+    },
+    {
+      "name": "terrain_raster",
+      "workspace": "terrain",
+      "file": "workspaces/terrain/terrain_raster.sld"
+    },
+    {
+      "name": "tree_overall_ch_style",
+      "workspace": "tree_overall_ch",
+      "file": "workspaces/tree_overall_ch/tree_overall_ch_style.sld"
+    },
+    {
+      "name": "nightlight1",
+      "workspace": "zerodose",
+      "file": "workspaces/zerodose/nightlight1.sld"
+    }
+  ]
+}

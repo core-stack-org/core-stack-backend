@@ -1,5 +1,8 @@
+import logging
 import os
-from typing import Any, Dict, Optional
+import time
+import uuid
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
 from django.views.decorators.csrf import csrf_exempt
@@ -7,18 +10,20 @@ from rest_framework import status
 from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 
+from dpr.utils import transform_name
+from moderation.utils.update_csdb import sync_form_type
 from nrm_app.settings import ODK_USER_EMAIL_SYNC, ODK_USER_PASSWORD_SYNC, TMP_LOCATION
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.constants import (
     ODK_SYNC_URL_AGRI_FEEDBACK,
     ODK_SYNC_URL_AGRI_MAINTENANCE,
+    ODK_SYNC_URL_AGROHORTICULTURE,
     ODK_SYNC_URL_CROP,
     ODK_SYNC_URL_GW_FEEDBACK,
     ODK_SYNC_URL_GW_MAINTENANCE,
     ODK_SYNC_URL_IRRIGATION_STRUCTURE,
     ODK_SYNC_URL_LIVELIHOOD,
-    ODK_SYNC_URL_AGROHORTICULTURE,
     ODK_SYNC_URL_RECHARGE_STRUCTURE,
     ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE,
     ODK_SYNC_URL_SETTLEMENT,
@@ -28,11 +33,27 @@ from utilities.constants import (
     ODK_SYNC_URL_WELL,
 )
 
+logger = logging.getLogger(__name__)
+
 from .build_layer import build_layer
-from .models import ODKSyncLog, Plan, PlanApp
+from .models import ODKSyncLog, PlanApp, Plan
 from .serializers import PlanAppSerializer
-from .utils import fetch_bearer_token, fetch_odk_data
+from .utils import fetch_bearer_token, fetch_db_data
 from geoadmin.models import GramPanchayat
+from django.db.models import Q
+
+_COMMON_REQUIRED_FIELDS: Tuple[str, ...] = (
+    "layer_name",
+    "plan_id",
+    "plan_name",
+    "district_name",
+    "block_name",
+)
+
+_LAYER_KIND_CONFIG: Dict[str, Dict[str, str]] = {
+    "resources": {"type_field": "resource_type", "singular": "resource"},
+    "works": {"type_field": "work_type", "singular": "work"},
+}
 
 
 # MARK: Get Plans API
@@ -79,55 +100,316 @@ def add_plan(request):
     )
 
 
+# MARK: Build Layer Helpers (shared by /add_resources and /add_works)
+def _extract_payload(request, kind: str) -> Tuple[Optional[Dict[str, Any]], List[str]]:
+    """Pull and normalize the request payload. Returns (payload, missing_fields)."""
+    type_field = _LAYER_KIND_CONFIG[kind]["type_field"]
+    required = (*_COMMON_REQUIRED_FIELDS, type_field)
+
+    missing = [f for f in required if not request.data.get(f)]
+    if missing:
+        return None, missing
+
+    def _lower(value: Any) -> Any:
+        return value.lower() if isinstance(value, str) else value
+
+    return {
+        "layer_name": _lower(request.data.get("layer_name")),
+        "item_type": _lower(request.data.get(type_field)),
+        "plan_id": request.data.get("plan_id"),
+        "plan_name": _lower(request.data.get("plan_name")),
+        "district": _lower(request.data.get("district_name")),
+        "block": _lower(request.data.get("block_name")),
+    }, []
+
+
+def _expected_layer_store_name(
+    item_type: str, plan_id: Any, district: str, block: str
+) -> str:
+    """Mirror the naming convention used by build_layer.build_layer for transparency."""
+    return f"{item_type}_{plan_id}_{district}_{transform_name(name=block)}"
+
+
+def _safe_unlink(csv_path: str, request_id: str, kind: str) -> None:
+    try:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+            logger.info(
+                f"[{request_id}] {kind}.build: cleaned up temp CSV at {csv_path}"
+            )
+    except OSError as exc:
+        logger.warning(
+            f"[{request_id}] {kind}.build: failed to remove temp CSV at "
+            f"{csv_path}: {exc}"
+        )
+
+
+def _error_response(
+    request_id: str,
+    code: str,
+    message: str,
+    http_status: int,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Response:
+    data: Dict[str, Any] = {"request_id": request_id}
+    if extra:
+        data.update(extra)
+    return Response(
+        {
+            "status": "error",
+            "code": code,
+            "error": message,
+            "data": data,
+        },
+        status=http_status,
+    )
+
+
+def _build_layer_for_kind(request, kind: str) -> Response:
+    """
+    Shared workflow for /add_resources and /add_works:
+      1. validate payload
+      2. trigger incremental ODK -> DB sync (best-effort)
+      3. fetch source records from DB and stage a CSV
+      4. publish the layer to GeoServer
+      5. clean up the temp CSV and return a structured response
+    """
+    request_id = uuid.uuid4().hex[:12]
+    type_field = _LAYER_KIND_CONFIG[kind]["type_field"]
+    singular = _LAYER_KIND_CONFIG[kind]["singular"]
+    started_at = time.perf_counter()
+
+    logger.info(
+        f"[{request_id}] {kind}.build: request received "
+        f"(content_type={request.content_type}, keys={list(request.data.keys())})"
+    )
+
+    payload, missing = _extract_payload(request, kind)
+    if missing:
+        logger.warning(
+            f"[{request_id}] {kind}.build: rejecting request — "
+            f"missing/empty fields: {missing}"
+        )
+        return _error_response(
+            request_id,
+            code="missing_fields",
+            message=f"Missing required field(s): {', '.join(missing)}.",
+            http_status=status.HTTP_400_BAD_REQUEST,
+            extra={"missing_fields": missing},
+        )
+
+    item_type = payload["item_type"]
+    plan_id = payload["plan_id"]
+    plan_name = payload["plan_name"]
+    district = payload["district"]
+    block = payload["block"]
+    layer_name = payload["layer_name"]
+
+    context = {
+        type_field: item_type,
+        "plan_id": plan_id,
+        "plan_name": plan_name,
+        "district": district,
+        "block": block,
+        "layer_name": layer_name,
+    }
+    logger.info(f"[{request_id}] {kind}.build: payload normalized — {context}")
+
+    csv_path = os.path.join(TMP_LOCATION, f"{item_type}_{plan_id}_{block}.csv")
+    logger.info(f"[{request_id}] {kind}.build: temp CSV path resolved to {csv_path}")
+
+    sync_started = time.perf_counter()
+    logger.info(
+        f"[{request_id}] {kind}.build: triggering incremental ODK sync for "
+        f"{type_field}={item_type}"
+    )
+    sync_ok = sync_form_type(item_type)
+    sync_ms = int((time.perf_counter() - sync_started) * 1000)
+    if sync_ok:
+        logger.info(
+            f"[{request_id}] {kind}.build: ODK sync completed for "
+            f"{type_field}={item_type} in {sync_ms}ms"
+        )
+    else:
+        logger.warning(
+            f"[{request_id}] {kind}.build: ODK sync FAILED for "
+            f"{type_field}={item_type} in {sync_ms}ms; proceeding with existing DB data"
+        )
+
+    fetch_started = time.perf_counter()
+    logger.info(
+        f"[{request_id}] {kind}.build: fetching DB data for {type_field}={item_type}, "
+        f"plan_id={plan_id}, block={block}"
+    )
+    try:
+        record_count = fetch_db_data(csv_path, item_type, block, plan_id)
+    except Exception as exc:
+        fetch_ms = int((time.perf_counter() - fetch_started) * 1000)
+        logger.exception(
+            f"[{request_id}] {kind}.build: unexpected error during fetch_db_data "
+            f"for {type_field}={item_type}, plan_id={plan_id} "
+            f"(fetch_ms={fetch_ms}): {exc}"
+        )
+        _safe_unlink(csv_path, request_id, kind)
+        return _error_response(
+            request_id,
+            code="db_fetch_failed",
+            message="Failed to fetch source data from the database.",
+            http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            extra={
+                **context,
+                "details": str(exc),
+                "sync_status": "success" if sync_ok else "failed",
+                "sync_duration_ms": sync_ms,
+                "fetch_duration_ms": fetch_ms,
+            },
+        )
+    fetch_ms = int((time.perf_counter() - fetch_started) * 1000)
+
+    if not record_count:
+        total_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.warning(
+            f"[{request_id}] {kind}.build: no DB data found for "
+            f"{type_field}={item_type}, plan_id={plan_id}, block={block} "
+            f"(sync_ok={sync_ok}, fetch_ms={fetch_ms}, total_ms={total_ms})"
+        )
+        return _error_response(
+            request_id,
+            code="no_data_found",
+            message=(
+                f"No records found for {type_field}='{item_type}', "
+                f"plan_id='{plan_id}', block='{block}'."
+            ),
+            http_status=status.HTTP_404_NOT_FOUND,
+            extra={
+                **context,
+                "record_count": 0,
+                "sync_status": "success" if sync_ok else "failed",
+                "sync_duration_ms": sync_ms,
+                "fetch_duration_ms": fetch_ms,
+                "total_duration_ms": total_ms,
+            },
+        )
+    logger.info(
+        f"[{request_id}] {kind}.build: DB fetch staged {record_count} row(s) "
+        f"in {fetch_ms}ms"
+    )
+
+    layer_store_name = _expected_layer_store_name(item_type, plan_id, district, block)
+    build_started = time.perf_counter()
+    logger.info(
+        f"[{request_id}] {kind}.build: publishing GeoServer layer "
+        f"workspace='{kind}', store='{layer_store_name}'"
+    )
+    try:
+        success = build_layer(
+            layer_type=kind,
+            item_type=item_type,
+            plan_id=plan_id,
+            district=district,
+            block=block,
+            csv_path=csv_path,
+        )
+    except Exception as exc:
+        build_ms = int((time.perf_counter() - build_started) * 1000)
+        total_ms = int((time.perf_counter() - started_at) * 1000)
+        logger.exception(
+            f"[{request_id}] {kind}.build: unexpected error during build_layer for "
+            f"{type_field}={item_type}, plan_id={plan_id} "
+            f"(build_ms={build_ms}, total_ms={total_ms}): {exc}"
+        )
+        _safe_unlink(csv_path, request_id, kind)
+        return _error_response(
+            request_id,
+            code="internal_error",
+            message="An unexpected error occurred while building the layer.",
+            http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            extra={
+                **context,
+                "layer_store_name": layer_store_name,
+                "details": str(exc),
+                "sync_status": "success" if sync_ok else "failed",
+                "sync_duration_ms": sync_ms,
+                "fetch_duration_ms": fetch_ms,
+                "build_duration_ms": build_ms,
+                "total_duration_ms": total_ms,
+            },
+        )
+    finally:
+        _safe_unlink(csv_path, request_id, kind)
+
+    build_ms = int((time.perf_counter() - build_started) * 1000)
+    total_ms = int((time.perf_counter() - started_at) * 1000)
+
+    if not success:
+        logger.error(
+            f"[{request_id}] {kind}.build: build_layer returned False for "
+            f"{type_field}={item_type}, plan_id={plan_id} "
+            f"(build_ms={build_ms}, total_ms={total_ms})"
+        )
+        return _error_response(
+            request_id,
+            code="layer_build_failed",
+            message=(
+                f"Failed to publish GeoServer layer '{layer_store_name}'. "
+                "See server logs for details."
+            ),
+            http_status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            extra={
+                **context,
+                "layer_store_name": layer_store_name,
+                "record_count": record_count,
+                "sync_status": "success" if sync_ok else "failed",
+                "sync_duration_ms": sync_ms,
+                "fetch_duration_ms": fetch_ms,
+                "build_duration_ms": build_ms,
+                "total_duration_ms": total_ms,
+            },
+        )
+
+    logger.info(
+        f"[{request_id}] {kind}.build: SUCCESS — published layer "
+        f"'{layer_store_name}' ({record_count} row(s)) in workspace='{kind}' "
+        f"(sync={sync_ms}ms, fetch={fetch_ms}ms, build={build_ms}ms, total={total_ms}ms)"
+    )
+    return Response(
+        {
+            "status": "success",
+            "code": "layer_published",
+            "message": (
+                f"Successfully published {singular} layer "
+                f"'{layer_store_name}' to GeoServer with {record_count} record(s)."
+            ),
+            "data": {
+                "request_id": request_id,
+                "layer_type": kind,
+                "workspace": kind,
+                "layer_store_name": layer_store_name,
+                "record_count": record_count,
+                **context,
+                "sync_status": "success" if sync_ok else "failed",
+                "sync_duration_ms": sync_ms,
+                "fetch_duration_ms": fetch_ms,
+                "build_duration_ms": build_ms,
+                "total_duration_ms": total_ms,
+            },
+        },
+        status=status.HTTP_201_CREATED,
+    )
+
+
 # api's for add settlement, add well, add waterbody | add work [new, maintenance]
 @api_view(["POST"])
 @auth_free
 @schema(None)
 def add_resources(request):
-    layer_name = request.data.get("layer_name").lower()
-    resource_type = request.data.get("resource_type").lower()
-    plan_id = request.data.get("plan_id")
-    plan_name = request.data.get("plan_name").lower()
-    district = request.data.get("district_name").lower()
-    block = request.data.get("block_name").lower()
+    """
+    Build and publish a GeoServer 'resources' layer for the given plan/block.
 
-    CSV_PATH = os.path.join(
-        TMP_LOCATION,
-        f"{resource_type}_{plan_id}_{block}.csv",
-    )
-
-    odk_data_found = fetch_odk_data(CSV_PATH, resource_type, block, plan_id)
-
-    if not odk_data_found:
-        return Response(
-            {"error": f"No ODK data found for the given Plan ID: {plan_id}"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    try:
-        success = build_layer(
-            layer_type="resources",
-            item_type=resource_type,
-            plan_id=plan_id,
-            district=district,
-            block=block,
-            csv_path=CSV_PATH,
-        )
-        if not success:
-            return Response(
-                {"error": "Failed to build resource layer."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-    except Exception as e:
-        return Response(
-            {"error": f"An unexpected error occurred: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-    finally:
-        if os.path.exists(CSV_PATH):
-            os.remove(CSV_PATH)
-
-    return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
+    Supported resource_type values: settlement, well, waterbody, cropping.
+    Layer naming convention: <resource_type>_<plan_id>_<district>_<block>.
+    """
+    return _build_layer_for_kind(request, kind="resources")
 
 
 @api_view(["POST"])
@@ -135,53 +417,21 @@ def add_resources(request):
 @schema(None)
 def add_works(request):
     """
-    work type: plan_gw: recharge st., main_swb: maintenance surface water bodies, plan_agri: irrigation works, livelihood
-    works: work_type_plan_id_district_block
+    Build and publish a GeoServer 'works' layer for the given plan/block.
+
+    Supported work_type values:
+      plan_gw           — new recharge structures (groundwater)
+      main_gw           — maintenance of recharge structures
+      plan_agri         — new irrigation structures
+      main_agri         — maintenance of irrigation structures
+      main_swb          — surface water body maintenance
+      main_swb_rs       — remote-sensed surface water body maintenance
+      livelihood        — livelihood
+      agrohorticulture  — agrohorticulture
+
+    Layer naming convention: <work_type>_<plan_id>_<district>_<block>.
     """
-    layer_name = request.data.get("layer_name").lower()
-    work_type = request.data.get("work_type").lower()
-    plan_id = request.data.get("plan_id")
-    plan_name = request.data.get("plan_name").lower()
-    district = request.data.get("district_name").lower()
-    block = request.data.get("block_name").lower()
-
-    CSV_PATH = os.path.join(
-        TMP_LOCATION,
-        f"{work_type}_{plan_id}_{block}.csv",
-    )
-
-    odk_data_found = fetch_odk_data(CSV_PATH, work_type, block, plan_id)
-
-    if not odk_data_found:
-        return Response(
-            {"error": f"No ODK data found for the given Plan ID: {plan_id}"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-
-    try:
-        success = build_layer(
-            layer_type="works",
-            item_type=work_type,
-            plan_id=plan_id,
-            district=district,
-            block=block,
-            csv_path=CSV_PATH,
-        )
-        if not success:
-            return Response(
-                {"error": "Failed to build work layer."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-    except Exception as e:
-        return Response(
-            {"error": f"An unexpected error occurred: {str(e)}"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-    finally:
-        if os.path.exists(CSV_PATH):
-            os.remove(CSV_PATH)
-
-    return Response({"message": "Success"}, status=status.HTTP_201_CREATED)
+    return _build_layer_for_kind(request, kind="works")
 
 
 # MARK: SYNC OFFLINE DATA HELPER FUNCTIONS

@@ -403,3 +403,164 @@ def fetch_gp_tehsilwise(request):
             "data": list(gp_queryset),
         }
     )
+
+
+@api_security_check(auth_type="Auth_free")
+@schema(None)
+def get_GP(request):
+    try:
+
+        gp_code = request.query_params.get("gram_panchayat_code")
+
+        gp_queryset = GramPanchayat.objects.all()
+
+        if gp_code:
+            gp_queryset = gp_queryset.filter(gram_panchayat_code=gp_code)
+
+        gp_queryset = gp_queryset.values(
+            "gram_panchayat_code",
+            "gram_panchayat_name",
+        )
+
+        return Response(
+            {
+                "success": True,
+                "count": gp_queryset.count(),
+                "data": list(gp_queryset),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    except Exception as e:
+
+        print("Exception in get_GP api :: ", e)
+
+        return Response(
+            {
+                "success": False,
+                "message": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def get_gp_mapped_with_plan(request):
+    try:
+        org = request.query_params.get("org_id")
+        tehsil = request.query_params.get("tehsil_id")
+        plan_queryset = (
+            PlanApp.objects.filter(
+                organization=org,
+                enabled=True,
+                is_dpr_reviewed=True,
+                is_completed=True,
+                gp__isnull=False,
+                tehsil_soi=tehsil,
+            )
+            .order_by("gp")
+            .distinct("gp")
+            .values(
+                "gp",
+                "gp__gram_panchayat_name",
+            )
+        )
+
+        return Response(
+            {
+                "success": True,
+                "count": plan_queryset.count(),
+                "data": list(plan_queryset),
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in get_gp_mapped_with_plan api :: ", e)
+        return Response(
+            {
+                "success": False,
+                "message": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+# get district in which org is working
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def get_district_org(request):
+    try:
+        org = request.query_params.get("org_id")
+        plan_queryset = (
+            PlanApp.objects.filter(
+                organization=org,
+                enabled=True,
+                is_dpr_reviewed=True,
+                is_completed=True,
+            )
+            .order_by("district_soi")
+            .distinct("district_soi")
+            .values(
+                "district_soi",
+                "district_soi__district_name",
+            )
+        )
+        return Response(
+            {
+                "success": True,
+                "count": plan_queryset.count(),
+                "data": list(plan_queryset),
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in get_district_org api :: ", e)
+        return Response(
+            {
+                "success": False,
+                "message": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+# get tehsil in which org is working
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def get_tehsil_org(request):
+    try:
+        org = request.query_params.get("org_id")
+        district = request.query_params.get("district_id")
+        plan_queryset = (
+            PlanApp.objects.filter(
+                organization=org,
+                enabled=True,
+                is_dpr_reviewed=True,
+                is_completed=True,
+                district_soi=district,
+            )
+            .order_by("tehsil_soi")
+            .distinct("tehsil_soi")
+            .values(
+                "tehsil_soi",
+                "tehsil_soi__tehsil_name",
+            )
+        )
+        return Response(
+            {
+                "success": True,
+                "count": plan_queryset.count(),
+                "data": list(plan_queryset),
+            },
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in get_district_org api :: ", e)
+        return Response(
+            {
+                "success": False,
+                "message": str(e),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )

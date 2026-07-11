@@ -1,0 +1,87 @@
+<div class="section">
+
+    <h3>{{ t.section_d_detail_water_structure.title }}</h3>
+
+    {% for waterbody in section_d.water_structures %}
+
+    <h4>
+        {{ waterbody.settlement|default:t.common.na }}
+    </h4>
+
+    <table>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.mws_id }}</td>
+            <td>{{ waterbody.mws_id|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.beneficiary_settlement }}</td>
+            <td>{{ waterbody.settlement|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.water_structure_owner }}</td>
+            <td>{{ waterbody.owner|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.beneficiary_name }}</td>
+            <td>{{ waterbody.beneficiary_name|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.beneficiary_father_name }}</td>
+            <td>{{ waterbody.father_name|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.who_manage }}</td>
+            <td>{{ waterbody.who_manages|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.caste_use }}</td>
+            <td>{{ waterbody.caste_uses|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.benefitted_household }}</td>
+            <td>{{ waterbody.households_benefitted|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.water_structure_type }}</td>
+            <td>{{ waterbody.structure_type|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.usage }}</td>
+            <td>{{ waterbody.usage|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.maintenance }}</td>
+            <td>{{ waterbody.need_maintenance|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.repair_activities }}</td>
+            <td>{{ waterbody.repair_activities|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.latitude }}</td>
+            <td>{{ waterbody.latitude|default:t.common.na }}</td>
+        </tr>
+
+        <tr>
+            <td class="label">{{ t.section_d_detail_water_structure.longitude }}</td>
+            <td>{{ waterbody.longitude|default:t.common.na }}</td>
+        </tr>
+
+    </table>
+
+    {% endfor %}
+
+</div>

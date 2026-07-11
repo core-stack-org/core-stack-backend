@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
@@ -30,7 +31,6 @@ from .serializers import (
     PlanCreateSerializer,
     PlanUpdateSerializer,
 )
-from rest_framework.pagination import PageNumberPagination
 
 STATE_CENTROIDS = {
     "Jammu & Kashmir": {"lat": 34.0837, "lon": 74.7973},
@@ -1105,10 +1105,20 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         filter_test_demo = (
             self.request.query_params.get("filter_test_plan", "").lower() == "true"
         )
+        filter_dpr_reviewed = (
+            self.request.query_params.get("is_dpr_reviewed", "").lower() == "true"
+        )
+        filter_is_completed = (
+            self.request.query_params.get("is_completed", "").lower() == "true"
+        )
         if filter_test_demo:
             queryset = queryset.exclude(
                 Q(plan__icontains="test") | Q(plan__icontains="demo")
             )
+        if filter_dpr_reviewed:
+            queryset = queryset.filter(is_dpr_reviewed=True)
+        if filter_is_completed:
+            queryset = queryset.filter(is_completed=True)
 
         return queryset.order_by("-created_at")
 

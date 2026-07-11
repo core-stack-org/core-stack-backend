@@ -1,0 +1,106 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Village Report - Data Unavailable</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom Earth Tone Colors -->
+    <style>
+        :root {
+            --primary-dark: #3e2723;
+            --primary-accent: #c17a4a;
+            --primary-light: #e8dcc8;
+            --secondary-green: #6b7c59;
+            --supporting-gray: #8b8680;
+            --supporting-beige: #d4c4b0;
+        }
+
+        body {
+            line-height: 1.8;
+            color: var(--primary-dark);
+        }
+
+        .text-accent { color: var(--primary-accent); }
+        .bg-accent { color: var(--primary-accent); }
+
+        @media print {
+            body {
+                background-color: white;
+                margin: 0;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 font-serif">
+    <!-- ===== PROFESSIONAL HEADER ===== -->
+    <div class="w-full text-white py-12 px-8" style="background-color: var(--primary-dark);">
+        <div class="max-w-screen-lg mx-auto text-center">
+            <h1 class="text-5xl font-bold mb-2 tracking-wide">Village Report</h1>
+            <p class="text-lg opacity-90">Comprehensive Analysis of Village Profile</p>
+        </div>
+    </div>
+
+    <div class="w-full bg-white" style="min-height: 60vh;">
+        <div class="max-w-screen-lg mx-auto">
+
+            <section class="px-20 py-20 flex flex-col items-center text-center">
+
+                <!-- Icon -->
+                <div class="mb-8">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#c17a4a" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="13"/>
+                        <circle cx="12" cy="16.5" r="0.6" fill="#c17a4a"/>
+                    </svg>
+                </div>
+
+                <h2 class="text-3xl font-bold mb-4" style="color: var(--primary-dark);">
+                    Data for this Village is Not Available
+                </h2>
+
+                <p class="text-base leading-relaxed mb-8 max-w-xl" style="color: var(--supporting-gray); line-height: 1.8;">
+                    We currently do not have sufficient data to generate a report for the selected village. This could be because the village boundary is not yet mapped, or development indicator data has not been collected for this location.
+                </p>
+
+                <!-- Location Breadcrumb -->
+                {% if state or district or block %}
+                <div class="text-sm mb-10 py-4 px-6 rounded inline-block"
+                     style="background-color: rgba(232, 220, 200, 0.5); color: var(--supporting-gray);">
+                    <div class="flex flex-wrap gap-3 items-center justify-center">
+                        <span class="font-semibold" style="color: var(--primary-dark);">Location:</span>
+                        {% if state %}<span style="text-transform: capitalize;">{{ state }}</span>{% endif %}
+                        {% if district %}<span class="text-accent">›</span><span style="text-transform: capitalize;">{{ district }}</span>{% endif %}
+                        {% if block %}<span class="text-accent">›</span><span style="text-transform: capitalize;">{{ block }}</span>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Suggestions Box -->
+                <div class="p-5 rounded text-sm leading-relaxed border-l-4 max-w-xl text-left"
+                     style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark);">
+                    <p class="font-semibold mb-2">What you can try:</p>
+                    <ul style="margin-left: 1rem; line-height: 1.8;">
+                        <li>Select a different village from the map or list view.</li>
+                        <li>Confirm that the village boundary appears correctly on the tehsil map.</li>
+                        <li>Check back later as new village data is added periodically.</li>
+                    </ul>
+                </div>
+
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="w-full py-6 px-8 text-center text-xs" style="background-color: var(--primary-light); color: var(--supporting-gray);">
+        <p>CoreStack &mdash; A commoning approach — Tech stacks for communities</p>
+    </div>
+</body>
+</html>

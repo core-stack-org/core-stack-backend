@@ -182,6 +182,16 @@ urlpatterns = [
         name="generate_facilities_proximity",
     ),
     path(
+        "generate_antyodaya/",
+        api.generate_antyodaya,
+        name="generate_antyodaya",
+    ),
+    path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
+    path(
         "generate_stac_collection/",
         api.generate_stac_collection,
         name="generate_stac_collection",
@@ -232,6 +242,26 @@ urlpatterns = [
         "generate_canal_vector/",
         api.generate_canal_vector,
         name="generate-canal-vector",
+    ),
+    path("refresh_cache/", api.refresh_layer_cache, name="refresh_cache"),
+    path(
+        "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
+    ),
+    path("missing_excel/", api.missing_excel, name="missing_excel"),
+    path(
+        "generate_tree_in_grassland/",
+        api.generate_tree_in_grassland,
+        name="generate_tree_in_grassland",
+    ),
+    path(
+        "forest_fringe_degradation/",
+        api.forest_fringe_degradation,
+        name="forest_fringe_degradation",
+    ),
+    path(
+        "generate_forest_fire/",
+        api.generate_forest_fire,
+        name="generate_forest_fire",
     ),
     path(
         "generate_et_downscale/",

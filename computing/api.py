@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
     api_view,
@@ -70,7 +71,13 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from .views import layer_status, get_layers_of_workspace, check_missing_layers
+from .views import (
+    layer_status,
+    get_layers_of_workspace,
+    missing_layer_for_all_workspace,
+    clear_layer_cache,
+    check_missing_excel_files,
+)
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
@@ -84,9 +91,13 @@ from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 
 
 @api_security_check(allowed_methods="POST")
@@ -1585,6 +1596,50 @@ def generate_facilities_proximity(request):
 
 @api_view(["POST"])
 @schema(None)
+def generate_antyodaya(request):
+    print("Inside generate_antyodaya API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
+        overwrite = request.data.get("overwrite", False)
+        generate_antyodaya_layer_task.apply_async(
+            args=[state, district, block, sync_to_geoserver, overwrite],
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_antyodaya api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_livestocks(request):
+    print("Inside generate_livestocks API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
+        overwrite = request.data.get("overwrite", False)
+        generate_livestocks_layer_task.apply_async(
+            args=[state, district, block, sync_to_geoserver, overwrite],
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
 def et_downscale(request):
     print("Inside generate_et_downscale API.")
     try:
@@ -1888,12 +1943,18 @@ def sync_layer_remote(request):
 @schema(None)
 def missing_layers(request):
     try:
-        workspace = request.query_params.get("workspace").lower()
-        result = check_missing_layers(workspace)
+        result = missing_layer_for_all_workspace()
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_layers_for_workspace api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def refresh_layer_cache(request, workspace=None):
+    clear_layer_cache(workspace)
+    return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
 
 
 @api_view(["POST"])
@@ -1938,4 +1999,104 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_tree_in_grassland(request):
+    print("Inside generate_tree_in_grassland API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_tree_in_grassland_layer.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Tree in Grassland task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_tree_in_grassland api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def forest_fringe_degradation(request):
+    print("Inside forest_fringe_degradation API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fringe_degradation.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fringe task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fringe api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fire(request):
+    print("Inside generate_forest_fire API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fire_layer_updated.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fire task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fire api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_excel(request):
+    try:
+        result = check_missing_excel_files()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in missing_excel api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

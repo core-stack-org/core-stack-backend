@@ -7,24 +7,25 @@ import json
 import pandas as pd
 from xml.sax.saxutils import escape
 import os
+from plans.models import PlanApp
+from .mapping import ICON_MAP
 
 logger = setup_logger(__name__)
 
 
-def load_csv_column_config():
+def load_yuktdhara_config():
+
     config_path = (
         Path(settings.BASE_DIR) / "data" / "Yuktdhara" / "yuktdhara_file_config.json"
     )
+
     if not os.path.exists(config_path):
         raise FileNotFoundError(
-            f"yuktdhara_file_config.json not found at: {config_path}\n"
-            "Please create data/Yuktdhara/yuktdhara_file_config.json as a JSON list of layer suffixes."
+            f"yuktdhara_file_config.json not found at: {config_path}"
         )
+
     with open(config_path, "r") as f:
         return json.load(f)
-
-
-CSV_COLUMNS = load_csv_column_config()
 
 
 def is_community_demand(demand_type):
@@ -42,72 +43,69 @@ MAINTENANCE_CATEGORY_MAP = {
 }
 
 
-def format_maintenance_row(item):
+def build_row(item, mapping_type, config):
+
+    mapping_config = config["mapping"][mapping_type]
+
+    row = {}
+
     community = is_community_demand(item.get("demand_type"))
-    maintenance_type = item.get("maintenance_category")
-    category = MAINTENANCE_CATEGORY_MAP.get(maintenance_type, "")
-    return {
-        "Irrigation work or Recharge Structure": category,
-        "new/maintenance": "Maintenance",
-        "Type of demand": item.get("demand_type", ""),
-        "Work demand": item.get("repair_activities", ""),
-        "Name of Beneficiary's Settlement": item.get("beneficiary_settlement", ""),
-        "Beneficiary's Name": ("NA" if community else item.get("beneficiary_name", "")),
-        "Beneficiary's Father's Name": (
-            "NA" if community else item.get("beneficiary_father_name", "")
-        ),
-        "Area(In acres)/Dimension(In ft)": "",
-        "Latitude": item.get("latitude", ""),
-        "Longitude": item.get("longitude", ""),
-    }
+
+    for output_column, rules in mapping_config.items():
+
+        # static values
+        if "value" in rules:
+            row[output_column] = rules["value"]
+            continue
+
+        value = item.get(
+            rules.get("source", ""),
+            "",
+        )
+
+        # community demand handling
+        if rules.get("community_na") and community:
+            value = "NA"
+
+        # transformations
+        transform = rules.get("transform")
+
+        if transform == "maintenance_category_map":
+            value = MAINTENANCE_CATEGORY_MAP.get(value, "")
+
+        row[output_column] = value
+
+    return row
 
 
-def format_nrm_row(item):
-    community = is_community_demand(item.get("demand_type"))
-    return {
-        "Irrigation work or Recharge Structure": item.get("work_category", ""),
-        "new/maintenance": "New demand",
-        "Type of demand": item.get("demand_type", ""),
-        "Work demand": item.get("work_demand", ""),
-        "Name of Beneficiary's Settlement": item.get("beneficiary_settlement", ""),
-        "Beneficiary's Name": ("NA" if community else item.get("beneficiary_name", "")),
-        "Beneficiary's Father's Name": (
-            "NA" if community else item.get("beneficiary_father_name", "")
-        ),
-        "Area(In acres)/Dimension(In ft)": "",
-        "Latitude": item.get("latitude", ""),
-        "Longitude": item.get("longitude", ""),
-    }
-
-
-def format_livelihood_row(item):
-    community = is_community_demand(item.get("demand_type"))
-    return {
-        "Irrigation work or Recharge Structure": item.get("livelihood_work", ""),
-        "new/maintenance": "New demand",
-        "Type of demand": item.get("demand_type", ""),
-        "Work demand": item.get("work_demand", ""),
-        "Name of Beneficiary's Settlement": item.get("beneficiary_settlement", ""),
-        "Beneficiary's Name": ("NA" if community else item.get("beneficiary_name", "")),
-        "Beneficiary's Father's Name": (
-            "NA" if community else item.get("beneficiary_father_name", "")
-        ),
-        "Area(In acres)/Dimension(In ft)": item.get("total_acres", ""),
-        "Latitude": item.get("latitude", ""),
-        "Longitude": item.get("longitude", ""),
-    }
-
-
-def fetch_data(plan_id, csv_path):
+def fetch_data(gp_id, csv_path):
     maintenance_data = []
-    maintenance_list = ["gw", "agri", "swb", "swb_rs"]
-    for maintenance in maintenance_list:
-        data = get_maintenance_data(plan_id, maintenance)
-        for item in data:
-            item["maintenance_category"] = maintenance
-        maintenance_data.extend(data)
-    nrm_works_data = get_nrm_works_data(plan_id)
-    livelihood_data = get_livelihood_data(plan_id)
+    nrm_works_data = []
+    livelihood_data = []
+    plans = PlanApp.objects.filter(gp_id=gp_id, enabled=True)
+    maintenance_list = [
+        "gw",
+        "agri",
+        "swb",
+        "swb_rs",
+    ]
+    for plan in plans:
+        plan_id = plan.id
+        # maintenance
+        for maintenance in maintenance_list:
+
+            data = get_maintenance_data(
+                plan_id,
+                maintenance,
+            )
+            for item in data:
+                item["maintenance_category"] = maintenance
+
+            maintenance_data.extend(data)
+        # nrm
+        nrm_works_data.extend(get_nrm_works_data(plan_id))
+        # livelihood
+        livelihood_data.extend(get_livelihood_data(plan_id))
     export_csv(
         maintenance_data,
         nrm_works_data,
@@ -122,33 +120,37 @@ def export_csv(
     livelihood_data,
     csv_path,
 ):
+    config = load_yuktdhara_config()
     rows = []
 
     # maintenance rows
     for item in maintenance_data:
-        rows.append(format_maintenance_row(item))
+        rows.append(build_row(item, "maintenance", config))
     logger.info("Maintenance demand is added")
 
     # nrm rows
     for item in nrm_data:
-        rows.append(format_nrm_row(item))
+        rows.append(build_row(item, "nrm", config))
     logger.info("New demand is added")
 
     # livelihood rows
     for item in livelihood_data:
-        rows.append(format_livelihood_row(item))
+        rows.append(build_row(item, "livelihood", config))
     logger.info("Livelihood demand is added")
 
     file_name = csv_path
 
     # write csv
     with open(file_name, "w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=CSV_COLUMNS)
+        writer = csv.DictWriter(csvfile, fieldnames=config["columns"])
 
         writer.writeheader()
         writer.writerows(rows)
 
     logger.info(f"CSV exported successfully: {file_name}")
+
+
+DEFAULT_ICON = "https://maps.google.com/mapfiles/kml/pushpin/blue-pushpin.png"
 
 
 def csv_to_kml(csv_file, output_kml):
@@ -193,6 +195,23 @@ def csv_to_kml(csv_file, output_kml):
             continue
 
         kml_parts.append("<Placemark>")
+        work_demand = str(row.get("Work demand", "")).strip()
+        icon_href = ICON_MAP.get(work_demand, DEFAULT_ICON)
+
+        kml_parts.append("""
+        <Style>
+            <IconStyle>
+                <scale>1.2</scale>
+                <Icon>
+        """)
+
+        kml_parts.append(f"<href>{escape(icon_href)}</href>")
+
+        kml_parts.append("""
+                </Icon>
+            </IconStyle>
+        </Style>
+        """)
 
         # extended data
         kml_parts.append('<ExtendedData><SchemaData schemaUrl="#yuktdhara">')

@@ -4,6 +4,7 @@ from datetime import date, datetime
 
 from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
+from django.templatetags.i18n import language
 from django.urls import reverse
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -15,6 +16,7 @@ from rest_framework.response import Response
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 from utilities.logger import setup_logger
+from nrm_app.settings import BASE_API_URL
 
 from .gen_dpr import (
     get_plan_details,
@@ -66,6 +68,7 @@ from .gen_mws_report import (
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
+    get_intersecting_village_ids,
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
@@ -81,6 +84,34 @@ from .gen_tehsil_report import (
     get_fishery_water_potential_data,
     get_agroforestry_transition_data,
 )
+from .gen_village_report import (
+    get_village_polygon_and_info,
+    get_development_data,
+    get_block_development_data,
+    calculate_demographics,
+    get_basic_infrastructure,
+    get_health_and_wash,
+    get_education_institutions,
+    get_financial_inclusion,
+    get_welfare_inclusion,
+    get_community_institutes,
+    get_livelihood_diversification,
+    get_livestock_management,
+    get_irrigation_Infra,
+    get_agri_support_service,
+    get_ecological_climate_resiliance,
+    get_all_villages_basic_infrastructure,
+    get_all_villages_health_and_wash,
+    get_all_villages_education_institutions,
+    get_all_villages_financial_inclusion,
+    get_all_villages_welfare_inclusion,
+    get_all_villages_community_institutes,
+    get_all_villages_livestock_management,
+    get_all_villages_irrigation_infra,
+    get_all_villages_agri_support_service,
+    get_all_villages_ecological_climate_resiliance,
+    get_mwses_ids,
+)
 from .gen_report_download import render_pdf_with_firefox
 from .utils import validate_email, transform_name
 from .tasks import generate_dpr_task
@@ -88,7 +119,8 @@ import tempfile
 import os
 from .generate_yuktdhara_format import csv_to_kml, fetch_data
 import zipfile
-from django.http import FileResponse
+from geoadmin.models import GramPanchayat
+from plans.models import PlanApp
 
 state_param = openapi.Parameter(
     "state",
@@ -137,6 +169,7 @@ def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
+        language = request.data.get("language")
         regenerate = request.data.get("regenerate", False)
 
         logger.info(
@@ -160,7 +193,9 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        generate_dpr_task.apply_async(args=[plan_id, email_id, regenerate], queue="dpr")
+        generate_dpr_task.apply_async(
+            args=[plan_id, email_id, language, regenerate], queue="dpr"
+        )
 
         return Response(
             {
@@ -301,10 +336,14 @@ def generate_mws_report(request):
 
         green_credits = get_green_credit_data(state, district, block, uid)
 
+        village_ids = get_intersecting_village_ids(state, district, block, uid)
+
         context = {
+            "state": state,
             "district": district,
             "block": block,
             "mws_id": uid,
+            "base_url": BASE_API_URL,
             "block_osm": parameter_block,
             "mws_osm": parameter_mws,
             "terrain_mws": terrain_mws,
@@ -366,6 +405,7 @@ def generate_mws_report(request):
             "factory_desc": factory_desc,
             "mining_desc": mining_desc,
             "green_credit_desc": green_credits,
+            "village_ids": json.dumps(village_ids),
         }
 
         # print("Api Processing End 1", datetime.now())
@@ -406,38 +446,38 @@ def generate_resource_report(request):
 @schema(None)
 @auth_free
 def download_report(request):
-    report_type = request.GET.get('report_type')
-    
+    report_type = request.GET.get("report_type")
+
     if not report_type:
         return HttpResponseBadRequest("Missing 'report_type' parameter")
-    
+
     # Define required params based on report type
-    if report_type == 'mws':
+    if report_type == "mws":
         required = ("state", "district", "block", "uid", "report_type")
-    elif report_type == 'resource':
+    elif report_type == "resource":
         required = ("district", "block", "plan_id", "plan_name", "report_type")
     else:
         return HttpResponseBadRequest(f"Unknown report_type: {report_type}")
-    
+
     missing = [k for k in required if k not in request.GET]
     if missing:
         return HttpResponseBadRequest(f"Missing query params: {', '.join(missing)}")
-    
-    if report_type == 'mws':
+
+    if report_type == "mws":
         report_html_url = (
             f"https://geoserver.core-stack.org/api/v1/generate_mws_report/"
             f"?state={request.GET.get('state')}&district={request.GET.get('district')}&block={request.GET.get('block')}&uid={request.GET.get('uid')}"
         )
         filename = f"mws_report_{request.GET.get('uid')}.pdf"
-    elif report_type == 'resource':
+    elif report_type == "resource":
         report_html_url = (
             f"https://geoserver.core-stack.org/api/v1/generate_resource_report/"
             f"?district={request.GET.get('district')}&block={request.GET.get('block')}&plan_id={request.GET.get('plan_id')}&plan_name={request.GET.get('plan_name')}"
         )
         filename = f"resource_report_{request.GET.get('plan_name')}.pdf"
-    
+
     pdf_bytes = render_pdf_with_firefox(report_html_url)
-    
+
     resp = HttpResponse(pdf_bytes, content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
@@ -557,6 +597,169 @@ def generate_tehsil_report(request):
     except Exception as e:
         logger.exception("Exception in generate_tehsil_report api :: ", e)
         return render(request, "error-page.html", {})
+
+
+@api_view(["GET"])
+@auth_free
+@schema(None)
+def generate_village_report(request):
+    """
+    Generate comprehensive village report with all sections.
+    """
+    state = request.GET.get("state")
+    district = request.GET.get("district")
+    block = request.GET.get("block")
+    village_id = request.GET.get("villageId")
+
+    if village_id == "0":
+        return render(
+            request,
+            "village-report-unavailable.html",
+            {
+                "state": state,
+                "district": district,
+                "block": block,
+            },
+        )
+
+    # Get village polygon and info from GeoServer
+    village_data = get_village_polygon_and_info(state, district, block, village_id)
+
+    # Get Development Scores
+    development_score = get_development_data(state, district, block, village_id)
+    block_development_score = get_block_development_data(state, district, block)
+
+    # Calculate demographic data with percentages
+    demographic_data = calculate_demographics(village_data["properties"])
+
+    # Calculate Basic Infra
+    basic_infra_data = get_basic_infrastructure(state, district, block, village_id)
+    # Convert scores to performance categories
+    basic_infra_performance = [
+        "Low" if score <= 0.33 else "High" if score > 0.66 else "Medium"
+        for score in basic_infra_data
+    ]
+
+    # Calculate Health and Wash
+    health_wash_data = get_health_and_wash(state, district, block, village_id)
+    health_wash_performance = [
+        # Maternal & Child Health (High / Low only)
+        "High" if health_wash_data[0] > 0.66 else "Low",
+        # Water & Sanitation (High / Medium / Low)
+        (
+            "Low"
+            if health_wash_data[1] <= 0.33
+            else "High" if health_wash_data[1] > 0.66 else "Medium"
+        ),
+    ]
+
+    # Calculate Education Institutions
+    education_data = get_education_institutions(state, district, block, village_id)
+
+    # Calculate Financial Inclusion
+    finance_data = get_financial_inclusion(state, district, block, village_id)
+
+    # Calculate Welfare
+    welfare_data = get_welfare_inclusion(state, district, block, village_id)
+
+    # Calculate Community Institutions
+    community_data = get_community_institutes(state, district, block, village_id)
+
+    # Livelihood Diversification
+    livelihood_data = get_livelihood_diversification(state, district, block, village_id)
+
+    # Livestock Management
+    livestock_data = get_livestock_management(state, district, block, village_id)
+
+    # Irrigation data
+    irrigation_data = get_irrigation_Infra(state, district, block, village_id)
+
+    # Agriculture Support
+    agri_support_data = get_agri_support_service(state, district, block, village_id)
+
+    # Climate Resiliance
+    climate_resiliance_data = get_ecological_climate_resiliance(
+        state, district, block, village_id
+    )
+
+    # Map Data
+    basic_infra_map = get_all_villages_basic_infrastructure(state, district, block)
+    health_wash_map = get_all_villages_health_and_wash(state, district, block)
+    education_map = get_all_villages_education_institutions(state, district, block)
+    financial_map = get_all_villages_financial_inclusion(state, district, block)
+    welfare_map = get_all_villages_welfare_inclusion(state, district, block)
+    community_map = get_all_villages_community_institutes(state, district, block)
+    livestock_map = get_all_villages_livestock_management(state, district, block)
+    irrigation_infra_map = get_all_villages_irrigation_infra(state, district, block)
+    agri_support_map = get_all_villages_agri_support_service(state, district, block)
+    climate_resiliance_map = get_all_villages_ecological_climate_resiliance(
+        state, district, block
+    )
+
+    mws_ids = get_mwses_ids(state, district, block, village_id)
+    mws_pattern_intensity = get_pattern_intensity(state, district, block)
+
+    # Build context for template
+    context = {
+        # Location info
+        "state": state,
+        "district": district,
+        "block": block,
+        "village_id": village_id,
+        "base_url": BASE_API_URL,
+        "village_name": village_data["village_name"],
+        "gram_panchayat_name": village_data["gram_panchayat_name"],
+        "area_hectares": village_data["area_hectares"],
+        "village_polygon": json.dumps(village_data["village_polygon"]),
+        # RADAR CHART DATA
+        "village_scores": json.dumps(development_score),
+        "block_average_scores": json.dumps(block_development_score),
+        # DEMOGRAPHIC DATA
+        "demographic_data": demographic_data,
+        # BASIC INFRASTRUCTURE DATA
+        "basic_infra_data": json.dumps(basic_infra_data),
+        "basic_infra_performance": basic_infra_performance,
+        # HEALTH AND WASH DATA
+        "health_wash_data": json.dumps(health_wash_data),
+        "health_wash_performance": health_wash_performance,
+        # Education Data
+        "education_data": json.dumps(education_data),
+        # Finance Data
+        "finance_data": json.dumps(finance_data),
+        # Welfare Inclusion
+        "welfare_data": json.dumps(welfare_data),
+        # Community Institutions
+        "community_data": json.dumps(community_data),
+        # Livelihood Diversification
+        "livelihood_data": json.dumps(livelihood_data),
+        # Livestock Management
+        "livestock_data": json.dumps(livestock_data),
+        # Irrigation Data
+        "irrigation_data": json.dumps(irrigation_data),
+        # Agri Support Data
+        "agri_support_data": json.dumps(agri_support_data),
+        # Climate Data
+        "climate_resiliance_data": json.dumps(climate_resiliance_data),
+        "village_polygon": json.dumps(village_data["village_polygon"]),
+        "basic_infra_map": json.dumps(basic_infra_map),
+        "health_wash_map": json.dumps(health_wash_map),
+        "education_map": json.dumps(education_map),
+        "financial_map": json.dumps(financial_map),
+        "welfare_map": json.dumps(welfare_map),
+        "community_map": json.dumps(community_map),
+        "livestock_map": json.dumps(livestock_map),
+        "irrigation_infra_map": json.dumps(irrigation_infra_map),
+        "agri_support_map": json.dumps(agri_support_map),
+        "climate_resiliance_map": json.dumps(climate_resiliance_map),
+        "mws_ids": json.dumps(mws_ids),
+        "pattern_intensity": json.dumps(mws_pattern_intensity["intensity"]),
+        "mws_active_patterns": json.dumps(mws_pattern_intensity["mws_active_patterns"]),
+        "pattern_display_mapping": json.dumps(
+            mws_pattern_intensity["pattern_display_mapping"]
+        ),
+    }
+
+    return render(request, "village-report.html", context)
 
 
 # ---------------------------------------------------------------------------
@@ -847,31 +1050,87 @@ def dpr_update_demand_status(request, plan_id):
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
 @schema(None)
 def export_yuktdhara(request):
+    gp_id = request.query_params.get("gp_id")
 
-    plan_id = request.query_params.get("plan_id")
+    if not gp_id:
+        return Response(
+            {
+                "success": False,
+                "message": "gp_id is required",
+            },
+            status=400,
+        )
+
+    try:
+        gp = GramPanchayat.objects.get(gram_panchayat_code=gp_id)
+
+    except GramPanchayat.DoesNotExist:
+        return Response(
+            {
+                "success": False,
+                "message": "Gram Panchayat not found",
+            },
+            status=404,
+        )
+
+    plans_exists = PlanApp.objects.filter(
+        gp_id=gp_id,
+        enabled=True,
+    ).exists()
+
+    if not plans_exists:
+        return Response(
+            {
+                "success": False,
+                "message": "No plans mapped with this Gram Panchayat",
+            },
+            status=404,
+        )
+
+    gp_name = gp.gram_panchayat_name
 
     with tempfile.TemporaryDirectory() as temp_dir:
 
-        csv_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.csv")
+        csv_path = os.path.join(
+            temp_dir,
+            f"Yuktdhara_{gp_name}.csv",
+        )
 
-        kml_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.kml")
+        kml_path = os.path.join(
+            temp_dir,
+            f"Yuktdhara_{gp_name}.kml",
+        )
 
-        zip_path = os.path.join(temp_dir, f"Yuktdhara_{plan_id}.zip")
+        zip_path = os.path.join(
+            temp_dir,
+            f"Yuktdhara_{gp_name}.zip",
+        )
 
-        fetch_data(plan_id, csv_path)
+        fetch_data(gp_id, csv_path)
 
         csv_to_kml(csv_path, kml_path)
 
         with zipfile.ZipFile(zip_path, "w") as zipf:
 
-            zipf.write(csv_path, arcname=os.path.basename(csv_path))
+            zipf.write(
+                csv_path,
+                arcname=os.path.basename(csv_path),
+            )
 
-            zipf.write(kml_path, arcname=os.path.basename(kml_path))
+            zipf.write(
+                kml_path,
+                arcname=os.path.basename(kml_path),
+            )
 
         with open(zip_path, "rb") as f:
-            response = HttpResponse(f.read(), content_type="application/zip")
+
+            response = HttpResponse(
+                f.read(),
+                content_type="application/zip",
+            )
+
             response["Content-Disposition"] = (
-                f"attachment; " f'filename="Yuktdhara_{plan_id}.zip"'
+                f'attachment; filename="Yuktdhara_{gp_name}.zip"'
             )
 
             return response
