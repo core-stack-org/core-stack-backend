@@ -1,0 +1,114 @@
+schema_version: 1
+description: >
+  Single source of truth for building pan-India GeoPackages and Earth Engine
+  assets from the local dataset pipelines. Step 1 runs the same pipeline code
+  the tehsil/district APIs execute for every scope in cs_admin_standard.gpkg.
+  Step 2 merges the recorded per-scope GeoPackages into pan-India GeoPackages
+  without changing their structure. Step 3 exports each merged GeoPackage to a
+  tab-delimited table with one GeoJSON geometry column, stages it to GCS, and
+  starts an Earth Engine table-ingestion task from a manifest.
+
+admin:
+  gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  layer: cs_admin_standard
+
+run:
+  # Scope level used to enumerate pipeline requests: tehsil or district.
+  scope_level: tehsil
+  state_file: data/pan_india_gee_assets/state/run_state.jsonl
+  log_file: logs/pan_india_gee_assets.log
+  # Standard API request body fields applied to every enumerated scope.
+  # GeoServer, GeoLibre, and Layer DB registration stay off for asset builds;
+  # use_pregenerated reuses each pipeline's own cached bundle when valid.
+  request_defaults:
+    sync_to_geoserver: false
+    register_layers: false
+    use_pregenerated: true
+    outputs:
+      gpkg: true
+      readme: false
+      metadata: false
+      geoserver: false
+      geolibre: false
+
+pipelines:
+  facilities:
+    entry: computing.misc.facilities.pipeline:run_facilities_pipeline
+  antyodaya:
+    entry: computing.misc.antyodaya.pipeline:run_antyodaya_pipeline
+  livestocks:
+    entry: computing.misc.livestocks.pipeline:run_livestocks_pipeline
+
+merge:
+  output_dir: data/pan_india_gee_assets/outputs
+  summary_yaml: data/pan_india_gee_assets/outputs/pan_india_merge_summary.yaml
+
+# Each asset merges one recorded per-scope layer across all successful runs
+# into one pan-India GeoPackage layer, then ingests it into Earth Engine
+# unchanged. `result_path_key` selects the GeoPackage path recorded in the
+# run-state row; `source_layer` selects the layer inside that GeoPackage
+# (`__scoped__` means the per-scope layer_name recorded by the pipeline).
+assets:
+  cs_village_facility_proximity:
+    pipeline: facilities
+    result_path_key: gpkg_path
+    source_layer: __scoped__
+    gpkg: cs_village_facility_proximity.gpkg
+    layer: cs_village_facility_proximity
+    asset_id: projects/corestack-datasets/assets/datasets/cs_village_facility_proximity
+
+  cs_pan_india_facilities:
+    pipeline: facilities
+    result_path_key: facility_points_gpkg_path
+    source_layer: tehsil_facility_collection
+    gpkg: cs_pan_india_facilities.gpkg
+    layer: tehsil_facility_collection
+    asset_id: projects/corestack-datasets/assets/datasets/cs_pan_india_facilities
+
+  cs_village_nearest_facilities:
+    pipeline: facilities
+    result_path_key: facility_points_gpkg_path
+    source_layer: village_nearest_facility_collection
+    gpkg: cs_pan_india_facilities.gpkg
+    layer: village_nearest_facility_collection
+    asset_id: projects/corestack-datasets/assets/datasets/cs_village_nearest_facilities
+
+  cs_antyodaya_2020:
+    pipeline: antyodaya
+    result_path_key: gpkg_path
+    source_layer: __scoped__
+    gpkg: cs_antyodaya_2020.gpkg
+    layer: cs_antyodaya_2020
+    asset_id: projects/corestack-datasets/assets/datasets/cs_antyodaya_2020
+
+  cs_village_livestock_census_20:
+    pipeline: livestocks
+    result_path_key: gpkg_path
+    source_layer: __scoped__
+    gpkg: cs_village_livestock_census_20.gpkg
+    layer: cs_village_livestock_census_20
+    asset_id: projects/corestack-datasets/assets/datasets/cs_village_livestock_census_20
+
+gee:
+  service_account_json: data/gee_confs/core-stack-learn-818963fa8f26.json
+  outputs:
+    directory: data/pan_india_gee_assets/gee
+    local_extension: .tsv
+    manifest_dir: data/pan_india_gee_assets/gee/manifests
+    build_summary_yaml: data/pan_india_gee_assets/gee/pan_india_gee_build_summary.yaml
+    upload_summary_yaml: data/pan_india_gee_assets/gee/pan_india_gee_upload_summary.yaml
+    status_summary_yaml: data/pan_india_gee_assets/gee/pan_india_gee_status.yaml
+    public_summary_yaml: data/pan_india_gee_assets/gee/pan_india_gee_public_summary.yaml
+    verify_summary_yaml: data/pan_india_gee_assets/gee/pan_india_gee_verify_summary.yaml
+    log_file: logs/pan_india_gee_ingest.log
+  upload:
+    gcs_bucket: core_stack
+    gcs_prefix: gee/pan_india_assets
+    gcs_object_extension: .csv
+    csv_delimiter: "\t"
+    csv_qualifier: '"'
+    crs: EPSG:4326
+    geodesic: false
+    max_vertices: 0
+    max_error_meters: 1.0
+    chunk_size_mb: 64
