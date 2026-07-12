@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 from xml.sax.saxutils import escape
 
 import requests
@@ -324,50 +324,87 @@ def publish_gpkg_layer(
 ) -> GeoServerPublishResult:
     """Publish a local GeoPackage layer to GeoServer and verify WFS output."""
 
+    results = publish_gpkg_layers(
+        gpkg_path,
+        workspace=workspace,
+        store_name=layer_name,
+        layers={layer_name: source_layer},
+        overwrite=overwrite,
+    )
+    return results[layer_name]
+
+
+def publish_gpkg_layers(
+    gpkg_path: str | Path,
+    *,
+    workspace: str,
+    store_name: str,
+    layers: Mapping[str, str | None],
+    overwrite: bool = True,
+) -> dict[str, GeoServerPublishResult]:
+    """Publish several layers from one GeoPackage through one datastore.
+
+    ``layers`` maps each public GeoServer feature-type name to its source
+    GeoPackage layer. The package is uploaded once, then every feature type is
+    configured and independently verified through WFS.
+    """
+
     gpkg_path = Path(gpkg_path)
     if not gpkg_path.exists():
         raise GeoServerPublishError(f"GeoPackage does not exist: {gpkg_path}")
+    if not layers:
+        raise GeoServerPublishError("At least one GeoPackage layer is required")
 
-    source_layer = _resolve_source_layer(gpkg_path, source_layer)
-    source_properties = _gpkg_columns(gpkg_path, source_layer)
-    source_feature_count = _gpkg_row_count(gpkg_path, source_layer)
-    store_name = layer_name
+    sources = {
+        str(layer_name): _resolve_source_layer(gpkg_path, source_layer)
+        for layer_name, source_layer in layers.items()
+    }
+    profiles = {
+        layer_name: (
+            _gpkg_columns(gpkg_path, source_layer),
+            _gpkg_row_count(gpkg_path, source_layer),
+        )
+        for layer_name, source_layer in sources.items()
+    }
 
     ensure_workspace_ready(workspace)
     if overwrite:
         delete_datastore(workspace, store_name)
 
     upload_response = _upload_gpkg_store(gpkg_path, workspace=workspace, store_name=store_name)
-    publish_response = _publish_feature_type(
-        workspace=workspace,
-        store_name=store_name,
-        source_layer=source_layer,
-        layer_name=layer_name,
-    )
-    verification = verify_wfs_layer(
-        workspace=workspace,
-        layer_name=layer_name,
-        expected_properties=source_properties,
-        expected_count=source_feature_count,
-    )
-
-    return GeoServerPublishResult(
-        layer_name=layer_name,
-        workspace=workspace,
-        store_name=store_name,
-        gpkg_path=gpkg_path.as_posix(),
-        source_layer=source_layer,
-        published_feature_type=layer_name,
-        upload_response=upload_response,
-        publish_response=publish_response,
-        wfs_url=geoserver_wfs_url(workspace, layer_name),
-        wms_url=geoserver_wms_url(workspace, layer_name),
-        wfs_verified=True,
-        source_feature_count=source_feature_count,
-        wfs_feature_count=verification["feature_count"],
-        wfs_properties=verification["properties"],
-        property_count=len(verification["properties"]),
-    )
+    results: dict[str, GeoServerPublishResult] = {}
+    for layer_name, source_layer in sources.items():
+        source_properties, source_feature_count = profiles[layer_name]
+        publish_response = _publish_feature_type(
+            workspace=workspace,
+            store_name=store_name,
+            source_layer=source_layer,
+            layer_name=layer_name,
+        )
+        verification = verify_wfs_layer(
+            workspace=workspace,
+            layer_name=layer_name,
+            expected_properties=source_properties,
+            expected_count=source_feature_count,
+        )
+        results[layer_name] = GeoServerPublishResult(
+            layer_name=layer_name,
+            workspace=workspace,
+            store_name=store_name,
+            gpkg_path=gpkg_path.as_posix(),
+            source_layer=source_layer,
+            published_feature_type=layer_name,
+            upload_response=upload_response,
+            publish_response=publish_response,
+            wfs_url=geoserver_wfs_url(workspace, layer_name),
+            wms_url=geoserver_wms_url(workspace, layer_name),
+            wfs_verified=True,
+            source_feature_count=source_feature_count,
+            wfs_feature_count=verification["feature_count"],
+            wfs_properties=verification["properties"],
+            property_count=len(verification["properties"]),
+        )
+    return results
 
 
 def register_layer(

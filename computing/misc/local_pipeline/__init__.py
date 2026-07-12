@@ -3,7 +3,7 @@
 The modules in this package are intentionally small and dependency-light. They
 support runtime pipelines that read only the requested administrative scope,
 use SQLite indexes in local GeoPackages, and write standard output bundles for
-API, GeoServer, STAC, EDA, and Excel handoff use.
+API, GeoServer, GeoLibre, metadata, and GIS handoff use.
 """
 
 from .admin import AdminScope, CSAdminSource

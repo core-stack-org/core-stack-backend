@@ -57,7 +57,7 @@ flowchart TD
     K --> L[Cross-category configuration analysis]
     L --> M[Profiles: risks, bottlenecks, opportunities]
     M --> N[Outputs: normalized values + cluster labels]
-    N --> O[Presentation: reports, GeoPackages, CSVs, STAC fragments]
+    N --> O[Presentation: reports, GeoPackages, metadata, live maps]
     O --> P[Visualization: boxplots, dashboards, GEE Explorer App]
 ```
 
@@ -180,7 +180,7 @@ flowchart TD
     D --> E[Fetch Antyodaya rows by village_id]
     E --> F[Validate category clusters and value columns]
     F --> G[Join attributes to admin rows]
-    G --> H[Write GPKG, CSV, README, metadata with column dictionary and EDA, STAC fragment]
+    G --> H[Write GPKG, README, metadata, and one links manifest]
     H --> I{GeoServer enabled?}
     I -- yes --> J[Publish local GPKG]
     I -- no --> K[Return local output bundle]
@@ -198,11 +198,10 @@ request or through `default_outputs` in `antyodaya_pipeline.yaml`):
 
 | Artifact | Contents |
 | --- | --- |
-| `<layer>.csv` | Report CSV: admin columns, `antyodaya_status`, all `*_cat_cluster` classes, all `*_cat_value` indices, then the raw survey columns. Feature-level columns are excluded for readability. |
 | `<layer>.gpkg` | Village geometries with the full attribute set, including `*_feat_value` feature columns for deeper analysis. |
-| `README.md` | Run summary with a column reference table (column, type, description). |
-| `<layer>.run_metadata.json` | Request, effective outputs, per-output column dictionary (`column`, `description`, `datatype`) and EDA summary. |
-| `<layer>.stac_fragment.json` | STAC item fragment for catalog integration. |
+| `README.md` | One run summary with a column reference table. |
+| `<layer>.run_metadata.json` | One metadata file with column descriptions, `column_rename_mapping`, and EDA. |
+| `<layer>.links.json` | One manifest containing local, GeoServer, and GeoLibre links. |
 | `antyodaya_2020_mapping.yaml` | Copy of the category/feature/raw-column mapping for provenance. |
 | GeoServer layer | Published from the GPKG when enabled. |
 
@@ -226,7 +225,7 @@ POST /api/v1/generate_antyodaya/
 # Structured body, for any scope level and per-artifact output control
 POST /api/v1/generate_antyodaya/
 {"scope": {"level": "district", "state_name": "Jharkhand", "district_name": "Ranchi"},
- "outputs": {"stac": false},
+ "outputs": {"metadata": true},
  "publish": {"sync_to_geoserver": false}}
 
 # CLI

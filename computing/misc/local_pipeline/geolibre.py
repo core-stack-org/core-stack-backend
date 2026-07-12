@@ -28,6 +28,7 @@ import requests
 
 from .outputs import slug, utc_now_text
 from .schema import coerce_bool
+from .unicode import normalize_unicode_data, normalize_unicode_text
 
 
 GEOLIBRE_REPOSITORY = "https://github.com/opengeos/GeoLibre"
@@ -636,6 +637,7 @@ def create_geolibre_outputs(
     output_name: str,
     scope: Any,
     geoserver: Mapping[str, Any],
+    geoserver_layers: Iterable[Mapping[str, Any]] | None = None,
     configured: Mapping[str, Any] | None = None,
     requested: Mapping[str, Any] | None = None,
     s3_client: Any = None,
@@ -651,9 +653,22 @@ def create_geolibre_outputs(
     started = time.perf_counter()
     try:
         options = GeoLibreOptions.from_mappings(configured, requested)
-        wfs_url = _optional_text(geoserver.get("wfs_url"))
-        workspace = _optional_text(geoserver.get("workspace"))
-        layer_name = _optional_text(geoserver.get("layer_name"))
+        declared_layers = [geoserver, *(list(geoserver_layers or []))]
+        unique_layers: list[Mapping[str, Any]] = []
+        seen_qualified_names: set[str] = set()
+        for declared in declared_layers:
+            declared_workspace = _optional_text(declared.get("workspace"))
+            declared_name = _optional_text(declared.get("layer_name"))
+            if not (declared_workspace and declared_name):
+                continue
+            qualified_name = f"{declared_workspace}:{declared_name}"
+            if qualified_name not in seen_qualified_names:
+                unique_layers.append(declared)
+                seen_qualified_names.add(qualified_name)
+        primary = unique_layers[0] if unique_layers else geoserver
+        wfs_url = _optional_text(primary.get("wfs_url"))
+        workspace = _optional_text(primary.get("workspace"))
+        layer_name = _optional_text(primary.get("layer_name"))
         if not (wfs_url and workspace and layer_name):
             raise GeoLibreIntegrationError("GeoServer result is missing wfs_url, workspace, or layer_name")
         current_qualified_name = f"{workspace}:{layer_name}"
@@ -664,23 +679,30 @@ def create_geolibre_outputs(
             available = []
             warnings.append(f"WFS capabilities discovery failed: {exc.__class__.__name__}: {str(exc)[:240]}")
 
-        selected = select_scope_feature_types(
+        available_by_name = {item.qualified_name: item for item in available}
+        selected: list[GeoServerFeatureType] = []
+        for declared in unique_layers:
+            declared_workspace = str(declared["workspace"])
+            declared_name = str(declared["layer_name"])
+            qualified_name = f"{declared_workspace}:{declared_name}"
+            selected.append(
+                available_by_name.get(qualified_name)
+                or GeoServerFeatureType(
+                    qualified_name=qualified_name,
+                    workspace=declared_workspace,
+                    layer_name=declared_name,
+                    title=declared_name.replace("_", " ").title(),
+                )
+            )
+        discovered = select_scope_feature_types(
             available,
             current_qualified_name=current_qualified_name,
             scope=scope,
             include_scope_layers=options.include_tehsil_layers,
             max_layers=options.max_layers,
         )
-        if not any(item.qualified_name == current_qualified_name for item in selected):
-            selected.insert(
-                0,
-                GeoServerFeatureType(
-                    qualified_name=current_qualified_name,
-                    workspace=workspace,
-                    layer_name=layer_name,
-                    title=layer_name.replace("_", " ").title(),
-                ),
-            )
+        selected_names = {item.qualified_name for item in selected}
+        selected.extend(item for item in discovered if item.qualified_name not in selected_names)
         selected = selected[: options.max_layers]
         if options.include_tehsil_layers and len(selected) >= options.max_layers:
             warnings.append(f"GeoServer scope discovery was capped at {options.max_layers} layers")
@@ -699,8 +721,16 @@ def create_geolibre_outputs(
         base_name = slug(output_name)
         project_path = directory / f"{base_name}.geolibre.json"
         html_path = directory / f"{base_name}.geolibre.html"
-        project_path.write_text(json.dumps(project, indent=2, ensure_ascii=False) + "\n")
-        html_path.write_text(build_clickable_html(project, title=title, viewer_url=options.viewer_url))
+        project_path.write_text(
+            json.dumps(normalize_unicode_data(project), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        html_path.write_text(
+            normalize_unicode_text(
+                build_clickable_html(project, title=title, viewer_url=options.viewer_url)
+            ),
+            encoding="utf-8",
+        )
 
         try:
             aws = publish_artifacts_to_s3(

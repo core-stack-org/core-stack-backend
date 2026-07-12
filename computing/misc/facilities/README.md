@@ -103,7 +103,7 @@ flowchart TD
     E --> F[Build KD-tree by L3 facility class]
     F --> G[Find nearest facility per village and L3 class]
     G --> H[Collapse nearest L3 rows into L2 category distances]
-    H --> I[Write CSV, GPKG, README, metadata with column dictionary and EDA, STAC]
+    H --> I[Write village GPKG, two-layer points GPKG, README, metadata, links]
     I --> J{GeoServer enabled?}
     J -- yes --> K[Publish local GPKG]
     J -- no --> L[Return local output bundle]
@@ -113,19 +113,19 @@ flowchart TD
 
 | Artifact | Contents |
 | --- | --- |
-| `<layer>.csv` | Report CSV: admin columns, `facilities_status`, then for each L2 group its `*_cat_distance_km` column followed by the `nearest_<facility>` detail and `nearest_<facility>_distance_km` pair for each member class. |
-| `<layer>.gpkg` | Village geometries plus the full machine columns (`l2_*`, `l3_*` distances, facility identifiers, inside-scope flags) for GIS and re-processing. |
-| `README.md` | Run summary with a column reference table (column, type, description). |
-| `<layer>.run_metadata.json` | Request, effective outputs, per-output column dictionary (`column`, `description`, `datatype`) and EDA summary for the CSV, GPKG, inventory, and nearest frames. |
-| `<layer>.stac_fragment.json` | STAC item fragment for catalog integration. |
-| GeoServer layer | Published from the GPKG when enabled. |
+| `<layer>.gpkg` | Village properties: geometries plus the full machine columns (`l2_*`, `l3_*` distances, facility identifiers, inside-scope flags). |
+| `<layer>.facility_points.gpkg` | Exactly two point layers: `tehsil_facility_collection` and `village_nearest_facility_collection`. |
+| `README.md` | One run summary with column reference and optional rename targets. |
+| `<layer>.run_metadata.json` | One metadata file with request, effective outputs, per-layer column descriptions, `column_rename_mapping`, and EDA. |
+| `<layer>.links.json` | One manifest containing local paths plus every GeoServer and GeoLibre link. |
+| GeoServer layers | Village properties and both point layers, published as three separately addressable feature types. |
 
-The report CSV column list is not hard-coded: it is derived from the
-classification structure (group order → category column → member classes),
-with names overridable through `output_contract.l2_distance_columns` in
+Machine-to-report rename suggestions are derived from the classification
+structure and recorded in metadata without changing stable GeoServer fields.
+Targets are overridable through `output_contract.l2_distance_columns` in
 `facilities_pipeline.yaml` (for example `apmc_access` publishes as
 `market_cat_distance_km`). Column descriptions come from the description
-templates in `facility_classifications.yaml`, so CSV, README, and metadata
+templates in `facility_classifications.yaml`, so README and metadata
 always agree.
 
 The `facilities_status` column sits right after the admin columns in every
@@ -172,7 +172,7 @@ POST /api/v1/generate_facilities_proximity/
 POST /api/v1/generate_facilities_proximity/
 {"scope": {"level": "district", "state_name": "MADHYA PRADESH",
            "district_name": "DAMOH"},
- "outputs": {"stac": false},
+ "outputs": {"metadata": true},
  "publish": {"sync_to_geoserver": true}}
 
 # CLI
@@ -182,6 +182,6 @@ python -m computing.misc.facilities --state "MADHYA PRADESH" --district DAMOH --
 python -m computing.misc.facilities --request-file requests.yaml
 ```
 
-Outputs (`gpkg`, `csv`, `readme`, `metadata`, `stac`, `geoserver`) can each be
+Outputs (`gpkg`, `readme`, `metadata`, `geoserver`, `geolibre`) can each be
 toggled per request under `outputs`, or by default in
 `facilities_pipeline.yaml` `default_outputs`.

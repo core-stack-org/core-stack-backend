@@ -9,9 +9,9 @@ pipelines:
 - Standard admin scope resolution from `cs_admin_standard.gpkg`.
 - CSV-to-SQLite sidecars for repeated keyed lookups.
 - Standard request parsing for API, CLI, and batch execution.
-- Standard output bundle writers for GPKG, CSV, README, run metadata (with
-  per-output column dictionary and EDA), STAC fragments, and GeoServer link
-  outputs.
+- Standard output bundle writers for Unicode-normalized GPKG, README, run
+  metadata (column descriptions, optional rename mappings, and EDA), and one
+  JSON links manifest.
 - GeoLibre projects and clickable HTML maps backed by live GeoServer WFS
   layers, with optional non-redundant S3 publication.
 
@@ -22,10 +22,11 @@ flowchart TD
     C --> D[Indexed GeoPackage read]
     D --> E[Dataset-specific pipeline]
     E --> F[OutputBundle writers]
-    F --> G[Optional GeoServer publish]
+    F --> G[Publish and verify GeoServer WFS]
     G --> H[Default local GeoLibre project and HTML]
     H --> I[Optional S3 project publication]
-    H --> J[Layer DB registration with GeoLibre links]
+    H --> J[One local and live links manifest]
+    J --> K[Layer DB registration]
 ```
 
 Runtime scripts in `computing/misc` should not use `pyogrio`. This package reads

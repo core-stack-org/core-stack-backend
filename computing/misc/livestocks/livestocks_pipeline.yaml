@@ -24,10 +24,8 @@ output:
 
 default_outputs:
   gpkg: true
-  csv: true
   readme: true
   metadata: true
-  stac: true
   geoserver: true
 
 # `status_column` places a per-village data-availability marker right after
@@ -37,7 +35,7 @@ default_outputs:
 output_contract:
   status_column:
     name: livestock_status
-    outputs: [csv, gpkg, geoserver]
+    outputs: [gpkg, geoserver]
 
 source_location_columns:
   - village_code

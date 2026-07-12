@@ -150,7 +150,7 @@ flowchart TD
     D --> E[Fetch livestock rows by village_code]
     E --> F[Validate non-negative count columns]
     F --> G[Derive species totals and group totals]
-    G --> H[Write GPKG, CSV, README, metadata with column dictionary and EDA, STAC fragment]
+    G --> H[Write GPKG, README, metadata, and one links manifest]
     H --> I{GeoServer enabled?}
     I -- yes --> J[Publish local GPKG]
     I -- no --> K[Return local output bundle]
@@ -163,11 +163,10 @@ The large source CSV and generated SQLite sidecar remain under ignored
 
 | Artifact | Contents |
 | --- | --- |
-| `<layer>.csv` | Report CSV with admin columns, `livestock_status`, and animal totals in the fixed order above. |
 | `<layer>.gpkg` | Village geometries with totals plus female/male counts interleaved per animal. |
-| `README.md` | Run summary with a column reference table (column, type, description). |
-| `<layer>.run_metadata.json` | Request, effective outputs, per-output column dictionary (`column`, `description`, `datatype`) and EDA summary. |
-| `<layer>.stac_fragment.json` | STAC item fragment for catalog integration. |
+| `README.md` | One run summary with a column reference table. |
+| `<layer>.run_metadata.json` | One metadata file with column descriptions, `column_rename_mapping`, and EDA. |
+| `<layer>.links.json` | One manifest containing local, GeoServer, and GeoLibre links. |
 | GeoServer layer | Published from the GPKG when enabled. |
 
 The `livestock_status` column sits right after the admin columns in every
@@ -187,7 +186,7 @@ POST /api/v1/generate_livestocks/
 # Structured body, for any scope level and per-artifact output control
 POST /api/v1/generate_livestocks/
 {"scope": {"level": "district", "state_name": "Jharkhand", "district_name": "Dumka"},
- "outputs": {"stac": false},
+ "outputs": {"metadata": true},
  "publish": {"sync_to_geoserver": false}}
 
 # CLI

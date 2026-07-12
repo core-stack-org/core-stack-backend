@@ -55,14 +55,19 @@ from computing.misc.local_pipeline.outputs import (
     stable_hash,
     utc_now_text,
 )
-from computing.misc.local_pipeline.publish import publish_gpkg_layer, register_layer
+from computing.misc.local_pipeline.publish import (
+    publish_gpkg_layer,
+    publish_gpkg_layers,
+    register_layer,
+)
+from computing.misc.local_pipeline.unicode import normalize_unicode_frame
 from nrm_app.celery import app
 from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE
 
 
 CONFIG_PATH = Path(__file__).with_name("facilities_pipeline.yaml")
 ALGORITHM = "local-facilities-live-proximity"
-ALGORITHM_VERSION = "1.3"
+ALGORITHM_VERSION = "2.0"
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -485,7 +490,7 @@ def _machine_output_columns(classification: Mapping[str, Any]) -> list[str]:
     The `l2_*`/`l3_*` columns are produced by pivot tables, which sort their
     columns alphabetically. Ordering them here keeps the GeoPackage (and the
     GeoServer feature type built from it) in the same group-then-member order
-    as the report CSV.
+    as the documented classification contract.
     """
 
     l3_by_l2 = _l3_classes_by_group(classification)
@@ -558,6 +563,10 @@ def _machine_column_describer(classification: Mapping[str, Any], config: Mapping
     def describe(name: str) -> str | None:
         if name in descriptions:
             return descriptions[name]
+        if name == "facilities_layer_kind":
+            return "Facilities output role for this feature."
+        if name == "title":
+            return "Human-readable feature title used by map viewers."
         for prefix, suffix, template in patterns:
             if name.startswith(prefix) and name.endswith(suffix):
                 stem = name[len(prefix) : -len(suffix)]
@@ -566,6 +575,88 @@ def _machine_column_describer(classification: Mapping[str, Any], config: Mapping
         return None
 
     return describe
+
+
+def _machine_column_renamer(classification: Mapping[str, Any], config: Mapping[str, Any]):
+    """Return optional report-facing names without changing stored fields."""
+
+    l2_targets: dict[str, str] = {}
+    for group in classification.get("l2_groups", []):
+        group_slug = slug(group["key"])
+        l2_targets[f"l2_{group_slug}_distance_km"] = _l2_output_column(group, config)
+        l2_targets[f"l2_{group_slug}_facility_uid"] = f"{group_slug}_selected_facility_uid"
+        l2_targets[f"l2_{group_slug}_selected_l3"] = f"{group_slug}_selected_facility_class"
+        l2_targets[f"l2_{group_slug}_selected_l3_label"] = f"{group_slug}_selected_facility_label"
+
+    def rename(name: str) -> str | None:
+        if name in l2_targets:
+            return l2_targets[name]
+        match = re.fullmatch(r"l3_(.+)_(distance_km|facility_uid|inside_scope)", name)
+        if not match:
+            return None
+        facility, suffix = match.groups()
+        return f"nearest_{facility}_{suffix}"
+
+    return rename
+
+
+def _facility_point_outputs(
+    inventory: gpd.GeoDataFrame,
+    nearest: gpd.GeoDataFrame,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    """Return the two clean point layers in the facilities collection."""
+
+    inventory_output = inventory.drop(
+        columns=["_admin_key", "index_right"], errors="ignore"
+    ).rename(
+        columns={
+            "fid_left": "facility_source_fid",
+            "fid_right": "admin_source_fid",
+            "NAME": "admin_village_name",
+            "TEHSIL": "tehsil_name",
+        }
+    )
+    nearest_output = nearest.drop(columns=["_admin_key", "fid"], errors="ignore").rename(
+        columns={"TEHSIL": "tehsil_name"}
+    )
+    return (
+        gpd.GeoDataFrame(normalize_unicode_frame(inventory_output), geometry="geometry", crs=inventory.crs),
+        gpd.GeoDataFrame(normalize_unicode_frame(nearest_output), geometry="geometry", crs=nearest.crs),
+    )
+
+
+def _point_column_describer(name: str) -> str | None:
+    descriptions = {
+        **ADMIN_COLUMN_DESCRIPTIONS,
+        "facility_uid": "Stable Core Stack identifier for the facility point.",
+        "facility_name": "Source facility name, normalized as Unicode text.",
+        "facility_code": "Source facility code when available.",
+        "nearest_distance_km": "Great-circle distance from the village locality point to this facility, in kilometres.",
+        "inside_requested_scope": "Whether the facility point lies inside the requested administrative boundary.",
+        "class_l1_domain": "Top-level facility domain.",
+        "class_l2_filter_group": "Facility service group used by proximity rollups.",
+        "class_l3_facility_class": "Standard Core Stack facility class.",
+        "class_l3_label": "Human-readable standard facility class label.",
+        "facilities_layer_kind": "Facilities output role for this feature.",
+        "title": "Human-readable facility title used by map viewers.",
+        "facility_source_fid": "Internal feature identifier from the facilities source GeoPackage.",
+        "admin_source_fid": "Internal feature identifier from the administrative source GeoPackage.",
+        "pc11_village_id": "Population Census 2011 village identifier.",
+        "admin_village_name": "Village name from the administrative boundary source.",
+        "latitude": "Facility latitude in decimal degrees (WGS84).",
+        "longitude": "Facility longitude in decimal degrees (WGS84).",
+        "class_l4_facility_subtype": "Detailed source facility subtype when available.",
+        "urban_rural": "Source urban or rural classification.",
+        "pincode": "Postal PIN code associated with the facility.",
+        "establishment_year": "Year the facility was established when available.",
+        "district_lgd": "Local Government Directory district code from the facility source.",
+        "village_census11": "Census 2011 village code associated with the facility source.",
+        "membership_count": "Source membership count where the facility represents an institution or collective.",
+        "service_level": "Taxonomy level used for the nearest-facility association.",
+    }
+    if re.fullmatch(r"class_k[1-8]", name):
+        return "Normalized auxiliary facility classification field."
+    return descriptions.get(name)
 
 
 def _status_value(village_id: Any, has_candidates: bool) -> str:
@@ -631,12 +722,13 @@ def _column_reference_lines(column_entries: list[Mapping[str, Any]]) -> list[str
     lines = [
         "## Column Reference",
         "",
-        "| Column | Type | Description |",
-        "| --- | --- | --- |",
+        "| Column | Type | Rename to (optional) | Description |",
+        "| --- | --- | --- | --- |",
     ]
     for entry in column_entries:
         description = str(entry.get("description") or "").replace("|", "\\|").replace("\n", " ")
-        lines.append(f"| `{entry['column']}` | {entry.get('datatype', '')} | {description} |")
+        rename_to = entry.get("rename_to") or ""
+        lines.append(f"| `{entry['column']}` | {entry.get('datatype', '')} | {rename_to} | {description} |")
     lines.append("")
     return lines
 
@@ -655,7 +747,7 @@ def _readme_lines(
         "",
         "## What This Dataset Is For",
         "",
-        "This dataset helps a village, tehsil, or district understand how far people are from important public services and rural infrastructure. It is designed for Core Stack reports, local planning conversations, and quick Excel-based review.",
+        "This dataset helps a village, tehsil, or district understand how far people are from important public services and rural infrastructure. It is designed for Core Stack reports, local planning conversations, and GIS review.",
         "",
         "The source facility points were cleaned into the Core Stack pan-India facilities GeoPackage. At runtime, this pipeline selects only the requested geography from `cs_admin_standard.gpkg`, finds nearby facilities from `cs_pan_india_facilities.gpkg`, and writes the result back with village boundaries so the data can be opened directly in GIS or published to GeoServer.",
         "",
@@ -679,9 +771,11 @@ def _readme_lines(
         "- `*_cat_distance_km` columns summarize a service category for the village. For essentials bundles (schooling tiers, basic health, financial inclusion) they use the farthest required service, so a low value means the whole baseline bundle is nearby. For opportunity gateways (higher education, advanced health, markets, post-harvest) they use the nearest option, since reaching any one member opens that access. Single-service groups use the nearest point directly.",
         "- `nearest_<facility>` columns hold a compact facility detail (name, subtype, code, inside/outside the requested boundary); the paired `nearest_<facility>_distance_km` column holds the great-circle distance in km from the village locality point.",
         "",
-        "## CSV And GIS Outputs",
+        "## Local GIS Outputs",
         "",
-        "The CSV holds the human-readable village service columns without geometry so it can be opened directly in Excel or report tooling. The GeoPackage keeps the village geometry plus the full machine columns (`l2_*`, `l3_*`) so the same result can be mapped or re-processed without another join.",
+        "The village-properties GeoPackage keeps village geometry plus the full machine columns (`l2_*`, `l3_*`). The facility-points GeoPackage contains exactly two layers: the facilities physically inside the tehsil and the village-nearest facility collection used by the distance calculation.",
+        "",
+        "Column descriptions and optional rename mappings are recorded in the run metadata; the GeoPackage is the only local data export.",
         "",
     ]
     if column_entries:
@@ -700,27 +794,6 @@ def _readme_lines(
     lines.extend(["## Cautions", ""])
     lines.extend([f"- {item}" for item in config.get("readme", {}).get("cautions", [])])
     return lines
-
-
-def _stac_fragment(config: Mapping[str, Any], result: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "type": "Feature",
-        "stac_version": "1.0.0",
-        "id": result["layer_name"],
-        "properties": {
-            "title": config["title"],
-            "description": config["description"],
-            "algorithm": ALGORITHM,
-            "algorithm_version": ALGORITHM_VERSION,
-            "generated_at_utc": utc_now_text(),
-            "source_facilities_gpkg": config["sources"]["facilities_gpkg"],
-            "source_admin_gpkg": config["sources"]["admin_gpkg"],
-        },
-        "assets": {
-            "data": {"href": result.get("gpkg_path"), "type": "application/geopackage+sqlite3"},
-            "readme": {"href": result.get("readme_path"), "type": "text/markdown"},
-        },
-    }
 
 
 def _cache_input_signatures(config: Mapping[str, Any], config_path: str | Path) -> dict[str, dict[str, Any]]:
@@ -751,19 +824,14 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
 
 
 def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
-    required: list[str] = []
+    required: list[str] = ["links_path"]
     if outputs.metadata:
         required.append("run_metadata_path")
     if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
-        required.append("gpkg_path")
-    if outputs.csv:
-        required.append("csv_path")
+        required.extend(("gpkg_path", "facility_points_gpkg_path"))
     if outputs.readme:
         required.append("readme_path")
-    if outputs.stac:
-        required.append("stac_fragment_path")
     if request.publish.sync_to_geoserver and outputs.geoserver:
-        required.append("geoserver_links_path")
         if outputs.geolibre:
             required.extend(("geolibre_project_path", "geolibre_html_path"))
     return tuple(dict.fromkeys(required))
@@ -836,12 +904,8 @@ def run_facilities_pipeline(
             _status_value(village_id, not nearest.empty)
             for village_id in village_service_gdf["village_id"]
         ]
-    focused_services = _focused_service_frame(village_service_gdf, nearest, classification, config)
-    descriptions = _column_descriptions(classification, config)
     describe_machine = _machine_column_describer(classification, config)
-    report_frame = focused_services
-    if status_name and "csv" not in status_outputs:
-        report_frame = focused_services.drop(columns=[status_name], errors="ignore")
+    rename_machine = _machine_column_renamer(classification, config)
     # Order the GeoPackage columns by the classification schema, then append any
     # remaining columns (title, layer kind) so nothing is silently dropped.
     present = set(village_service_gdf.columns)
@@ -862,6 +926,19 @@ def run_facilities_pipeline(
         geometry="geometry",
         crs=village_service_gdf.crs,
     )
+    village_service_output_gdf = gpd.GeoDataFrame(
+        normalize_unicode_frame(village_service_output_gdf),
+        geometry="geometry",
+        crs=village_service_output_gdf.crs,
+    )
+    tehsil_facilities, village_nearest_facilities = _facility_point_outputs(
+        inventory,
+        nearest,
+    )
+    tehsil_facilities_layer = "tehsil_facility_collection"
+    village_nearest_layer = "village_nearest_facility_collection"
+    published_tehsil_facilities_layer = f"{layer_name}_{tehsil_facilities_layer}"
+    published_village_nearest_layer = f"{layer_name}_{village_nearest_layer}"
 
     result: dict[str, Any] = {
         "status": "success",
@@ -872,7 +949,7 @@ def run_facilities_pipeline(
         "inventory_rows": int(len(inventory)),
         "nearest_rows": int(len(nearest)),
         "village_service_rows": int(len(village_service_output_gdf)),
-        "focused_service_rows": int(len(focused_services)),
+        "facility_point_layers": [tehsil_facilities_layer, village_nearest_layer],
         "created_facility_indexes": created_facility_indexes,
         "admin_created_indexes": admin_selection.created_indexes,
         "state_name": request.scope.state_name,
@@ -885,18 +962,23 @@ def run_facilities_pipeline(
 
     t0 = time.perf_counter()
     paths: dict[str, str] = {}
-    if outputs.csv:
-        paths["csv_path"] = bundle.write_csv(report_frame, ".csv").as_posix()
-    if outputs.gpkg:
+    bundle.remove_outputs(".csv", ".stac_fragment.json", ".geoserver_links.csv")
+    if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
         # The GPKG table name becomes the GeoServer feature-type name, so it
         # must be the scoped layer name rather than a generic table name.
         paths["gpkg_path"] = bundle.write_gpkg({layer_name: village_service_output_gdf}).as_posix()
+        paths["facility_points_gpkg_path"] = bundle.write_gpkg(
+            {
+                tehsil_facilities_layer: tehsil_facilities,
+                village_nearest_layer: village_nearest_facilities,
+            },
+            ".facility_points.gpkg",
+        ).as_posix()
     result.update(paths)
-    if outputs.stac:
-        result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()
     timings["write_local_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     geoserver = None
+    published_layers: dict[str, dict[str, Any]] = {}
     if request.publish.sync_to_geoserver and outputs.geoserver:
         t0 = time.perf_counter()
         gpkg_path = result.get("gpkg_path")
@@ -905,7 +987,8 @@ def run_facilities_pipeline(
             or output_config.get("geoserver_workspace")
             or FACILITIES_GEOSERVER_WORKSPACE
         )
-        if gpkg_path:
+        facility_points_gpkg_path = result.get("facility_points_gpkg_path")
+        if gpkg_path and facility_points_gpkg_path:
             try:
                 geoserver_result = publish_gpkg_layer(
                     gpkg_path,
@@ -916,7 +999,27 @@ def run_facilities_pipeline(
                 geoserver = asdict(geoserver_result)
                 geoserver["ok"] = True
                 geoserver["status"] = "published"
-                result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
+                published_layers["village_properties"] = geoserver
+                point_results = publish_gpkg_layers(
+                    facility_points_gpkg_path,
+                    workspace=geoserver_workspace,
+                    store_name=f"{layer_name}_facility_points",
+                    layers={
+                        published_tehsil_facilities_layer: tehsil_facilities_layer,
+                        published_village_nearest_layer: village_nearest_layer,
+                    },
+                    overwrite=request.publish.overwrite,
+                )
+                published_layers["tehsil_facility_collection"] = {
+                    **asdict(point_results[published_tehsil_facilities_layer]),
+                    "ok": True,
+                    "status": "published",
+                }
+                published_layers["village_nearest_facility_collection"] = {
+                    **asdict(point_results[published_village_nearest_layer]),
+                    "ok": True,
+                    "status": "published",
+                }
                 if outputs.geolibre:
                     geolibre_started = time.perf_counter()
                     result["geolibre"] = create_geolibre_outputs(
@@ -924,6 +1027,10 @@ def run_facilities_pipeline(
                         output_name=layer_name,
                         scope=request.scope,
                         geoserver=geoserver,
+                        geoserver_layers=[
+                            published_layers["tehsil_facility_collection"],
+                            published_layers["village_nearest_facility_collection"],
+                        ],
                         configured=config.get("geolibre"),
                         requested=request.raw.get("geolibre"),
                     )
@@ -935,30 +1042,6 @@ def run_facilities_pipeline(
                     timings["create_geolibre_seconds"] = round(
                         time.perf_counter() - geolibre_started, 3
                     )
-                if request.publish.register_layers:
-                    result["layer_registration"] = register_layer(
-                        dataset_name=output_config.get("dataset_name", "Facilities Proximity"),
-                        layer_name=layer_name,
-                        scope=request.scope,
-                        workspace=geoserver_workspace,
-                        geoserver_url=geoserver.get("wfs_url"),
-                        algorithm=ALGORITHM,
-                        algorithm_version=ALGORITHM_VERSION,
-                        misc={
-                            "source_facilities_gpkg": config["sources"]["facilities_gpkg"],
-                            "gpkg_path": result.get("gpkg_path"),
-                            "csv_path": result.get("csv_path"),
-                            "output_dir": bundle.path.as_posix(),
-                            "geoserver_layer_name": layer_name,
-                            "geoserver_url": geoserver.get("wfs_url"),
-                            "village_rows": result.get("village_rows"),
-                            "nearest_rows": result.get("nearest_rows"),
-                            "inventory_rows": result.get("inventory_rows"),
-                            **registration_metadata(result.get("geolibre")),
-                        },
-                        overwrite=request.publish.overwrite,
-                    )
-                    result["layer_id"] = (result["layer_registration"] or {}).get("layer_id")
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -975,23 +1058,83 @@ def run_facilities_pipeline(
                 "status": "missing_gpkg",
                 "workspace": geoserver_workspace,
                 "layer_name": layer_name,
-                "gpkg_path": None,
+                "gpkg_path": gpkg_path,
+                "facility_points_gpkg_path": facility_points_gpkg_path,
             }
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    result["geoserver_layers"] = published_layers
     if not (
         isinstance(result.get("geolibre"), Mapping)
         and result["geolibre"].get("ok")
     ):
         remove_geolibre_outputs(bundle.path, layer_name)
-    if outputs.geoserver and "geoserver_links_path" not in result:
-        stale_links = bundle.output_path(".geoserver_links.csv")
-        if stale_links.exists():
-            stale_links.unlink()
     if outputs.readme:
         result["readme_path"] = bundle.write_readme(
-            _readme_lines(request, config, layer_name, result, column_dictionary(report_frame, descriptions))
+            _readme_lines(
+                request,
+                config,
+                layer_name,
+                result,
+                column_dictionary(
+                    pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")),
+                    describe_machine,
+                    rename_machine,
+                ),
+            )
         ).as_posix()
+    result["links_path"] = bundle.write_links(
+        {
+            "local": {
+                "village_properties": {
+                    "gpkg_path": result.get("gpkg_path"),
+                    "layer_name": layer_name,
+                },
+                "facility_points": {
+                    "gpkg_path": result.get("facility_points_gpkg_path"),
+                    "layers": [tehsil_facilities_layer, village_nearest_layer],
+                },
+                "readme_path": result.get("readme_path"),
+            },
+            "geoserver": {
+                "status": geoserver.get("status") if isinstance(geoserver, Mapping) else "not_requested",
+                "layers": published_layers,
+            },
+            "geolibre": result.get("geolibre"),
+        }
+    ).as_posix()
+    if request.publish.register_layers and published_layers:
+        common_misc = {
+            "source_facilities_gpkg": config["sources"]["facilities_gpkg"],
+            "gpkg_path": result.get("gpkg_path"),
+            "facility_points_gpkg_path": result.get("facility_points_gpkg_path"),
+            "links_path": result.get("links_path"),
+            "output_dir": bundle.path.as_posix(),
+            "village_rows": result.get("village_rows"),
+            "nearest_rows": result.get("nearest_rows"),
+            "inventory_rows": result.get("inventory_rows"),
+            **registration_metadata(result.get("geolibre")),
+        }
+        registrations: dict[str, dict[str, Any]] = {}
+        for role, published in published_layers.items():
+            registrations[role] = register_layer(
+                dataset_name=(
+                    output_config.get("dataset_name", "Facilities Proximity")
+                    if role == "village_properties"
+                    else output_config.get("points_dataset_name", "Facilities Points")
+                ),
+                layer_name=published["layer_name"],
+                scope=request.scope,
+                workspace=published["workspace"],
+                geoserver_url=published["wfs_url"],
+                algorithm=ALGORITHM,
+                algorithm_version=ALGORITHM_VERSION,
+                misc={**common_misc, "output_role": role},
+                overwrite=request.publish.overwrite,
+            )
+        result["layer_registrations"] = registrations
+        result["layer_registration"] = registrations.get("village_properties")
+        result["layer_id"] = (result.get("layer_registration") or {}).get("layer_id")
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     if outputs.metadata:
@@ -1002,13 +1145,19 @@ def run_facilities_pipeline(
                 "result": result,
                 "config_path": str(config_path),
                 "outputs": {
-                    "csv": frame_profile(report_frame, descriptions),
-                    "gpkg_village_service": frame_profile(
+                    "village_properties": frame_profile(
                         pd.DataFrame(village_service_output_gdf.drop(columns=["geometry"], errors="ignore")),
                         describe_machine,
+                        rename_machine,
                     ),
-                    "inventory": frame_profile(pd.DataFrame(inventory.drop(columns=["geometry"], errors="ignore"))),
-                    "nearest": frame_profile(pd.DataFrame(nearest.drop(columns=["geometry"], errors="ignore"))),
+                    "tehsil_facility_collection": frame_profile(
+                        pd.DataFrame(tehsil_facilities.drop(columns=["geometry"], errors="ignore")),
+                        _point_column_describer,
+                    ),
+                    "village_nearest_facility_collection": frame_profile(
+                        pd.DataFrame(village_nearest_facilities.drop(columns=["geometry"], errors="ignore")),
+                        _point_column_describer,
+                    ),
                 },
             }
         ).as_posix()

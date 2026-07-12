@@ -45,13 +45,14 @@ from computing.misc.local_pipeline.schema import (
     validate_numeric_range,
 )
 from computing.misc.local_pipeline.tabular import CSVSQLiteSidecar, csv_header
+from computing.misc.local_pipeline.unicode import normalize_unicode_frame
 from nrm_app.celery import app
 from utilities.constants import LIVESTOCK_GEOSERVER_WORKSPACE
 
 
 CONFIG_PATH = Path(__file__).with_name("livestocks_pipeline.yaml")
 ALGORITHM = "local-livestock-csv-admin-join"
-ALGORITHM_VERSION = "1.3"
+ALGORITHM_VERSION = "2.0"
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -287,7 +288,7 @@ def _readme_lines(
         "- The requested admin scope is selected from `cs_admin_standard.gpkg` using SQLite indexes.",
         "- Matching livestock rows are fetched from a generated SQLite sidecar for the source CSV.",
         "- Village geometries are joined only after keyed livestock rows are selected.",
-        "- The report CSV keeps animal totals for direct reading; the GeoPackage keeps the female and male counts alongside each total in the same order.",
+        "- The GeoPackage keeps animal totals with female and male counts in schema order; column descriptions and optional rename mappings are in the run metadata.",
         "",
     ]
     if column_entries:
@@ -305,27 +306,6 @@ def _readme_lines(
     lines.extend(["## Cautions", ""])
     lines.extend([f"- {item}" for item in config.get("readme", {}).get("cautions", [])])
     return lines
-
-
-def _stac_fragment(config: Mapping[str, Any], result: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "type": "Feature",
-        "stac_version": "1.0.0",
-        "id": result["layer_name"],
-        "properties": {
-            "title": config["title"],
-            "description": config["description"],
-            "algorithm": ALGORITHM,
-            "algorithm_version": ALGORITHM_VERSION,
-            "generated_at_utc": utc_now_text(),
-            "source_csv": config["sources"]["csv"],
-            "source_admin_gpkg": config["sources"]["admin_gpkg"],
-        },
-        "assets": {
-            "data": {"href": result.get("gpkg_path"), "type": "application/geopackage+sqlite3"},
-            "readme": {"href": result.get("readme_path"), "type": "text/markdown"},
-        },
-    }
 
 
 def _cache_input_signatures(config: Mapping[str, Any], config_path: str | Path) -> dict[str, dict[str, Any]]:
@@ -356,19 +336,14 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
 
 
 def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
-    required: list[str] = []
+    required: list[str] = ["links_path"]
     if outputs.metadata:
         required.append("run_metadata_path")
     if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
         required.append("gpkg_path")
-    if outputs.csv:
-        required.append("csv_path")
     if outputs.readme:
         required.append("readme_path")
-    if outputs.stac:
-        required.append("stac_fragment_path")
     if request.publish.sync_to_geoserver and outputs.geoserver:
-        required.append("geoserver_links_path")
         if outputs.geolibre:
             required.extend(("geolibre_project_path", "geolibre_html_path"))
     return tuple(dict.fromkeys(required))
@@ -429,25 +404,19 @@ def run_livestocks_pipeline(
         ]
     ordered = _ordered_columns(joined, config, columns)
     villages_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered)
-    focused_frame = _focused_frame(
-        joined,
-        list(schema.get("focused_columns", [])),
-        status_name if status_name and "csv" in status_outputs else None,
-    )
-    overview = _overview(villages_frame, ["state_name", "district_name", "tehsil_name"], config)
     matched_rows = int(villages_frame["village_code"].notna().sum()) if "village_code" in villages_frame else 0
     gpkg_value_columns = [column for column in schema.get("gpkg_columns", []) if column in joined.columns] or ordered
     if status_name and {"gpkg", "geoserver"} & status_outputs:
         gpkg_value_columns = [status_name, *gpkg_value_columns]
     gpkg_frame = admin_output_frame(joined, value_columns=gpkg_value_columns, include_geometry=True)
+    gpkg_frame = normalize_unicode_frame(gpkg_frame)
     describe = _column_describer(schema, config)
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
 
     paths: dict[str, str] = {}
     t0 = time.perf_counter()
-    if outputs.csv:
-        paths["csv_path"] = bundle.write_csv(focused_frame, ".csv").as_posix()
-    if outputs.gpkg:
+    bundle.remove_outputs(".csv", ".stac_fragment.json", ".geoserver_links.csv")
+    if outputs.gpkg or (request.publish.sync_to_geoserver and outputs.geoserver):
         # The GPKG table name becomes the GeoServer feature-type name, so it
         # must be the scoped layer name rather than a generic table name.
         paths["gpkg_path"] = bundle.write_gpkg({layer_name: gpkg_frame}).as_posix()
@@ -459,7 +428,6 @@ def run_livestocks_pipeline(
         "algorithm_version": ALGORITHM_VERSION,
         "layer_name": layer_name,
         "rows": int(len(villages_frame)),
-        "focused_rows": int(len(focused_frame)),
         "matched_rows": matched_rows,
         "join_coverage": round(matched_rows / len(villages_frame), 6) if len(villages_frame) else 0,
         "validation_issues": [asdict(issue) for issue in validation_issues],
@@ -470,11 +438,9 @@ def run_livestocks_pipeline(
         "tehsil": request.scope.tehsil_name,
         "output_dir": bundle.path.as_posix(),
         "sync_to_geoserver": request.publish.sync_to_geoserver,
+        "links_path": bundle.output_path(".links.json").as_posix(),
         **paths,
     }
-
-    if outputs.stac:
-        result["stac_fragment_path"] = bundle.write_json(_stac_fragment(config, result), ".stac_fragment.json").as_posix()
 
     geoserver = None
     if request.publish.sync_to_geoserver and outputs.geoserver:
@@ -504,7 +470,6 @@ def run_livestocks_pipeline(
                 geoserver = asdict(geoserver_result)
                 geoserver["ok"] = True
                 geoserver["status"] = "published"
-                result["geoserver_links_path"] = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv").as_posix()
                 if outputs.geolibre:
                     geolibre_started = time.perf_counter()
                     result["geolibre"] = create_geolibre_outputs(
@@ -535,7 +500,7 @@ def run_livestocks_pipeline(
                         misc={
                             "source_csv": config["sources"]["csv"],
                             "gpkg_path": result.get("gpkg_path"),
-                            "csv_path": result.get("csv_path"),
+                            "links_path": result.get("links_path"),
                             "output_dir": bundle.path.as_posix(),
                             "geoserver_layer_name": layer_name,
                             "geoserver_url": geoserver.get("wfs_url"),
@@ -563,10 +528,6 @@ def run_livestocks_pipeline(
         and result["geolibre"].get("ok")
     ):
         remove_geolibre_outputs(bundle.path, layer_name)
-    if outputs.geoserver and "geoserver_links_path" not in result:
-        stale_links = bundle.output_path(".geoserver_links.csv")
-        if stale_links.exists():
-            stale_links.unlink()
     if outputs.readme:
         result["readme_path"] = bundle.write_readme(
             _readme_lines(
@@ -577,9 +538,23 @@ def run_livestocks_pipeline(
                 matched_rows=matched_rows,
                 issues=validation_issues,
                 geoserver=geoserver,
-                column_entries=column_dictionary(focused_frame, describe),
+                column_entries=column_dictionary(
+                    pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")),
+                    describe,
+                ),
             )
         ).as_posix()
+    bundle.write_links(
+        {
+            "local": {
+                "gpkg_path": result.get("gpkg_path"),
+                "layer_name": layer_name,
+                "readme_path": result.get("readme_path"),
+            },
+            "geoserver": geoserver,
+            "geolibre": result.get("geolibre"),
+        }
+    )
     result["timings"] = timings
     result["elapsed_seconds"] = round(time.perf_counter() - started, 3)
     if outputs.metadata:
@@ -590,9 +565,10 @@ def run_livestocks_pipeline(
                 "result": result,
                 "config_path": str(config_path),
                 "outputs": {
-                    "csv": frame_profile(focused_frame, describe),
-                    "gpkg_villages": frame_profile(pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")), describe),
-                    "overview": frame_profile(overview, describe),
+                    "villages": frame_profile(
+                        pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")),
+                        describe,
+                    ),
                 },
             }
         ).as_posix()

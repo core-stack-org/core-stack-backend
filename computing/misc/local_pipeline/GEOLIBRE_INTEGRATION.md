@@ -25,15 +25,16 @@ write-back to a GeoServer WFS source is not currently promised by upstream.
 
 ```mermaid
 flowchart LR
-    A[Local pipeline] --> B[Standard GPKG and CSV bundle]
+    A[Local pipeline] --> B[Unicode-normalized GeoPackage bundle]
     B --> C[Publish and verify GeoServer WFS]
     C --> D[Build GeoLibre project]
     D --> E[Write clickable local HTML]
     D --> F{AWS enabled?}
     F -- No --> G[Keep local artifacts]
     F -- Yes --> H[Upload canonical project JSON]
-    D --> I[Add GeoLibre paths and links to Layer misc]
-    I --> J[Register Layer]
+    D --> I[Write one links manifest]
+    I --> J[Add GeoLibre and links metadata]
+    J --> K[Register Layer]
 ```
 
 GeoLibre is presentation/discovery infrastructure, so its local or AWS failure
@@ -89,6 +90,12 @@ Core Stack layer convention. The current layer is always first; discovery is
 capped at 100 even if a request asks for more.
 
 ## Output and registration contract
+
+Every run writes one `<layer>.links.json`; the old links CSV is removed. It
+groups local paths, GeoServer URLs, and GeoLibre paths/URLs without copying
+feature data. Facilities projects explicitly contain the village-properties
+layer plus both layers from `<layer>.facility_points.gpkg` before optional
+same-tehsil discovery adds other domain layers.
 
 The pipeline result adds:
 

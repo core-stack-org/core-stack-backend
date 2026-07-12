@@ -12,6 +12,8 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from .unicode import normalize_unicode_data, normalize_unicode_text
+
 
 def slug(value: Any) -> str:
     """Return a filesystem-safe lowercase slug."""
@@ -155,11 +157,13 @@ def friendly_datatype(series: pd.Series) -> str:
 def column_dictionary(
     frame: pd.DataFrame,
     describe: Mapping[str, str] | Any = None,
+    rename: Mapping[str, str] | Any = None,
 ) -> list[dict[str, Any]]:
-    """Return `column`/`description`/`datatype` entries for an output frame.
+    """Return standard column metadata, including optional rename targets.
 
     `describe` may be a mapping of column name to description or a callable
-    returning a description (or None) for a column name.
+    returning a description (or None) for a column name. `rename` follows the
+    same convention and records only actual source-to-target changes.
     """
 
     entries: list[dict[str, Any]] = []
@@ -171,20 +175,40 @@ def column_dictionary(
             description = describe.get(name)
         else:
             description = None
-        entries.append(
-            {
-                "column": name,
-                "description": description,
-                "datatype": friendly_datatype(frame.iloc[:, position]),
-            }
-        )
+        if callable(rename):
+            rename_to = rename(name)
+        elif rename:
+            rename_to = rename.get(name)
+        else:
+            rename_to = None
+        entry = {
+            "column": name,
+            "description": description,
+            "datatype": friendly_datatype(frame.iloc[:, position]),
+        }
+        if rename_to and str(rename_to) != name:
+            entry["rename_to"] = str(rename_to)
+        entries.append(entry)
     return entries
 
 
-def frame_profile(frame: pd.DataFrame, describe: Mapping[str, str] | Any = None) -> dict[str, Any]:
-    """Return the standard per-output metadata block: column dictionary + EDA."""
+def frame_profile(
+    frame: pd.DataFrame,
+    describe: Mapping[str, str] | Any = None,
+    rename: Mapping[str, str] | Any = None,
+) -> dict[str, Any]:
+    """Return column docs, rename mapping, and EDA for one output layer."""
 
-    return {"columns": column_dictionary(frame, describe), "eda": dataframe_eda(frame)}
+    columns = column_dictionary(frame, describe, rename)
+    return {
+        "columns": columns,
+        "column_rename_mapping": {
+            entry["column"]: entry["rename_to"]
+            for entry in columns
+            if entry.get("rename_to")
+        },
+        "eda": dataframe_eda(frame),
+    }
 
 
 def _safe_field_value(value: Any) -> Any:
@@ -196,7 +220,7 @@ def _safe_field_value(value: Any) -> Any:
     except (TypeError, ValueError):
         pass
     if isinstance(value, (str, int, float)):
-        return value
+        return normalize_unicode_text(value) if isinstance(value, str) else value
     if isinstance(value, bool):
         return int(value)
     if isinstance(value, (dict, list, tuple, set)):
@@ -243,19 +267,35 @@ class OutputBundle:
         self.ensure()
         return self.path / f"{slug(self.name)}{suffix}"
 
-    def write_csv(self, frame: pd.DataFrame, suffix: str = ".csv") -> Path:
-        path = self.output_path(suffix)
-        frame.to_csv(path, index=False)
-        return path
+    def remove_outputs(self, *suffixes: str) -> list[str]:
+        """Remove obsolete artifacts from an earlier contract revision."""
+
+        removed: list[str] = []
+        for suffix in suffixes:
+            path = self.output_path(suffix)
+            if path.exists():
+                path.unlink()
+                removed.append(path.as_posix())
+        return removed
 
     def write_json(self, data: Mapping[str, Any], suffix: str) -> Path:
         path = self.output_path(suffix)
-        path.write_text(json.dumps(data, indent=2, default=str) + "\n")
+        payload = normalize_unicode_data(data)
+        path.write_text(
+            json.dumps(payload, indent=2, default=str, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
         return path
 
     def write_metadata(self, data: Mapping[str, Any]) -> Path:
         payload = {"generated_at_utc": utc_now_text(), **dict(data)}
         return self.write_json(payload, ".run_metadata.json")
+
+    def write_links(self, data: Mapping[str, Any]) -> Path:
+        """Write the single links manifest for all layers in this run."""
+
+        payload = {"generated_at_utc": utc_now_text(), **dict(data)}
+        return self.write_json(payload, ".links.json")
 
     def cache_manifest_path(self) -> Path:
         return self.output_path(".cache_manifest.json")
@@ -264,12 +304,17 @@ class OutputBundle:
         path = self.cache_manifest_path()
         if not path.exists():
             return None
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
 
     def write_cache_manifest(self, data: Mapping[str, Any]) -> Path:
-        payload = {"generated_at_utc": utc_now_text(), **dict(data)}
+        payload = normalize_unicode_data(
+            {"generated_at_utc": utc_now_text(), **dict(data)}
+        )
         path = self.cache_manifest_path()
-        path.write_text(json.dumps(payload, indent=2, default=str) + "\n")
+        path.write_text(
+            json.dumps(payload, indent=2, default=str, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
         return path
 
     def cached_result(
@@ -300,13 +345,18 @@ class OutputBundle:
     def write_readme(self, lines: list[str]) -> Path:
         self.ensure()
         path = self.path / "README.md"
-        path.write_text("\n".join(lines).rstrip() + "\n")
+        text = normalize_unicode_text("\n".join(lines).rstrip() + "\n")
+        path.write_text(text, encoding="utf-8")
         return path
 
-    def write_gpkg(self, layers: Mapping[str, Any]) -> Path:
+    def write_gpkg(
+        self,
+        layers: Mapping[str, Any],
+        suffix: str = ".gpkg",
+    ) -> Path:
         """Write GeoDataFrame layers to a GeoPackage using Fiona."""
 
-        gpkg_path = self.output_path(".gpkg")
+        gpkg_path = self.output_path(suffix)
         if gpkg_path.exists():
             gpkg_path.unlink()
         for layer_name, gdf in layers.items():

@@ -18,21 +18,18 @@ output:
   geoserver_workspace: testworkspace
   # Dataset row used when registering published layers in the Layer database.
   dataset_name: Facilities Proximity
+  points_dataset_name: Facilities Points
 
 default_outputs:
   gpkg: true
-  csv: true
   readme: true
   metadata: true
-  stac: true
   geoserver: true
 
-# The report CSV column list is derived from the classification structure:
-# for each L2 group (in order) the category distance column, then for each of
-# its L3 classes the `nearest_<class>` detail and `nearest_<class>_distance_km`
-# pair. Category distance columns default to `<group>_cat_distance_km`;
-# `l2_distance_columns` overrides the generated name where reports expect a
-# different one.
+# Category distance rename targets default to `<group>_cat_distance_km`;
+# `l2_distance_columns` overrides the generated target where reports expect a
+# different one. The mapping is metadata only; stored GeoServer fields remain
+# stable machine names.
 # `status_column` places a per-village data-availability marker right after
 # the admin columns in every listed output. Remove an entry from `outputs`
 # to drop the column from that artifact (the GeoServer layer is published
@@ -40,7 +37,7 @@ default_outputs:
 output_contract:
   status_column:
     name: facilities_status
-    outputs: [csv, gpkg, geoserver]
+    outputs: [gpkg, geoserver]
   l2_distance_columns:
     apmc_access: market_cat_distance_km
     cooperative: cooperative_societies_cat_distance_km

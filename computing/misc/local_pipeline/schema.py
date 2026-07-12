@@ -54,10 +54,8 @@ def status_column_config(config: Mapping[str, Any]) -> tuple[str | None, frozens
     """Return the configured `*_status` column name and the outputs keeping it.
 
     Pipelines configure this under `output_contract.status_column` with a
-    `name` and an `outputs` list (any of `csv`, `gpkg`, `geoserver`). Removing
-    an entry from `outputs` drops the column from that artifact. The GeoServer
-    layer is published from the GeoPackage, so `gpkg` and `geoserver` share
-    one frame; the column is kept when either is listed.
+    `name` and an `outputs` list (`gpkg` and/or `geoserver`). The GeoServer
+    layer is published from the GeoPackage, so both outputs share one frame.
     """
 
     contract = config.get("output_contract") or {}
@@ -72,19 +70,17 @@ def status_column_config(config: Mapping[str, Any]) -> tuple[str | None, frozens
 class OutputOptions:
     """Which artifacts a pipeline run writes.
 
-    The default mode writes the full standard bundle: one GeoPackage, one CSV
-    derived from the same data, a README, a metadata JSON (which includes the
-    EDA summary), a STAC item, a GeoServer layer published from the same
-    GeoPackage, and a GeoLibre project/HTML map referencing that live layer.
+    The default mode writes a GeoPackage, README, metadata JSON (including
+    column descriptions, rename mappings, and EDA), a single links manifest,
+    a GeoServer layer, and a GeoLibre project/HTML map referencing the live
+    published layer.
     Each artifact can be turned off per request or per pipeline YAML
     (`default_outputs`).
     """
 
     gpkg: bool = True
-    csv: bool = True
     readme: bool = True
     metadata: bool = True
-    stac: bool = True
     geoserver: bool = True
     geolibre: bool = True
 
@@ -150,7 +146,7 @@ def api_request_payload(data: Mapping[str, Any], *, overwrite: bool = True) -> d
     The structured shape addresses any scope level and toggles artifacts:
 
         {"scope": {"level": "district", "state_name": ..., "district_name": ...},
-         "outputs": {"stac": false}, "publish": {"sync_to_geoserver": false}}
+         "outputs": {"metadata": true}, "publish": {"sync_to_geoserver": false}}
 
     `overwrite` is the pipeline's default when the body does not set it.
     Raises ValueError when the body names no resolvable geography.
