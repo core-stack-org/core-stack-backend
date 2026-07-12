@@ -1,18 +1,16 @@
 # Local Pipeline V3 UAT Handoff
 
-This folder preserves the UAT-ready integration state for the local geospatial
-pipeline work. It is intentionally tracked on the temporary test branch even
-though `data/` is normally ignored.
+This folder contains test assets only. The test branch can be applied on top of
+`dev` or any local-pipeline implementation branch; it does not merge or copy
+implementation commits. This keeps UAT reusable while the five implementation
+branches progress independently toward `dev`, UAT, and `main`.
 
 ## Branch State
 
-- Integration branch: `test/local-pipeline-v3-uat`
-- Base: freshly updated `origin/dev`
-- Merged branches:
-  - `feat/local_geospatial_core_v3`
-  - `feat/facilities_v3`
-  - `feat/antyodaya_v3`
-  - `feat/livestocks`
+- Test-only branch: `test/local-pipeline-v3-uat`
+- Base: `origin/dev`
+- Contains: Python harness, focused module tests, Postman assets, and test docs
+- Requires: merge/pull the test branch over the implementation branch being assessed
 
 ## Postman UAT
 
@@ -28,6 +26,8 @@ Import the collection and environment in Postman, then set:
 - `sync_to_geoserver`: `true` for Postman UAT publishing, `false` for API smoke only
 - `overwrite`: `true` when re-running UAT
 - `use_pregenerated`: `false` for fresh runs, `true` when checking cache reuse
+- `include_tehsil_layers`: `true` to exercise bounded same-tehsil GeoLibre discovery
+- `geolibre_max_layers`: upper bound for GeoLibre WFS layer discovery
 
 All generated requests use structured payloads:
 
@@ -39,12 +39,17 @@ All generated requests use structured payloads:
     "district_name": "...",
     "tehsil_name": "..."
   },
-  "outputs": {},
+  "outputs": {"geolibre": true},
   "publish": {
     "sync_to_geoserver": true,
     "overwrite": true,
     "register_layers": false,
     "use_pregenerated": false
+  },
+  "geolibre": {
+    "include_tehsil_layers": "{{include_tehsil_layers}}",
+    "max_layers": "{{geolibre_max_layers}}",
+    "publish_to_aws": false
   }
 }
 ```
@@ -84,6 +89,21 @@ YAML files (`testworkspace`) or passed explicitly to the local test harness.
 
 ## Validation Result
 
+Finalized-contract focused smoke (not the full suite):
+
+- Date: 2026-07-12 UTC
+- Location: `Gujarat / Banas Kantha / Palanpur`
+- Pipeline cases: 6/6 passed (fresh plus cache reuse for all three pipelines)
+- API normalization calls: 9/9 passed (simple, structured GeoLibre, and invalid-body cases)
+- Shared module tests: 13/13 passed
+- Facilities point package: 1,220 tehsil facilities and 2,975 village-nearest associations across exactly two layers
+- Forbidden output artifacts: none
+- Links manifests: valid UTF-8 with local, GeoServer, and GeoLibre sections
+- Metadata: all emitted layers include columns, rename mapping, and EDA blocks
+
+The full scale suite and live three-layer GeoServer publish were intentionally
+not rerun in this pass.
+
 Last local smoke run:
 
 - Date: 2026-07-09 UTC
@@ -109,13 +129,10 @@ Timing summary:
 | livestocks | default | true | 0.229 | cached |
 | livestocks | metadata_only | false | 0.416 | success |
 
-Output checks:
-
-- Default GPKGs had expected village layers with 76 rows for all three pipelines.
-- Default CSVs existed for all three pipelines.
-- CSV checks confirmed `cs_feature_id` was not present.
-- Metadata-only cases correctly skipped CSV/GPKG outputs.
-- No missing result paths were reported.
+The result above predates the finalized output contract. Current tests instead
+assert GeoPackage-only data exports, one UTF-8 links manifest, no CSV or STAC
+artifacts, complete column-description/rename-mapping/EDA metadata, GeoLibre
+payload propagation, and exactly two layers in the facilities point package.
 
 Performance note:
 
@@ -150,12 +167,13 @@ validates the workspace/namespace, uploads GeoPackages directly, publishes the
 native GPKG layer under the unique pipeline layer name, and verifies WFS
 GeoJSON properties before reporting success.
 
-## PR Order
+## Implementation Merge Order
 
 1. `feat/local_geospatial_core_v3`
 2. `feat/facilities_v3`
 3. `feat/antyodaya_v3`
 4. `feat/livestocks`
+5. `feat/geolibre-local-pipeline`
 
 Open PRs in this order. The three domain branches are stacked on the core
 branch, so their visible diffs against `dev` will shrink after the core PR is
@@ -179,16 +197,16 @@ Title: Implement facilities local pipeline v3
 
 Body: Replaces the facilities runtime with a structured local pipeline package
 using `cs_admin_standard.gpkg` and the standard pan-India facilities asset.
-The branch adds classification config, nearest-service calculations, standard
-CSV/GPKG/README/metadata/STAC outputs, cache reuse, and structured API payload
-support for UAT.
+The branch adds classification config, nearest-service calculations, village
+properties plus two point-collection layers, unified metadata/links, cache
+reuse, and structured API payload support for UAT.
 
 ### feat/antyodaya_v3
 
 Title: Implement Antyodaya local pipeline v3
 
 Body: Adds a keyed Antyodaya 2020 local pipeline package with category mapping,
-standard admin joins, focused CSV/GPKG outputs, metadata EDA, STAC fragments,
+standard admin joins, GeoPackage outputs, metadata EDA and column mappings,
 cache reuse, structured API payload support, and tracked report/blog PDFs under
 `docs/reports`.
 
@@ -197,6 +215,14 @@ cache reuse, structured API payload support, and tracked report/blog PDFs under
 Title: Implement livestock local pipeline v3
 
 Body: Adds a keyed 20th Livestock Census local pipeline package with compact
-schema config, derived animal totals, standard CSV/GPKG/README/metadata/STAC
-outputs, cache reuse, and structured API payload support for test-workspace
+schema config, derived animal totals, GeoPackage/README/metadata/links outputs,
+cache reuse, and structured API payload support for test-workspace
 UAT.
+
+### feat/geolibre-local-pipeline
+
+Title: Add GeoLibre links to local pipeline outputs
+
+Body: Adds small GeoLibre project and clickable HTML outputs backed by verified
+GeoServer WFS layers, a single JSON links manifest, explicit facilities
+multi-layer projects, and optional non-redundant AWS project hosting.

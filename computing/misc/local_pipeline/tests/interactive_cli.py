@@ -133,7 +133,7 @@ def build_payload(location: dict[str, str]) -> dict[str, Any]:
     _print("\nOutputs (defaults write the full bundle):")
     outputs: dict[str, Any] = {}
     if not _ask_bool("Write all default outputs?", True):
-        for flag in ("gpkg", "csv", "readme", "metadata", "stac", "geoserver"):
+        for flag in ("gpkg", "readme", "metadata", "geoserver", "geolibre"):
             outputs[flag] = _ask_bool(f"  outputs.{flag}", True)
 
     sync = _ask_bool("Publish to GeoServer (testworkspace)?", False)
@@ -144,7 +144,10 @@ def build_payload(location: dict[str, str]) -> dict[str, Any]:
     }
     if sync:
         publish["geoserver_workspace"] = _ask("GeoServer workspace", "testworkspace")
-    return {"scope": scope, "outputs": outputs, "publish": publish}
+    geolibre = {
+        "include_tehsil_layers": _ask_bool("Include other same-tehsil GeoServer layers in GeoLibre?", False),
+    }
+    return {"scope": scope, "outputs": outputs, "publish": publish, "geolibre": geolibre}
 
 
 def run_direct(pipeline: str, payload: dict[str, Any]) -> dict[str, Any]:

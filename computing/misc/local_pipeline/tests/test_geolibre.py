@@ -162,6 +162,43 @@ class GeoLibreTests(unittest.TestCase):
             self.assertIn("geolibre:load-project", html_text)
             self.assertIn("embed=1&amp;welcome=0", html_text)
 
+    def test_explicit_facilities_layers_are_kept_in_one_project(self):
+        names = [
+            "facilities_banas_kantha_palanpur",
+            "facilities_banas_kantha_palanpur_tehsil_facility_collection",
+            "facilities_banas_kantha_palanpur_village_nearest_facility_collection",
+        ]
+        features = [
+            GeoServerFeatureType(
+                qualified_name=f"testworkspace:{name}",
+                workspace="testworkspace",
+                layer_name=name,
+                title=name,
+                bbox=(72.1, 23.8, 72.9, 24.5),
+            )
+            for name in names
+        ]
+        declared = [
+            {"workspace": "testworkspace", "layer_name": name, "wfs_url": WFS_URL}
+            for name in names
+        ]
+        with tempfile.TemporaryDirectory() as temporary, patch(
+            "computing.misc.local_pipeline.geolibre.fetch_wfs_feature_types",
+            return_value=features,
+        ):
+            result = create_geolibre_outputs(
+                output_dir=temporary,
+                output_name=names[0],
+                scope=SCOPE,
+                geoserver=declared[0],
+                geoserver_layers=declared[1:],
+            )
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(
+            result["layers"],
+            [f"testworkspace:{name}" for name in names],
+        )
+
     def test_s3_upload_is_canonical_json_only_by_default(self):
         fake = FakeS3Client()
         with tempfile.TemporaryDirectory() as temporary:

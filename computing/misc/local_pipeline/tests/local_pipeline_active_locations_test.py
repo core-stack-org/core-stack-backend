@@ -34,11 +34,11 @@ PIPELINE_MODULES = {
 DEFAULT_TEST_GEOSERVER_WORKSPACE = "testworkspace"
 
 # Named output-flag overrides exercised by the test matrix. Empty means the
-# pipeline default bundle (gpkg, csv, readme, metadata, stac, geoserver).
+# pipeline default bundle (GPKG, README, metadata, links, GeoServer, GeoLibre).
 OUTPUT_VARIANTS: dict[str, dict[str, Any]] = {
     "default": {},
-    "data_only": {"readme": False, "metadata": False, "stac": False},
-    "metadata_only": {"gpkg": False, "csv": False, "readme": False, "stac": False, "geoserver": False},
+    "data_only": {"readme": False, "metadata": False},
+    "metadata_only": {"gpkg": False, "readme": False, "geoserver": False, "geolibre": False},
 }
 
 API_ENDPOINTS = {
@@ -370,52 +370,6 @@ ADMIN_PREFIX = [
 ]
 STATUS_COLUMNS = {"facilities_status", "antyodaya_status", "livestock_status"}
 MACHINE_COLUMN_MARKERS = ("l2_", "l3_")
-LIVESTOCK_CSV_CONTRACT = [
-    *ADMIN_PREFIX,
-    "livestock_status",
-    "all_livestock_total",
-    "large_animals_total",
-    "cattle_total",
-    "buffalo_total",
-    "small_animals_total",
-    "sheep_total",
-    "goat_total",
-    "pig_total",
-]
-
-
-def csv_check(path: str | None, pipeline: str | None = None) -> dict[str, Any]:
-    if not path or not Path(path).exists():
-        return {"exists": False}
-    frame = pd.read_csv(path, nrows=50)
-    columns = [str(column) for column in frame.columns]
-    info: dict[str, Any] = {
-        "exists": True,
-        "column_count": int(len(columns)),
-        "has_cs_feature_id": "cs_feature_id" in columns,
-        "columns": columns,
-    }
-    # Report CSV contract: admin columns first, then the status column, and
-    # never the machine (l2_*/l3_*) or feature-level columns.
-    info["admin_prefix_ok"] = columns[: len(ADMIN_PREFIX)] == ADMIN_PREFIX
-    info["status_after_admin"] = len(columns) > len(ADMIN_PREFIX) and columns[len(ADMIN_PREFIX)] in STATUS_COLUMNS
-    info["machine_columns_in_csv"] = [
-        column for column in columns if column.startswith(MACHINE_COLUMN_MARKERS)
-    ]
-    info["feature_columns_in_csv"] = [column for column in columns if column.endswith("_feat_value")]
-    if pipeline == "livestocks":
-        info["contract_ok"] = columns == LIVESTOCK_CSV_CONTRACT
-    elif pipeline == "antyodaya":
-        clusters = [position for position, column in enumerate(columns) if column.endswith("_cat_cluster")]
-        values = [position for position, column in enumerate(columns) if column.endswith("_cat_value")]
-        info["contract_ok"] = bool(clusters) and bool(values) and max(clusters) < min(values)
-    elif pipeline == "facilities":
-        info["contract_ok"] = (
-            "essential_education_cat_distance_km" in columns
-            and "market_cat_distance_km" in columns
-            and not info["machine_columns_in_csv"]
-        )
-    return info
 
 
 def metadata_check(path: str | None) -> dict[str, Any]:
@@ -424,35 +378,65 @@ def metadata_check(path: str | None) -> dict[str, Any]:
     data = json.loads(Path(path).read_text())
     profiles = data.get("outputs") or {}
     checks: dict[str, Any] = {"exists": True, "profiles": sorted(profiles)}
-    csv_profile = profiles.get("csv") or {}
-    columns = csv_profile.get("columns") or []
-    checks["csv_columns_documented"] = len(columns)
-    checks["csv_columns_missing_description"] = [
-        entry["column"] for entry in columns if not entry.get("description")
-    ]
-    checks["csv_has_eda"] = bool((csv_profile.get("eda") or {}).get("row_count") is not None)
+    checks["profiles_complete"] = all(
+        isinstance(profile.get("columns"), list)
+        and isinstance(profile.get("column_rename_mapping"), dict)
+        and (profile.get("eda") or {}).get("row_count") is not None
+        for profile in profiles.values()
+    )
+    checks["documented_columns"] = {
+        name: len(profile.get("columns") or []) for name, profile in profiles.items()
+    }
+    checks["rename_mapping_counts"] = {
+        name: len(profile.get("column_rename_mapping") or {})
+        for name, profile in profiles.items()
+    }
     return checks
 
 
+def links_check(path: str | None) -> dict[str, Any]:
+    if not path or not Path(path).exists():
+        return {"exists": False}
+    raw = Path(path).read_bytes()
+    data = json.loads(raw.decode("utf-8"))
+    return {
+        "exists": True,
+        "utf8": True,
+        "has_local": isinstance(data.get("local"), dict),
+        "has_geoserver": "geoserver" in data,
+        "has_geolibre": "geolibre" in data,
+    }
+
+
 def validate_result(result: dict[str, Any], pipeline: str | None = None) -> dict[str, Any]:
-    csv_info = csv_check(result.get("csv_path") or result.get("village_service_csv_path"), pipeline)
     layers = gpkg_layers(result.get("gpkg_path"))
+    points_layers = gpkg_layers(result.get("facility_points_gpkg_path"))
+    output_dir = Path(result["output_dir"]) if result.get("output_dir") else None
+    forbidden_outputs = []
+    if output_dir and output_dir.exists():
+        forbidden_outputs = [
+            path.name
+            for path in output_dir.iterdir()
+            if path.name.endswith((".csv", ".stac_fragment.json", ".geoserver_links.csv"))
+        ]
     missing_paths = []
     for key, value in result.items():
         if key.endswith("_path") and value and not Path(str(value)).exists():
             missing_paths.append(key)
     return {
-        "csv_exists": csv_info["exists"],
-        "csv_has_cs_feature_id": csv_info.get("has_cs_feature_id"),
-        "csv_admin_prefix_ok": csv_info.get("admin_prefix_ok"),
-        "csv_status_after_admin": csv_info.get("status_after_admin"),
-        "csv_machine_columns": csv_info.get("machine_columns_in_csv"),
-        "csv_feature_columns": csv_info.get("feature_columns_in_csv"),
-        "csv_contract_ok": csv_info.get("contract_ok"),
+        "forbidden_output_files": forbidden_outputs,
         "metadata": metadata_check(result.get("run_metadata_path")),
+        "links": links_check(result.get("links_path")),
         "gpkg_column_order": gpkg_column_order(result.get("gpkg_path"), pipeline),
         "layer_registration": (result.get("layer_registration") or {}).get("status"),
         "gpkg_layers": layers,
+        "facility_points_layers": points_layers,
+        "facility_points_contract_ok": (
+            pipeline != "facilities"
+            or set(points_layers)
+            == {"tehsil_facility_collection", "village_nearest_facility_collection"}
+        ),
+        "geolibre_layers": (result.get("geolibre") or {}).get("layers"),
         "missing_result_paths": missing_paths,
     }
 
@@ -560,8 +544,9 @@ def run_api_normalization_smoke(
                 "district_name": location.district_name,
                 "tehsil_name": location.tehsil_name,
             },
-            "outputs": {"metadata": False, "stac": False},
+            "outputs": {"metadata": False, "geolibre": True},
             "publish": {"sync_to_geoserver": False, "use_pregenerated": True},
+            "geolibre": {"include_tehsil_layers": True, "max_layers": 12},
         }
         empty_body = {"sync_to_geoserver": False}
         view = getattr(api_module, view_name)
@@ -585,13 +570,17 @@ def run_api_normalization_smoke(
                         # captured entries hold apply_async's own kwargs, so the
                         # task payload sits under kwargs["kwargs"]["payload"].
                         task_kwargs = captured[-1]["kwargs"].get("kwargs") or {}
-                        scope = (task_kwargs.get("payload") or {}).get("scope") or {}
+                        queued_payload = task_kwargs.get("payload") or {}
+                        scope = queued_payload.get("scope") or {}
                         scope_ok = (
                             scope.get("level") == "tehsil"
                             and scope.get("state_name") == location.state_name
                             and scope.get("district_name") == location.district_name
                             and scope.get("tehsil_name") == location.tehsil_name
                         )
+                        if label == "structured":
+                            geolibre = queued_payload.get("geolibre") or {}
+                            scope_ok = scope_ok and geolibre.get("include_tehsil_layers") is True
                         ok = ok and scope_ok
                 else:
                     ok = response.status_code == 400 and not queued
