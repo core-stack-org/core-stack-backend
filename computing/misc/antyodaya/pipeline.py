@@ -20,6 +20,11 @@ from computing.misc.local_pipeline.admin import (
     admin_presentation_frame,
 )
 from computing.misc.local_pipeline.batch import load_request_file
+from computing.misc.local_pipeline.geolibre import (
+    create_geolibre_outputs,
+    registration_metadata,
+    remove_geolibre_outputs,
+)
 from computing.misc.local_pipeline.outputs import (
     OutputBundle,
     column_dictionary,
@@ -49,7 +54,7 @@ from utilities.constants import ANTYODAYA_GEOSERVER_WORKSPACE
 
 CONFIG_PATH = Path(__file__).with_name("antyodaya_pipeline.yaml")
 ALGORITHM = "local-antyodaya-csv-admin-join"
-ALGORITHM_VERSION = "1.2"
+ALGORITHM_VERSION = "1.3"
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -441,6 +446,7 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
             "scope": asdict(request.scope),
             "outputs": asdict(outputs),
             "publish": publish_options,
+            "geolibre": request.raw.get("geolibre") or {},
         }
     )
 
@@ -459,6 +465,8 @@ def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> 
         required.append("stac_fragment_path")
     if request.publish.sync_to_geoserver and outputs.geoserver:
         required.append("geoserver_links_path")
+        if outputs.geolibre:
+            required.extend(("geolibre_project_path", "geolibre_html_path"))
     return tuple(dict.fromkeys(required))
 
 
@@ -604,6 +612,24 @@ def run_antyodaya_pipeline(
                 geoserver["status"] = "published"
                 links_path = bundle.write_csv(pd.DataFrame([geoserver]), ".geoserver_links.csv")
                 result["geoserver_links_path"] = links_path.as_posix()
+                if outputs.geolibre:
+                    geolibre_started = time.perf_counter()
+                    result["geolibre"] = create_geolibre_outputs(
+                        output_dir=bundle.path,
+                        output_name=result_name,
+                        scope=request.scope,
+                        geoserver=geoserver,
+                        configured=config.get("geolibre"),
+                        requested=request.raw.get("geolibre"),
+                    )
+                    if result["geolibre"].get("ok"):
+                        result["geolibre_project_path"] = result["geolibre"][
+                            "project_path"
+                        ]
+                        result["geolibre_html_path"] = result["geolibre"]["html_path"]
+                    timings["create_geolibre_seconds"] = round(
+                        time.perf_counter() - geolibre_started, 3
+                    )
                 if request.publish.register_layers:
                     result["layer_registration"] = register_layer(
                         dataset_name=output_config.get("dataset_name", "Antyodaya 2020"),
@@ -623,6 +649,7 @@ def run_antyodaya_pipeline(
                             "rows": result.get("rows"),
                             "matched_rows": result.get("matched_rows"),
                             "join_coverage": result.get("join_coverage"),
+                            **registration_metadata(result.get("geolibre")),
                         },
                         overwrite=request.publish.overwrite,
                     )
@@ -638,6 +665,11 @@ def run_antyodaya_pipeline(
                 }
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if not (
+        isinstance(result.get("geolibre"), Mapping)
+        and result["geolibre"].get("ok")
+    ):
+        remove_geolibre_outputs(bundle.path, result_name)
     if outputs.geoserver and "geoserver_links_path" not in result:
         stale_links = bundle.output_path(".geoserver_links.csv")
         if stale_links.exists():

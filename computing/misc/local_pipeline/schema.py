@@ -74,9 +74,10 @@ class OutputOptions:
 
     The default mode writes the full standard bundle: one GeoPackage, one CSV
     derived from the same data, a README, a metadata JSON (which includes the
-    EDA summary), a STAC item, and a GeoServer layer published from the same
-    GeoPackage. Each artifact can be turned off per request or per pipeline
-    YAML (`default_outputs`).
+    EDA summary), a STAC item, a GeoServer layer published from the same
+    GeoPackage, and a GeoLibre project/HTML map referencing that live layer.
+    Each artifact can be turned off per request or per pipeline YAML
+    (`default_outputs`).
     """
 
     gpkg: bool = True
@@ -85,6 +86,7 @@ class OutputOptions:
     metadata: bool = True
     stac: bool = True
     geoserver: bool = True
+    geolibre: bool = True
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any] | None) -> "OutputOptions":
@@ -179,7 +181,23 @@ def api_request_payload(data: Mapping[str, Any], *, overwrite: bool = True) -> d
         # Simple bodies carry publish flags at the top level.
         publish.setdefault(key, body.get(key, default))
 
-    return {"scope": scope, "outputs": dict(body.get("outputs") or {}), "publish": publish}
+    geolibre = dict(body.get("geolibre") or {})
+    for key in (
+        "include_tehsil_layers",
+        "max_layers",
+        "refresh_interval_seconds",
+        "publish_to_aws",
+        "upload_html_to_aws",
+    ):
+        if key in body:
+            geolibre.setdefault(key, body[key])
+
+    return {
+        "scope": scope,
+        "outputs": dict(body.get("outputs") or {}),
+        "publish": publish,
+        "geolibre": geolibre,
+    }
 
 
 @dataclass(frozen=True)
