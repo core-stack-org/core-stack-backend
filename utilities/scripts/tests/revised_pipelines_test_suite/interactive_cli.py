@@ -4,7 +4,7 @@
 Run it from the repo root while Django and Celery run in other terminals
 (API mode) or on its own (direct mode, no server needed):
 
-    python computing/misc/local_pipeline/tests/interactive_cli.py
+    python utilities/scripts/tests/revised_pipelines_test_suite/interactive_cli.py
 
 The console lets you pick a pipeline, pick or search an active location,
 toggle outputs, run the request either in-process or through the live API,
