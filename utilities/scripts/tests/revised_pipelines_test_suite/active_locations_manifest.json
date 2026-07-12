@@ -1,0 +1,13 @@
+{
+  "generated_at_utc": "2026-07-09T23:35:01+00:00",
+  "source": "data/proposed_blocks_active_locations.json",
+  "active_location_count": 414,
+  "pipelines": [
+    "facilities",
+    "antyodaya",
+    "livestock"
+  ],
+  "request_count": 1242,
+  "collection": "utilities/scripts/tests/revised_pipelines_test_suite/core_stack_local_pipeline_uat.postman_collection.json",
+  "environment": "utilities/scripts/tests/revised_pipelines_test_suite/core_stack_local_pipeline_uat.postman_environment.json"
+}

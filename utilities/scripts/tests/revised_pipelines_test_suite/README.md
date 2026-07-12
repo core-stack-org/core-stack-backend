@@ -14,6 +14,7 @@ branches progress independently toward `dev`, UAT, and `main`.
 
 ## Postman UAT
 
+- Suite directory: `utilities/scripts/tests/revised_pipelines_test_suite/`
 - Collection: `core_stack_local_pipeline_uat.postman_collection.json`
 - Environment: `core_stack_local_pipeline_uat.postman_environment.json`
 - Source active locations: `data/proposed_blocks_active_locations.json`
@@ -71,7 +72,7 @@ Small local runner smoke without GeoServer:
 
 ```bash
 /home/amitportal/miniconda3/envs/corestack-backend/bin/python \
-  computing/misc/local_pipeline/tests/local_pipeline_active_locations_test.py \
+  utilities/scripts/tests/revised_pipelines_test_suite/local_pipeline_active_locations_test.py \
   --pipelines facilities antyodaya livestocks \
   --max-tehsils 1 \
   --all-sample 0 \

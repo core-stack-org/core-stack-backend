@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Render a human-readable markdown report from an active-locations test run.
 
-    python computing/misc/local_pipeline/tests/render_run_report.py \
+    python utilities/scripts/tests/revised_pipelines_test_suite/render_run_report.py \
         data/local_pipeline_test_runs/<run> [--output report.md]
 """
 
