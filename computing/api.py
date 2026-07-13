@@ -52,6 +52,7 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .cropping_intensity.cropping_intesity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
+from .soil_health.soil_health import soil_health_local
 from .spei.spei import (
     generate_spei_pipeline,
     run_drought_resistance_resilience,
@@ -143,8 +144,12 @@ from .tree_health.local.canopy_height_local import tree_health_ch_raster_local
 from .tree_health.local.canopy_height_vector_local import tree_health_ch_vector_local
 from .tree_health.local.ccd_local import tree_health_ccd_raster_local
 from .tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
-from .tree_health.local.overall_change_local import tree_health_overall_change_raster_local
-from .tree_health.local.overall_change_vector_local import tree_health_overall_change_vector_local
+from .tree_health.local.overall_change_local import (
+    tree_health_overall_change_raster_local,
+)
+from .tree_health.local.overall_change_vector_local import (
+    tree_health_overall_change_vector_local,
+)
 
 from .utils import (
     Geoserver,
@@ -244,6 +249,7 @@ from .misc.antyodaya_local_compute import (
 from .misc.livestocks_local_compute import (
     generate_livestocks_data_local as generate_livestocks_data_local_task,
 )
+
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
@@ -1138,7 +1144,6 @@ def tree_health_raster(request):
             queue="nrm",
         )
 
-
         return Response(
             {"Success": "tree_health task initiated"},
             status=status.HTTP_200_OK,
@@ -1207,11 +1212,7 @@ def tree_health_vector(request):
         )
         print("What is task? ", overall_task)
 
-        task_kwargs = {
-            "state": state,
-            "district": district,
-            "block": block
-        }
+        task_kwargs = {"state": state, "district": district, "block": block}
         if not compute == "local":
             task_kwargs.update(
                 {
@@ -2493,7 +2494,10 @@ def generate_fabdem_raster_vector(request):
             generate_febdem_raster_vector_clip_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -2519,7 +2523,10 @@ def generate_canal_vector(request):
             canal_vector_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2548,7 +2555,10 @@ def generate_river_data(request):
             river_vector_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2575,7 +2585,10 @@ def generate_drainage_density_data(request):
             drainage_density_vector_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2602,7 +2615,10 @@ def generate_antyodaya(request):
             generate_antyodaya_data_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2629,7 +2645,10 @@ def generate_livestocks(request):
             generate_livestocks_data_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2637,4 +2656,23 @@ def generate_livestocks(request):
         )
     except Exception as e:
         print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_soil_health(request):
+    print("Inside generate_soil_health API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        soil_health_local.apply_async(args=[state, district, block], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated generate_soil_health task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_soil_health api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -288,4 +288,9 @@ urlpatterns = [
         api.generate_livestocks,
         name="generate_livestocks",
     ),
+    path(
+        "generate_soil_health/",
+        api.generate_soil_health,
+        name="generate_soil_health",
+    ),
 ]
