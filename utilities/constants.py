@@ -204,6 +204,10 @@ GEE_PATHS = {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/plantation/",
         "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/plantation/",
     },
+    "FARM_STRESS": {
+        "GEE_ASSET_PATH": GEE_BASE_PATH + "/farm_stress/",
+        "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "/farm_stress/",
+    },
     "WATERBODY": {
         "GEE_ASSET_PATH": GEE_BASE_PATH + "/waterbody/",
         "GEE_HELPER_PATH": GEE_HELPER_BASE_PATH + "waterbody/",
