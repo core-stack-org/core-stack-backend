@@ -30,23 +30,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from nrm_app.settings import lulc_years, water_classes
+from nrm_app.settings import water_classes
 import pandas as pd
 import math
 
 import os
 import requests
 import json
-
-years = [
-    "2017_2018",
-    "2018_2019",
-    "2019_2020",
-    "2020_2021",
-    "2021_2022",
-    "2022_2023",
-    "2023_2024",
-]
 
 # utils.py
 
@@ -160,16 +150,16 @@ def fine_closest_wb_pixel(lon, lat):
     ee_initialize()
 
 
-def find_nearest_water_pixel(lat, lon, distance_threshold):
+def find_nearest_water_pixel(lat, lon, distance_threshold, start_year=None, end_year=None):
     """
     Finds the nearest water pixel within a given threshold.
 
     Parameters:
         lat (float): Latitude of the input location.
         lon (float): Longitude of the input location.
-        lulc_years (list of str): List of LULC year identifiers (e.g., '2017_2018').
-        water_classes (list of int): List of LULC class codes considered as water.
         distance_threshold (float): Maximum distance (in meters) to consider.
+        start_year (int): First hydrological year start (required).
+        end_year (int): Last hydrological year start (required).
 
     Returns:
         dict: {
@@ -179,6 +169,16 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
             'distance_m': float (if success)
         }
     """
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year are required for find_nearest_water_pixel."
+        )
+    start_year = int(start_year)
+    end_year = int(end_year)
+    if start_year > end_year:
+        raise ValueError("start_year must be less than or equal to end_year.")
+
+    lulc_year_ids = [f"{y}_{y + 1}" for y in range(start_year, end_year + 1)]
 
     print("Given lat long")
     print(f"-----{lat}----{lon}---")
@@ -186,7 +186,7 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
 
     # Create water masks from each LULC year
     water_masks = []
-    for year in lulc_years:
+    for year in lulc_year_ids:
         image = ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}")
         water_mask = (
             image.select("predicted_label")
@@ -670,8 +670,18 @@ def merge_assets_chunked_on_year(chunk_assets):
 
 
 def get_ndvi_for_zoi(
-    zoi_asset_path, asset_suffix, asset_folder, proj_id=None, app_type="WATER_REJ"
+    zoi_asset_path,
+    asset_suffix,
+    asset_folder,
+    proj_id=None,
+    app_type="WATER_REJ",
+    start_year=None,
+    end_year=None,
 ):
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year are required for get_ndvi_for_zoi."
+        )
     proj_obj = Project.objects.get(pk=proj_id)
     asset_suffix_ndvi = f"zoi_ndvi_{proj_obj.name}_{proj_obj.id}"
     ndvi_asset_path = (
@@ -685,7 +695,9 @@ def get_ndvi_for_zoi(
         asset_folder, app_type, f"{proj_obj.name}_{proj_obj.id}".lower(), zoi_roi=zoi_asset_path
     )
 
-    fc = get_ndvi_data(zoi_collections, 2017, 2024, asset_suffix_ndvi, ndvi_asset_path)
+    fc = get_ndvi_data(
+        zoi_collections, start_year, end_year, asset_suffix_ndvi, ndvi_asset_path
+    )
     task = ee.batch.Export.table.toAsset(
         collection=fc, description=asset_suffix_ndvi, assetId=ndvi_asset_path
     )

@@ -22,7 +22,7 @@ from computing.utils import (
 from computing.water_rejuvenation.water_rejuventation import (
     find_watersheds_for_point_with_buffer,
 )
-from computing.zoi_layers.zoi import generate_zoi
+from computing.zoi_layers.zoi import generate_zoi, _resolve_zoi_time_window
 from projects.models import Project
 
 from utilities.constants import SITE_DATA_PATH, GEE_PATHS
@@ -389,11 +389,15 @@ def Upload_Desilting_Points(
             return None
         return val
 
-    if is_processing_required and (not start_date or not end_date):
+    if (is_processing_required or is_closest_wp) and (not start_date or not end_date):
         raise ValueError(
             "start_date and end_date are required when processing desilting points "
-            "through ZOI (YYYY-MM-DD)."
+            "or finding the closest water pixel (YYYY-MM-DD)."
         )
+
+    start_year = end_year = None
+    if start_date and end_date:
+        _, _, start_year, end_year = _resolve_zoi_time_window(start_date, end_date)
 
     ee_initialize(gee_account_id)
 
@@ -444,7 +448,11 @@ def Upload_Desilting_Points(
             print("inside closest wp")
             try:
                 result_dict = find_nearest_water_pixel(
-                    dsilting_obj_log.lat, dsilting_obj_log.lon, 1500
+                    dsilting_obj_log.lat,
+                    dsilting_obj_log.lon,
+                    1500,
+                    start_year=start_year,
+                    end_year=end_year,
                 )
                 print(result_dict)
             except Exception as e:
@@ -528,11 +536,9 @@ def Generate_lulc_mws(
     start_date=None,
     end_date=None,
 ):
-    if not start_date or not end_date:
-        raise ValueError(
-            "start_date and end_date are required for water-rej ZOI generation "
-            "(YYYY-MM-DD)."
-        )
+    start_date, end_date, start_year, end_year = _resolve_zoi_time_window(
+        start_date, end_date
+    )
     proj_obj = Project.objects.get(pk=proj_id)
     asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
     asset_folder = [proj_obj.name.lower()]
@@ -558,8 +564,8 @@ def Generate_lulc_mws(
         make_asset_public(mws_asset_id)
         if is_lulc_required:
             clip_lulc_v3(
-                start_year=2017,
-                end_year=2024,
+                start_year=start_year,
+                end_year=end_year,
                 gee_account_id=gee_account_id,
                 roi_path=mws_asset_id,
                 asset_folder=asset_folder,
@@ -570,7 +576,11 @@ def Generate_lulc_mws(
     except Exception as e:
         logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
     Generate_water_balance_indicator(
-        mws_asset_id, proj_id=proj_obj.id, gee_account_id=gee_account_id
+        mws_asset_id,
+        proj_id=proj_obj.id,
+        gee_account_id=gee_account_id,
+        start_date=start_date,
+        end_date=end_date,
     )
     asset_suffix_swb3 = f"swb3_{proj_obj.name}+{proj_obj.id}"
     asset_id_swb = (
@@ -580,7 +590,10 @@ def Generate_lulc_mws(
         + asset_suffix_swb3
     )
     BuildMWSLayer(
-        gee_account_id=gee_account_id, proj_id=proj_obj.id, app_type="WATERBODY"
+        gee_account_id=gee_account_id,
+        proj_id=proj_obj.id,
+        app_type="WATERBODY",
+        export_year_range=(start_year, end_year),
     )
     asset_suffix_wb = f"waterbodies_{asset_suffix}".lower()
     asset_id_wb = (
@@ -602,9 +615,14 @@ def Generate_lulc_mws(
 
 
 @shared_task()
-def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None):
+def Generate_water_balance_indicator(
+    mws_asset_id, proj_id, gee_account_id=None, start_date=None, end_date=None
+):
 
     print(f"project id {gee_account_id}")
+    start_date, end_date, start_year, end_year = _resolve_zoi_time_window(
+        start_date, end_date
+    )
     proj_obj = Project.objects.get(pk=proj_id)
     logger.info("Generating SWB layer for given lat long")
     asset_folder = [str(proj_obj.name).lower()]
@@ -655,8 +673,8 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
-        start_year="2017",
-        end_year="2024",
+        start_year=str(start_year),
+        end_year=str(end_year),
         is_all_classes=True,
         gee_account_id=gee_account_id,
     )
@@ -680,8 +698,8 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
-        start_date="2017-06-30",
-        end_date="2025-07-1",
+        start_date=start_date,
+        end_date=end_date,
         is_annual=False,
     )
     make_asset_public(asset_id_prec)
@@ -691,12 +709,14 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder,
         app_type="WATERBODY",
-        start_year=2017,
-        end_year=2024,
+        start_year=start_year,
+        end_year=end_year,
         gee_account_id=gee_account_id,
         state=proj_obj.state_soi.state_name,
     )
-    dst_filename = "drought_" + asset_suffix + "_" + str(2017) + "_" + str(2022)
+    dst_filename = (
+        "drought_" + asset_suffix + "_" + str(start_year) + "_" + str(end_year)
+    )
     draught_asset_id = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
@@ -884,7 +904,7 @@ def BuildMWSLayer(
     block=None,
     district=None,
     drought_asset_override=None,  # optional: full path to drought asset if you want to override default
-    export_year_range=(2017, 2022),  # for naming drought asset
+    export_year_range=None,  # (start_year, end_year) for naming drought asset
 ):
     """
     Full BuildMWSLayer: builds final MWS waterbody FC, joins drought properties (flat, prefixed),
@@ -902,6 +922,10 @@ def BuildMWSLayer(
 
     try:
         # initialize GEE
+        if export_year_range is None:
+            raise ValueError(
+                "export_year_range=(start_year, end_year) is required for BuildMWSLayer."
+            )
         ee_initialize(gee_account_id)
 
         # -------------------------
@@ -953,10 +977,10 @@ def BuildMWSLayer(
         # -------------------------
         # Drought asset id (default naming)
         # -------------------------
+        start_y, end_y = export_year_range
         if drought_asset_override:
             draught_asset_id = drought_asset_override
         else:
-            start_y, end_y = export_year_range
             dst_filename = f"drought_{asset_suffix}"
             draught_asset_id = (
                 get_gee_dir_path(
@@ -984,8 +1008,12 @@ def BuildMWSLayer(
         # -------------------------
         # Create final_fc using your domain function
         # -------------------------
+        start_y, end_y = export_year_range
         final_fc = calculate_precipitation_season(
-            mws_geojson_op, draught_asset_id=draught_asset_id
+            mws_geojson_op,
+            draught_asset_id=draught_asset_id,
+            start_year=start_y,
+            end_year=end_y,
         )
         final_fc = ee.FeatureCollection(final_fc)
 
