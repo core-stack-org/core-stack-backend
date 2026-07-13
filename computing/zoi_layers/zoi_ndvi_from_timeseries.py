@@ -142,10 +142,10 @@ def get_ndvi_for_zoi_from_timeseries_compute(
     zoi_roi=None,
     asset_suffix=None,
     asset_folder_list=None,
-    start_date="2017-07-01",
-    end_date="2025-06-30",
-    start_year=2017,
-    end_year=2024,
+    start_date=None,
+    end_date=None,
+    start_year=None,
+    end_year=None,
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
@@ -155,6 +155,10 @@ def get_ndvi_for_zoi_from_timeseries_compute(
     the ndvi_timeseries compute (get_padded_ndvi_ts_image) instead of get_ndvi_data.
     """
     print("started generating ndvi for zoi (timeseries compute, fast reduce)")
+    if not start_date or not end_date or start_year is None or end_year is None:
+        raise ValueError(
+            "start_date, end_date, start_year, and end_year are required for ZOI NDVI."
+        )
     ee_initialize(gee_account_id)
 
     zoi_collections = resolve_zoi_ndvi_input(

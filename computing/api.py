@@ -1512,25 +1512,71 @@ def generate_ndvi_timeseries(request):
 def generate_zoi_to_gee(request):
     print("Inside generate zoi layers")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
+        start_date = request.data.get("start_date") or request.data.get("startDate")
+        end_date = request.data.get("end_date") or request.data.get("endDate")
+        start_year = request.data.get("start_year") or request.data.get("startYear")
+        end_year = request.data.get("end_year") or request.data.get("endYear")
+
+        if not state or not district or not block:
+            return Response(
+                {"error": "state, district, and block are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Allow start_year/end_year as hydrological-year shorthand.
+        if not start_date and start_year is not None:
+            start_date = f"{int(start_year)}-07-01"
+        if not end_date and end_year is not None:
+            end_date = f"{int(end_year) + 1}-06-30"
+
+        if not start_date or not end_date:
+            return Response(
+                {
+                    "error": (
+                        "start_date and end_date are required (YYYY-MM-DD), "
+                        "or provide start_year and end_year (hydrological years)."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from computing.zoi_layers.zoi import _resolve_zoi_time_window
+
+        try:
+            start_date, end_date, _, _ = _resolve_zoi_time_window(start_date, end_date)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state.lower()
+        district = district.lower()
+        block = block.lower()
+
         generate_zoi.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
                 "gee_account_id": gee_account_id,
+                "start_date": start_date,
+                "end_date": end_date,
             },
             queue="waterbody",
         )
 
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "Success": "Successfully initiated",
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_mining_to_gee api :: ", e)
+        print("Exception in generate_zoi_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -376,6 +376,8 @@ def Upload_Desilting_Points(
     is_lulc_required=True,
     gee_account_id=None,
     is_processing_required=True,
+    start_date=None,
+    end_date=None,
 ):
     import pandas as pd
     from .models import WaterbodiesFileUploadLog, WaterbodiesDesiltingLog
@@ -386,6 +388,12 @@ def Upload_Desilting_Points(
         if isinstance(val, str) and val.strip() == "":
             return None
         return val
+
+    if is_processing_required and (not start_date or not end_date):
+        raise ValueError(
+            "start_date and end_date are required when processing desilting points "
+            "through ZOI (YYYY-MM-DD)."
+        )
 
     ee_initialize(gee_account_id)
 
@@ -504,6 +512,8 @@ def Upload_Desilting_Points(
             is_lulc_required=is_lulc_required,
             gee_account_id=gee_account_id,
             proj_id=proj_obj.id,
+            start_date=start_date,
+            end_date=end_date,
         )
 
     wb_obj.process = True
@@ -515,7 +525,14 @@ def Generate_lulc_mws(
     is_lulc_required=True,
     gee_account_id=None,
     proj_id=None,
+    start_date=None,
+    end_date=None,
 ):
+    if not start_date or not end_date:
+        raise ValueError(
+            "start_date and end_date are required for water-rej ZOI generation "
+            "(YYYY-MM-DD)."
+        )
     proj_obj = Project.objects.get(pk=proj_id)
     asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
     asset_folder = [proj_obj.name.lower()]
@@ -579,6 +596,8 @@ def Generate_lulc_mws(
         asset_suffix=asset_suffix,
         asset_folder=asset_folder,
         app_type="WATERBODY",
+        start_date=start_date,
+        end_date=end_date,
     )
 
 
@@ -719,6 +738,8 @@ def Genereate_zoi_and_zoi_indicator(
     asset_suffix=None,
     asset_folder=None,
     roi=None,
+    start_date=None,
+    end_date=None,
 ):
     print(f"roi: {roi}")
     ee_initialize(gee_project_id)
@@ -737,6 +758,8 @@ def Genereate_zoi_and_zoi_indicator(
         app_type=app_type,
         gee_account_id=gee_project_id,
         proj_id=proj_id,
+        start_date=start_date,
+        end_date=end_date,
     )
 
 

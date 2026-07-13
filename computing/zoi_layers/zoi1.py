@@ -50,10 +50,14 @@ def generate_zoi1(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
-    start_date="2017-07-01",
-    end_date="2025-06-30",
+    start_date=None,
+    end_date=None,
 ):
     print("insdie zoi")
+    if not start_date or not end_date:
+        raise ValueError(
+            "start_date and end_date are required for ZOI generation (YYYY-MM-DD)."
+        )
     ee_initialize(gee_account_id)
     description = "swb3_" + asset_suffix
     asset_id = (
