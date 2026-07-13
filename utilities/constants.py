@@ -334,8 +334,6 @@ DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 
 # workspace
 FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
-ANTYODAYA_GEOSERVER_WORKSPACE = "antyodaya_2020"
-LIVESTOCK_GEOSERVER_WORKSPACE = "livestocks"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
