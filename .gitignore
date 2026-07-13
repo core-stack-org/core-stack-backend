@@ -48,8 +48,3 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
-
-
-.history/
-.local/
-
