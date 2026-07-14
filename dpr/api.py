@@ -72,7 +72,6 @@ from .gen_mws_report import (
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
-    get_intersecting_village_ids,
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
@@ -359,7 +358,6 @@ def generate_mws_report(request):
 
         green_credits = get_green_credit_data(state, district, block, uid)
 
-        village_ids = get_intersecting_village_ids(state, district, block, uid)
 
         context = {
             "state": state,
@@ -451,7 +449,6 @@ def generate_mws_report(request):
             "factory_desc": factory_desc,
             "mining_desc": mining_desc,
             "green_credit_desc": green_credits,
-            "village_ids": json.dumps(village_ids),
         }
 
         # print("Api Processing End 1", datetime.now())
