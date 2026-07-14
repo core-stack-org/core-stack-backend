@@ -88,10 +88,24 @@ ANNUAL_METRIC_UNIT_OVERRIDES = {
 }
 
 
+def _keyword_matches(keyword, metric):
+    """Match keyword as an underscore-/dot-delimited token, not a raw substring.
+
+    Prevents short tokens like ``et`` from matching inside ``market``, ``budget``,
+    ``veterinary``, ``internet``, ``details``, ``penetration``, etc. (Antyodaya).
+    """
+    return re.search(rf"(^|[_.]){re.escape(keyword)}([_.]|$)", metric) is not None
+
+
 def _infer_unit(metric_name):
     metric = str(metric_name).strip().lower()
     if metric in ANNUAL_METRIC_UNIT_OVERRIDES:
         return ANNUAL_METRIC_UNIT_OVERRIDES[metric]
+    # Antyodaya / village indicator conventions.
+    if metric.endswith(("_feat_cluster", "_feat_value", "_cat_cluster", "_cat_value")):
+        return "value"
+    if metric.startswith("is_") or metric.startswith("availability_of_"):
+        return "value"
     if metric == "g" or metric.startswith("g_"):
         return "mm"
     if "delta_g" in metric or "deltag" in metric:
@@ -103,7 +117,7 @@ def _infer_unit(metric_name):
     if "sqkm" in metric:
         return "sqkm"
     for keyword, unit in UNIT_KEYWORDS:
-        if keyword in metric:
+        if _keyword_matches(keyword, metric):
             return unit
     return "value"
 
