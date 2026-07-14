@@ -47,7 +47,6 @@ from nrm_app.celery import app
 from utilities.constants import (
     ADMIN_BOUNDARY_GPKG,
     ANTYODAYA_2020_CSV,
-    ANTYODAYA_2020_SIDECAR_SQLITE,
     ANTYODAYA_GEOSERVER_WORKSPACE,
 )
 
@@ -58,7 +57,6 @@ ALGORITHM_VERSION = "2.0"
 SOURCE_DEFAULTS = {
     "admin_gpkg": ADMIN_BOUNDARY_GPKG,
     "csv": ANTYODAYA_2020_CSV,
-    "sidecar_sqlite": ANTYODAYA_2020_SIDECAR_SQLITE,
 }
 
 
@@ -77,6 +75,9 @@ def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
     sources = dict(resolved.get("sources") or {})
     for name, default in SOURCE_DEFAULTS.items():
         sources[name] = sources.get(name) or default
+    sources["sidecar_sqlite"] = (
+        sources.get("sidecar_sqlite") or f"{sources['csv']}.sqlite"
+    )
     resolved["sources"] = sources
     return resolved
 

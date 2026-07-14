@@ -10,19 +10,11 @@ ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 BASE_RESOURCES_DIR = "data/base_resources"
 ADMIN_BOUNDARY_GPKG = f"{BASE_RESOURCES_DIR}/cs_admin_standard.gpkg"
 FACILITIES_GPKG = f"{BASE_RESOURCES_DIR}/cs_pan_india_facilities.gpkg"
-ANTYODAYA_2020_GPKG = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020.gpkg"
 ANTYODAYA_2020_CSV = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020_cluster_analysis.csv"
-ANTYODAYA_2020_SIDECAR_SQLITE = f"{ANTYODAYA_2020_CSV}.sqlite"
-LIVESTOCK_CENSUS_20_GPKG = f"{BASE_RESOURCES_DIR}/cs_village_livestock_census_20.gpkg"
 LIVESTOCK_CENSUS_20_CSV = f"{BASE_RESOURCES_DIR}/cs_livestock_census_20.csv"
-LIVESTOCK_CENSUS_20_SIDECAR_SQLITE = f"{LIVESTOCK_CENSUS_20_CSV}.sqlite"
 
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
-
-# Compatibility names used by the legacy clipping modules.
-ANTYODAYA_2020 = ANTYODAYA_2020_GPKG
-LIVESTOCKS = LIVESTOCK_CENSUS_20_GPKG
 
 MERGE_MWS_PATH = "data/merge_mws"
 

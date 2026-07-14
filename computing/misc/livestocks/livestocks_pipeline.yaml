@@ -9,7 +9,6 @@ sources:
   # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
   admin_layer: cs_admin_standard
   # csv: data/tests/fixtures/cs_livestock_census_20.csv
-  # sidecar_sqlite: data/tests/fixtures/cs_livestock_census_20.csv.sqlite
   schema_yaml: computing/misc/livestocks/livestocks_schema.yaml
 
 keys:
