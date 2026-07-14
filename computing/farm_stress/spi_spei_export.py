@@ -1,23 +1,30 @@
-"""GEE-side exports for the historical SPI-1/SPEI-3 archive (plan.md Step 1 /
-Script 01a). This module only builds and submits Earth Engine export tasks -
-the local gamma/log-logistic fitting and monsoon onset detection run
-separately (spi_spei_fit.py, monsoon_onset.py, added in a later pass) once
-these rasters are downloaded.
+"""Historical SPI-1/SPEI-3 input rasters (plan.md Step 1 / Script 01a).
 
-Rainfall is exported first, one dataset at a time, per the phased rollout:
-this file currently implements the GSMaP rainfall accumulation export only.
-PET (prorated MOD16A2) and water balance follow once rainfall is validated.
+Builds the GSMaP rainfall accumulation in Earth Engine, then pulls the
+result straight to local disk via getDownloadURL (see local_download.py)
+rather than an async GCS export - these rasters are small enough (single
+band, ~11km resolution) that a direct download is simpler than submitting
+and polling a batch export task.
+
+The local gamma/log-logistic fitting and monsoon onset detection run
+separately (spi_spei_fit.py, monsoon_onset.py, added in a later pass) once
+these rasters are on disk.
+
+Rainfall is implemented first, one dataset at a time, per the phased
+rollout: PET (prorated MOD16A2GF) and water balance follow once rainfall
+is validated.
 """
 
 import ee
 
-from utilities.gee_utils import ee_initialize, sync_raster_to_gcs
+from utilities.gee_utils import ee_initialize
+from computing.farm_stress.local_download import download_image
 from computing.farm_stress.config import (
     GSMAP_COLLECTION,
     GSMAP_BAND,
     SPI_SCALE_M,
     INDIA_BBOX_COORDS,
-    GCS_PATH_GSMAP_MONTHLY,
+    LOCAL_DIR_GSMAP_MONTHLY,
 )
 
 
@@ -61,31 +68,22 @@ def export_gsmap_period(
     period_end,
     period_label,
     gee_account_id=22,
-    gcs_path=GCS_PATH_GSMAP_MONTHLY,
+    output_dir=LOCAL_DIR_GSMAP_MONTHLY,
 ):
-    """Export one 28-day GSMaP rainfall accumulation as a single-band GeoTIFF
-    to GCS. This is the single-file smoke test for the historical rainfall
-    export: exactly one period, to validate the merge/accumulation/export
-    path before looping over all ~325 historical periods.
+    """Download one 28-day GSMaP rainfall accumulation as a single-band
+    GeoTIFF straight to local disk. period_label identifies the file
+    (encoded in the filename, e.g. precip_2023_07.tif) - direct downloads
+    don't carry ee.Image .set() properties through as GeoTIFF tags the way
+    an asset/GCS export would, so the filename is the source of truth here.
     """
     ee_initialize(gee_account_id)
     region = get_india_bbox()
 
-    period_rainfall = (
-        compute_period_rainfall(period_start, period_end, region)
-        .clip(region)
-        .set(
-            {
-                "period_label": period_label,
-                "period_start": period_start,
-                "period_end": period_end,
-            }
-        )
+    period_rainfall = compute_period_rainfall(period_start, period_end, region).clip(
+        region
     )
 
-    layer_name = f"precip_{period_label}"
-    task_id = sync_raster_to_gcs(
-        period_rainfall, SPI_SCALE_M, layer_name, gcs_path=gcs_path
-    )
-    print(f"Started export task {task_id} -> gs://{gcs_path}{layer_name}.tif")
-    return task_id
+    output_path = f"{output_dir.rstrip('/')}/precip_{period_label}.tif"
+    download_image(period_rainfall, region, output_path, SPI_SCALE_M)
+    print(f"Downloaded -> {output_path}")
+    return output_path

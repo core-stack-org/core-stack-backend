@@ -6,6 +6,9 @@ GEE asset roots come from utilities.constants.GEE_PATHS["FARM_STRESS"]
 project ids, and GCS export paths use settings.GCS_BUCKET_NAME.
 """
 
+import os
+
+from nrm_app.settings import BASE_DIR
 from utilities.constants import GEE_PATHS
 
 # ── GEE asset roots ───────────────────────────────────────────────────────────
@@ -13,7 +16,13 @@ FARM_STRESS_ASSET_ROOT = GEE_PATHS["FARM_STRESS"]["GEE_ASSET_PATH"].rstrip("/")
 
 # ── MODIS products ────────────────────────────────────────────────────────────
 MODIS_LC_COLLECTION = "MODIS/061/MCD12Q1"  # land cover, annual, 500m
-MODIS_ET_COLLECTION = "MODIS/061/MOD16A2"  # 8-day ET/PET, 500m, from 2001
+# MOD16A2GF (gap-filled) instead of raw MOD16A2: same ET/PET/PET_QC bands,
+# but gap-filled composites instead of masked-out low-quality pixels - better
+# for the historical archive. Verified on the GEE catalog: covers
+# 2000-01-01 through 2025-12-27 (the GF product lags behind the live edge
+# vs raw MOD16A2, since gap-filling needs later composites as input - keep
+# this in mind for the operational current-period lookup in a later phase).
+MODIS_ET_COLLECTION = "MODIS/061/MOD16A2GF"  # 8-day ET/PET, 500m, from 2000
 MODIS_NDVI_COLLECTION = "MODIS/061/MOD13A1"  # 16-day NDVI, 500m, from 2000
 
 # MODIS land cover class values treated as agricultural.
@@ -37,7 +46,19 @@ INDIA_BBOX_COORDS = [68.0, 6.5, 97.5, 37.5]
 EXPORT_SCALE_M = 500  # metres - all fused/alert exports at this scale
 SPI_SCALE_M = 11000  # GSMaP native ~11km; SPI/SPEI fitted here, resampled for fusion
 
-# ── GCS export paths (all rooted under the user's bucket folder for now) ─────
+# ── Local download paths ──────────────────────────────────────────────────────
+# Historical archive rasters (11km, single-band) are downloaded directly via
+# ee.Image.getDownloadURL() rather than a GCS batch export - they're small
+# enough that a synchronous direct download is simpler than submitting and
+# polling an export task. See computing/farm_stress/local_download.py.
+LOCAL_EXPORT_ROOT = os.path.join(BASE_DIR, "data", "farm_stress", "exports")
+LOCAL_DIR_GSMAP_MONTHLY = os.path.join(LOCAL_EXPORT_ROOT, "gsmap_monthly")
+LOCAL_DIR_MODIS_PET_MONTHLY = os.path.join(LOCAL_EXPORT_ROOT, "modis_pet_monthly")
+LOCAL_DIR_WATER_BALANCE_MONTHLY = os.path.join(LOCAL_EXPORT_ROOT, "water_balance_monthly")
+LOCAL_DIR_GSMAP_DAILY = os.path.join(LOCAL_EXPORT_ROOT, "gsmap_daily")
+
+# GCS is still used for the much larger weekly 500m operational alert
+# rasters (a later phase), which are too big for a direct download.
 GCS_PATH_GSMAP_MONTHLY = "ksheetiz/farm_stress/gsmap_monthly/"
 GCS_PATH_MODIS_PET_MONTHLY = "ksheetiz/farm_stress/modis_pet_monthly/"
 GCS_PATH_WATER_BALANCE_MONTHLY = "ksheetiz/farm_stress/water_balance_monthly/"
@@ -47,7 +68,7 @@ GCS_PATH_GSMAP_DAILY = "ksheetiz/farm_stress/gsmap_daily/"
 HISTORICAL_START = "2000-01-01"
 HISTORICAL_END = "2025-12-31"
 SPI1_HISTORICAL_START = "2000-01-01"  # GSMaP available from 2000
-SPEI_HISTORICAL_START = "2001-01-01"  # MOD16A2 available from 2001
+SPEI_HISTORICAL_START = "2000-01-01"  # MOD16A2GF available from 2000 (raw MOD16A2 was 2001)
 KHARIF_START_DOY = 121  # May 1 - earliest possible onset scan start
 KHARIF_END_DOY = 304  # Oct 31
 
