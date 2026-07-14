@@ -41,6 +41,10 @@ dependencies:
   - pyyaml=5.4.1
   - python-dotenv
   - psycopg2
+  - pango
+  - cairo
+  - gdk-pixbuf
+  - libffi
 
   - pip:
       - django==5.2.9
@@ -83,3 +87,4 @@ dependencies:
       - orjson
       - ijson
       - polars
+      - weasyprint

@@ -73,26 +73,73 @@ class SubmissionsOfPlan:
             raise ValueError(f"No fetch field configured for {model.__name__}")
 
         if model in [Agri_maintenance, GW_maintenance]:
-            qs = (
+            rows = (
                 model.objects.filter(plan_id=plan_id)
                 .exclude(is_deleted=True)
                 .order_by("-submission_time")
-                .values_list(field_name, "is_moderated", "uuid")
+                .values(
+                    field_name,
+                    "is_moderated",
+                    "uuid",
+                    "latitude",
+                    "longitude",
+                    "submission_time",
+                )
             )
+            qs = [
+                [
+                    row[field_name],
+                    row["is_moderated"],
+                    row["uuid"],
+                    {
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "submission_time": row["submission_time"],
+                    },
+                ]
+                for row in rows
+            ]
         elif model == ODK_agrohorticulture:
-            qs = (
+            rows = (
                 model.objects.filter(plan_id=plan_id)
                 .exclude(is_deleted=True)
                 .order_by("-agrohorticulture_id")
-                .values_list(field_name, "is_moderated")
+                .values(field_name, "is_moderated", "latitude", "longitude")
             )
+            qs = [
+                [
+                    row[field_name],
+                    row["is_moderated"],
+                    {"latitude": row["latitude"], "longitude": row["longitude"]},
+                ]
+                for row in rows
+            ]
         else:
-            qs = (
+            rows = (
                 model.objects.filter(plan_id=plan_id)
                 .exclude(is_deleted=True)
                 .order_by("-submission_time")
-                .values_list(field_name, "is_moderated")
+                .values(
+                    field_name,
+                    "is_moderated",
+                    "latitude",
+                    "longitude",
+                    "submission_time",
+                )
             )
+            qs = [
+                [
+                    row[field_name],
+                    row["is_moderated"],
+                    {
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "submission_time": row["submission_time"],
+                    },
+                ]
+                for row in rows
+            ]
+
         if page is None:
             data = list(qs)
             return {

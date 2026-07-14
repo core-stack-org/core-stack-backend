@@ -1,0 +1,93 @@
+name: livestock_census_20
+title: Livestock Census 2020
+description: >
+  Village-level livestock census counts joined at runtime to the Core Stack
+  standard admin boundary.
+
+sources:
+  # Optional test overrides; canonical defaults come from utilities/constants.py.
+  # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  # csv: data/tests/fixtures/cs_livestock_census_20.csv
+  schema_yaml: computing/misc/livestocks/livestocks_schema.yaml
+
+keys:
+  admin_join_key: pc11_village_id
+  source_join_key: village_code
+
+output:
+  root: data/outputs
+  directory_name: livestocks20
+  layer_prefix: livestocks
+  geoserver_workspace: testworkspace
+  # Dataset row used when registering published layers in the Layer database.
+  dataset_name: Livestock Census
+
+default_outputs:
+  gpkg: true
+  readme: true
+  metadata: true
+  geoserver: true
+
+# `status_column` places a per-village data-availability marker right after
+# the admin columns in every listed output. Remove an entry from `outputs`
+# to drop the column from that artifact (the GeoServer layer is published
+# from the GeoPackage, so `gpkg` and `geoserver` share one frame).
+output_contract:
+  status_column:
+    name: livestock_status
+    outputs: [gpkg, geoserver]
+
+source_location_columns:
+  - village_code
+  - row_index
+  - location_type
+  - state_code
+  - district_code
+  - subdistrict_code
+  - subdistrict_name
+  - village_name
+  - town_name
+  - ward_code
+  - ward_number
+  - ward_name
+
+metrics:
+  sidecar_columns:
+    - village_code
+    - cattle_male
+    - cattle_female
+    - buffalo_male
+    - buffalo_female
+    - sheep_male
+    - sheep_female
+    - goat_male
+    - goat_female
+    - pig_male
+    - pig_female
+  count_columns:
+    - cattle_male
+    - cattle_female
+    - cattle_total
+    - buffalo_male
+    - buffalo_female
+    - buffalo_total
+    - sheep_male
+    - sheep_female
+    - sheep_total
+    - goat_male
+    - goat_female
+    - goat_total
+    - pig_male
+    - pig_female
+    - pig_total
+
+readme:
+  audience:
+    - local stewards
+    - Core Stack platform users
+    - Know Your Landscape reports
+    - data analysts preparing Excel handoffs
+  cautions:
+    - Villages without a matching livestock village_code remain in spatial outputs with null livestock metrics.
+    - Aggregated overviews sum matched village rows and should be interpreted with join coverage.
