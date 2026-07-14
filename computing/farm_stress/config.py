@@ -21,13 +21,27 @@ MODIS_NDVI_COLLECTION = "MODIS/061/MOD13A1"  # 16-day NDVI, 500m, from 2000
 AGRI_LC_CLASSES = [12, 14]
 
 # ── GSMaP rainfall ────────────────────────────────────────────────────────────
-GSMAP_COLLECTION_REANALYSIS = "JAXA/GPM_L3/GSMaP/v8/reanalysis"  # 2000-2014
-GSMAP_COLLECTION_OPERATIONAL = "JAXA/GPM_L3/GSMaP/v8/operational"  # 2014-present
-GSMAP_BAND = "hourlyPrecipRate"  # mm/hr -> multiply by 24 for daily mm
+# v8/operational is a single continuous collection covering 1998-01-01 to
+# present (near-real-time) - verified against the GEE catalog directly.
+# Unlike v6 (which was split into separate reanalysis/2000-2014 and
+# operational/2014-present collections), v8 needs no merge.
+GSMAP_COLLECTION = "JAXA/GPM_L3/GSMaP/v8/operational"
+GSMAP_BAND = "hourlyPrecipRate"  # mm/hr instantaneous rate, one image/hour
+
+# ── Geography ─────────────────────────────────────────────────────────────────
+# India bounding box (rectangle; not clipped to a country/agri boundary at
+# this stage - Step 1 exports are the raw background-climatology inputs).
+INDIA_BBOX_COORDS = [68.0, 6.5, 97.5, 37.5]
 
 # ── Resolution ────────────────────────────────────────────────────────────────
 EXPORT_SCALE_M = 500  # metres - all fused/alert exports at this scale
 SPI_SCALE_M = 11000  # GSMaP native ~11km; SPI/SPEI fitted here, resampled for fusion
+
+# ── GCS export paths (all rooted under the user's bucket folder for now) ─────
+GCS_PATH_GSMAP_MONTHLY = "ksheetiz/farm_stress/gsmap_monthly/"
+GCS_PATH_MODIS_PET_MONTHLY = "ksheetiz/farm_stress/modis_pet_monthly/"
+GCS_PATH_WATER_BALANCE_MONTHLY = "ksheetiz/farm_stress/water_balance_monthly/"
+GCS_PATH_GSMAP_DAILY = "ksheetiz/farm_stress/gsmap_daily/"
 
 # ── Time / period convention ──────────────────────────────────────────────────
 HISTORICAL_START = "2000-01-01"
