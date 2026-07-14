@@ -72,7 +72,6 @@ from .gen_mws_report import (
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
-    get_intersecting_village_ids,
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
