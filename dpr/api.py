@@ -57,14 +57,18 @@ from .gen_mws_report import (
     get_change_detection_data,
     get_land_conflict_industrial_data,
     get_cropping_intensity,
-    get_double_cropping_area,
+    get_cropping_year_range,
     get_drought_data,
     get_osm_data,
     get_soge_data,
+    get_hydro_tabular_data,
+    get_cropping_water_hydro_data,
+    get_terrain_and_lulc_data,
     get_surface_Water_bodies_data,
     get_terrain_data,
     get_village_data,
     get_water_balance_data,
+    get_fortnightly_water_balance_data,
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
@@ -269,20 +273,20 @@ def generate_mws_report(request):
         ) = get_terrain_data(state, district, block, uid)
 
         # ? Degradation Description generation
-        land_degrad, tree_degrad, urbanization, restore_desc = (
+        land_degrad, tree_degrad, urbanization, restore_desc, crop_intensity_sankey, tree_reduction_sankey, urbanization_sankey = (
             get_change_detection_data(state, district, block, uid)
         )
 
-        # ? Double Cropping Description Generation
-        double_crop_des, year_range_text = get_double_cropping_area(
-            state, district, block, uid
-        )
+        # ? Cropping Year Range
+        year_range_text = get_cropping_year_range(state, district, block, uid)
 
         # ? Surface Waterbody Description
         (
+            swb_intro_desc,
             swb_desc,
             trend_desc,
             final_desc,
+            swb_season_avg_desc,
             kharif_data,
             rabi_data,
             zaid_data,
@@ -291,6 +295,7 @@ def generate_mws_report(request):
 
         # ? Water Balance Description
         (
+            water_balance_trend,
             wb_desc,
             good_rainfall,
             bad_rainfall,
@@ -301,8 +306,25 @@ def generate_mws_report(request):
             wb_years,
         ) = get_water_balance_data(state, district, block, uid)
 
+        # ? Fortnightly Water Balance Description
+        (
+            fortnight_labels,
+            fortnight_precip_data,
+            fortnight_et_data,
+            fortnight_runoff_data,
+        ) = get_fortnightly_water_balance_data(state, district, block, uid)
+
         # ? SOGE Description
         soge_desc = get_soge_data(state, district, block, uid)
+
+        # ? Hydro Tabular Data
+        min_elev, max_elev, mean_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
+
+        # ? Cropping, Water, and Hydrology Data
+        cwh_data = get_cropping_water_hydro_data(state, district, block, uid)
+
+        # ? Tree Map Terrain LULC Data
+        terrain_lulc_data = get_terrain_and_lulc_data(state, district, block, uid)
 
         # ? Drought Description
         drought_desc, drought_weeks, mod_drought, sev_drought, drysp_all, dg_years = (
@@ -322,6 +344,7 @@ def generate_mws_report(request):
             ofl_works,
             ca_works,
             ofw_works,
+            villages_intersect_pct,
         ) = get_village_data(state, district, block, uid)
 
         # ? Cropping Intensity Description
@@ -353,11 +376,16 @@ def generate_mws_report(request):
             "tree_degrad": tree_degrad,
             "urbanization": urbanization,
             "restore_desc": restore_desc,
-            "double_crop_des": double_crop_des,
+            "crop_intensity_sankey": json.dumps(crop_intensity_sankey),
+            "tree_reduction_sankey": json.dumps(tree_reduction_sankey),
+            "urbanization_sankey": json.dumps(urbanization_sankey),
             "year_range_text": year_range_text,
+            "swb_intro_desc": swb_intro_desc,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,
+            "swb_season_avg_desc": swb_season_avg_desc,
+            "water_balance_trend": water_balance_trend,
             "wb_desc": wb_desc,
             "good_rainfall": good_rainfall,
             "bad_rainfall": bad_rainfall,
@@ -365,6 +393,19 @@ def generate_mws_report(request):
             "inten_desc1": inten_desc1,
             "inten_desc2": inten_desc2,
             "soge_desc": soge_desc,
+            "min_elev": min_elev,
+            "max_elev": max_elev,
+            "mean_elev": mean_elev,
+            "dem_relief": dem_relief,
+            "aquifer_class": aquifer_class,
+            "soge_class": soge_class,
+            "drainage_density": drainage_density,
+            "drainage_length": total_length,
+            "area": area,
+            "perimeter": perimeter,
+            "compactness": compactness,
+            **cwh_data,
+            **terrain_lulc_data,
             "mws_areas": json.dumps(mws_areas),
             "block_areas": json.dumps(block_areas),
             "lulc_mws_slope": json.dumps(lulc_mws_slope),
@@ -378,6 +419,10 @@ def generate_mws_report(request):
             "runoff_data": json.dumps(runoff_data),
             "et_data": json.dumps(et_data),
             "dg_data": json.dumps(dg_data),
+            "fortnight_labels": json.dumps(fortnight_labels),
+            "fortnight_precip_data": json.dumps(fortnight_precip_data),
+            "fortnight_et_data": json.dumps(fortnight_et_data),
+            "fortnight_runoff_data": json.dumps(fortnight_runoff_data),
             "swc_works": json.dumps(swc_works),
             "lr_works": json.dumps(lr_works),
             "plantation_work": json.dumps(plantation_work),
@@ -389,6 +434,7 @@ def generate_mws_report(request):
             "mod_drought": json.dumps(mod_drought.astype(int).tolist()),
             "sev_drought": json.dumps(sev_drought.astype(int).tolist()),
             "villages_name": json.dumps(villages_name),
+            "villages_intersect_pct": json.dumps(villages_intersect_pct),
             "villages_sc": json.dumps(villages_sc),
             "villages_st": json.dumps(villages_st),
             "villages_pop": json.dumps(villages_pop),
