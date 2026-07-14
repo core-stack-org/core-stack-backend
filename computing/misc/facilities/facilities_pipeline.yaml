@@ -5,15 +5,17 @@ description: >
   cs_pan_india_facilities.gpkg and cs_admin_standard.gpkg.
 
 sources:
-  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  # Optional test overrides; canonical defaults come from utilities/constants.py.
+  # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
   admin_layer: cs_admin_standard
-  facilities_gpkg: data/facilities/outputs/cs_pan_india_facilities.gpkg
+  # facilities_gpkg: data/tests/fixtures/cs_pan_india_facilities.gpkg
   facilities_layer: facilities
   taxonomy_table: facility_taxonomy
   classification_yaml: computing/misc/facilities/facility_classifications.yaml
 
 output:
-  root: data/tests/outputs/facilities
+  root: data/outputs
+  directory_name: facilities
   layer_prefix: facilities
   geoserver_workspace: testworkspace
   # Dataset row used when registering published layers in the Layer database.
@@ -70,8 +72,6 @@ facility_columns:
   - pincode
   - establishment_year
   - district_lgd
-  - village_census11
-  - village_name
   - membership_count
 
 readme:

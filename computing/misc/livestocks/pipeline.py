@@ -41,12 +41,20 @@ from utilities.pipelines.schema import (
 from utilities.pipelines.tabular import CSVSQLiteSidecar, csv_header
 from utilities.pipelines.unicode import normalize_unicode_frame
 from nrm_app.celery import app
-from utilities.constants import LIVESTOCK_GEOSERVER_WORKSPACE
+from utilities.constants import (
+    ADMIN_BOUNDARY_GPKG,
+    LIVESTOCK_CENSUS_20_CSV,
+    LIVESTOCK_GEOSERVER_WORKSPACE,
+)
 
 
 CONFIG_PATH = Path(__file__).with_name("livestocks_pipeline.yaml")
 ALGORITHM = "local-livestock-csv-admin-join"
 ALGORITHM_VERSION = "2.0"
+SOURCE_DEFAULTS = {
+    "admin_gpkg": ADMIN_BOUNDARY_GPKG,
+    "csv": LIVESTOCK_CENSUS_20_CSV,
+}
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -55,6 +63,20 @@ def _repo_path(path: str | Path) -> Path:
         return path
     base_dir = Path(settings.BASE_DIR) if settings.configured else Path.cwd()
     return base_dir / path
+
+
+def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Use constants for production resources and YAML only for overrides."""
+
+    resolved = dict(config)
+    sources = dict(resolved.get("sources") or {})
+    for name, default in SOURCE_DEFAULTS.items():
+        sources[name] = sources.get(name) or default
+    sources["sidecar_sqlite"] = (
+        sources.get("sidecar_sqlite") or f"{sources['csv']}.sqlite"
+    )
+    resolved["sources"] = sources
+    return resolved
 
 
 def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
@@ -346,14 +368,18 @@ def run_livestocks_pipeline(
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
-    config = load_config(config_path)
+    config = _apply_source_defaults(load_config(config_path))
     outputs = resolve_output_options(request, config)
     schema = _schema(config)
     columns = _source_columns(config)
     output_config = config["output"]
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
     output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
-    bundle = OutputBundle(output_root, layer_name)
+    bundle = OutputBundle(
+        output_root,
+        layer_name,
+        directory_name=output_config["directory_name"],
+    )
     cache_key = _cache_key(request, outputs)
     cache_signatures = _cache_input_signatures(config, config_path)
     required_result_paths = _required_result_paths(outputs, request)

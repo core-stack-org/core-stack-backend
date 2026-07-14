@@ -5,10 +5,10 @@ description: >
   standard admin boundary.
 
 sources:
-  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  # Optional test overrides; canonical defaults come from utilities/constants.py.
+  # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
   admin_layer: cs_admin_standard
-  csv: data/base_resources/cs_livestock_census_20.csv
-  sidecar_sqlite: data/base_resources/cs_livestock_census_20.csv.sqlite
+  # csv: data/tests/fixtures/cs_livestock_census_20.csv
   schema_yaml: computing/misc/livestocks/livestocks_schema.yaml
 
 keys:
@@ -16,7 +16,8 @@ keys:
   source_join_key: village_code
 
 output:
-  root: data/tests/outputs/livestock20
+  root: data/outputs
+  directory_name: livestocks20
   layer_prefix: livestocks
   geoserver_workspace: testworkspace
   # Dataset row used when registering published layers in the Layer database.

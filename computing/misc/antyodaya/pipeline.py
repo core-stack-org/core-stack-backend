@@ -44,12 +44,20 @@ from utilities.pipelines.schema import (
 from utilities.pipelines.tabular import CSVSQLiteSidecar, csv_header
 from utilities.pipelines.unicode import normalize_unicode_frame
 from nrm_app.celery import app
-from utilities.constants import ANTYODAYA_GEOSERVER_WORKSPACE
+from utilities.constants import (
+    ADMIN_BOUNDARY_GPKG,
+    ANTYODAYA_2020_CSV,
+    ANTYODAYA_GEOSERVER_WORKSPACE,
+)
 
 
 CONFIG_PATH = Path(__file__).with_name("antyodaya_pipeline.yaml")
 ALGORITHM = "local-antyodaya-csv-admin-join"
 ALGORITHM_VERSION = "2.0"
+SOURCE_DEFAULTS = {
+    "admin_gpkg": ADMIN_BOUNDARY_GPKG,
+    "csv": ANTYODAYA_2020_CSV,
+}
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -58,6 +66,20 @@ def _repo_path(path: str | Path) -> Path:
         return path
     base_dir = Path(settings.BASE_DIR) if settings.configured else Path.cwd()
     return base_dir / path
+
+
+def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Use constants for production resources and YAML only for overrides."""
+
+    resolved = dict(config)
+    sources = dict(resolved.get("sources") or {})
+    for name, default in SOURCE_DEFAULTS.items():
+        sources[name] = sources.get(name) or default
+    sources["sidecar_sqlite"] = (
+        sources.get("sidecar_sqlite") or f"{sources['csv']}.sqlite"
+    )
+    resolved["sources"] = sources
+    return resolved
 
 
 def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
@@ -87,7 +109,11 @@ def _source_columns(config: Mapping[str, Any]) -> dict[str, list[str]]:
     feature_value = [col for col in header if col.endswith(validation["feature_value_suffix"])]
     metric_columns = set(category_cluster + category_value + feature_value)
     location_columns = [col for col in config["source_location_columns"] if col in header]
-    excluded_raw = set(location_columns) | metric_columns
+    source_identity_columns = {
+        config["keys"]["source_join_key"],
+        config["keys"]["source_unique_key"],
+    }
+    excluded_raw = set(location_columns) | source_identity_columns | metric_columns
     raw_columns = [col for col in header if col not in excluded_raw]
     return {
         "header": header,
@@ -269,8 +295,6 @@ def _column_describer(config: Mapping[str, Any], columns: Mapping[str, list[str]
                 f"`{STATUS_NO_VILLAGE_ID}` when the admin row lacks a village identifier, and "
                 f"`{STATUS_NO_DATA}` when no Antyodaya record matched this village."
             )
-        if name == "village_key":
-            return "Unique Mission Antyodaya 2020 village record key."
         if name.endswith(cluster_suffix):
             return (
                 f"Relative class (LOW/MEDIUM/HIGH) of the {title_for(name[: -len(cluster_suffix)])} category "
@@ -444,14 +468,18 @@ def run_antyodaya_pipeline(
 
     started = time.perf_counter()
     timings: dict[str, float] = {}
-    config = load_config(config_path)
+    config = _apply_source_defaults(load_config(config_path))
     outputs = resolve_output_options(request, config)
     columns = _source_columns(config)
     output_config = config["output"]
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
     result_name = layer_name or f"{output_config['layer_prefix']}_{slug(request.scope.level)}"
     output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
-    bundle = OutputBundle(output_root, result_name)
+    bundle = OutputBundle(
+        output_root,
+        result_name,
+        directory_name=output_config["directory_name"],
+    )
     cache_key = _cache_key(request, outputs)
     cache_signatures = _cache_input_signatures(config, config_path)
     required_result_paths = _required_result_paths(outputs, request)
@@ -484,9 +512,14 @@ def run_antyodaya_pipeline(
     _normalize_category_clusters(source_rows, columns["category_cluster"])
     validation_issues = _validate_antyodaya(source_rows, config)
     joined = _merge_admin_antyodaya(admin_selection.rows, source_rows, config)
+    village_keys = (
+        joined["village_key"]
+        if "village_key" in joined.columns
+        else pd.Series([None] * len(joined), index=joined.index)
+    )
+    matched_rows = int(village_keys.notna().sum())
     status_name, status_outputs = status_column_config(config)
     if status_name:
-        village_keys = joined["village_key"] if "village_key" in joined.columns else pd.Series([None] * len(joined), index=joined.index)
         joined[status_name] = [
             STATUS_NO_VILLAGE_ID
             if pd.isna(village_id)
@@ -495,7 +528,6 @@ def run_antyodaya_pipeline(
         ]
     ordered_columns = _ordered_tabular_columns(joined, columns)
     villages_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered_columns)
-    matched_rows = int(villages_frame["village_key"].notna().sum()) if "village_key" in villages_frame else 0
     gpkg_value_columns = list(ordered_columns)
     if status_name and {"gpkg", "geoserver"} & status_outputs:
         gpkg_value_columns = [status_name, *gpkg_value_columns]

@@ -12,7 +12,7 @@ import pandas as pd
 try:
     from utilities.constants import ADMIN_BOUNDARY_GPKG
 except ImportError:
-    ADMIN_BOUNDARY_GPKG = "data/admin-boundary/cs_admin_standard.gpkg"
+    ADMIN_BOUNDARY_GPKG = "data/base_resources/cs_admin_standard.gpkg"
 
 from .gpkg import (
     IndexSpec,
