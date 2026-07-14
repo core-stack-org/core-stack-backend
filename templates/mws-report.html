@@ -2769,6 +2769,14 @@
             return '#d4a5d4';
         };
 
+        const withOpacity = (color, alpha) => {
+            if (color.startsWith('rgba')) return color;
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        };
+
         const addDemographicBoundariesToMap = async (mwsFeature) => {
             try {
                 const mwsGeometry = mwsFeature.getGeometry();
@@ -2797,7 +2805,7 @@
                         const tot_p = feature.get('TOT_P');
                         return new ol.style.Style({
                             stroke: new ol.style.Stroke({ color: 'yellow', width: 1 }),
-                            fill: new ol.style.Fill({ color: getPopColor(tot_p) }),
+                            fill: new ol.style.Fill({ color: withOpacity(getPopColor(tot_p), 0.8) }),
                         });
                     },
                     zIndex: 5,
@@ -2814,7 +2822,7 @@
                         const pct = tot_p > 0 ? (p_lit / tot_p) * 100 : 0;
                         return new ol.style.Style({
                             stroke: new ol.style.Stroke({ color: 'yellow', width: 1 }),
-                            fill: new ol.style.Fill({ color: getLitColor(pct) }),
+                            fill: new ol.style.Fill({ color: withOpacity(getLitColor(pct), 0.8) }),
                         });
                     },
                     zIndex: 5,
@@ -2832,7 +2840,7 @@
                         const pct = tot_p > 0 ? ((p_sc + p_st) / tot_p) * 100 : 0;
                         return new ol.style.Style({
                             stroke: new ol.style.Stroke({ color: 'yellow', width: 1 }),
-                            fill: new ol.style.Fill({ color: getMargColor(pct) }),
+                            fill: new ol.style.Fill({ color: withOpacity(getMargColor(pct), 0.8) }),
                         });
                     },
                     zIndex: 5,
