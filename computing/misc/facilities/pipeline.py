@@ -19,6 +19,7 @@ from scipy.spatial import cKDTree
 from utilities.pipelines import AdminScope, CSAdminSource, StandardRequest, load_config
 from utilities.pipelines.admin import (
     ADMIN_COLUMN_DESCRIPTIONS,
+    ADMIN_PRESENTATION_COLUMNS,
     admin_output_frame,
     admin_presentation_frame,
 )
@@ -229,7 +230,20 @@ def _read_facilities_bbox(
 def _inventory(candidates: gpd.GeoDataFrame, admin_rows) -> gpd.GeoDataFrame:
     if candidates.empty:
         return candidates
-    admin_context = admin_rows[["fid", "pc11_village_id", "village_id", "NAME", "state_name", "district_name", "TEHSIL", "geometry"]].copy()
+    admin_context = admin_rows[
+        [
+            "fid",
+            "pc11_state_id",
+            "pc11_district_id",
+            "pc11_subdistrict_id",
+            "village_id",
+            "NAME",
+            "state_name",
+            "district_name",
+            "TEHSIL",
+            "geometry",
+        ]
+    ].copy()
     admin_context["_admin_key"] = admin_context["fid"]
     joined = gpd.sjoin(candidates, admin_context, how="inner", predicate="intersects")
     if "index_right" in joined.columns:
@@ -326,7 +340,9 @@ def _nearest(
             row = {
                 "_admin_key": village.get("_admin_key"),
                 "fid": village.get("fid"),
-                "pc11_village_id": village.get("pc11_village_id"),
+                "pc11_state_id": village.get("pc11_state_id"),
+                "pc11_district_id": village.get("pc11_district_id"),
+                "pc11_subdistrict_id": village.get("pc11_subdistrict_id"),
                 "village_id": village.get("village_id"),
                 "village_name": village.get("NAME"),
                 "state_name": village.get("state_name"),
@@ -351,7 +367,6 @@ def _nearest(
                 "class_l4_facility_subtype",
                 "urban_rural",
                 "pincode",
-                "village_census11",
             ]:
                 row[column] = facility.get(column)
             row["geometry"] = facility.geometry
@@ -594,11 +609,39 @@ def _machine_column_renamer(classification: Mapping[str, Any], config: Mapping[s
     return rename
 
 
-def _drop_pc11_output_columns(frame: pd.DataFrame) -> pd.DataFrame:
-    """Remove redundant source Census identifiers from user-facing outputs."""
+def _canonical_facility_point_output(frame: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Keep one standard admin identity and discard source village aliases."""
 
-    columns = [column for column in frame.columns if str(column).lower().startswith("pc11")]
-    return frame.drop(columns=columns, errors="ignore")
+    output = frame.drop(
+        columns=[
+            "pc11_village_id",
+            "village_census11",
+            "admin_village_name",
+        ],
+        errors="ignore",
+    ).rename(
+        columns={
+            "pc11_state_id": "state_id",
+            "pc11_district_id": "district_id",
+            "pc11_subdistrict_id": "tehsil_id",
+            "TEHSIL": "tehsil_name",
+            "NAME": "village_name",
+        }
+    )
+    admin_columns = [column for column in ADMIN_PRESENTATION_COLUMNS if column in output.columns]
+    value_columns = [
+        column
+        for column in output.columns
+        if column not in {*admin_columns, "geometry"}
+    ]
+    ordered = [*admin_columns, *value_columns]
+    if "geometry" in output.columns:
+        ordered.append("geometry")
+    return gpd.GeoDataFrame(
+        normalize_unicode_frame(output.reindex(columns=ordered)),
+        geometry="geometry",
+        crs=frame.crs,
+    )
 
 
 def _facility_point_outputs(
@@ -608,23 +651,20 @@ def _facility_point_outputs(
     """Return the two clean point layers in the facilities collection."""
 
     inventory_output = inventory.drop(
-        columns=["_admin_key", "index_right"], errors="ignore"
+        columns=["_admin_key", "index_right", "village_name", "village_census11"],
+        errors="ignore",
     ).rename(
         columns={
             "fid_left": "facility_source_fid",
-            "fid_right": "admin_source_fid",
-            "NAME": "admin_village_name",
-            "TEHSIL": "tehsil_name",
+            "fid_right": "index",
         }
     )
-    nearest_output = nearest.drop(columns=["_admin_key", "fid"], errors="ignore").rename(
-        columns={"TEHSIL": "tehsil_name"}
+    nearest_output = nearest.drop(columns=["_admin_key"], errors="ignore").rename(
+        columns={"fid": "index"}
     )
-    inventory_output = _drop_pc11_output_columns(inventory_output)
-    nearest_output = _drop_pc11_output_columns(nearest_output)
     return (
-        gpd.GeoDataFrame(normalize_unicode_frame(inventory_output), geometry="geometry", crs=inventory.crs),
-        gpd.GeoDataFrame(normalize_unicode_frame(nearest_output), geometry="geometry", crs=nearest.crs),
+        _canonical_facility_point_output(inventory_output),
+        _canonical_facility_point_output(nearest_output),
     )
 
 
@@ -643,8 +683,6 @@ def _point_column_describer(name: str) -> str | None:
         "facilities_layer_kind": "Facilities output role for this feature.",
         "title": "Human-readable facility title used by map viewers.",
         "facility_source_fid": "Internal feature identifier from the facilities source GeoPackage.",
-        "admin_source_fid": "Internal feature identifier from the administrative source GeoPackage.",
-        "admin_village_name": "Village name from the administrative boundary source.",
         "latitude": "Facility latitude in decimal degrees (WGS84).",
         "longitude": "Facility longitude in decimal degrees (WGS84).",
         "class_l4_facility_subtype": "Detailed source facility subtype when available.",
@@ -652,7 +690,6 @@ def _point_column_describer(name: str) -> str | None:
         "pincode": "Postal PIN code associated with the facility.",
         "establishment_year": "Year the facility was established when available.",
         "district_lgd": "Local Government Directory district code from the facility source.",
-        "village_census11": "Census 2011 village code associated with the facility source.",
         "membership_count": "Source membership count where the facility represents an institution or collective.",
         "service_level": "Taxonomy level used for the nearest-facility association.",
     }
@@ -926,11 +963,6 @@ def run_facilities_pipeline(
     )
     village_service_output_gdf = gpd.GeoDataFrame(
         normalize_unicode_frame(village_service_output_gdf),
-        geometry="geometry",
-        crs=village_service_output_gdf.crs,
-    )
-    village_service_output_gdf = gpd.GeoDataFrame(
-        _drop_pc11_output_columns(village_service_output_gdf),
         geometry="geometry",
         crs=village_service_output_gdf.crs,
     )

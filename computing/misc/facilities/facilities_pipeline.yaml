@@ -70,8 +70,6 @@ facility_columns:
   - pincode
   - establishment_year
   - district_lgd
-  - village_census11
-  - village_name
   - membership_count
 
 readme:
