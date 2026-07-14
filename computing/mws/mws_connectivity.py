@@ -40,24 +40,7 @@ def generate_mws_connectivity_data(self, state, district, block, gee_account_id)
 
     pan_india_data = ee.FeatureCollection(pan_india_asset_id)
     clipped_data = pan_india_data.filterBounds(roi.geometry())
-
-    spatial_filter = ee.Filter.intersects(
-        leftField=".geo", rightField=".geo", maxError=1
-    )
-
-    # Join the clipped data with ROI features to get uid
-    join = ee.Join.saveFirst(matchKey="roi_match")
-    joined_data = join.apply(clipped_data, roi, spatial_filter)
-
-    # Extract uid from matched ROI feature and add to clipped feature
-    def add_uid(feature):
-        feature = ee.Feature(feature)
-        roi_match = ee.Feature(feature.get("roi_match"))
-        uid = roi_match.get("uid")
-        return feature.set("uid", uid).set("roi_match", None)
-
-    clipped_data_with_uid = joined_data.map(add_uid)
-    task = export_vector_asset_to_gee(clipped_data_with_uid, description, asset_id)
+    task = export_vector_asset_to_gee(clipped_data, description, asset_id)
 
     task_id_list = check_task_status([task])
     print(f"Task completed. Task IDs: {task_id_list}")

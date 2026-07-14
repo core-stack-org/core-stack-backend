@@ -4,6 +4,7 @@ from plans.models import PlanApp
 
 from django.db.models import Max
 from django.db.models.functions import Greatest
+from django.utils import timezone
 
 DPR_STATUS_CHOICES = [
     ("PENDING", "PENDING"),
@@ -305,7 +306,10 @@ class ODK_crop(models.Model):
     plan_id = models.TextField()
     plan_name = models.TextField()
     status_re = models.TextField()
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
     system = models.JSONField()
+    gps_point = models.JSONField(default=dict, null=True, blank=True)
     data_crop = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
@@ -661,8 +665,9 @@ class DPR_Report(models.Model):
                 latest_moderation=Max("moderated_at"),
             )
             for key in ("latest_submission", "latest_deletion", "latest_moderation"):
-                if agg[key]:
-                    times.append(agg[key])
+                dt = normalize_datetime(agg[key])
+                if dt:
+                    times.append(dt)
         return max(times) if times else None
 
     def needs_regeneration(self):
@@ -672,3 +677,13 @@ class DPR_Report(models.Model):
         if not latest_change:
             return False
         return latest_change > self.dpr_generated_at
+
+
+def normalize_datetime(dt):
+    if not dt:
+        return None
+
+    if timezone.is_naive(dt):
+        return timezone.make_aware(dt, timezone.get_current_timezone())
+
+    return dt

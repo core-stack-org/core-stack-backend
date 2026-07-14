@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "name": "antyodaya",
+  "description": "Pan-India Mission Antyodaya 2020 cluster, value, raw parameter, and unit asset.",
+  "admin": {
+    "gpkg": "data/admin-boundary/cs_admin_sanitised.gpkg",
+    "layer": "cs_admin_sanitised",
+    "left_key": "pc11_village_id"
+  },
+  "source": {
+    "path": "data/antyodaya/output/antyodaya_2020_cluster_analysis_full.csv",
+    "right_key": "village_id",
+    "exclude_columns": [
+      "village_key",
+      "state_code",
+      "district_code",
+      "sub_district_code",
+      "village_id",
+      "state_name",
+      "district_name",
+      "sub_district_name",
+      "village_name",
+      "block_code_nunique",
+      "block_name",
+      "gp_code_nunique",
+      "gp_name"
+    ]
+  },
+  "output": {
+    "gpkg": "data/antyodaya/output/antyodaya_2020.gpkg",
+    "geojson": "data/antyodaya/output/antyodaya_2020.geojson",
+    "layer": "antyodaya_2020",
+    "formats": [
+      "gpkg",
+      "geojson"
+    ],
+    "reports_dir": "data/antyodaya/output/antyodaya_2020_asset_reports",
+    "admin_columns": [
+      "state_name",
+      "district_name",
+      "TEHSIL",
+      "pc11_village_id",
+      "NAME",
+      "pc11_state_id",
+      "pc11_district_id",
+      "pc11_subdistrict_id"
+    ],
+    "include_joined_columns": true,
+    "include_match_status": false,
+    "rename_columns": {
+      "pc11_village_id": "village_id",
+      "NAME": "village_name"
+    }
+  },
+  "processing": {
+    "join_storage": "sqlite",
+    "join_work_db": "data/antyodaya/output/.antyodaya_2020_join_work.sqlite3",
+    "source_chunk_size": 50000,
+    "chunk_size": 50000
+  }
+}

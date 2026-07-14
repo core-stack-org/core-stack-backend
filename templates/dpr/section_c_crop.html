@@ -1,0 +1,72 @@
+<div class="section">
+
+    <h2>
+        {{ t.section_c_crop.title }}
+    </h2>
+
+    <table>
+
+            <tr>
+                <th>{{ t.section_c_crop.settlement_name }}</th>
+                <th>{{ t.section_c_crop.irrigation_source }}</th>
+                <th>{{ t.section_c_crop.crop_in_kharif }}</th>
+                <th>{{ t.section_c_crop.kharif_acerage }}</th>
+                <th>{{ t.section_c_crop.crop_in_rabi }}</th>
+                <th>{{ t.section_c_crop.rabi_acerage }}</th>
+                <th>{{ t.section_c_crop.crop_in_zaid }}</th>
+                <th>{{ t.section_c_crop.zaid_acerage }}</th>
+                <th>{{ t.section_c_crop.crop_intensity }}</th>
+                <th>{{ t.section_c_crop.land_classification }}</th>
+
+            </tr>
+
+            {% for item in section_c.crop_info %}
+            <tr>
+
+                <td>
+                    {{ item.beneficiary_settlement|default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.irrigation_source|default:t.common.na }}
+
+                </td>
+
+                <td>
+                    {{ item.kharif_crops|default:t.common.na }}
+
+                </td>
+
+                <td>
+                    {{ item.kharif_acres |default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.rabi_crops |default:t.common.na}}
+                </td>
+
+                <td>
+                    {{ item.rabi_acres |default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.zaid_crops |default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.zaid_acres |default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.cropping_intensity |default:t.common.na }}
+                </td>
+
+                <td>
+                    {{ item.land_classification |default:t.common.na }}
+                </td>
+
+            </tr>
+            {% endfor %}
+    </table>
+
+</div>

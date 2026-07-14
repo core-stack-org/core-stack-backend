@@ -1,0 +1,48 @@
+<h3>{{ t.section_e.remote_sensed_surface_water_structures }}</h3>
+
+<table>
+
+    <thead>
+        <tr>
+            <th>{{ t.section_e.type_of_demand }}</th>
+            <th>{{ t.section_e.beneficiary_settlement }}</th>
+            <th>{{ t.section_e.beneficiary_name }}</th>
+            <th>{{ t.section_e.father_name }}</th>
+            <th>{{ t.section_e.type_of_work }}</th>
+            <th>{{ t.section_e.repair_activities }}</th>
+            <th>{{ t.section_e.latitude }}</th>
+            <th>{{ t.section_e.longitude }}</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+        {% for item in section_e.swb_rs %}
+        <tr>
+
+            <td>{{ item.demand_type|default:t.common.na }}</td>
+
+            <td>{{ item.beneficiary_settlement|default:t.common.na }}</td>
+
+            <td>{{ item.beneficiary_name|default:t.common.na }}</td>
+
+            <td>{{ item.beneficiary_father_name|default:t.common.na }}</td>
+
+            <td>{{ item.structure_type|default:t.common.na }}</td>
+
+            <td>{{ item.repair_activities | default:t.common.na}}</td>
+
+            <td>{{ item.latitude }}</td>
+
+            <td>{{ item.longitude }}</td>
+
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="8">{{ t.common.na }}</td>
+        </tr>
+        {% endfor %}
+
+    </tbody>
+
+</table>

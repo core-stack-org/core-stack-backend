@@ -41,6 +41,9 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from utilities.geoserver_utils import Geoserver
+from django.core.mail import EmailMessage, get_connection
+import time
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +73,7 @@ def convert_to_zip(dir_name, file_type):
 
 
 def push_shape_to_geoserver(
-    path, store_name=None, workspace=None, layer_name=None, file_type="shp"
+        path, store_name=None, workspace=None, layer_name=None, file_type="shp"
 ):
     geo = Geoserver()
 
@@ -261,13 +264,13 @@ def create_chunk(aoi, description, chunk_size):
 
 
 def merge_chunks(
-    aoi,
-    folder_list,
-    description,
-    chunk_size,
-    chunk_asset_path=GEE_HELPER_PATH,
-    merge_asset_path=GEE_ASSET_PATH,
-    merge_asset_id=None,
+        aoi,
+        folder_list,
+        description,
+        chunk_size,
+        chunk_asset_path=GEE_HELPER_PATH,
+        merge_asset_path=GEE_ASSET_PATH,
+        merge_asset_id=None,
 ):
     print("Merge Chunk task initiated")
     ee_initialize()
@@ -279,7 +282,7 @@ def merge_chunks(
         end = start + chunk_size
         block_name_for_parts = description + "_" + str(start) + "-" + str(end)
         src_asset_id = (
-            get_gee_dir_path(folder_list, chunk_asset_path) + block_name_for_parts
+                get_gee_dir_path(folder_list, chunk_asset_path) + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
             assets.append(ee.FeatureCollection(src_asset_id))
@@ -287,7 +290,7 @@ def merge_chunks(
     asset = ee.FeatureCollection(assets).flatten()
 
     asset_id = merge_asset_id or (
-        get_gee_dir_path(folder_list, merge_asset_path) + description
+            get_gee_dir_path(folder_list, merge_asset_path) + description
     )
     try:
         # Export an ee.FeatureCollection as an Earth Engine asset.
@@ -350,9 +353,8 @@ def get_agri_year_key(season_key):
 
 
 def calculate_precipitation_season(
-    geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
+        geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
 ):
-
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
         feature_collection = json.load(f)
@@ -416,17 +418,17 @@ def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
 
     # Build CI and NDVI asset paths
     asset_path_ci = (
-        get_gee_dir_path(
-            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
-        )
-        + ci_asset
+            get_gee_dir_path(
+                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            )
+            + ci_asset
     )
 
     asset_path_ndvi = (
-        get_gee_dir_path(
-            [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
-        )
-        + ndvi_asset
+            get_gee_dir_path(
+                [proj_obj.name], asset_path=GEE_PATHS["WATER_REJ"]["GEE_ASSET_PATH"]
+            )
+            + ndvi_asset
     )
 
     # Load FeatureCollections
@@ -480,9 +482,8 @@ def get_directory_size(path):
 
 
 def generate_geojson_with_ci_ndvi_ndmi(
-    zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id
+        zoi_asset, ci_asset, ndvi_asset, ndmi_asset, proj_id
 ):
-
     # Load project
     proj_obj = Project.objects.get(pk=proj_id)
 
@@ -607,18 +608,19 @@ def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
 
 
 def save_layer_info_to_db(
-    state,
-    district,
-    block,
-    layer_name,
-    asset_id,
-    dataset_name,
-    sync_to_geoserver=False,
-    layer_version="1.0",
-    algorithm=None,
-    algorithm_version="1.0",
-    misc=None,
-    is_override=False,
+        state,
+        district,
+        block,
+        layer_name,
+        asset_id,
+        dataset_name,
+        sync_to_geoserver=False,
+        layer_version="1.0",
+        algorithm=None,
+        algorithm_version="1.0",
+        misc=None,
+        is_override=False,
+        is_gee_asset=True,
 ):
     print("inside the save_layer_info_to_db function")
 
@@ -636,7 +638,7 @@ def save_layer_info_to_db(
         print("Error fetching in state district block:", e)
         return
 
-    is_public = is_asset_public(asset_id)
+    is_public = is_asset_public(asset_id) if is_gee_asset else False
 
     # Check if there’s an existing layer
     existing_layer = (
@@ -741,12 +743,12 @@ def get_layer_object(state, district, block, layer_name, dataset_name):
 
 
 def update_dashboard_geojson(
-    state=None,
-    district=None,
-    block=None,
-    layer_name=None,
-    workspace_name=None,
-    proj_id=None,
+        state=None,
+        district=None,
+        block=None,
+        layer_name=None,
+        workspace_name=None,
+        proj_id=None,
 ):
     if state and block and block:
         print(f"🔄 Updating GeoJSON for {state}, {district}, {block}")
@@ -880,11 +882,11 @@ def safe_reduce_max(image, geom, scale=30):
 #  MAIN FUNCTION TO PROCESS SWB LAYER
 # ------------------------------------------------------
 def generate_swb_layer_with_max_so_catchment(
-    roi=None,
-    app_type="MWS",
-    asset_suffix=None,
-    asset_folder=None,
-    gee_account_id=None,
+        roi=None,
+        app_type="MWS",
+        asset_suffix=None,
+        asset_folder=None,
+        gee_account_id=None,
 ):
     ee_initialize(gee_account_id)
 
@@ -960,7 +962,7 @@ def _sync_layer_to_prod_db(payload: dict):
 
 
 def _update_layer_sync_remote(
-    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+        layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
     prod_url = _get_prod_backend_url()
     if not prod_url or layer_id is None:
@@ -995,7 +997,7 @@ def _update_layer_sync_remote(
 
 
 def update_layer_sync_status(
-    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+        layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
     if _get_prod_backend_url():
         _update_layer_sync_remote(
@@ -1030,3 +1032,160 @@ def update_layer_sync_status(
 
     except Exception as e:
         print(f"Error updating layer sync status: {e}")
+
+
+def _is_cache_valid(cache: dict, workspace: str) -> bool:
+    if workspace not in cache:
+        return False
+    age = time.time() - cache[workspace]["cached_at"]
+    if age > 3600:
+        logger.info(f"Cache expired for {workspace} (age: {int(age)}s)")
+        return False
+    return True
+
+
+def _set_cache(cache: dict, workspace: str, data: set):
+    cache[workspace] = {
+        "data": data,
+        "cached_at": time.time(),
+    }
+
+
+def send_report_email(
+        result,
+        report_type: str = "missing_layers",
+        recipients: list = None,
+) -> bool:
+    """
+    Generic reusable function to email a JSON report.
+    report_type: "missing_layers" or "missing_excel_files"
+    """
+    if recipients is None:
+        recipients = getattr(settings, "MISSING_LAYER_RECIPIENTS", [])
+
+    if isinstance(recipients, str):
+        recipients = [recipients]
+
+    if not recipients:
+        logger.error("No recipients configured for report email.")
+        return False
+
+    if report_type == "missing_layers":
+        subject = "Missing Layers Report"
+        attachment_name = "missing_layers.json"
+
+        strict_result = result.get("Mandatory", {})
+        can_be_empty_result = result.get("can_be_empty", {})
+
+        # Filter out workspaces with zero missing layers
+        strict_filtered = {
+            ws: data for ws, data in strict_result.items() if data.get("missing_layers")
+        }
+        can_be_empty_filtered = {
+            ws: data
+            for ws, data in can_be_empty_result.items()
+            if data.get("missing_layers")
+        }
+
+        strict_summary = []
+        total_strict_missing = 0
+        for layer, data in strict_filtered.items():
+            count = len(data.get("missing_layers", []))
+            total_strict_missing += count
+            strict_summary.append(f"{layer}: {count}")
+
+        can_be_empty_summary = []
+        total_can_be_empty_missing = 0
+        for layer, data in can_be_empty_filtered.items():
+            count = len(data.get("missing_layers", []))
+            total_can_be_empty_missing += count
+            can_be_empty_summary.append(f"{layer}: {count}")
+
+        total_missing = total_strict_missing + total_can_be_empty_missing
+
+        body = (
+                "Missing Layers Report\n\n"
+                f"Total Missing: {total_missing}\n"
+                f"  - Mandatory (needs attention): {total_strict_missing}\n"
+                f"  - Can-Be-Empty (may be legitimately absent): {total_can_be_empty_missing}\n\n"
+                "---- Mandatory Workspaces (data expected everywhere) ----\n"
+                + (
+                    "\n".join(strict_summary)
+                    if strict_summary
+                    else "None — nothing missing"
+                )
+                + "\n\n"
+                  "---- Can-Be-Empty Workspaces (some locations may legitimately have no data) ----\n"
+                + (
+                    "\n".join(can_be_empty_summary)
+                    if can_be_empty_summary
+                    else "None — nothing missing"
+                )
+                + "\n\nDetailed report attached."
+        )
+        result = {
+            "Mandatory": strict_filtered,
+            "can_be_empty": can_be_empty_filtered,
+        }
+
+    elif report_type == "missing_excel_files":
+        subject = "Missing Stats Excel/JSON Files Report"
+        attachment_name = "missing_excel_files.json"
+        total_locations = len(result)
+        total_missing_files = sum(len(loc.get("missing_files", [])) for loc in result)
+        total_xlsx_issues = sum(1 for loc in result if loc.get("xlsx_issues"))
+        body = (
+            "Missing Stats Excel/JSON Files Report\n\n"
+            f"Tehsils which files(json/excel) are missing: {total_locations}\n"
+            f"Total missing files: {total_missing_files}\n"
+            f"Tehsils with xlsx sheet missing: {total_xlsx_issues}\n\n"
+            "Detailed report attached."
+        )
+
+    else:
+        logger.error(f"Unknown report_type: {report_type}")
+        return False
+
+    attachment_content = json.dumps(result, indent=4)
+    max_retries = 3
+
+    for attempt in range(max_retries):
+        connection = None
+        try:
+            connection = get_connection(timeout=120)
+            connection.open()
+            email = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=settings.EMAIL_HOST_USER,
+                to=recipients,
+                connection=connection,
+            )
+            email.attach(
+                attachment_name,
+                attachment_content,
+                "application/json",
+            )
+            email.send()
+            logger.info(f"{subject} sent to {recipients}")
+            logger.info(
+                f"Attachment size: "
+                f"{len(attachment_content.encode('utf-8')) / 1024:.2f} KB"
+            )
+            return True
+        except Exception as e:
+            logger.exception(f"Attempt {attempt + 1}/{max_retries} failed: {e}")
+            if attempt < max_retries - 1:
+                wait_time = 5 * (attempt + 1)
+                logger.info(f"Retrying after {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                logger.error("All attempts to send email failed.")
+                return False
+        finally:
+            if connection:
+                try:
+                    connection.close()
+                except Exception:
+                    pass
+    return False

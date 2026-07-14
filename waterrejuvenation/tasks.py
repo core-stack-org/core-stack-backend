@@ -28,7 +28,6 @@ from projects.models import Project
 from utilities.constants import SITE_DATA_PATH, GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
-    gdf_to_ee_fc,
     get_gee_dir_path,
     make_asset_public,
     valid_gee_text,
@@ -63,6 +62,105 @@ def is_nan(value):
         or (isinstance(value, float) and math.isnan(value))
         or pd.isna(value)
     )
+
+
+def _gee_safe_property(value):
+    import numpy as np
+
+    if is_nan(value):
+        return "N/A"
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        return float(value)
+    if isinstance(value, bool):
+        return value
+    return str(value)
+
+
+def _gdf_to_ee_feature_collection(gdf):
+    features = []
+    for _, row in gdf.iterrows():
+        geom = row.geometry
+        if geom is None or geom.is_empty:
+            continue
+        props = {
+            col: _gee_safe_property(row[col])
+            for col in gdf.columns
+            if col != "geometry"
+        }
+        features.append(ee.Feature(ee.Geometry(geom.__geo_interface__), props))
+    return ee.FeatureCollection(features)
+
+
+def _fc_to_gdf(feature_collection):
+    info = feature_collection.getInfo()
+    features = info.get("features") or []
+    if not features:
+        return gpd.GeoDataFrame(
+            columns=["geometry"], geometry="geometry", crs="EPSG:4326"
+        )
+    return gpd.GeoDataFrame.from_features(features, crs="EPSG:4326")
+
+
+def _match_desilting_points_to_waterbodies(desilt_gdf, wb_gdf, max_distance_m=100):
+    if desilt_gdf.empty:
+        return (
+            gpd.GeoDataFrame(
+                columns=["geometry"], geometry="geometry", crs="EPSG:4326"
+            ),
+            gpd.GeoDataFrame(
+                columns=["geometry"], geometry="geometry", crs="EPSG:4326"
+            ),
+        )
+
+    desilt_metric = desilt_gdf.to_crs(3857)
+    wb_metric = wb_gdf.to_crs(3857)
+
+    matched_rows = []
+    unmatched_rows = []
+
+    for idx, point_row in desilt_gdf.iterrows():
+        point_metric = desilt_metric.loc[idx].geometry
+        props = {col: point_row[col] for col in desilt_gdf.columns if col != "geometry"}
+
+        intersect_hits = wb_metric[wb_metric.intersects(point_metric)]
+        if not intersect_hits.empty:
+            wb_idx = intersect_hits.index[0]
+            out_geom = wb_gdf.loc[wb_idx].geometry
+            props["matched"] = True
+            props["match_type"] = "intersect"
+            matched_rows.append({**props, "geometry": out_geom})
+            continue
+
+        near_hits = wb_metric[wb_metric.intersects(point_metric.buffer(max_distance_m))]
+        if not near_hits.empty:
+            wb_idx = near_hits.index[0]
+            out_geom = wb_gdf.loc[wb_idx].geometry
+            props["matched"] = True
+            props["match_type"] = "near"
+            matched_rows.append({**props, "geometry": out_geom})
+            continue
+
+        props["matched"] = False
+        props["match_type"] = "none"
+        unmatched_rows.append({**props, "geometry": point_row.geometry})
+
+    matched_gdf = (
+        gpd.GeoDataFrame(matched_rows, geometry="geometry", crs="EPSG:4326")
+        if matched_rows
+        else gpd.GeoDataFrame(
+            columns=["geometry"], geometry="geometry", crs="EPSG:4326"
+        )
+    )
+    unmatched_gdf = (
+        gpd.GeoDataFrame(unmatched_rows, geometry="geometry", crs="EPSG:4326")
+        if unmatched_rows
+        else gpd.GeoDataFrame(
+            columns=["geometry"], geometry="geometry", crs="EPSG:4326"
+        )
+    )
+    return matched_gdf, unmatched_gdf
 
 
 @shared_task
@@ -381,7 +479,12 @@ def Generate_water_balance_indicator(mws_asset_id, proj_id, gee_account_id=None)
         + dst_filename
     )
 
-    BuildDesiltingLayer(proj_obj.id, gee_account_id)
+    BuildDesiltingLayer(
+        proj_obj.id,
+        gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        asset_folder=asset_folder,
+    )
     BuildWaterBodyLayer(
         proj_id=proj_obj.id,
         app_type="WATERBODY",
@@ -433,17 +536,28 @@ def Genereate_zoi_and_zoi_indicator(
 
 @shared_task()
 def BuildDesiltingLayer(
-    project_id, asset_suffix=None, asset_folder=None, gee_account_id=None
+    project_id, gee_account_id=None, asset_suffix=None, asset_folder=None
 ):
-    # ee_initialize(gee_account_id)
     from .models import WaterbodiesDesiltingLog
+
+    ee_initialize(gee_account_id)
 
     instance = Project.objects.get(pk=project_id)
     data = WaterbodiesDesiltingLog.objects.filter(
         project_id=project_id, closest_wb_lat__isnull=False, process=True
     )
-    asset_folder = [instance.name]
-    assst_suffix_desilt = f"Desilt_layer_{instance.name}_{instance.id}".lower()
+
+    if not data.exists():
+        raise ValueError(
+            f"No processed desilting points for project_id={project_id}. "
+            "Upload excel and run Upload_Desilting_Points first."
+        )
+    asset_folder = asset_folder or [instance.name]
+    if asset_suffix in (None, ""):
+        desilt_key = f"{instance.name}_{instance.id}".lower()
+    else:
+        desilt_key = str(asset_suffix).lower()
+    assst_suffix_desilt = f"desilt_layer_{desilt_key}"
     asset_id_desilt = (
         get_gee_dir_path(
             asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
@@ -508,14 +622,26 @@ def BuildDesiltingLayer(
             )
     df = pd.read_csv(file_path)
     df = df.fillna("N/A").replace(r"^\s*$", "N/A", regex=True)
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+    df = df.dropna(subset=["latitude", "longitude"])
+
+    if df.empty:
+        raise ValueError("No valid desilting point coordinates to export to GEE.")
+
     geometry = [Point(xy) for xy in zip(df["longitude"], df["latitude"])]
     gdf = gpd.GeoDataFrame(df, geometry=geometry)
     gdf.set_crs("EPSG:4326", allow_override=True, inplace=True)
     gdf = gdf.dropna(subset=["geometry"])
-    fc = gdf_to_ee_fc(gdf)
+    if gdf.empty:
+        raise ValueError("No valid desilting points to export to GEE.")
+
+    fc = _gdf_to_ee_feature_collection(gdf)
     delete_asset_on_GEE(asset_id_desilt)
     point_tasks = ee.batch.Export.table.toAsset(
-        collection=fc, description=assst_suffix_desilt, assetId=asset_id_desilt
+        collection=fc,
+        description=assst_suffix_desilt,
+        assetId=asset_id_desilt,
     )
     point_tasks.start()
     wait_for_task_completion(point_tasks)
@@ -840,57 +966,31 @@ def BuildWaterBodyLayer(
     )
     desilting_points = ee.FeatureCollection(desilt_asset_id)
 
-    MAX_DISTANCE = 100  # meters
+    logger.info(
+        "BuildWaterBodyLayer project=%s waterbodies=%s desilting=%s",
+        proj_id,
+        waterbody_asset_id,
+        desilt_asset_id,
+    )
 
-    # ------------------------------------------------------------------
-    # Point → Polygon matching logic
-    # ------------------------------------------------------------------
-    def attach_polygon_to_point(point):
-        pt_geom = point.geometry()
+    wb_gdf = _fc_to_gdf(waterbodies)
+    desilt_gdf = _fc_to_gdf(desilting_points)
+    if desilt_gdf.empty:
+        raise ValueError(f"Desilting asset is empty or missing: {desilt_asset_id}")
+    if wb_gdf.empty:
+        raise ValueError(f"Waterbody asset is empty or missing: {waterbody_asset_id}")
 
-        intersecting = waterbodies.filterBounds(pt_geom)
-        nearby = waterbodies.filterBounds(pt_geom.buffer(MAX_DISTANCE))
+    matched_gdf, unmatched_gdf = _match_desilting_points_to_waterbodies(
+        desilt_gdf, wb_gdf, max_distance_m=100
+    )
+    matched_fc = _gdf_to_ee_feature_collection(matched_gdf)
+    unmatched_fc = _gdf_to_ee_feature_collection(unmatched_gdf)
 
-        intersect_size = intersecting.size()
-        nearby_size = nearby.size()
-
-        has_match = intersect_size.gt(0).Or(nearby_size.gt(0))
-
-        matched_polygon = ee.Algorithms.If(
-            intersect_size.gt(0),
-            intersecting.first(),
-            ee.Algorithms.If(nearby_size.gt(0), nearby.first(), None),
-        )
-
-        match_type = ee.Algorithms.If(
-            intersect_size.gt(0),
-            "intersect",
-            ee.Algorithms.If(nearby_size.gt(0), "near", "none"),
-        )
-
-        return ee.Feature(
-            ee.Algorithms.If(
-                has_match,
-                #  MATCH FOUND → duplicate polygon geometry
-                ee.Feature(matched_polygon)
-                .copyProperties(point)
-                .set("matched", True)
-                .set("match_type", match_type),
-                #  NO MATCH → keep original POINT geometry
-                ee.Feature(pt_geom)
-                .copyProperties(point)
-                .set("matched", False)
-                .set("match_type", "none"),
-            )
-        )
-
-    # ------------------------------------------------------------------
-    # Apply matching
-    # ------------------------------------------------------------------
-    exploded = desilting_points.map(attach_polygon_to_point)
-
-    matched_fc = exploded.filter(ee.Filter.eq("matched", True))
-    unmatched_fc = exploded.filter(ee.Filter.eq("matched", False))
+    logger.info(
+        "BuildWaterBodyLayer matched=%s unmatched=%s",
+        len(matched_gdf),
+        len(unmatched_gdf),
+    )
 
     # ------------------------------------------------------------------
     # EXPORT 1: MATCHED POLYGONS (GeoServer / GeoJSON)
@@ -906,14 +1006,19 @@ def BuildWaterBodyLayer(
 
     delete_asset_on_GEE(matched_asset_id)
 
-    export_matched = ee.batch.Export.table.toAsset(
-        collection=matched_fc,
-        description=f"water_rej_desilting_{proj_obj.id}",
-        assetId=matched_asset_id,
-    )
-
-    export_matched.start()
-    wait_for_task_completion(export_matched)
+    if len(matched_gdf) > 0:
+        export_matched = ee.batch.Export.table.toAsset(
+            collection=matched_fc,
+            description=f"water_rej_desilting_{proj_obj.id}",
+            assetId=matched_asset_id,
+        )
+        export_matched.start()
+        wait_for_task_completion(export_matched)
+    else:
+        logger.warning(
+            "No matched desilting polygons for project %s; skipping matched export.",
+            proj_obj.id,
+        )
 
     # ------------------------------------------------------------------
     # EXPORT 2: UNMATCHED POINTS (INTERNAL – DB UPDATE ONLY)
@@ -929,43 +1034,44 @@ def BuildWaterBodyLayer(
 
     delete_asset_on_GEE(unmatched_asset_id)
 
-    export_unmatched = ee.batch.Export.table.toAsset(
-        collection=unmatched_fc,
-        description=f"water_rej_desilting_unmatched_{proj_obj.id}",
-        assetId=unmatched_asset_id,
-    )
-
-    export_unmatched.start()
-    wait_for_task_completion(export_unmatched)
+    if len(unmatched_gdf) > 0:
+        export_unmatched = ee.batch.Export.table.toAsset(
+            collection=unmatched_fc,
+            description=f"water_rej_desilting_unmatched_{proj_obj.id}",
+            assetId=unmatched_asset_id,
+        )
+        export_unmatched.start()
+        wait_for_task_completion(export_unmatched)
 
     # ------------------------------------------------------------------
     # Publish matched layer to GeoServer
     # ------------------------------------------------------------------
     layer_name = f"waterbodies_{proj_obj.name}_{proj_obj.id}".lower()
-    sync_project_fc_to_geoserver(
-        matched_fc,
-        proj_obj.name,
-        layer_name,
-        "swb",
-    )
+    if len(matched_gdf) > 0:
+        sync_project_fc_to_geoserver(
+            matched_fc,
+            proj_obj.name,
+            layer_name,
+            "swb",
+        )
 
     # ------------------------------------------------------------------
     # Update Django DB for unmatched points
     # ------------------------------------------------------------------
     from .models import WaterbodiesDesiltingLog
 
-    try:
-        unmatched_info = ee.FeatureCollection(unmatched_asset_id).getInfo()
-        unmatched_ids = []
-        for feature in unmatched_info["features"]:
-            desilting_id = feature["properties"]["desilt_id"]
-            if desilting_id:
-                unmatched_ids.append(desilting_id)
+    unmatched_ids = []
+    for _, row in unmatched_gdf.iterrows():
+        desilting_id = row.get("desilt_id")
+        if desilting_id is None or desilting_id == "N/A":
+            continue
+        try:
+            unmatched_ids.append(int(desilting_id))
+        except (TypeError, ValueError):
+            continue
 
-        if unmatched_ids:
-            WaterbodiesDesiltingLog.objects.filter(id__in=unmatched_ids).update(
-                process=False, failure_reason="No waterbody found within 100m"
-            )
-
-    except Exception as e:
-        print("No Umnatch point found")
+    if unmatched_ids:
+        WaterbodiesDesiltingLog.objects.filter(id__in=unmatched_ids).update(
+            process=False,
+            failure_reason="No waterbody found within 100m",
+        )
