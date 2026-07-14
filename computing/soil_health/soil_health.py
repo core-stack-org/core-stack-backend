@@ -35,7 +35,7 @@ LOCAL_OUTPUT_BASE_DIR = "data/soil_health"
 GEOSERVER_STYLE = ""
 GEOSERVER_RASTER_WORKSPACE = "soil_health_raster"
 GEOSERVER_VECTOR_WORKSPACE = "soil_health_vector"
-NUTRIENTS = ["N", "K", "P", "OC"]
+NUTRIENTS = ["N", "K", "P", "OC", "OLM"]
 NUTRIENT_PERCENTILES = (5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95)
 LOCAL_ALGORITHM = "local_soil_health"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
@@ -43,7 +43,7 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 
 def _get_lulc_mask_classes(nutrient):
     nutrient = str(nutrient).strip().upper()
-    if nutrient == "OC":
+    if nutrient in {"OC", "OLM"}:
         return {6}
     if nutrient in {"N", "P", "K"}:
         return {8, 9, 10, 11}
@@ -255,7 +255,7 @@ def clip_soil_health_raster(
                 except Exception as e:
                     print(f"Error generating STAC: {e}")
 
-    return all(geoserver_statuses) if push_to_geoserver else True  # TODO Add Stac specs
+    return all(geoserver_statuses) if push_to_geoserver else True
 
 
 def get_roi(asset_suffix, block, district, roi, state, precomputed_roi_dir):
@@ -317,9 +317,9 @@ def vectorize_soil_health(
             percentiles=tuple(NUTRIENT_PERCENTILES),
             nutrient=nutrient,
         )
-
+        output_layer_name = f"{layer_name}_vector_{nutrient}"
         output_path = build_output_vector_path(
-            layer_name=f"{layer_name}_vector_{nutrient}",
+            layer_name=output_layer_name,
             state=state,
             district=district,
             block=block,
@@ -328,14 +328,14 @@ def vectorize_soil_health(
         asset_id = write_vector_output(
             gdf=result_gdf,
             output_path=output_path,
-            layer_name=layer_name,
+            layer_name=output_layer_name,
         )
         print(f"Saved soil health vector: {output_path}")
 
         if push_to_geoserver:
             geoserver_response = push_local_vector_to_geoserver(
                 path=os.path.splitext(output_path)[0],
-                layer_name=layer_name,
+                layer_name=output_layer_name,
                 workspace=GEOSERVER_VECTOR_WORKSPACE,
                 file_type="gpkg",
             )
@@ -352,7 +352,7 @@ def vectorize_soil_health(
                 state=state,
                 district=district,
                 block=block,
-                layer_name=layer_name,
+                layer_name=output_layer_name,
                 asset_id=asset_id,
                 dataset_name="Soil Health Vector",
                 misc={"is_generated_locally": True},
@@ -383,6 +383,7 @@ def vectorize_soil_health(
 
 @app.task(bind=True)
 def soil_health_local(
+    self,
     state=None,
     district=None,
     block=None,
