@@ -14,7 +14,8 @@ sources:
   classification_yaml: computing/misc/facilities/facility_classifications.yaml
 
 output:
-  root: data/tests/outputs/facilities
+  root: data/outputs
+  directory_name: facilities
   layer_prefix: facilities
   geoserver_workspace: testworkspace
   # Dataset row used when registering published layers in the Layer database.

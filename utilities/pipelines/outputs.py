@@ -251,13 +251,14 @@ class OutputBundle:
 
     root: str | Path
     name: str
+    directory_name: str | None = None
 
     def __post_init__(self) -> None:
         self.root = Path(self.root)
 
     @property
     def path(self) -> Path:
-        return self.root / slug(self.name)
+        return self.root / slug(self.directory_name or self.name)
 
     def ensure(self) -> Path:
         self.path.mkdir(parents=True, exist_ok=True)

@@ -375,7 +375,11 @@ def run_livestocks_pipeline(
     output_config = config["output"]
     layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
     output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
-    bundle = OutputBundle(output_root, layer_name)
+    bundle = OutputBundle(
+        output_root,
+        layer_name,
+        directory_name=output_config["directory_name"],
+    )
     cache_key = _cache_key(request, outputs)
     cache_signatures = _cache_input_signatures(config, config_path)
     required_result_paths = _required_result_paths(outputs, request)
