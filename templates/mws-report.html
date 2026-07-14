@@ -630,45 +630,29 @@
            ============================================================================ */
 
         .ol-scale {
-            position: absolute;
-            bottom: 15px;
-            right: 15px;
+            position: absolute !important;
+            bottom: 15px !important;
+            right: 15px !important;
+            left: auto !important;
             background: #FFFFFF !important;
             border-radius: 4px;
-            padding: 8px 10px !important;
+            padding: 6px 10px !important;
             font-size: 11px;
             font-family: 'Roboto', 'Arial', sans-serif;
             z-index: 10;
             border: 1px solid #666 !important;
         }
 
-        .ol-scale-singlebar,
-        .ol-scale-multibars {
-            background: transparent !important;
+        .ol-scale .ol-scale-line-inner {
             border: none !important;
-            padding: 4px 0 !important;
-            margin: 0 !important;
-        }
-
-        .ol-scale-singlebar {
             border-bottom: 3px solid #000 !important;
-            border-left: 3px solid #000 !important;
-            border-right: 3px solid #000 !important;
-        }
-
-        .ol-scale-multibars {
-            border-bottom: 3px solid #000 !important;
-        }
-
-        .ol-scale-value {
+            color: #000000 !important;
+            text-shadow: none !important;
             font-size: 13px !important;
             font-weight: 800 !important;
-            color: #ffffff !important;
             text-align: center;
-            padding: 4px 0 !important;
-            background: transparent !important;
-            margin: 3px 0 0 0 !important;
-            display: block;
+            padding: 0 0 3px 0 !important;
+            margin: 0 !important;
             letter-spacing: 0.3px;
         }
 
@@ -681,10 +665,10 @@
             border-radius: 2px;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
             width: 10vw;
-            height: 10vh;
+            height: auto;
             max-width: 10vw;
-            max-height: 10vh;
-            overflow-y: auto;
+            max-height: none;
+            overflow-y: visible;
             overflow-x: hidden;
             font-family: 'Roboto', 'Arial', sans-serif;
             z-index: 9;
@@ -840,7 +824,7 @@
             .google-maps-legend {
                 width: 200px;
                 max-width: 200px;
-                max-height: 250px;
+                max-height: none;
                 top: 10px;
                 right: 10px;
             }
@@ -858,15 +842,16 @@
             }
 
             .ol-scale {
-                bottom: 10px;
-                right: 10px;
+                bottom: 10px !important;
+                right: 10px !important;
+                left: auto !important;
                 font-size: 10px;
                 padding: 6px 8px !important;
             }
 
-            .ol-scale-value {
+            .ol-scale .ol-scale-line-inner {
                 font-size: 11px !important;
-                padding: 3px 0 !important;
+                padding: 0 0 2px 0 !important;
             }
         }
 
@@ -1194,47 +1179,31 @@
             /* SCALE IN PRINT MODE */
             .ol-scale {
                 display: block !important;
-                position: absolute;
-                bottom: 15px;
-                right: 15px;
+                position: absolute !important;
+                bottom: 15px !important;
+                right: 15px !important;
+                left: auto !important;
                 width: auto;
-                min-width: 100px;
+                min-width: 80px;
                 background: #FFFFFF !important;
                 border-radius: 4px;
-                padding: 8px 10px !important;
+                padding: 6px 10px !important;
                 box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
                 z-index: 20 !important;
                 border: 1px solid #666 !important;
                 font-size: 10px !important;
             }
 
-            .ol-scale-singlebar,
-            .ol-scale-multibars {
-                background: transparent !important;
+            .ol-scale .ol-scale-line-inner {
                 border: none !important;
-                padding: 4px 0 !important;
-                margin: 0 !important;
-            }
-
-            .ol-scale-singlebar {
                 border-bottom: 3px solid #000 !important;
-                border-left: 3px solid #000 !important;
-                border-right: 3px solid #000 !important;
-            }
-
-            .ol-scale-multibars {
-                border-bottom: 3px solid #000 !important;
-            }
-
-            .ol-scale-value {
+                color: #000000 !important;
+                text-shadow: none !important;
                 font-size: 13px !important;
                 font-weight: 800 !important;
-                color: #000000 !important;
                 text-align: center;
-                padding: 4px 0 !important;
-                background: transparent !important;
-                margin: 3px 0 0 0 !important;
-                display: block;
+                padding: 0 0 3px 0 !important;
+                margin: 0 !important;
                 letter-spacing: 0.3px;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -1757,7 +1726,7 @@
                 <tbody>
                     <tr style="font-weight: bold;">
                         <td colspan="3" style="padding: 10px; border: 1px solid black;">Total Length (km)</td>
-                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Drainage Density (km/km²)</td>
+                        <td colspan="3" style="padding: 10px; border: 1px solid black;">Drainage Density (1/km)</td>
                     </tr>
                     <tr>
                         <td colspan="3" id="tbl-drainage-length" style="padding: 10px; border: 1px solid black;">
@@ -1921,9 +1890,9 @@
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping Area (Hec)</td>
+                        <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Cropping Area (Ha)</td>
                         <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Surface water
-                            availability (Hec)</td>
+                            availability (Ha)</td>
                         <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Rainfall (mm)</td>
                         <td style="padding: 10px; border: 1px solid black; font-weight: bold;">ET (mm)</td>
                         <td style="padding: 10px; border: 1px solid black; font-weight: bold;">Run off (mm)</td>
@@ -2472,16 +2441,14 @@
         <section class="section">
             <h3>Hydrological cycle</h3>
 
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <div class="chart-container" style="flex: 1 1 32%; min-width: 250px;">
-                    <canvas id="lineChart-rainfall-fn"></canvas>
-                </div>
-                <div class="chart-container" style="flex: 1 1 32%; min-width: 250px;">
-                    <canvas id="lineChart-et-fn"></canvas>
-                </div>
-                <div class="chart-container" style="flex: 1 1 32%; min-width: 250px;">
-                    <canvas id="lineChart-runoff-fn"></canvas>
-                </div>
+            <div class="chart-container">
+                <canvas id="lineChart-rainfall-fn"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineChart-et-fn"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineChart-runoff-fn"></canvas>
             </div>
 
             <p class="legend-note">
@@ -3968,20 +3935,16 @@
                     let fillColor = 'rgba(135, 206, 235, 0.0)';
 
                     if (uid === '{{mws_id}}') {
+                        strokeColor = "#87CEEB";
                         if (type === "Safe") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
                             fillColor = "rgba(255, 255, 255, 0.4)";
                         } else if (type === "Semi-critical") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
                             fillColor = "rgba(224, 243, 248, 0.4)";
                         } else if (type === "Critical") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
                             fillColor = "rgba(69, 117, 180, 0.4)";
                         } else if (type === "Not Assessed") {
-                            strokeColor = "rgba(51, 51, 51, 1)";
                             fillColor = "rgba(169, 169, 169, 0.4)";
                         } else {
-                            strokeColor = "rgba(51, 51, 51, 1)";
                             fillColor = "rgba(49, 54, 149, 0.4)";
                         }
                     }
@@ -4016,11 +3979,10 @@
         // Function to add scale control to a map
         const addVisualScaleBar = (map) => {
             const scaleControl = new ol.control.ScaleLine({
+                className: 'ol-scale',
                 units: 'metric',
-                bar: true,
-                steps: 4,
-                text: true,
-                minWidth: 100
+                bar: false,
+                minWidth: 80
             });
             map.addControl(scaleControl);
         };
@@ -4063,10 +4025,20 @@
         const initializeMapControls = () => {
             // Add scale bars to ALL maps
             if (typeof mainMap !== 'undefined') addVisualScaleBar(mainMap);
+            if (typeof TerrainMap !== 'undefined') addVisualScaleBar(TerrainMap);
             if (typeof demMap !== 'undefined') addVisualScaleBar(demMap);
             if (typeof demMapTerrain !== 'undefined') addVisualScaleBar(demMapTerrain);
             if (typeof drainageMap !== 'undefined') addVisualScaleBar(drainageMap);
             if (typeof terrainRasterMap !== 'undefined') addVisualScaleBar(terrainRasterMap);
+            if (typeof landscapeLulcMap !== 'undefined') addVisualScaleBar(landscapeLulcMap);
+            if (typeof farmLossMap !== 'undefined') addVisualScaleBar(farmLossMap);
+            if (typeof treeLossMap !== 'undefined') addVisualScaleBar(treeLossMap);
+            if (typeof demographicPopMap !== 'undefined') addVisualScaleBar(demographicPopMap);
+            if (typeof demographicLitMap !== 'undefined') addVisualScaleBar(demographicLitMap);
+            if (typeof demographicMargMap !== 'undefined') addVisualScaleBar(demographicMargMap);
+            if (typeof hydroVectorMap !== 'undefined') addVisualScaleBar(hydroVectorMap);
+            if (typeof DegradMap !== 'undefined') addVisualScaleBar(DegradMap);
+            if (typeof treeReduceMap !== 'undefined') addVisualScaleBar(treeReduceMap);
 
             if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
             if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
@@ -4100,6 +4072,13 @@
         const rabiData = JSON.parse('{{rabi_data|safe}}')
         const zaidData = JSON.parse('{{zaid_data|safe}}')
         const waterYears = JSON.parse('{{water_years|safe}}')
+
+        const waterYearRange = (() => {
+            if (!waterYears || waterYears.length === 0) return '';
+            const allYears = waterYears.join(' ').match(/\d{4}/g);
+            if (!allYears || allYears.length === 0) return '';
+            return `${allYears[0]}-${allYears[allYears.length - 1]}`;
+        })();
 
         const barChart_swb = new Chart(document.getElementById('barChart-swb'), {
             type: 'bar',
@@ -4146,7 +4125,7 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Surface water availability during Kharif, Rabi, and Zaid (2017-2022)'
+                        text: `Surface water availability during Kharif, Rabi, and Zaid (${waterYearRange})`
                     },
                     legend: { position: 'top' }
                 }

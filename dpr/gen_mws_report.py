@@ -1,4 +1,5 @@
 import re
+import functools
 import requests
 import geopandas as gpd
 import pandas as pd
@@ -20,6 +21,23 @@ from utilities.logger import setup_logger
 logger = setup_logger(__name__)
 
 DATA_DIR_TEMP = EXCEL_DIR
+
+
+@functools.lru_cache(maxsize=8)
+def _get_excel_file(path):
+    """Cached ExcelFile handle. Every get_* function in this module used to call
+    pd.read_excel()/pd.ExcelFile() independently for the same report's workbook,
+    re-opening and re-parsing the whole .xlsx from disk on every call (dozens of
+    times per report). This opens/parses each workbook once per path and reuses
+    the in-memory handle for every sheet read after that."""
+    return pd.ExcelFile(path)
+
+
+def read_excel_sheet(path, sheet_name):
+    """Read a sheet via the cached ExcelFile handle for `path`. Returns a fresh
+    copy so callers can mutate the DataFrame freely without affecting other
+    callers sharing the same cached workbook."""
+    return _get_excel_file(path).parse(sheet_name).copy()
 
 
 # ? MARK: HELPER FUNCTIONS
@@ -212,7 +230,7 @@ def get_rainfall_type(rainfall):
 def get_osm_data(state, district, block, uid):
     try:
         # * Area of the Tehsil
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -222,7 +240,7 @@ def get_osm_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="terrain",
+            "terrain",
         )
         df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
 
@@ -889,9 +907,9 @@ def get_osm_data(state, district, block, uid):
 
 def get_terrain_data(state, district, block, uid):
     try:
-        excel_file = pd.ExcelFile(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
+        excel_file = _get_excel_file(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx")
 
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -901,7 +919,7 @@ def get_terrain_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="terrain",
+            "terrain",
         )
 
         df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
@@ -1004,7 +1022,7 @@ def get_terrain_data(state, district, block, uid):
 
         if "terrain_lulc_slope" in excel_file.sheet_names:
 
-            df_slopes = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="terrain_lulc_slope")
+            df_slopes = read_excel_sheet(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx", "terrain_lulc_slope")
 
             block_shrub_area = sum(df_slopes["shrub_scrubs_area_percent"] * df_slopes["area_in_ha"] / 100)
             block_barren_area = sum(df_slopes["barren_area_percent"] * df_slopes["area_in_ha"] / 100)
@@ -1042,7 +1060,7 @@ def get_terrain_data(state, district, block, uid):
                 slope_shrub_percent = float(shrub_percent)
 
         if "terrain_lulc_plain" in excel_file.sheet_names:
-            df_plain = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="terrain_lulc_plain")
+            df_plain = read_excel_sheet(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx", "terrain_lulc_plain")
 
             block_shrub_area = sum(df_plain["shrub_scrubs_area_percent"] * df_plain["area_in_ha"] / 100)
             block_barren_area = sum(df_plain["barren_area_percent"] * df_plain["area_in_ha"] / 100)
@@ -1122,7 +1140,7 @@ def get_mws_barren_percent(state, district, block, uid):
     try:
         base_path = DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx"
 
-        df_terrain = pd.read_excel(base_path, sheet_name="terrain")
+        df_terrain = read_excel_sheet(base_path, "terrain")
         row_terrain = df_terrain.loc[df_terrain["UID"] == uid]
         if row_terrain.empty:
             return 0
@@ -1132,7 +1150,7 @@ def get_mws_barren_percent(state, district, block, uid):
 
         slope_barren_percent = 0
         try:
-            df_slope = pd.read_excel(base_path, sheet_name="terrain_lulc_slope")
+            df_slope = read_excel_sheet(base_path, "terrain_lulc_slope")
             row_slope = df_slope.loc[df_slope["UID"] == uid]
             if not row_slope.empty:
                 slope_barren_percent = float(row_slope["barren_area_percent"].values[0])
@@ -1141,7 +1159,7 @@ def get_mws_barren_percent(state, district, block, uid):
 
         plain_barren_percent = 0
         try:
-            df_plain = pd.read_excel(base_path, sheet_name="terrain_lulc_plain")
+            df_plain = read_excel_sheet(base_path, "terrain_lulc_plain")
             row_plain = df_plain.loc[df_plain["UID"] == uid]
             if not row_plain.empty:
                 plain_barren_percent = float(row_plain["barren_area_percent"].values[0])
@@ -1158,22 +1176,18 @@ def get_crop_intensity_sankey_data(state, district, block, uid):
     """Cropping-intensity class transitions (single/double/triple) for the MWS, as sankey source-target-value links."""
     sankey_data = []
     try:
-        df_cc = pd.read_excel(
+        df_cc = read_excel_sheet(
             DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="change_detection_cropintensity",
+            "change_detection_cropintensity",
         )
         row_cc = df_cc.loc[df_cc["UID"] == uid]
         if not row_cc.empty:
+            # Only degradation flows: Triple/Double (left) -> Double/Single (right)
             transitions = [
-                ("single_to_single_area_in_ha", "Single", "Single"),
-                ("single_to_double_area_in_ha", "Single", "Double"),
-                ("single_to_triple_area_in_ha", "Single", "Triple"),
                 ("double_to_single_area_in_ha", "Double", "Single"),
                 ("double_to_double_area_in_ha", "Double", "Double"),
-                ("double_to_triple_area_in_ha", "Double", "Triple"),
                 ("triple_to_single_area_in_ha", "Triple", "Single"),
                 ("triple_to_double_area_in_ha", "Triple", "Double"),
-                ("triple_to_triple_area_in_ha", "Triple", "Triple"),
             ]
             for col, source, target in transitions:
                 if col not in row_cc.columns:
@@ -1196,9 +1210,9 @@ def get_tree_reduction_sankey_data(state, district, block, uid):
     """Forest cover transitions (to barren/built-up/farm/forest/scrub) for the MWS, as sankey source-target-value links."""
     sankey_data = []
     try:
-        df_defo = pd.read_excel(
+        df_defo = read_excel_sheet(
             DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="change_detection_deforestation",
+            "change_detection_deforestation",
         )
         row_defo = df_defo.loc[df_defo["UID"] == uid]
         if not row_defo.empty:
@@ -1230,9 +1244,9 @@ def get_urbanization_sankey_data(state, district, block, uid):
     """Land cover transitions into built-up area for the MWS, as sankey source-target-value links."""
     sankey_data = []
     try:
-        df_urban = pd.read_excel(
+        df_urban = read_excel_sheet(
             DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="change_detection_urbanization",
+            "change_detection_urbanization",
         )
         row_urban = df_urban.loc[df_urban["UID"] == uid]
         if not row_urban.empty:
@@ -1261,7 +1275,7 @@ def get_urbanization_sankey_data(state, district, block, uid):
 
 def get_change_detection_data(state, district, block, uid):
     try:
-        df_degrad = pd.read_excel(
+        df_degrad = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1271,9 +1285,9 @@ def get_change_detection_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="change_detection_degradation",
+            "change_detection_degradation",
         )
-        df_defo = pd.read_excel(
+        df_defo = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1283,9 +1297,9 @@ def get_change_detection_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="change_detection_deforestation",
+            "change_detection_deforestation",
         )
-        df_urban = pd.read_excel(
+        df_urban = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1295,9 +1309,9 @@ def get_change_detection_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="change_detection_urbanization",
+            "change_detection_urbanization",
         )
-        df_restore = pd.read_excel(
+        df_restore = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1307,7 +1321,7 @@ def get_change_detection_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="restoration_vector",
+            "restoration_vector",
         )
 
         parameter_land = f""
@@ -1381,7 +1395,7 @@ def get_change_detection_data(state, district, block, uid):
 
 def get_land_conflict_industrial_data(state, district, block, uid):
     try:
-        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="lcw_conflict")
+        df = read_excel_sheet(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx", "lcw_conflict")
 
         filtered_title = df.loc[df["UID"] == uid, "title_of_conflict"]
         filtered_link = df.loc[df["UID"] == uid, "link_to_conflict"]
@@ -1407,7 +1421,7 @@ def get_land_conflict_industrial_data(state, district, block, uid):
 
 def get_factory_data(state, district, block, uid):
     try:
-        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="factory_csr")
+        df = read_excel_sheet(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx", "factory_csr")
 
         # Filter by UID
         filtered_df = df[df["UID"] == uid]
@@ -1445,7 +1459,7 @@ def get_factory_data(state, district, block, uid):
 
 def get_mining_data(state, district, block, uid):
     try:
-        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="mining")
+        df = read_excel_sheet(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx", "mining")
 
         # Filter by UID first
         filtered_df = df[df["UID"] == uid]
@@ -1479,7 +1493,7 @@ def get_mining_data(state, district, block, uid):
 
 def get_green_credit_data(state, district, block, uid):
     try:
-        df = pd.read_excel(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx",sheet_name="green_credit")
+        df = read_excel_sheet(DATA_DIR_TEMP+ state.upper()+ "/"+ district.upper()+ "/"+ district.lower()+ "_"+ block.lower()+ ".xlsx", "green_credit")
 
         # Filter by UID
         filtered_df = df[df["UID"] == uid]
@@ -1518,8 +1532,8 @@ def get_green_credit_data(state, district, block, uid):
 
 def get_cropping_intensity(state, district, block, uid):
     try:
-        df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="croppingIntensity_annual")
-        df_drought = pd.read_excel( DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="croppingDrought_kharif")
+        df = read_excel_sheet(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", "croppingIntensity_annual")
+        df_drought = read_excel_sheet( DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", "croppingDrought_kharif")
 
         selected_columns_inten = [col for col in df.columns if col.startswith("cropping_intensity_")]
 
@@ -1580,7 +1594,7 @@ def get_cropping_intensity(state, district, block, uid):
             for index, item in enumerate(mws_drought_moderate):
                 drought_check = mws_drought_moderate[index] + mws_drought_severe[index]
                 match_exp = re.search(r"\d{4}", selected_columns_severe[index])
-                if drought_check > 5:
+                if drought_check >= 5:
                     if match_exp:
                         drought_years.append(match_exp.group(0))
                 else:
@@ -1674,7 +1688,7 @@ def get_cropping_intensity(state, district, block, uid):
 
 def get_cropping_year_range(state, district, block, uid):
     try:
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1684,7 +1698,7 @@ def get_cropping_year_range(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="croppingIntensity_annual",
+            "croppingIntensity_annual",
         )
 
         selected_columns_single = [
@@ -1709,9 +1723,9 @@ def get_cropping_year_range(state, district, block, uid):
 def get_mws_area_from_cropping_sheet(state, district, block, uid):
     """MWS area in hectares, read from the croppingIntensity_annual sheet."""
     try:
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx",
-            sheet_name="croppingIntensity_annual",
+            "croppingIntensity_annual",
         )
         row = df.loc[df["UID"] == uid]
         if not row.empty and "area_in_ha" in row.columns:
@@ -1767,7 +1781,7 @@ def get_waterbody_stats(state, district, block, uid):
 
 def get_surface_Water_bodies_data(state, district, block, uid):
     try:
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1777,9 +1791,9 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="surfaceWaterBodies_annual",
+            "surfaceWaterBodies_annual",
         )
-        df_drought = pd.read_excel(
+        df_drought = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1789,13 +1803,13 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="croppingDrought_kharif",
+            "croppingDrought_kharif",
         )
 
         base_path = DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx"
 
         # ? Waterbody presence check
-        df_intersect = pd.read_excel(base_path, sheet_name="mws_intersect_swb")
+        df_intersect = read_excel_sheet(base_path, "mws_intersect_swb")
         has_waterbody = not df_intersect.loc[df_intersect["UID"] == uid].empty
 
         selected_columns = [col for col in df.columns if col.startswith("total_area_")]
@@ -1848,19 +1862,19 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             wb_total_count, wb_large_count, wb_declining_percent = get_waterbody_stats(state, district, block, uid)
 
             try:
-                df_river = pd.read_excel(base_path, sheet_name="river")
+                df_river = read_excel_sheet(base_path, "river")
                 river_count = len(df_river.loc[df_river["UID"] == uid])
             except Exception:
                 river_count = 0
 
             try:
-                df_canal = pd.read_excel(base_path, sheet_name="canal")
+                df_canal = read_excel_sheet(base_path, "canal")
                 canal_count = len(df_canal.loc[df_canal["UID"] == uid])
             except Exception:
                 canal_count = 0
 
             try:
-                df_dd = pd.read_excel(base_path, sheet_name="drainage_density")
+                df_dd = read_excel_sheet(base_path, "drainage_density")
                 row_dd = df_dd.loc[df_dd["UID"] == uid]
                 drainage_density = round(float(row_dd["drainage_density_std_in_km_per_km2"].values[0]), 2) if not row_dd.empty else "-"
             except Exception:
@@ -1914,13 +1928,13 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 drought_check = mws_drought_moderate[index] + mws_drought_severe[index]
                 match_exp = re.search(r"\d{4}", selected_columns_severe[index])
                 if match_exp:
-                    if drought_check > 5:
+                    if drought_check >= 5:
                         drought_years.append(match_exp.group(0))
                     else:
                         non_drought_year.append(match_exp.group(0))
             
             if len(drought_years):
-                
+
                 total_area_d = 0
                 total_area_nd = 0
 
@@ -1938,18 +1952,28 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                         yearly_area = df.loc[df["UID"] == uid, selected_column_temp].values
                         if len(yearly_area) > 0 and len(yearly_area[0]) > 0:
                             total_area_nd += yearly_area[0][0]
-                
-                percent_nd_t_d = ((total_area_nd - total_area_d) / total_area_nd ) * 100
 
+                # Compare per-year averages, not raw sums, so unequal drought/non-drought
+                # year counts don't distort the percentage.
+                avg_area_d = total_area_d / len(drought_years) if len(drought_years) else 0
+                avg_area_nd = total_area_nd / len(non_drought_year) if len(non_drought_year) else 0
 
-                if result.trend == "increasing":
-                    parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
-                    
-                else:
-                    parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
+                if avg_area_nd > 0:
+                    percent_nd_t_d = ((avg_area_nd - avg_area_d) / avg_area_nd) * 100
+
+                    if result.trend == "increasing":
+                        parameter_swb_2 = f"During the monsoon, on average we observe that the area under surface water during drought years ({' and '.join(map(str, drought_years))}) is {round(percent_nd_t_d, 2)}% less than during non-drought years. This decline highlights a significant impact of drought on surface water availability during the primary crop-growing season, and indicates sensitivity of the cropping to droughts."
+
+                    else:
+                        parameter_swb_2 = f"During the monsoon, we observed a {round(percent_nd_t_d, 2)}% decrease in surface water area during drought years ({' and '.join(map(str, drought_years))}), as compared to non-drought years. This decline serves as a sensitivity measure, highlighting the significant impact of drought on surface water availability during the primary crop-growing season."
 
 
             #? Non-Drought Years SWB
+            # Defaults in case one of the two groups (drought/non-drought years) is empty,
+            # so the comparison below never references an undefined value.
+            percent_rb_kh_non_drought = None
+            hectare_drop_non_drought = None
+
             if len(non_drought_year):
                 area_under_rb_nd = 0
                 area_under_kh_nd = 0
@@ -1958,12 +1982,12 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 for year in non_drought_year:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
-                    
+
                     if selected_column_temp:
                         yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values
                         if len(yearly_area_kh) > 0 and len(yearly_area_kh[0]) > 0:
                             area_under_kh_nd += yearly_area_kh[0][0]
-                    
+
                     if selected_column_temp_rb:
                         yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values
                         if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
@@ -1972,6 +1996,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 # Handle division by zero for non-drought years
                 if area_under_kh_nd > 0:
                     percent_rb_kh = ((area_under_kh_nd - area_under_rb_nd) / area_under_kh_nd) * 100
+                    percent_rb_kh_non_drought = percent_rb_kh
+                    hectare_drop_non_drought = area_under_kh_nd - area_under_rb_nd
 
                     if result.trend == "increasing":
                         parameter_swb_3 += f"In non-drought years, surface water typically decreases by {round(percent_rb_kh, 2)}% from the Kharif to the Rabi season."
@@ -1988,27 +2014,40 @@ def get_surface_Water_bodies_data(state, district, block, uid):
                 for year in drought_years:
                     selected_column_temp = [col for col in df.columns if col.startswith("kharif_area_in_ha_" + year)]
                     selected_column_temp_rb = [col for col in df.columns if col.startswith("rabi_area_in_ha_" + year)]
-                    
+
                     if selected_column_temp:
                         yearly_area_kh = df.loc[df["UID"] == uid, selected_column_temp].values
                         if len(yearly_area_kh) > 0 and len(yearly_area_kh[0]) > 0:
                             area_under_kh += yearly_area_kh[0][0]
-                    
+
                     if selected_column_temp_rb:
                         yearly_area_rb = df.loc[df["UID"] == uid, selected_column_temp_rb].values
                         if len(yearly_area_rb) > 0 and len(yearly_area_rb[0]) > 0:
                             area_under_rb += yearly_area_rb[0][0]
-                
+
                 # Handle division by zero for drought years
                 if area_under_kh > 0:
                     percent_rb_kh = ((area_under_kh - area_under_rb) / area_under_kh) * 100
+                    hectare_drop_drought = area_under_kh - area_under_rb
 
                     if result.trend == "increasing":
-                        parameter_swb_3 += f" However, during drought years, this reduction is significantly higher, and reaches {round(area_under_kh - area_under_rb, 2)} hectares from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
-                    elif result.trend == "decreasing":
-                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is significantly higher, reaching {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                        # Increasing-trend wording compares raw hectares dropped (both quantities
+                        # are already in hectares), rather than percentages.
+                        if hectare_drop_non_drought is None or hectare_drop_drought > hectare_drop_non_drought:
+                            comparison = "significantly higher, and reaches"
+                        elif hectare_drop_drought < hectare_drop_non_drought:
+                            comparison = "actually lower, at just"
+                        else:
+                            comparison = "about the same, at"
+                        parameter_swb_3 += f" However, during drought years, this reduction is {comparison} {round(hectare_drop_drought, 2)} hectares from Kharif to Rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
                     else:
-                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is significantly higher, reaching {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
+                        if percent_rb_kh_non_drought is None or percent_rb_kh > percent_rb_kh_non_drought:
+                            comparison = "significantly higher, reaching"
+                        elif percent_rb_kh < percent_rb_kh_non_drought:
+                            comparison = "actually lower, at just"
+                        else:
+                            comparison = "about the same, at"
+                        parameter_swb_3 += f" However, during drought years, this seasonal reduction is {comparison} {round(percent_rb_kh, 2)}% from kharif to rabi. This underscores the need for enhanced water conservation measures during kharif to stabilize surface water availability and support rabi agriculture under drought conditions."
 
             # ? Data yearwise for waterbody
             selected_columns_kharif = [col for col in df.columns if col.startswith("kharif_area_in_ha_")]
@@ -2087,7 +2126,7 @@ def get_fortnightly_water_balance_data(state, district, block, uid):
 
 def get_water_balance_data(state, district, block, uid):
     try:
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -2097,9 +2136,9 @@ def get_water_balance_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="hydrological_annual",
+            "hydrological_annual",
         )
-        df_drought = pd.read_excel(
+        df_drought = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -2109,10 +2148,10 @@ def get_water_balance_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="croppingDrought_kharif",
+            "croppingDrought_kharif",
         )
 
-        df_seasonal = pd.read_excel(
+        df_seasonal = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -2122,7 +2161,7 @@ def get_water_balance_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="hydrological_seasonal",
+            "hydrological_seasonal",
         )
 
         #? Parameters and Lists for Graphs
@@ -2176,7 +2215,7 @@ def get_water_balance_data(state, district, block, uid):
         for index, item in enumerate(mws_drought_moderate):
             drought_check = mws_drought_moderate[index] + mws_drought_severe[index]
             match_exp = re.search(r"\d{4}", selected_columns_severe[index])
-            if drought_check > 5:
+            if drought_check >= 5:
                 if match_exp:
                     drought_years.append(match_exp.group(0))
             else:
@@ -2390,7 +2429,7 @@ def get_hydro_tabular_data(state, district, block, uid):
         
         # Read Area from mws sheet
         try:
-            df_mws = pd.read_excel(base_path, sheet_name="mws")
+            df_mws = read_excel_sheet(base_path, "mws")
             row_mws = df_mws.loc[df_mws["UID"] == uid]
             if not row_mws.empty and "area_in_ha" in row_mws.columns:
                 import math
@@ -2440,7 +2479,7 @@ def get_hydro_tabular_data(state, district, block, uid):
 
         # Read DEM
         try:
-            df_dem = pd.read_excel(base_path, sheet_name="dem")
+            df_dem = read_excel_sheet(base_path, "dem")
             row_dem = df_dem.loc[df_dem["UID"] == uid]
             if not row_dem.empty:
                 min_elev = round(float(row_dem["min_elevation_in_m"].values[0]), 2)
@@ -2455,7 +2494,7 @@ def get_hydro_tabular_data(state, district, block, uid):
 
         # Read Aquifer
         try:
-            df_aq = pd.read_excel(base_path, sheet_name="aquifer_vector")
+            df_aq = read_excel_sheet(base_path, "aquifer_vector")
             row_aq = df_aq.loc[df_aq["UID"] == uid]
             aquifer_class = row_aq["aquifer_class"].values[0] if not row_aq.empty else "-"
         except Exception as e:
@@ -2464,7 +2503,7 @@ def get_hydro_tabular_data(state, district, block, uid):
 
         # Read SOGE
         try:
-            df_soge = pd.read_excel(base_path, sheet_name="soge_vector")
+            df_soge = read_excel_sheet(base_path, "soge_vector")
             row_soge = df_soge.loc[df_soge["UID"] == uid]
             soge_class = row_soge["class_name"].values[0] if not row_soge.empty else "-"
         except Exception as e:
@@ -2473,7 +2512,7 @@ def get_hydro_tabular_data(state, district, block, uid):
 
         # Read Drainage Density
         try:
-            df_dd = pd.read_excel(base_path, sheet_name="drainage_density")
+            df_dd = read_excel_sheet(base_path, "drainage_density")
             row_dd = df_dd.loc[df_dd["UID"] == uid]
             if not row_dd.empty:
                 if "drainage_density_std_in_km_per_km2" in df_dd.columns:
@@ -2507,7 +2546,7 @@ def get_terrain_and_lulc_data(state, district, block, uid):
         # Terrain Description
         terrain_desc = "-"
         try:
-            df_terrain = pd.read_excel(base_path, sheet_name="terrain")
+            df_terrain = read_excel_sheet(base_path, "terrain")
             row_t = df_terrain.loc[df_terrain["UID"] == uid]
             if not row_t.empty:
                 terrain_desc = row_t["terrain_description"].values[0]
@@ -2543,7 +2582,7 @@ def get_terrain_and_lulc_data(state, district, block, uid):
         tp_val, cp_val, sp_val, bp_val, bup_val = 0.0, 0.0, 0.0, 0.0, 0.0
 
         try:
-            df_slope = pd.read_excel(base_path, sheet_name="terrain_lulc_slope")
+            df_slope = read_excel_sheet(base_path, "terrain_lulc_slope")
             ts_val, cs_val, ss_val, bs_val, bus_val = get_vals(df_slope, uid)
             trees += ts_val
             crops += cs_val
@@ -2554,7 +2593,7 @@ def get_terrain_and_lulc_data(state, district, block, uid):
             pass
             
         try:
-            df_plain = pd.read_excel(base_path, sheet_name="terrain_lulc_plain")
+            df_plain = read_excel_sheet(base_path, "terrain_lulc_plain")
             tp_val, cp_val, sp_val, bp_val, bup_val = get_vals(df_plain, uid)
             trees += tp_val
             crops += cp_val
@@ -2610,7 +2649,7 @@ def get_cropping_water_hydro_data(state, district, block, uid):
         
         # Cropping Area
         try:
-            df_crop = pd.read_excel(base_path, sheet_name="croppingIntensity_annual")
+            df_crop = read_excel_sheet(base_path, "croppingIntensity_annual")
             single_kharif = get_latest_col_val(df_crop, "single_kharif_cropped_area_in_ha_", uid)
             doubly = get_latest_col_val(df_crop, "doubly_cropped_area_in_ha_", uid)
             triply = get_latest_col_val(df_crop, "triply_cropped_area_in_ha_", uid)
@@ -2625,7 +2664,7 @@ def get_cropping_water_hydro_data(state, district, block, uid):
 
         # Surface Water
         try:
-            df_swb = pd.read_excel(base_path, sheet_name="surfaceWaterBodies_annual")
+            df_swb = read_excel_sheet(base_path, "surfaceWaterBodies_annual")
             water_kharif = round(get_latest_col_val(df_swb, "kharif_area_in_ha_", uid), 2)
             water_rabi = round(get_latest_col_val(df_swb, "rabi_area_in_ha_", uid), 2)
             water_zaid = round(get_latest_col_val(df_swb, "zaid_area_in_ha_", uid), 2)
@@ -2639,7 +2678,7 @@ def get_cropping_water_hydro_data(state, district, block, uid):
 
         # Hydrology Seasonal
         try:
-            df_hydro = pd.read_excel(base_path, sheet_name="hydrological_seasonal")
+            df_hydro = read_excel_sheet(base_path, "hydrological_seasonal")
             rf_kharif = round(get_latest_col_val(df_hydro, "precipitation_kharif_in_mm_", uid), 2)
             rf_rabi = round(get_latest_col_val(df_hydro, "precipitation_rabi_in_mm_", uid), 2)
             rf_zaid = round(get_latest_col_val(df_hydro, "precipitation_zaid_in_mm_", uid), 2)
@@ -2690,9 +2729,9 @@ def get_cropping_water_hydro_data(state, district, block, uid):
 
 def get_soge_data(state, district, block, uid):
     try :
-        df = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="aquifer_vector")
-        df_soge = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="soge_vector")
-        df_hydro = pd.read_excel(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", sheet_name="hydrological_annual")
+        df = read_excel_sheet(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", "aquifer_vector")
+        df_soge = read_excel_sheet(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", "soge_vector")
+        df_hydro = read_excel_sheet(DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/" + district.lower() + "_" + block.lower() + ".xlsx", "hydrological_annual")
 
         parameter_soge = f""
 
@@ -2756,7 +2795,7 @@ def get_soge_data(state, district, block, uid):
 
 def get_drought_data(state, district, block, uid):
     try:
-        df = pd.read_excel(
+        df = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -2766,7 +2805,7 @@ def get_drought_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            sheet_name="croppingDrought_kharif",
+            "croppingDrought_kharif",
         )
 
         # ? Drought Years
@@ -2809,7 +2848,7 @@ def get_drought_data(state, district, block, uid):
             ) / 6
             drought_weeks.append(drought_week)
 
-            if drought_check > 5:
+            if drought_check >= 5:
                 match_exp = re.search(r"\d{4}", selected_columns_severe[index])
                 if match_exp:
                     drought_years.append(match_exp.group(0))
@@ -2905,7 +2944,7 @@ def get_village_data(state, district, block, uid):
         )
         
         # Check available sheets
-        excel_file = pd.ExcelFile(file_path)
+        excel_file = _get_excel_file(file_path)
         available_sheets = excel_file.sheet_names
         
         # Check if mws_intersect_villages sheet is present (mandatory)
@@ -2918,7 +2957,7 @@ def get_village_data(state, district, block, uid):
             return [], [], [], [], [], [], [], [], [], [], [], []
 
         # Load the main sheet
-        df = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
+        df = read_excel_sheet(file_path, "mws_intersect_villages")
         
         # Check for optional sheets
         has_nrega = "nrega_assets_village" in available_sheets
@@ -2929,10 +2968,10 @@ def get_village_data(state, district, block, uid):
         df_socio = None
         
         if has_nrega:
-            df_village = pd.read_excel(file_path, sheet_name="nrega_assets_village")
+            df_village = read_excel_sheet(file_path, "nrega_assets_village")
         
         if has_socio:
-            df_socio = pd.read_excel(file_path, sheet_name="social_economic_indicator")
+            df_socio = read_excel_sheet(file_path, "social_economic_indicator")
 
         selected_columns_ids = [
             col for col in df.columns if col.startswith("Village IDs")
