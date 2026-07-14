@@ -592,13 +592,21 @@ def is_asset_public(asset_id):
         return False
 
 
-def sync_raster_to_gcs(image, scale, layer_name):
+def sync_raster_to_gcs(image, scale, layer_name, gcs_path=None):
+    """Export an image to GCS.
+
+    gcs_path is the folder prefix within the bucket the raster is written
+    to (e.g. "farm_stress/gsmap_monthly/"). When omitted, the existing
+    default "nrm_raster/" prefix is used so all current callers are
+    unaffected.
+    """
     print("inside sync_raster_to_gcs")
+    file_name_prefix = (gcs_path or "nrm_raster/").rstrip("/") + "/" + layer_name
     export_task = ee.batch.Export.image.toCloudStorage(
         image=image,
         description="gcs_" + layer_name,
         bucket=GCS_BUCKET_NAME,
-        fileNamePrefix="nrm_raster/" + layer_name,
+        fileNamePrefix=file_name_prefix,
         scale=scale,
         fileFormat="GeoTIFF",
         crs="EPSG:4326",
