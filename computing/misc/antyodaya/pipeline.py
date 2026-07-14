@@ -44,12 +44,22 @@ from utilities.pipelines.schema import (
 from utilities.pipelines.tabular import CSVSQLiteSidecar, csv_header
 from utilities.pipelines.unicode import normalize_unicode_frame
 from nrm_app.celery import app
-from utilities.constants import ANTYODAYA_GEOSERVER_WORKSPACE
+from utilities.constants import (
+    ADMIN_BOUNDARY_GPKG,
+    ANTYODAYA_2020_CSV,
+    ANTYODAYA_2020_SIDECAR_SQLITE,
+    ANTYODAYA_GEOSERVER_WORKSPACE,
+)
 
 
 CONFIG_PATH = Path(__file__).with_name("antyodaya_pipeline.yaml")
 ALGORITHM = "local-antyodaya-csv-admin-join"
 ALGORITHM_VERSION = "2.0"
+SOURCE_DEFAULTS = {
+    "admin_gpkg": ADMIN_BOUNDARY_GPKG,
+    "csv": ANTYODAYA_2020_CSV,
+    "sidecar_sqlite": ANTYODAYA_2020_SIDECAR_SQLITE,
+}
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -58,6 +68,17 @@ def _repo_path(path: str | Path) -> Path:
         return path
     base_dir = Path(settings.BASE_DIR) if settings.configured else Path.cwd()
     return base_dir / path
+
+
+def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Use constants for production resources and YAML only for overrides."""
+
+    resolved = dict(config)
+    sources = dict(resolved.get("sources") or {})
+    for name, default in SOURCE_DEFAULTS.items():
+        sources[name] = sources.get(name) or default
+    resolved["sources"] = sources
+    return resolved
 
 
 def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
@@ -446,7 +467,7 @@ def run_antyodaya_pipeline(
 
     started = time.perf_counter()
     timings: dict[str, float] = {}
-    config = load_config(config_path)
+    config = _apply_source_defaults(load_config(config_path))
     outputs = resolve_output_options(request, config)
     columns = _source_columns(config)
     output_config = config["output"]

@@ -5,11 +5,12 @@ description: >
   joined at runtime to the Core Stack standard admin boundary.
 
 sources:
-  admin_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  # Optional test overrides; canonical defaults come from utilities/constants.py.
+  # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
   admin_layer: cs_admin_standard
-  csv: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv
+  # csv: data/tests/fixtures/cs_antyodaya_2020_cluster_analysis.csv
   mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
-  sidecar_sqlite: data/base_resources/cs_antyodaya_2020_cluster_analysis.csv.sqlite
+  # sidecar_sqlite: data/tests/fixtures/cs_antyodaya_2020_cluster_analysis.csv.sqlite
   report_pdf: docs/reports/antyodaya_cluster_analysis_report.pdf
   blog_pdf: docs/reports/antyodaya_cluster_analysis_blog.pdf
   report_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_report.pdf

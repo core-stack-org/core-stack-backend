@@ -41,12 +41,22 @@ from utilities.pipelines.schema import (
 from utilities.pipelines.tabular import CSVSQLiteSidecar, csv_header
 from utilities.pipelines.unicode import normalize_unicode_frame
 from nrm_app.celery import app
-from utilities.constants import LIVESTOCK_GEOSERVER_WORKSPACE
+from utilities.constants import (
+    ADMIN_BOUNDARY_GPKG,
+    LIVESTOCK_CENSUS_20_CSV,
+    LIVESTOCK_CENSUS_20_SIDECAR_SQLITE,
+    LIVESTOCK_GEOSERVER_WORKSPACE,
+)
 
 
 CONFIG_PATH = Path(__file__).with_name("livestocks_pipeline.yaml")
 ALGORITHM = "local-livestock-csv-admin-join"
 ALGORITHM_VERSION = "2.0"
+SOURCE_DEFAULTS = {
+    "admin_gpkg": ADMIN_BOUNDARY_GPKG,
+    "csv": LIVESTOCK_CENSUS_20_CSV,
+    "sidecar_sqlite": LIVESTOCK_CENSUS_20_SIDECAR_SQLITE,
+}
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -55,6 +65,17 @@ def _repo_path(path: str | Path) -> Path:
         return path
     base_dir = Path(settings.BASE_DIR) if settings.configured else Path.cwd()
     return base_dir / path
+
+
+def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Use constants for production resources and YAML only for overrides."""
+
+    resolved = dict(config)
+    sources = dict(resolved.get("sources") or {})
+    for name, default in SOURCE_DEFAULTS.items():
+        sources[name] = sources.get(name) or default
+    resolved["sources"] = sources
+    return resolved
 
 
 def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
@@ -346,7 +367,7 @@ def run_livestocks_pipeline(
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
-    config = load_config(config_path)
+    config = _apply_source_defaults(load_config(config_path))
     outputs = resolve_output_options(request, config)
     schema = _schema(config)
     columns = _source_columns(config)

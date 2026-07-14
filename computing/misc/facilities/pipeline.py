@@ -57,12 +57,20 @@ from utilities.pipelines.publish import (
 )
 from utilities.pipelines.unicode import normalize_unicode_frame
 from nrm_app.celery import app
-from utilities.constants import FACILITIES_GEOSERVER_WORKSPACE
+from utilities.constants import (
+    ADMIN_BOUNDARY_GPKG,
+    FACILITIES_GEOSERVER_WORKSPACE,
+    FACILITIES_GPKG,
+)
 
 
 CONFIG_PATH = Path(__file__).with_name("facilities_pipeline.yaml")
 ALGORITHM = "local-facilities-live-proximity"
 ALGORITHM_VERSION = "2.0"
+SOURCE_DEFAULTS = {
+    "admin_gpkg": ADMIN_BOUNDARY_GPKG,
+    "facilities_gpkg": FACILITIES_GPKG,
+}
 
 
 def _repo_path(path: str | Path) -> Path:
@@ -71,6 +79,17 @@ def _repo_path(path: str | Path) -> Path:
         return path
     base_dir = Path(settings.BASE_DIR) if settings.configured else Path.cwd()
     return base_dir / path
+
+
+def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
+    """Use constants for production resources and YAML only for overrides."""
+
+    resolved = dict(config)
+    sources = dict(resolved.get("sources") or {})
+    for name, default in SOURCE_DEFAULTS.items():
+        sources[name] = sources.get(name) or default
+    resolved["sources"] = sources
+    return resolved
 
 
 def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
@@ -879,7 +898,7 @@ def run_facilities_pipeline(
 ) -> dict[str, Any]:
     started = time.perf_counter()
     timings: dict[str, float] = {}
-    config = load_config(config_path)
+    config = _apply_source_defaults(load_config(config_path))
     outputs = resolve_output_options(request, config)
     output_config = config["output"]
     output_parts, layer_name = scope_output_identity(output_config["layer_prefix"], request.scope)
