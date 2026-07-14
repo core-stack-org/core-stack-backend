@@ -594,6 +594,13 @@ def _machine_column_renamer(classification: Mapping[str, Any], config: Mapping[s
     return rename
 
 
+def _drop_pc11_output_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Remove redundant source Census identifiers from user-facing outputs."""
+
+    columns = [column for column in frame.columns if str(column).lower().startswith("pc11")]
+    return frame.drop(columns=columns, errors="ignore")
+
+
 def _facility_point_outputs(
     inventory: gpd.GeoDataFrame,
     nearest: gpd.GeoDataFrame,
@@ -613,6 +620,8 @@ def _facility_point_outputs(
     nearest_output = nearest.drop(columns=["_admin_key", "fid"], errors="ignore").rename(
         columns={"TEHSIL": "tehsil_name"}
     )
+    inventory_output = _drop_pc11_output_columns(inventory_output)
+    nearest_output = _drop_pc11_output_columns(nearest_output)
     return (
         gpd.GeoDataFrame(normalize_unicode_frame(inventory_output), geometry="geometry", crs=inventory.crs),
         gpd.GeoDataFrame(normalize_unicode_frame(nearest_output), geometry="geometry", crs=nearest.crs),
@@ -635,7 +644,6 @@ def _point_column_describer(name: str) -> str | None:
         "title": "Human-readable facility title used by map viewers.",
         "facility_source_fid": "Internal feature identifier from the facilities source GeoPackage.",
         "admin_source_fid": "Internal feature identifier from the administrative source GeoPackage.",
-        "pc11_village_id": "Population Census 2011 village identifier.",
         "admin_village_name": "Village name from the administrative boundary source.",
         "latitude": "Facility latitude in decimal degrees (WGS84).",
         "longitude": "Facility longitude in decimal degrees (WGS84).",
@@ -918,6 +926,11 @@ def run_facilities_pipeline(
     )
     village_service_output_gdf = gpd.GeoDataFrame(
         normalize_unicode_frame(village_service_output_gdf),
+        geometry="geometry",
+        crs=village_service_output_gdf.crs,
+    )
+    village_service_output_gdf = gpd.GeoDataFrame(
+        _drop_pc11_output_columns(village_service_output_gdf),
         geometry="geometry",
         crs=village_service_output_gdf.crs,
     )
