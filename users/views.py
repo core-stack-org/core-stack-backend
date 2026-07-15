@@ -151,26 +151,27 @@ class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         # Call parent class method to validate credentials and get tokens
         try:
-            captcha_token = request.data.get("captcha")
-            if not captcha_token:
-                logger.warning(
-                    "Login attempt without captcha. Username: %s",
-                    request.data.get("username"),
-                )
-                return Response(
-                    {"message": "Captcha is required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            if not verify_recaptcha(captcha_token):
-                logger.warning(
-                    "Invalid captcha during login. Username: %s",
-                    request.data.get("username"),
-                )
-                return Response(
-                    {"message": "Invalid captcha"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                 )
-            
+            if not settings.DEBUG:
+                captcha_token = request.data.get("captcha")
+                if not captcha_token:
+                    logger.warning(
+                        "Login attempt without captcha. Username: %s",
+                        request.data.get("username"),
+                    )
+                    return Response(
+                        {"message": "Captcha is required"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if not verify_recaptcha(captcha_token):
+                    logger.warning(
+                        "Invalid captcha during login. Username: %s",
+                        request.data.get("username"),
+                    )
+                    return Response(
+                        {"message": "Invalid captcha"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                     )
+
             response = super().post(request, *args, **kwargs)
 
             token = response.data.get("access")
