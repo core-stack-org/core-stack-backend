@@ -593,6 +593,8 @@ def geojson_to_ee_featurecollection(geojson_data):
 
 
 def is_gee_asset_exists(path):
+    if not isinstance(path, str) or not path.strip():
+        return False
     asset = ee.Asset(path)
     flag = asset.exists()
     if flag:
@@ -602,13 +604,13 @@ def is_gee_asset_exists(path):
 
 def _rewrite_gee_project(asset_id, project):
     """Rewrite ``projects/<name>/...`` to use ``project`` (or prefix a relative id)."""
-    if not asset_id:
-        raise ValueError("asset_id is required")
-    parts = str(asset_id).strip("/").split("/")
+    if not isinstance(asset_id, str) or not asset_id.strip():
+        raise ValueError("asset_id must be a non-empty GEE asset path string")
+    parts = asset_id.strip("/").split("/")
     if len(parts) >= 2 and parts[0] == "projects":
         parts[1] = project
         return "/".join(parts)
-    return f"projects/{project}/assets/{str(asset_id).lstrip('/')}"
+    return f"projects/{project}/assets/{asset_id.lstrip('/')}"
 
 
 def resolve_gee_asset_path(
@@ -622,6 +624,11 @@ def resolve_gee_asset_path(
     Primary: ``GEE_STORAGE_PROJECT`` (override with ``primary_project``).
     Fallback: ``GEE_STORAGE_PROJECT_HELPER`` (override with ``fallback_project``).
     """
+    if not isinstance(asset_id, str):
+        raise TypeError(
+            f"resolve_gee_asset_path expects a string path, got {type(asset_id).__name__}"
+        )
+
     primary_project = primary_project or GEE_STORAGE_PROJECT
     fallback_project = fallback_project or GEE_STORAGE_PROJECT_HELPER
     if not primary_project:
@@ -661,8 +668,11 @@ def load_gee_asset(
 
     Tries ``GEE_STORAGE_PROJECT`` first, then ``GEE_STORAGE_PROJECT_HELPER``.
 
+    If ``asset_id`` is already an Earth Engine object (e.g. FeatureCollection),
+    it is returned unchanged — matching ``ee.FeatureCollection(obj)`` pass-through.
+
     Args:
-        asset_id: Full ``projects/...`` path or relative asset id.
+        asset_id: Full ``projects/...`` path, relative asset id, or existing ee object.
         asset_type: ``FeatureCollection``, ``Image``, or ``ImageCollection``.
         primary_project: Override primary GEE project.
         fallback_project: Override fallback GEE project.
@@ -670,6 +680,10 @@ def load_gee_asset(
     Returns:
         The loaded ``ee`` object for the first existing asset path.
     """
+    # Callers often pass an already-loaded ROI / FC / Image (not a path string).
+    if not isinstance(asset_id, str):
+        return asset_id
+
     path = resolve_gee_asset_path(
         asset_id,
         primary_project=primary_project,
