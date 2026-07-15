@@ -10,12 +10,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     check_task_status,
     export_raster_asset_to_gee,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
-    sync_raster_to_gcs,
-)
+    sync_raster_to_gcs,)
 from nrm_app.celery import app
 from computing.lulc.utils.built_up import *
 from computing.lulc.utils.cropland import *
@@ -30,7 +30,7 @@ def generate_lulc_v3_tehsil(
 ):
     ee_initialize(gee_account_id)
     print("Inside generate lulc")
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state_name, district_name, tehsil_name)
         + "filtered_mws_"
         + valid_gee_text(district_name.lower())
@@ -76,11 +76,11 @@ def generate_lulc_v3_tehsil(
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         crop_freq_array.append(cropping_frequency_img)
-        lulc_v2 = ee.Image(
+        lulc_v2 = load_gee_asset(
             get_gee_asset_path(state_name, district_name, tehsil_name)
             + curr_filename
             + "_LULCmap_10m_v2"
-        )
+        , asset_type="Image")
         l1_asset_new.append(lulc_v2)
 
     """
@@ -520,7 +520,7 @@ def sync_lulc_to_gcs(
     task_ids = []
     for i in range(0, len(final_output_assetid_array_new)):
         make_asset_public(final_output_assetid_array_new[i])
-        image = ee.Image(final_output_assetid_array_new[i])
+        image = load_gee_asset(final_output_assetid_array_new[i], asset_type="Image")
         name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]

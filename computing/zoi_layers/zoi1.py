@@ -26,10 +26,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    check_task_status,
-)
+    check_task_status,)
 from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 
 from waterrejuvenation.utils import (
@@ -67,7 +67,7 @@ def generate_zoi1(
         print(roi)
         roi = ee.FeatureCollection(roi)
     else:
-        roi = ee.FeatureCollection(asset_id)
+        roi = load_gee_asset(asset_id)
     description_zoi = "zoi_" + asset_suffix
     asset_id_zoi = (
         get_gee_dir_path(

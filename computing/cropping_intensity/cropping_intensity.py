@@ -15,10 +15,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     make_asset_public,
     export_vector_asset_to_gee,
-    merge_fc_into_existing_fc,
-)
+    merge_fc_into_existing_fc,)
 from nrm_app.celery import app
 from utilities.geoserver_utils import Geoserver
 from dataclasses import dataclass
@@ -76,7 +76,7 @@ def generate_cropping_intensity(
 
     print(f"{asset_id=}")
 
-    roi = ee.FeatureCollection(roi_path)
+    roi = load_gee_asset(roi_path)
 
     if is_gee_asset_exists(asset_id):
         layer_obj = None
@@ -173,7 +173,7 @@ def generate_gee_asset(
     s_year = initial_year  # start_year  # START_YEAR
     while s_year <= end_year:
         lulc_js_list.append(
-            ee.Image(
+            load_gee_asset(
                 get_gee_dir_path(
                     asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
                 )
@@ -183,7 +183,7 @@ def generate_gee_asset(
                 + "-07-01_"
                 + str(s_year + 1)
                 + "-06-30_LULCmap_10m"
-            )
+            , asset_type="Image")
         )
         s_year += 1
     lulc = ee.List(lulc_js_list)
@@ -362,7 +362,7 @@ def save_to_db_and_sync_to_geoserver(
 
     make_asset_public(asset_id)
 
-    fc = ee.FeatureCollection(asset_id)
+    fc = load_gee_asset(asset_id)
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "crop_intensity")
     print(res)
     layer_at_geoserver = False
@@ -377,7 +377,7 @@ def get_last_date(asset_id, layer_obj):
     if layer_obj:
         existing_end_year = layer_obj.misc["end_year"]
     else:
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         col_names = fc.first().propertyNames().getInfo()
         filtered_col = [
             col.split("_")[2]

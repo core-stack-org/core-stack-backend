@@ -3,8 +3,8 @@ from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from utilities.gee_utils import (
     check_task_status,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 
 
 def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
@@ -127,7 +127,7 @@ def merge_assets_chunked_on_year(chunk_assets):
         for i in range(1, len(chunk_assets)):
             # Find the matching feature in the second collection
             matched_feature = ee.Feature(
-                ee.FeatureCollection(chunk_assets[i])
+                load_gee_asset(chunk_assets[i])
                 .filter(ee.Filter.eq("uid", uid))
                 .first()
             )
@@ -144,5 +144,5 @@ def merge_assets_chunked_on_year(chunk_assets):
         return ee.Feature(feature.geometry(), merged_properties)
 
     # Map the merge function over the first feature collection
-    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+    merged_fc = load_gee_asset(chunk_assets[0]).map(merge_features)
     return merged_fc

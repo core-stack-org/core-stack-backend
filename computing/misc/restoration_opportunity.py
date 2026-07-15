@@ -5,12 +5,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     export_vector_asset_to_gee,
-    make_asset_public,
-)
+    make_asset_public,)
 from nrm_app.celery import app
 from computing.utils import (
     sync_layer_to_geoserver,
@@ -27,7 +27,7 @@ def generate_restoration_opportunity(self, state, district, block, gee_account_i
     It will generate restoration opportunity layer for given location at tehsil level
     """
     ee_initialize(gee_account_id)
-    roi = ee.FeatureCollection(
+    roi = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -82,7 +82,7 @@ def clip_raster(roi, state, district, block, description):
         )
         make_asset_public(asset_id)
 
-        image = ee.Image(asset_id)
+        image = load_gee_asset(asset_id, asset_type="Image")
         task_id = sync_raster_to_gcs(image, 60, description + "_raster")
         check_task_status([task_id])
         res = sync_raster_gcs_to_geoserver(
@@ -100,7 +100,7 @@ def clip_raster(roi, state, district, block, description):
 
 
 def generate_vector(roi, raster_asset_id, args, state, district, block, description):
-    raster = ee.Image(raster_asset_id)
+    raster = load_gee_asset(raster_asset_id, asset_type="Image")
     fc = roi
     for arg in args:
         raster = raster.select(["b1"])

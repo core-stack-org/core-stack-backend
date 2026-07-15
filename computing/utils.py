@@ -40,9 +40,9 @@ from utilities.gee_utils import (
     get_geojson_from_gcs,
     is_asset_public,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_vector_to_gcs,
-    valid_gee_text,
-)
+    valid_gee_text,)
 from utilities.geoserver_utils import Geoserver
 from django.core.mail import EmailMessage, get_connection
 import time
@@ -290,7 +290,7 @@ def merge_chunks(
             get_gee_dir_path(folder_list, chunk_asset_path) + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
-            assets.append(ee.FeatureCollection(src_asset_id))
+            assets.append(load_gee_asset(src_asset_id))
 
     asset = ee.FeatureCollection(assets).flatten()
 
@@ -438,9 +438,9 @@ def generate_geojson_with_ci_and_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     )
 
     # Load FeatureCollections
-    zoi = ee.FeatureCollection(zoi_asset)
-    ci = ee.FeatureCollection(asset_path_ci)
-    ndvi = ee.FeatureCollection(asset_path_ndvi)
+    zoi = load_gee_asset(zoi_asset)
+    ci = load_gee_asset(asset_path_ci)
+    ndvi = load_gee_asset(asset_path_ndvi)
 
     # -------------------------
     # STEP 1: Join ZOI with Cropping Intensity
@@ -494,14 +494,14 @@ def generate_geojson_with_ci_ndvi_ndmi(
     # Load project
     proj_obj = Project.objects.get(pk=proj_id)
 
-    zoi = ee.FeatureCollection(zoi_asset)
+    zoi = load_gee_asset(zoi_asset)
     print("Number of features zoi:", zoi.size().getInfo())
 
-    ci = ee.FeatureCollection(ci_asset)
+    ci = load_gee_asset(ci_asset)
     print("Number of features zoi:", ci.size().getInfo())
-    ndvi = ee.FeatureCollection(ndmi_asset)
+    ndvi = load_gee_asset(ndmi_asset)
     print("Number of features zoi:", ndvi.size().getInfo())
-    ndmi = ee.FeatureCollection(ndmi_asset)
+    ndmi = load_gee_asset(ndmi_asset)
     print("Number of features zoi:", ndmi.size().getInfo())
 
     # -------------------------
@@ -561,9 +561,9 @@ def generate_geojson_with_ci_ndvi(zoi_asset, ci_asset, ndvi_asset, proj_id):
     ee_initialize(4)
 
     # Load FeatureCollections
-    zoi = ee.FeatureCollection(zoi_asset)
-    ci = ee.FeatureCollection(ci_asset)
-    ndvi = ee.FeatureCollection(ndvi_asset)
+    zoi = load_gee_asset(zoi_asset)
+    ci = load_gee_asset(ci_asset)
+    ndvi = load_gee_asset(ndvi_asset)
 
     print("ZOI:", zoi.size().getInfo())
     print("CI:", ci.size().getInfo())
@@ -877,8 +877,8 @@ def generate_swb_layer_with_max_so_catchment(
     ca_asset = f"{base_path}catchment_area_{asset_suffix}_raster"
 
     # Load rasters
-    stream_order_band = ee.Image(so_asset).select("b1")
-    catchment_band = ee.Image(ca_asset).select("b1")
+    stream_order_band = load_gee_asset(so_asset, asset_type="Image").select("b1")
+    catchment_band = load_gee_asset(ca_asset, asset_type="Image").select("b1")
 
     # Processing per waterbody
     def compute_for_feature(feature):

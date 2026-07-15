@@ -11,9 +11,9 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
-    make_asset_public,
-)
+    make_asset_public,)
 from nrm_app.celery import app
 
 
@@ -26,7 +26,7 @@ def vectorise_change_detection(
     Deforestation, Afforestation and cropintensity for given location(tehsil level)
     """
     ee_initialize(gee_account_id)
-    roi = ee.FeatureCollection(
+    roi = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -162,10 +162,10 @@ def crop_intensity_vector(roi, state, district, block, start_year, end_year):
 def generate_vector(
     roi, args, state, district, block, layer_name, start_year, end_year
 ):
-    raster = ee.Image(
+    raster = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + f"change_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_{layer_name}_{start_year}_{end_year}"
-    )  # Change detection raster layer
+    , asset_type="Image")  # Change detection raster layer
 
     fc = roi
     for arg in args:
@@ -219,7 +219,7 @@ def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
     #     "Afforestation": "change_tree_cover_gain_vector",
     #     "CropIntensity": "change_cropping_intensity_vector",
     # }
-    fc = ee.FeatureCollection(asset_id).getInfo()
+    fc = load_gee_asset(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
         state,

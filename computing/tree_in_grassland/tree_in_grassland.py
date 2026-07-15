@@ -20,9 +20,9 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     make_asset_public,
-    export_vector_asset_to_gee,
-)
+    export_vector_asset_to_gee,)
 from nrm_app.celery import app
 from .tree_in_grassland_utils import (
     SCALE,
@@ -110,7 +110,7 @@ def generate_tree_in_grassland_layer(
             + f"filtered_mws_{valid_gee_text(district.lower())}"
             + f"_{valid_gee_text(block.lower())}_uid"
     )
-    mws_fc = ee.FeatureCollection(roi_path)
+    mws_fc = load_gee_asset(roi_path)
 
     # ------------------------------------------------------------------
     # STEP 3: Compute tree-in-grassland metrics
@@ -272,7 +272,7 @@ def _save_to_db_and_sync_to_geoserver(
 
     make_asset_public(asset_id)
 
-    fc = ee.FeatureCollection(asset_id)
+    fc = load_gee_asset(asset_id)
     res = sync_fc_to_geoserver(fc, state, layer_name, "tree_in_grassland")
     print(res)
 

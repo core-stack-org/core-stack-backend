@@ -3,7 +3,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
-)
+    load_gee_asset,)
 
 
 def create_model_classifier(state, district, block):
@@ -14,7 +14,7 @@ def create_model_classifier(state, district, block):
     if is_gee_asset_exists(asset_id):
         return None
 
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -36,7 +36,7 @@ def create_model_classifier(state, district, block):
     easy_scrubland = [ee.Filter.gte("size", 60000)]
     easy_plantation = [ee.Filter.lt("area", 20000), ee.Filter.gt("area", 1000)]
 
-    all_boundaries = ee.FeatureCollection(
+    all_boundaries = load_gee_asset(
         get_gee_asset_path(state, district, block) + f"lulc_v4_{directory}_boundaries"
     )
     farm = all_boundaries.filter(ee.Filter.And(*easy_farm))
@@ -47,7 +47,7 @@ def create_model_classifier(state, district, block):
         .filter(ee.Filter.And(easy_plantation))
     )
 
-    farm_vectors = ee.FeatureCollection(
+    farm_vectors = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + f"lulc_v4_{directory}_farm_clusters"
     )
@@ -55,11 +55,11 @@ def create_model_classifier(state, district, block):
 
     ## Scrubland filtering. Remove large boundaries due to wrong field segmentation from scrubland samples
     # Step 1: Mask for class 8, 9, 10, 11
-    lulc_v3 = ee.Image(
+    lulc_v3 = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + directory
         + "_2023-07-01_2024-06-30_LULCmap_10m"
-    )
+    , asset_type="Image")
 
     classes_of_interest = [8, 9, 10, 11]
     masked_lulc = lulc_v3.remap(
@@ -118,9 +118,9 @@ def create_model_classifier(state, district, block):
         .where(plantation_mask, mapping["plantation"])
     )
 
-    ts_data = ee.Image(
+    ts_data = load_gee_asset(
         get_gee_asset_path(state, district, block) + f"lulc_v4_ts_data_{directory}"
-    )
+    , asset_type="Image")
 
     # Classes to sample (exclude background = 0)
     class_values = [(1, 20000), (2, 20000), (3, 20000)]

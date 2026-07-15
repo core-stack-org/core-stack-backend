@@ -14,11 +14,11 @@ from utilities.constants import (
     PAN_INDIA_LULC_PATH,
     PAN_INDIA_MWS_PATH,
 )
-from utilities.gee_utils import (
+from utilities.gee_utils import (    load_gee_asset,
+
     ee_initialize,
     get_distance_between_two_lan_long,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
@@ -149,7 +149,7 @@ def generate_lulc_raster_for_intersecting_mws():
     image = ee.Image(PAN_INDIA_LULC_PATH)
 
     # Load or define a vector region (e.g., a country)
-    roi = ee.FeatureCollection(asset_id)
+    roi = load_gee_asset(asset_id)
 
     # Clip the raster using the vector geometry
     clipped_image = image.clip(roi.geometry())
@@ -235,7 +235,7 @@ def calculate_elevation(landsat_collection, lulc_asset_id):
     ndmi_image = (
         landsat_collection.mean().normalizedDifference(["B5", "B6"]).rename("NDMI")
     )
-    lulc = ee.Image(lulc_asset_id)
+    lulc = load_gee_asset(lulc_asset_id, asset_type="Image")
     cropping_mask = lulc.eq(8).Or(lulc.eq(9)).Or(lulc.eq(10)).Or(lulc.eq(11))
     # Load elevation dataset
     elevation = ee.Image(SRTM_DIGITAL_ELEVATION)
@@ -370,7 +370,7 @@ def get_centroid_point(feature):
 def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
     ee_initialize()
     proj_obj = Project.objects.get(pk=proj_id)
-    swb_feature_collection = ee.FeatureCollection(swb_asset_id)
+    swb_feature_collection = load_gee_asset(swb_asset_id)
     scored_fc = swb_feature_collection.map(compute_water_score)
     top_feature = scored_fc.sort("water_score", False).first()
     lulc_year = top_feature.getInfo()["properties"]["water_year"]
@@ -407,7 +407,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
     )
     task.start()
     wait_for_task_completion(task)
-    ndmi_fc = ee.FeatureCollection(asset_asset_ndmi)
+    ndmi_fc = load_gee_asset(asset_asset_ndmi)
     ndmi_list = ndmi_fc.map(extract_ndmis)
     ndmi_lists = ndmi_list.aggregate_array("ndmis")
     lat_list = ndmi_list.aggregate_array("lat")
@@ -485,7 +485,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
 
     task.start()
     wait_for_task_completion(task)
-    input_fc = ee.FeatureCollection(asset_id_zoi)
+    input_fc = load_gee_asset(asset_id_zoi)
     valid_features = input_fc.filter(ee.Filter.gt("zoi", 0))
     zoi_rings = valid_features.map(create_ring)
     asset_id_zoi_ring = get_filtered_mws_layer_name(proj_obj.name, "swb_zoi_ring")
@@ -499,7 +499,7 @@ def generate_zoi_asset_on_gee(swb_asset_id, proj_id):
 
     task.start()
     wait_for_task_completion(task)
-    zoi = ee.FeatureCollection(asset_id_zoi_ring)
+    zoi = load_gee_asset(asset_id_zoi_ring)
     spatial_filter = ee.Filter.intersects(leftField=".geo", rightField=".geo")
 
     # Define the join
@@ -533,7 +533,7 @@ def generate_ndmi_layer(swb_asset_id, proj_id):
     proj_obj = Project.objects.get(pk=proj_id)
 
     # Step 1: Load SWB Features and Compute Water Score
-    swb_fc = ee.FeatureCollection(swb_asset_id)
+    swb_fc = load_gee_asset(swb_asset_id)
     scored_fc = swb_fc.map(compute_water_score)
     top_feature = scored_fc.sort("water_score", False).first()
     lulc_year = top_feature.getInfo()["properties"]["water_year"]

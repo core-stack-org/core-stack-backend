@@ -3,8 +3,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 
 
 def classify_raster(state, district, block):
@@ -18,9 +18,9 @@ def classify_raster(state, district, block):
     classifier = ee.Classifier.load(
         get_gee_asset_path(state, district, block) + f"lulc_v4_{directory}_classifier"
     )
-    ts_data = ee.Image(
+    ts_data = load_gee_asset(
         get_gee_asset_path(state, district, block) + f"lulc_v4_ts_data_{directory}"
-    )
+    , asset_type="Image")
     classified = ts_data.classify(classifier)
 
     mapping = {"farm": 1, "plantation": 2, "scrubland": 3, "rest": 0}
@@ -37,7 +37,7 @@ def classify_raster(state, district, block):
         )
         return feature.set("class", class_values.get("classification"))
 
-    all_boundaries = ee.FeatureCollection(
+    all_boundaries = load_gee_asset(
         get_gee_asset_path(state, district, block) + f"lulc_v4_{directory}_boundaries"
     )
 

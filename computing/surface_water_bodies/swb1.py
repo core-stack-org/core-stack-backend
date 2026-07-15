@@ -5,8 +5,8 @@ from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 from dateutil.relativedelta import relativedelta
 
 
@@ -71,7 +71,7 @@ def vectorize_water_pixels(
         curr_end_date = curr_end_date.strftime("%Y-%m-%d")
 
         # Get LULC map for current period
-        lulc_image = ee.Image(
+        lulc_image = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -81,7 +81,7 @@ def vectorize_water_pixels(
             + "_"
             + curr_end_date
             + "_LULCmap_10m"
-        )
+        , asset_type="Image")
 
         # Add water presence masks to collections
         lulc_water_pixel_collec.append(lulc_image.gte(2).And(lulc_image.lte(4)))

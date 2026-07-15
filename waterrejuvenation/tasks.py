@@ -26,12 +26,12 @@ from computing.zoi_layers.zoi import generate_zoi, _resolve_zoi_time_window
 from projects.models import Project
 
 from utilities.constants import SITE_DATA_PATH, GEE_PATHS
-from utilities.gee_utils import (
+from utilities.gee_utils import (    load_gee_asset,
+
     ee_initialize,
     get_gee_dir_path,
     make_asset_public,
-    valid_gee_text,
-)
+    valid_gee_text,)
 import ee
 import logging
 from datetime import datetime
@@ -691,7 +691,7 @@ def Generate_water_balance_indicator(
         )
         + asset_suffix_prec
     )
-    roi = ee.FeatureCollection(mws_asset_id)
+    roi = load_gee_asset(mws_asset_id)
     sys.setrecursionlimit(6000)
     precipitation(
         roi=roi,
@@ -957,7 +957,7 @@ def BuildMWSLayer(
             )
             + asset_suffix_prec
         )
-        precip = ee.FeatureCollection(asset_id_prec)
+        precip = load_gee_asset(asset_id_prec)
 
         # If precip empty -> fail early
         if precip.size().getInfo() == 0:
@@ -1037,7 +1037,7 @@ def BuildMWSLayer(
         # ------------------------------------------------
         # JOIN AND FLATTEN DROUGHT PROPERTIES (prefixed)
         # ------------------------------------------------
-        drought_fc = ee.FeatureCollection(draught_asset_id)
+        drought_fc = load_gee_asset(draught_asset_id)
 
         # It's possible drought asset does not exist or is empty - handle gracefully
         try:
@@ -1140,7 +1140,7 @@ def BuildMWSLayer(
 
         # After export, optionally refresh or get info
         try:
-            exported_count = ee.FeatureCollection(asset_id_wb_mws).size().getInfo()
+            exported_count = load_gee_asset(asset_id_wb_mws).size().getInfo()
         except Exception:
             exported_count = None
 
@@ -1208,7 +1208,7 @@ def BuildWaterBodyLayer(
         )
         + wb_description
     )
-    waterbodies = ee.FeatureCollection(waterbody_asset_id)
+    waterbodies = load_gee_asset(waterbody_asset_id)
 
     # ------------------------------------------------------------------
     # Desilting points
@@ -1221,7 +1221,7 @@ def BuildWaterBodyLayer(
         )
         + desilt_suffix
     )
-    desilting_points = ee.FeatureCollection(desilt_asset_id)
+    desilting_points = load_gee_asset(desilt_asset_id)
 
     logger.info(
         "BuildWaterBodyLayer project=%s waterbodies=%s desilting=%s",

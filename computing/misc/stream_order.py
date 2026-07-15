@@ -15,13 +15,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
     get_gee_dir_path,
-    export_vector_asset_to_gee,
-)
+    export_vector_asset_to_gee,)
 
 
 @app.task(bind=True)
@@ -47,7 +47,7 @@ def generate_stream_order(
             "stream_order_" + valid_gee_text(district) + "_" + valid_gee_text(block)
         )
 
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -69,7 +69,7 @@ def generate_stream_order(
             + valid_gee_text(str(proj_id))
         ).lower()
 
-        roi = ee.FeatureCollection(roi_path)
+        roi = load_gee_asset(roi_path)
         asset_id_raster = (
             get_gee_dir_path(
                 [proj_obj.name], asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
@@ -150,7 +150,7 @@ def stream_order_raster_generation(
     layer_at_geoserver = False
     if is_gee_asset_exists(raster_asset_id):
         """Sync image to google cloud storage and then to geoserver"""
-        image = ee.Image(raster_asset_id)
+        image = load_gee_asset(raster_asset_id, asset_type="Image")
         task_id = sync_raster_to_gcs(image, 30, description + "_raster")
 
         task_id_list = check_task_status([task_id])
@@ -260,7 +260,7 @@ def stream_order_vector_generation(
     # -------------------------------
     # Sync to GeoServer
     # -------------------------------
-    ee_fc = ee.FeatureCollection(vector_asset_id).getInfo()
+    ee_fc = load_gee_asset(vector_asset_id).getInfo()
     geojson_fc = {
         "type": ee_fc["type"],
         "features": ee_fc["features"],

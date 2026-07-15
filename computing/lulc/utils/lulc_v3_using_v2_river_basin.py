@@ -8,10 +8,10 @@ from utilities.gee_utils import (
     check_task_status,
     valid_gee_text,
     get_gee_asset_path,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
-    make_asset_public,
-)
+    make_asset_public,)
 from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
 from computing.lulc.misc import clip_lulc_from_river_basin
@@ -25,7 +25,7 @@ from utilities.constants import (
 def lulc_river_basin(self, state_name, district_name, block_name, start_year, end_year):
     ee_initialize()
     print("Inside lulc_river_basin")
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state_name, district_name, block_name)
         + "filtered_mws_"
         + valid_gee_text(district_name.lower())
@@ -479,7 +479,7 @@ def sync_lulc_to_gcs(
     task_ids = []
     for i in range(0, len(final_output_assetid_array_new)):
         make_asset_public(final_output_assetid_array_new[i])
-        image = ee.Image(final_output_assetid_array_new[i])
+        image = load_gee_asset(final_output_assetid_array_new[i], asset_type="Image")
         name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]

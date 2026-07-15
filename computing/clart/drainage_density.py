@@ -7,12 +7,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     upload_tif_to_gcs,
     upload_tif_from_gcs_to_gee,
     sync_vector_to_gcs,
     get_geojson_from_gcs,
-    make_asset_public,
-)
+    make_asset_public,)
 from utilities.constants import DRAINAGE_DENSITY_OUTPUT, CRS_4326
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
@@ -77,7 +77,7 @@ def drainage_density(self, state, district, block):
 
 
 def generate_vector(state, district, block):
-    mws = ee.FeatureCollection(
+    mws = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -92,7 +92,7 @@ def generate_vector(state, district, block):
     watersheds = gpd.GeoDataFrame.from_features(mws)
     watersheds.set_crs(CRS_4326, inplace=True)
 
-    drainage_lines = ee.FeatureCollection(
+    drainage_lines = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     )

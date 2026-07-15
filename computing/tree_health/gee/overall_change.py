@@ -6,13 +6,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from computing.STAC_specs import generate_STAC_layerwise
 
@@ -40,7 +40,7 @@ def tree_health_overall_change_raster(
         )
         asset_folder_list = [state, district, block]
 
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -99,7 +99,7 @@ def tree_health_overall_change_raster(
             asset_id,
             "Tree Overall Change Raster",
         )
-        task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, description)
+        task_id = sync_raster_to_gcs(load_gee_asset(asset_id, asset_type="Image"), 25, description)
 
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to GCS", task_id_list)
@@ -129,21 +129,21 @@ def mask_raster(
     app_type, asset_folder_list, asset_suffix, tree_change, start_year, end_year
 ):
     # STEP 1: Load IndiaSAT and Tree change layers and reproject to 25m
-    deforestation = ee.Image(
+    deforestation = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list,
             asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
         + f"change_{asset_suffix}_Deforestation_{start_year}_{int(end_year)+1}"
-    ).reproject(crs="EPSG:4326", scale=25)
+    , asset_type="Image").reproject(crs="EPSG:4326", scale=25)
 
-    afforestation = ee.Image(
+    afforestation = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list,
             asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
         )
         + f"change_{asset_suffix}_Afforestation_{start_year}_{int(end_year)+1}"
-    ).reproject(crs="EPSG:4326", scale=25)
+    , asset_type="Image").reproject(crs="EPSG:4326", scale=25)
 
     # Overall tree change raster (DW + IndiaSAT)
     tree_change = tree_change.reproject(crs="EPSG:4326", scale=25)

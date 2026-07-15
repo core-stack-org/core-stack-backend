@@ -4,11 +4,11 @@ from gee_computing.models import GEEAccount
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
+    load_gee_asset,
     ee_initialize,
     get_gee_dir_path,
     export_vector_asset_to_gee,
-    build_gee_helper_paths,
-)
+    build_gee_helper_paths,)
 from functools import reduce
 
 
@@ -46,7 +46,7 @@ def merge_drought_layers_chunks(
             + block_name_for_parts
         )
         if is_gee_asset_exists(src_asset_id):
-            assets.append(ee.FeatureCollection(src_asset_id))
+            assets.append(load_gee_asset(src_asset_id))
 
     asset = ee.FeatureCollection(assets).flatten()
     task_id = export_vector_asset_to_gee(asset, dst_filename, asset_id)
@@ -83,7 +83,7 @@ def merge_yearly_layers(
         return f"{get_gee_dir_path(asset_folder_list, asset_path=asset_path)}drought_{asset_suffix}_{year}_v2"
 
     # Get base feature collection
-    first_year_fc = ee.FeatureCollection(get_collection_path(start_year))
+    first_year_fc = load_gee_asset(get_collection_path(start_year))
     geometries_with_ids = first_year_fc.map(
         lambda f: ee.Feature(
             f.geometry(),
@@ -104,7 +104,7 @@ def merge_yearly_layers(
             feat = ee.Feature(prev_feature)
 
             # Get year's collection
-            year_fc = ee.FeatureCollection(get_collection_path(year))
+            year_fc = load_gee_asset(get_collection_path(year))
             year_feature = ee.Feature(
                 year_fc.filter(ee.Filter.equals("uid", uid)).first()
             )

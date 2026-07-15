@@ -2,6 +2,7 @@ import datetime
 import re
 
 import ee
+from utilities.gee_utils import load_gee_asset
 
 _HYDROLOGY_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _HYDROLOGY_YEAR_RANGE_RE = re.compile(r"^\d{4}_\d{4}$")
@@ -58,7 +59,7 @@ def get_last_date(asset_id, is_annual, layer_obj):
     if layer_obj:
         existing_end_date = parse_hydrology_end_date(layer_obj.misc["end_date"])
     else:
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         col_names = fc.first().propertyNames().getInfo()
         period_cols = hydrology_period_columns(col_names)
         if not period_cols:

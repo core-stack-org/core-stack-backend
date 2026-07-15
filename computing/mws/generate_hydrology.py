@@ -13,7 +13,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     make_asset_public,
     is_gee_asset_exists,
-)
+    load_gee_asset,)
 from .well_depth import well_depth
 from .calculateG import calculate_g
 import sys
@@ -55,7 +55,7 @@ def generate_hydrology(
         )
         asset_folder_list = [state, district, block]
 
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -217,7 +217,7 @@ def generate_hydrology(
             },
         )
 
-        fc = ee.FeatureCollection(asset_id).getInfo()
+        fc = load_gee_asset(asset_id).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
         res = sync_layer_to_geoserver(asset_suffix, fc, layer_name, "mws_layers")
         print(res)

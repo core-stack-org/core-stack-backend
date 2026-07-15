@@ -14,10 +14,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
 from utilities.constants import AEZ, GEE_HELPER_PATH
 
@@ -39,15 +39,15 @@ def lulc_on_plain_cluster(
     if not is_gee_asset_exists(asset_id):
         aez_india = ee.FeatureCollection(AEZ)
 
-        landforms = ee.Image(
+        landforms = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "terrain_raster_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-        )  # The eleven landforms raster
+        , asset_type="Image")  # The eleven landforms raster
 
-        mwsheds = ee.FeatureCollection(
+        mwsheds = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -62,7 +62,7 @@ def lulc_on_plain_cluster(
 
         lulc_imgs = []
         for y in range(start_year, end_year + 1):
-            lulc_img = ee.Image(
+            lulc_img = load_gee_asset(
                 get_gee_asset_path(state, district, block)
                 + valid_gee_text(district.lower())
                 + "_"
@@ -72,7 +72,7 @@ def lulc_on_plain_cluster(
                 + "-07-01_"
                 + str(y + 1)
                 + "-06-30_LULCmap_10m"
-            )
+            , asset_type="Image")
             lulc_imgs.append(lulc_img)
 
         lulc_img_collection = ee.ImageCollection.fromImages(lulc_imgs)
@@ -158,7 +158,7 @@ def lulc_on_plain_cluster(
         )
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id).getInfo()
+        fc = load_gee_asset(asset_id).getInfo()
         fc = {"features": fc["features"], "type": fc["type"]}
         res = sync_layer_to_geoserver(
             state,

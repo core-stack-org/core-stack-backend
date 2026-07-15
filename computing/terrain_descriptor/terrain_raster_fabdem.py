@@ -12,10 +12,10 @@ from utilities.gee_utils import (
     make_asset_public,
     is_gee_asset_exists,
     get_gee_asset_path,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS, PAN_INDIA_RASTER_FABDEM
 
@@ -69,7 +69,7 @@ def generate_terrain_raster_clip(
 
     if not is_gee_asset_exists(asset_id):
         # Load ROI geometry
-        roi = ee.FeatureCollection(roi_asset_id)
+        roi = load_gee_asset(roi_asset_id)
 
         # Load the raster image and clip to ROI
         pan_india_raster = ee.Image(PAN_INDIA_RASTER_FABDEM)
@@ -92,7 +92,7 @@ def generate_terrain_raster_clip(
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
 
-        task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
+        task_id = sync_raster_to_gcs(load_gee_asset(asset_id, asset_type="Image"), 30, layer_name)
         task_id_list = check_task_status([task_id])
         print("task_id_list sync to gcs ", task_id_list)
         if state and district and block:

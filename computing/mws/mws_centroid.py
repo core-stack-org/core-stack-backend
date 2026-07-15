@@ -14,7 +14,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     get_gee_asset_path,
-)
+    load_gee_asset,)
 from nrm_app.celery import app
 
 
@@ -35,7 +35,7 @@ def generate_mws_centroid_data(self, state, district, block, gee_account_id):
     asset_id = get_gee_asset_path(state, district, block) + description
 
     if not is_gee_asset_exists(asset_id):
-        roi = ee.FeatureCollection(roi_asset_id)
+        roi = load_gee_asset(roi_asset_id)
 
         # Function to convert polygon to point at centroid, preserving properties
         def polygon_to_centroid(feature):
@@ -71,7 +71,7 @@ def generate_mws_centroid_data(self, state, district, block, gee_account_id):
         )
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         res = sync_fc_to_geoserver(
             fc,
             state,

@@ -13,7 +13,7 @@ from utilities.gee_utils import (
     make_asset_public,
     get_gee_dir_path,
     is_gee_asset_exists,
-)
+    load_gee_asset,)
 
 from nrm_app.celery import app
 from .swb1 import vectorize_water_pixels
@@ -48,7 +48,7 @@ def generate_swb_layer(
         )
         asset_folder_list = [state, district, block]
 
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -59,7 +59,7 @@ def generate_swb_layer(
             + "_uid"
         )
     else:
-        roi = ee.FeatureCollection(roi_path)
+        roi = load_gee_asset(roi_path)
     start_date = f"{start_year}-07-01"
     end_date = f"{end_year}-06-30"
 
@@ -176,7 +176,7 @@ def sync_asset_to_db_and_geoserver(
 
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, workspace=workspace)
         print(f"response:{res}")
 

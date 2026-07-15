@@ -10,21 +10,21 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     export_vector_asset_to_gee,
     is_gee_asset_exists,
+    load_gee_asset,
     check_task_status,
-    make_asset_public,
-)
+    make_asset_public,)
 
 
 def crop_grids_lulc(state, district, block):
-    lulc_image = ee.Image(
+    lulc_image = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
         + "_2023-07-01_2024-06-30_LULCmap_10m"
-    )
+    , asset_type="Image")
 
-    tiles_uid = ee.FeatureCollection(
+    tiles_uid = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "crop_grid_"
         + valid_gee_text(district.lower())

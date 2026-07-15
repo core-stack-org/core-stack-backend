@@ -15,8 +15,8 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     get_gee_asset_path,
-    create_gee_directory,
-)
+    load_gee_asset,
+    create_gee_directory,)
 from utilities.layer_generation_logging import (
     log_task_failure,
     log_task_step,
@@ -77,7 +77,7 @@ def generate_factory_csr_data(self, state, district, block, gee_account_id):
                 f"Factory CSR pan-India dataset not found: {pan_india_asset_id}"
             )
 
-        roi = ee.FeatureCollection(roi_asset_id)
+        roi = load_gee_asset(roi_asset_id)
         pan_india_data = ee.FeatureCollection(pan_india_asset_id)
         clipped_data = pan_india_data.filterBounds(roi.geometry())
 
@@ -141,7 +141,7 @@ def generate_factory_csr_data(self, state, district, block, gee_account_id):
         make_asset_public(asset_id)
         log_task_step(TASK_NAME, "layer_saved_to_db", layer_id=layer_id, **ctx)
 
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         log_task_step(TASK_NAME, "sync_fc_to_geoserver", workspace="factory_csr", **ctx)
         res = sync_fc_to_geoserver(
             fc,

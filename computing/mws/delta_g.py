@@ -11,10 +11,10 @@ from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     check_task_status,
-    merge_fc_into_existing_fc,
-)
+    merge_fc_into_existing_fc,)
 
 
 def delta_g(
@@ -117,18 +117,18 @@ def _generate_data(
     end_date,
     is_annual,
 ):
-    prec = ee.FeatureCollection(
+    prec = load_gee_asset(
         asset_path + "Prec_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # Precipitation feature collection
 
-    runoff = ee.FeatureCollection(
+    runoff = load_gee_asset(
         asset_path
         + "Runoff_"
         + ("annual_" if is_annual else "fortnight_")
         + asset_suffix
     )  # RO feature collection
 
-    et = ee.FeatureCollection(
+    et = load_gee_asset(
         asset_path + "ET_" + ("annual_" if is_annual else "fortnight_") + asset_suffix
     )  # et feature collection
 

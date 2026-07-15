@@ -12,10 +12,10 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     check_task_status,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from nrm_app.celery import app
 
 
@@ -45,7 +45,7 @@ def tree_health_overall_change_vector(
         asset_folder_list = [state, district, block]
 
         # Load ROI from GEE
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -86,7 +86,7 @@ def tree_health_overall_change_vector(
 
         layer_at_geoserver = False
 
-        merged_fc = ee.FeatureCollection(asset_id)
+        merged_fc = load_gee_asset(asset_id)
 
         # Sync to GeoServer
         sync_res = sync_fc_to_geoserver(
@@ -118,12 +118,12 @@ def overall_change_vector(roi, asset_folder_list, asset_suffix, app_type):
     ]
 
     # Load overall change raster
-    raster = ee.Image(
+    raster = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + f"overall_change_raster_{asset_suffix}"
-    )
+    , asset_type="Image")
 
     fc = roi
 

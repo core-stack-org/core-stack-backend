@@ -12,10 +12,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from computing.mws.evapotranspiration import merge_assets_chunked_on_year
 
 
@@ -45,7 +45,7 @@ def tree_health_ch_vector(
         asset_folder_list = [state, district, block]
 
         # Load ROI from GEE asset
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -97,7 +97,7 @@ def tree_health_ch_vector(
         task = merge_assets_chunked_on_year(yearly_assets, description, asset_id)
         check_task_status([task])
 
-    merged_fc = ee.FeatureCollection(asset_id)
+    merged_fc = load_gee_asset(asset_id)
 
     # Sync to GeoServer
     sync_res = sync_fc_to_geoserver(merged_fc, state, description, "tree_ch_vector")
@@ -119,7 +119,7 @@ def tree_health_ch_vector(
     # Update sync status for sync to geoserver
     try:
         layer_at_geoserver = False
-        merged_fc = ee.FeatureCollection(asset_id)
+        merged_fc = load_gee_asset(asset_id)
 
         sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height")
 
@@ -146,12 +146,12 @@ def ch_vector(roi, year, asset_folder_list, asset_suffix, app_type):
     ]
 
     # Load raster image
-    raster = ee.Image(
+    raster = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + f"ch_raster_{asset_suffix}_{year}"
-    )
+    , asset_type="Image")
 
     fc = roi
 

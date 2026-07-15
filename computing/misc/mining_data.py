@@ -14,7 +14,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     get_gee_asset_path,
-)
+    load_gee_asset,)
 from nrm_app.celery import app
 
 
@@ -41,7 +41,7 @@ def generate_mining_data(self, state, district, block, gee_account_id):
     )
     asset_id = get_gee_asset_path(state, district, block) + description
 
-    roi = ee.FeatureCollection(roi_asset_id)
+    roi = load_gee_asset(roi_asset_id)
 
     pan_india_data = ee.FeatureCollection(pan_india_asset_id)
     clipped_data = pan_india_data.filterBounds(roi.geometry())
@@ -81,7 +81,7 @@ def generate_mining_data(self, state, district, block, gee_account_id):
         )
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         res = sync_fc_to_geoserver(
             fc,
             state,

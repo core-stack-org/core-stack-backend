@@ -8,9 +8,9 @@ from utilities.gee_utils import (
     check_task_status,
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
-    merge_fc_into_existing_fc,
-)
+    merge_fc_into_existing_fc,)
 import calendar
 from utilities.constants import (
     ET_FLDAS_BOUNDING_BOX,
@@ -147,7 +147,7 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
         for i in range(1, len(chunk_assets)):
             # Find the matching feature in the second collection
             matched_feature = ee.Feature(
-                ee.FeatureCollection(chunk_assets[i])
+                load_gee_asset(chunk_assets[i])
                 .filter(ee.Filter.eq("uid", uid))
                 .first()
             )
@@ -164,7 +164,7 @@ def merge_assets_chunked_on_year(chunk_assets, description, asset_id):
         return ee.Feature(feature.geometry(), merged_properties)
 
     # Map the merge function over the first feature collection
-    merged_fc = ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+    merged_fc = load_gee_asset(chunk_assets[0]).map(merge_features)
 
     # Export feature collection to GEE
     task_id = export_vector_asset_to_gee(merged_fc, description, asset_id)

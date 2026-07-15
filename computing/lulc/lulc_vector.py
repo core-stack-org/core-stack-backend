@@ -12,17 +12,17 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    merge_fc_into_existing_fc,
-)
+    merge_fc_into_existing_fc,)
 from nrm_app.celery import app
 
 
 @app.task(bind=True)
 def vectorise_lulc(self, state, district, block, start_year, end_year, gee_account_id):
     ee_initialize(gee_account_id)
-    fc = ee.FeatureCollection(
+    fc = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -54,7 +54,7 @@ def vectorise_lulc(self, state, district, block, start_year, end_year, gee_accou
         if layer_obj:
             existing_end_date = int(layer_obj.misc["end_year"])
         else:
-            roi = ee.FeatureCollection(asset_id)
+            roi = load_gee_asset(asset_id)
             col_names = roi.first().propertyNames().getInfo()
             filtered_col = [col for col in col_names if col.startswith("tree")]
             filtered_col.sort()
@@ -111,7 +111,7 @@ def generate_vector(
     s_year = start_year  # START_YEAR
     while s_year <= end_year:
         lulc_list.append(
-            ee.Image(
+            load_gee_asset(
                 get_gee_asset_path(state, district, block)
                 + valid_gee_text(district.lower())
                 + "_"
@@ -121,7 +121,7 @@ def generate_vector(
                 + "-07-01_"
                 + str(s_year + 1)
                 + "-06-30_LULCmap_10m"
-            )
+            , asset_type="Image")
         )
         s_year += 1
 
@@ -202,7 +202,7 @@ def sync_to_db_and_geoserver(
         )
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id).getInfo()
+        fc = load_gee_asset(asset_id).getInfo()
 
         fc = {"features": fc["features"], "type": fc["type"]}
         res = sync_layer_to_geoserver(

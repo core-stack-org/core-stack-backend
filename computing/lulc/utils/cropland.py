@@ -8,6 +8,7 @@ from utilities.constants import (
     SENTINEL2_LEVEL_1C_TOA,
     CROPLAND_DATASET_PATH,
 )
+from utilities.gee_utils import load_gee_asset
 
 
 def fill_empty_bands(image):
@@ -170,7 +171,7 @@ def interpolate_sar_timeseries(S1_TS):
 
 def get_trained_model(training_data_assetpath):
     print("inside create trained model")
-    training_data = ee.FeatureCollection(training_data_assetpath)
+    training_data = load_gee_asset(training_data_assetpath)
     print("Featurecollection for training data created")
     training_band_names = [
         "0_VV",

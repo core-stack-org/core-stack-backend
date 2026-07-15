@@ -8,7 +8,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
-)
+    load_gee_asset,)
 from waterrejuvenation.utils import wait_for_task_completion
 import ee
 
@@ -58,7 +58,7 @@ def get_ndvi_for_zoi(
         + description_ndvi
     )
 
-    zoi_collections = ee.FeatureCollection(asset_id_zoi)
+    zoi_collections = load_gee_asset(asset_id_zoi)
     fc = get_ndvi_data(
         zoi_collections, start_year, end_year, description_ndvi, ndvi_asset_path
     )

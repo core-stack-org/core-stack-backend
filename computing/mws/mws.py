@@ -14,13 +14,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     make_asset_public,
     export_vector_asset_to_gee,
     # earthdata_auth,
     # gdf_to_ee_fc,
     # upload_shp_to_gee,
 )
-
 # import zipfile
 # import pandas as pd
 # from osgeo import gdal
@@ -48,7 +48,7 @@ def mws_layer(self, state, district, block, gee_account_id):
     if not is_gee_asset_exists(asset_id):
         mwses_uid_fc = ee.FeatureCollection(MWS_DATASET)
 
-        admin_boundary = ee.FeatureCollection(
+        admin_boundary = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "admin_boundary_"
             + valid_gee_text(district.lower())
@@ -74,7 +74,7 @@ def mws_layer(self, state, district, block, gee_account_id):
             dataset_name="MWS",
             algorithm_version="1.2",
         )
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         res = sync_fc_to_geoserver(
             fc,
             state,
@@ -103,7 +103,7 @@ def mws_layer(self, state, district, block, gee_account_id):
 #     if not is_gee_asset_exists(asset_id):
 #         mwses_uid_fc = ee.FeatureCollection(GEE_DATASET_PATH + "/India_mws_UID_Merged")
 #
-#         admin_boundary = ee.FeatureCollection(
+#         admin_boundary = load_gee_asset(
 #             get_gee_asset_path(state, district, block)
 #             + "admin_boundary_"
 #             + valid_gee_text(district.lower())

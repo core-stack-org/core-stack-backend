@@ -12,9 +12,9 @@ from utilities.constants import GEE_PATHS, MERGE_MWS_PATH
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     upload_shp_to_gee,
-    check_task_status,
-)
+    check_task_status,)
 import geopandas as gpd
 from utilities.constants import CRS_4326
 
@@ -55,7 +55,7 @@ def calculate_g(
         if layer_obj:
             db_end_date = parse_hydrology_end_date(layer_obj.misc["end_date"])
         else:
-            roi = ee.FeatureCollection(asset_id)
+            roi = load_gee_asset(asset_id)
             col_names = roi.first().propertyNames().getInfo()
             period_cols = hydrology_period_columns(col_names)
             db_end_date = parse_hydrology_end_date(period_cols[-1])
@@ -64,7 +64,7 @@ def calculate_g(
         else:
             return asset_id
 
-    fc = ee.FeatureCollection(delta_g_asset_id)
+    fc = load_gee_asset(delta_g_asset_id)
     deltaG_col_names = hydrology_period_columns(fc.first().propertyNames().getInfo())
     fc = fc.getInfo()
     features = fc["features"]

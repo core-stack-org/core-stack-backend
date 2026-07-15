@@ -1,4 +1,5 @@
 import ee
+from utilities.gee_utils import load_gee_asset
 
 
 class ComputeOnGEE:
@@ -10,8 +11,8 @@ class ComputeOnGEE:
         Computes Precipitation on Google Earth Engine
         """
         # TODO: change this to block specific path and mws layer [comes from one time activity]
-        active_district = ee.FeatureCollection(mws_path)
-        dataset = ee.ImageCollection(data_path).filter(
+        active_district = load_gee_asset(mws_path)
+        dataset = load_gee_asset(data_path, asset_type="ImageCollection").filter(
             ee.Filter.date(start_date, end_date)
         )
 
@@ -43,13 +44,13 @@ class ComputeOnGEE:
         # TODO
 
     def run_off(self, slope_path, soil_path, mws_path, lulc_path):
-        slope = ee.Image(slope_path)
-        soil = ee.Image(soil_path)
+        slope = load_gee_asset(slope_path, asset_type="Image")
+        soil = load_gee_asset(soil_path, asset_type="Image")
         # TODO: change this
-        active_district = ee.FeatureCollection(
+        active_district = load_gee_asset(
             mws_path
         )  # block specific mws layer and path
-        lulc = ee.ImageCollection(lulc_path)
+        lulc = load_gee_asset(lulc_path, asset_type="ImageCollection")
         classification = lulc.select("label")
         dw_composite = classification.reduce(ee.Reducer.mode())
         dw_composite = (

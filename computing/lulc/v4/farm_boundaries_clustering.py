@@ -4,8 +4,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 
 
 def cluster_farm_boundaries(state, district, block):
@@ -16,7 +16,7 @@ def cluster_farm_boundaries(state, district, block):
     if is_gee_asset_exists(asset_id):
         return None
 
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -46,7 +46,7 @@ def cluster_farm_boundaries(state, district, block):
         ee.Filter.lt("ent", 1),
     ]
 
-    all_boundaries = ee.FeatureCollection(
+    all_boundaries = load_gee_asset(
         get_gee_asset_path(state, district, block) + f"lulc_v4_{directory}_boundaries"
     )
     farm = all_boundaries.filter(ee.Filter.And(*easy_farm))

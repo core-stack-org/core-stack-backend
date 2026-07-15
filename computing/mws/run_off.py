@@ -19,6 +19,7 @@ from utilities.constants import (
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
+    load_gee_asset,
     check_task_status,
     make_asset_public,
     ee_initialize,
@@ -26,8 +27,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     export_vector_asset_to_gee,
     merge_fc_into_existing_fc,
-    build_gee_helper_paths,
-)
+    build_gee_helper_paths,)
 
 
 def run_off(
@@ -147,7 +147,7 @@ def _generate_layer(
                     tasks.append(task_id)
             else:
                 if not last_date:
-                    fc = ee.FeatureCollection(chunk_asset_id)
+                    fc = load_gee_asset(chunk_asset_id)
                     col_names = fc.first().propertyNames().getInfo()
                     period_cols = hydrology_period_columns(col_names)
                     period_start = parse_hydrology_period_start(period_cols[-1])

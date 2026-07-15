@@ -15,9 +15,9 @@ from utilities.gee_utils import (
     check_task_status,
     make_asset_public,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from utilities.constants import (
     GEE_PATHS,
     PAN_INDIA_DRAINAGE_LINES_DATASET,
@@ -47,7 +47,7 @@ def clip_drainage_lines(
     pan_india_drainage = ee.FeatureCollection(PAN_INDIA_DRAINAGE_LINES_DATASET)
     description = ""
     if state and district and block:
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -66,7 +66,7 @@ def clip_drainage_lines(
         description = f"drainage_lines_{asset_suffix}"
         proj_obj = Project.objects.get(pk=proj_id)
         state_name = proj_obj.name
-        roi = ee.FeatureCollection(roi_path)
+        roi = load_gee_asset(roi_path)
         state = proj_obj.name
         asset_id = (
             get_gee_dir_path(
@@ -98,7 +98,7 @@ def clip_drainage_lines(
 
         try:
             # Load feature collection from Earth Engine
-            fc = ee.FeatureCollection(asset_id)
+            fc = load_gee_asset(asset_id)
             res = sync_fc_to_geoserver(fc, state_name, asset_suffix, "drainage")
             print("Drainage line synced to geoserver:", res)
             if geoserver_sync_succeeded(res) and layer_id:

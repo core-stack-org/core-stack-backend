@@ -8,8 +8,8 @@ from utilities.gee_utils import (
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     is_gee_asset_exists,
-    make_asset_public,
-)
+    load_gee_asset,
+    make_asset_public,)
 from nrm_app.celery import app
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
@@ -38,7 +38,7 @@ def get_change_detection(
     s_year = start_year
     while s_year <= end_year:
         l1_asset.append(
-            ee.Image(
+            load_gee_asset(
                 get_gee_asset_path(state, district, block)
                 + valid_gee_text(district.lower())
                 + "_"
@@ -48,12 +48,12 @@ def get_change_detection(
                 + "-07-01_"
                 + str(s_year + 1)
                 + "-06-30_LULCmap_10m"
-            )
+            , asset_type="Image")
         )
         s_year += 1
 
     # Filter for the region of interest
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -339,10 +339,10 @@ def sync_to_gcs_geoserver(
     task_list = []
 
     for change in param_list:
-        image = ee.Image(
+        image = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + f"{description}_{change}_{start_year}_{end_year}"
-        )
+        , asset_type="Image")
         task_id = sync_raster_to_gcs(
             image, 10, f"{description}_{change}_{start_year}_{end_year}"
         )

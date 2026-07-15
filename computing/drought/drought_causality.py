@@ -20,7 +20,7 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
-)
+    load_gee_asset,)
 from utilities.constants import GEE_HELPER_PATH, GEE_PATHS
 
 
@@ -509,7 +509,7 @@ def drought_causality(
     self, state, district, block, start_year, end_year, gee_account_id, app_type="MWS"
 ):
     ee_initialize(gee_account_id)
-    mws_feature_collection = ee.FeatureCollection(
+    mws_feature_collection = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -527,7 +527,7 @@ def drought_causality(
     combined_uid_data = {}
 
     for year in range(start_year, end_year + 1):
-        asset_path = ee.FeatureCollection(
+        asset_path = load_gee_asset(
             get_gee_asset_path(
                 state, district, block, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -540,7 +540,7 @@ def drought_causality(
             + "_v2"
         )
 
-        feature_collection = ee.FeatureCollection(asset_path)
+        feature_collection = load_gee_asset(asset_path)
         asset_info = feature_collection.getInfo()
         features = asset_info["features"]
         data = [feature["properties"] for feature in features]

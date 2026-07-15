@@ -5,10 +5,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     check_task_status,
     export_vector_asset_to_gee,
-    make_asset_public,
-)
+    make_asset_public,)
 from utilities.constants import AQUIFER_DATASET_PATH
 from computing.utils import (
     sync_fc_to_geoserver,
@@ -37,7 +37,7 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
         get_gee_asset_path(state, district, block)
         + f"filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid"
     )
-    roi = ee.FeatureCollection(roi_asset_id)
+    roi = load_gee_asset(roi_asset_id)
 
     aquifers_fc = ee.FeatureCollection(AQUIFER_DATASET_PATH)
 
@@ -299,7 +299,7 @@ def generate_aquifer_vector(self, state, district, block, gee_account_id):
         )
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         res = sync_fc_to_geoserver(fc, state, description, "aquifer")
         if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)

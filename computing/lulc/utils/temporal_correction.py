@@ -4,7 +4,7 @@ from datetime import timedelta
 import ee
 from dateutil.relativedelta import relativedelta
 
-from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path
+from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path, load_gee_asset
 from nrm_app.celery import app
 from computing.lulc.cropping_frequency import *
 from utilities.constants import CRS_4326
@@ -16,7 +16,7 @@ def lulc_temporal_correction(
 ):
     ee_initialize()
     print("Inside lulc_temporal_correction")
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state_name, district_name, block_name)
         + "filtered_mws_"
         + valid_gee_text(district_name.lower())
@@ -61,7 +61,7 @@ def lulc_temporal_correction(
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
         crop_freq_array.append(cropping_frequency_img)
-        l1_asset_new.append(ee.Image(final_output_assetid + "_v2"))
+        l1_asset_new.append(load_gee_asset(final_output_assetid + "_v2", asset_type="Image"))
 
     """
         temporal correction for background pixels

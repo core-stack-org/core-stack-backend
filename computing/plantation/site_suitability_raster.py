@@ -10,6 +10,7 @@ from utilities.constants import (
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
+    load_gee_asset,
     harmonize_band_types,
     get_gee_dir_path,
     check_task_status,
@@ -17,8 +18,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
-    export_raster_asset_to_gee,
-)
+    export_raster_asset_to_gee,)
 from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from computing.plantation.utils.plantation_utils import dataset_info
 from utilities.logger import setup_logger
@@ -477,7 +477,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
                 f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{s_year}_{str(s_year + 1)}"
             )
             lulc_img = (
-                ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
+                load_gee_asset(asset_id, asset_type="Image").select(["predicted_label"]).clip(roi.geometry())
             )
             lulc_years.append(lulc_img)
             s_year += 1
@@ -519,7 +519,7 @@ def get_dataset(variable, state, roi, start_year, end_year):
                 f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{s_year}_{str(s_year + 1)}"
             )
             lulc_img = (
-                ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
+                load_gee_asset(asset_id, asset_type="Image").select(["predicted_label"]).clip(roi.geometry())
             )
             lulc_years.append(lulc_img)
             s_year += 1
@@ -600,7 +600,7 @@ def create_classification(
 
 
 def sync_to_gcs_geoserver(asset_id, layer_name, scale, layer_id):
-    image = ee.Image(asset_id)
+    image = load_gee_asset(asset_id, asset_type="Image")
     task_id = sync_raster_to_gcs(image, scale, layer_name)
     task_id_list = check_task_status([task_id])
     print("task_id sync to gcs ", task_id_list)

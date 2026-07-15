@@ -11,10 +11,10 @@ from utilities.gee_utils import (
     valid_gee_text,
     check_task_status,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from nrm_app.celery import app
 
 
@@ -44,7 +44,7 @@ def canal_vector(
         asset_folder_list = [state, district, block]
 
         # Load ROI from GEE
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -85,7 +85,7 @@ def canal_vector(
 
         layer_at_geoserver = False
 
-        merged_fc = ee.FeatureCollection(asset_id)
+        merged_fc = load_gee_asset(asset_id)
 
         # Sync to GeoServer
         sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canal")

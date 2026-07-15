@@ -20,9 +20,9 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     make_asset_public,
-    valid_gee_text,
-)
+    valid_gee_text,)
 
 SCALE = 1000
 TILE_SCALE = 4
@@ -129,7 +129,7 @@ def _load_fire_collection(start_year, end_year):
 
 
 def _prepare_mws_features(roi_path):
-    fc = ee.FeatureCollection(roi_path).filter(ee.Filter.notNull(["uid"]))
+    fc = load_gee_asset(roi_path).filter(ee.Filter.notNull(["uid"]))
 
     def repair_and_measure(feature):
         geom = feature.geometry().buffer(0).simplify(10)
@@ -250,7 +250,7 @@ def _save_to_db_and_sync_to_geoserver(
 
     make_asset_public(asset_id)
 
-    fc = ee.FeatureCollection(asset_id)
+    fc = load_gee_asset(asset_id)
     res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fire")
     print(res)
 

@@ -6,11 +6,11 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
-    make_asset_public,
-)
+    make_asset_public,)
 from utilities.constants import (
     GEE_LITHOLOGY_ASSET_PATH,
     SRTM_DIGITAL_ELEVATION,
@@ -51,7 +51,7 @@ def clart_layer(state, district, block):
     if not is_gee_asset_exists(final_output_assetid):
         srtm = ee.Image(SRTM_DIGITAL_ELEVATION)
         india_lin = ee.Image(INDIA_LINEAMENTS)
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -59,20 +59,20 @@ def clart_layer(state, district, block):
             + valid_gee_text(block.lower())
             + "_uid"
         )
-        drainage = ee.Image(
+        drainage = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "drainage_density_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-        )
-        lithology = ee.Image(
+        , asset_type="Image")
+        lithology = load_gee_asset(
             GEE_LITHOLOGY_ASSET_PATH
             + valid_gee_text(state.lower())
             + "/"
             + valid_gee_text(state.lower())
             + "_lithology"
-        )
+        , asset_type="Image")
 
         lin = india_lin.clip(roi)
         lith = lithology.clip(roi)
@@ -241,7 +241,7 @@ def clart_layer(state, district, block):
         make_asset_public(final_output_assetid)
 
         """ Sync image to google cloud storage and then to geoserver"""
-        image = ee.Image(final_output_assetid)
+        image = load_gee_asset(final_output_assetid, asset_type="Image")
         task_id = sync_raster_to_gcs(image, 30, layer_name)
 
         task_id_list = check_task_status([task_id])

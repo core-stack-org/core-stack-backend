@@ -1,7 +1,7 @@
 from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS
-from utilities.gee_utils import valid_gee_text, get_gee_dir_path, make_asset_public
+from utilities.gee_utils import valid_gee_text, get_gee_dir_path, make_asset_public, load_gee_asset
 from projects.models import Project
 from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 import ee
@@ -61,7 +61,7 @@ def generate_zoi_ci(
     if roi:
         roi = ee.FeatureCollection(roi)
     else:
-        roi = ee.FeatureCollection(asset_id_zoi)
+        roi = load_gee_asset(asset_id_zoi)
     generate_cropping_intensity(
         roi_path=roi,
         zoi_ci_asset=asset_id_ci,
@@ -86,6 +86,6 @@ def generate_zoi_ci(
         )
     else:
         proj_obj = Project.objects.get(pk=proj_id)
-        fc = ee.FeatureCollection(asset_id_zoi_ci)
+        fc = load_gee_asset(asset_id_zoi_ci)
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         sync_project_fc_to_geoserver(fc, proj_obj.name, layer_name, "zoi_layers")

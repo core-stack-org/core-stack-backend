@@ -7,7 +7,7 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
-)
+    load_gee_asset,)
 from computing.lulc.utils.built_up import *
 from computing.lulc.utils.cropland import *
 from computing.lulc.cropping_frequency import *
@@ -29,7 +29,7 @@ def generate_layers_v2(state_name, district_name, block_name, start_year, end_ye
 
     start_date, end_date = str(start_year) + "-07-01", str(end_year) + "-6-30"
 
-    roi_boundary_geom = ee.FeatureCollection(
+    roi_boundary_geom = load_gee_asset(
         get_gee_asset_path(state_name, district_name, block_name)
         + "filtered_mws_"
         + valid_gee_text(district_name.lower())

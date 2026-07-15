@@ -16,11 +16,11 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     valid_gee_text,
     is_gee_asset_exists,
+    load_gee_asset,
     export_raster_asset_to_gee,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
-    make_asset_public,
-)
+    make_asset_public,)
 from nrm_app.celery import app
 from computing.utils import save_layer_info_to_db
 
@@ -64,7 +64,7 @@ def generate_final(state, district, block, start_year, end_year):
     if is_gee_asset_exists(asset_id):
         return
 
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -73,7 +73,7 @@ def generate_final(state, district, block, start_year, end_year):
         + "_uid"
     ).union()
 
-    all_boundaries = ee.FeatureCollection(
+    all_boundaries = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + f"lulc_v4_{filename_prefix}_boundaries_refined"
     )

@@ -13,8 +13,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     make_asset_public,
     get_gee_asset_path,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 from nrm_app.celery import app
 from computing.plantation.utils.plantation_utils import combine_kmls
 from utilities.logger import setup_logger
@@ -94,7 +94,7 @@ def site_suitability(
             generate_project_roi(asset_id, description, project_name, kml_files_obj)
         print("have_new_sites", have_new_sites)
 
-        roi = ee.FeatureCollection(asset_id)
+        roi = load_gee_asset(asset_id)
 
         # Perform site suitability analysis
         vector_asset_id, asset_name, layer_id = check_site_suitability(
@@ -111,7 +111,7 @@ def site_suitability(
             vector_asset_id, organization, asset_name, layer_id
         )
     else:
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -148,7 +148,7 @@ def merge_new_kmls(asset_id, description, project_name, kml_files_obj, have_new_
     gdf = combine_kmls(kml_files_obj)
 
     # Load existing ROI from Earth Engine
-    roi = ee.FeatureCollection(asset_id)
+    roi = load_gee_asset(asset_id)
     roi = gpd.GeoDataFrame.from_features(roi.getInfo())
 
     # Remove duplicate entries based on 'uid'
@@ -204,7 +204,7 @@ def sync_suitability_to_geoserver(asset_id, shp_folder, layer_name, layer_id):
 
     try:
         # Load feature collection from Earth Engine
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
 
         # Sync to GeoServer with a generated layer name
         res = sync_fc_to_geoserver(

@@ -1,22 +1,23 @@
 import ee
 
 from gee_computing.models import GEEAccount
+from nrm_app.settings import GEE_HELPER_ACCOUNT_ID
 from utilities.constants import (
+    GEE_PATHS,
     CHIRPS_PPT,
     MODIS_TERRA_NET_ET_GAP_FILLED_8_DAY,
     MODIS_TERRA_SURFACE_REFLECTANCE,
-    PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH,
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
+    load_gee_asset,
     ee_initialize,
     check_task_status,
     make_asset_public,
     create_gee_dir,
     get_gee_dir_path,
     export_vector_asset_to_gee,
-    build_gee_helper_paths,
-)
+    build_gee_helper_paths,)
 
 
 def get_day_of_year(date):
@@ -177,41 +178,35 @@ def drought_chunk(
     modis_scale = 500
     modis_available_from_year = 2000
 
-    # lulc_path = (
-    #     get_gee_dir_path(
-    #         asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-    #     )
-    #     + asset_suffix
-    #     + "_"
-    #     + str(current_year)
-    #     + "-07-01_"
-    #     + str(current_year + 1)
-    #     + "-06-30_LULCmap_10m"
-    # )
-    lulc_path = ee.Image(
-        f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{current_year}_{str(current_year + 1)}"
+    lulc_path = (
+        get_gee_dir_path(
+            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        )
+        + asset_suffix
+        + "_"
+        + str(current_year)
+        + "-07-01_"
+        + str(current_year + 1)
+        + "-06-30_LULCmap_10m"
     )
-    cur_year_crop_img = lulc_path.clip(aoi.geometry())
+    cur_year_crop_img = load_gee_asset(lulc_path, asset_type="Image")
     lulc_scale = 10
     lulc_available_from_year = start_year
     lulc_y = start_year
     lulc_images = []
     while lulc_y <= end_year:
         lulc_images.append(
-            ee.Image(
-                f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{lulc_y}_{str(lulc_y + 1)}"
-            ).clip(aoi.geometry())
-            # ee.Image(
-            #     get_gee_dir_path(
-            #         asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            #     )
-            #     + asset_suffix
-            #     + "_"
-            #     + str(lulc_y)
-            #     + "-07-01_"
-            #     + str(lulc_y + 1)
-            #     + "-06-30_LULCmap_10m"
-            # )
+            load_gee_asset(
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + asset_suffix
+                + "_"
+                + str(lulc_y)
+                + "-07-01_"
+                + str(lulc_y + 1)
+                + "-06-30_LULCmap_10m"
+            , asset_type="Image")
         )
         lulc_y += 1
     lulc = ee.List(lulc_images)

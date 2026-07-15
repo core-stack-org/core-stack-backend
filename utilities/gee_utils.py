@@ -11,6 +11,7 @@ from nrm_app.settings import (
     GEE_DEFAULT_ACCOUNT_ID,
     GEE_HELPER_ACCOUNT_ID,
     GEE_STORAGE_PROJECT,
+    GEE_STORAGE_PROJECT_HELPER,
     FERNET_KEY,
     GCS_BUCKET_NAME,
 )
@@ -597,6 +598,94 @@ def is_gee_asset_exists(path):
     if flag:
         print(f"{path} already exists.")
     return flag
+
+
+def _rewrite_gee_project(asset_id, project):
+    """Rewrite ``projects/<name>/...`` to use ``project`` (or prefix a relative id)."""
+    if not asset_id:
+        raise ValueError("asset_id is required")
+    parts = str(asset_id).strip("/").split("/")
+    if len(parts) >= 2 and parts[0] == "projects":
+        parts[1] = project
+        return "/".join(parts)
+    return f"projects/{project}/assets/{str(asset_id).lstrip('/')}"
+
+
+def resolve_gee_asset_path(
+    asset_id,
+    primary_project=None,
+    fallback_project=None,
+):
+    """
+    Resolve a GEE asset path, preferring the primary project then a fallback.
+
+    Primary: ``GEE_STORAGE_PROJECT`` (override with ``primary_project``).
+    Fallback: ``GEE_STORAGE_PROJECT_HELPER`` (override with ``fallback_project``).
+    """
+    primary_project = primary_project or GEE_STORAGE_PROJECT
+    fallback_project = fallback_project or GEE_STORAGE_PROJECT_HELPER
+    if not primary_project:
+        raise ValueError(
+            "GEE_STORAGE_PROJECT is not set. Configure it in the environment."
+        )
+    if not fallback_project:
+        raise ValueError(
+            "GEE_STORAGE_PROJECT_HELPER is not set. Configure it in the environment."
+        )
+
+    primary_path = _rewrite_gee_project(asset_id, primary_project)
+    if is_gee_asset_exists(primary_path):
+        return primary_path
+
+    fallback_path = _rewrite_gee_project(asset_id, fallback_project)
+    if fallback_path != primary_path and is_gee_asset_exists(fallback_path):
+        print(
+            f"Asset not found in {primary_project}; using fallback "
+            f"{fallback_project}: {fallback_path}"
+        )
+        return fallback_path
+
+    raise FileNotFoundError(
+        f"GEE asset not found in '{primary_project}' or '{fallback_project}': {asset_id}"
+    )
+
+
+def load_gee_asset(
+    asset_id,
+    asset_type="FeatureCollection",
+    primary_project=None,
+    fallback_project=None,
+):
+    """
+    Load a GEE asset from the primary project, falling back to the helper project.
+
+    Tries ``GEE_STORAGE_PROJECT`` first, then ``GEE_STORAGE_PROJECT_HELPER``.
+
+    Args:
+        asset_id: Full ``projects/...`` path or relative asset id.
+        asset_type: ``FeatureCollection``, ``Image``, or ``ImageCollection``.
+        primary_project: Override primary GEE project.
+        fallback_project: Override fallback GEE project.
+
+    Returns:
+        The loaded ``ee`` object for the first existing asset path.
+    """
+    path = resolve_gee_asset_path(
+        asset_id,
+        primary_project=primary_project,
+        fallback_project=fallback_project,
+    )
+    loaders = {
+        "FeatureCollection": ee.FeatureCollection,
+        "Image": ee.Image,
+        "ImageCollection": ee.ImageCollection,
+    }
+    if asset_type not in loaders:
+        raise ValueError(
+            f"Unsupported asset_type '{asset_type}'. "
+            f"Expected one of: {', '.join(loaders)}"
+        )
+    return loaders[asset_type](path)
 
 
 def move_asset_to_another_folder(src_folder, dest_folder):

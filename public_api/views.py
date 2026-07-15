@@ -11,7 +11,7 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
-)
+    load_gee_asset,)
 from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL, GEE_HELPER_ACCOUNT_ID
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 from computing.models import Layer, LayerType
@@ -426,7 +426,7 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
         )
 
     # Filter feature collection by MWS ID
-    mws_fc = ee.FeatureCollection(mws_asset_id)
+    mws_fc = load_gee_asset(mws_asset_id)
     matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
 
     if matching_feature is None or matching_feature.getInfo() is None:

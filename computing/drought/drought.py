@@ -13,8 +13,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
-    make_asset_public,
-)
+    load_gee_asset,
+    make_asset_public,)
 from .generate_layers import generate_drought_layers
 from .merge_layers import (
     merge_drought_layers_chunks,
@@ -63,7 +63,7 @@ def calculate_drought(
         )
         + dst_filename
     )
-    roi = ee.FeatureCollection(roi_path)
+    roi = load_gee_asset(roi_path)
     layer_name = asset_suffix + "_drought"
 
     if is_gee_asset_exists(asset_id):
@@ -187,7 +187,7 @@ def push_to_geoserver_db_stc(
 
         make_asset_public(asset_id)
 
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
 
         res = sync_fc_to_geoserver(fc, state, layer_name, "drought")
         print(res)
@@ -202,7 +202,7 @@ def get_last_date(asset_id, layer_obj):
     if layer_obj:
         existing_end_year = int(layer_obj.misc["end_year"])
     else:
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         col_names = fc.first().propertyNames().getInfo()
         filtered_col = [
             col.split("_")[1] for col in col_names if col.startswith("drlb_")

@@ -13,8 +13,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 from .crop_gridXlulc import crop_grids_lulc
 from nrm_app.celery import app
 from utilities.constants import SOI_TEHSIL, CROP_GRID_PATH, CRS_4326
@@ -283,7 +283,7 @@ def merge_chunks(state, district, block, asset_ids):
 
     assets = []
     for asset in asset_ids:
-        assets.append(ee.FeatureCollection(asset))
+        assets.append(load_gee_asset(asset))
 
     asset = ee.FeatureCollection(assets).flatten()
     asset_id = get_gee_asset_path(state, district, block) + description

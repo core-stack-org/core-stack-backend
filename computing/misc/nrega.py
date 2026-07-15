@@ -27,9 +27,9 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     upload_shp_to_gee,
     is_gee_asset_exists,
+    load_gee_asset,
     ee_initialize,
-    make_asset_public,
-)
+    make_asset_public,)
 import ee
 import numpy as np
 import shutil
@@ -153,7 +153,7 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
 
     admin_asset_id = get_gee_asset_path(state, district, block) + admin_description
 
-    geojson_dict = ee.FeatureCollection(admin_asset_id).getInfo()
+    geojson_dict = load_gee_asset(admin_asset_id).getInfo()
     boundary_gdf = gpd.GeoDataFrame.from_features(
         geojson_dict["features"], crs="EPSG:4326"
     )

@@ -18,11 +18,11 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_asset_path,
+    load_gee_asset,
     create_gee_directory,
     make_asset_public,
     check_task_status,
-    export_vector_asset_to_gee,
-)
+    export_vector_asset_to_gee,)
 
 
 def split_multipolygon_into_individual_polygons(data_gdf):
@@ -94,7 +94,7 @@ def export_gdf_to_gee_in_chunks(
                 + chunk_output_suffix
             )
             asset_ids.append(asset_id)
-            assets.append(ee.FeatureCollection(asset_id))
+            assets.append(load_gee_asset(asset_id))
             print("asset_id" + asset_id)
             task_id = sync_fc_to_gee(fc, chunk_output_suffix, asset_id)
             if task_id:
@@ -166,9 +166,9 @@ def merge_swb_ponds(
     # admin boundary asset
     # admin_boundary_layer_path = [asset['id'] for asset in assets if 'admin_boundary' in os.path.basename(asset['id'])]
 
-    swb_fc = ee.FeatureCollection(swb_layer_path[0])
-    ponds_fc = ee.FeatureCollection(ponds_layer_path[0])
-    mws_fc = ee.FeatureCollection(mws_layer_path[0])
+    swb_fc = load_gee_asset(swb_layer_path[0])
+    ponds_fc = load_gee_asset(ponds_layer_path[0])
+    mws_fc = load_gee_asset(mws_layer_path[0])
     # admin_boundary_fc = ee.FeatureCollection(admin_boundary_layer_path[0])
 
     # Adding handling for cases where there are more than 5000 rows in any of the files below,

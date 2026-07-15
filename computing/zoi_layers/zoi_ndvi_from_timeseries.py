@@ -17,8 +17,8 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     check_task_status,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 from waterrejuvenation.utils import wait_for_task_completion
 
 
@@ -30,7 +30,7 @@ def _merge_ndvi_year_assets(chunk_assets):
         matched_features = []
         for i in range(1, len(chunk_assets)):
             matched_feature = ee.Feature(
-                ee.FeatureCollection(chunk_assets[i])
+                load_gee_asset(chunk_assets[i])
                 .filter(ee.Filter.eq("UID", uid))
                 .first()
             )
@@ -44,7 +44,7 @@ def _merge_ndvi_year_assets(chunk_assets):
 
         return ee.Feature(feature.geometry(), merged_properties)
 
-    return ee.FeatureCollection(chunk_assets[0]).map(merge_features)
+    return load_gee_asset(chunk_assets[0]).map(merge_features)
 
 
 def _ndvi_bands_to_json_property(feature, year):
@@ -168,7 +168,7 @@ def get_ndvi_for_zoi_from_timeseries_compute(
     if zoi_roi:
         zoi_collections = ee.FeatureCollection(zoi_roi)
     else:
-        zoi_collections = ee.FeatureCollection(asset_id_zoi)
+        zoi_collections = load_gee_asset(asset_id_zoi)
 
     description_ndvi = asset_suffix
     ndvi_asset_path = (

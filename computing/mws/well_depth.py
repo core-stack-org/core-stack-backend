@@ -12,8 +12,8 @@ from utilities.constants import GEE_PATHS, PRINCIPAL_AQUIFER
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 from computing.models import Layer, Dataset
 
 
@@ -66,7 +66,7 @@ def _generate_data(
     asset_id, asset_path, description, asset_suffix, start_date, end_date
 ):
     principal_aquifers = ee.FeatureCollection(PRINCIPAL_AQUIFER)
-    delta_g = ee.FeatureCollection(
+    delta_g = load_gee_asset(
         asset_path + "filtered_delta_g_annual_" + asset_suffix + "_uid"
     )
     yeild__ = ee.List(principal_aquifers.aggregate_array("yeild__"))

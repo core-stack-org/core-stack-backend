@@ -1,7 +1,7 @@
 from computing.utils import sync_fc_to_geoserver, sync_project_fc_to_geoserver
 from projects.models import Project
 from utilities.constants import GEE_PATHS, STREAM_ORDER_ASSET, CATCHMENT_AREA
-from utilities.gee_utils import ee_initialize, get_gee_asset_path, get_gee_dir_path
+from utilities.gee_utils import ee_initialize, get_gee_asset_path, get_gee_dir_path, load_gee_asset
 import ee
 from waterrejuvenation.utils import delete_asset_on_GEE, wait_for_task_completion
 
@@ -10,7 +10,7 @@ def compute_max_stream_order_and_catchment_for_swb(swb_layer_asset, proj_id):
     proj_obj = Project.objects.get(pk=proj_id)
     geoserver_layer_name = "WaterRejapp-" + str(proj_obj.name) + "_" + str(proj_obj.id)
     ee_initialize()
-    swb = ee.FeatureCollection(swb_layer_asset)  # Replace with your asset ID
+    swb = load_gee_asset(swb_layer_asset)  # Replace with your asset ID
 
     # Load the raster image (must contain 'SR_B1' or your band)
 

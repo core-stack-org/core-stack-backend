@@ -6,13 +6,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from computing.STAC_specs import generate_STAC_layerwise
 
@@ -45,7 +45,7 @@ def tree_health_ch_raster(
         asset_folder_list = [state, district, block]
 
         # Load ROI FeatureCollection
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -84,12 +84,12 @@ def tree_health_ch_raster(
             raster = ch_raster.filterBounds(roi.geometry()).mean().clip(roi.geometry())
 
             # Load LULC map for tree masking
-            lulc = ee.Image(
+            lulc = load_gee_asset(
                 get_gee_dir_path(
                     asset_folder_list, asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"]
                 )
                 + f"{asset_suffix}_{year}-07-01_{year + 1}-06-30_LULCmap_10m"
-            )
+            , asset_type="Image")
 
             # Apply tree mask (class 6 = tree)
             tree_mask = lulc.eq(6).reproject(crs="EPSG:4326", scale=25)
@@ -122,7 +122,7 @@ def tree_health_ch_raster(
             )
 
             # Export raster to Google Cloud Storage
-            task_id = sync_raster_to_gcs(ee.Image(asset_id), 25, description)
+            task_id = sync_raster_to_gcs(load_gee_asset(asset_id, asset_type="Image"), 25, description)
 
             check_task_status([task_id])
 

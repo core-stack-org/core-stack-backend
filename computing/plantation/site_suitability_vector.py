@@ -13,6 +13,7 @@ from utilities.gee_utils import (
     create_gee_dir,
     get_gee_dir_path,
     is_gee_asset_exists,
+    load_gee_asset,
     valid_gee_text,
     make_asset_public,
     export_vector_asset_to_gee,
@@ -125,7 +126,7 @@ def check_site_suitability(
                 )
             return asset_id, asset_name, layer_id
 
-    pss_rasters = ee.Image(pss_rasters_asset)
+    pss_rasters = load_gee_asset(pss_rasters_asset, asset_type="Image")
 
     if pss_rasters is None:
         raise Exception("Failed to calculate PSS rasters")

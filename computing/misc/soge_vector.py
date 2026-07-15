@@ -5,12 +5,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     check_task_status,
     sync_raster_gcs_to_geoserver,
     export_vector_asset_to_gee,
-    make_asset_public,
-)
+    make_asset_public,)
 from computing.utils import (
     sync_layer_to_geoserver,
     save_layer_info_to_db,
@@ -40,7 +40,7 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
             asset_path
             + f"filtered_mws_{valid_gee_text(district)}_{valid_gee_text(block)}_uid"
         )
-        mws_fc = ee.FeatureCollection(mws_asset_id)
+        mws_fc = load_gee_asset(mws_asset_id)
 
         def process_mws(mws_feature):
             mws_geom = mws_feature.geometry()
@@ -145,7 +145,7 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
         make_asset_public(asset_id)
 
         print("Geoserver Sync task started")
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         res = sync_fc_to_geoserver(fc, state, description, "soge")
         if geoserver_sync_succeeded(res) and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)

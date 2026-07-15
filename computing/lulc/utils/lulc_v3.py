@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from dateutil.relativedelta import relativedelta
 
-from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path
+from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_path, load_gee_asset
 from nrm_app.celery import app
 from computing.lulc.utils.built_up import *
 from computing.lulc.utils.cropland import *
@@ -19,7 +19,7 @@ def generate_lulc_layers(
 ):
     ee_initialize()
     print("Inside generate lulc")
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state_name, district_name, block_name)
         + "filtered_mws_"
         + valid_gee_text(district_name.lower())

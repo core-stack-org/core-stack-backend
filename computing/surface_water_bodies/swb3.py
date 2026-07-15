@@ -4,8 +4,8 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 import ee
 
 from waterrejuvenation.utils import add_on_drainage_flag
@@ -32,7 +32,7 @@ def _safe_feature_collection(asset_id):
     try:
         # For public datasets, metadata fetch can fail in some environments
         # even when the collection is readable in computations.
-        return ee.FeatureCollection(asset_id)
+        return load_gee_asset(asset_id)
     except Exception:
         print(f"[SWB4] Asset not found or inaccessible: {asset_id}")
         return None
@@ -253,7 +253,7 @@ def waterbody_catchment_streamorder_properties(
         + asset_suffix
     )
     # As requested: SWB3 always uses SWB2 as input.
-    water_bodies = ee.FeatureCollection(swb2_asset)
+    water_bodies = load_gee_asset(swb2_asset)
 
     print(f"asset_i{water_bodies}")
     swb4_fs = generate_swb_layer_with_max_so_catchment(

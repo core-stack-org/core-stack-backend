@@ -15,9 +15,9 @@ from utilities.gee_utils import (
     make_asset_public,
     export_raster_asset_to_gee,
     is_gee_asset_exists,
+    load_gee_asset,
     get_gee_dir_path,
-    gcs_file_exists,
-)
+    gcs_file_exists,)
 from nrm_app.celery import app
 from .cropping_frequency import *
 from computing.utils import (
@@ -51,7 +51,7 @@ def clip_lulc_v3(
     start_date, end_date = str(start_year) + "-07-01", str(end_year + 1) + "-06-30"
 
     if state and district and block:
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -65,7 +65,7 @@ def clip_lulc_v3(
         )
         gee_asset_path = get_gee_asset_path(state, district, block)
     else:
-        roi = ee.FeatureCollection(roi_path).union()
+        roi = load_gee_asset(roi_path).union()
 
         filename_prefix = valid_gee_text(asset_suffix)
 
@@ -214,7 +214,7 @@ def sync_lulc_to_gcs(
     task_ids = []
     for i in range(0, len(final_output_assetid_array_new)):
         make_asset_public(final_output_assetid_array_new[i])
-        image = ee.Image(final_output_assetid_array_new[i])
+        image = load_gee_asset(final_output_assetid_array_new[i], asset_type="Image")
         name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]

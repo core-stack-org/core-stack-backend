@@ -4,8 +4,8 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     valid_gee_text,
     is_gee_asset_exists,
-    export_raster_asset_to_gee,
-)
+    load_gee_asset,
+    export_raster_asset_to_gee,)
 from .misc import get_points
 
 
@@ -17,7 +17,7 @@ def time_series(state, district, block, start_year, end_year):
     if is_gee_asset_exists(asset_id):
         return
 
-    roi_boundary = ee.FeatureCollection(
+    roi_boundary = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())

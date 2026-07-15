@@ -6,12 +6,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 import ee
 
 from .terrain_utils import generate_terrain_classified_raster
@@ -44,7 +44,7 @@ def terrain_raster(
             + valid_gee_text(block.lower())
         )
         asset_id = get_gee_asset_path(state, district, block) + description
-        roi_boundary = ee.FeatureCollection(
+        roi_boundary = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -62,7 +62,7 @@ def terrain_raster(
             )
             + description
         )
-        roi_boundary = ee.FeatureCollection(roi_path)
+        roi_boundary = load_gee_asset(roi_path)
 
     if not is_gee_asset_exists(asset_id):
 
@@ -94,7 +94,7 @@ def terrain_raster(
                 + valid_gee_text(block.lower())
                 + "_terrain_raster"
             )
-            task_id = sync_raster_to_gcs(ee.Image(asset_id), 30, layer_name)
+            task_id = sync_raster_to_gcs(load_gee_asset(asset_id, asset_type="Image"), 30, layer_name)
 
             task_id_list = check_task_status([task_id])
             print("task_id_list sync to gcs ", task_id_list)

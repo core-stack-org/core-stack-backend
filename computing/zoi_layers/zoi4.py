@@ -9,13 +9,13 @@ from computing.water_rejuvenation.water_rejuventation import (
 )
 from gee_computing.utils import mask_landsat_clouds
 from utilities.constants import GEE_PATHS
-from utilities.gee_utils import (
+from utilities.gee_utils import (    load_gee_asset,
+
     ee_initialize,
     get_gee_dir_path,
     valid_gee_text,
     sync_raster_gcs_to_geoserver,
-    export_vector_asset_to_gee,
-)
+    export_vector_asset_to_gee,)
 import ee
 
 from waterrejuvenation.utils import delete_asset_on_GEE
@@ -53,7 +53,7 @@ def generate_ndmi_layer(
         + description_swb
     )
     # Step 1: Load SWB Features and Compute Water Score
-    swb_fc = ee.FeatureCollection(asset_id_swb)
+    swb_fc = load_gee_asset(asset_id_swb)
     scored_fc = swb_fc.map(compute_water_score)
     top_feature = scored_fc.sort("water_score", False).first()
     lulc_year = top_feature.getInfo()["properties"]["water_year"].split("-")

@@ -12,12 +12,12 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 
 
 @app.task(bind=True)
@@ -46,7 +46,7 @@ def generate_catchment_area_singleflow(
             + "_raster"
         )
         asset_id = get_gee_asset_path(state, district, block) + description
-        roi_boundary = ee.FeatureCollection(
+        roi_boundary = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -56,7 +56,7 @@ def generate_catchment_area_singleflow(
         )
 
     else:
-        roi_boundary = ee.FeatureCollection(roi_path)
+        roi_boundary = load_gee_asset(roi_path)
         description = "catchment_area_" + asset_suffix + "_raster"
 
         asset_id = (
@@ -113,7 +113,7 @@ def catchment_area_raster_generation(
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         """Sync image to google cloud storage and then to geoserver"""
-        image = ee.Image(asset_id)
+        image = load_gee_asset(asset_id, asset_type="Image")
         task_id = sync_raster_to_gcs(image, 30, description)
 
         task_id_list = check_task_status([task_id])

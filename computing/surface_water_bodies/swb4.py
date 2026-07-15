@@ -4,8 +4,8 @@ from utilities.constants import GEE_PATHS, WBC
 from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
-    export_vector_asset_to_gee,
-)
+    load_gee_asset,
+    export_vector_asset_to_gee,)
 
 
 def waterbody_wbc_intersection(
@@ -34,7 +34,7 @@ def waterbody_wbc_intersection(
 
     # Load census state and water bodies feature collections
     census_state = ee.FeatureCollection(WBC + state.upper().replace(" ", "") + "_UPD")
-    water_bodies = ee.FeatureCollection(
+    water_bodies = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )

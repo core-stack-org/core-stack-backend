@@ -3,9 +3,9 @@ import ee
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     is_gee_asset_exists,
+    load_gee_asset,
     get_gee_dir_path,
-    export_vector_asset_to_gee,
-)
+    export_vector_asset_to_gee,)
 
 
 def waterbody_mws_intersection(
@@ -25,7 +25,7 @@ def waterbody_mws_intersection(
     if is_gee_asset_exists(asset_id):
         return None, asset_id
 
-    water_bodies = ee.FeatureCollection(
+    water_bodies = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )

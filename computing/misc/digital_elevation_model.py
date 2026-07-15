@@ -13,13 +13,13 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     export_raster_asset_to_gee,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 
 from computing.utils import (
     sync_layer_to_geoserver,
@@ -55,7 +55,7 @@ def generate_dem_layer(
             + "_dem_raster"
         )
         asset_id = get_gee_asset_path(state, district, block) + description
-        roi_boundary = ee.FeatureCollection(
+        roi_boundary = load_gee_asset(
             get_gee_asset_path(state, district, block)
             + "filtered_mws_"
             + valid_gee_text(district.lower())
@@ -65,7 +65,7 @@ def generate_dem_layer(
         )
 
     else:
-        roi_boundary = ee.FeatureCollection(roi_path)
+        roi_boundary = load_gee_asset(roi_path)
         description = asset_suffix + "_dem_raster"
 
         asset_id = (
@@ -129,7 +129,7 @@ def dem_raster_generation(
     layer_at_geoserver = False
     if is_gee_asset_exists(asset_id):
         """Sync image to google cloud storage and then to geoserver"""
-        image = ee.Image(asset_id)
+        image = load_gee_asset(asset_id, asset_type="Image")
         task_id = sync_raster_to_gcs(image, 30, description)
 
         task_id_list = check_task_status([task_id])
@@ -165,7 +165,7 @@ def vectorize_fabdem(mws_fc, raster_asset_id, state, district, block):
         + "_dem_vector"
     )
 
-    dem = ee.Image(raster_asset_id).select("elevation")
+    dem = load_gee_asset(raster_asset_id, asset_type="Image").select("elevation")
 
     pixel_area = ee.Image.pixelArea()
     area_image = pixel_area.updateMask(dem.mask()).rename("area")

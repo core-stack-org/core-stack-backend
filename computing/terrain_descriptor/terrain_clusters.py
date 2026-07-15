@@ -11,9 +11,9 @@ from utilities.gee_utils import (
     valid_gee_text,
     get_gee_asset_path,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
-    make_asset_public,
-)
+    make_asset_public,)
 from nrm_app.celery import app
 from utilities.constants import FABDEM
 
@@ -69,7 +69,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
         fabdem.mosaic().setDefaultProjection("EPSG:3857", None, 30).rename("elevation")
     )
 
-    mt1k = ee.FeatureCollection(
+    mt1k = load_gee_asset(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
@@ -394,7 +394,7 @@ def compute_on_gee(state, district, block, asset_id, asset_name):
 
 
 def sync_to_geoserver(state, district, block, asset_id, layer_id, layer_name):
-    fc = ee.FeatureCollection(asset_id).getInfo()
+    fc = load_gee_asset(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
         state,

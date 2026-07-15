@@ -12,10 +12,10 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     check_task_status,
     is_gee_asset_exists,
+    load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,
-)
+    get_gee_dir_path,)
 from nrm_app.celery import app
 from computing.mws.evapotranspiration import merge_assets_chunked_on_year
 
@@ -46,7 +46,7 @@ def tree_health_ccd_vector(
         asset_folder_list = [state, district, block]
 
         # Load ROI from GEE
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -121,7 +121,7 @@ def tree_health_ccd_vector(
             misc={"star_year": start_year, "end_year": end_year},
         )
 
-        merged_fc = ee.FeatureCollection(asset_id)
+        merged_fc = load_gee_asset(asset_id)
 
         # Sync to GeoServer
         sync_res = sync_fc_to_geoserver(merged_fc, state, description, "tree_ccd_vector")
@@ -145,12 +145,12 @@ def ccd_vector(roi, year, asset_folder_list, asset_suffix, app_type):
     ]
 
     # Load CCD raster
-    raster = ee.Image(
+    raster = load_gee_asset(
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + f"ccd_raster_{asset_suffix}_{year}"
-    )
+    , asset_type="Image")
 
     fc = roi
 

@@ -26,11 +26,11 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     check_task_status,
     is_gee_asset_exists,
+    load_gee_asset,
     merge_fc_into_existing_fc,
     make_asset_public,
     create_gee_dir,
-    build_gee_helper_paths,
-)
+    build_gee_helper_paths,)
 
 
 @app.task(bind=True)
@@ -61,7 +61,7 @@ def ndvi_timeseries(
         )
         asset_folder_list = [state, district, block]
 
-        roi = ee.FeatureCollection(
+        roi = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -167,7 +167,7 @@ def ndvi_timeseries(
                 },
             )
 
-            fc = ee.FeatureCollection(cls_asset_id)
+            fc = load_gee_asset(cls_asset_id)
             res = sync_fc_to_geoserver(
                 fc, asset_suffix, cls_description, workspace="ndvi_timeseries"
             )
@@ -187,7 +187,7 @@ def extract_class_fc(asset_id, cls_prefix):
     cls_prefix: 'crop' | 'tree' | 'shrub'
     """
 
-    fc = ee.FeatureCollection(asset_id)
+    fc = load_gee_asset(asset_id)
 
     def filter_props(f):
         props = f.toDictionary()
@@ -216,7 +216,7 @@ def build_final_class_asset(yearly_assets, asset_id, description):
         asset_exists = False
         if is_gee_asset_exists(cls_asset_id):
             asset_exists = True
-            merged = ee.FeatureCollection(cls_asset_id)
+            merged = load_gee_asset(cls_asset_id)
             ind = 0
         else:
             merged = fc_list[0]
@@ -385,7 +385,7 @@ def _generate_ndvi(
     task_id = None
     if not is_gee_asset_exists(ndvi_asset_id):
 
-        lulc = ee.Image(
+        lulc = load_gee_asset(
             get_gee_dir_path(
                 asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
             )
@@ -395,7 +395,7 @@ def _generate_ndvi(
             + "-07-01_"
             + str(f_start_date.year + 1)
             + "-06-30_LULCmap_10m"
-        )
+        , asset_type="Image")
         crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
         tree_mask = lulc.eq(6)
         shrub_mask = lulc.eq(12)
@@ -467,7 +467,7 @@ def get_last_date(asset_id, layer_obj):
         existing_end_date = layer_obj.misc["end_date"]
         existing_end_date = datetime.datetime.strptime(existing_end_date, "%Y-%m-%d")
     else:
-        fc = ee.FeatureCollection(asset_id)
+        fc = load_gee_asset(asset_id)
         col_names = fc.first().propertyNames().getInfo()
         filtered_col = [col for col in col_names if col.startswith("20")]
         filtered_col.sort()
