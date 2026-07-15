@@ -53,6 +53,39 @@ def get_completed_period(run_date, epoch_anchor=EPOCH_ANCHOR):
     }
 
 
+def generate_28day_periods(start_year, end_year, epoch_anchor=EPOCH_ANCHOR):
+    """List every fixed 28-day EPOCH_ANCHOR period overlapping
+    [start_year-01-01, end_year-12-31], in chronological order.
+
+    Each entry: {period_index, period_start, period_end, label} where
+    period_start/period_end are "YYYY-MM-DD" strings and label is
+    period_start with dashes stripped (e.g. "20200620"), used as the
+    filename identifier for downloaded rasters.
+    """
+    anchor = _parse_date(epoch_anchor)
+    range_start = datetime(start_year, 1, 1)
+    range_end = datetime(end_year, 12, 31)
+
+    n = (range_start - anchor).days // 28
+    periods = []
+    while True:
+        period_start = anchor + timedelta(days=n * 28)
+        if period_start > range_end:
+            break
+        period_end = anchor + timedelta(days=(n + 1) * 28 - 1)
+        if period_end >= range_start:
+            periods.append(
+                {
+                    "period_index": n,
+                    "period_start": period_start.strftime("%Y-%m-%d"),
+                    "period_end": period_end.strftime("%Y-%m-%d"),
+                    "label": period_start.strftime("%Y%m%d"),
+                }
+            )
+        n += 1
+    return periods
+
+
 def doy_to_8day_period_index(doy):
     """Map a day-of-year to the MOD16A2 8-day composite period index (0-45)."""
     return (int(doy) - 1) // 8
