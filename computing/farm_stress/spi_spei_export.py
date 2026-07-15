@@ -15,10 +15,14 @@ rollout: PET (prorated MOD16A2GF) and water balance follow once rainfall
 is validated.
 """
 
+import os
+import time
+
 import ee
 
 from utilities.gee_utils import ee_initialize
 from computing.farm_stress.local_download import download_image
+from computing.farm_stress.helper import generate_28day_periods
 from computing.farm_stress.config import (
     GSMAP_COLLECTION,
     GSMAP_BAND,
@@ -87,3 +91,53 @@ def export_gsmap_period(
     download_image(period_rainfall, region, output_path, SPI_SCALE_M)
     print(f"Downloaded -> {output_path}")
     return output_path
+
+
+def export_gsmap_historical_archive(
+    start_year=2000,
+    end_year=2025,
+    gee_account_id=22,
+    output_dir=LOCAL_DIR_GSMAP_MONTHLY,
+    overwrite=False,
+    sleep_seconds=0.2,
+):
+    """Download the full historical GSMaP rainfall archive: one 28-day-period
+    GeoTIFF per real EPOCH_ANCHOR period from start_year through end_year.
+
+    Safe to interrupt and re-run: files already on disk are skipped unless
+    overwrite=True, so a partial run resumes where it left off instead of
+    re-downloading everything.
+    """
+    ee_initialize(gee_account_id)
+    region = get_india_bbox()
+    periods = generate_28day_periods(start_year, end_year)
+    output_dir = output_dir.rstrip("/")
+
+    print(f"{len(periods)} periods to process ({start_year}-{end_year})")
+    downloaded, skipped = [], []
+    for i, period in enumerate(periods, start=1):
+        label = period["label"]
+        output_path = f"{output_dir}/precip_{label}.tif"
+
+        if os.path.exists(output_path) and not overwrite:
+            skipped.append(output_path)
+            continue
+
+        print(
+            f"[{i}/{len(periods)}] downloading {label} "
+            f"({period['period_start']} to {period['period_end']})"
+        )
+        image = compute_period_rainfall(
+            period["period_start"], period["period_end"], region
+        ).clip(region)
+        download_image(image, region, output_path, SPI_SCALE_M)
+        downloaded.append(output_path)
+
+        if sleep_seconds:
+            time.sleep(sleep_seconds)
+
+    print(
+        f"Done. Downloaded {len(downloaded)} new file(s), "
+        f"skipped {len(skipped)} already on disk."
+    )
+    return {"downloaded": downloaded, "skipped": skipped}
