@@ -109,7 +109,7 @@ from .misc.aquifer_vector_local import (
 )
 from .misc.catchment_area import generate_catchment_area_singleflow
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.facilities import generate_facilities_proximity_task
 from .misc.factory_csr import generate_factory_csr_data
 from .misc.green_credit import generate_green_credit_data
 from .misc.lcw_conflict import generate_lcw_conflict_data
@@ -201,7 +201,6 @@ from .mws.mws_connectivity_local_compute import (
     mws_connectivity_vector as generate_mws_connectivity_local_task,
 )
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
