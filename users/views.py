@@ -1,6 +1,6 @@
 import logging
 import token
-import requests
+# import requests
 
 from django.conf import settings
 from django.contrib.auth.models import Group
@@ -35,44 +35,44 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 
-def verify_recaptcha(token):
-        try:
-            response = requests.post(
-                "https://www.google.com/recaptcha/api/siteverify",
-                data={
-                    "secret": settings.RECAPTCHA_SECRET_KEY,
-                    "response": token,
-                },
-                timeout=10,
-            )
+# def verify_recaptcha(token):
+#         try:
+#             response = requests.post(
+#                 "https://www.google.com/recaptcha/api/siteverify",
+#                 data={
+#                     "secret": settings.RECAPTCHA_SECRET_KEY,
+#                     "response": token,
+#                 },
+#                 timeout=10,
+#             )
 
-            response.raise_for_status()
+#             response.raise_for_status()
 
-            result = response.json()
-            success = result.get("success", False)
+#             result = response.json()
+#             success = result.get("success", False)
 
-            if not success:
-                logger.warning(
-                    "reCAPTCHA verification failed. Response: %s",
-                    result,
-                )
+#             if not success:
+#                 logger.warning(
+#                     "reCAPTCHA verification failed. Response: %s",
+#                     result,
+#                 )
 
-            return success
-        except requests.exceptions.Timeout:
-            logger.error("reCAPTCHA request timed out")
-            return False
-        except requests.exceptions.RequestException as exc:
-            logger.exception(
-                "Error while verifying reCAPTCHA: %s",
-                str(exc),
-            )
-            return False
-        except Exception as exc:
-            logger.exception(
-                "Unexpected error during reCAPTCHA verification: %s",
-                str(exc),
-            )
-            return False
+#             return success
+#         except requests.exceptions.Timeout:
+#             logger.error("reCAPTCHA request timed out")
+#             return False
+#         except requests.exceptions.RequestException as exc:
+#             logger.exception(
+#                 "Error while verifying reCAPTCHA: %s",
+#                 str(exc),
+#             )
+#             return False
+#         except Exception as exc:
+#             logger.exception(
+#                 "Unexpected error during reCAPTCHA verification: %s",
+#                 str(exc),
+#             )
+#             return False
 
 
 class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
@@ -140,6 +140,63 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
     
 
 
+# class LoginView(TokenObtainPairView):
+#     """
+#     API endpoint for user login.
+#     Extends SimpleJWT's TokenObtainPairView to customize the response.
+#     """
+
+#     schema = None
+
+#     def post(self, request, *args, **kwargs):
+#         # Call parent class method to validate credentials and get tokens
+#         try:
+#             captcha_token = request.data.get("captcha")
+#             if not captcha_token:
+#                 logger.warning(
+#                     "Login attempt without captcha. Username: %s",
+#                     request.data.get("username"),
+#                 )
+#                 return Response(
+#                     {"message": "Captcha is required"},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+#             if not verify_recaptcha(captcha_token):
+#                 logger.warning(
+#                     "Invalid captcha during login. Username: %s",
+#                     request.data.get("username"),
+#                 )
+#                 return Response(
+#                     {"message": "Invalid captcha"},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                  )
+            
+#             response = super().post(request, *args, **kwargs)
+
+#             token = response.data.get("access")
+#             jwt_auth = JWTAuthentication()
+#             validated_token = jwt_auth.get_validated_token(token)
+#             user = jwt_auth.get_user(validated_token)
+#             logger.info(
+#                 "User logged in successfully. User ID: %s Username: %s",
+#                 user.id,
+#                 user.username,
+#             )
+#             response.data["user"] = UserSerializer(user).data
+#             return response
+#         except Exception as exc:
+#             logger.exception(
+#                 "Unexpected error during login: %s",
+#                 str(exc),
+#             )
+
+#             return Response(
+#                 {"message": "An error occurred during login"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )
+        
+
+
 class LoginView(TokenObtainPairView):
     """
     API endpoint for user login.
@@ -150,52 +207,16 @@ class LoginView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         # Call parent class method to validate credentials and get tokens
-        try:
-            if not settings.DEBUG:
-                captcha_token = request.data.get("captcha")
-                if not captcha_token:
-                    logger.warning(
-                        "Login attempt without captcha. Username: %s",
-                        request.data.get("username"),
-                    )
-                    return Response(
-                        {"message": "Captcha is required"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if not verify_recaptcha(captcha_token):
-                    logger.warning(
-                        "Invalid captcha during login. Username: %s",
-                        request.data.get("username"),
-                    )
-                    return Response(
-                        {"message": "Invalid captcha"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                     )
+        response = super().post(request, *args, **kwargs)
 
-            response = super().post(request, *args, **kwargs)
+        token = response.data.get("access")
+        jwt_auth = JWTAuthentication()
+        validated_token = jwt_auth.get_validated_token(token)
+        user = jwt_auth.get_user(validated_token)
 
-            token = response.data.get("access")
-            jwt_auth = JWTAuthentication()
-            validated_token = jwt_auth.get_validated_token(token)
-            user = jwt_auth.get_user(validated_token)
-            logger.info(
-                "User logged in successfully. User ID: %s Username: %s",
-                user.id,
-                user.username,
-            )
-            response.data["user"] = UserSerializer(user).data
-            return response
-        except Exception as exc:
-            logger.exception(
-                "Unexpected error during login: %s",
-                str(exc),
-            )
+        response.data["user"] = UserSerializer(user).data
 
-            return Response(
-                {"message": "An error occurred during login"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        
+        return response
 
 
 class LogoutView(generics.GenericAPIView):
