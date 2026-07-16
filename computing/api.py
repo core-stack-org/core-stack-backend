@@ -40,10 +40,15 @@ from computing.layer_dependency.layer_generation_in_order import (
 from computing.misc.drainage_lines import (
     clip_drainage_lines as clip_drainage_lines_gee_task,
 )
+from utilities.pipelines import api_request_payload
 from .et_downscale.et_downscale import generate_et_downscale
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
+from .misc.livestocks import generate_livestocks_layer_task
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
 from .utils import (
     save_layer_info_to_db,
-    update_layer_sync_status,)
+    update_layer_sync_status,
+)
 from computing.misc.drainage_lines_local_compute import (
     clip_drainage_lines as clip_drainage_lines_local_task,
 )
@@ -151,8 +156,12 @@ from .tree_health.local.canopy_height_local import tree_health_ch_raster_local
 from .tree_health.local.canopy_height_vector_local import tree_health_ch_vector_local
 from .tree_health.local.ccd_local import tree_health_ccd_raster_local
 from .tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
-from .tree_health.local.overall_change_local import tree_health_overall_change_raster_local
-from .tree_health.local.overall_change_vector_local import tree_health_overall_change_vector_local
+from .tree_health.local.overall_change_local import (
+    tree_health_overall_change_raster_local,
+)
+from .tree_health.local.overall_change_vector_local import (
+    tree_health_overall_change_vector_local,
+)
 
 from .utils import (
     Geoserver,
@@ -173,6 +182,7 @@ from .views import (
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
     clear_layer_cache,
+    check_missing_excel_files,
 )
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
@@ -252,6 +262,7 @@ from .misc.antyodaya_local_compute import (
 from .misc.livestocks_local_compute import (
     generate_livestocks_data_local as generate_livestocks_data_local_task,
 )
+
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
@@ -1146,7 +1157,6 @@ def tree_health_raster(request):
             queue="nrm",
         )
 
-
         return Response(
             {"Success": "tree_health task initiated"},
             status=status.HTTP_200_OK,
@@ -1215,11 +1225,7 @@ def tree_health_vector(request):
         )
         print("What is task? ", overall_task)
 
-        task_kwargs = {
-            "state": state,
-            "district": district,
-            "block": block
-        }
+        task_kwargs = {"state": state, "district": district, "block": block}
         if not compute == "local":
             task_kwargs.update(
                 {
@@ -2013,7 +2019,11 @@ def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
         payload = api_request_payload(
-            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            (
+                request.data.dict()
+                if hasattr(request.data, "dict")
+                else dict(request.data)
+            ),
             overwrite=True,
         )
         generate_facilities_proximity_task.apply_async(
@@ -2021,7 +2031,8 @@ def generate_facilities_proximity(request):
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload},
+            status=status.HTTP_200_OK,
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2036,7 +2047,11 @@ def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
         payload = api_request_payload(
-            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            (
+                request.data.dict()
+                if hasattr(request.data, "dict")
+                else dict(request.data)
+            ),
             overwrite=False,
         )
         generate_antyodaya_layer_task.apply_async(
@@ -2044,7 +2059,8 @@ def generate_antyodaya(request):
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload},
+            status=status.HTTP_200_OK,
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2059,7 +2075,11 @@ def generate_livestocks(request):
     print("Inside generate_livestocks API.")
     try:
         payload = api_request_payload(
-            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            (
+                request.data.dict()
+                if hasattr(request.data, "dict")
+                else dict(request.data)
+            ),
             overwrite=False,
         )
         generate_livestocks_layer_task.apply_async(
@@ -2067,7 +2087,8 @@ def generate_livestocks(request):
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload},
+            status=status.HTTP_200_OK,
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2557,7 +2578,10 @@ def generate_fabdem_raster_vector(request):
             generate_febdem_raster_vector_clip_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
@@ -2583,7 +2607,10 @@ def generate_canal_vector(request):
             canal_vector_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2612,7 +2639,10 @@ def generate_river_data(request):
             river_vector_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2639,7 +2669,10 @@ def generate_drainage_density_data(request):
             drainage_density_vector_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2666,7 +2699,10 @@ def generate_antyodaya(request):
             generate_antyodaya_data_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
@@ -2693,7 +2729,10 @@ def generate_livestocks(request):
             generate_livestocks_data_local_task,
         )
         if task is None:
-            return Response({"Error": "GEE execution not supported for this module."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"Error": "GEE execution not supported for this module."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
             {"Success": f"Successfully initiated {compute} task"},
