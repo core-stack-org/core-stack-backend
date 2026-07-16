@@ -19,7 +19,7 @@ output:
   root: data/outputs
   directory_name: livestocks20
   layer_prefix: livestocks
-  geoserver_workspace: testworkspace
+  # geoserver_workspace: testworkspace
   # Dataset row used when registering published layers in the Layer database.
   dataset_name: Livestock Census
 
