@@ -2,8 +2,6 @@ import json
 import os
 
 import requests
-from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
-from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from rest_framework import status
@@ -14,12 +12,11 @@ from rest_framework.decorators import (
     permission_classes,
     schema,
 )
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
 
+from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
 from computing.change_detection.change_detection import (
     get_change_detection as get_change_detection_gee_task,
 )
@@ -32,6 +29,7 @@ from computing.change_detection.change_detection_vector import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from computing.layer_dependency.layer_generation_in_order import (
     layer_generate_map,
     normalize_compute as _normalize_layer_order_compute,
@@ -40,24 +38,15 @@ from computing.layer_dependency.layer_generation_in_order import (
 from computing.misc.drainage_lines import (
     clip_drainage_lines as clip_drainage_lines_gee_task,
 )
-from utilities.pipelines import api_request_payload
-from .et_downscale.et_downscale import generate_et_downscale
-from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
-from .misc.livestocks import generate_livestocks_layer_task
-from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
-from .utils import (
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
 from computing.misc.drainage_lines_local_compute import (
     clip_drainage_lines as clip_drainage_lines_local_task,
 )
-from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
 from utilities.gee_utils import check_gee_task_status, download_gee_layer
-
+from utilities.pipelines import api_request_payload
+from .STAC_specs.stac_collection import generate_stac_collection_task
 from .clart.clart import generate_clart_layer
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .crop_grid.crop_grid import create_crop_grids
@@ -65,13 +54,10 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .cropping_intensity.cropping_intesity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
-from .spei.spei import (
-    generate_spei_pipeline,
-    run_drought_resistance_resilience,
-    run_rainfall_resistance_resilience,
-)
 from .drought.drought import calculate_drought
 from .drought.drought_causality import drought_causality
+from .et_downscale.et_downscale import generate_et_downscale
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 from .local_compute_helper import (
     get_compute_mode as _get_compute_mode,
 )
@@ -101,31 +87,98 @@ from .lulc_X_terrain.lulc_on_slope_cluster_local import (
 )
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.agroecological_space import generate_agroecological_data
+from .misc.agroecological_space_local_compute import (
+    generate_agroecological_data_local as generate_agroecological_data_local_task,
+)
+from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.antyodaya_local_compute import (
+    generate_antyodaya_data_local as generate_antyodaya_data_local_task,
+)
 from .misc.aquifer_vector import (
     generate_aquifer_vector as generate_aquifer_vector_gee_task,
 )
 from .misc.aquifer_vector_local import (
     generate_aquifer_vector as generate_aquifer_vector_local_task,
 )
+from .misc.canal_layer import canal_vector
+from .misc.canal_local_compute import canal_vector as canal_vector_local_task
 from .misc.catchment_area import generate_catchment_area_singleflow
+from .misc.catchment_area_local_compute import (
+    generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task,
+)
+from .misc.digital_elevation_model import generate_dem_layer
+from .misc.digital_elevation_model_local import (
+    generate_febdem_raster_vector_clip as generate_febdem_raster_vector_clip_local_task,
+)
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.facilities import generate_facilities_proximity_task
+from .misc.distancetonearestdrainage_local_compute import (
+    generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task,
+)
+from .misc.drainage_density_local_compute import (
+    drainage_density as drainage_density_vector_local_task,
+)
+from .misc.facilities.pipeline import generate_facilities_proximity_task
 from .misc.factory_csr import generate_factory_csr_data
+from .misc.factory_csr_local_compute import (
+    generate_factory_csr_data_local as generate_factory_csr_data_local_task,
+)
 from .misc.green_credit import generate_green_credit_data
+from .misc.green_credit_local_compute import (
+    generate_green_credit_data_local as generate_green_credit_data_local_task,
+)
 from .misc.lcw_conflict import generate_lcw_conflict_data
+from .misc.lcw_conflict_local_compute import (
+    generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
+)
+
+from .misc.livestocks.pipeline import generate_livestocks_layer_task
+from .misc.antyodaya.pipeline import generate_antyodaya_layer_task
+
 from .misc.mining_data import generate_mining_data
+from .misc.mining_data_local_compute import (
+    generate_mining_data_local as generate_mining_data_local_task,
+)
 from .misc.naturaldepression import generate_natural_depression_data
+from .misc.naturaldepression_local_compute import (
+    generate_natural_depression_data_local as generate_natural_depression_data_local_task,
+)
 from .misc.ndvi_time_series import ndvi_timeseries
 from .misc.nrega import clip_nrega_district_block
+from .misc.nrega_local_compute import (
+    generate_nrega_data_local as generate_nrega_data_local_task,
+)
 from .misc.restoration_opportunity import generate_restoration_opportunity
+from .misc.restoration_opportunity_local_compute import (
+    generate_restoration_opportunity_local as generate_restoration_opportunity_local_task,
+)
+from .misc.river_local_compute import river_vector as river_vector_local_task
 from .misc.slope_percentage import generate_slope_percentage_data
+from .misc.slope_percentage_local_compute import (
+    generate_slope_percentage_data_local as generate_slope_percentage_data_local_task,
+)
 from .misc.soge_vector import generate_soge_vector
+from .misc.soge_vector_local_compute import (
+    generate_soge_vector_local as generate_soge_vector_local_task,
+)
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
 from .mws.mws import mws_layer
 from .mws.mws_centroid import generate_mws_centroid_data
-from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid_local_compute import (
+    generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
+)
+from .mws.mws_connectivity import (
+    generate_mws_connectivity_data as generate_mws_connectivity_gee_task,
+)
+from .mws.mws_connectivity_local_compute import (
+    mws_connectivity_vector as generate_mws_connectivity_local_task,
+)
 from .plantation.site_suitability import site_suitability
+from .spei.spei import (
+    generate_spei_pipeline,
+    run_drought_resistance_resilience,
+    run_rainfall_resistance_resilience,
+)
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
 from .surface_water_bodies.swb_local import (
@@ -162,105 +215,21 @@ from .tree_health.local.overall_change_local import (
 from .tree_health.local.overall_change_vector_local import (
     tree_health_overall_change_vector_local,
 )
-
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
 from .utils import (
     Geoserver,
     kml_to_shp,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from .misc.aquifer_vector_local import (
-    generate_aquifer_vector as generate_aquifer_vector_local_task,
-)
-from .misc.soge_vector import generate_soge_vector
-from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
-from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
-from utilities.auth_check_decorator import api_security_check
 from .views import (
-    check_missing_layers,
     layer_status,
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
     clear_layer_cache,
     check_missing_excel_files,
 )
-from .misc.lcw_conflict import generate_lcw_conflict_data
-from .misc.agroecological_space import generate_agroecological_data
-from .misc.factory_csr import generate_factory_csr_data
-from .misc.green_credit import generate_green_credit_data
-from .misc.mining_data import generate_mining_data
-from .misc.slope_percentage import generate_slope_percentage_data
-from .misc.naturaldepression import generate_natural_depression_data
-from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
-from .mws.mws_connectivity import (
-    generate_mws_connectivity_data as generate_mws_connectivity_gee_task,
-)
-from .mws.mws_connectivity_local_compute import (
-    mws_connectivity_vector as generate_mws_connectivity_local_task,
-)
-from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.antyodaya import generate_antyodaya_layer_task
-from .misc.digital_elevation_model import generate_dem_layer
-from .misc.canal_layer import canal_vector
-from .STAC_specs.stac_collection import generate_stac_collection_task
-from .mws.mws_centroid_local_compute import (
-    generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
-)
-from .misc.facilities_proximity_local_compute import (
-    generate_facilities_proximity_local as generate_facilities_proximity_local_task,
-)
-from .misc.digital_elevation_model_local import (
-    generate_febdem_raster_vector_clip as generate_febdem_raster_vector_clip_local_task,
-)
-from .misc.canal_local_compute import canal_vector as canal_vector_local_task
-from .misc.river_local_compute import river_vector as river_vector_local_task
-from .misc.drainage_density_local_compute import (
-    drainage_density as drainage_density_vector_local_task,
-)
-from .misc.restoration_opportunity_local_compute import (
-    generate_restoration_opportunity_local as generate_restoration_opportunity_local_task,
-)
-from .misc.soge_vector_local_compute import (
-    generate_soge_vector_local as generate_soge_vector_local_task,
-)
-from .misc.nrega_local_compute import (
-    generate_nrega_data_local as generate_nrega_data_local_task,
-)
-from .misc.catchment_area_local_compute import (
-    generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task,
-)
-from .misc.distancetonearestdrainage_local_compute import (
-    generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task,
-)
-from .misc.naturaldepression_local_compute import (
-    generate_natural_depression_data_local as generate_natural_depression_data_local_task,
-)
-from .misc.slope_percentage_local_compute import (
-    generate_slope_percentage_data_local as generate_slope_percentage_data_local_task,
-)
-from .misc.mining_data_local_compute import (
-    generate_mining_data_local as generate_mining_data_local_task,
-)
-from .misc.green_credit_local_compute import (
-    generate_green_credit_data_local as generate_green_credit_data_local_task,
-)
-from .misc.factory_csr_local_compute import (
-    generate_factory_csr_data_local as generate_factory_csr_data_local_task,
-)
-from .misc.agroecological_space_local_compute import (
-    generate_agroecological_data_local as generate_agroecological_data_local_task,
-)
-from .misc.lcw_conflict_local_compute import (
-    generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
-)
-from .misc.antyodaya_local_compute import (
-    generate_antyodaya_data_local as generate_antyodaya_data_local_task,
-)
-from .misc.livestocks_local_compute import (
-    generate_livestocks_data_local as generate_livestocks_data_local_task,
-)
 
 
 @api_security_check(allowed_methods="POST")
@@ -2725,7 +2694,7 @@ def generate_livestocks(request):
         task = _select_compute_task(
             compute,
             None,
-            generate_livestocks_data_local_task,
+            generate_livestocks_layer_task,
         )
         if task is None:
             return Response(
