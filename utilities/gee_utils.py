@@ -610,7 +610,7 @@ def sync_raster_to_gcs(image, scale, layer_name):
     return export_task.status()["id"]
 
 
-def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
+def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name=None):
     print("inside sync_raster_to_geoserver")
     geo = Geoserver()
     geo.delete_raster_store(workspace=workspace, store=layer_name)

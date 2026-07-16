@@ -6,6 +6,7 @@ from .models import Organization
 from .serializers import OrganizationSerializer
 from users.models import User
 from users.serializers import UserSerializer
+from django.db.models import Count, Q
 
 
 class IsSuperAdmin(permissions.BasePermission):
@@ -25,7 +26,16 @@ class OrganizationViewSet(viewsets.ModelViewSet):
     API endpoint that allows organizations to be viewed or edited.
     """
 
-    queryset = Organization.objects.all()
+    queryset = Organization.objects.annotate(
+        total_plan=Count(
+            "planapp",
+            filter=Q(planapp__enabled=True)
+        ),
+        completed_plan=Count(
+            "planapp",
+            filter=Q(planapp__is_completed=True)
+        )
+    )
     serializer_class = OrganizationSerializer
     permission_classes = [IsSuperAdmin]
     schema = None

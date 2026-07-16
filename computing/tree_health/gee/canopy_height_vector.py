@@ -121,7 +121,7 @@ def tree_health_ch_vector(
         layer_at_geoserver = False
         merged_fc = ee.FeatureCollection(asset_id)
 
-        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height")
+        sync_res = sync_fc_to_geoserver(merged_fc, state, description, "canopy_height_vector")
 
         if sync_res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)

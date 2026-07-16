@@ -548,7 +548,7 @@ def get_section_e_data(plan, language):
             language,
         )
     for row in agri_data:
-        demand_type = classify_demand_type(row["demand_type"].lower())
+        demand_type = classify_demand_type((row.get("demand_type") or "").lower())
         row["demand_type"] = translate_choice(
             agri_label,
             "demand_type".lower().replace(" ", "_"),

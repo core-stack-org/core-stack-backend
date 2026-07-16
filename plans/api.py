@@ -758,32 +758,3 @@ def map_plan_to_gp(request):
             },
         }
     )
-
-
-@api_view(["GET"])
-@schema(None)
-def plan_count(request):
-    """
-    gives plan count on the basis of org_id or project_id and filter
-    """
-    org_id = request.query_params.get("org_id")
-    project_id = request.query_params.get("project_id")
-    is_completed = request.query_params.get("is_completed")
-
-    queryset = PlanApp.objects.filter(enabled=True).exclude(
-        Q(plan__icontains="test") | Q(plan__icontains="demo")
-    )
-
-    if is_completed:
-        queryset = queryset.filter(is_completed=True).exclude(
-            Q(plan__icontains="test") | Q(plan__icontains="demo")
-        )
-
-    if org_id:
-        plan_count = queryset.filter(organization=org_id).count()
-    elif project_id:
-        plan_count = queryset.filter(project=project_id).count()
-    else:
-        plan_count = 0
-
-    return Response({"plan_count": plan_count})

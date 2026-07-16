@@ -110,8 +110,10 @@ from computing.terrain_descriptor.terrain_clusters_local import (
 from computing.terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as terrain_raster_local,
 )
+from stats_generator.utils import generate_stats_excel_file
 from utilities.gee_utils import valid_gee_text
 import os
+from nrm_app.celery import app
 from computing.models import Layer
 import json
 
@@ -617,11 +619,14 @@ def run_layer_with_dependency(
             print(
                 f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
             )
-            result = (
-                node_func_obj(state=state, district=district, block=block, **args)
-                if args
-                else node_func_obj(state, district, block)
-            )
+            if node_func_name == "generate_stats_excel_file":
+                result = node_func_obj(state, district, block)
+            else:
+                result = (
+                    node_func_obj(state=state, district=district, block=block, **args)
+                    if args
+                    else node_func_obj(state, district, block)
+                )
             if result:
                 print(f"{node_func_name} is completed...")
                 status[node_func_name] = True
