@@ -1103,19 +1103,23 @@ def get_terrain_data(state, district, block, uid):
 
         if filtered_df[0] == "Broad Sloppy and Hilly":
             parameter_main += f"The micro-watershed is spread across <strong>{round(mws_area,2)}</strong> hectares. The terrain of our micro-watershed consists of gently sloping land and rolling hills with <strong>{round(percent_slope,2)}</strong> % area under broad slopes and <strong>{round(percent_hill, 2)}</strong> % area under hills."
+            terrain_category_pct = f"Slope: {round(percent_slope, 2)}% | Hill: {round(percent_hill, 2)}%"
 
         elif filtered_df[0] == "Mostly Plains":
             parameter_main += f"The micro-watershed is spread across <strong>{round(mws_area,2)}</strong> hectares. The micro-watershed mainly consists of flat plains covering <strong>{round(percent_plain, 2)}</strong> % micro-watershed area."
             if plain_farmland_percent > 15:
                 parameter_main += checkdam_advice
+            terrain_category_pct = f"Plains: {round(percent_plain, 2)}%"
 
         elif filtered_df[0] == "Mostly Hills and Valleys":
             parameter_main += f"The micro-watershed is spread across <strong>{round(mws_area,2)}</strong> hectares. The micro-watershed terrain is mainly hills and valleys with <strong>{round(percent_hill, 2)}</strong> % under hills and <strong>{round(percent_valley, 2)}</strong> % under valleys."
+            terrain_category_pct = f"Hill: {round(percent_hill, 2)}% | Valley: {round(percent_valley, 2)}%"
 
         else:
             parameter_main += f"The micro-watershed is spread across <strong>{round(mws_area, 2)}</strong> hectares. The micro-watershed includes flat plains and gentle slopes with <strong>{round(percent_plain, 2)}</strong> % area as plains and <strong>{round(percent_slope, 2)}</strong> % area under broad slopes."
             if plain_farmland_percent > 15:
                 parameter_main += checkdam_advice
+            terrain_category_pct = f"Plains: {round(percent_plain, 2)}% | Slope: {round(percent_slope, 2)}%"
 
         gully_plug_subjects = []
         if slope_tree_percent > 15:
@@ -1126,13 +1130,13 @@ def get_terrain_data(state, district, block, uid):
         if gully_plug_subjects:
             parameter_main += f" {' and '.join(gully_plug_subjects)} may benefit from gully plugs and staggered trenches to improve soil moisture for vegetation and reduce soil erosion."
 
-        return parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain
+        return parameter_main, mws_areas, block_areas, parameter_comp, parameter_lulc, mws_lulc_area_slope, block_lulc_area_slope, mws_lulc_area_plain, block_lulc_area_plain, terrain_category_pct, round(percent_plain, 2), round(percent_slope, 2)
 
     except Exception as e:
         logger.info(
             "Not able to access excel for %s district, %s block", district, block
         )
-        return "", [], [], "", "", [], [], [], []
+        return "", [], [], "", "", [], [], [], [], "", "-", "-"
 
 
 def get_mws_barren_percent(state, district, block, uid):
@@ -1207,7 +1211,7 @@ def get_crop_intensity_sankey_data(state, district, block, uid):
 
 
 def get_tree_reduction_sankey_data(state, district, block, uid):
-    """Forest cover transitions (to barren/built-up/farm/forest/scrub) for the MWS, as sankey source-target-value links."""
+    """Tree cover transitions (to barren/built-up/farm/tree/scrub) for the MWS, as sankey source-target-value links."""
     sankey_data = []
     try:
         df_defo = read_excel_sheet(
@@ -1217,7 +1221,7 @@ def get_tree_reduction_sankey_data(state, district, block, uid):
         row_defo = df_defo.loc[df_defo["UID"] == uid]
         if not row_defo.empty:
             transitions = [
-                ("forest_to_forest_area_in_ha", "Forest"),
+                ("forest_to_forest_area_in_ha", "Trees"),
                 ("forest_to_barren_area_in_ha", "Barren"),
                 ("forest_to_built_up_area_in_ha", "Built Up"),
                 ("forest_to_farm_area_in_ha", "Farm"),
@@ -1230,7 +1234,7 @@ def get_tree_reduction_sankey_data(state, district, block, uid):
                 value = float(value) if not pd.isna(value) else 0
                 if value > 0:
                     sankey_data.append({
-                        "source": "Forest (Before)",
+                        "source": "Trees (Before)",
                         "target": f"{target} (After)",
                         "value": round(value, 2),
                     })
@@ -2187,7 +2191,8 @@ def get_water_balance_data(state, district, block, uid):
         #? Trend Calculation
         filtered_df_dg = df.loc[df["UID"] == uid, selected_column_dg].values[0]
         avg_del_g = sum(filtered_df_dg) / len(filtered_df_dg)
-        
+        mean_water_balance = round(avg_del_g, 2)
+
         filtered_df_g = df.loc[df["UID"] == uid, selected_column_g].values[0]
 
         result = mk.original_test(filtered_df_g)
@@ -2407,6 +2412,7 @@ def get_water_balance_data(state, district, block, uid):
             trend_desc,
             good_rainfall,
             bad_rainfall,
+            mean_water_balance,
             filtered_df_precip,
             filtered_df_runoff,
             filtered_df_et,
@@ -2420,7 +2426,7 @@ def get_water_balance_data(state, district, block, uid):
             district,
             block
         )
-        return "-", "", "", "", [], [], [], [], []
+        return "-", "", "", "", "-", [], [], [], [], []
 
 
 def get_hydro_tabular_data(state, district, block, uid):
@@ -2506,9 +2512,11 @@ def get_hydro_tabular_data(state, district, block, uid):
             df_soge = read_excel_sheet(base_path, "soge_vector")
             row_soge = df_soge.loc[df_soge["UID"] == uid]
             soge_class = row_soge["class_name"].values[0] if not row_soge.empty else "-"
+            soge_dev_percent = round(float(row_soge["soge_dev_percent"].values[0]), 2) if not row_soge.empty and "soge_dev_percent" in row_soge.columns else "-"
         except Exception as e:
             logger.info(f"Failed to read soge_vector sheet for {uid}: {e}")
             soge_class = "-"
+            soge_dev_percent = "-"
 
         # Read Drainage Density
         try:
@@ -2532,11 +2540,11 @@ def get_hydro_tabular_data(state, district, block, uid):
             drainage_density, total_length = "-", "-"
         print(f"drainage density is {drainage_density} and total length {total_length}")
 
-        return min_elev, max_elev, mean_elev, relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness
+        return min_elev, max_elev, mean_elev, relief, aquifer_class, soge_class, soge_dev_percent, drainage_density, total_length, area, perimeter, compactness
 
     except Exception as e:
         logger.info(f"Error in get_hydro_tabular_data for {uid}: {e}")
-        return "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"
+        return "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-", "-"
 
 
 def get_terrain_and_lulc_data(state, district, block, uid):
