@@ -7,10 +7,6 @@ Earth Engine's per-request download size limit), so a direct HTTP download
 is simpler and faster than submitting a batch export task and separately
 pulling it down from GCS afterwards. That async path is still the right
 tool for the much larger weekly 500m operational rasters (a later phase).
-
-Adapted from a similar CHIRPS/MODIS-PET download script already used
-elsewhere in this repo (data/test_code.py) for a closely related
-SPEI-inputs pipeline.
 """
 
 import time
