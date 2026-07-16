@@ -25,7 +25,7 @@ output:
   root: data/outputs
   directory_name: antyodaya20
   layer_prefix: antyodaya20
-  geoserver_workspace: testworkspace
+  # geoserver_workspace: testworkspace
   # Dataset row used when registering published layers in the Layer database.
   dataset_name: Antyodaya 2020
 

@@ -695,7 +695,7 @@
         .legend-close {
             background: none;
             border: none;
-            font-size: 20px;
+            font-size: 14px;
             color: #70757a;
             cursor: pointer;
             padding: 0;
@@ -704,12 +704,48 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
             flex-shrink: 0;
         }
 
         .legend-close:hover {
             color: #202124;
+        }
+
+        .google-maps-legend.collapsed .legend-close {
+            transform: rotate(-90deg);
+        }
+
+        .google-maps-legend.collapsed .legend-section {
+            display: none;
+        }
+
+        /* Collapsible raster/class legend boxes (DEM, terrain, LULC, farm/tree loss, demographics) */
+        .raster-legend-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .raster-legend-chevron {
+            font-size: 9px;
+            color: #6b7280;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .raster-legend.collapsed .raster-legend-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .raster-legend.collapsed .raster-legend-body {
+            display: none;
+        }
+
+        .raster-legend.collapsed .raster-legend-header h4 {
+            margin: 0 !important;
         }
 
         .legend-section {
@@ -1176,6 +1212,15 @@
                 visibility: hidden !important;
             }
 
+            /* Raster/class legends always fully expanded in print, regardless of on-screen collapse state */
+            .raster-legend .raster-legend-body {
+                display: block !important;
+            }
+
+            .raster-legend .raster-legend-chevron {
+                display: none !important;
+            }
+
             /* SCALE IN PRINT MODE */
             .ol-scale {
                 display: block !important;
@@ -1348,10 +1393,14 @@
 
             <div class="map-group-3">
                 <div id="demMap" class="map" style="position: relative;">
-                    <div
-                        style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; transform: scale(0.75); transform-origin: bottom left;">
-                        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute
-                            Elevation (m)</h4>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; transform: scale(0.75); transform-origin: bottom left;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute
+                                Elevation (m)</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; gap: 8px;">
                             <div
                                 style="width: 18px; height: 160px; background: linear-gradient(to top, #0d0030 0.0%, #1a0f6e 7.1%, #1746a0 14.3%, #1a72c0 21.4%, #2191c0 28.6%, #1aab9e 35.7%, #16a085 42.9%, #1cb870 48.6%, #27ae60 54.3%, #5ab836 58.6%, #95c623 62.9%, #d4d400 67.1%, #f1c40f 71.4%, #e09a30 75.7%, #d4845a 80.0%, #b0623a 84.3%, #8b5e3c 88.6%, #c4a882 94.3%, #f5f0e8 100.0%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;">
@@ -1407,14 +1456,19 @@
                             </div>
                             <span style="font-size: 10px; color: #6b7280;">Contour lines</span>
                         </div>
+                        </div>
                     </div>
                 </div>
                 <div id="drainageMap" class="map"></div>
                 <div id="terrainRasterMap" class="map" style="position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 60%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Terrain
-                            Classes</h4>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 60%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Terrain
+                                Classes</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1468,22 +1522,28 @@
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Upper Slopes</span>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 32%; text-align: center;">DEM Raster</div>
+                <div style="width: 32%; text-align: center;">Digital Elevation Model</div>
                 <div style="width: 32%; text-align: center;">Drainage Lines</div>
-                <div style="width: 32%; text-align: center;">Terrain Raster</div>
+                <div style="width: 32%; text-align: center;">Terrain</div>
             </div>
 
-            <div id="landscapeLulcMap" class="map" style="position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes
-                        </h4>
+            <div class="map-group">
+                <div id="landscapeLulcMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes
+                            </h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1554,15 +1614,10 @@
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Shrubs and Scrubs</span>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
-
-            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                LULC Raster
-            </div>
-
-            <div class="map-group">
-                <div id="hydroVectorMap" class="map" style="position: relative;">
+                <div id="hydroVectorMap" class="map" style="flex: 1 1 48%; position: relative;">
                     <div
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
                         <!-- <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Hydrology Features</h4> -->
@@ -1586,8 +1641,10 @@
                 </div>
             </div>
 
-            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Map showing Waterbodies, Rivers and Canals
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Land use and land cover (2024-25)</div>
+                <div style="width: 48%; text-align: center;">Waterbodies (24-25), rivers, and canals</div>
             </div>
 
             <div class="chart-container">
@@ -1599,10 +1656,14 @@
 
             <div class="map-group">
                 <div id="farmLossMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Farm Cover
-                            Loss</h4>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Farm Cover
+                                Loss</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1630,13 +1691,18 @@
                                     style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Shrubs_and_Scrubs</span>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
                 <div id="treeLossMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Tree Cover
-                            Loss</h4>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Tree Cover
+                                Loss</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1670,14 +1736,15 @@
                                     style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Shrubs_and_Scrubs</span>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 48%; text-align: center;">Farm Cover Loss</div>
-                <div style="width: 48%; text-align: center;">Tree Cover Loss</div>
+                <div style="width: 48%; text-align: center;">Cropping Degradation (2017-24)</div>
+                <div style="width: 48%; text-align: center;">Reduction in Tree Cover (2017-24)</div>
             </div>
 
             <div class="map-group-3">
@@ -1687,9 +1754,9 @@
             </div>
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 32%; text-align: center;">Total Population</div>
-                <div style="width: 32%; text-align: center;">Literacy</div>
-                <div style="width: 32%; text-align: center;">Marginal Communities</div>
+                <div style="width: 32%; text-align: center;">Total Population (Census 2011)</div>
+                <div style="width: 32%; text-align: center;">Literacy (Census 2011)</div>
+                <div style="width: 32%; text-align: center;">Marginal Communities (Census 2011)</div>
             </div>
         </section>
 
@@ -1701,18 +1768,15 @@
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
                     <tr style="font-weight: bold;">
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Area<br>(hectares)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Perimeter<br>(km)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">
-                            Compactness<br>(Kc)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Max Elev<br>(m)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Min Elev<br>(m)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Relief<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Area<br>(hectares)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Perimeter<br>(km)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Max Elev<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Min Elev<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Relief<br>(m)</td>
                     </tr>
                     <tr>
                         <td id="tbl-area" style="padding: 10px; border: 1px solid black;">{{ area }}</td>
                         <td id="tbl-perimeter" style="padding: 10px; border: 1px solid black;">{{ perimeter }}</td>
-                        <td id="tbl-compactness" style="padding: 10px; border: 1px solid black;">{{ compactness }}</td>
                         <td id="tbl-max-elev" style="padding: 10px; border: 1px solid black;">{{ max_elev }}</td>
                         <td id="tbl-min-elev" style="padding: 10px; border: 1px solid black;">{{ min_elev }}</td>
                         <td id="tbl-relief" style="padding: 10px; border: 1px solid black;">{{ dem_relief }}</td>
@@ -1744,19 +1808,27 @@
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
                     <tr style="font-weight: bold;">
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">Aquifer</td>
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">State of Groundwater Extraction (2020)</td>
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">Water Balance Trend</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Aquifer</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">State of Groundwater Extraction (2020)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">SOGE dev %</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Water Balance Trend</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Mean Annual Water Balance</td>
                     </tr>
                     <tr>
-                        <td colspan="2" id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">
+                        <td id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">
                             {{ aquifer_class }}
                         </td>
-                        <td colspan="2" id="tbl-soge" style="padding: 10px; border: 1px solid black;">
+                        <td id="tbl-soge" style="padding: 10px; border: 1px solid black;">
                             {{ soge_class }}
                         </td>
-                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">
+                        <td id="tbl-soge-dev" style="padding: 10px; border: 1px solid black;">
+                            {{ soge_dev_percent }}
+                        </td>
+                        <td id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">
                             {{ water_balance_trend }}
+                        </td>
+                        <td id="tbl-mean-water-balance" style="padding: 10px; border: 1px solid black;">
+                            {{ mean_water_balance }}
                         </td>
                     </tr>
                 </tbody>
@@ -1770,7 +1842,7 @@
                 <!-- Top Box -->
                 <div
                     style="background-color: #71a2d5; padding: 10px; font-size: 16px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; margin-bottom: 0;">
-                    Terrain Category - {{ terrain_desc }}
+                    Terrain Category - {{ terrain_desc }} ({{ terrain_category_pct }})
                 </div>
 
                 <!-- Columns -->
@@ -1778,14 +1850,14 @@
                     <div id="plainColumn" style="display: none; flex-direction: column; min-width: 0;">
                         <div
                             style="background-color: #71a2d5; padding: 8px; font-size: 15px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; border-top: none; margin-bottom: 0;">
-                            Area type = Plains</div>
+                            Area type = Plains ({{ terrain_plain_pct }}%)</div>
                         <div id="plainTreemap"
                             style="height: 300px; border: 1px solid #ddd; border-top: none; width: 100%;"></div>
                     </div>
                     <div id="slopeColumn" style="display: none; flex-direction: column; min-width: 0;">
                         <div
                             style="background-color: #71a2d5; padding: 8px; font-size: 15px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; border-top: none; margin-bottom: 0;">
-                            Area type = Slope</div>
+                            Area type = Slope ({{ terrain_slope_pct }}%)</div>
                         <div id="slopeTreemap"
                             style="height: 300px; border: 1px solid #ddd; border-top: none; width: 100%;"></div>
                     </div>
@@ -2135,7 +2207,7 @@
             {% if tree_reduction_sankey %}
             <div id="treeReductionSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
             <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Forest Cover Change (Sankey)
+                Tree Cover Change (Sankey)
             </div>
             {% endif %}
 
@@ -2407,14 +2479,9 @@
 
             <p>{{swb_season_avg_desc}}</p>
 
-            <div class="map-group">
-                <div id="swbMap" class="map"></div>
-                <div id="swbVillageMap2" class="map"></div>
-            </div>
-            <div
-                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
-                <div style="width: 48%; text-align: center;">MWS, Village Boundaries and Waterbodies</div>
+            <div id="swbMap" class="map"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Seasonal Surface Water Availability
             </div>
 
             <div class="legend">
@@ -2858,44 +2925,50 @@
                 demographicMargMap.addLayer(new ol.layer.Vector({ source: mwsSource, style: mwsStyle, zIndex: 10 }));
 
                 // Embedded Map Legends
-                const legendStyle = 'position: absolute; bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; pointer-events: none; font-size: 10px; line-height: 1.2; border: 1px solid #ccc; z-index: 1000;';
+                const legendStyle = 'position: absolute; bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; pointer-events: auto; font-size: 10px; line-height: 1.2; border: 1px solid #ccc; z-index: 1000;';
 
                 const popLegend = document.createElement('div');
-                popLegend.className = 'ol-unselectable ol-control';
+                popLegend.className = 'ol-unselectable ol-control raster-legend';
                 popLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 popLegend.innerHTML = `
-                    <div style="font-weight: bold; margin-bottom: 3px;">Total Population</div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Total Population</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-body">
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffb3ba; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 500</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffdfba; border: 1px solid #999; margin-right: 4px;"></div><span>500-1000</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffba; border: 1px solid #999; margin-right: 4px;"></div><span>1000-2000</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #baffc9; border: 1px solid #999; margin-right: 4px;"></div><span>2000-4000</span></div>
                     <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #bae1ff; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 4000</span></div>
+                    </div>
                 `;
                 demographicPopMap.addControl(new ol.control.Control({ element: popLegend }));
 
                 const litLegend = document.createElement('div');
-                litLegend.className = 'ol-unselectable ol-control';
+                litLegend.className = 'ol-unselectable ol-control raster-legend';
                 litLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 litLegend.innerHTML = `
-                    <div style="font-weight: bold; margin-bottom: 3px;">Literacy (%)</div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Literacy (%)</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-body">
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #f3c5ff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 40%</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #c5ebff; border: 1px solid #999; margin-right: 4px;"></div><span>40-55%</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #e2ffc5; border: 1px solid #999; margin-right: 4px;"></div><span>55-70%</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffc5d9; border: 1px solid #999; margin-right: 4px;"></div><span>70-85%</span></div>
                     <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ffe8c5; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 85%</span></div>
+                    </div>
                 `;
                 demographicLitMap.addControl(new ol.control.Control({ element: litLegend }));
 
                 const margLegend = document.createElement('div');
-                margLegend.className = 'ol-unselectable ol-control';
+                margLegend.className = 'ol-unselectable ol-control raster-legend';
                 margLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 margLegend.innerHTML = `
-                    <div style="font-weight: bold; margin-bottom: 3px;">Marginalized Communities (%)</div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>SC + ST population %</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-body">
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4a5a5; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 20%</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5c4d4; border: 1px solid #999; margin-right: 4px;"></div><span>20-40%</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>40-60%</span></div>
                     <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>60-80%</span></div>
                     <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #d4a5d4; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 80%</span></div>
+                    </div>
                 `;
                 demographicMargMap.addControl(new ol.control.Control({ element: margLegend }));
 
@@ -3634,26 +3707,6 @@
             ])
         })
 
-        const swbVillageMap2View = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const swbVillageMap2 = new ol.Map({
-            target: 'swbVillageMap2',
-            layers: [getBaseLayer()],
-            view: swbVillageMap2View,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
         const villageIntersectMapView = new ol.View({
             center: [78.9, 23.6],
             zoom: 10,
@@ -3809,7 +3862,6 @@
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature, true);
-                        addVillageBoundariesToMap(swbVillageMap2, feature, true);
                         addVillageBoundariesToMap(villageIntersectMap, feature, true);
                         addDemographicBoundariesToMap(feature);
 
@@ -3841,7 +3893,6 @@
                     addMwsBoundaryToMap(ComparisonMap5);
                     addMwsBoundaryToMap(swbMap);
                     addMwsBoundaryToMap(swbVillageMap);
-                    addMwsBoundaryToMap(swbVillageMap2);
                     addMwsBoundaryToMap(villageIntersectMap);
 
                     addMwsBoundaryToMap(demMap);
@@ -3875,7 +3926,6 @@
                     demographicMargMap.getView().fit(arr, fitOptions);
                     swbMap.getView().fit(arr, fitOptions);
                     swbVillageMap.getView().fit(arr, fitOptions);
-                    swbVillageMap2.getView().fit(arr, fitOptions);
                     villageIntersectMap.getView().fit(arr, fitOptions);
                     sogeMap.getView().fit(arr, fitOptions);
                 })
@@ -3919,7 +3969,6 @@
                 });
 
                 swbVillageMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
-                swbVillageMap2.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
             })
             .catch(error => {
                 // Silently handle fetch errors
@@ -3995,6 +4044,15 @@
             map.addControl(scaleControl);
         };
 
+        // Toggle collapse for the raster/class legend boxes (DEM, terrain, LULC, farm/tree loss, demographics)
+        function toggleRasterLegend(headerEl) {
+            const box = headerEl.closest('.raster-legend');
+            if (!box) return;
+            const collapsed = box.classList.toggle('collapsed');
+            headerEl.setAttribute('aria-expanded', String(!collapsed));
+        }
+        window.toggleRasterLegend = toggleRasterLegend;
+
         const addGoogleMapsLegend = (mapElement) => {
             if (mapElement.querySelector('.google-maps-legend')) {
                 return;
@@ -4002,10 +4060,14 @@
 
             const legendHTML = `
             <div class="google-maps-legend">
-                
+                <div class="legend-header">
+                    <p class="legend-title">Legend</p>
+                    <button type="button" class="legend-close" aria-label="Toggle legend" aria-expanded="true">&#9660;</button>
+                </div>
+
                 <div class="legend-section">
                     <div class="legend-section-title">Boundaries</div>
-                    
+
                     <div class="legend-item">
                         <div class="legend-checkbox">
                             <label for="village-${mapElement.id}">
@@ -4014,7 +4076,7 @@
                             </label>
                         </div>
                     </div>
-                    
+
                     <div class="legend-item">
                         <div class="legend-checkbox">
                             <label for="mws-${mapElement.id}">
@@ -4028,6 +4090,13 @@
         `;
 
             mapElement.insertAdjacentHTML('beforeend', legendHTML);
+
+            const legendEl = mapElement.querySelector('.google-maps-legend');
+            const toggleBtn = legendEl.querySelector('.legend-close');
+            toggleBtn.addEventListener('click', () => {
+                const collapsed = legendEl.classList.toggle('collapsed');
+                toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+            });
         };
 
         const initializeMapControls = () => {
@@ -4056,13 +4125,12 @@
 
             if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
             if (typeof swbVillageMap !== 'undefined') addVisualScaleBar(swbVillageMap);
-            if (typeof swbVillageMap2 !== 'undefined') addVisualScaleBar(swbVillageMap2);
             if (typeof villageIntersectMap !== 'undefined') addVisualScaleBar(villageIntersectMap);
             if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['mainMap', 'compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'swbVillageMap2', 'villageIntersectMap', 'sogeMap'];
+            const boundaryMaps = ['mainMap', 'compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
@@ -4488,7 +4556,7 @@
 
         // Tree Cover Change Sankey
         renderSankeyChart('treeReductionSankey', JSON.parse('{{tree_reduction_sankey|safe}}'), {
-            'Forest': '#73bb53',
+            'Trees': '#73bb53',
             'Built Up': '#ff0000',
             'Farm': '#eee05d',
             'Barren': '#a9a9a9',
@@ -4634,7 +4702,7 @@
         window.addEventListener('beforeprint', function () {
             const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap, sogeMap];
+                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, villageIntersectMap, sogeMap];
 
             allMaps.forEach(function (map) {
                 if (map) {
@@ -4652,7 +4720,7 @@
 
             const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap, sogeMap, demMapTerrain];
+                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, villageIntersectMap, sogeMap, demMapTerrain];
 
             setTimeout(function () {
                 allMaps.forEach(function (map) {
@@ -4701,7 +4769,7 @@
 
             [mainMap, TerrainMap, DegradMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap]
+                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, villageIntersectMap]
                 .filter(Boolean)
                 .forEach(m => m.once('rendercomplete', afterRender));
 
@@ -4715,7 +4783,7 @@
                         try {
                             [mainMap, TerrainMap, DegradMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap]
+                                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, villageIntersectMap]
                                 .filter(Boolean)
                                 .forEach(m => m.renderSync());
                         } catch (e) { }

@@ -21,9 +21,6 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
             instance.groups.add(group)
         subject = f"New User Registered – Assign to Project"
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
-        superuser_emails = list(
-            User.objects.filter(is_superuser=True).values_list("email", flat=True)
-        )
 
         message = f"""
         <html>
@@ -65,13 +62,5 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
 </html>
         """
 
-        recipients = (
-            superuser_emails
-            if superuser_emails
-            else [
-                "ankit.kumar@oniondev.com",
-                "aman.verma@oniondev.com",
-                "kapil.dadheech@gramvaani.org",
-            ]
-        )
+        recipients = ["support@core-stack.org"]
         send_email_notification.delay(subject, "", message, recipients)
