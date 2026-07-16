@@ -269,6 +269,9 @@ def generate_mws_report(request):
             lulc_block_slope,
             lulc_mws_plain,
             lulc_block_plain,
+            terrain_category_pct,
+            terrain_plain_pct,
+            terrain_slope_pct,
         ) = get_terrain_data(state, district, block, uid)
 
         # ? Degradation Description generation
@@ -298,6 +301,7 @@ def generate_mws_report(request):
             wb_desc,
             good_rainfall,
             bad_rainfall,
+            mean_water_balance,
             precip_data,
             runoff_data,
             et_data,
@@ -317,7 +321,7 @@ def generate_mws_report(request):
         soge_desc = get_soge_data(state, district, block, uid)
 
         # ? Hydro Tabular Data
-        min_elev, max_elev, mean_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
+        min_elev, max_elev, mean_elev, dem_relief, aquifer_class, soge_class, soge_dev_percent, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
 
         # ? Cropping, Water, and Hydrology Data
         cwh_data = get_cropping_water_hydro_data(state, district, block, uid)
@@ -370,6 +374,9 @@ def generate_mws_report(request):
             "terrain_mws": terrain_mws,
             "terrain_comp": terrain_comp,
             "terrain_land_use": terrain_land_use,
+            "terrain_category_pct": terrain_category_pct,
+            "terrain_plain_pct": terrain_plain_pct,
+            "terrain_slope_pct": terrain_slope_pct,
             "land_degrad": land_degrad,
             "tree_degrad": tree_degrad,
             "urbanization": urbanization,
@@ -384,6 +391,7 @@ def generate_mws_report(request):
             "swb_season_desc": final_desc,
             "swb_season_avg_desc": swb_season_avg_desc,
             "water_balance_trend": water_balance_trend,
+            "mean_water_balance": mean_water_balance,
             "wb_desc": wb_desc,
             "good_rainfall": good_rainfall,
             "bad_rainfall": bad_rainfall,
@@ -397,6 +405,7 @@ def generate_mws_report(request):
             "dem_relief": dem_relief,
             "aquifer_class": aquifer_class,
             "soge_class": soge_class,
+            "soge_dev_percent": soge_dev_percent,
             "drainage_density": drainage_density,
             "drainage_length": total_length,
             "area": area,
