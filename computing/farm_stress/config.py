@@ -57,6 +57,14 @@ LOCAL_DIR_MODIS_PET_MONTHLY = os.path.join(LOCAL_EXPORT_ROOT, "modis_pet_monthly
 LOCAL_DIR_WATER_BALANCE_MONTHLY = os.path.join(LOCAL_EXPORT_ROOT, "water_balance_monthly")
 LOCAL_DIR_GSMAP_DAILY = os.path.join(LOCAL_EXPORT_ROOT, "gsmap_daily")
 
+# Local fitting outputs (Script 01b) - parameter rasters (one 3-band file
+# per calendar month) and the full standardised timeseries (one file per
+# period, same grid/labels as the rainfall/water-balance inputs).
+LOCAL_DIR_SPI1_PARAMS = os.path.join(LOCAL_EXPORT_ROOT, "spi1_params")
+LOCAL_DIR_SPI1_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spi1_timeseries")
+LOCAL_DIR_SPEI3_PARAMS = os.path.join(LOCAL_EXPORT_ROOT, "spei3_params")
+LOCAL_DIR_SPEI3_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries")
+
 # GCS is still used for the much larger weekly 500m operational alert
 # rasters (a later phase), which are too big for a direct download.
 GCS_PATH_GSMAP_MONTHLY = "ksheetiz/farm_stress/gsmap_monthly/"
