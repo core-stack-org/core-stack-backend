@@ -91,9 +91,6 @@ from .misc.agroecological_space_local_compute import (
     generate_agroecological_data_local as generate_agroecological_data_local_task,
 )
 from .misc.antyodaya import generate_antyodaya_layer_task
-from .misc.antyodaya_local_compute import (
-    generate_antyodaya_data_local as generate_antyodaya_data_local_task,
-)
 from .misc.aquifer_vector import (
     generate_aquifer_vector as generate_aquifer_vector_gee_task,
 )
@@ -130,10 +127,7 @@ from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.lcw_conflict_local_compute import (
     generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
 )
-
 from .misc.livestocks.pipeline import generate_livestocks_layer_task
-from .misc.antyodaya.pipeline import generate_antyodaya_layer_task
-
 from .misc.mining_data import generate_mining_data
 from .misc.mining_data_local_compute import (
     generate_mining_data_local as generate_mining_data_local_task,
@@ -2020,7 +2014,7 @@ def generate_antyodaya(request):
                 if hasattr(request.data, "dict")
                 else dict(request.data)
             ),
-            overwrite=False,
+            overwrite=True,
         )
         generate_antyodaya_layer_task.apply_async(
             kwargs={"payload": payload},
@@ -2048,7 +2042,7 @@ def generate_livestocks(request):
                 if hasattr(request.data, "dict")
                 else dict(request.data)
             ),
-            overwrite=False,
+            overwrite=True,
         )
         generate_livestocks_layer_task.apply_async(
             kwargs={"payload": payload},
@@ -2648,66 +2642,6 @@ def generate_drainage_density_data(request):
         )
     except Exception as e:
         print("Exception in river data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_antyodaya(request):
-    print("Inside generate_antyodaya API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
-        compute = _get_compute_mode(request)
-        task = _select_compute_task(
-            compute,
-            None,
-            generate_antyodaya_data_local_task,
-        )
-        if task is None:
-            return Response(
-                {"Error": "GEE execution not supported for this module."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
-        return Response(
-            {"Success": f"Successfully initiated {compute} task"},
-            status=status.HTTP_200_OK,
-        )
-    except Exception as e:
-        print("Exception in generate_antyodaya api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-def generate_livestocks(request):
-    print("Inside generate_livestocks API.")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
-        compute = _get_compute_mode(request)
-        task = _select_compute_task(
-            compute,
-            None,
-            generate_livestocks_layer_task,
-        )
-        if task is None:
-            return Response(
-                {"Error": "GEE execution not supported for this module."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
-        return Response(
-            {"Success": f"Successfully initiated {compute} task"},
-            status=status.HTTP_200_OK,
-        )
-    except Exception as e:
-        print("Exception in generate_livestocks api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
