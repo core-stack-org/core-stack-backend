@@ -486,29 +486,6 @@ def run_livestocks_pipeline(
                 geoserver = asdict(geoserver_result)
                 geoserver["ok"] = True
                 geoserver["status"] = "published"
-                if request.publish.register_layers:
-                    result["layer_registration"] = register_layer(
-                        dataset_name=output_config.get("dataset_name", "Livestock Census"),
-                        layer_name=layer_name,
-                        scope=request.scope,
-                        workspace=geoserver_workspace,
-                        geoserver_url=geoserver.get("wfs_url"),
-                        algorithm=ALGORITHM,
-                        algorithm_version=ALGORITHM_VERSION,
-                        misc={
-                            "source_csv": config["sources"]["csv"],
-                            "gpkg_path": result.get("gpkg_path"),
-                            "links_path": result.get("links_path"),
-                            "output_dir": bundle.path.as_posix(),
-                            "geoserver_layer_name": layer_name,
-                            "geoserver_url": geoserver.get("wfs_url"),
-                            "rows": result.get("rows"),
-                            "matched_rows": result.get("matched_rows"),
-                            "join_coverage": result.get("join_coverage"),
-                        },
-                        overwrite=request.publish.overwrite,
-                    )
-                    result["layer_id"] = (result["layer_registration"] or {}).get("layer_id")
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -520,6 +497,29 @@ def run_livestocks_pipeline(
                 }
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if request.publish.register_layers and geoserver and geoserver.get("ok"):
+        result["layer_registration"] = register_layer(
+            dataset_name=output_config.get("dataset_name", "Livestock Census"),
+            layer_name=layer_name,
+            scope=request.scope,
+            workspace=geoserver_workspace,
+            geoserver_url=geoserver.get("wfs_url"),
+            algorithm=ALGORITHM,
+            algorithm_version=ALGORITHM_VERSION,
+            misc={
+                "source_csv": config["sources"]["csv"],
+                "gpkg_path": result.get("gpkg_path"),
+                "links_path": result.get("links_path"),
+                "output_dir": bundle.path.as_posix(),
+                "geoserver_layer_name": layer_name,
+                "geoserver_url": geoserver.get("wfs_url"),
+                "rows": result.get("rows"),
+                "matched_rows": result.get("matched_rows"),
+                "join_coverage": result.get("join_coverage"),
+            },
+            overwrite=request.publish.overwrite,
+        )
+        result["layer_id"] = result["layer_registration"]["layer_id"]
     if outputs.readme:
         result["readme_path"] = bundle.write_readme(
             _readme_lines(
