@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 import requests
@@ -261,6 +262,8 @@ from .misc.antyodaya_local_compute import (
 from .misc.livestocks_local_compute import (
     generate_livestocks_data_local as generate_livestocks_data_local_task,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @api_security_check(allowed_methods="POST")
@@ -1598,7 +1601,6 @@ def wells_compute(request):
 @api_view(["POST"])
 @schema(None)
 def generate_layer_in_order(request):
-    print("inside generate_layer_order_first")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1611,8 +1613,17 @@ def generate_layer_in_order(request):
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
 
+        logger.info(
+            f"generate_layer_in_order requested: state={state}, district={district}, "
+            f"block={block}, map={map_order}, compute={compute}"
+        )
+
         validation_errors = validate_layer_map_request(map_order, compute=compute)
         if validation_errors:
+            logger.error(
+                f"generate_layer_in_order validation failed for map={map_order}, "
+                f"compute={compute}: {'; '.join(validation_errors)}"
+            )
             return Response(
                 {"Exception": "; ".join(validation_errors)},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1635,17 +1646,18 @@ def generate_layer_in_order(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        print("Invalid request in generate_layer_order_first api :: ", e)
+        logger.warning(f"Invalid request in generate_layer_in_order api: {e}")
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_layer_order_first api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.exception("Exception in generate_layer_in_order api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
 @schema(None)
 def layer_status_dashboard(request):
-    print("inside layer_staus_dashboard")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1656,8 +1668,10 @@ def layer_status_dashboard(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in layer_staus_dashboard api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.exception("Exception in layer_status_dashboard api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
