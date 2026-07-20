@@ -16,6 +16,7 @@ import pandas as pd
 from django.conf import settings
 from scipy.spatial import cKDTree
 
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from utilities.pipelines import AdminScope, CSAdminSource, StandardRequest, load_config
 from utilities.pipelines.admin import (
     ADMIN_COLUMN_DESCRIPTIONS,
@@ -53,7 +54,6 @@ from utilities.pipelines.outputs import (
 from utilities.pipelines.publish import (
     publish_gpkg_layer,
     publish_gpkg_layers,
-    register_layer,
 )
 from utilities.pipelines.unicode import normalize_unicode_frame
 from nrm_app.celery import app
@@ -1134,33 +1134,48 @@ def run_facilities_pipeline(
         }
     ).as_posix()
     if request.publish.register_layers and published_layers:
-        common_misc = {
-            "source_facilities_gpkg": config["sources"]["facilities_gpkg"],
-            "gpkg_path": result.get("gpkg_path"),
-            "facility_points_gpkg_path": result.get("facility_points_gpkg_path"),
-            "links_path": result.get("links_path"),
-            "output_dir": bundle.path.as_posix(),
-            "village_rows": result.get("village_rows"),
-            "nearest_rows": result.get("nearest_rows"),
-            "inventory_rows": result.get("inventory_rows"),
-        }
+        state = request.scope.state_name
+        district = request.scope.district_name
+        block = request.scope.tehsil_name
+        if not (state and district and block):
+            raise ValueError(
+                "Layer registration requires state, district, and tehsil names."
+            )
         registrations: dict[str, dict[str, Any]] = {}
         for role, published in published_layers.items():
-            registrations[role] = register_layer(
-                dataset_name=(
-                    output_config.get("dataset_name", "Facilities Proximity")
-                    if role == "village_properties"
-                    else output_config.get("points_dataset_name", "Facilities Points")
-                ),
+            dataset_name = (
+                output_config.get("dataset_name", "Facilities Proximity")
+                if role == "village_properties"
+                else output_config.get("points_dataset_name", "Facilities Points")
+            )
+            layer_id = save_layer_info_to_db(
+                state=state,
+                district=district,
+                block=block,
                 layer_name=published["layer_name"],
-                scope=request.scope,
-                workspace=published["workspace"],
-                geoserver_url=published["wfs_url"],
+                asset_id="not applicable: local compute GeoServer layer",
+                dataset_name=dataset_name,
                 algorithm=ALGORITHM,
                 algorithm_version=ALGORITHM_VERSION,
-                misc={**common_misc, "output_role": role},
-                overwrite=request.publish.overwrite,
+                misc={"is_generated_locally": True},
+                is_override=request.publish.overwrite,
             )
+            if layer_id is None:
+                raise RuntimeError(
+                    f"Database registration failed for layer {published['layer_name']!r}."
+                )
+            if update_layer_sync_status(
+                layer_id=layer_id, sync_to_geoserver=True
+            ) is None:
+                raise RuntimeError(
+                    f"GeoServer sync status update failed for layer ID {layer_id}."
+                )
+            registrations[role] = {
+                "ok": True,
+                "status": "registered",
+                "dataset": dataset_name,
+                "layer_id": layer_id,
+            }
         result["layer_registrations"] = registrations
         result["layer_registration"] = registrations.get("village_properties")
         result["layer_id"] = (result.get("layer_registration") or {}).get("layer_id")
