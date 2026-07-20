@@ -421,13 +421,9 @@ def register_layer(
 ) -> dict[str, Any]:
     """Register a published layer in the Core Stack layer database.
 
-    Uses the same `save_layer_info_to_db` path as the GEE-backed pipelines, so
-    local pipeline layers appear alongside every other layer. The `Layer` model
-    is keyed on state/district/block, so only tehsil-scoped runs can register;
+    The `Layer` model is keyed on state/district/block, so only tehsil-scoped runs can register;
     other scopes are reported as skipped rather than failing the run.
 
-    Never raises: the run has already succeeded by the time this is called, so
-    a database problem is reported in the result instead of losing the outputs.
     """
 
     level = str(getattr(scope, "level", "") or "").lower()
@@ -437,32 +433,60 @@ def register_layer(
     if not (state and district and block):
         return {"ok": False, "status": "skipped", "reason": "scope is missing state, district, or tehsil name"}
 
-    try:
-        from computing.models import Dataset, LayerType
-        from computing.utils import save_layer_info_to_db, update_layer_sync_status
+    from django.db import transaction
 
-        Dataset.objects.get_or_create(
+    from computing.models import Dataset, Layer, LayerType
+    from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
+
+    with transaction.atomic():
+        dataset, _ = Dataset.objects.get_or_create(
             name=dataset_name,
-            defaults={"layer_type": LayerType.VECTOR, "workspace": workspace},
+            defaults={
+                "layer_type": LayerType.VECTOR,
+                "workspace": workspace,
+                "is_active": True,
+            },
         )
-        layer_id = save_layer_info_to_db(
-            state=state,
-            district=district,
-            block=block,
+        dataset.layer_type = LayerType.VECTOR
+        dataset.workspace = workspace
+        dataset.is_active = True
+        dataset.save(update_fields=["layer_type", "workspace", "is_active", "updated_at"])
+
+        state_obj = StateSOI.objects.get(state_name__iexact=state)
+        district_obj = DistrictSOI.objects.get(
+            district_name__iexact=district,
+            state=state_obj,
+        )
+        block_obj = TehsilSOI.objects.get(
+            tehsil_name__iexact=block,
+            district=district_obj,
+        )
+        layer, _ = Layer.objects.update_or_create(
+            dataset=dataset,
             layer_name=layer_name,
-            asset_id=geoserver_url,
-            dataset_name=dataset_name,
-            algorithm=algorithm,
-            algorithm_version=algorithm_version,
-            misc={"is_generated_locally": True, "geoserver_workspace": workspace, **(misc or {})},
-            is_override=overwrite,
-            is_gee_asset=False,
+            state=state_obj,
+            district=district_obj,
+            block=block_obj,
+            layer_version="1.0",
+            defaults={
+                "algorithm": algorithm,
+                "algorithm_version": algorithm_version,
+                "is_sync_to_geoserver": True,
+                "is_override": overwrite,
+                "gee_asset_path": "not applicable: local compute GeoServer layer",
+                "is_public_gee_asset": False,
+                "misc": {
+                    "is_generated_locally": True,
+                    "source_type": "local_compute",
+                    "geoserver_workspace": workspace,
+                    "geoserver_url": geoserver_url,
+                    **(misc or {}),
+                },
+            },
         )
-        if not layer_id:
-            return {"ok": False, "status": "not_registered", "dataset": dataset_name,
-                    "reason": "save_layer_info_to_db returned no layer id (check state/district/block exist in the SOI tables)"}
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        return {"ok": True, "status": "registered", "dataset": dataset_name, "layer_id": layer_id}
-    except Exception as exc:
-        return {"ok": False, "status": "registration_failed", "dataset": dataset_name,
-                "error_type": exc.__class__.__name__, "error": str(exc)[:500]}
+    return {
+        "ok": True,
+        "status": "registered",
+        "dataset": dataset_name,
+        "layer_id": layer.id,
+    }
