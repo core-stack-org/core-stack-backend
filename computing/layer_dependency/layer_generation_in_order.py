@@ -83,6 +83,14 @@ from computing.misc.drainage_lines_local_compute import (
 from computing.misc.facilities_proximity_local_compute import (
     generate_facilities_proximity_local,
 )
+from computing.misc.antyodaya_local_compute import generate_antyodaya_data_local
+from computing.misc.canal_local_compute import canal_vector as canal_vector_local
+from computing.misc.digital_elevation_model_local import (
+    generate_febdem_raster_vector_clip,
+)
+from computing.misc.drainage_density_local_compute import drainage_density
+from computing.misc.livestocks_local_compute import generate_livestocks_data_local
+from computing.misc.river_local_compute import river_vector as river_vector_local
 from computing.misc.factory_csr_local_compute import generate_factory_csr_data_local
 from computing.misc.green_credit_local_compute import generate_green_credit_data_local
 from computing.misc.lcw_conflict_local_compute import generate_lcw_conflict_data_local
@@ -106,15 +114,21 @@ from computing.surface_water_bodies.swb_local import (
 from computing.terrain_descriptor.terrain_clusters_local import (
     generate_terrain_clusters as generate_terrain_clusters_local,
 )
+from computing.terrain_descriptor.terrain_compute_all_local import (
+    generate_terrain_compute_all,
+)
 from computing.terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as terrain_raster_local,
 )
 from stats_generator.utils import generate_stats_excel_file
 from utilities.gee_utils import valid_gee_text
 import os
+import logging
 from nrm_app.celery import app
 from computing.models import Layer
 import json
+
+logger = logging.getLogger(__name__)
 
 VALID_COMPUTE_TYPES = {"gee", "local"}
 
@@ -130,8 +144,6 @@ END_YEAR_RULE_FILES = {
     "gee": "end_year_rules.json",
     "local": "local_end_year_rules.json",
 }
-
-status = {}
 
 
 GEE_TASK_REGISTRY = {
@@ -237,6 +249,7 @@ LOCAL_TASK_REGISTRY = {
     "generate_terrain_raster": terrain_raster_local,
     "generate_terrain_clusters": generate_terrain_clusters_local,
     "generate_terrain_descriptor": generate_terrain_clusters_local,
+    "generate_terrain_compute_all": generate_terrain_compute_all,
     "lulc_on_plain_cluster": lulc_on_plain_cluster_local,
     "terrain_lulc_plain_cluster": lulc_on_plain_cluster_local,
     "lulc_on_slope_cluster": lulc_on_slope_cluster_local,
@@ -268,6 +281,12 @@ LOCAL_TASK_REGISTRY = {
     "generate_mws_connectivity": mws_connectivity_vector,
     "generate_facilities_proximity_task": generate_facilities_proximity_local,
     "generate_facilities_proximity": generate_facilities_proximity_local,
+    "generate_livestocks": generate_livestocks_data_local,
+    "generate_antyodaya": generate_antyodaya_data_local,
+    "generate_density_vector": drainage_density,
+    "generate_river_data": river_vector_local,
+    "generate_canal_vector": canal_vector_local,
+    "generate_dem_raster_vector": generate_febdem_raster_vector_clip,
     "generate_mws_centroid_data": generate_mws_centroid_data_local,
     "generate_mws_centroid": generate_mws_centroid_data_local,
 }
@@ -292,9 +311,13 @@ def layer_generate_map(
 ):
     """
     This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
+
+    Sibling nodes (nodes that don't depend on each other) keep running even if one of
+    them fails; only nodes that declare a dependency on a failed node are skipped.
     """
     compute = normalize_compute(compute)
-    status.clear()
+    log_ctx = f"state={state}, district={district}, block={block}, map={map_order}, compute={compute}"
+    status = {}
 
     # checking:- is mws layer generated?
     try:
@@ -307,8 +330,10 @@ def layer_generate_map(
                 .first()
             )
             if not layer:
+                logger.error(f"MWS layer missing, cannot proceed ({log_ctx})")
                 return f"check mws layer for {district}_{block}"
     except Exception as e:
+        logger.exception(f"Exception while checking mws layer ({log_ctx})")
         return f"exception occur while checking mws for {district}_{block} as: {e}"
 
     global_args = {}
@@ -321,15 +346,20 @@ def layer_generate_map(
     map_config = load_map_config(map_order, compute=compute)
 
     if not map_config:
+        logger.error(f"Map configuration not found ({log_ctx})")
         return f"Map configuration not found for {map_order} using compute={compute}"
 
     validation_errors = validate_map_config(map_config, compute=compute)
     if validation_errors:
+        logger.error(
+            f"Invalid map configuration ({log_ctx}): {'; '.join(validation_errors)}"
+        )
         return (
             f"Invalid {compute} map configuration for {map_order}: "
             f"{'; '.join(validation_errors)}"
         )
 
+    logger.info(f"Starting layer generation ({log_ctx})")
     task_registry = TASK_REGISTRIES[compute]
     for func in map_config:
         run_node_tree(
@@ -341,6 +371,20 @@ def layer_generate_map(
             block=block,
             global_args=global_args,
             gee_account_id=gee_account_id,
+            status=status,
+        )
+
+    failed_nodes = sorted(name for name, ok in status.items() if not ok)
+    succeeded_nodes = sorted(name for name, ok in status.items() if ok)
+    if failed_nodes:
+        logger.error(
+            f"Layer generation completed with failures ({log_ctx}): "
+            f"failed={failed_nodes}, succeeded={succeeded_nodes}"
+        )
+    else:
+        logger.info(
+            f"Layer generation completed successfully ({log_ctx}): "
+            f"succeeded={succeeded_nodes}"
         )
 
     return f"{status = }"
@@ -555,6 +599,7 @@ def run_node_tree(
     block,
     global_args,
     gee_account_id,
+    status,
 ):
     node_func_name = node["name"]
     node_func_obj = task_registry[node_func_name]
@@ -571,9 +616,11 @@ def run_node_tree(
         district=district,
         block=block,
         args=args,
+        status=status,
     )
 
     if not status.get(node_func_name, False):
+        # Only nodes depending on this one are affected; siblings keep running.
         return
 
     for child in node.get("children", []):
@@ -586,23 +633,25 @@ def run_node_tree(
             block=block,
             global_args=global_args,
             gee_account_id=gee_account_id,
+            status=status,
         )
 
 
 def run_layer_with_dependency(
-    deps, node_func_name, node_func_obj, compute, state, district, block, args
+    deps, node_func_name, node_func_obj, compute, state, district, block, args, status
 ):
     """
     This function checks dependency of layer if it is generated or not and call the pipeline functions and maintain status of each function,
     """
+    log_ctx = f"node={node_func_name}, state={state}, district={district}, block={block}"
     for dep in deps:
         if status.get(dep, False):
             continue
         checker = DependencyValidator.get_checker(dep, compute)
         status[dep] = checker(district, block) if checker else False
         if not status[dep]:
-            print(
-                f"Skipping {node_func_name} because dependency {dep} failed or not executed."
+            logger.warning(
+                f"Skipping {node_func_name} because dependency {dep} failed or was not executed ({log_ctx})"
             )
             status[node_func_name] = False
             break
@@ -613,8 +662,8 @@ def run_layer_with_dependency(
                 args["end_year"] = end_year_rules[node_func_name]
             if node_func_name == "site_suitability":
                 args["project_id"] = None
-            print(
-                f"{node_func_name} is running... with args={args, state, district, block}, depends_on={deps}"
+            logger.info(
+                f"Running {node_func_name} with args={args}, depends_on={deps} ({log_ctx})"
             )
             if node_func_name == "generate_stats_excel_file":
                 result = node_func_obj(state, district, block)
@@ -625,15 +674,16 @@ def run_layer_with_dependency(
                     else node_func_obj(state, district, block)
                 )
             if result:
-                print(f"{node_func_name} is completed...")
                 status[node_func_name] = True
+                logger.info(f"Completed {node_func_name} ({log_ctx}): result={result}")
             else:
-                print(f"check the {node_func_name}")
                 status[node_func_name] = False
-            print(f"{result = }")
-        except Exception as e:
-            print(f"{node_func_name} raised an error: {e}")
+                logger.warning(
+                    f"{node_func_name} returned a falsy result, treating as failed ({log_ctx}): result={result}"
+                )
+        except Exception:
             status[node_func_name] = False
+            logger.exception(f"{node_func_name} raised an error ({log_ctx})")
 
 
 def get_args(iterator_name, global_args, gee_account_id):
