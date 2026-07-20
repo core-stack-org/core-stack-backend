@@ -10,6 +10,7 @@ import yaml
 from computing.config_loader import (
     ADMIN_BOUNDARY_INPUT_DIR,
     ADMIN_BOUNDARY_OUTPUT_DIR,
+    DATA_DIR,
     MICROWATERSHED_PATH,
     PROJECT_ROOT,
     SOI_TEHSIL_PATH,
@@ -32,7 +33,7 @@ from computing.config_loader import (
 )
 logger = logging.getLogger(__name__)
 
-CONFIG_NEW_PATH = Path(__file__).resolve().parent / "config_new.yaml"
+CONFIG_NEW_PATH = Path(__file__).resolve().parent / "config.yaml"
 
 _SOI_WFS_PARAMS = {
     "service": "WFS",
@@ -54,6 +55,10 @@ def _layer_key(name: str) -> str:
 def _load_new_config() -> dict:
     with open(CONFIG_NEW_PATH) as f:
         return yaml.safe_load(f) or {}
+
+
+def _local_path(rel_path: str) -> Path:
+    return Path(rel_path.replace("{DATA_DIR}", str(DATA_DIR)))
 
 
 def _format_periodic_value(template: str, year: int) -> str:
@@ -229,7 +234,7 @@ def ensure_manifest_base_layers(*layers):
                     "Base layer %s has no source in %s; create it manually at %s.",
                     layer["name"],
                     CONFIG_NEW_PATH,
-                    PROJECT_ROOT / layer["local_path"],
+                    _local_path(layer["local_path"]),
                 )
                 continue
 
@@ -239,7 +244,7 @@ def ensure_manifest_base_layers(*layers):
                     f"{layer.get('type')}"
                 )
 
-            local_path = PROJECT_ROOT / layer["local_path"]
+            local_path = _local_path(layer["local_path"])
             if local_path.exists():
                 logger.info(
                     "Base layer %s already exists at %s, skipping.",
@@ -315,7 +320,7 @@ def ensure_admin_boundary_data():
     logger.info("Extracting admin boundary data...")
     try:
         subprocess.run(
-            ["7z", "x", str(archive_path), f"-o{PROJECT_ROOT / 'data/admin-boundary'}"],
+            ["7z", "x", str(archive_path), f"-o{DATA_DIR / 'admin-boundary'}"],
             check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
