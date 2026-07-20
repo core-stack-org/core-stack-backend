@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-import csv
 import hashlib
 import json
 import math
@@ -2209,7 +2208,6 @@ def write_reports(
         for flag in str(row.get("pattern_flags") or "").split("|"):
             if flag:
                 pattern_counts[flag] += 1
-    action_counts = Counter(row["standard_action"] for row in decision_rows)
     pd.DataFrame(
         [{"pattern_flag": key, "groups": value} for key, value in sorted(pattern_counts.items())]
     ).to_csv(reports_dir / "standard_pattern_summary.csv", index=False)
