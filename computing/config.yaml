@@ -19,6 +19,14 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/aquifer/aquifer.geojson
           type: file
 
+        - name: surface water bodies
+          aliases:
+              - swb
+              - pan india waterbodies
+          local_path: "{DATA_DIR}/base_layers/pan_india_waterbodies.fgb"
+          source: ""
+          type: file
+
         - name: restoration opportunity
           local_path: "{DATA_DIR}/base_layers/restoration_opportunity/restoration_opportunity.geojson"
           source: s3://corestack-datasets/base_layers/static_layers/restoration_opportunity/restoration_opportunity.geojson
