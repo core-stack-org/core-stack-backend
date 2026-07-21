@@ -65,6 +65,11 @@ LOCAL_DIR_SPI1_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spi1_timeseries")
 LOCAL_DIR_SPEI3_PARAMS = os.path.join(LOCAL_EXPORT_ROOT, "spei3_params")
 LOCAL_DIR_SPEI3_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries")
 
+# Monsoon onset detection output (Script 01c) - one raster per year
+# (onset day-of-year, NaN if not detected by Aug 31) plus a multi-year
+# climatological median.
+LOCAL_DIR_MONSOON_ONSET = os.path.join(LOCAL_EXPORT_ROOT, "monsoon_onset")
+
 # GCS is still used for the much larger weekly 500m operational alert
 # rasters (a later phase), which are too big for a direct download.
 GCS_PATH_GSMAP_MONTHLY = "ksheetiz/farm_stress/gsmap_monthly/"
