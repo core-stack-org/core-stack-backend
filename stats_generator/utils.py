@@ -263,16 +263,22 @@ def create_excel_for_livestock(data, writer):
         df = pd.DataFrame(df_data)
 
         # Columns to exclude
-        exclude_cols = ["state_name", "district_name", "TEHSIL"]
+        exclude_cols = ["cattle_female", "cattle_male", "buffalo_female", "buffalo_male", "sheep_female", "sheep_male", "goat_female", "goat_male", "pig_female", "pig_male"]
         df = df.drop(columns=exclude_cols, errors="ignore")
 
-        if "pc11_village_id" in df.columns:
-            df = df[df["pc11_village_id"].notna() &(df["pc11_village_id"].astype(str).str.strip() != "") &(df["pc11_village_id"] != 0)]
+        # if "pc11_village_id" in df.columns:
+        #     df = df[df["pc11_village_id"].notna() &(df["pc11_village_id"].astype(str).str.strip() != "") &(df["pc11_village_id"] != 0)]
+        #
+        # # Keep important columns first if they exist
+        # first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
+        # other_cols = [c for c in df.columns if c not in first_cols]
+        # df = df[first_cols + other_cols]
+        # Rename remaining columns
 
-        # Keep important columns first if they exist
-        first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
-        other_cols = [c for c in df.columns if c not in first_cols]
-        df = df[first_cols + other_cols]
+        rename_cols = {
+            "livestock_status": "data_availability_status",
+        }
+        df = df.rename(columns=rename_cols)
 
         df.to_excel(writer, sheet_name="livestock", index=False)
         print("Excel file created for livestock")
@@ -286,173 +292,78 @@ def create_excel_for_antyodaya_20(data, writer):
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
 
-        required_columns = [
-            "state_name", "district_name", "TEHSIL", "village_id", "village_name",
-            "pc11_state_id", "pc11_district_id", "pc11_subdistrict_id",
-            "institutionalization_cat_cluster", "institutionalization_cat_value",
-            "total_hhd", "total_hhd_mobilized_into_shg",
-            "total_no_of_shg_promoted", "total_shg",
-            "total_hhd_mobilized_into_pg", "availability_of_fpos_pacs",
-            "social_protection_cat_cluster", "social_protection_cat_value",
-            "gp_total_hhd_eligible_under_nfsa",
-            "gp_total_hhd_receiving_food_grains_from_fps",
-            "total_hhd_having_bpl_cards",
-            "total_hhd_availing_pension_under_nsap",
-            "civic_infrastructure_cat_cluster",
-            "civic_infrastructure_cat_value",
-            "availability_of_panchayat_bhawan",
-            "is_post_office_available",
-            "total_no_of_elect_rep_undergone_training_under_rgsa",
-            "total_no_of_elected_representatives",
-            "total_no_of_elect_rep_oriented_under_rgsa",
-            "availability_of_public_information_board",
-            "availability_of_public_library",
-            "financial_inclusion_cat_cluster",
-            "financial_inclusion_cat_value",
-            "is_bank_available",
-            "is_atm_available",
-            "is_bank_buss_correspondent_with_internet",
-            "total_shg_accessed_bank_loans",
-            "total_hhd_availing_pmjdy_bank_ac",
-            "energy_access_cat_cluster",
-            "energy_access_cat_value",
-            "availablility_hours_of_domestic_electricity",
-            "availability_of_elect_supply_to_msme",
-            "total_hhd_with_clean_energy",
-            "road_connectivity_cat_cluster",
-            "road_connectivity_cat_value",
-            "is_village_connected_to_all_weather_road",
-            "availability_of_internal_pucca_road",
-            "availability_of_public_transport",
-            "availability_of_railway_station",
-            "housing_quality_cat_cluster",
-            "housing_quality_cat_value",
-            "total_hhd_with_kuccha_wall_kuccha_roof",
-            "total_hhd_got_benefit_under_state_housing_scheme",
-            "total_hhd_have_got_pmay_house",
-            "total_hhd_in_pmay_permanent_wait_list",
-            "total_hhd_availing_pmuy_benefits",
-            "maternal_child_health_cat_cluster",
-            "maternal_child_health_cat_value",
-            "availability_of_mother_child_health_facilities",
-            "is_aanganwadi_centre_available",
-            "is_early_childhood_edu_provided_in_anganwadi",
-            "total_childs_aged_0_to_3_years",
-            "total_childs_aged_0_to_3_years_reg_under_aanganwadi",
-            "total_childs_aged_3_to_6_years_reg_under_aanganwadi",
-            "total_female_child_age_bw_0_6",
-            "total_male_child_age_bw_0_6",
-            "total_no_of_children_in_icds_cas",
-            "total_no_of_registered_children_in_anganwadi",
-            "total_anemic_pregnant_women",
-            "total_no_of_lactating_mothers",
-            "total_no_of_lactating_mothers_receiving_services_under_icds",
-            "total_no_of_pregnant_women",
-            "total_no_of_pregnant_women_receiving_services_under_icds",
-            "total_no_of_women_delivered_babies_at_hospitals_registered_asha",
-            "total_childs_aged_0_to_3_years_immunized",
-            "total_childs_categorized_non_stunted_as_per_icds",
-            "total_no_of_young_anemic_children_6_59_months_in_icds_cas",
-            "total_underweight_child_age_under_6_years",
-            "total_no_of_newly_born_children",
-            "total_no_of_newly_born_underweight_children",
-            "gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay",
-            "gp_total_no_of_eligible_beneficiaries_under_pmjay",
-            "total_hhd_registered_under_pmjay",
-            "total_no_of_beneficiaries_receiving_benefits_under_pmmvy",
-            "total_no_of_eligible_beneficiaries_under_pmmvy",
-            "water_sanitation_cat_cluster",
-            "water_sanitation_cat_value",
-            "availability_of_piped_tap_water",
-            "total_hhd_having_piped_water_connection",
-            "total_hhd_not_having_sanitary_latrines",
-            "availability_of_drainage_system",
-            "is_community_waste_disposal_system",
-            "is_community_biogas_waste_recycle_for_production",
-            "livelihoods_cottage_traditional_industry_cat_cluster",
-            "livelihoods_cottage_traditional_industry_cat_value",
-            "availability_of_cottage_small_scale_units",
-            "total_hhd_engaged_cottage_small_scale_units",
-            "is_handloom",
-            "is_handicrafts",
-            "livelihoods_employment_cat_cluster",
-            "livelihoods_employment_cat_value",
-            "total_hhd_engaged_in_farm_activities",
-            "livelihoods_forest_resources_cat_cluster",
-            "livelihoods_forest_resources_cat_value",
-            "availability_of_community_forest",
-            "availability_of_minor_forest_production",
-            "total_hhd_source_of_minor_forest_production",
-            "livelihoods_common_resources_cat_cluster",
-            "livelihoods_common_resources_cat_value",
-            "is_common_pastures_available",
-            "livelihoods_alternative_farming_cat_cluster",
-            "livelihoods_alternative_farming_cat_value",
-            "is_bee_farming",
-            "is_sericulture",
-            "livelihoods_fisheries_cat_cluster",
-            "livelihoods_fisheries_cat_value",
-            "availability_of_aquaculture_ext_facility",
-            "availability_of_fish_community_ponds",
-            "availability_of_fish_farming",
-            "livestock_veterinary_cat_cluster",
-            "livestock_veterinary_cat_value",
-            "availability_of_livestock_extension_services",
-            "is_veterinary_hospital_available",
-            "availability_of_goatary_dev_project",
-            "availability_of_pigery_development",
-            "availability_of_poultry_dev_project",
-            "availability_of_milk_routes",
-            "agriculture_land_cultivation_cat_cluster",
-            "agriculture_land_cultivation_cat_value",
-            "area_irrigated_in_hac",
-            "net_sown_area_in_hac",
-            "net_sown_area_kharif_in_hac",
-            "net_sown_area_other_in_hac",
-            "net_sown_area_rabi_in_hac",
-            "total_cultivable_area_in_hac",
-            "agriculture_irrigation_watershed_cat_cluster",
-            "agriculture_irrigation_watershed_cat_value",
-            "availability_of_major_source_of_irrigation",
-            "availability_of_rain_harvest_system",
-            "availability_of_watershed_dev_project",
-            "total_approved_labour_budget_for_year",
-            "total_expenditure_approved_under_nrm_labour_budget_during_yr",
-            "no_of_farmers_using_drip_sprinkler",
-            "total_no_of_farmers",
-            "agriculture_organic_farming_cat_cluster",
-            "agriculture_organic_farming_cat_value",
-            "total_no_farmers_adopted_organic_farming",
-            "agriculture_support_services_cat_cluster",
-            "agriculture_support_services_cat_value",
-            "is_fertilizer_shop_available",
-            "is_govt_seed_centre_available",
-            "is_soil_testing_centre_available",
-            "total_no_of_farmers_received_benefit_under_pmfby",
-            "total_no_of_farmers_registered_under_pmkpy",
-            "total_no_of_farmers_add_fert_in_soil_as_per_report",
-            "agricultural_markets_cat_cluster",
-            "agricultural_markets_cat_value",
-            "availability_of_market",
-            "availability_of_food_storage_warehouse"
+        exclude_cols = [
+            "shg_pen_feat_value",
+            "shg_fed_feat_value",
+            "pg_pen_feat_value",
+            "fpo_feat_value",
+            "pds_util_feat_value",
+            "bpl_cov_feat_value",
+            "nfsa_cov_feat_value",
+            "pension_cov_feat_value",
+            "panchayat_bhawan_feat_value",
+            "post_office_feat_value",
+            "rep_training_feat_value",
+            "rep_orientation_feat_value",
+            "info_board_feat_value",
+            "public_library_feat_value",
+            "bank_feat_value",
+            "atm_feat_value",
+            "bank_correspondent_feat_value",
+            "shg_credit_feat_value",
+            "jan_dhan_pen_feat_value",
+            "electrification_rate_feat_value",
+            "electricity_supply_to_msme_feat_value",
+            "clean_energy_penetration_feat_value",
+            "all_weather_road_feat_value",
+            "internal_pucca_road_feat_value",
+            "public_transport_feat_value",
+            "railway_station_feat_value",
+            "pucca_housing_rate_feat_value",
+            "housing_scheme_coverage_feat_value",
+            "pmay_demand_met_feat_value",
+            "ujjwala_coverage_feat_value",
+            "awc_infra_enrollment_coverage_feat_value",
+            "maternal_health_care_access_feat_value",
+            "child_nutrition_development_feat_value",
+            "newborn_health_outcomes_feat_value",
+            "health_schemes_utilization_feat_value",
+            "piped_water_coverage_feat_value",
+            "sanitation_coverage_feat_value",
+            "drainage_quality_feat_value",
+            "waste_disposal_feat_value",
+            "biogas_waste_recycling_feat_value",
+            "cottage_units_available_feat_value",
+            "cottage_industry_participation_feat_value",
+            "handloom_feat_value",
+            "handicrafts_feat_value",
+            "farm_employment_feat_value",
+            "community_forest_feat_value",
+            "minor_forest_production_feat_value",
+            "forest_dependence_feat_value",
+            "common_pastures_feat_value",
+            "alternative_farming_feat_value",
+            "fisheries_aquaculture_feat_value",
+            "veterinary_services_feat_value",
+            "development_projects_feat_value",
+            "milk_routes_feat_value",
+            "land_utilization_feat_value",
+            "irrigation_infra_watershed_dev_feat_value",
+            "nrega_nrm_exp_feat_value",
+            "modern_irrigation_feat_value",
+            "organic_farming_feat_value",
+            "agri_inputs_availability_feat_value",
+            "agri_risk_support_feat_value",
+            "soil_testing_adoption_feat_value",
+            "market_access_feat_value",
+            "food_storage_feat_value"
         ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        rename_cols = {
+            "antyodaya_status": "data_availability_status",
+        }
+        df = df.rename(columns=rename_cols)
 
-        # Keep only available columns from the required list
-        df = df[[col for col in required_columns if col in df.columns]]
-
-        df = df.rename(columns={"TEHSIL": "tehsil_name"})
-
-        if "village_id" in df.columns:
-            df = df[df["village_id"].notna() &(df["village_id"].astype(str).str.strip() != "") &(df["village_id"] != 0)]
-
-        # Keep important columns first if they exist
-        first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
-        other_cols = [c for c in df.columns if c not in first_cols]
-        df = df[first_cols + other_cols]
-
-        # Round numeric columns
-        numeric_cols = df.select_dtypes(include=["number"]).columns
-        df[numeric_cols] = df[numeric_cols].round(2)
         df.to_excel(writer, sheet_name="antyodaya", index=False)
         print("Excel file created for antyodaya")
     except Exception as e:
@@ -679,33 +590,162 @@ def create_excel_for_facilities(data, writer):
         df_data = [feature["properties"] for feature in features]
 
         df = pd.DataFrame(df_data)
-        if "censuscode2011" in df.columns:
-            df = df[df["censuscode2011"].notna() &(df["censuscode2011"].astype(str).str.strip() != "") &(df["censuscode2011"] != 0)]
-
-        first_cols = ["censuscode2011", "censusname"]
-        other_cols = [c for c in df.columns if c not in first_cols]
-        df = df[first_cols + other_cols]
-
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-        df[numeric_cols] = df[numeric_cols].round(2)
-
         exclude_cols = [
-            "censuscode2011",
-            "censusname",
-            "district",
-            "core_admin_uid",
-            "shrid2",
-            "state",
-            "tehsil",
+            "l2_essential_education_selected_l3",
+            "l2_essential_education_facility_uid",
+            "l3_school_primary_facility_uid",
+            "l3_school_primary_inside_scope",
+            "l3_school_upper_primary_facility_uid",
+            "l3_school_upper_primary_inside_scope",
+            "l3_school_secondary_facility_uid",
+            "l3_school_secondary_inside_scope",
+            "l2_higher_education_selected_l3",
+            "l2_higher_education_facility_uid",
+            "l3_school_higher_secondary_facility_uid",
+            "l3_school_higher_secondary_inside_scope",
+            "l3_college_facility_uid",
+            "l3_college_inside_scope",
+            "l3_universities_facility_uid",
+            "l3_universities_inside_scope",
+            "l2_essential_health_selected_l3",
+            "l2_essential_health_facility_uid",
+            "l3_health_sub_cen_facility_uid",
+            "l3_health_sub_cen_inside_scope",
+            "l3_health_phc_facility_uid",
+            "l3_health_phc_inside_scope",
+            "l2_advanced_health_selected_l3",
+            "l2_advanced_health_facility_uid",
+            "l3_health_chc_facility_uid",
+            "l3_health_chc_inside_scope",
+            "l3_health_dis_h_facility_uid",
+            "l3_health_dis_h_inside_scope",
+            "l3_health_s_t_h_facility_uid",
+            "l3_health_s_t_h_inside_scope",
+            "l2_essential_services_selected_l3",
+            "l2_essential_services_facility_uid",
+            "l3_pds_facility_uid",
+            "l3_pds_inside_scope",
+            "l2_financial_inclusion_selected_l3",
+            "l2_financial_inclusion_facility_uid",
+            "l3_csc_facility_uid",
+            "l3_csc_inside_scope",
+            "l3_bank_mitra_facility_uid",
+            "l3_bank_mitra_inside_scope",
+            "l3_bank_branch_facility_uid",
+            "l3_bank_branch_inside_scope",
+            "l3_bank_atm_facility_uid",
+            "l3_bank_atm_inside_scope",
+            "l2_apmc_access_selected_l3",
+            "l2_apmc_access_facility_uid",
+            "l3_apmc_facility_uid",
+            "l3_apmc_inside_scope",
+            "l3_agri_industry_markets_trading_facility_uid",
+            "l3_agri_industry_markets_trading_inside_scope",
+            "l2_post_harvest_selected_l3",
+            "l2_post_harvest_facility_uid",
+            "l3_agri_industry_storage_warehousing_facility_uid",
+            "l3_agri_industry_storage_warehousing_inside_scope",
+            "l3_agri_industry_distribution_utilities_facility_uid",
+            "l3_agri_industry_distribution_utilities_inside_scope",
+            "l3_agri_industry_agri_processing_facility_uid",
+            "l3_agri_industry_agri_processing_inside_scope",
+            "l3_agri_industry_industrial_manufacturing_facility_uid",
+            "l3_agri_industry_industrial_manufacturing_inside_scope",
+            "l2_cooperative_selected_l3",
+            "l2_cooperative_facility_uid",
+            "l3_agri_industry_co_operatives_societies_facility_uid",
+            "l3_agri_industry_co_operatives_societies_inside_scope",
+            "l2_livestock_selected_l3",
+            "l2_livestock_facility_uid",
+            "l3_agri_industry_dairy_animal_husbandry_facility_uid",
+            "l3_agri_industry_dairy_animal_husbandry_inside_scope",
+            "l2_agri_support_infra_selected_l3",
+            "l2_agri_support_infra_facility_uid",
+            "l3_agri_industry_agri_support_infrastructure_facility_uid",
+            "l3_agri_industry_agri_support_infrastructure_inside_scope",
+            "facilities_layer_kind",
+            "title",
         ]
-        df.rename(
-            columns={
-                col: f"{col}_in_km" for col in df.columns if col not in exclude_cols
-            },
-            inplace=True,
-        )
+
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        # if "censuscode2011" in df.columns:
+        #     df = df[df["censuscode2011"].notna() &(df["censuscode2011"].astype(str).str.strip() != "") &(df["censuscode2011"] != 0)]
+        #
+        # first_cols = ["censuscode2011", "censusname"]
+        # other_cols = [c for c in df.columns if c not in first_cols]
+        # df = df[first_cols + other_cols]
+        #
+        # numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        # df[numeric_cols] = df[numeric_cols].round(2)
+        #
+        # exclude_cols = [
+        #     "censuscode2011",
+        #     "censusname",
+        #     "district",
+        #     "core_admin_uid",
+        #     "shrid2",
+        #     "state",
+        #     "tehsil",
+        # ]
+        # df.rename(
+        #     columns={
+        #         col: f"{col}_in_km" for col in df.columns if col not in exclude_cols
+        #     },
+        #     inplace=True,
+        # )
 
         # Write to Excel
+        rename_cols = {
+            "facilities_status": "data_availability_status",
+            "l2_essential_education_distance_km": "essential_education_cat_distance_km",
+            "l2_essential_education_selected_l3_label": "essential_education_facility_label",
+            "l3_school_primary_distance_km": "school_primary_distance_km",
+            "l3_school_upper_primary_distance_km": "school_upper_primary_distance_km",
+            "l3_school_secondary_distance_km": "school_secondary_distance_km",
+            "l2_higher_education_distance_km": "higher_education_cat_distance_km",
+            "l2_higher_education_selected_l3_label": "higher_education_facility_label",
+            "l3_school_higher_secondary_distance_km": "school_higher_secondary_distance_km",
+            "l3_college_distance_km": "college_distance_km",
+            "l3_universities_distance_km": "universities_distance_km",
+            "l2_essential_health_distance_km": "essential_health_cat_distance_km",
+            "l2_essential_health_selected_l3_label": "essential_health_facility_label",
+            "l3_health_sub_cen_distance_km": "health_sub_cen_distance_km",
+            "l3_health_phc_distance_km": "health_phc_distance_km",
+            "l2_advanced_health_distance_km": "advanced_health_cat_distance_km",
+            "l2_advanced_health_selected_l3_label": "advanced_health_facility_label",
+            "l3_health_chc_distance_km": "health_chc_distance_km",
+            "l3_health_dis_h_distance_km": "health_dis_h_distance_km",
+            "l3_health_s_t_h_distance_km": "health_s_t_h_distance_km",
+            "l2_essential_services_distance_km": "essential_services_cat_distance_km",
+            "l2_essential_services_selected_l3_label": "essential_services_facility_label",
+            "l3_pds_distance_km": "pds_distance_km",
+            "l2_financial_inclusion_distance_km": "financial_inclusion_cat_distance_km",
+            "l2_financial_inclusion_selected_l3_label": "financial_inclusion_facility_label",
+            "l3_csc_distance_km": "csc_distance_km",
+            "l3_bank_mitra_distance_km": "bank_mitra_distance_km",
+            "l3_bank_branch_distance_km": "bank_branch_distance_km",
+            "l3_bank_atm_distance_km": "bank_atm_distance_km",
+            "l2_apmc_access_distance_km": "apmc_markets_cat_distance_km",
+            "l2_apmc_access_selected_l3_label": "apmc_markets_facility_label",
+            "l3_apmc_distance_km": "apmc_markets_distance_km",
+            "l3_agri_industry_markets_trading_distance_km": "agri_industry_markets_trading_distance_km",
+            "l2_post_harvest_distance_km": "post_harvest_cat_distance_km",
+            "l2_post_harvest_selected_l3_label": "post_harvest_facility_label",
+            "l3_agri_industry_storage_warehousing_distance_km": "agri_industry_storage_warehousing_distance_km",
+            "l3_agri_industry_distribution_utilities_distance_km": "agri_industry_distribution_utilities_distance_km",
+            "l3_agri_industry_agri_processing_distance_km": "agri_industry_agri_processing_distance_km",
+            "l3_agri_industry_industrial_manufacturing_distance_km": "agri_industry_industrial_manufacturing_distance_km",
+            "l2_cooperative_distance_km": "cooperative_cat_distance_km",
+            "l2_cooperative_selected_l3_label": "cooperative_facility_label",
+            "l3_agri_industry_co_operatives_societies_distance_km": "agri_industry_co_operatives_societies_distance_km",
+            "l2_livestock_distance_km": "livestock_cat_distance_km",
+            "l2_livestock_selected_l3_label": "livestock_facility_label",
+            "l3_agri_industry_dairy_animal_husbandry_distance_km": "agri_industry_dairy_animal_husbandry_distance_km",
+            "l2_agri_support_infra_distance_km": "agri_support_infra_cat_distance_km",
+            "l2_agri_support_infra_selected_l3_label": "agri_support_infra_facility_label",
+            "l3_agri_industry_agri_support_infrastructure_distance_km": "agri_industry_agri_support_infrastructure_distance_km",
+        }
+        df = df.rename(columns=rename_cols)
         df.to_excel(writer, sheet_name="facilities_proximity", index=False)
 
         print("Excel file created for facilities_proximity")
