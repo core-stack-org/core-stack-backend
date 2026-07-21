@@ -13,6 +13,7 @@ from typing import Any, Mapping
 import pandas as pd
 from django.conf import settings
 
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from utilities.pipelines import AdminScope, CSAdminSource, StandardRequest, load_config
 from utilities.pipelines.admin import (
     ADMIN_COLUMN_DESCRIPTIONS,
@@ -28,7 +29,7 @@ from utilities.pipelines.outputs import (
     stable_hash,
     utc_now_text,
 )
-from utilities.pipelines.publish import publish_gpkg_layer, register_layer
+from utilities.pipelines.publish import publish_gpkg_layer
 from utilities.pipelines.schema import (
     STATUS_MATCHED,
     STATUS_NO_DATA,
@@ -597,29 +598,6 @@ def run_antyodaya_pipeline(
                 geoserver = asdict(geoserver_result)
                 geoserver["ok"] = True
                 geoserver["status"] = "published"
-                if request.publish.register_layers:
-                    result["layer_registration"] = register_layer(
-                        dataset_name=output_config.get("dataset_name", "Antyodaya 2020"),
-                        layer_name=result_name,
-                        scope=request.scope,
-                        workspace=geoserver_workspace,
-                        geoserver_url=geoserver.get("wfs_url"),
-                        algorithm=ALGORITHM,
-                        algorithm_version=ALGORITHM_VERSION,
-                        misc={
-                            "source_csv": config["sources"]["csv"],
-                            "gpkg_path": result.get("gpkg_path"),
-                            "links_path": result.get("links_path"),
-                            "output_dir": bundle.path.as_posix(),
-                            "geoserver_layer_name": result_name,
-                            "geoserver_url": geoserver.get("wfs_url"),
-                            "rows": result.get("rows"),
-                            "matched_rows": result.get("matched_rows"),
-                            "join_coverage": result.get("join_coverage"),
-                        },
-                        overwrite=request.publish.overwrite,
-                    )
-                    result["layer_id"] = (result["layer_registration"] or {}).get("layer_id")
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -631,6 +609,42 @@ def run_antyodaya_pipeline(
                 }
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if request.publish.register_layers and geoserver and geoserver.get("ok"):
+        state = request.scope.state_name
+        district = request.scope.district_name
+        block = request.scope.tehsil_name
+        if not (state and district and block):
+            raise ValueError(
+                "Layer registration requires state, district, and tehsil names."
+            )
+        dataset_name = output_config.get("dataset_name", "Antyodaya 2020")
+        layer_id = save_layer_info_to_db(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=result_name,
+            asset_id="not applicable: local compute GeoServer layer",
+            dataset_name=dataset_name,
+            algorithm=ALGORITHM,
+            algorithm_version=ALGORITHM_VERSION,
+            misc={"is_generated_locally": True},
+            is_override=request.publish.overwrite,
+        )
+        if layer_id is None:
+            raise RuntimeError(f"Database registration failed for layer {result_name!r}.")
+        if update_layer_sync_status(
+            layer_id=layer_id, sync_to_geoserver=True
+        ) is None:
+            raise RuntimeError(
+                f"GeoServer sync status update failed for layer ID {layer_id}."
+            )
+        result["layer_id"] = layer_id
+        result["layer_registration"] = {
+            "ok": True,
+            "status": "registered",
+            "dataset": dataset_name,
+            "layer_id": layer_id,
+        }
     if outputs.readme:
         result["readme_path"] = bundle.write_readme(
             _readme_lines(
