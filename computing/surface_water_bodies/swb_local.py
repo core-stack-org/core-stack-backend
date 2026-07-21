@@ -16,7 +16,11 @@ from computing.local_compute_helper import (
     write_vector_output,
 )
 from computing.surface_water_bodies.clip_swb_local import _clip_gdf, _to_geom
-from computing.utils import save_layer_info_to_db
+from computing.utils import (
+    push_shape_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
@@ -34,6 +38,7 @@ from utilities.gee_utils import (
 LOCAL_ALGORITHM = "local_surface_water_bodies_clip"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
 DATASET_NAME = "Surface Water Bodies"
+GEOSERVER_WORKSPACE = "swb"
 logger = logging.getLogger(__name__)
 SQM_PER_HECTARE = 10000.0
 GEE_EXPORT_CHUNK_SIZE = 1000
@@ -256,6 +261,17 @@ def _export_gdf_to_gee_in_chunks(gdf, base_description, base_asset_id):
             )
 
 
+def _push_local_swb_to_geoserver(output_path, layer_name):
+    geoserver_response = push_shape_to_geoserver(
+        str(Path(output_path).with_suffix("")),
+        workspace=GEOSERVER_WORKSPACE,
+        layer_name=layer_name,
+        file_type="gpkg",
+    )
+    logger.info("GeoServer response for local SWB layer %s: %s", layer_name, geoserver_response)
+    return bool(geoserver_response) and geoserver_response.get("status_code") in (200, 201)
+
+
 def run_swb_local(
     state=None,
     district=None,
@@ -264,7 +280,7 @@ def run_swb_local(
     roi_path=None,
     asset_suffix=None,
     swb_path=SWB_VECTOR_PATH,
-    push_to_geoserver=False,
+    push_to_geoserver=True,
     sync_layer_metadata=True,
     gee_account_id=None,
     app_type="MWS",
@@ -310,10 +326,22 @@ def run_swb_local(
         asset_folder_list,
     )
 
+    output_path = build_output_vector_path(
+        layer_name=layer_name,
+        state=state,
+        district=district,
+        block=block,
+        output_base_dir=LOCAL_OUTPUT_BASE_DIR,
+        custom_subdir=asset_suffix,
+        block_fallback="unknown_block",
+    )
+    logger.info("Local SWB output path: %s", output_path)
+
     if is_gee_asset_exists(gee_asset_id):
         logger.info("GEE asset already exists, reusing: %s", gee_asset_id)
+        layer_id = None
         if sync_layer_metadata:
-            save_layer_info_to_db(
+            layer_id = save_layer_info_to_db(
                 state=state,
                 district=district,
                 block=block,
@@ -325,18 +353,15 @@ def run_swb_local(
                 algorithm_version=LOCAL_ALGORITHM_VERSION,
             )
         make_asset_public(gee_asset_id)
-        return True
 
-    output_path = build_output_vector_path(
-        layer_name=layer_name,
-        state=state,
-        district=district,
-        block=block,
-        output_base_dir=LOCAL_OUTPUT_BASE_DIR,
-        custom_subdir=asset_suffix,
-        block_fallback="unknown_block",
-    )
-    logger.info("Local SWB output path: %s", output_path)
+        if push_to_geoserver and output_path.exists():
+            layer_at_geoserver = _push_local_swb_to_geoserver(
+                output_path=output_path, layer_name=layer_name
+            )
+            if layer_at_geoserver and layer_id:
+                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+                logger.info("Sync to GeoServer flag updated for existing local SWB layer")
+        return True
 
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
@@ -359,7 +384,6 @@ def run_swb_local(
     )
     logger.info("Saved local SWB vector to disk: %s", local_asset_path)
 
-    _ = push_to_geoserver
     ee_initialize(gee_account_id)
     logger.info(
         "Initialized Earth Engine for local SWB export: gee_account_id=%s",
@@ -442,6 +466,14 @@ def run_swb_local(
             layer_name,
         )
 
+    if push_to_geoserver:
+        layer_at_geoserver = _push_local_swb_to_geoserver(
+            output_path=local_asset_path, layer_name=layer_name
+        )
+        if layer_at_geoserver and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            logger.info("Sync to GeoServer flag updated for local SWB layer: %s", layer_name)
+
     return True
 
 
@@ -465,7 +497,7 @@ def _generate_swb_local_task(
         roi=roi,
         roi_path=roi_path,
         asset_suffix=asset_suffix,
-        push_to_geoserver=False,
+        push_to_geoserver=True,
         sync_layer_metadata=True,
         gee_account_id=gee_account_id,
         app_type=app_type,
