@@ -894,9 +894,9 @@ def get_osm_data(state, district, block, uid):
             parameter_block = f"The Tehsil {block} having total area {total_area:,} hectares" + parameter_block + "."
 
         if parameter_mws == "":
-            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block} which lies in district {district.capitalize()} in {state.capitalize()}."
+            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block}</strong> which lies in district <strong>{district.capitalize()}</strong> in <strong>{state.capitalize()}</strong>."
         else :
-            parameter_mws = f"The micro-watershed {uid} is in Tehsil {block}" + parameter_mws + "."
+            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block}</strong>" + parameter_mws + "."
 
         return parameter_block, parameter_mws
 
