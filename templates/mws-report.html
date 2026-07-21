@@ -1384,7 +1384,7 @@
 
         <section class="section">
             <h2>Landscape Overview</h2>
-            <p>{{mws_osm}}</p>
+            <p>{{mws_osm|safe}}</p>
 
             <div id="mainMap" class="map" style="position: relative;">
             </div>
@@ -2460,8 +2460,15 @@
         <section class="section">
             <h3>Water availability in this microwatershed</h3>
 
-            <div id="swbVillageMap" class="map" style="position: relative;"></div>
-            <p class="legend-note" style="margin-bottom: 20px;">Fig: Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color).</p>
+            <div class="map-group">
+                <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
+                <div id="swbMap" class="map" style="flex: 1 1 48%;"></div>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color)</div>
+                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
+            </div>
 
             <p>{{swb_intro_desc}}</p>
 
@@ -2478,11 +2485,6 @@
             </div>
 
             <p>{{swb_season_avg_desc}}</p>
-
-            <div id="swbMap" class="map"></div>
-            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Seasonal Surface Water Availability
-            </div>
 
             <div class="legend">
                 <div class="legend-item">
@@ -2723,6 +2725,43 @@
             return '';
         };
 
+        // Shows a small floating tooltip with the village name while hovering over a village
+        // boundary feature on the given map/layer. Reused across every map that renders villages.
+        const attachVillageHoverTooltip = (map, villageLayer) => {
+            const targetEl = map.getTargetElement ? map.getTargetElement() : document.getElementById(map.get('target'));
+            if (!targetEl || targetEl.querySelector('.village-hover-tooltip')) return;
+
+            const tooltipEl = document.createElement('div');
+            tooltipEl.className = 'village-hover-tooltip';
+            tooltipEl.style.cssText = 'position: absolute; background: rgba(0,0,0,0.75); color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; pointer-events: none; z-index: 20; display: none;';
+            targetEl.appendChild(tooltipEl);
+
+            const tooltipOverlay = new ol.Overlay({
+                element: tooltipEl,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+            });
+            map.addOverlay(tooltipOverlay);
+
+            map.on('pointermove', evt => {
+                if (evt.dragging) {
+                    tooltipEl.style.display = 'none';
+                    return;
+                }
+                const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, { layerFilter: l => l === villageLayer });
+                const name = feature ? getVillageLabelName(feature) : '';
+                if (name) {
+                    tooltipEl.textContent = name;
+                    tooltipEl.style.display = 'block';
+                    tooltipOverlay.setPosition(evt.coordinate);
+                    targetEl.style.cursor = 'pointer';
+                } else {
+                    tooltipEl.style.display = 'none';
+                    targetEl.style.cursor = '';
+                }
+            });
+        };
+
         const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false) => {
             try {
                 const mwsGeometry = mwsFeature.getGeometry();
@@ -2783,6 +2822,9 @@
                             color: 'yellow',
                             width: 1.5,
                         }),
+                        fill: new ol.style.Fill({
+                            color: 'rgba(0, 0, 0, 0)',
+                        }),
                         text: showLabels ? new ol.style.Text({
                             text: getVillageLabelName(feature),
                             font: '11px sans-serif',
@@ -2796,6 +2838,7 @@
 
                 // Add layer to map
                 map.addLayer(villageLayer);
+                attachVillageHoverTooltip(map, villageLayer);
 
                 // Handle errors silently
                 villageSource.on('change', (e) => {
@@ -2878,6 +2921,7 @@
                     zIndex: 5,
                 });
                 demographicPopMap.addLayer(popLayer);
+                attachVillageHoverTooltip(demographicPopMap, popLayer);
 
                 // Literacy Layer
                 const litSource = new ol.source.Vector({ features: features });
@@ -2895,6 +2939,7 @@
                     zIndex: 5,
                 });
                 demographicLitMap.addLayer(litLayer);
+                attachVillageHoverTooltip(demographicLitMap, litLayer);
 
                 // Marginalized Layer
                 const margSource = new ol.source.Vector({ features: features });
@@ -2913,6 +2958,7 @@
                     zIndex: 5,
                 });
                 demographicMargMap.addLayer(margLayer);
+                attachVillageHoverTooltip(demographicMargMap, margLayer);
 
                 // MWS Boundary Layer
                 const mwsSource = new ol.source.Vector({ features: [mwsFeature] });
@@ -3861,8 +3907,8 @@
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
-                        addVillageBoundariesToMap(swbVillageMap, feature, true);
-                        addVillageBoundariesToMap(villageIntersectMap, feature, true);
+                        addVillageBoundariesToMap(swbVillageMap, feature);
+                        addVillageBoundariesToMap(villageIntersectMap, feature);
                         addDemographicBoundariesToMap(feature);
 
                     }
