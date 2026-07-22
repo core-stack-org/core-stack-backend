@@ -28,72 +28,77 @@ except ImportError:
     )
 
 
-def generate_wue(cfg: dict, region: ee.Geometry):
-    """Read exported GPP/AET assets and export interpolated monthly WUE."""
+def generate_mai(cfg: dict, region: ee.Geometry):
+    """Read exported AET/PET assets and export interpolated monthly MAI."""
     year = int(cfg["year"])
     start_month = crop_year_start_month(cfg)
 
-    gpp_stack = load_product_monthly_stack(cfg, "gpp", "GPP")
     aet_stack = load_product_monthly_stack(cfg, "aet", "ET")
+    pet_stack = load_product_monthly_stack(cfg, "pet", "PET")
     proj = aet_stack.select("ET_01").projection()
 
-    wue_raw = build_wue_image(gpp_stack, aet_stack)
-    wue_monthly = interpolate_monthly_stack(
-        wue_raw,
-        "WUE",
+    mai_raw = build_mai_image(aet_stack, pet_stack)
+    mai_monthly = interpolate_monthly_stack(
+        mai_raw,
+        "MAI",
         region,
         year,
         proj=proj,
         start_month=start_month,
     )
-    wue_annual = ee_annual_mean_band(
-        wue_monthly,
-        "WUE",
-        band_name="WUE_annual",
+    mai_annual = ee_annual_mean_band(
+        mai_monthly,
+        "MAI",
+        band_name="MAI_annual",
     )
 
-    metadata = common_metadata(cfg, "wue")
+    metadata = common_metadata(cfg, "mai")
     metadata.update(
         {
-            "units": "g C / kg H2O",
-            "formula": "GPP / AET",
-            "gpp_asset": product_asset_id(cfg, "gpp"),
+            "units": "ratio (AET/PET)",
+            "formula": "AET / PET",
             "aet_asset": product_asset_id(cfg, "aet"),
+            "pet_asset": product_asset_id(cfg, "pet"),
             "valid_data_rule": (
-                "Calculated independently for each month and pixel where GPP "
-                "and AET are valid and AET > 0."
+                "Calculated independently for each month and pixel where AET "
+                "and PET are valid and PET > 0."
             ),
             "interpolation": (
                 "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only"
             ),
             "description": (
-                "Monthly water-use efficiency after pixel-wise temporal gap "
-                "filling, plus crop-year mean"
+                "Monthly Moisture Adequacy Index after pixel-wise temporal "
+                "gap filling, plus crop-year mean"
             ),
         }
     )
-    wue_image = finalize_export_image(
-        wue_monthly,
-        wue_annual,
+    mai_image = finalize_export_image(
+        mai_monthly,
+        mai_annual,
         region,
         metadata=metadata,
         band_descriptions=[
-            f"WUE_{abbr}_gC_per_kgH2O" for abbr in crop_month_abbrs(start_month)
+            f"MAI_{abbr}" for abbr in crop_month_abbrs(start_month)
         ]
-        + ["WUE_annual_mean"],
+        + ["MAI_annual"],
         default_proj=proj,
     )
-    return export_product_asset("wue", "WUE", wue_image, cfg)
+    return export_product_asset(
+        "mai",
+        "Moisture Adequacy Index (MAI)",
+        mai_image,
+        cfg,
+    )
 
 
-def build_wue_image(gpp_stack: ee.Image, aet_stack: ee.Image) -> ee.Image:
-    """Build raw monthly WUE using a separate valid-pixel intersection per month."""
+def build_mai_image(aet_stack: ee.Image, pet_stack: ee.Image) -> ee.Image:
+    """Build raw monthly MAI using a separate valid-pixel intersection per month."""
     bands = []
     for month in range(1, 13):
-        gpp = gpp_stack.select(f"GPP_{month:02d}")
         aet = aet_stack.select(f"ET_{month:02d}")
-        wue = divide_where_valid(gpp, aet).rename(f"WUE_{month:02d}")
-        bands.append(wue.float())
+        pet = pet_stack.select(f"PET_{month:02d}")
+        mai = divide_where_valid(aet, pet).rename(f"MAI_{month:02d}")
+        bands.append(mai.float())
     return ee.Image.cat(bands)
 
 
@@ -103,7 +108,7 @@ def main():
     except ImportError:
         from et_downscale import main as run_et_application
 
-    run_et_application(default_application="wue")
+    run_et_application(default_application="mai")
 
 
 if __name__ == "__main__":

@@ -1,61 +1,125 @@
-from computing.et_downscale.et_downscale import generate_et_downscale
+#!/usr/bin/env python3
+"""AEZ wrapper for config-independent ET downscaling exports."""
+
+import argparse
+
 import ee
 
-from utilities.constants import AEZ
-from utilities.gee_utils import ee_initialize
+try:
+    from .et_downscale import APPLICATIONS, generate_et_downscale, init_ee
+except ImportError:
+    from et_downscale import APPLICATIONS, generate_et_downscale, init_ee
+
+
+def _asset_name(asset_id: str) -> str:
+    return str(asset_id).rstrip("/").split("/")[-1]
 
 
 def generate_et_aez(
-    aez_no=None,
-    start_year=2017,
-    end_year=None,
-    application="aet",
-    project_name="corestack-datasets",
+    *,
+    aez_asset: str,
+    asset_root: str,
+    model_aez: str | None = None,
+    aez_no: int | None = None,
+    aez_code_field: str = "ae_regcode",
+    start_year: int = 2017,
+    end_year: int | None = None,
+    application: str = "aet",
+    project_name: str = "",
+    asset_suffix: str | None = None,
+    overwrite_assets: bool = False,
+    wait_exports: bool = True,
+    poll_seconds: int = 30,
+    dry_run: bool = False,
 ):
     """
-    We are exporting the assets directly to drive in case of AEZ level generation because they take a lot of space
-    which is not manageable on GEE. So here instead of using service_account for GEE authentication,
-    we are using browser-based authentication.
+    Generate ET application assets for one AEZ, or for a supplied AEZ asset.
+
     Args:
-        aez_no: ae_regcode of the AEZ for which we want to generate the assets
-        project_name: GEE project name on which we want to run the computation
-        start_year: start year for which we want to run the computation
-        end_year: end year for which we want to run the computation
-        application: ET application name (aet/pet/gpp, etc.)
+        aez_asset: GEE FeatureCollection asset containing AEZ geometry.
+        asset_root: Parent GEE asset folder for outputs.
+        model_aez: RF model asset path. Required when AET must be generated.
+        aez_no: Optional AEZ code to filter from ``aez_asset``.
+        aez_code_field: Property containing the AEZ code.
+        start_year: First crop-year start year.
+        end_year: Last crop-year start year. Defaults to ``start_year``.
+        application: One of aet/pet/gpp/kc/rwdi/wue/all.
+        project_name: Earth Engine project used for initialization.
     """
-    initialize_gee_and_drive(project_name)
-    if aez_no:
-        generate_et(aez_no, start_year, end_year, application)
+    if not dry_run:
+        init_ee(project_name)
+    if dry_run:
+        roi = None
     else:
-        for aez_no in range(2, 20):
-            generate_et(aez_no, start_year, end_year, application)
+        aez_fc = ee.FeatureCollection(aez_asset)
+        roi = aez_fc
 
+    if aez_no is None:
+        suffix = asset_suffix or _asset_name(aez_asset)
+    else:
+        if not dry_run:
+            roi = roi.filter(ee.Filter.eq(aez_code_field, int(aez_no)))
+        suffix = asset_suffix or f"AEZ_{int(aez_no)}"
 
-def generate_et(aez_no, start_year, end_year, application):
-    aez = ee.FeatureCollection(AEZ)
-    roi = aez.filter(ee.Filter.eq("ae_regcode", aez_no))
-    generate_et_downscale(
+    return generate_et_downscale(
         roi=roi,
-        asset_suffix=f"AEZ_{str(aez_no)}",
-        asset_folder_list=["et_downscale"],
+        tehsil_asset=aez_asset,
+        asset_root=asset_root,
+        model_aez=model_aez,
+        asset_suffix_value=suffix,
+        tehsil_name=suffix,
         start_year=start_year,
-        end_year=end_year,
+        end_year=end_year or start_year,
         application=application,
-        aez=aez_no,
+        gee_project=project_name,
+        overwrite_assets=overwrite_assets,
+        wait_exports=wait_exports,
+        poll_seconds=poll_seconds,
+        initialize=False,
+        dry_run=dry_run,
     )
 
 
-def initialize_gee_and_drive(project_name: str):
-    """
-    Initialize Google Earth Engine (GEE) and authenticate the user through the browser where the GEE account is logged in.
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run config-independent ET downscaling for AEZ assets."
+    )
+    parser.add_argument("--aez-asset", required=True)
+    parser.add_argument("--aez-no", type=int, default=None)
+    parser.add_argument("--aez-code-field", default="ae_regcode")
+    parser.add_argument("--asset-root", required=True)
+    parser.add_argument("--model-aez", default=None)
+    parser.add_argument("--asset-suffix", default=None)
+    parser.add_argument("--start-year", type=int, default=2017)
+    parser.add_argument("--end-year", type=int, default=None)
+    parser.add_argument("--application", choices=APPLICATIONS, default="aet")
+    parser.add_argument("--gee-project", default="")
+    parser.add_argument("--overwrite-assets", action="store_true", default=False)
+    parser.add_argument("--no-wait-exports", action="store_true", default=False)
+    parser.add_argument("--poll-interval-seconds", type=int, default=30)
+    parser.add_argument("--dry-run", action="store_true", default=False)
+    return parser
 
-    Args:
-        project_name (str): The name of the GEE project to initialize.
-    """
-    try:
-        ee.Authenticate()
-        ee.Initialize(project=project_name)
-        print("Google Earth Engine initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing GEE: {e}")
-        print("Please authenticate your Google Earth Engine account.")
+
+def main():
+    args = build_parser().parse_args()
+    return generate_et_aez(
+        aez_asset=args.aez_asset,
+        aez_no=args.aez_no,
+        aez_code_field=args.aez_code_field,
+        asset_root=args.asset_root,
+        model_aez=args.model_aez,
+        asset_suffix=args.asset_suffix,
+        start_year=args.start_year,
+        end_year=args.end_year,
+        application=args.application,
+        project_name=args.gee_project,
+        overwrite_assets=args.overwrite_assets,
+        wait_exports=not args.no_wait_exports,
+        poll_seconds=args.poll_interval_seconds,
+        dry_run=args.dry_run,
+    )
+
+
+if __name__ == "__main__":
+    main()

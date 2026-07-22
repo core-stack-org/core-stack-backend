@@ -1,399 +1,450 @@
+#!/usr/bin/env python3
 """
-ET-Applications - Pan-India ET Downscaling CLI  (GEE Asset Export Edition)
-===========================================================================
-Each output mode now builds its 13-band image fully inside Earth Engine and
-exports it directly to a GEE asset. The monthly calculations are performed
-entirely server-side in Earth Engine.
+ET downscaling applications - GEE asset export CLI.
 
-  PIXEL CONSISTENCY GUARANTEE
-  ----------------------------
-  All exported assets produced by the same tehsil + year combination share
-  the same bounding box, CRS, and 30 m pixel grid. The AET (Landsat 8)
-  pixel grid drives the spatial reference; MODIS-derived bands are
-  resampled to this grid before export. Pixels outside the tehsil boundary
-  are written as NoData (-9999).
+The exported monthly bands follow crop-year order:
 
-  Band descriptions and valid-pixel counts are stored as Earth Engine image
-  properties on the exported assets.
+    b1..b12 = Jul, Aug, Sep, Oct, Nov, Dec, Jan, Feb, Mar, Apr, May, Jun
+    b13     = crop-year annual total or mean
 
-  Core Layers + Derived Applications
-  ----------------------------------
-  aet           ->  aet_<TEHSIL>_<YEAR>                13 bands  (12 monthly + annual total)
-  pet           ->  pet_<TEHSIL>_<YEAR>                13 bands  (12 monthly + annual total)
-  gpp           ->  gpp_<TEHSIL>_<YEAR>                13 bands  (12 monthly + annual mean)
-  rwdi          ->  rwdi_<TEHSIL>_<YEAR>               13 bands  (12 monthly + annual mean)
-  kc            ->  kc_<TEHSIL>_<YEAR>                 13 bands  (12 monthly + annual mean)
-  wue           ->  wue_<TEHSIL>_<YEAR>                13 bands  (12 monthly + annual mean)
-  all           ->  three feature layers + three derived applications
-
-  GPP Method (Light Use Efficiency)
-  ----------------------------------
-  GPP = PAR x fAPAR x eps
-    PAR    = 0.45 x SWdown_f_tavg (GLDAS W/m2 -> MJ/m2/day)
-    fAPAR  = max(0, 1.24 x NDVI - 0.168) from Landsat 8
-    eps    = eps_max x TMIN_scalar x VPD_scalar
-    eps_max, TMIN/VPD thresholds from MOD17 BPLUT keyed on MCD12Q1 land cover
-
-  WUE Formula
-  -----------
-  WUE = GPP / AET   (g C m-2 day-1) / (mm day-1) = g C / kg H2O
-  where AET is the Landsat + GLDAS RF-downscaled actual ET.
-
-  Quick-start
-  -----------
-  python3 et_fixed.py --tehsil-asset ... --model-aez ... --asset-root ...
-  python3 et_fixed.py --application aet ...
-  python3 et_fixed.py --application all ...
-
-  Or call main() programmatically with the same parameters.
+This module is config-independent. Pass all asset paths and run parameters as
+CLI arguments, or call ``generate_et_downscale`` with the same values.
 """
+
+import argparse
 
 import ee
 
-from computing.et_downscale.aet import generate_aet
-from computing.et_downscale.gpp import generate_gpp
-from computing.et_downscale.helper import (
-    wait_for_tasks,
-)
-from computing.et_downscale.kc import generate_kc
-from computing.et_downscale.pet import generate_pet
-from computing.et_downscale.rwdi import generate_rwdi
-from computing.et_downscale.wue import generate_wue
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
-from utilities.constants import GEE_PATHS, AEZ
-from utilities.gee_utils import (
-    ee_initialize,
-    get_gee_dir_path,
-    valid_gee_text,
-    sync_raster_to_gcs,
-    check_task_status,
-    sync_raster_gcs_to_geoserver,
-    is_gee_asset_exists,
-    make_asset_public,
-    gcs_file_exists,
-)
-from nrm_app.celery import app
+try:
+    from .aet import generate_aet
+    from .gpp import generate_gpp
+    from .helper import (
+        DEFAULT_CROP_YEAR_START_MONTH,
+        MODIS_COL,
+        asset_exists,
+        asset_suffix,
+        crop_month_order,
+        product_asset_id,
+        wait_for_tasks,
+    )
+    from .mai import generate_mai
+    from .pet import generate_pet
+    from .rwdi import generate_rwdi
+    from .wue import generate_wue
+except ImportError:
+    from aet import generate_aet
+    from gpp import generate_gpp
+    from helper import (
+        DEFAULT_CROP_YEAR_START_MONTH,
+        MODIS_COL,
+        asset_exists,
+        asset_suffix,
+        crop_month_order,
+        product_asset_id,
+        wait_for_tasks,
+    )
+    from mai import generate_mai
+    from pet import generate_pet
+    from rwdi import generate_rwdi
+    from wue import generate_wue
 
 
-@app.task(bind=True)
-def generate_et_downscale(
-    self,
-    state: str | None = None,
-    district: str | None = None,
-    tehsil: str | None = None,
-    roi: str | None = None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    start_year: int = 2017,
-    end_year: int = 2024,
-    gee_account_id: int = 1,
-    application: str = "all",
-    overwrite_assets: bool = False,
-    wait_exports: bool = True,
-    poll_seconds: int = 30,
-    app_type: str = "MWS",
-    aez=None,
-    asset_root=None,
-):
-    if not aez:
-        ee_initialize(account_id=gee_account_id)
-
-    if state and district and tehsil:
-        asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(tehsil.lower())
-        )
-        asset_folder_list = [state, district, tehsil]
-
-        roi_path = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + "filtered_mws_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(tehsil.lower())
-            + "_uid"
-        )
-
-        roi = ee.FeatureCollection(roi_path)
-
-    model_aez = get_model_aez(roi, aez)
-
-    if not asset_root and not aez:
-        asset_root = get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-
-    specs_list = []
-    roi_path = f"{asset_root}/{asset_suffix}"
-    for year in range(start_year, end_year + 1):
-        cfg = _build_cfg(
-            aez=str(aez),
-            roi_path=roi_path,
-            model_aez=model_aez,
-            asset_root=asset_root,
-            year=year,
-            district_name=district,
-            asset_suffix=asset_suffix,
-            application=application,
-            overwrite_assets=overwrite_assets,
-            wait_exports=wait_exports,
-            poll_seconds=poll_seconds,
-        )
-
-        app = cfg["application"]
-
-        print("\n" + "=" * 68)
-        print("  ET-Applications  (GEE Asset Export Edition - v3.0 with GPP/WUE/Kc)")
-        print("=" * 68)
-        for label, key in [
-            ("Asset Suffix", "asset_suffix"),
-            ("Year", "year"),
-            ("Output mode", "application"),
-            ("Asset root", "asset_root"),
-            ("Overwrite assets", "overwrite_assets"),
-            ("Model (AEZ)", "model_aez"),
-            ("ROI path", "roi_path"),
-            ("Wait for exports", "wait_exports"),
-            ("Poll interval (s)", "poll_seconds"),
-            ("MODIS collection", "modis_collection"),
-        ]:
-            print(f"  {label:<22}: {cfg.get(key, 'N/A')}")
-        print("=" * 68 + "\n")
-
-        region = roi.geometry()
-
-        dispatch = {
-            "aet": lambda: generate_aet(cfg, region),
-            "pet": lambda: generate_pet(cfg, region),
-            "rwdi": lambda: generate_rwdi(cfg, region),
-            "kc": lambda: generate_kc(cfg, region),
-            "gpp": lambda: generate_gpp(cfg, region),
-            "wue": lambda: generate_wue(cfg, region),
-            "all": lambda: run_all(state, district, tehsil, cfg, region),
-        }
-
-        result = dispatch[app]()
-        if app == "all":
-            print("\nDone. Export assets:")
-            for label, asset_id in result.items():
-                print(f"  {label:<5} -> {asset_id}")
-        else:
-            print(f"\nDone. Export asset: {result}")
-            specs = result[-1]
-            specs_list.append(specs)
-
-    if not aez and len(specs_list) > 0:
-        wait_for_tasks(specs_list)
-        sync_to_db_and_geoserver(state, district, tehsil, specs_list)
-
-    return None  # TODO return something for sync run
+APPLICATIONS = ("all", "aet", "pet", "rwdi", "mai", "gpp", "wue")
+APPLICATION_DEPENDENCIES = {
+    "mai": ("aet", "pet"),
+    "rwdi": ("mai",),
+    "wue": ("aet", "gpp"),
+}
 
 
-def _build_cfg(
+def init_ee(project: str = "") -> None:
+    try:
+        ee.Initialize(project=project) if project else ee.Initialize()
+        print("[EE] Initialised.")
+    except Exception:
+        print("[EE] Running authenticate ...")
+        ee.Authenticate()
+        ee.Initialize(project=project) if project else ee.Initialize()
+
+
+def build_cfg(
     *,
-    aez: str,
-    roi_path: str,
-    model_aez: str,
+    tehsil_asset: str,
     asset_root: str,
+    model_aez: str | None = None,
     year: int = 2022,
-    district_name: str | None = None,
-    asset_suffix: str | None = None,
+    crop_year_start_month: int = DEFAULT_CROP_YEAR_START_MONTH,
+    asset_suffix_value: str | None = None,
+    tehsil_name: str | None = None,
     application: str = "all",
+    gee_project: str | None = None,
+    modis_collection: str = MODIS_COL,
     overwrite_assets: bool = False,
     wait_exports: bool = True,
     poll_seconds: int = 30,
+    dry_run: bool = False,
 ) -> dict:
     return {
-        "aez": aez,
-        "roi_path": roi_path,
-        "model_aez": model_aez,
-        "asset_root": asset_root,
+        "tehsil_asset": tehsil_asset,
+        "model_aez": model_aez or "",
         "year": int(year),
-        "district_name": district_name,
-        "asset_suffix": asset_suffix or "",
+        "crop_year_start_month": int(crop_year_start_month),
+        "asset_root": asset_root,
+        "asset_suffix": asset_suffix_value or tehsil_name or "",
+        "gee_project": gee_project or "",
+        "tehsil_name": tehsil_name or "",
         "application": application,
-        "overwrite_assets": overwrite_assets,
-        "wait_exports": wait_exports,
-        "poll_seconds": poll_seconds,
+        "modis_collection": modis_collection,
+        "overwrite_assets": bool(overwrite_assets),
+        "wait_exports": bool(wait_exports),
+        "poll_seconds": int(poll_seconds),
+        "dry_run": bool(dry_run),
     }
 
 
-def get_model_aez(roi, aez=None):
-    if not aez:
-        aez = (
-            ee.FeatureCollection(AEZ)
-            .filterBounds(roi.geometry())
-            .first()
-            .get("ae_regcode")
-            .getInfo()
-        )
-    if aez == 1:
-        raise RuntimeError("No model for AEZ 1")
+def cfg_from_args(args: argparse.Namespace) -> dict:
+    tehsil_asset = args.tehsil_asset or args.roi_asset
+    return build_cfg(
+        tehsil_asset=tehsil_asset,
+        model_aez=args.model_aez,
+        year=args.year,
+        crop_year_start_month=args.crop_year_start_month,
+        asset_root=args.asset_root,
+        asset_suffix_value=args.asset_suffix,
+        gee_project=args.gee_project,
+        tehsil_name=args.tehsil_name,
+        application=args.application,
+        modis_collection=args.modis_collection,
+        overwrite_assets=args.overwrite_assets,
+        wait_exports=not args.no_wait_exports,
+        poll_seconds=args.poll_interval_seconds,
+        dry_run=args.dry_run,
+    )
 
-    return f"projects/corestack-datasets-beta/assets/models_downscaling_et/rf_aez{aez}_final"
+
+def _validate_cfg(cfg: dict) -> None:
+    if not cfg.get("tehsil_asset"):
+        raise ValueError("--tehsil-asset or --roi-asset is required")
+    if not cfg.get("asset_root"):
+        raise ValueError("--asset-root is required")
+    if not cfg.get("tehsil_name"):
+        cfg["tehsil_name"] = cfg["tehsil_asset"].rstrip("/").split("/")[-1].upper()
+    if not cfg.get("asset_suffix"):
+        cfg["asset_suffix"] = cfg["tehsil_name"]
+
+    start_month = int(cfg.get("crop_year_start_month", DEFAULT_CROP_YEAR_START_MONTH))
+    if start_month < 1 or start_month > 12:
+        raise ValueError("crop_year_start_month must be between 1 and 12")
+    cfg["crop_year_start_month"] = start_month
+
+    app = cfg.get("application", "all")
+    if app not in APPLICATIONS:
+        raise ValueError(f"application must be one of: {', '.join(APPLICATIONS)}")
+    if app in {"aet", "all"} and not cfg.get("model_aez"):
+        raise ValueError("--model-aez is required to generate AET")
 
 
-def run_all(
-    state: str, district: str, tehsil: str, cfg: dict, region: ee.Geometry
-) -> dict:
-    """
-    Run the three core layers first, wait for them to finish exporting,
-    then export the three derived applications.
+def validate_config(cfg: dict, parser: argparse.ArgumentParser) -> None:
+    try:
+        _validate_cfg(cfg)
+    except ValueError as error:
+        parser.error(str(error))
 
-    Export sequencing guarantee:
-      1. Start AET, PET, and GPP export tasks.
-      2. Wait until all three core exports reach a terminal state.
-      3. Only then start RWDI, KC, and WUE export tasks.
 
-    Pixel consistency guarantee:
-      All outputs are derived from the same AET/PET/GPP stacks.
-      They are therefore spatially identical - same CRS, transform, and
-      pixel grid. No post-processing alignment is needed.
-    """
+def print_run_config(cfg: dict) -> None:
+    print("\n" + "=" * 68)
+    print("  ET Downscale  (Config-independent GEE Asset Export)")
+    print("=" * 68)
+    for label, key in [
+        ("Tehsil/ROI", "tehsil_name"),
+        ("Asset suffix", None),
+        ("Crop year", "year"),
+        ("Crop-year start month", "crop_year_start_month"),
+        ("Crop-year month order", "month_order"),
+        ("Output mode", "application"),
+        ("Asset root", "asset_root"),
+        ("Overwrite assets", "overwrite_assets"),
+        ("GEE project", "gee_project"),
+        ("Model (AEZ)", "model_aez"),
+        ("Tehsil/ROI asset", "tehsil_asset"),
+        ("Wait for exports", "wait_exports"),
+        ("Poll interval (s)", "poll_seconds"),
+        ("MODIS collection", "modis_collection"),
+        ("Dry run", "dry_run"),
+    ]:
+        if key is None:
+            value = asset_suffix(cfg)
+        elif key == "month_order":
+            value = crop_month_order(cfg["crop_year_start_month"])
+        else:
+            value = cfg.get(key, "N/A")
+        print(f"  {label:<24}: {value}")
+    print("=" * 68 + "\n")
 
+
+def _generate_application(app: str, cfg: dict, region: ee.Geometry) -> dict:
+    """Submit one independent product export and return its export spec."""
+    if app == "aet":
+        if not cfg.get("model_aez"):
+            raise ValueError("model_aez is required because the AET asset is missing")
+        return generate_aet(cfg, region)
+    if app == "pet":
+        return generate_pet(cfg, region)
+    if app == "gpp":
+        return generate_gpp(cfg, region)
+    if app == "mai":
+        return generate_mai(cfg, region)
+    if app == "rwdi":
+        return generate_rwdi(cfg, region)
+    if app == "wue":
+        return generate_wue(cfg, region)
+    raise ValueError(f"Unsupported application: {app}")
+
+
+def ensure_product_asset(label: str, cfg: dict, region: ee.Geometry) -> str:
+    """Recursively create a missing dependency asset, then return its asset ID."""
+    asset_id = product_asset_id(cfg, label)
+    if asset_exists(asset_id):
+        print(f"  OK      {label.upper():<4}: {asset_id}")
+        return asset_id
+
+    for dependency in APPLICATION_DEPENDENCIES.get(label, ()):
+        ensure_product_asset(dependency, cfg, region)
+
+    print(f"  MISSING {label.upper():<4}: {asset_id}")
+    print(f"          Submitting {label.upper()} export ...")
+    dep_cfg = dict(cfg)
+    dep_cfg["overwrite_assets"] = False
+    spec = _generate_application(label, dep_cfg, region)
+    wait_for_tasks(
+        [spec],
+        cfg.get("poll_seconds", 30),
+        fail_on_error=True,
+    )
+    return asset_id
+
+
+def ensure_single_run_dependencies(app: str, cfg: dict, region: ee.Geometry) -> None:
+    dependencies = APPLICATION_DEPENDENCIES.get(app, ())
+    if not dependencies:
+        return
+
+    print(f"\n[input] Checking exported dependencies for {app.upper()} ...")
+    for label in dependencies:
+        ensure_product_asset(label, cfg, region)
+
+
+def run_single(app: str, cfg: dict, region: ee.Geometry) -> str:
+    ensure_single_run_dependencies(app, cfg, region)
+    spec = _generate_application(app, cfg, region)
+    if cfg.get("wait_exports", True):
+        wait_for_tasks([spec], cfg.get("poll_seconds", 30), fail_on_error=True)
+    return spec["asset_id"]
+
+
+def run_all(cfg: dict, region: ee.Geometry) -> dict:
+    """Export each product independently, using completed assets as inputs."""
     print(f"\n{'=' * 60}")
-    print("  [all] Building shared GEE stacks ...")
+    print("  [all] Asset-first ET applications ...")
     print(f"{'=' * 60}")
 
-    core_task_specs = []
-    derived_task_specs = []
     results = {}
 
-    print("\n  [1/3] Building AET stack (Landsat 8 + GLDAS -> RF model) ...")
-    aet_stack, common_mask, footprint, grid_proj, aet_specs = generate_aet(cfg, region)
-    results["aet"] = aet_specs["asset_id"]
-    core_task_specs.append(aet_specs)
-
-    print("\n  [2/3] Building PET stack (MODIS MOD16A2) ...")
-    pet_stack, proj, pet_specs = generate_pet(
-        cfg=cfg,
-        region=region,
-        common_mask=common_mask,
-        footprint=footprint,
-        grid_proj=grid_proj,
-    )
-    results["pet"] = pet_specs["asset_id"]
-    core_task_specs.append(pet_specs)
-
-    print("\n  [3/3] Building GPP stack (LUE: GLDAS + Landsat NDVI + MCD12Q1) ...")
-    gpp_stack, gpp_specs = generate_gpp(
-        cfg=cfg,
-        region=region,
-        common_mask=common_mask,
-        footprint=footprint,
-        grid_proj=grid_proj,
-        proj=proj,
-    )
-
-    results["gpp"] = gpp_specs["asset_id"]
-    core_task_specs.append(gpp_specs)
-
-    print(
-        "\n  [phase 1/2] Waiting for core exports (AET, PET, GPP) before derived exports ..."
-    )
+    print("\n  [phase 1/3] Exporting independent AET, PET, and GPP assets ...")
+    core_task_specs = []
+    for label in ("aet", "pet", "gpp"):
+        spec = _generate_application(label, cfg, region)
+        core_task_specs.append(spec)
+        results[label] = spec["asset_id"]
     wait_for_tasks(core_task_specs, cfg.get("poll_seconds", 30), fail_on_error=True)
-    sync_to_db_and_geoserver(state, district, tehsil, core_task_specs)
 
-    print(
-        "\n  [phase 2/2] Starting derived exports (RWDI, KC, WUE) from the shared core stacks ..."
-    )
+    print("\n  [phase 2/3] Reading AET/PET assets and exporting MAI ...")
+    mai_spec = _generate_application("mai", cfg, region)
+    results["mai"] = mai_spec["asset_id"]
 
-    rwdi_specs = generate_rwdi(
-        cfg,
-        region,
-        footprint=footprint,
-        common_mask=common_mask,
-        grid_proj=grid_proj,
-        aet_stack=aet_stack,
-        pet_stack=pet_stack,
-    )
-    derived_task_specs.append(rwdi_specs)
+    # Phase 3 reads MAI, so its export must finish before phase 3 starts.
+    wait_for_tasks([mai_spec], cfg.get("poll_seconds", 30), fail_on_error=True)
 
-    kc_specs = generate_kc(
-        cfg,
-        region,
-        footprint=footprint,
-        common_mask=common_mask,
-        grid_proj=grid_proj,
-        aet_stack=aet_stack,
-        pet_stack=pet_stack,
-    )
-    derived_task_specs.append(kc_specs)
-
-    wue_specs = generate_wue(
-        cfg,
-        region,
-        footprint=footprint,
-        common_mask=common_mask,
-        grid_proj=grid_proj,
-        aet_stack=aet_stack,
-        gpp_stack=gpp_stack,
-    )
-    derived_task_specs.append(wue_specs)
+    print("\n  [phase 3/3] Exporting RWDI and WUE from saved assets ...")
+    rwdi_spec = _generate_application("rwdi", cfg, region)
+    wue_spec = _generate_application("wue", cfg, region)
+    results["rwdi"] = rwdi_spec["asset_id"]
+    results["wue"] = wue_spec["asset_id"]
 
     if cfg.get("wait_exports", True):
         wait_for_tasks(
-            derived_task_specs, cfg.get("poll_seconds", 30), fail_on_error=True
+            [rwdi_spec, wue_spec],
+            cfg.get("poll_seconds", 30),
+            fail_on_error=True,
         )
-
-        sync_to_db_and_geoserver(state, district, tehsil, derived_task_specs)
     else:
-        print(
-            "\n[exports] Derived export tasks started. Final completion polling skipped (wait_exports=false)."
-        )
+        print("\n[exports] Export tasks started. Completion polling skipped.")
     return results
 
 
-def sync_to_geoserver(asset_id, layer_name, workspace, scale=30):
-    """Sync image to google cloud storage and then to geoserver"""
-    image = ee.Image(asset_id)
-    if not gcs_file_exists(layer_name):
-        task_id = sync_raster_to_gcs(image, scale, layer_name)
-
-        task_id_list = check_task_status([task_id])
-        print("task_id_list sync to gcs ", task_id_list)
-
-    res = sync_raster_gcs_to_geoserver(workspace, layer_name, layer_name)
-    return res
+def run_for_region(cfg: dict, region: ee.Geometry):
+    app = cfg.get("application", "all")
+    return run_all(cfg, region) if app == "all" else run_single(app, cfg, region)
 
 
-def sync_to_db_and_geoserver(state, district, tehsil, specs_list):
-    gcs_tasks = []
-    layer_ids = []
-    for layer in specs_list:
-        asset_id = layer["asset_id"]
-        layer_name = asset_id.split("/")[-1]
+def planned_asset_ids(cfg: dict) -> dict:
+    app = cfg.get("application", "all")
+    labels = ("aet", "pet", "gpp", "mai", "rwdi", "wue") if app == "all" else (app,)
+    return {label: product_asset_id(cfg, label) for label in labels}
 
-        if is_gee_asset_exists(asset_id):
-            layer_id = save_layer_info_to_db(
-                state,
-                district,
-                tehsil,
-                layer_name=layer_name,
-                asset_id=asset_id,
-                dataset_name="ET Downscale",
-            )
-            layer_ids.append(layer_id)
 
-            make_asset_public(asset_id)
+def print_dry_run_plan(cfg: dict) -> dict:
+    planned = planned_asset_ids(cfg)
+    print("\n[dry-run] No Earth Engine initialization or export tasks will be started.")
+    print("[dry-run] Planned output assets:")
+    for label, asset_id in planned.items():
+        print(f"  {label:<5} -> {asset_id}")
+    return planned
 
-            """Sync image to google cloud storage and then to geoserver"""
-            image = ee.Image(asset_id)
-            if not gcs_file_exists(layer_name):
-                task_id = sync_raster_to_gcs(image, 30, layer_name)
-                gcs_tasks.append(task_id)
 
-    task_id_list = check_task_status(gcs_tasks)
-    print("task_id_list sync to gcs ", task_id_list)
+def _region_from_roi(roi, tehsil_asset: str):
+    if roi is not None:
+        if isinstance(roi, str):
+            return ee.FeatureCollection(roi)
+        return ee.FeatureCollection(roi)
+    return ee.FeatureCollection(tehsil_asset)
 
-    for i in range(0, len(specs_list)):
-        layer = specs_list[i]
-        asset_id = layer["asset_id"]
-        layer_name = asset_id.split("/")[-1]
-        res = sync_raster_gcs_to_geoserver("ET", layer_name, layer_name)
 
-        if res and layer_ids[i]:
-            print("layer_ids[i]", layer_ids[i])
-            update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
-            print("sync to geoserver flag updated")
+def generate_et_downscale(
+    *,
+    tehsil_asset: str | None = None,
+    roi=None,
+    asset_root: str,
+    model_aez: str | None = None,
+    asset_suffix_value: str | None = None,
+    asset_suffix: str | None = None,
+    tehsil_name: str | None = None,
+    year: int | None = None,
+    start_year: int | None = None,
+    end_year: int | None = None,
+    application: str = "all",
+    gee_project: str | None = None,
+    crop_year_start_month: int = DEFAULT_CROP_YEAR_START_MONTH,
+    modis_collection: str = MODIS_COL,
+    overwrite_assets: bool = False,
+    wait_exports: bool = True,
+    poll_seconds: int = 30,
+    initialize: bool = True,
+    dry_run: bool = False,
+):
+    """
+    Programmatic config-independent entry point.
+
+    ``roi`` may be a FeatureCollection object or a FeatureCollection asset ID.
+    ``tehsil_asset``/``roi`` is used only as the processing region; all export
+    paths come from ``asset_root`` and ``asset_suffix``.
+    """
+    suffix = asset_suffix_value or asset_suffix
+    roi_asset = tehsil_asset if tehsil_asset is not None else roi if isinstance(roi, str) else ""
+    if initialize and not dry_run:
+        init_ee(gee_project or "")
+
+    start = int(year if year is not None else start_year if start_year is not None else 2022)
+    end = int(year if year is not None else end_year if end_year is not None else start)
+    if end < start:
+        raise ValueError("end_year must be greater than or equal to start_year")
+
+    region = None
+    if not dry_run:
+        roi_fc = _region_from_roi(roi, tehsil_asset or roi_asset)
+        region = roi_fc.geometry()
+
+    results = {}
+    for run_year in range(start, end + 1):
+        cfg = build_cfg(
+            tehsil_asset=roi_asset,
+            model_aez=model_aez,
+            year=run_year,
+            crop_year_start_month=crop_year_start_month,
+            asset_root=asset_root,
+            asset_suffix_value=suffix,
+            gee_project=gee_project,
+            tehsil_name=tehsil_name,
+            application=application,
+            modis_collection=modis_collection,
+            overwrite_assets=overwrite_assets,
+            wait_exports=wait_exports,
+            poll_seconds=poll_seconds,
+            dry_run=dry_run,
+        )
+        _validate_cfg(cfg)
+        print_run_config(cfg)
+        if dry_run:
+            results[run_year] = print_dry_run_plan(cfg)
+            continue
+        results[run_year] = run_for_region(cfg, region)
+    return results
+
+
+def build_parser(default_application: str | None = None):
+    if default_application is not None and default_application not in APPLICATIONS:
+        raise ValueError(f"Unsupported default application: {default_application}")
+    parser = argparse.ArgumentParser(
+        prog=default_application or "et_downscale",
+        description="ET downscaling applications exported as GEE assets.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument("--tehsil-asset", default=None,
+                        help="GEE FeatureCollection asset path for the tehsil")
+    parser.add_argument("--roi-asset", default=None,
+                        help="GEE FeatureCollection asset path for any ROI/AEZ")
+    parser.add_argument("--model-aez", default=None,
+                        help="GEE asset path for the RF ensemble model")
+    parser.add_argument("--year", type=int, default=2022,
+                        help="Crop-year start year")
+    parser.add_argument("--crop-year-start-month", type=int,
+                        default=DEFAULT_CROP_YEAR_START_MONTH,
+                        help="First month of the crop year. Default: 7 (July)")
+    parser.add_argument("--asset-root", default=None,
+                        help="Parent GEE asset path where exports will be created")
+    parser.add_argument("--asset-suffix", default=None,
+                        help="Suffix used in output asset names")
+    parser.add_argument("--overwrite-assets", action="store_true", default=False,
+                        help="Delete an existing target asset before exporting")
+    parser.add_argument("--no-wait-exports", action="store_true", default=False,
+                        help="Start GEE export tasks and exit without polling")
+    parser.add_argument("--poll-interval-seconds", type=int, default=30,
+                        help="Delay between export task status checks")
+    parser.add_argument("--gee-project", default=None)
+    parser.add_argument("--tehsil-name", default=None)
+    parser.add_argument("--modis-collection", default=MODIS_COL)
+    parser.add_argument("--dry-run", action="store_true", default=False,
+                        help="Validate inputs and print planned assets without running GEE")
+    if default_application is None:
+        parser.add_argument("--application", default="all", choices=APPLICATIONS,
+                            help="Which output mode to run")
+    else:
+        parser.set_defaults(application=default_application)
+    return parser
+
+
+def main(default_application: str | None = None):
+    parser = build_parser(default_application)
+    args = parser.parse_args()
+    cfg = cfg_from_args(args)
+    validate_config(cfg, parser)
+    print_run_config(cfg)
+
+    if args.dry_run:
+        return print_dry_run_plan(cfg)
+
+    init_ee(cfg.get("gee_project", ""))
+    region = ee.FeatureCollection(cfg["tehsil_asset"]).geometry()
+    result = run_for_region(cfg, region)
+
+    if cfg.get("application") == "all":
+        print("\nDone. Export assets:")
+        for label, asset_id in result.items():
+            print(f"  {label:<5} -> {asset_id}")
+    else:
+        print(f"\nDone. Export asset: {result}")
+
+
+if __name__ == "__main__":
+    main()
