@@ -28,8 +28,8 @@ base_layers:
           type: file
 
         - name: restoration opportunity
-          local_path: "{DATA_DIR}/base_layers/restoration_opportunity/restoration_opportunity.geojson"
-          source: s3://corestack-datasets/base_layers/static_layers/restoration_opportunity/restoration_opportunity.geojson
+          local_path: "{DATA_DIR}/base_layers/restoration_opportunity/restoration_opportunity.tif"
+          source: s3://corestack-datasets/base_layers/static_layers/restoration_opportunity/restoration_opportunity.tif
           type: file
 
         - name: soge
@@ -38,8 +38,8 @@ base_layers:
           type: file
 
         - name: lcw
-          local_path: "{DATA_DIR}/base_layers/lcw/lcw.tif"
-          source: s3://corestack-datasets/base_layers/static_layers/lcw/lcw.tif
+          local_path: "{DATA_DIR}/base_layers/lcw/lcw.geojson"
+          source: s3://corestack-datasets/base_layers/static_layers/lcw/lcw.geojson
           type: file
 
         - name: factory csr
