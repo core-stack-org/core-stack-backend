@@ -1,6 +1,7 @@
 import json
 import os
 import requests
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from rest_framework.decorators import (
     api_view,
@@ -17,6 +18,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
+from .et_downscale.et_downscale import generate_et_downscale
 from .utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
@@ -88,12 +90,15 @@ from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.facilities import generate_facilities_proximity_task
+from utilities.pipelines import api_request_payload
 from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 
 
 @api_security_check(allowed_methods="POST")
@@ -1575,16 +1580,19 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=True,
+        )
         generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={"payload": payload},
+            queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1595,18 +1603,19 @@ def generate_facilities_proximity(request):
 def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
         generate_antyodaya_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+            kwargs={"payload": payload},
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_antyodaya api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1617,20 +1626,54 @@ def generate_antyodaya(request):
 def generate_livestocks(request):
     print("Inside generate_livestocks API.")
     try:
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
+        generate_livestocks_layer_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def et_downscale(request):
+    print("Inside generate_et_downscale API.")
+    try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
-        generate_livestocks_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+        tehsil = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        application = request.data.get("application") or "all"
+
+        generate_et_downscale.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "tehsil": tehsil,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+                "application": application,
+            },
             queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_livestocks api :: ", e)
+        print("Exception in generate_mws_centroid api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1909,7 +1952,7 @@ def missing_layers(request):
         result = missing_layer_for_all_workspace()
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in missing_layers api :: ", e)
+        print("Exception in get_layers_for_workspace api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1962,6 +2005,95 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_tree_in_grassland(request):
+    print("Inside generate_tree_in_grassland API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_tree_in_grassland_layer.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Tree in Grassland task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_tree_in_grassland api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def forest_fringe_degradation(request):
+    print("Inside forest_fringe_degradation API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fringe_degradation.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fringe task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fringe api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fire(request):
+    print("Inside generate_forest_fire API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fire_layer_updated.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fire task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fire api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

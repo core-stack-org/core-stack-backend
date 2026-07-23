@@ -1,0 +1,76 @@
+name: antyodaya_2020
+title: Mission Antyodaya 2020
+description: >
+  Village-level Mission Antyodaya category, feature, and raw indicator pipeline
+  joined at runtime to the Core Stack standard admin boundary.
+
+sources:
+  # Optional test overrides; canonical defaults come from utilities/constants.py.
+  # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  # csv: data/tests/fixtures/cs_antyodaya_2020_cluster_analysis.csv
+  mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
+  report_pdf: docs/reports/antyodaya_cluster_analysis_report.pdf
+  blog_pdf: docs/reports/antyodaya_cluster_analysis_blog.pdf
+  report_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_report.pdf
+  blog_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_blog.pdf
+  gee_explorer_url: https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer
+
+keys:
+  admin_join_key: village_id
+  source_join_key: village_id
+  source_unique_key: village_key
+
+output:
+  root: data/outputs
+  directory_name: antyodaya20
+  layer_prefix: antyodaya20
+  # geoserver_workspace: testworkspace
+  # Dataset row used when registering published layers in the Layer database.
+  dataset_name: Antyodaya 2020
+
+default_outputs:
+  gpkg: true
+  readme: true
+  metadata: true
+  geoserver: true
+
+# `status_column` places a per-village data-availability marker right after
+# the admin columns in every listed output. Remove an entry from `outputs`
+# to drop the column from that artifact (the GeoServer layer is published
+# from the GeoPackage, so `gpkg` and `geoserver` share one frame).
+output_contract:
+  status_column:
+    name: antyodaya_status
+    outputs: [gpkg, geoserver]
+
+source_location_columns:
+  - state_code
+  - district_code
+  - sub_district_code
+  - village_id
+  - village_name
+  - block_code_nunique
+  - block_name
+  - gp_code_nunique
+  - gp_name
+
+validation:
+  category_cluster_suffix: _cat_cluster
+  category_cluster_values:
+    - HIGH
+    - MEDIUM
+    - LOW
+  category_value_suffix: _cat_value
+  feature_value_suffix: _feat_value
+  value_min: 0
+  value_max: 1
+
+readme:
+  audience:
+    - local stewards
+    - Core Stack platform users
+    - Know Your Landscape reports
+  cautions:
+    - Category clusters are normalized to HIGH, MEDIUM, LOW in runtime outputs.
+    - Aggregated overviews summarize selected village rows and should be treated as a signal and not a replacement for village-level evidence.

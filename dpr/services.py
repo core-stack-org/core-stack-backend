@@ -396,6 +396,8 @@ def get_maintenance_data(plan_id, maintenance_type):
                     "repair_activities": repair,
                     "latitude": m.latitude,
                     "longitude": m.longitude,
+                    "resource_type": "gw_maintenance",
+                    "status": m.recharge_structure_maintenance_status,
                 }
             )
 
@@ -421,6 +423,8 @@ def get_maintenance_data(plan_id, maintenance_type):
                     "repair_activities": repair,
                     "latitude": m.latitude,
                     "longitude": m.longitude,
+                    "resource_type": "agri_maintenance",
+                    "status": m.irrigation_structure_maintenance_status,
                 }
             )
 
@@ -445,6 +449,8 @@ def get_maintenance_data(plan_id, maintenance_type):
                     "repair_activities": repair,
                     "latitude": m.latitude,
                     "longitude": m.longitude,
+                    "resource_type": "swb_maintenance",
+                    "status": m.swb_maintenance_status,
                 }
             )
 
@@ -469,6 +475,8 @@ def get_maintenance_data(plan_id, maintenance_type):
                     "repair_activities": repair,
                     "latitude": m.latitude,
                     "longitude": m.longitude,
+                    "resource_type": "swb_rs_maintenance",
+                    "status": m.swb_rs_maintenance_status,
                 }
             )
 
@@ -492,6 +500,7 @@ def get_nrm_works_data(plan_id):
         dg = structure.data_groundwater or {}
         result.append(
             {
+                "id": structure.recharge_structure_id,
                 "work_category": "Recharge Structure",
                 "demand_type": classify_demand_type(dg.get("demand_type")),
                 "work_demand": structure.work_type,
@@ -501,6 +510,8 @@ def get_nrm_works_data(plan_id):
                 "beneficiary_father_name": dg.get("ben_father"),
                 "latitude": structure.latitude,
                 "longitude": structure.longitude,
+                "resource_type": "groundwater",
+                "status": structure.recharge_structure_demand_status,
             }
         )
 
@@ -515,6 +526,7 @@ def get_nrm_works_data(plan_id):
             work_demand = da.get("TYPE_OF_WORK_ID_other") or "Other (unspecified)"
         result.append(
             {
+                "id": irr.irrigation_work_id,
                 "work_category": "Irrigation Work",
                 "demand_type": classify_demand_type(da.get("demand_type_irrigation")),
                 "work_demand": work_demand,
@@ -524,6 +536,8 @@ def get_nrm_works_data(plan_id):
                 "beneficiary_father_name": da.get("ben_father"),
                 "latitude": irr.latitude,
                 "longitude": irr.longitude,
+                "resource_type": "agri",
+                "status": irr.irrigation_work_demand_status,
             }
         )
 
@@ -566,6 +580,7 @@ def get_livelihood_data(plan_id):
                     demands = dl.get("select_one_promoting_livestock_other")
             result.append(
                 {
+                    "id": record.livelihood_id,
                     "livelihood_work": "Livestock",
                     "demand_type": livestock_group.get("livestock_demand"),
                     "work_demand": format_text(demands).strip() if demands else None,
@@ -578,6 +593,8 @@ def get_livelihood_data(plan_id):
                     ),
                     "latitude": record.latitude,
                     "longitude": record.longitude,
+                    "resource_type": "livelihood_livestock",
+                    "status": record.livestock_demand_status,
                 }
             )
 
@@ -596,6 +613,7 @@ def get_livelihood_data(plan_id):
                     demands = dl.get("select_one_promoting_fisheries_other")
             result.append(
                 {
+                    "id": record.livelihood_id,
                     "livelihood_work": "Fisheries",
                     "demand_type": fisheries_group.get("demand_type_fisheries"),
                     "work_demand": format_text(demands).strip() if demands else None,
@@ -608,6 +626,8 @@ def get_livelihood_data(plan_id):
                     ),
                     "latitude": record.latitude,
                     "longitude": record.longitude,
+                    "resource_type": "livelihood_fisheries",
+                    "status": record.fisheries_demand_status,
                 }
             )
 
@@ -619,6 +639,7 @@ def get_livelihood_data(plan_id):
         if is_plantation:
             result.append(
                 {
+                    "id": record.livelihood_id,
                     "livelihood_work": "Plantations",
                     "demand_type": classify_demand_type(
                         plantation_group.get("demand_type_plantations")
@@ -634,6 +655,8 @@ def get_livelihood_data(plan_id):
                     or plantation_group.get("crop_area"),
                     "latitude": record.latitude,
                     "longitude": record.longitude,
+                    "resource_type": "livelihood_plantation",
+                    "status": record.plantation_demand_status,
                 }
             )
 
@@ -644,6 +667,7 @@ def get_livelihood_data(plan_id):
         if is_kitchen_garden:
             result.append(
                 {
+                    "id": record.livelihood_id,
                     "livelihood_work": "Kitchen Garden",
                     "demand_type": kitchen_garden_group.get(
                         "demand_type_kitchen_garden"
@@ -660,6 +684,8 @@ def get_livelihood_data(plan_id):
                     or kitchen_garden_group.get("area_kg"),
                     "latitude": record.latitude,
                     "longitude": record.longitude,
+                    "resource_type": "livelihood_kitchen_garden",
+                    "status": record.kitchen_garden_demand_status,
                 }
             )
 
@@ -679,6 +705,7 @@ def get_livelihood_data(plan_id):
         species = " ".join(species_parts) or None
         result.append(
             {
+                "id": agrohorti.agrohorticulture_id,
                 "livelihood_work": "Plantations",
                 "demand_type": classify_demand_type(
                     data.get("demand_type_plantations")
@@ -691,6 +718,8 @@ def get_livelihood_data(plan_id):
                 "total_acres": data.get("crop_area"),
                 "latitude": agrohorti.latitude,
                 "longitude": agrohorti.longitude,
+                "resource_type": "agrohorticulture",
+                "status": agrohorti.agrohorticulture_demand_status,
             }
         )
 
@@ -715,7 +744,26 @@ DEMAND_TYPE_MAP = {
         "recharge_structure_demand_status",
     ),
     "agri": (ODK_agri, "irrigation_work_id", "irrigation_work_demand_status"),
-    "livelihood": (ODK_livelihood, "livelihood_id", "livelihood_demand_status"),
+    "livelihood_livestock": (
+        ODK_livelihood,
+        "livelihood_id",
+        "livestock_demand_status",
+    ),
+    "livelihood_fisheries": (
+        ODK_livelihood,
+        "livelihood_id",
+        "fisheries_demand_status",
+    ),
+    "livelihood_kitchen_garden": (
+        ODK_livelihood,
+        "livelihood_id",
+        "kitchen_garden_demand_status",
+    ),
+    "livelihood_plantation": (
+        ODK_livelihood,
+        "livelihood_id",
+        "plantation_demand_status",
+    ),
     "agrohorticulture": (
         ODK_agrohorticulture,
         "agrohorticulture_id",

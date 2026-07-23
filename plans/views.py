@@ -436,6 +436,8 @@ def _build_steward_listing(queryset):
         "project__name",
         "state_soi",
         "state_soi__state_name",
+        "latitude",
+        "longitude",
     ):
         name = row["facilitator_name"]
         plans_by_steward.setdefault(name, []).append(
@@ -444,6 +446,8 @@ def _build_steward_listing(queryset):
                 "plan": row["plan"],
                 "is_completed": row["is_completed"],
                 "village_name": row["effective_village"],
+                "latitude": row["latitude"],
+                "longitude": row["longitude"],
             }
         )
         villages_by_steward.setdefault(name, set()).add(row["effective_village"])
@@ -1065,7 +1069,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for organization level watershed planning ops
     Allows superadmins to view plans for a specific organization
-    URL: /api/v1/organization/{organization_id}/watershed/plans/
+    URL: /api/v1/organizations/{organization_id}/watershed/plans/
     """
 
     schema = None
@@ -1122,6 +1126,113 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         return queryset.order_by("-created_at")
 
+    def _check_organization_access(self, organization_id):
+        """
+        Resolve the organization for this request and ensure org admins are
+        scoped to their own organization. Returns (organization, error_response).
+        """
+        user = self.request.user
+        is_superadmin = user.is_superadmin or user.is_superuser
+        is_org_admin = user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
+
+        try:
+            organization = Organization.objects.get(pk=organization_id)
+        except Organization.DoesNotExist:
+            return None, Response(
+                {"message": "Organization not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if is_org_admin and not is_superadmin and user.organization != organization:
+            return None, Response(
+                {"message": "You do not have access to this organization."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return organization, None
+
+    @action(detail=False, methods=["get"], url_path="steward-meta-stats")
+    def steward_meta_stats(self, request, *args, **kwargs):
+        """
+        Get steward meta statistics scoped to an organization.
+
+        URL: /api/v1/organizations/{organization_id}/watershed/plans/steward-meta-stats/
+        """
+        organization_id = self.kwargs.get("organization_pk")
+        organization, error_response = self._check_organization_access(
+            organization_id
+        )
+        if error_response:
+            return error_response
+
+        base_queryset = PlanApp.objects.filter(
+            enabled=True, organization=organization
+        ).exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_meta_stats(
+            steward_qs, organization_id=organization_id
+        )
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="steward-listing")
+    def steward_listing(self, request, *args, **kwargs):
+        """
+        Get steward listing scoped to an organization.
+
+        URL: /api/v1/organizations/{organization_id}/watershed/plans/steward-listing/
+        """
+        organization_id = self.kwargs.get("organization_pk")
+        organization, error_response = self._check_organization_access(
+            organization_id
+        )
+        if error_response:
+            return error_response
+
+        base_queryset = PlanApp.objects.filter(
+            enabled=True, organization=organization
+        ).exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_listing(steward_qs)
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
     @action(
         detail=False,
         methods=["get"],
@@ -1135,7 +1246,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         Query Parameters:
         - facilitator_name: The facilitator's full name (required)
 
-        URL: /api/v1/organization/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx
+        URL: /api/v1/organizations/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx
         """
         facilitator_name = request.query_params.get("facilitator_name")
         if not facilitator_name:
@@ -1187,7 +1298,11 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             if p["project"]:
                 projects[p["project"]] = p["project__name"]
 
-        plans = list(plans_queryset.values("id", "plan", "is_completed"))
+        plans = list(
+            plans_queryset.values(
+                "id", "plan", "is_completed", "latitude", "longitude"
+            )
+        )
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -1211,7 +1326,13 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             ),
             "projects": [{"id": k, "name": v} for k, v in projects.items()],
             "plans": [
-                {"id": p["id"], "name": p["plan"], "is_completed": p["is_completed"]}
+                {
+                    "id": p["id"],
+                    "name": p["plan"],
+                    "is_completed": p["is_completed"],
+                    "latitude": p["latitude"],
+                    "longitude": p["longitude"],
+                }
                 for p in plans
             ],
             "profile_picture": profile_picture_url,
@@ -1488,9 +1609,9 @@ class PlanViewSet(viewsets.ModelViewSet):
         Excludes Test/Demo plans from counts.
 
         Query Parameters:
-        - state: Filter by state ID
-        - district: Filter by district ID
-        - block: Filter by block ID
+        - state: Filter by state_soi ID
+        - district: Filter by district_soi ID
+        - tehsil: Filter by tehsil_soi ID
         - project: Filter by project ID (optional when called from project context)
 
         URL: /api/v1/projects/{project_id}/watershed/plans/meta-stats/
@@ -1502,7 +1623,7 @@ class PlanViewSet(viewsets.ModelViewSet):
         - DPR generated count
         - DPR reviewed count
         - DPR approved count
-        - Plans by state/district/block breakdown
+        - Plans by state/district/tehsil breakdown
         """
         user = request.user
         project_id = self.kwargs.get("project_pk") or request.query_params.get(
@@ -2030,7 +2151,11 @@ class PlanViewSet(viewsets.ModelViewSet):
             if p["project"]:
                 projects[p["project"]] = p["project__name"]
 
-        plans = list(plans_queryset.values("id", "plan", "is_completed"))
+        plans = list(
+            plans_queryset.values(
+                "id", "plan", "is_completed", "latitude", "longitude"
+            )
+        )
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -2054,7 +2179,13 @@ class PlanViewSet(viewsets.ModelViewSet):
             ),
             "projects": [{"id": k, "name": v} for k, v in projects.items()],
             "plans": [
-                {"id": p["id"], "name": p["plan"], "is_completed": p["is_completed"]}
+                {
+                    "id": p["id"],
+                    "name": p["plan"],
+                    "is_completed": p["is_completed"],
+                    "latitude": p["latitude"],
+                    "longitude": p["longitude"],
+                }
                 for p in plans
             ],
             "profile_picture": profile_picture_url,
