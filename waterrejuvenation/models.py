@@ -62,6 +62,9 @@ class WaterbodiesFileUploadLog(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to calculate file hash before saving"""
+        start_date = kwargs.pop("start_date", None)
+        end_date = kwargs.pop("end_date", None)
+
         if not self.excel_hash and self.file:
             # Calculate hash for new file
             self.file.seek(0)
@@ -74,6 +77,11 @@ class WaterbodiesFileUploadLog(models.Model):
         print(f"is processing required: {self.is_processing_required}")
         print(f"is lullc required: {self.is_lulc_required}")
         if self.is_compute:
+            if self.is_processing_required and (not start_date or not end_date):
+                raise ValueError(
+                    "start_date and end_date are required when is_compute and "
+                    "is_processing_required are true (YYYY-MM-DD)."
+                )
             Upload_Desilting_Points.apply_async(
                 kwargs={
                     "file_obj_id": self.id,
@@ -81,6 +89,8 @@ class WaterbodiesFileUploadLog(models.Model):
                     "is_lulc_required": self.is_lulc_required,
                     "is_processing_required": self.is_processing_required,
                     "is_closest_wp": self.is_closest_wp,
+                    "start_date": start_date,
+                    "end_date": end_date,
                 },
                 queue="waterbody1",
             )
