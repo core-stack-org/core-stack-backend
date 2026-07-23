@@ -1,0 +1,81 @@
+name: facilities
+title: Facilities and Village Service Proximity
+description: >
+  Live local facilities inventory and nearest-service pipeline built from
+  cs_pan_india_facilities.gpkg and cs_admin_standard.gpkg.
+
+sources:
+  # Optional test overrides; canonical defaults come from utilities/constants.py.
+  # admin_gpkg: data/tests/fixtures/cs_admin_standard.gpkg
+  admin_layer: cs_admin_standard
+  # facilities_gpkg: data/tests/fixtures/cs_pan_india_facilities.gpkg
+  facilities_layer: facilities
+  taxonomy_table: facility_taxonomy
+  classification_yaml: computing/misc/facilities/facility_classifications.yaml
+
+output:
+  root: data/outputs
+  directory_name: facilities
+  layer_prefix: facilities
+  # geoserver_workspace: testworkspace
+  # Dataset row used when registering published layers in the Layer database.
+  dataset_name: Facilities Proximity
+  points_dataset_name: Facilities Points
+
+default_outputs:
+  gpkg: true
+  readme: true
+  metadata: true
+  geoserver: true
+
+# Category distance rename targets default to `<group>_cat_distance_km`;
+# `l2_distance_columns` overrides the generated target where reports expect a
+# different one. The mapping is metadata only; stored GeoServer fields remain
+# stable machine names.
+# `status_column` places a per-village data-availability marker right after
+# the admin columns in every listed output. Remove an entry from `outputs`
+# to drop the column from that artifact (the GeoServer layer is published
+# from the GeoPackage, so `gpkg` and `geoserver` share one frame).
+output_contract:
+  status_column:
+    name: facilities_status
+    outputs: [gpkg, geoserver]
+  l2_distance_columns:
+    apmc_access: market_cat_distance_km
+    cooperative: cooperative_societies_cat_distance_km
+    livestock: dairy_livestock_cat_distance_km
+
+search:
+  base_expansion_degrees: 0.25
+  supplemental_expansion_degrees: 2.0
+  earth_radius_km: 6371.0088
+
+facility_columns:
+  - facility_uid
+  - facility_name
+  - facility_code
+  - latitude
+  - longitude
+  - class_l1_domain
+  - class_l2_filter_group
+  - class_l3_facility_class
+  - class_l4_facility_subtype
+  - class_k1
+  - class_k2
+  - class_k3
+  - class_k4
+  - class_k5
+  - class_k6
+  - class_k7
+  - class_k8
+  - urban_rural
+  - pincode
+  - establishment_year
+  - district_lgd
+  - membership_count
+
+readme:
+  cautions:
+    - Nearest-service outputs are computed from facility points and village representative points.
+    - Facilities outside the requested geography may appear in nearest-service outputs when they are the closest service for a selected village.
+    - Distance values are great-circle approximations in kilometers.

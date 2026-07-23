@@ -90,7 +90,8 @@ from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.facilities import generate_facilities_proximity_task
+from utilities.pipelines import api_request_payload
 from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
@@ -1625,16 +1626,19 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=True,
+        )
         generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+            kwargs={"payload": payload},
+            queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1645,18 +1649,19 @@ def generate_facilities_proximity(request):
 def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
         generate_antyodaya_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+            kwargs={"payload": payload},
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_antyodaya api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -1667,18 +1672,19 @@ def generate_antyodaya(request):
 def generate_livestocks(request):
     print("Inside generate_livestocks API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
         generate_livestocks_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+            kwargs={"payload": payload},
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_livestocks api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

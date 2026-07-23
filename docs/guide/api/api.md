@@ -1042,6 +1042,23 @@ Superadmins must specify the organization ID since they can create projects for 
     - `top_stewards`: top 10 stewards ranked by plan count, with their villages
     - Village name is resolved from `village_name` field; if blank, extracted from plan name (e.g., "Plan Villagename" yields "Villagename")
 
+### Steward Meta Stats (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/steward-meta-stats/`
+- **Method**: GET
+- **Description**: Get steward statistics scoped to a specific organization
+- **Authentication**: Required
+- **Permissions**:
+    - Superadmins: Full access to any organization
+    - Org Admins: Access to their own organization only (`403` if requesting another organization)
+- **Query Parameters**:
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**: Same structure as Global Level (see above), with `filters_applied` containing `organization_id` (from the URL) instead of `project_id`
+- **Error Responses**:
+    - `404 Not Found` — organization does not exist
+    - `403 Forbidden` — org admin requesting an organization other than their own
+
 ### Steward Meta Stats (Project Level)
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-meta-stats/`
 - **Method**: GET
@@ -1093,9 +1110,9 @@ Superadmins must specify the organization ID since they can create projects for 
               ],
               "villages": ["Village A", "Village B"],
               "plans": [
-                  {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A"},
-                  {"id": 2, "plan": "Plan Village B", "is_completed": true, "village_name": "Village B"},
-                  {"id": 5, "plan": "Plan Village A Phase 2", "is_completed": false, "village_name": "Village A"}
+                  {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A", "latitude": 25.1234, "longitude": 82.5678},
+                  {"id": 2, "plan": "Plan Village B", "is_completed": true, "village_name": "Village B", "latitude": 25.2345, "longitude": 82.6789},
+                  {"id": 5, "plan": "Plan Village A Phase 2", "is_completed": false, "village_name": "Village A", "latitude": null, "longitude": null}
               ]
           }
       ],
@@ -1108,6 +1125,24 @@ Superadmins must specify the organization ID since they can create projects for 
     - Per-steward `organization`: the organization the steward belongs to, derived from their plans (single object)
     - Per-steward `projects`: all distinct projects the steward has plans in
     - Per-steward `states`: all distinct states that steward has plans in
+    - Per-plan `latitude`/`longitude`: coordinates of the plan (nullable if not set on the plan)
+
+### Steward Listing (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/steward-listing/`
+- **Method**: GET
+- **Description**: List all stewards and their plans scoped to a specific organization
+- **Authentication**: Required
+- **Permissions**:
+    - Superadmins: Full access to any organization
+    - Org Admins: Access to their own organization only (`403` if requesting another organization)
+- **Query Parameters**:
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**: Same structure as Global Level (see above), with `filters_applied` containing `organization_id` (from the URL) instead of `project_id`
+- **Error Responses**:
+    - `404 Not Found` — organization does not exist
+    - `403 Forbidden` — org admin requesting an organization other than their own
 
 ### Steward Listing (Project Level)
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-listing/`
@@ -1123,6 +1158,62 @@ Superadmins must specify the organization ID since they can create projects for 
     - `district` (optional): Filter by district SOI ID
     - `tehsil` (optional): Filter by tehsil SOI ID
 - **Response**: Same structure as Global Level (see above), with `filters_applied` containing `project_id` instead of `organization_id`
+
+### Steward Details (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx`
+- **Method**: GET
+- **Description**: Get full profile and plan details for a single facilitator (steward), scoped to an organization
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins and org admins (of the organization in the URL)
+- **Query Parameters**:
+    - `facilitator_name` (required): The facilitator's full name (case-insensitive exact match)
+- **Response**:
+  ```json
+  {
+      "facilitator_name": "Dr. Rajesh Kumar",
+      "username": "rajesh.kumar",
+      "first_name": "Rajesh",
+      "last_name": "Kumar",
+      "age": 34,
+      "gender": "Male",
+      "education_qualification": "Graduate",
+      "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
+      "projects": [
+          {"id": 10, "name": "Delhi Watershed Project"}
+      ],
+      "plans": [
+          {"id": 1, "name": "Plan Village A", "is_completed": true, "latitude": 25.1234, "longitude": 82.5678}
+      ],
+      "profile_picture": "https://.../media/profile_pictures/rajesh.jpg",
+      "statistics": {
+          "total_plans": 3,
+          "dpr_completed": 2
+      },
+      "working_locations": {
+          "states": [{"id": 3, "name": "Bihar"}],
+          "districts": [{"id": 12, "name": "Nalanda"}],
+          "tehsils": [{"id": 55, "name": "Hilsa"}]
+      }
+  }
+  ```
+- **Notes**:
+    - `plans` includes every plan by this facilitator within the organization, with per-plan `latitude`/`longitude` (nullable)
+    - `statistics.dpr_completed` counts plans with `is_dpr_approved=True`
+    - `profile_picture` is `null` if the user has none uploaded
+- **Error Responses**:
+    - `400 Bad Request` — `facilitator_name` query parameter missing
+
+### Steward Details (Project Level)
+- **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-details/?facilitator_name=xxx`
+- **Method**: GET
+- **Description**: Get full profile and plan details for a single facilitator (steward), scoped to a project
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins, org admins, and users with access to the project
+- **Query Parameters**:
+    - `facilitator_name` (required): The facilitator's full name (case-insensitive exact match)
+- **Response**: Same structure as Steward Details (Organization Level) above, scoped to plans within the given project
+- **Error Responses**:
+    - `400 Bad Request` — `facilitator_name` query parameter missing
 
 ## Legacy Plan Endpoints
 
