@@ -150,6 +150,10 @@ from .tree_health.local.overall_change_local import (
 from .tree_health.local.overall_change_vector_local import (
     tree_health_overall_change_vector_local,
 )
+from .tree_health.ltp_stp.generate_ltp_stp_change_local import (
+    generate_ltp_stp_change_local,
+)
+from .tree_health.ltp_stp.generate_ltp_stp_local import generate_ltp_stp_local
 
 from .utils import (
     Geoserver,
@@ -2675,4 +2679,42 @@ def generate_soil_health(request):
         )
     except Exception as e:
         print("Exception in generate_soil_health api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_ltp_stp(request):
+    print("Inside generate_ltp_stp API.")
+    try:
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+
+        generate_ltp_stp_local.apply_async(args=[start_year, end_year], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated generate_ltp_stp task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_ltp_stp api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_ltp_stp_change(request):
+    print("Inside generate_ltp_stp API.")
+    try:
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+
+        generate_ltp_stp_change_local.apply_async(
+            args=[start_year, end_year], queue="nrm"
+        )
+        return Response(
+            {"Success": f"Successfully initiated generate_ltp_stp task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_ltp_stp api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

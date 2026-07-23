@@ -16,6 +16,8 @@ from glob import glob
 from math import floor
 from rasterio.transform import Affine
 
+from nrm_app.celery import app
+
 """
 Generate Long-Term Tree Patches (LTP) and Short-Term Tree Patches (STP) rasters.
 
@@ -69,7 +71,8 @@ ACZS = {
 }
 
 
-def generate_ltp_stp_local(start_year, end_year):
+@app.task(bind=True)
+def generate_ltp_stp_local(self, start_year, end_year):
     """
     Main function to generate LTP/STP classification rasters.
 
