@@ -7,7 +7,7 @@ from utilities.gee_utils import (
 )
 
 
-def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_id=None):
+def generate_hybrid_tree_mask(aez, start_year=2003, end_year=None, gee_account_id=None):
     """
     Forest Sensitivity Analysis Pipeline — Script 1
     Hybrid 30m Annual Tree Cover Mask + Contiguous Forest Period
@@ -35,15 +35,20 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=2024, gee_account_i
     start_year = 2003
     LULC_START_YEAR = 2017
 
-    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-
-    OUTPUT_DESC = f"Hybrid_Tree_AEZ_{aez}_Period_{str(start_year)}_{str(end_year)}"
+    OUTPUT_DESC = f"Hybrid_Tree_AEZ_{aez}_{str(start_year)}_{str(end_year)}"
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID
+
+    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
+    aoi = (
+        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+        .filter(ee.Filter.eq("Name", "Odisha"))
+        .geometry()
+    )
 
     # DATASET PREPARATION :=
     # --- GLC-FCS30D ---
