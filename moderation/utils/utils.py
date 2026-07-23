@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.utils import timezone
 
 from dpr.models import (
     ODK_settlement,
@@ -97,12 +98,23 @@ def sync_edited_updated_settlement(sub):
 
 def sync_edited_updated_well(well_submission):
     well_id = well_submission.get("well_id")
+    uuid_val = well_submission.get("__id") or "NA"
     if (
         ODK_well.objects.filter(well_id=well_id)
         .filter(Q(is_moderated=True) | Q(is_deleted=True))
         .exists()
     ):
         return
+
+    # Soft-delete stale row if ODK edit changed the well_id for this submission
+    stale_wells = ODK_well.objects.filter(uuid=uuid_val).exclude(
+        well_id=well_id
+    ).filter(is_moderated=False, is_deleted=False)
+    for stale in stale_wells:
+        stale.is_deleted = True
+        stale.deleted_at = timezone.now()
+        stale.uuid = f"{stale.uuid}-deleted-{stale.well_id}"
+        stale.save(update_fields=["is_deleted", "deleted_at", "uuid"])
 
     Well_usage = well_submission.get("Well_usage", {})
     gps = well_submission.get("GPS_point", {})
@@ -115,7 +127,7 @@ def sync_edited_updated_well(well_submission):
         need_maintenance = Well_condition.get("select_one_maintenance") or "NA"
 
     mapped = {
-        "uuid": well_submission.get("__id") or "NA",
+        "uuid": uuid_val,
         "submission_time": system.get("submissionDate"),
         "beneficiary_settlement": to_utf8(
             well_submission.get("beneficiary_settlement") or "NA"
@@ -285,9 +297,9 @@ def sync_edited_updated_agri(agri_submission):
 
 
 def sync_edited_updated_livelihood(livelihood_submission):
-    livelihood_id = livelihood_submission.get("work_id")
+    uuid_val = livelihood_submission.get("__id") or "0"
     if (
-        ODK_livelihood.objects.filter(livelihood_id=livelihood_id)
+        ODK_livelihood.objects.filter(uuid=uuid_val)
         .filter(Q(is_moderated=True) | Q(is_deleted=True))
         .exists()
     ):
@@ -298,7 +310,6 @@ def sync_edited_updated_livelihood(livelihood_submission):
     lat, lon = extract_lat_lon_from_gps(gps)
 
     mapped = {
-        "uuid": livelihood_submission.get("__id") or "0",
         "beneficiary_settlement": to_utf8(
             livelihood_submission.get("beneficiary_settlement") or "0"
         ),
@@ -326,7 +337,7 @@ def sync_edited_updated_livelihood(livelihood_submission):
     }
 
     ODK_livelihood.objects.update_or_create(
-        livelihood_id=livelihood_id, defaults=mapped
+        uuid=uuid_val, defaults=mapped
     )
 
 
@@ -343,6 +354,17 @@ def sync_edited_updated_cropping_pattern(cp_submission):
         .exists()
     ):
         return
+
+    # Soft-delete stale row if PK changed (e.g., uuid was used as PK fallback earlier,
+    # now the actual crop_Grid_id is available)
+    stale_crops = ODK_crop.objects.filter(uuid=uuid_val).exclude(
+        crop_grid_id=crop_grid_id
+    ).filter(is_moderated=False, is_deleted=False)
+    for stale in stale_crops:
+        stale.is_deleted = True
+        stale.deleted_at = timezone.now()
+        stale.uuid = f"{stale.uuid}-deleted-{stale.crop_grid_id}"
+        stale.save(update_fields=["is_deleted", "deleted_at", "uuid"])
 
     system = cp_submission.get("__system", {})
     gps = cp_submission.get("GPS_point") or {}
@@ -515,6 +537,14 @@ def sync_edited_updated_swb_rs_maintenance(swb_rs_submission):
 
 
 def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
+    uuid_val = agrohorticulture_submission.get("__id")
+    if (
+        ODK_agrohorticulture.objects.filter(uuid=uuid_val)
+        .filter(Q(is_moderated=True) | Q(is_deleted=True))
+        .exists()
+    ):
+        return
+
     gps = agrohorticulture_submission.get("GPS_point", {})
     system = agrohorticulture_submission.get("__system", {})
     lat = None
@@ -526,7 +556,6 @@ def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
     except Exception:
         pass
     mapped = {
-        "uuid": agrohorticulture_submission.get("__id"),
         "plan_id": agrohorticulture_submission.get("plan_id"),
         "plan_name": to_utf8(agrohorticulture_submission.get("plan_name")),
         "latitude": lat,
@@ -535,7 +564,7 @@ def sync_edited_updated_agrohorticulture(agrohorticulture_submission):
         "data_agohorticulture": agrohorticulture_submission,
     }
     ODK_agrohorticulture.objects.update_or_create(
-        uuid=agrohorticulture_submission.get("__id"), defaults=mapped
+        uuid=uuid_val, defaults=mapped
     )
 
 
