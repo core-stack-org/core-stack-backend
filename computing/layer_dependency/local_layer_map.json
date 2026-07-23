@@ -1,6 +1,9 @@
 {
     "dynamic_layers": [
         {
+            "name": "generate_nrega_layer"
+        },
+        {
             "name": "lulc_v3",
             "use_global_args": true
         },
@@ -42,9 +45,6 @@
         {
             "name": "generate_swb",
             "use_global_args": true
-        },
-        {
-            "name": "generate_nrega_layer"
         }
     ],
     "static_layers": [
