@@ -45,6 +45,41 @@
         {
             "name": "generate_swb",
             "use_global_args": true
+        },
+        {
+            "name": "tree_health_ch_raster",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_ch_vector",
+                    "use_global_args": true
+                }
+            ]
+        },
+        {
+            "name": "tree_health_ccd_raster",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_ccd_vector",
+                    "use_global_args": true
+                }
+            ]
+        },
+        {
+            "name": "tree_health_overall_change_raster",
+            "depends_on": ["change_detection"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_overall_change_vector"
+                }
+            ]
+        },
+        {
+            "name": "soil_health"
         }
     ],
     "static_layers": [

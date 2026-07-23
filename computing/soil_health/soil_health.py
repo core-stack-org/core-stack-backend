@@ -2,6 +2,7 @@ import os
 import geopandas as gpd
 
 from computing.soil_health.soil_health_helper import nutrient_stats_for_geometries
+from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
     PROJECT_ROOT,
@@ -102,6 +103,7 @@ def vectorize_soil_health(
 
     asset_suffix, roi_gdf = get_roi(asset_suffix, block, district, roi, state)
     layer_name = f"{asset_suffix}_soil_health"
+    geoserver_statuses = []
 
     for nutrient in NUTRIENTS:
         # This produces one output feature per ROI geometry with Nitrogen summary columns.
@@ -142,5 +144,28 @@ def vectorize_soil_health(
                 file_type="gpkg",
             )
             print(f"GeoServer response: {geoserver_response}")
+            geoserver_statuses.append(
+                isinstance(geoserver_response, dict)
+                and geoserver_response.get("status_code") in (200, 201)
+            )
 
         # TODO Add Stac specs
+
+    return all(geoserver_statuses) if push_to_geoserver else True
+
+
+@app.task(bind=True)
+def generate_soil_health_local(self, state=None, district=None, block=None):
+    raster_generated = clip_soil_health_raster(
+        state=state,
+        district=district,
+        block=block,
+    )
+    if not raster_generated:
+        return False
+
+    return vectorize_soil_health(
+        state=state,
+        district=district,
+        block=block,
+    )

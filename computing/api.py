@@ -1094,7 +1094,6 @@ def tree_health_raster(request):
             tree_health_ccd_raster,
             tree_health_ccd_raster_local,
         )
-        print("What is task? ", ccd_task)
 
         ccd_task.apply_async(
             kwargs=task_kwargs,
@@ -1106,7 +1105,6 @@ def tree_health_raster(request):
             tree_health_ch_raster,
             tree_health_ch_raster_local,
         )
-        print("What is task? ", ch_task)
         ch_task.apply_async(
             kwargs=task_kwargs,
             queue="nrm",
@@ -1116,7 +1114,6 @@ def tree_health_raster(request):
             tree_health_overall_change_raster,
             tree_health_overall_change_raster_local,
         )
-        print("What is task? ", overall_task)
         overall_task.apply_async(
             kwargs=task_kwargs,
             queue="nrm",

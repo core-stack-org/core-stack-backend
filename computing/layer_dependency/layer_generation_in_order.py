@@ -32,6 +32,19 @@ from computing.tree_health.gee.overall_change import tree_health_overall_change_
 from computing.tree_health.gee.overall_change_vector import (
     tree_health_overall_change_vector,
 )
+from computing.tree_health.local.canopy_height_local import tree_health_ch_raster_local
+from computing.tree_health.local.canopy_height_vector_local import (
+    tree_health_ch_vector_local,
+)
+from computing.tree_health.local.ccd_local import tree_health_ccd_raster_local
+from computing.tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
+from computing.tree_health.local.overall_change_local import (
+    tree_health_overall_change_raster_local,
+)
+from computing.tree_health.local.overall_change_vector_local import (
+    tree_health_overall_change_vector_local,
+)
+from computing.soil_health.soil_health import generate_soil_health_local
 from computing.misc.naturaldepression import generate_natural_depression_data
 from computing.misc.distancetonearestdrainage import (
     generate_distance_to_nearest_drainage_line,
@@ -289,6 +302,13 @@ LOCAL_TASK_REGISTRY = {
     "generate_dem_raster_vector": generate_febdem_raster_vector_clip,
     "generate_mws_centroid_data": generate_mws_centroid_data_local,
     "generate_mws_centroid": generate_mws_centroid_data_local,
+    "tree_health_ch_raster": tree_health_ch_raster_local,
+    "tree_health_ch_vector": tree_health_ch_vector_local,
+    "tree_health_ccd_raster": tree_health_ccd_raster_local,
+    "tree_health_ccd_vector": tree_health_ccd_vector_local,
+    "tree_health_overall_change_raster": tree_health_overall_change_raster_local,
+    "tree_health_overall_change_vector": tree_health_overall_change_vector_local,
+    "soil_health": generate_soil_health_local,
 }
 
 TASK_REGISTRIES = {
@@ -604,7 +624,10 @@ def run_node_tree(
     node_func_name = node["name"]
     node_func_obj = task_registry[node_func_name]
     args = get_args(
-        iterator_name=node, global_args=global_args, gee_account_id=gee_account_id
+        iterator_name=node,
+        global_args=global_args,
+        gee_account_id=gee_account_id,
+        compute=compute,
     )
     deps = node.get("depends_on", [])
     run_layer_with_dependency(
@@ -686,16 +709,17 @@ def run_layer_with_dependency(
             logger.exception(f"{node_func_name} raised an error ({log_ctx})")
 
 
-def get_args(iterator_name, global_args, gee_account_id):
+def get_args(iterator_name, global_args, gee_account_id, compute="gee"):
     """
     This function merge the global agrs and local args(define in json maps) return combination of both.
     """
     arg = iterator_name.get("args", {})
-    args = {"gee_account_id": gee_account_id, **arg}
+    args = dict(arg)
+    if normalize_compute(compute) == "gee":
+        args["gee_account_id"] = gee_account_id
     if iterator_name.get("use_global_args", False):
         args = {
             **global_args,
-            "gee_account_id": gee_account_id,
             **args,
         }
     return args
