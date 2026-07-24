@@ -136,6 +136,11 @@ base_layers:
           source: ""
           type: file
 
+        - name: soil type
+          local_path: "{DATA_DIR}/base_layers/soil_type/"
+          source: ""
+          type: directory
+
         - name: Nrega Layer (Scrapping)
           aliases:
               - nrega layer
@@ -454,6 +459,12 @@ derived_layers:
     - name: aquifer vector
       local_path: "{DATA_DIR}/layers/aquifer_vector/"
       geoserver_workspace: aquifer_vector
+      layer_type: vector
+
+    - name: soil type
+      filename: soil_type_{district}_{block}.gpkg
+      local_path: "{DATA_DIR}/layers/soil_type/{state}/{district}/{block}/{filename}"
+      geoserver_workspace: soil_type
       layer_type: vector
 
     - name: generate_swb

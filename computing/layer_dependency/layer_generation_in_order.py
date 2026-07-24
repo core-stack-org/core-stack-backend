@@ -45,6 +45,7 @@ from computing.tree_health.local.overall_change_vector_local import (
     tree_health_overall_change_vector_local,
 )
 from computing.soil_health.soil_health import generate_soil_health_local
+from computing.soil_type.soil_type_local import generate_soil_type_local
 from computing.misc.naturaldepression import generate_natural_depression_data
 from computing.misc.distancetonearestdrainage import (
     generate_distance_to_nearest_drainage_line,
@@ -309,6 +310,8 @@ LOCAL_TASK_REGISTRY = {
     "tree_health_overall_change_raster": tree_health_overall_change_raster_local,
     "tree_health_overall_change_vector": tree_health_overall_change_vector_local,
     "soil_health": generate_soil_health_local,
+    "generate_soil_type": generate_soil_type_local,
+    "soil_type": generate_soil_type_local,
 }
 
 TASK_REGISTRIES = {

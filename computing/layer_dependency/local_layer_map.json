@@ -148,6 +148,9 @@
         },
         {
             "name": "generate_mws_centroid"
+        },
+        {
+            "name": "soil_type"
         }
     ]
 }

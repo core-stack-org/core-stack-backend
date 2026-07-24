@@ -167,6 +167,24 @@ SWB_VECTOR_PATH: Path = _base_layer_path(
 
 SOI_TEHSIL_PATH: Path = _base_layer_path("admin boundaries")
 
+SOIL_TYPE_BASE_DIR: Path = _base_layer_path("soil type")
+SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
+    "available_water_capacity": SOIL_TYPE_BASE_DIR / "available_water_capacity.tif",
+    "soil_drainage_classes": SOIL_TYPE_BASE_DIR / "soil_drainage_classes.tif",
+    "subsoil_bulk_density": SOIL_TYPE_BASE_DIR / "subsoil_bulk_density.tif",
+    "subsoil_exchange_capacity": SOIL_TYPE_BASE_DIR
+    / "subsoil_exchange_capacity.tif",
+    "subsoil_organic_carbon": SOIL_TYPE_BASE_DIR / "subsoil_organic_carbon.tif",
+    "subsoil_ph": SOIL_TYPE_BASE_DIR / "subsoil_pH.tif",
+    "subsoil_texture": SOIL_TYPE_BASE_DIR / "subsoil_texture.tif",
+    "topsoil_bulk_density": SOIL_TYPE_BASE_DIR / "topsoil_bulk_density.tif",
+    "topsoil_exchange_capacity": SOIL_TYPE_BASE_DIR
+    / "topsoil_exchange_capacity.tif",
+    "topsoil_organic_carbon": SOIL_TYPE_BASE_DIR / "topsoil_organic_carbon.tif",
+    "topsoil_ph": SOIL_TYPE_BASE_DIR / "topsoil_pH.tif",
+    "topsoil_texture": SOIL_TYPE_BASE_DIR / "topsoil_texture.tif",
+}
+
 ADMIN_BOUNDARY_INPUT_DIR: Path = DATA_DIR / "admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR: Path = DATA_DIR / "admin-boundary/output"
 VILLAGE_BOUNDARIES_DIR: Path = DATA_DIR / "base_layers/village_boundaries"
@@ -200,6 +218,7 @@ LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc slope clusters")
 LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
 SWB_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("generate_swb")
+SOIL_TYPE_OUTPUT_DIR: Path = _derived_output_dir("soil type")
 
 
 PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
