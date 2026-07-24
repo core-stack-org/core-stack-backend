@@ -32,6 +32,7 @@ LOCAL_ALGORITHM = "local_soil_type_zonal_summary"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
 DATASET_NAME = "Soil Type"
 
+# TODO: water capacity could be a mean instead of dominant
 AVAILABLE_WATER_CAPACITY_CLASSES = {
     1: 150,
     2: 125,
