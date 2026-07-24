@@ -57,6 +57,8 @@ from .spei.spei import (
     generate_spei_pipeline,
     run_drought_resistance_resilience,
     run_rainfall_resistance_resilience,
+    run_forest_fire_resistance_resilience,
+    run_high_wind_resistance_resilience,
 )
 from .drought.drought import calculate_drought
 from .drought.drought_causality import drought_causality
@@ -2428,9 +2430,7 @@ def generate_canal_vector(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(
-            f"Exception in generate canal vector layer for {district} - {block}:: ", e
-        )
+        print(f"Exception in generate canal vector layer: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2448,9 +2448,7 @@ def drought_resilience_resistance(request):
             args=[aez, start_year, end_year, gee_account_id], queue="nrm"
         )
         return Response(
-            {
-                "Success": "Successfully drought_resilience_resistance generate_spei task"
-            },
+            {"Success": "Successfully drought_resilience_resistance task"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
@@ -2472,13 +2470,55 @@ def rainfall_resilience_resistance(request):
             args=[aez, start_year, end_year, gee_account_id], queue="nrm"
         )
         return Response(
-            {
-                "Success": "Successfully rainfall_resilience_resistance generate_spei task"
-            },
+            {"Success": "Successfully rainfall_resilience_resistance task"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
         print("Exception in rainfall_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def forest_fire_resilience_resistance(request):
+    print("Inside forest_fire_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_forest_fire_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully forest_fire_resilience_resistance task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in forest_fire_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def high_wind_resilience_resistance(request):
+    print("Inside run_high_wind_resistance_resilience API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_high_wind_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully run_high_wind_resistance_resilience task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in run_high_wind_resistance_resilience api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

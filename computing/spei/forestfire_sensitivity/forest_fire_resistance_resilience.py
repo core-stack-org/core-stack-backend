@@ -1,40 +1,33 @@
 import ee
 
-from utilities.gee_utils import (
-    ee_initialize,
-    is_gee_asset_exists,
-    export_raster_asset_to_gee,
-)
+from utilities.constants import AEZ
+from utilities.gee_utils import export_raster_asset_to_gee, is_gee_asset_exists
+
+"""
+ * Forest Sensitivity Analysis Pipeline — Fire Resistance & Resilience
+ * Fire Shock Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
+ *
+ * Signed resistance (both +ve and -ve events):
+ * Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
+ *
+ * Resilience computed ONLY when Ye < Yn_bar (negative effect years):
+ * Resilience = |Ye - Yn_bar| / |Ye+1 - Yn_bar| × sign(Ye+1 - Yn_bar)
+ *
+ * Harmonization: Transforms Landsat 8/9 (OLI) to Landsat 5/7 (ETM+)
+ * equivalent before computing kNDVI to eliminate sensor-shift bias.
+ *
+ * Requires:
+ * - Forest mask asset (Script 1)
+ * - Fire index asset (FRP > 30)
+"""
 
 
-def generate_drought_resistance(
-    aez, start_year=2004, end_year=None, gee_account_id=None
-):
-    """
-    * Forest Sensitivity Analysis Pipeline — Script 2
-    * Drought Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
-    *
-    * For each forest pixel, computes mean resistance and resilience
-    * across all drought years (SPEI-12 < threshold).
-    *
-    * Harmonization: Transforms Landsat 8/9 (OLI) to Landsat 5/7 (ETM+)
-    * equivalent before computing kNDVI to eliminate sensor-shift bias.
-    *
-    * Signed resistance (both +ve and -ve events):
-    * Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
-    *
-    * Resilience computed ONLY when Ye < Yn_bar (negative effect years):
-    * Resilience = |Ye - Yn_bar| / |Ye+1 - Yn_bar| × sign(Ye+1 - Yn_bar)
-    *
-    * Requires:
-    * - Forest mask asset from Script 1
-    * - SPEI-12 assets from spei-drought-analysis-pipeline
-    """
-
-    ee_initialize(gee_account_id)
-
+def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=None):
     TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2003)}_{str(end_year)}"
-    OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
+
+    FIRE_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/fire_index_FRP30_AEZ_{aez}"
+
+    OUTPUT_DESC = f"fire_metrics_harmonized_kNDVI_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
@@ -42,12 +35,13 @@ def generate_drought_resistance(
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
 
-    DROUGHT_THRESHOLD = -1.0  # SPEI-12 below this = drought year
+    Z_THRESHOLD = 1.0
 
-    # Fixed baseline window. This is independent of analysis START_YEAR/END_YEAR.
-    # Please don't EVER change this once results are published, or old outputs will change when the pipeline timeline is extended.
-    # This helps in fixing the Yn_bar (the average of the non-drought year NDVI) to a constant value.
-    BASELINE_START_YEAR = 2004  # SPEI has no data before 2004
+    # I'm using 2004-2024 to match the same baseline window I already locked
+    # in for drought (Script 2), rain (Script 3b), and the fire z-score
+    # itself (fire index script) — keeping all my baselines consistent with
+    # each other.
+    BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
 
     # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
@@ -57,35 +51,30 @@ def generate_drought_resistance(
         .geometry()
     )
     # Loading the assets :=
-
     treeMeta = ee.Image(TREE_COVER_ASSET)
+    startYearTree = treeMeta.select("start_year")
+    endYearTree = treeMeta.select("end_year")
 
-    startYear = treeMeta.select("start_year")
-    endYear = treeMeta.select("end_year")
+    fireIndex = ee.Image(FIRE_INDEX_ASSET)
 
-    # Load SPEI-12 collection from single multiband asset
-    SPEI12_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/SPEI12"
-    spei12_raw = ee.Image(SPEI12_ASSET)
-    spei12_bandnames = []
+    # I need zScore bands covering BOTH my analysis window and my baseline
+    # window — whichever stretches further in either direction. Right now
+    # they're the same range (2004-2024), so this doesn't change anything
+    # today, but it protects me for later when I extend END_YEAR and the two
+    # windows stop lining up.
+    zMinYear = min(start_year, BASELINE_START_YEAR)
+    zMaxYear = max(end_year, BASELINE_END_YEAR)
 
-    for yn in range(2004, end_year + 1):
-        spei12_bandnames.append("y" + str(yn))
-    spei12_named = spei12_raw.rename(spei12_bandnames)
+    zScoreCol_list = []
 
-    # Building the per-year SPEI collection here.
-    speiMinYear = min(start_year, BASELINE_START_YEAR)
-    speiMaxYear = max(end_year, BASELINE_END_YEAR)
-
-    speiImages = []
-    for y in range(speiMinYear, speiMaxYear + 1):
-        speiImages.append(
-            spei12_named.select("y" + str(y)).rename("spei").set("year", y)
+    for y in range(zMinYear, zMaxYear + 1):
+        zScoreCol_list.append(
+            fireIndex.select("zScore_" + str(y)).rename("zScore").set("year", y)
         )
-    speiCol = ee.ImageCollection(speiImages)
+
+    zScoreCol = ee.ImageCollection(zScoreCol_list)
 
     # LANDSAT HARMONIZATION & kNDVI :=
-
-    # Chastain et al. coefficients (OLI to ETM+)
     chastainBandNames = ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "SWIR2"]
     oliETMSlopes = ee.Image.constant(
         [1.03501, 1.00921, 1.01991, 1.14061, 1.04351, 1.05271]
@@ -99,7 +88,6 @@ def generate_drought_resistance(
         qa = image.select("QA_PIXEL")
         mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
 
-        # Apply mask, select optical bands, and apply Collection 2 scale factors
         scaled = (
             image.updateMask(mask)
             .select(["SR_B1", "SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B7"])
@@ -116,7 +104,6 @@ def generate_drought_resistance(
         qa = image.select("QA_PIXEL")
         mask = qa.bitwiseAnd(1 << 3).eq(0).And(qa.bitwiseAnd(1 << 4).eq(0))
 
-        # Apply mask, select optical bands, and apply Collection 2 scale factors
         scaled = (
             image.updateMask(mask)
             .select(["SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7"])
@@ -125,9 +112,7 @@ def generate_drought_resistance(
             .rename(chastainBandNames)
         )
 
-        # Apply Chastain regression model (OLI -> ETM+)
         harmonized = scaled.multiply(oliETMSlopes).add(oliETMIntercepts)
-
         return harmonized.copyProperties(image, ["system:time_start"])
 
     # Calculate annual median kNDVI
@@ -165,61 +150,66 @@ def generate_drought_resistance(
 
         return l89.merge(l57).median().set("year", year).rename("kndvi")
 
-    # Load kNDVI for START_YEAR to END_YEAR+1 (need next year for resilience)
-    # kndviYears = ee.List.sequence(start_year, end_year + 1)
+    # Same idea as zScoreCol above — I need kNDVI images covering whichever
+    # is bigger: my baseline window, or my analysis window PLUS ONE year
+    # (because resilience for my very last analysis year needs next-year
+    # kNDVI to compare against).
     kndviMinYear = min(start_year, BASELINE_START_YEAR)
     kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
-
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 
-    # BASELINE kNDVI (Yn_bar) :=
-    # Mean kNDVI across non-drought years only
+    # BASELINE kNDVI (Yn_bar):=
+    # Mean kNDVI across non-anomalous years only
 
-    # The analysis years will still remain the same , so if some internal year width is given like 2010-2018 for example
-    # then too the baseline yn_bar would be same of the bigger normalization. But the analysis will be resulting only of the analysis years.
     analysisYears = ee.List.sequence(start_year, end_year)
 
+    # This is my frozen baseline window — the years I use to WORK OUT what
+    # Yn_bar (my "normal" kNDVI reference) is. On purpose, kept separate from
+    # analysisYears so extending my results later never shifts this.
     baselineYears = ee.List.sequence(BASELINE_START_YEAR, BASELINE_END_YEAR)
 
-    def calc_kndviNonDrought(y):
+    def calc_kndvi(y):
         year = ee.Number(y)
-        kndvi = kndviCol.filter(ee.Filter.eq("year", year)).first()
-        spei = (
-            speiCol.filter(ee.Filter.eq("year", year))
-            .first()
+        kndvi = ee.Image(kndviCol.filter(ee.Filter.eq("year", year)).first())
+        zScore = (
+            ee.Image(zScoreCol.filter(ee.Filter.eq("year", year)).first())
             .resample("bilinear")
             .reproject(crs=kndvi.projection(), scale=30)
         )
-        isNonDrought = spei.gte(DROUGHT_THRESHOLD)
-        return kndvi.updateMask(isNonDrought).set("year", year)
 
-    kndviNonDrought = ee.ImageCollection(baselineYears.map(calc_kndviNonDrought))
+        isNormal = zScore.select("zScore").abs().lt(Z_THRESHOLD)
+        isForest = startYearTree.lte(year).And(endYearTree.gte(year))
 
-    Yn_bar = kndviNonDrought.mean().rename("kndvi_baseline")
+        return kndvi.updateMask(isNormal.And(isForest)).set("year", year)
+
+    Yn_bar = (
+        ee.ImageCollection(baselineYears.map(calc_kndvi))
+        .mean()
+        .rename("kndvi_baseline")
+    )
 
     # SIGNED RESISTANCE & RESILIENCE :=
+    def calc_kndvi_ye(y):
 
-    def calc_metrics_col(y):
         year = ee.Number(y)
 
-        kndviYe = kndviCol.filter(ee.Filter.eq("year", year)).first()
-        speiYe = (
-            speiCol.filter(ee.Filter.eq("year", year))
-            .first()
+        kndviYe = ee.Image(kndviCol.filter(ee.Filter.eq("year", year)).first())
+        zScore = (
+            ee.Image(zScoreCol.filter(ee.Filter.eq("year", year)).first())
             .resample("bilinear")
             .reproject(crs=kndviYe.projection(), scale=30)
         )
 
-        # Only compute on forest pixels during drought years
-        isForest = startYear.lte(year).And(endYear.gte(year))
-        isDrought = speiYe.lt(DROUGHT_THRESHOLD)
-        eventMask = isForest.And(isDrought)
+        # Only compute on forest pixels during anomalous fire years
+        isAnomalous = zScore.select("zScore").gt(Z_THRESHOLD)
+        isForest = startYearTree.lte(year).And(endYearTree.gte(year))
+        eventMask = isAnomalous.And(isForest)
 
         diffRaw = kndviYe.subtract(Yn_bar)
         diffAbs = diffRaw.abs().max(1e-6)
 
-        # Resistance: signed, computed for ALL drought years
+        # Resistance: signed, computed for ALL anomalous years (both +ve and -ve)
         resistance = (
             Yn_bar.divide(diffAbs)
             .multiply(diffRaw.signum())
@@ -229,30 +219,31 @@ def generate_drought_resistance(
 
         # Resilience: ONLY computed when Ye < Yn_bar (negative effect years)
         isNegativeEffect = kndviYe.lt(Yn_bar)
-        resilMask = eventMask.And(isNegativeEffect)
+        resil_mask = eventMask.And(isNegativeEffect)
 
-        kndviNext = kndviCol.filter(ee.Filter.eq("year", year.add(1))).first()
-        diffNext = kndviNext.subtract(Yn_bar)
+        kndvi_next = ee.Image(
+            kndviCol.filter(ee.Filter.eq("year", year.add(1))).first()
+        )
+        diffNext = kndvi_next.subtract(Yn_bar)
         diffNextAbs = diffNext.abs().max(1e-6)
 
         resilience = (
             diffAbs.divide(diffNextAbs)
             .multiply(diffNext.signum())
             .rename("resilience")
-            .updateMask(resilMask)
+            .updateMask(resil_mask)
         )
 
         return ee.Image.cat([resistance, resilience]).set("year", year)
 
-    metricsCol = ee.ImageCollection(analysisYears.map(calc_metrics_col))
+    metricsCol = ee.ImageCollection(analysisYears.map(calc_kndvi_ye))
 
     # AGGREGATE & EXPORT :=
+    mean_resist = metricsCol.select("resistance").mean().clip(aoi)
+    mean_resil = metricsCol.select("resilience").mean().clip(aoi)
 
-    meanResistance = metricsCol.select("resistance").mean().clip(aoi)
-    meanResilience = metricsCol.select("resilience").mean().clip(aoi)
-
-    finalOutput = meanResistance.rename("resistance").addBands(
-        meanResilience.rename("resilience")
+    finalOutput = mean_resist.rename("resistance").addBands(
+        mean_resil.rename("resilience")
     )
 
     task_id = export_raster_asset_to_gee(

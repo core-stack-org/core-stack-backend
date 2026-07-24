@@ -259,6 +259,16 @@ urlpatterns = [
         name="rainfall_resilience_resistance",
     ),
     path(
+        "forest_fire_resilience_resistance/",
+        api.forest_fire_resilience_resistance,
+        name="forest_fire_resilience_resistance",
+    ),
+    path(
+        "high_wind_resilience_resistance/",
+        api.high_wind_resilience_resistance,
+        name="high_wind_resilience_resistance",
+    ),
+    path(
         "generate_dem_raster_vector/",
         api.generate_fabdem_raster_vector,
         name="generate-dem-raster-vector",
