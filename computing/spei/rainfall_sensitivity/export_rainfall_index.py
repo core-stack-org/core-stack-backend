@@ -32,7 +32,7 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
     """
 
     ee_initialize(gee_account_id)
-    OUTPUT_DESC = f"rain_index_{aez}"  # f"rain_index_AEZ_{aez}"
+    OUTPUT_DESC = f"rain_index_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )

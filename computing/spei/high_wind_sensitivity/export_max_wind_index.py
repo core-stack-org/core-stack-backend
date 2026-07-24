@@ -49,7 +49,7 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     WIND_THRESHOLD = 10.0
 
     # ===========================================================================
-    #                    3. HOURLY WINDSPEED FROM U/V COMPONENTS
+    #                    1. HOURLY WINDSPEED FROM U/V COMPONENTS
     # ===========================================================================
 
     era5Hourly = (
@@ -74,7 +74,7 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     windSpeedCol = era5Hourly.map(toWindSpeed)
 
     # ===========================================================================
-    #                    4. ANNUAL METRICS (Max, Hours > Thresh, Mean > Thresh)
+    #                    2. ANNUAL METRICS (Max, Hours > Thresh, Mean > Thresh)
     # ===========================================================================
 
     years = ee.List.sequence(start_year, end_year)
@@ -111,7 +111,7 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     annual_ws_metrics = ee.ImageCollection(years.map(annual_metrics))
 
     # ===========================================================================
-    #                    5. STACK INTO SINGLE MULTIBAND IMAGE
+    #                    3. STACK INTO SINGLE MULTIBAND IMAGE
     # ===========================================================================
     def add_year_bands(year, image):
         year = ee.Number(year)
@@ -139,8 +139,5 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     task_id = export_raster_asset_to_gee(
         output_image.clip(aoi), OUTPUT_DESC, OUTPUT_ASSET_ID, scale=1000, region=aoi
     )
-
-    print("✅ Clean pipeline compilation verified.")
-    print("Ready to execute in the tasks tab. Total structured bands: 95.")
 
     return task_id
