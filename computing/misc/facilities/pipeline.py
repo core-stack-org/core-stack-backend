@@ -23,6 +23,7 @@ from utilities.pipelines.admin import (
     ADMIN_PRESENTATION_COLUMNS,
     admin_output_frame,
     admin_presentation_frame,
+    resolve_registration_scope,
 )
 from utilities.pipelines.schema import (
     STATUS_COMPUTED,
@@ -1134,13 +1135,10 @@ def run_facilities_pipeline(
         }
     ).as_posix()
     if request.publish.register_layers and published_layers:
-        state = request.scope.state_name
-        district = request.scope.district_name
-        block = request.scope.tehsil_name
-        if not (state and district and block):
-            raise ValueError(
-                "Layer registration requires state, district, and tehsil names."
-            )
+        registration_scope = resolve_registration_scope(request.scope)
+        state = registration_scope.state_name
+        district = registration_scope.district_name
+        block = registration_scope.tehsil_name
         registrations: dict[str, dict[str, Any]] = {}
         for role, published in published_layers.items():
             dataset_name = (
