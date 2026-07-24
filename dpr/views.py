@@ -2,7 +2,9 @@ from datetime import date
 from django.template.loader import render_to_string
 from dpr.service.translation_service import load_translations
 
-# from weasyprint import HTML
+from weasyprint import HTML
+from django.conf import settings
+from pathlib import Path
 from .gen_dpr import get_settlement_count_for_plan
 from .utils import get_vector_layer_geoserver, transform_name
 from nrm_app.settings import GEOSERVER_URL
@@ -15,6 +17,18 @@ from .get_dpr_sectionwise_data import (
     get_section_g_data,
 )
 from .service.form_download_service import sync_odk_forms
+
+font_regular = (
+    Path(settings.BASE_DIR)
+    / "dpr"
+    / "static"
+    / "fonts"
+    / "NotoSansDevanagari-Regular.ttf"
+).as_uri()
+
+font_bold = (
+    Path(settings.BASE_DIR) / "dpr" / "static" / "fonts" / "NotoSansDevanagari-Bold.ttf"
+).as_uri()
 
 
 def generate_dpr_html(plan, language="en"):
@@ -48,17 +62,22 @@ def generate_dpr_html(plan, language="en"):
             "section_e": section_e_data,
             "section_f": section_f_data,
             "section_g": section_g_data,
-            "footnote": f"DPR supported by {plan.organization.name} in {date.today().year}",
+            "footnote": f"DPR supported by {plan.organization.name} in {plan.created_at.year}",
+            "font_regular": font_regular,
+            "font_bold": font_bold,
         },
     )
 
     return html
 
 
-# def generate_dpr_pdf(plan, language="en"):
-#     sync_odk_forms()
-#     html = generate_dpr_html(plan, language)
-#
-#     pdf = HTML(string=html).write_pdf()
-#
-#     return pdf
+def generate_dpr_pdf(plan, language="en"):
+    sync_odk_forms()
+    html = generate_dpr_html(plan, language)
+
+    pdf = HTML(
+        string=html,
+        base_url=settings.BASE_DIR,
+    ).write_pdf()
+
+    return pdf

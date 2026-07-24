@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 import requests
@@ -12,10 +13,11 @@ from rest_framework.decorators import (
     permission_classes,
     schema,
 )
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
 from computing.change_detection.change_detection import (
     get_change_detection as get_change_detection_gee_task,
 )
@@ -28,6 +30,7 @@ from computing.change_detection.change_detection_vector import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from computing.layer_dependency.layer_generation_in_order import (
     layer_generate_map,
     normalize_compute as _normalize_layer_order_compute,
@@ -44,7 +47,8 @@ from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
 from utilities.gee_utils import check_gee_task_status, download_gee_layer
-
+from utilities.pipelines import api_request_payload
+from .STAC_specs.stac_collection import generate_stac_collection_task
 from .clart.clart import generate_clart_layer
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .crop_grid.crop_grid import create_crop_grids
@@ -53,15 +57,11 @@ from .cropping_intensity.cropping_intesity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
 from .soil_health.soil_health import soil_health_local
-from .spei.spei import (
-    generate_spei_pipeline,
-    run_drought_resistance_resilience,
-    run_rainfall_resistance_resilience,
-    run_forest_fire_resistance_resilience,
-    run_high_wind_resistance_resilience,
-)
+
 from .drought.drought import calculate_drought
 from .drought.drought_causality import drought_causality
+from .et_downscale.et_downscale import generate_et_downscale
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 from .local_compute_helper import (
     get_compute_mode as _get_compute_mode,
 )
@@ -91,31 +91,94 @@ from .lulc_X_terrain.lulc_on_slope_cluster_local import (
 )
 from .misc.admin_boundary import generate_tehsil_shape_file_data
 from .misc.agroecological_space import generate_agroecological_data
+from .misc.agroecological_space_local_compute import (
+    generate_agroecological_data_local as generate_agroecological_data_local_task,
+)
+from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.aquifer_vector import (
     generate_aquifer_vector as generate_aquifer_vector_gee_task,
 )
 from .misc.aquifer_vector_local import (
     generate_aquifer_vector as generate_aquifer_vector_local_task,
 )
+from .misc.canal_layer import canal_vector
+from .misc.canal_local_compute import canal_vector as canal_vector_local_task
 from .misc.catchment_area import generate_catchment_area_singleflow
+from .misc.catchment_area_local_compute import (
+    generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task,
+)
+from .misc.digital_elevation_model import generate_dem_layer
+from .misc.digital_elevation_model_local import (
+    generate_febdem_raster_vector_clip as generate_febdem_raster_vector_clip_local_task,
+)
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.distancetonearestdrainage_local_compute import (
+    generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task,
+)
+from .misc.drainage_density_local_compute import (
+    drainage_density as drainage_density_vector_local_task,
+)
+from .misc.facilities.pipeline import generate_facilities_proximity_task
 from .misc.factory_csr import generate_factory_csr_data
+from .misc.factory_csr_local_compute import (
+    generate_factory_csr_data_local as generate_factory_csr_data_local_task,
+)
 from .misc.green_credit import generate_green_credit_data
+from .misc.green_credit_local_compute import (
+    generate_green_credit_data_local as generate_green_credit_data_local_task,
+)
 from .misc.lcw_conflict import generate_lcw_conflict_data
+from .misc.lcw_conflict_local_compute import (
+    generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
+)
+from .misc.livestocks.pipeline import generate_livestocks_layer_task
 from .misc.mining_data import generate_mining_data
+from .misc.mining_data_local_compute import (
+    generate_mining_data_local as generate_mining_data_local_task,
+)
 from .misc.naturaldepression import generate_natural_depression_data
+from .misc.naturaldepression_local_compute import (
+    generate_natural_depression_data_local as generate_natural_depression_data_local_task,
+)
 from .misc.ndvi_time_series import ndvi_timeseries
 from .misc.nrega import clip_nrega_district_block
+from .misc.nrega_local_compute import (
+    generate_nrega_data_local as generate_nrega_data_local_task,
+)
 from .misc.restoration_opportunity import generate_restoration_opportunity
+from .misc.restoration_opportunity_local_compute import (
+    generate_restoration_opportunity_local as generate_restoration_opportunity_local_task,
+)
+from .misc.river_local_compute import river_vector as river_vector_local_task
 from .misc.slope_percentage import generate_slope_percentage_data
+from .misc.slope_percentage_local_compute import (
+    generate_slope_percentage_data_local as generate_slope_percentage_data_local_task,
+)
 from .misc.soge_vector import generate_soge_vector
+from .misc.soge_vector_local_compute import (
+    generate_soge_vector_local as generate_soge_vector_local_task,
+)
 from .misc.stream_order import generate_stream_order
 from .mws.generate_hydrology import generate_hydrology
 from .mws.mws import mws_layer
 from .mws.mws_centroid import generate_mws_centroid_data
-from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid_local_compute import (
+    generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
+)
+from .mws.mws_connectivity import (
+    generate_mws_connectivity_data as generate_mws_connectivity_gee_task,
+)
+from .mws.mws_connectivity_local_compute import (
+    mws_connectivity_vector as generate_mws_connectivity_local_task,
+)
 from .plantation.site_suitability import site_suitability
+from .spei.spei import (
+    generate_spei_pipeline,
+    run_drought_resistance_resilience,
+    run_rainfall_resistance_resilience,
+    run_forest_fire_resistance_resilience,
+    run_high_wind_resistance_resilience,
+)
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
 from .surface_water_bodies.swb_local import (
@@ -157,104 +220,29 @@ from .tree_health.ltp_stp.generate_ltp_stp_change_local import (
 )
 from .tree_health.ltp_stp.generate_ltp_stp_local import generate_ltp_stp_local
 
+from .tree_health.local.overall_change_local import (
+    tree_health_overall_change_raster_local,
+)
+from .tree_health.local.overall_change_vector_local import (
+    tree_health_overall_change_vector_local,
+)
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
 from .utils import (
     Geoserver,
     kml_to_shp,
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from .misc.aquifer_vector_local import (
-    generate_aquifer_vector as generate_aquifer_vector_local_task,
-)
-from .misc.soge_vector import generate_soge_vector
-from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
-from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
-from utilities.auth_check_decorator import api_security_check
 from .views import (
-    check_missing_layers,
     layer_status,
     get_layers_of_workspace,
     missing_layer_for_all_workspace,
     clear_layer_cache,
+    check_missing_excel_files,
 )
-from .misc.lcw_conflict import generate_lcw_conflict_data
-from .misc.agroecological_space import generate_agroecological_data
-from .misc.factory_csr import generate_factory_csr_data
-from .misc.green_credit import generate_green_credit_data
-from .misc.mining_data import generate_mining_data
-from .misc.slope_percentage import generate_slope_percentage_data
-from .misc.naturaldepression import generate_natural_depression_data
-from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
-from .mws.mws_connectivity import (
-    generate_mws_connectivity_data as generate_mws_connectivity_gee_task,
-)
-from .mws.mws_connectivity_local_compute import (
-    mws_connectivity_vector as generate_mws_connectivity_local_task,
-)
-from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
-from .misc.antyodaya import generate_antyodaya_layer_task
-from .misc.digital_elevation_model import generate_dem_layer
-from .misc.canal_layer import canal_vector
-from .STAC_specs.stac_collection import generate_stac_collection_task
-from .mws.mws_centroid_local_compute import (
-    generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
-)
-from .misc.facilities_proximity_local_compute import (
-    generate_facilities_proximity_local as generate_facilities_proximity_local_task,
-)
-from .misc.digital_elevation_model_local import (
-    generate_febdem_raster_vector_clip as generate_febdem_raster_vector_clip_local_task,
-)
-from .misc.canal_local_compute import canal_vector as canal_vector_local_task
-from .misc.river_local_compute import river_vector as river_vector_local_task
-from .misc.drainage_density_local_compute import (
-    drainage_density as drainage_density_vector_local_task,
-)
-from .misc.restoration_opportunity_local_compute import (
-    generate_restoration_opportunity_local as generate_restoration_opportunity_local_task,
-)
-from .misc.soge_vector_local_compute import (
-    generate_soge_vector_local as generate_soge_vector_local_task,
-)
-from .misc.nrega_local_compute import (
-    generate_nrega_data_local as generate_nrega_data_local_task,
-)
-from .misc.catchment_area_local_compute import (
-    generate_catchment_area_singleflow_local as generate_catchment_area_singleflow_local_task,
-)
-from .misc.distancetonearestdrainage_local_compute import (
-    generate_distance_to_nearest_drainage_line_local as generate_distance_to_nearest_drainage_line_local_task,
-)
-from .misc.naturaldepression_local_compute import (
-    generate_natural_depression_data_local as generate_natural_depression_data_local_task,
-)
-from .misc.slope_percentage_local_compute import (
-    generate_slope_percentage_data_local as generate_slope_percentage_data_local_task,
-)
-from .misc.mining_data_local_compute import (
-    generate_mining_data_local as generate_mining_data_local_task,
-)
-from .misc.green_credit_local_compute import (
-    generate_green_credit_data_local as generate_green_credit_data_local_task,
-)
-from .misc.factory_csr_local_compute import (
-    generate_factory_csr_data_local as generate_factory_csr_data_local_task,
-)
-from .misc.agroecological_space_local_compute import (
-    generate_agroecological_data_local as generate_agroecological_data_local_task,
-)
-from .misc.lcw_conflict_local_compute import (
-    generate_lcw_conflict_data_local as generate_lcw_conflict_data_local_task,
-)
-from .misc.antyodaya_local_compute import (
-    generate_antyodaya_data_local as generate_antyodaya_data_local_task,
-)
-from .misc.livestocks_local_compute import (
-    generate_livestocks_data_local as generate_livestocks_data_local_task,
-)
+
+logger = logging.getLogger(__name__)
 
 
 @api_security_check(allowed_methods="POST")
@@ -1122,7 +1110,6 @@ def tree_health_raster(request):
             tree_health_ccd_raster,
             tree_health_ccd_raster_local,
         )
-        print("What is task? ", ccd_task)
 
         ccd_task.apply_async(
             kwargs=task_kwargs,
@@ -1134,7 +1121,6 @@ def tree_health_raster(request):
             tree_health_ch_raster,
             tree_health_ch_raster_local,
         )
-        print("What is task? ", ch_task)
         ch_task.apply_async(
             kwargs=task_kwargs,
             queue="nrm",
@@ -1144,7 +1130,6 @@ def tree_health_raster(request):
             tree_health_overall_change_raster,
             tree_health_overall_change_raster_local,
         )
-        print("What is task? ", overall_task)
         overall_task.apply_async(
             kwargs=task_kwargs,
             queue="nrm",
@@ -1605,8 +1590,17 @@ def generate_layer_in_order(request):
         start_year = int(start_year) if start_year is not None else None
         end_year = int(end_year) if end_year is not None else None
 
+        logger.info(
+            f"generate_layer_in_order requested: state={state}, district={district}, "
+            f"block={block}, map={map_order}, compute={compute}"
+        )
+
         validation_errors = validate_layer_map_request(map_order, compute=compute)
         if validation_errors:
+            logger.error(
+                f"generate_layer_in_order validation failed for map={map_order}, "
+                f"compute={compute}: {'; '.join(validation_errors)}"
+            )
             return Response(
                 {"Exception": "; ".join(validation_errors)},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1629,11 +1623,13 @@ def generate_layer_in_order(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        print("Invalid request in generate_layer_order_first api :: ", e)
+        logger.warning(f"Invalid request in generate_layer_in_order api: {e}")
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_layer_order_first api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.exception("Exception in generate_layer_in_order api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
@@ -1650,8 +1646,10 @@ def layer_status_dashboard(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in layer_staus_dashboard api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.exception("Exception in layer_status_dashboard api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
@@ -2011,20 +2009,24 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        gee_account_id = request.data.get("gee_account_id")
-        compute = _get_compute_mode(request)
-        task = _select_compute_task(
-            compute,
-            generate_facilities_proximity_task,
-            generate_facilities_proximity_local_task,
+        payload = api_request_payload(
+            (
+                request.data.dict()
+                if hasattr(request.data, "dict")
+                else dict(request.data)
+            ),
+            overwrite=True,
         )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
+        generate_facilities_proximity_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {"Success": "Successfully initiated", "request": payload},
+            status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -2035,20 +2037,87 @@ def generate_facilities_proximity(request):
 def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
+        payload = api_request_payload(
+            (
+                request.data.dict()
+                if hasattr(request.data, "dict")
+                else dict(request.data)
+            ),
+            overwrite=True,
+        )
+        generate_antyodaya_layer_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated", "request": payload},
+            status=status.HTTP_200_OK,
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_antyodaya api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_livestocks(request):
+    print("Inside generate_livestocks API.")
+    try:
+        payload = api_request_payload(
+            (
+                request.data.dict()
+                if hasattr(request.data, "dict")
+                else dict(request.data)
+            ),
+            overwrite=True,
+        )
+        generate_livestocks_layer_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated", "request": payload},
+            status=status.HTTP_200_OK,
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def et_downscale(request):
+    print("Inside generate_et_downscale API.")
+    try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        sync_to_geoserver = request.data.get("sync_to_geoserver", True)
-        overwrite = request.data.get("overwrite", False)
-        generate_antyodaya_layer_task.apply_async(
-            args=[state, district, block, sync_to_geoserver, overwrite],
+        tehsil = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        application = request.data.get("application") or "all"
+
+        generate_et_downscale.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "tehsil": tehsil,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+                "application": application,
+            },
             queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_antyodaya api :: ", e)
+        print("Exception in generate_et_downscale api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2384,10 +2453,7 @@ def generate_fabdem_layer(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(
-            f"Exception in generate DEM raster and vector layer for {district} - {block}:: ",
-            e,
-        )
+        print(f"Exception in generate DEM raster and vector layer:", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2448,7 +2514,9 @@ def drought_resilience_resistance(request):
             args=[aez, start_year, end_year, gee_account_id], queue="nrm"
         )
         return Response(
-            {"Success": "Successfully drought_resilience_resistance task"},
+            {
+                "Success": "Successfully drought_resilience_resistance generate_spei task"
+            },
             status=status.HTTP_200_OK,
         )
     except Exception as e:
@@ -2470,7 +2538,9 @@ def rainfall_resilience_resistance(request):
             args=[aez, start_year, end_year, gee_account_id], queue="nrm"
         )
         return Response(
-            {"Success": "Successfully rainfall_resilience_resistance task"},
+            {
+                "Success": "Successfully rainfall_resilience_resistance generate_spei task"
+            },
             status=status.HTTP_200_OK,
         )
     except Exception as e:
@@ -2547,7 +2617,7 @@ def generate_fabdem_raster_vector(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(f"Exception in generate DEM raster layer for {district} - {block}:: ", e)
+        print(f"Exception in generate DEM raster layer:", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2577,9 +2647,7 @@ def generate_canal_vector(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print(
-            f"Exception in generate canal vector layer for {district} - {block}:: ", e
-        )
+        print(f"Exception in generate canal vector layer: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2645,61 +2713,101 @@ def generate_drainage_density_data(request):
 
 @api_view(["POST"])
 @schema(None)
-def generate_antyodaya(request):
-    print("Inside generate_antyodaya API.")
+def generate_tree_in_grassland(request):
+    print("Inside generate_tree_in_grassland API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        compute = _get_compute_mode(request)
-        task = _select_compute_task(
-            compute,
-            None,
-            generate_antyodaya_data_local_task,
+        generate_tree_in_grassland_layer.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
-        if task is None:
-            return Response(
-                {"Error": "GEE execution not supported for this module."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
-            {"Success": f"Successfully initiated {compute} task"},
+            {"Success": "Tree in Grassland task initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_antyodaya api :: ", e)
+        print("Exception in generate_tree_in_grassland api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
-def generate_livestocks(request):
-    print("Inside generate_livestocks API.")
+def forest_fringe_degradation(request):
+    print("Inside forest_fringe_degradation API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        compute = _get_compute_mode(request)
-        task = _select_compute_task(
-            compute,
-            None,
-            generate_livestocks_data_local_task,
+        generate_forest_fringe_degradation.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
-        if task is None:
-            return Response(
-                {"Error": "GEE execution not supported for this module."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        task.apply_async(args=[state, district, block, gee_account_id], queue="nrm")
         return Response(
-            {"Success": f"Successfully initiated {compute} task"},
+            {"Success": "Forest Fringe task initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_livestocks api :: ", e)
+        print("Exception in generate_forest_fringe api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fire(request):
+    print("Inside generate_forest_fire API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fire_layer_updated.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fire task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fire api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_excel(request):
+    try:
+        result = check_missing_excel_files()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in missing_excel api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

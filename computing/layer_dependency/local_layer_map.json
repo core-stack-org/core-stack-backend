@@ -1,11 +1,7 @@
 {
-    "map_2_1": [
+    "dynamic_layers": [
         {
-            "name": "generate_terrain_raster"
-        },
-        {
-            "name": "generate_terrain_descriptor",
-            "depends_on": ["generate_terrain_raster"]
+            "name": "generate_nrega_layer"
         },
         {
             "name": "lulc_v3",
@@ -17,28 +13,6 @@
             "use_global_args": true
         },
         {
-            "name": "terrain_lulc_slope_cluster",
-            "depends_on": ["generate_terrain_descriptor", "lulc_v3"],
-            "use_global_args": true
-        },
-        {
-            "name": "terrain_lulc_plain_cluster",
-            "depends_on": ["generate_terrain_descriptor", "lulc_v3"],
-            "use_global_args": true
-        }
-    ],
-    "map_2_2": [
-        {
-            "name": "generate_ci_layer",
-            "use_global_args": true
-        },
-        {
-            "name": "generate_swb",
-            "use_global_args": true
-        }
-    ],
-    "map_3": [
-        {
             "name": "change_detection",
             "use_global_args": true
         },
@@ -46,20 +20,101 @@
             "name": "change_detection_vector",
             "depends_on": ["change_detection"],
             "use_global_args": true
+        },
+        {
+            "name": "generate_terrain_raster"
+        },
+        {
+            "name": "generate_terrain_descriptor",
+            "depends_on": ["generate_terrain_raster"]
+        },
+        {
+            "name": "terrain_lulc_plain_cluster",
+            "depends_on": ["generate_terrain_raster", "lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "terrain_lulc_slope_cluster",
+            "depends_on": ["generate_terrain_raster", "lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "generate_ci_layer",
+            "use_global_args": true
+        },
+        {
+            "name": "generate_swb",
+            "use_global_args": true
+        },
+        {
+            "name": "tree_health_ch_raster",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_ch_vector",
+                    "use_global_args": true
+                }
+            ]
+        },
+        {
+            "name": "tree_health_ccd_raster",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_ccd_vector",
+                    "use_global_args": true
+                }
+            ]
+        },
+        {
+            "name": "tree_health_overall_change_raster",
+            "depends_on": ["change_detection"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_overall_change_vector"
+                }
+            ]
+        },
+        {
+            "name": "soil_health"
         }
     ],
-    "map_static": [
+    "static_layers": [
+        {
+            "name": "aquifer_vector"
+        },
+        {
+            "name": "generate_livestocks"
+        },
+        {
+            "name": "generate_antyodaya"
+        },
+        {
+            "name": "generate_density_vector"
+        },
+        {
+            "name": "generate_river_data"
+        },
+        {
+            "name": "generate_canal_vector"
+        },
+        {
+            "name": "generate_dem_raster_vector"
+        },
+        {
+            "name": "generate_facilities_proximity"
+        },
         {
             "name": "generate_drainage_layer"
         },
         {
-            "name": "generate_slope_percentage"
+            "name": "restoration_opportunity"
         },
         {
-            "name": "generate_catchment_area_singleflow"
-        },
-        {
-            "name": "generate_natural_depression"
+            "name": "soge_vector"
         },
         {
             "name": "generate_lcw"
@@ -77,25 +132,25 @@
             "name": "generate_mining"
         },
         {
-            "name": "soge_vector"
+            "name": "generate_natural_depression"
         },
         {
-            "name": "aquifer_vector"
+            "name": "generate_distance_nearest_DL"
         },
         {
-            "name": "restoration_opportunity"
+            "name": "generate_catchment_area_singleflow"
         },
         {
-            "name": "generate_mws_connectivity"
+            "name": "generate_slope_percentage"
+        },
+        {
+            "name": "generate_mws_connectivity_data"
         },
         {
             "name": "generate_mws_centroid"
         },
         {
-            "name": "generate_facilities_proximity"
-        },
-        {
-            "name": "generate_nrega_layer"
+            "name": "soil_type"
         }
     ]
 }

@@ -41,6 +41,10 @@ dependencies:
   - pyyaml=5.4.1
   - python-dotenv
   - psycopg2
+  - pango
+  - cairo
+  - gdk-pixbuf
+  - libffi
 
   - pip:
       - django==5.2.9
@@ -48,7 +52,7 @@ dependencies:
       - django-timezone-field==7.2.1
       - djangorestframework-simplejwt==5.5.0
       - djangorestframework-api-key==3.1.0
-      - earthengine-api==0.1.389
+      - earthengine-api==1.5.9
       - geoserver-rest==2.5.3
       - geojson==3.1.0
       - google-api-core==2.17.0
@@ -83,3 +87,4 @@ dependencies:
       - orjson
       - ijson
       - polars
+      - weasyprint

@@ -57,18 +57,21 @@ from .gen_mws_report import (
     get_change_detection_data,
     get_land_conflict_industrial_data,
     get_cropping_intensity,
-    get_double_cropping_area,
+    get_cropping_year_range,
     get_drought_data,
     get_osm_data,
     get_soge_data,
+    get_hydro_tabular_data,
+    get_cropping_water_hydro_data,
+    get_terrain_and_lulc_data,
     get_surface_Water_bodies_data,
     get_terrain_data,
     get_village_data,
     get_water_balance_data,
+    get_fortnightly_water_balance_data,
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
-    get_intersecting_village_ids
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
@@ -169,7 +172,7 @@ def generate_dpr(request):
     try:
         plan_id = request.data.get("plan_id")
         email_id = request.data.get("email_id")
-        # language = request.data.get("language")
+        language = request.data.get("language")
         regenerate = request.data.get("regenerate", False)
 
         logger.info(
@@ -193,7 +196,9 @@ def generate_dpr(request):
                 {"error": "Plan not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        generate_dpr_task.apply_async(args=[plan_id, email_id, regenerate], queue="dpr")
+        generate_dpr_task.apply_async(
+            args=[plan_id, email_id, language, regenerate], queue="dpr"
+        )
 
         return Response(
             {
@@ -267,20 +272,20 @@ def generate_mws_report(request):
         ) = get_terrain_data(state, district, block, uid)
 
         # ? Degradation Description generation
-        land_degrad, tree_degrad, urbanization, restore_desc = (
+        land_degrad, tree_degrad, urbanization, restore_desc, crop_intensity_sankey, tree_reduction_sankey, urbanization_sankey = (
             get_change_detection_data(state, district, block, uid)
         )
 
-        # ? Double Cropping Description Generation
-        double_crop_des, year_range_text = get_double_cropping_area(
-            state, district, block, uid
-        )
+        # ? Cropping Year Range
+        year_range_text = get_cropping_year_range(state, district, block, uid)
 
         # ? Surface Waterbody Description
         (
+            swb_intro_desc,
             swb_desc,
             trend_desc,
             final_desc,
+            swb_season_avg_desc,
             kharif_data,
             rabi_data,
             zaid_data,
@@ -289,6 +294,7 @@ def generate_mws_report(request):
 
         # ? Water Balance Description
         (
+            water_balance_trend,
             wb_desc,
             good_rainfall,
             bad_rainfall,
@@ -299,8 +305,25 @@ def generate_mws_report(request):
             wb_years,
         ) = get_water_balance_data(state, district, block, uid)
 
+        # ? Fortnightly Water Balance Description
+        (
+            fortnight_labels,
+            fortnight_precip_data,
+            fortnight_et_data,
+            fortnight_runoff_data,
+        ) = get_fortnightly_water_balance_data(state, district, block, uid)
+
         # ? SOGE Description
         soge_desc = get_soge_data(state, district, block, uid)
+
+        # ? Hydro Tabular Data
+        min_elev, max_elev, mean_elev, dem_relief, aquifer_class, soge_class, drainage_density, total_length, area, perimeter, compactness = get_hydro_tabular_data(state, district, block, uid)
+
+        # ? Cropping, Water, and Hydrology Data
+        cwh_data = get_cropping_water_hydro_data(state, district, block, uid)
+
+        # ? Tree Map Terrain LULC Data
+        terrain_lulc_data = get_terrain_and_lulc_data(state, district, block, uid)
 
         # ? Drought Description
         drought_desc, drought_weeks, mod_drought, sev_drought, drysp_all, dg_years = (
@@ -320,6 +343,7 @@ def generate_mws_report(request):
             ofl_works,
             ca_works,
             ofw_works,
+            villages_intersect_pct,
         ) = get_village_data(state, district, block, uid)
 
         # ? Cropping Intensity Description
@@ -334,14 +358,13 @@ def generate_mws_report(request):
 
         green_credits = get_green_credit_data(state, district, block, uid)
 
-        village_ids = get_intersecting_village_ids(state, district, block, uid)
 
         context = {
-            "state" : state,
+            "state": state,
             "district": district,
             "block": block,
             "mws_id": uid,
-            "base_url" : BASE_API_URL,
+            "base_url": BASE_API_URL,
             "block_osm": parameter_block,
             "mws_osm": parameter_mws,
             "terrain_mws": terrain_mws,
@@ -351,11 +374,16 @@ def generate_mws_report(request):
             "tree_degrad": tree_degrad,
             "urbanization": urbanization,
             "restore_desc": restore_desc,
-            "double_crop_des": double_crop_des,
+            "crop_intensity_sankey": json.dumps(crop_intensity_sankey),
+            "tree_reduction_sankey": json.dumps(tree_reduction_sankey),
+            "urbanization_sankey": json.dumps(urbanization_sankey),
             "year_range_text": year_range_text,
+            "swb_intro_desc": swb_intro_desc,
             "swb_desc": swb_desc,
             "trend_desc": trend_desc,
             "swb_season_desc": final_desc,
+            "swb_season_avg_desc": swb_season_avg_desc,
+            "water_balance_trend": water_balance_trend,
             "wb_desc": wb_desc,
             "good_rainfall": good_rainfall,
             "bad_rainfall": bad_rainfall,
@@ -363,6 +391,19 @@ def generate_mws_report(request):
             "inten_desc1": inten_desc1,
             "inten_desc2": inten_desc2,
             "soge_desc": soge_desc,
+            "min_elev": min_elev,
+            "max_elev": max_elev,
+            "mean_elev": mean_elev,
+            "dem_relief": dem_relief,
+            "aquifer_class": aquifer_class,
+            "soge_class": soge_class,
+            "drainage_density": drainage_density,
+            "drainage_length": total_length,
+            "area": area,
+            "perimeter": perimeter,
+            "compactness": compactness,
+            **cwh_data,
+            **terrain_lulc_data,
             "mws_areas": json.dumps(mws_areas),
             "block_areas": json.dumps(block_areas),
             "lulc_mws_slope": json.dumps(lulc_mws_slope),
@@ -376,6 +417,10 @@ def generate_mws_report(request):
             "runoff_data": json.dumps(runoff_data),
             "et_data": json.dumps(et_data),
             "dg_data": json.dumps(dg_data),
+            "fortnight_labels": json.dumps(fortnight_labels),
+            "fortnight_precip_data": json.dumps(fortnight_precip_data),
+            "fortnight_et_data": json.dumps(fortnight_et_data),
+            "fortnight_runoff_data": json.dumps(fortnight_runoff_data),
             "swc_works": json.dumps(swc_works),
             "lr_works": json.dumps(lr_works),
             "plantation_work": json.dumps(plantation_work),
@@ -387,6 +432,7 @@ def generate_mws_report(request):
             "mod_drought": json.dumps(mod_drought.astype(int).tolist()),
             "sev_drought": json.dumps(sev_drought.astype(int).tolist()),
             "villages_name": json.dumps(villages_name),
+            "villages_intersect_pct": json.dumps(villages_intersect_pct),
             "villages_sc": json.dumps(villages_sc),
             "villages_st": json.dumps(villages_st),
             "villages_pop": json.dumps(villages_pop),
@@ -403,7 +449,6 @@ def generate_mws_report(request):
             "factory_desc": factory_desc,
             "mining_desc": mining_desc,
             "green_credit_desc": green_credits,
-            "village_ids" : json.dumps(village_ids)
         }
 
         # print("Api Processing End 1", datetime.now())
@@ -603,33 +648,37 @@ def generate_village_report(request):
     """
     Generate comprehensive village report with all sections.
     """
-    state = request.GET.get('state')
-    district = request.GET.get('district')
-    block = request.GET.get('block')
-    village_id = request.GET.get('villageId')
+    state = request.GET.get("state")
+    district = request.GET.get("district")
+    block = request.GET.get("block")
+    village_id = request.GET.get("villageId")
 
-    if village_id == '0':
-        return render(request, 'village-report-unavailable.html', {
-            'state': state,
-            'district': district,
-            'block': block,
-        })
-    
+    if village_id == "0":
+        return render(
+            request,
+            "village-report-unavailable.html",
+            {
+                "state": state,
+                "district": district,
+                "block": block,
+            },
+        )
+
     # Get village polygon and info from GeoServer
     village_data = get_village_polygon_and_info(state, district, block, village_id)
- 
+
     # Get Development Scores
     development_score = get_development_data(state, district, block, village_id)
     block_development_score = get_block_development_data(state, district, block)
- 
+
     # Calculate demographic data with percentages
-    demographic_data = calculate_demographics(village_data['properties'])
+    demographic_data = calculate_demographics(village_data["properties"])
 
     # Calculate Basic Infra
     basic_infra_data = get_basic_infrastructure(state, district, block, village_id)
     # Convert scores to performance categories
     basic_infra_performance = [
-        'Low' if score <= 0.33 else 'High' if score > 0.66 else 'Medium'
+        "Low" if score <= 0.33 else "High" if score > 0.66 else "Medium"
         for score in basic_infra_data
     ]
 
@@ -638,46 +687,44 @@ def generate_village_report(request):
     health_wash_performance = [
         # Maternal & Child Health (High / Low only)
         "High" if health_wash_data[0] > 0.66 else "Low",
-
         # Water & Sanitation (High / Medium / Low)
         (
             "Low"
             if health_wash_data[1] <= 0.33
-            else "High"
-            if health_wash_data[1] > 0.66
-            else "Medium"
-        )
+            else "High" if health_wash_data[1] > 0.66 else "Medium"
+        ),
     ]
 
-    #Calculate Education Institutions
+    # Calculate Education Institutions
     education_data = get_education_institutions(state, district, block, village_id)
 
     # Calculate Financial Inclusion
     finance_data = get_financial_inclusion(state, district, block, village_id)
 
-    #Calculate Welfare
+    # Calculate Welfare
     welfare_data = get_welfare_inclusion(state, district, block, village_id)
 
-    #Calculate Community Institutions
+    # Calculate Community Institutions
     community_data = get_community_institutes(state, district, block, village_id)
 
-    #Livelihood Diversification
+    # Livelihood Diversification
     livelihood_data = get_livelihood_diversification(state, district, block, village_id)
 
-    #Livestock Management
+    # Livestock Management
     livestock_data = get_livestock_management(state, district, block, village_id)
 
-    #Irrigation data
+    # Irrigation data
     irrigation_data = get_irrigation_Infra(state, district, block, village_id)
 
-    #Agriculture Support
+    # Agriculture Support
     agri_support_data = get_agri_support_service(state, district, block, village_id)
 
-    #Climate Resiliance
-    climate_resiliance_data = get_ecological_climate_resiliance(state, district, block, village_id)
+    # Climate Resiliance
+    climate_resiliance_data = get_ecological_climate_resiliance(
+        state, district, block, village_id
+    )
 
-
-    #Map Data
+    # Map Data
     basic_infra_map = get_all_villages_basic_infrastructure(state, district, block)
     health_wash_map = get_all_villages_health_and_wash(state, district, block)
     education_map = get_all_villages_education_institutions(state, district, block)
@@ -687,11 +734,13 @@ def generate_village_report(request):
     livestock_map = get_all_villages_livestock_management(state, district, block)
     irrigation_infra_map = get_all_villages_irrigation_infra(state, district, block)
     agri_support_map = get_all_villages_agri_support_service(state, district, block)
-    climate_resiliance_map = get_all_villages_ecological_climate_resiliance(state, district, block)
+    climate_resiliance_map = get_all_villages_ecological_climate_resiliance(
+        state, district, block
+    )
 
     mws_ids = get_mwses_ids(state, district, block, village_id)
     mws_pattern_intensity = get_pattern_intensity(state, district, block)
- 
+
     # Build context for template
     context = {
         # Location info
@@ -699,74 +748,60 @@ def generate_village_report(request):
         "district": district,
         "block": block,
         "village_id": village_id,
-        "base_url" : BASE_API_URL,
-        "village_name": village_data['village_name'],
-        "gram_panchayat_name": village_data['gram_panchayat_name'],
-        "area_hectares": village_data['area_hectares'],
-        "village_polygon": json.dumps(village_data['village_polygon']),
-        
+        "base_url": BASE_API_URL,
+        "village_name": village_data["village_name"],
+        "gram_panchayat_name": village_data["gram_panchayat_name"],
+        "area_hectares": village_data["area_hectares"],
+        "village_polygon": json.dumps(village_data["village_polygon"]),
         # RADAR CHART DATA
         "village_scores": json.dumps(development_score),
         "block_average_scores": json.dumps(block_development_score),
-        
         # DEMOGRAPHIC DATA
         "demographic_data": demographic_data,
-
         # BASIC INFRASTRUCTURE DATA
-        "basic_infra_data" : json.dumps(basic_infra_data),
+        "basic_infra_data": json.dumps(basic_infra_data),
         "basic_infra_performance": basic_infra_performance,
-
         # HEALTH AND WASH DATA
-        "health_wash_data" : json.dumps(health_wash_data),
-        "health_wash_performance" : health_wash_performance,
-
-        #Education Data
-        "education_data" : json.dumps(education_data),
-
-        #Finance Data
-        "finance_data" : json.dumps(finance_data),
-
-        #Welfare Inclusion
-        "welfare_data" : json.dumps(welfare_data),
-
-        #Community Institutions
-        "community_data" : json.dumps(community_data),
-
-        #Livelihood Diversification
-        "livelihood_data" : json.dumps(livelihood_data),
-
-        #Livestock Management
-        "livestock_data" : json.dumps(livestock_data),
-
-        #Irrigation Data
-        "irrigation_data" : json.dumps(irrigation_data),
-
-        #Agri Support Data
-        "agri_support_data" : json.dumps(agri_support_data),
-
-        #Climate Data
-        "climate_resiliance_data" : json.dumps(climate_resiliance_data),
-
-        "village_polygon": json.dumps(village_data['village_polygon']),
-
-        "basic_infra_map" : json.dumps(basic_infra_map),
-        "health_wash_map" : json.dumps(health_wash_map),
-        "education_map" : json.dumps(education_map),
-        "financial_map" : json.dumps(financial_map),
-        "welfare_map" : json.dumps(welfare_map),
-        "community_map" : json.dumps(community_map),
-        "livestock_map" : json.dumps(livestock_map),
-        "irrigation_infra_map" : json.dumps(irrigation_infra_map),
-        "agri_support_map" : json.dumps(agri_support_map),
-        "climate_resiliance_map" : json.dumps(climate_resiliance_map),
-
-        "mws_ids" : json.dumps(mws_ids),
-        "pattern_intensity": json.dumps(mws_pattern_intensity['intensity']),
-        "mws_active_patterns": json.dumps(mws_pattern_intensity['mws_active_patterns']),
-        "pattern_display_mapping": json.dumps(mws_pattern_intensity['pattern_display_mapping']),
+        "health_wash_data": json.dumps(health_wash_data),
+        "health_wash_performance": health_wash_performance,
+        # Education Data
+        "education_data": json.dumps(education_data),
+        # Finance Data
+        "finance_data": json.dumps(finance_data),
+        # Welfare Inclusion
+        "welfare_data": json.dumps(welfare_data),
+        # Community Institutions
+        "community_data": json.dumps(community_data),
+        # Livelihood Diversification
+        "livelihood_data": json.dumps(livelihood_data),
+        # Livestock Management
+        "livestock_data": json.dumps(livestock_data),
+        # Irrigation Data
+        "irrigation_data": json.dumps(irrigation_data),
+        # Agri Support Data
+        "agri_support_data": json.dumps(agri_support_data),
+        # Climate Data
+        "climate_resiliance_data": json.dumps(climate_resiliance_data),
+        "village_polygon": json.dumps(village_data["village_polygon"]),
+        "basic_infra_map": json.dumps(basic_infra_map),
+        "health_wash_map": json.dumps(health_wash_map),
+        "education_map": json.dumps(education_map),
+        "financial_map": json.dumps(financial_map),
+        "welfare_map": json.dumps(welfare_map),
+        "community_map": json.dumps(community_map),
+        "livestock_map": json.dumps(livestock_map),
+        "irrigation_infra_map": json.dumps(irrigation_infra_map),
+        "agri_support_map": json.dumps(agri_support_map),
+        "climate_resiliance_map": json.dumps(climate_resiliance_map),
+        "mws_ids": json.dumps(mws_ids),
+        "pattern_intensity": json.dumps(mws_pattern_intensity["intensity"]),
+        "mws_active_patterns": json.dumps(mws_pattern_intensity["mws_active_patterns"]),
+        "pattern_display_mapping": json.dumps(
+            mws_pattern_intensity["pattern_display_mapping"]
+        ),
     }
-    
-    return render(request, 'village-report.html', context)
+
+    return render(request, "village-report.html", context)
 
 
 # ---------------------------------------------------------------------------

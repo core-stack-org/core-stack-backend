@@ -366,7 +366,16 @@ class ODK_livelihood(models.Model):
     )
     moderation_reason = models.TextField(null=True, blank=True)
     moderation_bookmark = models.BooleanField(default=False, blank=True, null=True)
-    livelihood_demand_status = models.CharField(
+    livestock_demand_status = models.CharField(
+        max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING"
+    )
+    plantation_demand_status = models.CharField(
+        max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING"
+    )
+    fisheries_demand_status = models.CharField(
+        max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING"
+    )
+    kitchen_garden_demand_status = models.CharField(
         max_length=255, choices=DEMAND_STATUS_CHOICES, default="PENDING"
     )
     data_before_moderation = models.JSONField(default=dict, null=True, blank=True)
