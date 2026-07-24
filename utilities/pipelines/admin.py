@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
@@ -84,10 +85,113 @@ def is_internal_admin_column(column: Any) -> bool:
     return str(column) in INTERNAL_ADMIN_COLUMNS
 
 
+def normalize_scope_name(value: Any) -> str | None:
+    """Normalize API-safe separators without changing an admin name."""
+
+    if value is None:
+        return None
+    text = re.sub(r"_+", " ", str(value).strip())
+    return " ".join(text.split()) or None
+
+
 def normalize_key(value: Any) -> str:
     """Normalize an admin name for consistent lowercase lookup."""
 
-    return " ".join(str(value or "").strip().lower().split())
+    return (normalize_scope_name(value) or "").lower()
+
+
+def admin_name_match_keys(value: Any) -> frozenset[str]:
+    """Return conservative comparison keys for common admin-name spellings."""
+
+    text = normalize_scope_name(value) or ""
+    variants = [text]
+    variants.extend(re.findall(r"\(([^()]*)\)", text))
+    variants.append(re.sub(r"\([^()]*\)", " ", text))
+    keys: set[str] = set()
+    for variant in variants:
+        words = re.sub(r"[^0-9a-z]+", " ", variant.lower()).split()
+        if words:
+            keys.add(" ".join(words))
+            keys.add("".join(words))
+    return frozenset(keys)
+
+
+def _unique_admin_name_match(
+    candidates: Sequence[str], requested: str, label: str
+) -> str:
+    """Resolve one name without fuzzy spelling or word-order matching."""
+
+    exact = [
+        candidate
+        for candidate in candidates
+        if normalize_key(candidate) == normalize_key(requested)
+    ]
+    if len(exact) == 1:
+        return exact[0]
+    requested_keys = admin_name_match_keys(requested)
+    matches = [
+        candidate
+        for candidate in candidates
+        if requested_keys & admin_name_match_keys(candidate)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"Could not uniquely resolve {label} {requested!r}."
+        )
+    return matches[0]
+
+
+def resolve_registration_scope(scope: "AdminScope") -> "AdminScope":
+    """Resolve a tehsil scope to the exact names stored in Django."""
+
+    if not (scope.state_name and scope.district_name and scope.tehsil_name):
+        raise ValueError(
+            "Layer registration requires state, district, and tehsil names."
+        )
+
+    from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
+
+    def unique_match(queryset, field: str, requested: str, label: str):
+        exact = list(queryset.filter(**{f"{field}__iexact": requested})[:2])
+        if len(exact) == 1:
+            return exact[0]
+        matches = [
+            item
+            for item in queryset
+            if admin_name_match_keys(getattr(item, field))
+            & admin_name_match_keys(requested)
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"Could not uniquely resolve {label} {requested!r} for layer registration."
+            )
+        return matches[0]
+
+    state = unique_match(
+        StateSOI.objects.all(),
+        "state_name",
+        scope.state_name,
+        "state",
+    )
+    district = unique_match(
+        DistrictSOI.objects.filter(state=state),
+        "district_name",
+        scope.district_name,
+        "district",
+    )
+    tehsil = unique_match(
+        TehsilSOI.objects.filter(district=district),
+        "tehsil_name",
+        scope.tehsil_name,
+        "tehsil",
+    )
+    return AdminScope(
+        level=scope.level,
+        state_name=state.state_name,
+        district_name=district.district_name,
+        tehsil_name=tehsil.tehsil_name,
+        village_ids=scope.village_ids,
+    )
 
 
 def format_admin_name(value: Any) -> str | None:
@@ -206,9 +310,13 @@ class AdminScope:
 
         return cls(
             level=str(data.get("level") or data.get("scope_level") or "tehsil").lower(),
-            state_name=data.get("state_name") or data.get("state"),
-            district_name=data.get("district_name") or data.get("district"),
-            tehsil_name=data.get("tehsil_name") or data.get("block_name") or data.get("block"),
+            state_name=normalize_scope_name(data.get("state_name") or data.get("state")),
+            district_name=normalize_scope_name(
+                data.get("district_name") or data.get("district")
+            ),
+            tehsil_name=normalize_scope_name(
+                data.get("tehsil_name") or data.get("block_name") or data.get("block")
+            ),
             village_ids=_as_tuple(data.get("village_ids") or data.get("village_id")),
         )
 
@@ -287,6 +395,63 @@ class CSAdminSource:
 
         return ensure_indexes(self.path, self.required_indexes)
 
+    def _resolve_scope_aliases(self, scope: AdminScope) -> AdminScope:
+        """Resolve conservative punctuation/spacing aliases in the GPKG."""
+
+        level = scope.level.lower()
+        if level == "village":
+            return scope
+        with sqlite3.connect(self.path) as connection:
+            table = quote_identifier(self.table_name)
+            state_names = [
+                row[0]
+                for row in connection.execute(
+                    f"SELECT DISTINCT {quote_identifier('state_name')} "
+                    f"FROM {table}"
+                )
+                if row[0]
+            ]
+            state = _unique_admin_name_match(
+                state_names, scope.state_name or "", "state"
+            )
+            district = scope.district_name
+            tehsil = scope.tehsil_name
+            if level in {"district", "tehsil", "block"}:
+                district_names = [
+                    row[0]
+                    for row in connection.execute(
+                        f"SELECT DISTINCT {quote_identifier('district_name')} "
+                        f"FROM {table} WHERE {lower_key_expression('state_name')} = ?",
+                        (normalize_key(state),),
+                    )
+                    if row[0]
+                ]
+                district = _unique_admin_name_match(
+                    district_names, district or "", "district"
+                )
+            if level in {"tehsil", "block"}:
+                tehsil_names = [
+                    row[0]
+                    for row in connection.execute(
+                        f"SELECT DISTINCT {quote_identifier('TEHSIL')} "
+                        f"FROM {table} "
+                        f"WHERE {lower_key_expression('state_name')} = ? "
+                        f"AND {lower_key_expression('district_name')} = ?",
+                        (normalize_key(state), normalize_key(district)),
+                    )
+                    if row[0]
+                ]
+                tehsil = _unique_admin_name_match(
+                    tehsil_names, tehsil or "", "tehsil"
+                )
+        return AdminScope(
+            level=scope.level,
+            state_name=state,
+            district_name=district,
+            tehsil_name=tehsil,
+            village_ids=scope.village_ids,
+        )
+
     def _where_for_scope(self, scope: AdminScope) -> tuple[str, tuple[Any, ...]]:
         level = scope.level.lower()
         clauses: list[str] = []
@@ -360,5 +525,34 @@ class CSAdminSource:
                 params=params,
             )
         if rows.empty:
-            raise ValueError(f"No admin rows found for scope: {scope}")
+            resolved_scope = self._resolve_scope_aliases(scope)
+            resolved_where, resolved_params = self._where_for_scope(
+                resolved_scope
+            )
+            if include_geometry:
+                rows = read_features(
+                    self.path,
+                    self.table_name,
+                    columns=read_columns,
+                    where=resolved_where,
+                    params=resolved_params,
+                    geometry_column_name=ADMIN_GEOMETRY_COLUMN,
+                )
+            else:
+                rows = read_table(
+                    self.path,
+                    self.table_name,
+                    columns=read_columns,
+                    where=resolved_where,
+                    params=resolved_params,
+                )
+            if rows.empty:
+                raise ValueError(f"No admin rows found for scope: {scope}")
+            return AdminSelection(
+                resolved_scope,
+                rows,
+                created_indexes,
+                resolved_where,
+                resolved_params,
+            )
         return AdminSelection(scope, rows, created_indexes, where, params)

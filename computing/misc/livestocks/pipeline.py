@@ -18,6 +18,7 @@ from utilities.pipelines.admin import (
     ADMIN_COLUMN_DESCRIPTIONS,
     admin_output_frame,
     admin_presentation_frame,
+    resolve_registration_scope,
 )
 from utilities.pipelines.outputs import (
     OutputBundle,
@@ -499,13 +500,10 @@ def run_livestocks_pipeline(
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
     if request.publish.register_layers and geoserver and geoserver.get("ok"):
-        state = request.scope.state_name
-        district = request.scope.district_name
-        block = request.scope.tehsil_name
-        if not (state and district and block):
-            raise ValueError(
-                "Layer registration requires state, district, and tehsil names."
-            )
+        registration_scope = resolve_registration_scope(request.scope)
+        state = registration_scope.state_name
+        district = registration_scope.district_name
+        block = registration_scope.tehsil_name
         dataset_name = output_config.get("dataset_name", "Livestock Census")
         layer_id = save_layer_info_to_db(
             state=state,
