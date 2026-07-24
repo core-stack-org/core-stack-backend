@@ -264,6 +264,16 @@ urlpatterns = [
         name="rainfall_resilience_resistance",
     ),
     path(
+        "forest_fire_resilience_resistance/",
+        api.forest_fire_resilience_resistance,
+        name="forest_fire_resilience_resistance",
+    ),
+    path(
+        "high_wind_resilience_resistance/",
+        api.high_wind_resilience_resistance,
+        name="high_wind_resilience_resistance",
+    ),
+    path(
         "generate_dem_raster_vector/",
         api.generate_fabdem_raster_vector,
         name="generate-dem-raster-vector",
@@ -292,6 +302,21 @@ urlpatterns = [
         "generate_livestocks/",
         api.generate_livestocks,
         name="generate_livestocks",
+    ),
+    path(
+        "generate_soil_health/",
+        api.generate_soil_health,
+        name="generate_soil_health",
+    ),
+    path(
+        "generate_ltp_stp/",
+        api.generate_ltp_stp,
+        name="generate_ltp_stp",
+    ),
+    path(
+        "generate_ltp_stp_change/",
+        api.generate_ltp_stp_change,
+        name="generate_ltp_stp_change",
     ),
     path("missing_excel/", api.missing_excel, name="missing_excel"),
     path(

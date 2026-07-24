@@ -1,21 +1,20 @@
 import ee
 
+from utilities.constants import AEZ
 from utilities.gee_utils import (
-    ee_initialize,
     is_gee_asset_exists,
     export_raster_asset_to_gee,
+    ee_initialize,
 )
 
 
-def generate_drought_resistance(
-    aez, start_year=2004, end_year=None, gee_account_id=None
-):
+def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=None):
     """
-    * Forest Sensitivity Analysis Pipeline — Script 2
-    * Drought Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
+    * Forest Sensitivity Analysis Pipeline — Script 5b
+    * High Windspeed Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
     *
     * For each forest pixel, computes mean resistance and resilience
-    * across all drought years (SPEI-12 < threshold).
+    * across all high-windspeed years (WSmax > threshold).
     *
     * Harmonization: Transforms Landsat 8/9 (OLI) to Landsat 5/7 (ETM+)
     * equivalent before computing kNDVI to eliminate sensor-shift bias.
@@ -28,13 +27,16 @@ def generate_drought_resistance(
     *
     * Requires:
     * - Forest mask asset from Script 1
-    * - SPEI-12 assets from spei-drought-analysis-pipeline
+    * - Windspeed index asset from Script 5a
     """
-
     ee_initialize(gee_account_id)
 
     TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2003)}_{str(end_year)}"
-    OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
+    WIND_INDEX_ASSET = (
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/wind_index_AEZ_{aez}"
+    )
+
+    OUTPUT_DESC = f"wind_metrics_harmonized_kNDVI_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
     )
@@ -42,12 +44,9 @@ def generate_drought_resistance(
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
 
-    DROUGHT_THRESHOLD = -1.0  # SPEI-12 below this = drought year
+    WIND_THRESHOLD = 15
 
-    # Fixed baseline window. This is independent of analysis START_YEAR/END_YEAR.
-    # Please don't EVER change this once results are published, or old outputs will change when the pipeline timeline is extended.
-    # This helps in fixing the Yn_bar (the average of the non-drought year NDVI) to a constant value.
-    BASELINE_START_YEAR = 2004  # SPEI has no data before 2004
+    BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
 
     # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
@@ -59,29 +58,25 @@ def generate_drought_resistance(
     # Loading the assets :=
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
-
     startYear = treeMeta.select("start_year")
     endYear = treeMeta.select("end_year")
 
-    # Load SPEI-12 collection from single multiband asset
-    SPEI12_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/SPEI12"
-    spei12_raw = ee.Image(SPEI12_ASSET)
-    spei12_bandnames = []
+    # Load windspeed index from single multiband asset (Script 5a output)
+    windIndex_raw = ee.Image(WIND_INDEX_ASSET)
 
-    for yn in range(2004, end_year + 1):
-        spei12_bandnames.append("y" + str(yn))
-    spei12_named = spei12_raw.rename(spei12_bandnames)
+    # I need WSmax bands covering BOTH my analysis window and my baseline
+    # window — whichever stretches further. Right now they're the same range
+    # (2004-2022), so this doesn't change anything today, but it protects me
+    # once the two windows stop lining up in the future.
+    wsMinYear = min(start_year, BASELINE_START_YEAR)
+    wsMaxYear = max(end_year, BASELINE_END_YEAR)
 
-    # Building the per-year SPEI collection here.
-    speiMinYear = min(start_year, BASELINE_START_YEAR)
-    speiMaxYear = max(end_year, BASELINE_END_YEAR)
-
-    speiImages = []
-    for y in range(speiMinYear, speiMaxYear + 1):
-        speiImages.append(
-            spei12_named.select("y" + str(y)).rename("spei").set("year", y)
+    wsImages = []
+    for y in range(wsMinYear, wsMaxYear + 1):
+        wsImages.append(
+            windIndex_raw.select("WSmax_").cat(y).rename("windspeed").set("year", y)
         )
-    speiCol = ee.ImageCollection(speiImages)
+    wsCol = ee.ImageCollection(wsImages)
 
     # LANDSAT HARMONIZATION & kNDVI :=
 
@@ -166,60 +161,63 @@ def generate_drought_resistance(
         return l89.merge(l57).median().set("year", year).rename("kndvi")
 
     # Load kNDVI for START_YEAR to END_YEAR+1 (need next year for resilience)
-    # kndviYears = ee.List.sequence(start_year, end_year + 1)
+    # I need kNDVI images covering whichever is bigger: my baseline window, or
+    # my analysis window PLUS ONE year (since resilience for my last analysis
+    # year needs next-year kNDVI to compare against).
+
     kndviMinYear = min(start_year, BASELINE_START_YEAR)
     kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
-
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 
-    # BASELINE kNDVI (Yn_bar) :=
-    # Mean kNDVI across non-drought years only
+    # BASELINE kNDVI (Yn_bar):=
+    # Mean kNDVI across non-high-wind years only
 
-    # The analysis years will still remain the same , so if some internal year width is given like 2010-2018 for example
-    # then too the baseline yn_bar would be same of the bigger normalization. But the analysis will be resulting only of the analysis years.
     analysisYears = ee.List.sequence(start_year, end_year)
 
+    # This is my frozen baseline window — the years I use to WORK OUT what
+    # Yn_bar (my "normal" kNDVI reference) is, kept separate from
+    # analysisYears on purpose.
     baselineYears = ee.List.sequence(BASELINE_START_YEAR, BASELINE_END_YEAR)
 
-    def calc_kndviNonDrought(y):
+    def calc_kndvi_non_event(y):
         year = ee.Number(y)
         kndvi = kndviCol.filter(ee.Filter.eq("year", year)).first()
-        spei = (
-            speiCol.filter(ee.Filter.eq("year", year))
+        ws = (
+            wsCol.filter(ee.Filter.eq("year", year))
             .first()
             .resample("bilinear")
             .reproject(crs=kndvi.projection(), scale=30)
         )
-        isNonDrought = spei.gte(DROUGHT_THRESHOLD)
-        return kndvi.updateMask(isNonDrought).set("year", year)
+        isNonEvent = ws.lte(WIND_THRESHOLD)
+        return kndvi.updateMask(isNonEvent).set("year", year)
 
-    kndviNonDrought = ee.ImageCollection(baselineYears.map(calc_kndviNonDrought))
+    kndviNonEvent = ee.ImageCollection(baselineYears.map(calc_kndvi_non_event))
 
-    Yn_bar = kndviNonDrought.mean().rename("kndvi_baseline")
+    Yn_bar = kndviNonEvent.mean().rename("kndvi_baseline")
 
     # SIGNED RESISTANCE & RESILIENCE :=
-
     def calc_metrics_col(y):
         year = ee.Number(y)
 
         kndviYe = kndviCol.filter(ee.Filter.eq("year", year)).first()
-        speiYe = (
-            speiCol.filter(ee.Filter.eq("year", year))
+        wsYe = (
+            wsCol.filter(ee.Filter.eq("year", year))
             .first()
             .resample("bilinear")
             .reproject(crs=kndviYe.projection(), scale=30)
         )
 
-        # Only compute on forest pixels during drought years
+        # Only compute on forest pixels during high-windspeed years
+        # Flag ANY year where WSmax crosses the threshold, however briefly
         isForest = startYear.lte(year).And(endYear.gte(year))
-        isDrought = speiYe.lt(DROUGHT_THRESHOLD)
-        eventMask = isForest.And(isDrought)
+        isHighWind = wsYe.gt(WIND_THRESHOLD)
+        eventMask = isForest.And(isHighWind)
 
         diffRaw = kndviYe.subtract(Yn_bar)
         diffAbs = diffRaw.abs().max(1e-6)
 
-        # Resistance: signed, computed for ALL drought years
+        # Resistance: signed, computed for ALL high-wind years
         resistance = (
             Yn_bar.divide(diffAbs)
             .multiply(diffRaw.signum())
@@ -246,8 +244,7 @@ def generate_drought_resistance(
 
     metricsCol = ee.ImageCollection(analysisYears.map(calc_metrics_col))
 
-    # AGGREGATE & EXPORT :=
-
+    # AGGREGATE & EXPORT
     meanResistance = metricsCol.select("resistance").mean().clip(aoi)
     meanResilience = metricsCol.select("resilience").mean().clip(aoi)
 

@@ -42,6 +42,7 @@ from computing.misc.drainage_lines import (
 from computing.misc.drainage_lines_local_compute import (
     clip_drainage_lines as clip_drainage_lines_local_task,
 )
+from computing.STAC_specs.stac_collection import STACConfig, sanitize_text
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
 from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
@@ -55,6 +56,8 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .cropping_intensity.cropping_intesity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
+from .soil_health.soil_health import soil_health_local
+
 from .drought.drought import calculate_drought
 from .drought.drought_causality import drought_causality
 from .et_downscale.et_downscale import generate_et_downscale
@@ -173,6 +176,8 @@ from .spei.spei import (
     generate_spei_pipeline,
     run_drought_resistance_resilience,
     run_rainfall_resistance_resilience,
+    run_forest_fire_resistance_resilience,
+    run_high_wind_resistance_resilience,
 )
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from .surface_water_bodies.swb import generate_swb_layer as generate_swb_gee_task
@@ -204,6 +209,17 @@ from .tree_health.local.canopy_height_local import tree_health_ch_raster_local
 from .tree_health.local.canopy_height_vector_local import tree_health_ch_vector_local
 from .tree_health.local.ccd_local import tree_health_ccd_raster_local
 from .tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
+from .tree_health.local.overall_change_local import (
+    tree_health_overall_change_raster_local,
+)
+from .tree_health.local.overall_change_vector_local import (
+    tree_health_overall_change_vector_local,
+)
+from .tree_health.ltp_stp.generate_ltp_stp_change_local import (
+    generate_ltp_stp_change_local,
+)
+from .tree_health.ltp_stp.generate_ltp_stp_local import generate_ltp_stp_local
+
 from .tree_health.local.overall_change_local import (
     tree_health_overall_change_raster_local,
 )
@@ -1561,6 +1577,7 @@ def wells_compute(request):
 @api_view(["POST"])
 @schema(None)
 def generate_layer_in_order(request):
+    print("inside generate_layer_order_first")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1618,6 +1635,7 @@ def generate_layer_in_order(request):
 @api_view(["POST"])
 @schema(None)
 def layer_status_dashboard(request):
+    print("inside layer_staus_dashboard")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2099,7 +2117,7 @@ def et_downscale(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_mws_centroid api :: ", e)
+        print("Exception in generate_et_downscale api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2435,10 +2453,7 @@ def generate_fabdem_layer(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(
-            f"Exception in generate DEM raster and vector layer for {district} - {block}:: ",
-            e,
-        )
+        print(f"Exception in generate DEM raster and vector layer:", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2481,9 +2496,7 @@ def generate_canal_vector(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(
-            f"Exception in generate canal vector layer for {district} - {block}:: ", e
-        )
+        print(f"Exception in generate canal vector layer: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2537,6 +2550,50 @@ def rainfall_resilience_resistance(request):
 
 @api_view(["POST"])
 @schema(None)
+def forest_fire_resilience_resistance(request):
+    print("Inside forest_fire_resilience_resistance API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_forest_fire_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully forest_fire_resilience_resistance task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in forest_fire_resilience_resistance api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def high_wind_resilience_resistance(request):
+    print("Inside run_high_wind_resistance_resilience API.")
+    try:
+        aez = request.data.get("aez")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+
+        run_high_wind_resistance_resilience.apply_async(
+            args=[aez, start_year, end_year, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully run_high_wind_resistance_resilience task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in run_high_wind_resistance_resilience api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
 def generate_fabdem_raster_vector(request):
     print("Inside generate DEM raster layer API.")
     try:
@@ -2560,7 +2617,7 @@ def generate_fabdem_raster_vector(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(f"Exception in generate DEM raster layer for {district} - {block}:: ", e)
+        print(f"Exception in generate DEM raster layer:", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2590,9 +2647,7 @@ def generate_canal_vector(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print(
-            f"Exception in generate canal vector layer for {district} - {block}:: ", e
-        )
+        print(f"Exception in generate canal vector layer: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2753,4 +2808,61 @@ def missing_excel(request):
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in missing_excel api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_soil_health(request):
+    print("Inside generate_soil_health API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        soil_health_local.apply_async(args=[state, district, block], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated generate_soil_health task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_soil_health api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_ltp_stp(request):
+    print("Inside generate_ltp_stp API.")
+    try:
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+
+        generate_ltp_stp_local.apply_async(args=[start_year, end_year], queue="nrm")
+        return Response(
+            {"Success": f"Successfully initiated generate_ltp_stp task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_ltp_stp api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_ltp_stp_change(request):
+    print("Inside generate_ltp_stp API.")
+    try:
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+
+        generate_ltp_stp_change_local.apply_async(
+            args=[start_year, end_year], queue="nrm"
+        )
+        return Response(
+            {"Success": f"Successfully initiated generate_ltp_stp task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_ltp_stp api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

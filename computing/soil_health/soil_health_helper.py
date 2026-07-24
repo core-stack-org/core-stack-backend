@@ -63,9 +63,7 @@ def nutrient_stats_for_geometries(roi_gdf, raster_path, percentiles, nutrient):
             else:
                 stats[f"{nutrient}_mean"] = float(np.mean(values))
                 percentile_values = np.percentile(values, percentiles)
-                print(f"Percentile values: {percentile_values}")
                 for percentile, value in zip(percentiles, percentile_values):
-                    print(f"Percentile: {percentile}, Value: {value}")
                     stats[f"{nutrient}_p{percentile:02d}"] = float(value)
             rows.append(stats)
 
