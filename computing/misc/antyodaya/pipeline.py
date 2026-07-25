@@ -26,6 +26,7 @@ from utilities.pipelines.outputs import (
     column_dictionary,
     frame_profile,
     input_signatures,
+    resolved_scope_output_identity,
     slug,
     stable_hash,
     utc_now_text,
@@ -55,7 +56,7 @@ from utilities.constants import (
 
 CONFIG_PATH = Path(__file__).with_name("antyodaya_pipeline.yaml")
 ALGORITHM = "local-antyodaya-csv-admin-join"
-ALGORITHM_VERSION = "2.0"
+ALGORITHM_VERSION = "2.1"
 SOURCE_DEFAULTS = {
     "admin_gpkg": ADMIN_BOUNDARY_GPKG,
     "csv": ANTYODAYA_2020_CSV,
@@ -82,10 +83,6 @@ def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
     )
     resolved["sources"] = sources
     return resolved
-
-
-def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
-    return f"{prefix}_{slug(district)}_{slug(tehsil)}".strip("_")
 
 
 def _cli_request(state: str, district: str, tehsil: str, sync_to_geoserver: bool = True) -> StandardRequest:
@@ -474,9 +471,19 @@ def run_antyodaya_pipeline(
     outputs = resolve_output_options(request, config)
     columns = _source_columns(config)
     output_config = config["output"]
-    layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
-    result_name = layer_name or f"{output_config['layer_prefix']}_{slug(request.scope.level)}"
-    output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
+
+    t0 = time.perf_counter()
+    admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
+    include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
+    admin_selection, output_parts, result_name = resolved_scope_output_identity(
+        admin_source,
+        output_config["layer_prefix"],
+        AdminScope.from_mapping(asdict(request.scope)),
+        include_geometry=include_geometry,
+    )
+    timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
+
+    output_root = _repo_path(output_config["root"]).joinpath(*output_parts)
     bundle = OutputBundle(
         output_root,
         result_name,
@@ -494,12 +501,6 @@ def run_antyodaya_pipeline(
         if cached:
             cached["cache_hit"] = True
             return cached
-
-    t0 = time.perf_counter()
-    admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
-    include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
-    admin_selection = admin_source.read_scope(AdminScope.from_mapping(asdict(request.scope)), include_geometry=include_geometry)
-    timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
     sidecar = _sidecar(config, columns)
