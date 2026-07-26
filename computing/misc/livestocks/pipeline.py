@@ -18,7 +18,6 @@ from utilities.pipelines.admin import (
     ADMIN_COLUMN_DESCRIPTIONS,
     admin_output_frame,
     admin_presentation_frame,
-    resolve_registration_scope,
 )
 from utilities.pipelines.outputs import (
     OutputBundle,
@@ -376,7 +375,12 @@ def run_livestocks_pipeline(
     t0 = time.perf_counter()
     admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
     include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
-    admin_selection, output_parts, layer_name = resolved_scope_output_identity(
+    (
+        admin_selection,
+        registration_scope,
+        output_parts,
+        layer_name,
+    ) = resolved_scope_output_identity(
         admin_source,
         output_config["layer_prefix"],
         AdminScope.from_mapping(asdict(request.scope)),
@@ -502,7 +506,6 @@ def run_livestocks_pipeline(
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
     if request.publish.register_layers and geoserver and geoserver.get("ok"):
-        registration_scope = resolve_registration_scope(request.scope)
         state = registration_scope.state_name
         district = registration_scope.district_name
         block = registration_scope.tehsil_name

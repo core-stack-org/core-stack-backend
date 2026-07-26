@@ -26,10 +26,9 @@ def slug(value: Any) -> str:
 def layer_slug(value: Any) -> str:
     """Return the established Core Stack spelling for a layer-name part."""
 
-    import re
+    from utilities.gee_utils import valid_gee_text
 
-    text = re.sub(r"[^a-z0-9 ,:;_-]", "", str(value or "").lower())
-    return text.replace(" ", "_")
+    return valid_gee_text(str(value or "").lower())
 
 
 def utc_now_text() -> str:
@@ -84,15 +83,23 @@ def resolved_scope_output_identity(
     scope: Any,
     *,
     include_geometry: bool,
-) -> tuple[Any, tuple[str, ...], str]:
-    """Read a scope, then derive output identity from its canonical names."""
+) -> tuple[Any, Any, tuple[str, ...], str]:
+    """Read a scope and derive its output and DB-compatible layer identity."""
+
+    from .admin import resolve_registration_scope
 
     selection = admin_source.read_scope(
         scope,
         include_geometry=include_geometry,
     )
-    output_parts, layer_name = scope_output_identity(prefix, selection.scope)
-    return selection, output_parts, layer_name
+    output_parts, _ = scope_output_identity(prefix, selection.scope)
+    naming_scope = (
+        resolve_registration_scope(scope)
+        if str(getattr(scope, "level", "") or "").lower() == "tehsil"
+        else selection.scope
+    )
+    _, layer_name = scope_output_identity(prefix, naming_scope)
+    return selection, naming_scope, output_parts, layer_name
 
 
 def mark_cached_result(result: Mapping[str, Any], started: float) -> dict[str, Any]:
