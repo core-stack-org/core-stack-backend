@@ -242,6 +242,7 @@ def run_cropping_intensity_local(
             misc={
                 "start_year": start_year,
                 "end_year": end_year,
+                "is_generated_locally": True,
             },
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,

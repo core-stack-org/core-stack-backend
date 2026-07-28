@@ -90,6 +90,7 @@ def run_terrain_raster_fabdem_local(
             layer_name=layer_name,
             asset_id=clipped_raster_path,
             dataset_name="Terrain Raster",
+            misc={"is_generated_locally": True},
             algorithm="FABDEM",
             algorithm_version="2.0",
         )
