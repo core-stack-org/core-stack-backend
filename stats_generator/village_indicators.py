@@ -390,20 +390,21 @@ def extract_antyodaya(df_antyodaya, v_id):
         ),
     }
 
-    if df_antyodaya.empty or "village_id" not in df_antyodaya.columns:
-        return {}
-
-    village_rows = df_antyodaya[df_antyodaya["village_id"] == v_id]
-    if village_rows.empty:
-        return {}
-
     required_columns = []
     for category, raw_columns in category_raw_columns.items():
         required_columns.extend(
             (f"{category}_cat_cluster", f"{category}_cat_value", *raw_columns)
         )
-    # Raw inputs shared by categories remain a single field in the flat KYL row.
     required_columns = list(dict.fromkeys(required_columns))
+
+    default_row = {column: -9999 for column in required_columns}
+
+    if df_antyodaya.empty or "village_id" not in df_antyodaya.columns:
+        return default_row
+
+    village_rows = df_antyodaya[df_antyodaya["village_id"] == v_id]
+    if village_rows.empty:
+        return default_row
 
     missing_columns = [
         column for column in required_columns if column not in df_antyodaya.columns
