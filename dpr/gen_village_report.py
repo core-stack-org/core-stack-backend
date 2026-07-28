@@ -31,11 +31,11 @@ def load_block_sheets(state, district, block):
         df = pd.read_excel(excel_file, sheet_name="antyodaya")
         df["village_id"] = df["village_id"].astype(str).str.strip()
         df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
-        df_facilities["censuscode2011"] = df_facilities["censuscode2011"].astype(str).str.strip()
+        df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
         df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
         df_nrega["vill_id"] = df_nrega["vill_id"].astype(str).str.strip()
         df_livestock = pd.read_excel(excel_file, sheet_name="livestock")
-        df_livestock["pc11_village_id"] = df_livestock["pc11_village_id"].astype(str).str.strip()
+        df_livestock["village_id"] = df_livestock["village_id"].astype(str).str.strip()
         return df, df_facilities, df_nrega, df_livestock
     except Exception as e:
         logger.error(
@@ -319,7 +319,7 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
                 df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
         normalize_column(df, "village_id")
-        normalize_column(df_facilities, "censuscode2011")
+        normalize_column(df_facilities, "village_id")
 
         village_id = str(village_id).strip()
 
@@ -337,7 +337,7 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -498,7 +498,7 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
 
             pds_distance = get_numeric(
                 facility_row,
-                "pds_distance"
+                "pds_distance_in_km"
             )
 
             pds_score = 1 if (
@@ -521,7 +521,7 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
         scores.append(calculate_band_score(community_avg_score))
 
         #* Livelihood Diversification Score
-        livelihood_farm_score = safe_float(row.get("farm_employment_feat_value", 0))
+        livelihood_farm_score = safe_float(row.get("livelihoods_employment_cat_value", 0))
         livelihood_forest_score = safe_float(row.get("livelihoods_forest_resources_cat_value", 0))
         livelihood_fish_score = safe_float(row.get("livelihoods_fisheries_cat_value", 0))
         livelihood_alternate_score = safe_float(row.get("livelihoods_alternative_farming_cat_value", 0))
@@ -541,7 +541,7 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
         if facility_row is not None:
             husbandry_distance = get_numeric(
                 facility_row,
-                "agri_industry_dairy_animal_husbandry_distance"
+                "agri_industry_dairy_animal_husbandry_distance_in_km"
             )
 
             # High: < 10 km
@@ -745,7 +745,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
                 df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
         normalize_column(df, "village_id")
-        normalize_column(df_facilities, "censuscode2011")
+        normalize_column(df_facilities, "village_id")
         normalize_column(df_nrega, "vill_id")
 
         block_scores = []
@@ -904,10 +904,10 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
             financial_distance = get_distance_logic(
                 facility_row,
                 [
-                    "csc_distance",
-                    "bank_mitra_distance",
-                    "bank_branch_distance",
-                    "bank_atm_distance"
+                    "csc_distance_in_km",
+                    "bank_mitra_distance_in_km",
+                    "bank_branch_distance_in_km",
+                    "bank_atm_distance_in_km"
                 ],
                 logic="max"
             )
@@ -944,7 +944,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
             pds_distance = get_numeric(
                 facility_row,
-                "pds_distance"
+                "pds_distance_in_km"
             )
 
             pds_scores.append(
@@ -986,7 +986,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
         livelihood_avg = (
             df[
                 [
-                    "farm_employment_feat_value",
+                    "livelihoods_employment_cat_value",
                     "livelihoods_forest_resources_cat_value",
                     "livelihoods_fisheries_cat_value",
                     "livelihoods_alternative_farming_cat_value",
@@ -1015,7 +1015,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
             husbandry_distance = get_numeric(
                 facility_row,
-                "agri_industry_dairy_animal_husbandry_distance"
+                "agri_industry_dairy_animal_husbandry_distance_in_km"
             )
 
             if pd.notnull(husbandry_distance) and husbandry_distance < 10:
@@ -1044,7 +1044,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
         for _, facility_row in df_facilities.iterrows():
 
-            village_id = facility_row["censuscode2011"]
+            village_id = facility_row["village_id"]
 
             village_match = df[
                 df["village_id"] == village_id
@@ -1293,8 +1293,8 @@ def get_health_and_wash(state, district, block, village_id, df=None, df_faciliti
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -1317,7 +1317,7 @@ def get_health_and_wash(state, district, block, village_id, df=None, df_faciliti
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -1414,8 +1414,8 @@ def get_education_institutions(state, district, block, village_id, df_facilities
                 sheet_name="facilities_proximity"
             )
 
-            df_facilities["censuscode2011"] = (
-                df_facilities["censuscode2011"]
+            df_facilities["village_id"] = (
+                df_facilities["village_id"]
                 .astype(str)
                 .str.strip()
             )
@@ -1423,7 +1423,7 @@ def get_education_institutions(state, district, block, village_id, df_facilities
         village_id = str(village_id).strip()
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         if facility_match.empty:
@@ -1549,8 +1549,8 @@ def get_financial_inclusion(state, district, block, village_id, df_facilities=No
                 sheet_name="facilities_proximity"
             )
 
-            df_facilities["censuscode2011"] = (
-                df_facilities["censuscode2011"]
+            df_facilities["village_id"] = (
+                df_facilities["village_id"]
                 .astype(str)
                 .str.strip()
             )
@@ -1558,7 +1558,7 @@ def get_financial_inclusion(state, district, block, village_id, df_facilities=No
         village_id = str(village_id).strip()
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         if facility_match.empty:
@@ -1659,8 +1659,8 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
                     sheet_name="facilities_proximity"
                 )
 
-                df_facilities["censuscode2011"] = (
-                    df_facilities["censuscode2011"]
+                df_facilities["village_id"] = (
+                    df_facilities["village_id"]
                     .astype(str)
                     .str.strip()
                 )
@@ -1671,8 +1671,8 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -1693,7 +1693,7 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -1880,7 +1880,7 @@ def get_livelihood_diversification(state, district, block, village_id, df=None):
         row = matched_rows.iloc[0]
 
         return [
-            safe_float(row.get("farm_employment_feat_value", 0)),
+            safe_float(row.get("livelihoods_employment_cat_value", 0)),
             safe_float(row.get("livelihoods_forest_resources_cat_value", 0)),
             safe_float(row.get("livelihoods_alternative_farming_cat_value", 0)),
             safe_float(row.get("livelihoods_fisheries_cat_value", 0)),
@@ -1946,8 +1946,8 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -1968,7 +1968,7 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -2060,8 +2060,8 @@ def get_livestock_count(state, district, block, village_id, df_livestock=None):
                 sheet_name="livestock"
             )
 
-        df_livestock["pc11_village_id"] = (
-            df_livestock["pc11_village_id"]
+        df_livestock["village_id"] = (
+            df_livestock["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -2069,7 +2069,7 @@ def get_livestock_count(state, district, block, village_id, df_livestock=None):
         village_id = str(village_id).strip()
 
         matched_rows = df_livestock[
-            df_livestock["pc11_village_id"] == village_id
+            df_livestock["village_id"] == village_id
         ]
 
         if matched_rows.empty:
@@ -2084,31 +2084,14 @@ def get_livestock_count(state, district, block, village_id, df_livestock=None):
         row = matched_rows.iloc[0]
 
         return {
-            "cattle": {
-                "male":   safe_int(row.get("cattle_male")),
-                "female": safe_int(row.get("cattle_female")),
-                "total":  safe_int(row.get("cattle_total")),
-            },
-            "buffalo": {
-                "male":   safe_int(row.get("buffalo_male")),
-                "female": safe_int(row.get("buffalo_female")),
-                "total":  safe_int(row.get("buffalo_total")),
-            },
-            "sheep": {
-                "male":   safe_int(row.get("sheep_male")),
-                "female": safe_int(row.get("sheep_female")),
-                "total":  safe_int(row.get("sheep_total")),
-            },
-            "goat": {
-                "male":   safe_int(row.get("goat_male")),
-                "female": safe_int(row.get("goat_female")),
-                "total":  safe_int(row.get("goat_total")),
-            },
-            "pig": {
-                "male":   safe_int(row.get("pig_male")),
-                "female": safe_int(row.get("pig_female")),
-                "total":  safe_int(row.get("pig_total")),
-            },
+            "large_animals_total": safe_int(row.get("large_animals_total")),
+            "cattle_total":        safe_int(row.get("cattle_total")),
+            "buffalo_total":       safe_int(row.get("buffalo_total")),
+            "small_animals_total": safe_int(row.get("small_animals_total")),
+            "sheep_total":         safe_int(row.get("sheep_total")),
+            "goat_total":          safe_int(row.get("goat_total")),
+            "pig_total":           safe_int(row.get("pig_total")),
+            "all_livestock_total": safe_int(row.get("all_livestock_total")),
         }
 
     except Exception as e:
@@ -2174,20 +2157,20 @@ def get_land_cultivation(state, district, block, village_id, df=None):
         row = matched_rows.iloc[0]
 
         land_utilization_score = safe_float(
-            row.get("land_utilization_feat_value", 0)
+            row.get("agriculture_land_cultivation_cat_value", 0)
         )
 
         # Seasonal cultivation score: kharif sown / total cultivable, clamped to [0, 1]
-        kharif_ha = safe_float(row.get("net_sown_area_kharif_in_ha", 0))
-        cultivable_ha = safe_float(row.get("total_cultivable_area_in_ha", 0))
+        kharif_ha = safe_float(row.get("net_sown_area_kharif_in_hac", 0))
+        cultivable_ha = safe_float(row.get("total_cultivable_area_in_hac", 0))
         if cultivable_ha > 0:
             seasonal_cultivation_score = min(kharif_ha / cultivable_ha, 1.0)
         else:
             seasonal_cultivation_score = 0.0
 
-        # Map color from land_utilization_feat_cluster
+        # Map color from agriculture_land_cultivation_cat_cluster
         land_utilization_cluster = str(
-            row.get("land_utilization_feat_cluster", "Low")
+            row.get("agriculture_land_cultivation_cat_cluster", "Low")
         ).strip()
         if land_utilization_cluster == "High":
             land_utilization_color = "green"
@@ -2433,8 +2416,8 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -2457,7 +2440,7 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -2510,7 +2493,7 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
             apmc_access_distance = get_distance_logic(
                 facility_row,
                 [
-                    "apmc_distance_in_km",
+                    "apmc_markets_distance_in_km",
                     "agri_industry_markets_trading_distance_in_km"
                 ],
                 logic="min"
@@ -2964,8 +2947,8 @@ def get_all_villages_education_institutions(state, district, block, df_facilitie
             if df_facilities is None:
                 df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -3024,8 +3007,8 @@ def get_all_villages_financial_inclusion(state, district, block, df_facilities=N
             if df_facilities is None:
                 df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -3098,8 +3081,8 @@ def get_all_villages_welfare_inclusion(state, district, block, df=None, df_facil
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )

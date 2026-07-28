@@ -703,12 +703,8 @@
                 <table style="width: 100%; border-collapse: collapse; font-family: 'Georgia', 'Garamond', serif; font-size: 0.95rem;">
                     <thead>
                         <tr style="background-color: var(--primary-accent); color: white;">
-                            <th style="padding: 0.6rem 1rem; text-align: left; border: 1px solid rgba(255,255,255,0.2);"></th>
-                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Cattle</th>
-                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Buffalo</th>
-                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Sheep</th>
-                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Goat</th>
-                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Pig</th>
+                            <th style="padding: 0.6rem 1rem; text-align: left; border: 1px solid rgba(255,255,255,0.2);">Animal</th>
+                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Total</th>
                         </tr>
                     </thead>
                     <tbody id="livestockCountTableBody">
@@ -1957,29 +1953,28 @@
         try {
             const livestockCount = JSON.parse('{{ livestock_count_data|escapejs }}');
             if (livestockCount && Object.keys(livestockCount).length > 0) {
-                const animals = ['cattle', 'buffalo', 'sheep', 'goat', 'pig'];
                 const rows = [
-                    { label: 'Male',   key: 'male' },
-                    { label: 'Female', key: 'female' },
-                    { label: 'Total',  key: 'total' },
+                    { label: 'Large Animals',  key: 'large_animals_total', bold: true },
+                    { label: '  Cattle',   key: 'cattle_total',         bold: false },
+                    { label: '  Buffalo',  key: 'buffalo_total',        bold: false },
+                    { label: 'Small Animals',  key: 'small_animals_total', bold: true },
+                    { label: '  Sheep',    key: 'sheep_total',          bold: false },
+                    { label: '  Goat',     key: 'goat_total',           bold: false },
+                    { label: '  Pig',      key: 'pig_total',            bold: false },
+                    { label: 'All Livestock',  key: 'all_livestock_total', bold: true },
                 ];
                 const tbody = document.getElementById('livestockCountTableBody');
-                const rowStyles = [
-                    'background-color: rgba(232, 220, 200, 0.15);',
-                    'background-color: rgba(232, 220, 200, 0.30);',
-                    'background-color: rgba(232, 220, 200, 0.50); font-weight: 600;'
-                ];
                 rows.forEach((row, i) => {
                     const tr = document.createElement('tr');
-                    tr.style.cssText = rowStyles[i];
-                    let html = `<td style="padding: 0.5rem 1rem; border: 1px solid #d4c4a8; color: var(--primary-dark);">${row.label}</td>`;
-                    animals.forEach(animal => {
-                        const animalData = livestockCount[animal];
-                        const rawVal = animalData != null ? animalData[row.key] : null;
-                        const val = rawVal != null ? rawVal : '-';
-                        html += `<td style="padding: 0.5rem 1rem; text-align: center; border: 1px solid #d4c4a8; color: var(--primary-dark);">${val}</td>`;
-                    });
-                    tr.innerHTML = html;
+                    const bg = row.bold
+                        ? 'background-color: rgba(232, 220, 200, 0.45);'
+                        : (i % 2 === 0 ? 'background-color: rgba(232, 220, 200, 0.10);' : 'background-color: rgba(232, 220, 200, 0.25);');
+                    tr.style.cssText = bg;
+                    const val = livestockCount[row.key] != null ? livestockCount[row.key] : '-';
+                    const fw = row.bold ? 'font-weight: 600;' : '';
+                    tr.innerHTML =
+                        `<td style="padding: 0.5rem 1rem; border: 1px solid #d4c4a8; color: var(--primary-dark); ${fw}">${row.label}</td>` +
+                        `<td style="padding: 0.5rem 1rem; text-align: center; border: 1px solid #d4c4a8; color: var(--primary-dark); ${fw}">${val}</td>`;
                     tbody.appendChild(tr);
                 });
                 document.getElementById('livestockCountTableContainer').style.display = 'block';
