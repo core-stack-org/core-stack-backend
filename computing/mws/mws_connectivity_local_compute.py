@@ -55,9 +55,6 @@ def _compute_mws_connectivity_for_watersheds(watersheds_gdf, mws_gdf):
 @app.task(bind=True)
 def mws_connectivity_vector(
     self,
-    asset_folder_list=None,
-    app_type=None,
-    gee_account_id=None,
     state=None,
     district=None,
     block=None,
