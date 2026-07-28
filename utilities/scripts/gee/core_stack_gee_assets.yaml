@@ -35,7 +35,7 @@ assets:
     asset_id: projects/corestack-datasets/assets/datasets/cs_admin_standard
     kind: feature_layer
     format: gpkg
-    source: data/admin-boundary/cs_admin_standard.gpkg
+    source: data/base_resources/cs_admin_standard.gpkg
     layer: cs_admin_standard
     geometry_column: geometry
     properties:
@@ -68,7 +68,7 @@ assets:
   cs_pan_india_facilities:
     asset_id: projects/corestack-datasets/assets/datasets/cs_pan_india_facilities
     kind: facility_membership_points
-    source: data/facilities/outputs/pan_india_facilities.gpkg
+    source: data/base_resources/cs_pan_india_facilities.gpkg
     geometry_column: geometry
     columns:
       facility:
@@ -105,7 +105,7 @@ assets:
     asset_id: projects/corestack-datasets/assets/datasets/cs_village_livestock_census_20
     kind: feature_layer
     format: gpkg
-    source: data/livestock/cs_village_livestock_census_20.gpkg
+    source: data/base_resources/cs_village_livestock_census_20.gpkg
     layer: cs_village_livestock_census_20
     geometry_column: geometry
     properties:

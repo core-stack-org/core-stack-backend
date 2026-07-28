@@ -24,9 +24,10 @@ Engine table-ingestion task from a manifest.
 - `cs_village_livestock_census_20`
 - `cs_antyodaya_2020`
 
-`cs_pan_india_facilities` currently uses the existing source file
-`data/facilities/outputs/pan_india_facilities.gpkg`; it is named with the `cs_`
-asset key in the GEE config without making a duplicate 2 GB GeoPackage.
+The admin, facilities, and livestock jobs read their canonical files directly
+from `data/base_resources/`. The Facilities builder writes
+`cs_pan_india_facilities.gpkg` there, so GEE ingestion and the local runtime
+use the same file without a separate copy or promotion step.
 
 ## Commands
 
