@@ -1,18 +1,23 @@
 """Shared constants for the Farm Stress Detection System.
 
-Mirrors the design in data/plan.md, adapted to this repo's conventions:
-GEE asset roots come from utilities.constants.GEE_PATHS["FARM_STRESS"]
-(resolved against settings.GEE_STORAGE_PROJECT) rather than hardcoded
-project ids, and GCS export paths use settings.GCS_BUCKET_NAME.
+Mirrors the design in data/plan.md, adapted to this repo's conventions.
+GCS export paths use settings.GCS_BUCKET_NAME.
 """
 
 import os
 
 from nrm_app.settings import BASE_DIR
-from utilities.constants import GEE_PATHS
 
 # ── GEE asset roots ───────────────────────────────────────────────────────────
-FARM_STRESS_ASSET_ROOT = GEE_PATHS["FARM_STRESS"]["GEE_ASSET_PATH"].rstrip("/")
+# Deliberately NOT derived from utilities.constants.GEE_PATHS/
+# settings.GEE_STORAGE_PROJECT: that setting is an unfilled 'xxx' placeholder
+# in this environment's .env (confirmed directly), and changing it globally
+# risks affecting other unrelated apps that may already depend on its
+# current value. Hardcoded to the actual GCP project backing GEEAccount
+# id=22 (invertible-fin-447406-g5), which is what every farm_stress GEE
+# call already authenticates against via ee_initialize(22).
+FARM_STRESS_GEE_PROJECT = "invertible-fin-447406-g5"
+FARM_STRESS_ASSET_ROOT = f"projects/{FARM_STRESS_GEE_PROJECT}/assets/apps/farm_stress"
 
 # ── MODIS products ────────────────────────────────────────────────────────────
 MODIS_LC_COLLECTION = "MODIS/061/MCD12Q1"  # land cover, annual, 500m
