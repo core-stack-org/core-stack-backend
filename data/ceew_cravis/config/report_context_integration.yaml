@@ -1,0 +1,300 @@
+artifact_kind: ceew_report_context_integration_config
+version: 1
+enabled: true
+
+references:
+  methodology: data/ceew_cravis/docs/ceew_methodology.md
+  dataset_guide: data/ceew_cravis/docs/ceew_dataset_structure_guide.md
+  pattern_criteria: data/ceew_cravis/docs/ceew_pattern_criteria_library.md
+  implementation_methodology: data/ceew_cravis/docs/report_context_yaml_methodology.md
+
+data_sources:
+  profile_root: data/ceew_cravis/output/district_profiles
+  profile_path_pattern: "{profile_root}/{state_slug}/{district_slug}/{state_slug}_{district_slug}_profile.json"
+  metadata_path_pattern: "{profile_root}/{state_slug}/{district_slug}/{state_slug}_{district_slug}_metadata_config.json"
+  map_index_path: data/ceew_cravis/output/map_layers/district_map_index.json
+  global_metadata_path: data/ceew_cravis/output/ceew_cravis_metadata_config.json
+  access_module: computing.misc.ceew
+
+scale_policy:
+  label: "CEEW District Context"
+  below_district_note: "Values shown here are district-scale CEEW/CRAVIS context for the local planning evidence in this report."
+  district_note: "Values shown here are from the cleaned district CEEW/CRAVIS profile."
+  never_downscale_district_values: true
+  use_llm_outputs: false
+  use_risk_scores_as_provided: true
+  allowed_light_derivations:
+    - period_mean
+    - period_min
+    - period_max
+    - period_delta_value
+    - current_to_future_difference
+    - current_to_future_percent_change
+
+scenario_policy:
+  primary_framework: rcpssp
+  preferred_scenarios:
+    - RCP85
+    - RCP45
+  observed_scenario: imd
+  preferred_periods:
+    observed_baseline: "1981-2010"
+    recent_observed: "2011-2024"
+    near_future: "2031-2050"
+    mid_future: "2051-2070"
+  value_field: mean_value
+  fallback_value_fields:
+    - max_value
+    - min_value
+    - delta_value
+
+metric_selectors:
+  climate_cards:
+    annual_rainfall:
+      label: "Annual rainfall"
+      unit_hint: "mm"
+      path: climate.rcpssp.RCP85.precipitation.time_series_metrics.total_rainfall.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [overview, water_balance, surface_water, agriculture]
+    monsoon_rainfall:
+      label: "Monsoon rainfall"
+      unit_hint: "mm"
+      path: climate.rcpssp.RCP85.precipitation.time_series_metrics.total_rainfall.monsoon_JJAS
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [overview, agriculture, surface_water]
+    wet_days:
+      label: "Wet days"
+      unit_hint: "days"
+      path: climate.rcpssp.RCP85.precipitation.derived_metrics.wet_days.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [surface_water, water_balance, agriculture]
+    longest_dry_spell:
+      label: "Longest dry spell"
+      unit_hint: "days"
+      path: climate.rcpssp.RCP85.precipitation.derived_metrics.longest_dry_spell.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [drought, groundwater, agriculture, ecological]
+    heaviest_1_day_rainfall:
+      label: "Heaviest 1-day rainfall"
+      unit_hint: "mm"
+      path: climate.rcpssp.RCP85.precipitation.derived_metrics.heaviest_1_day_rainfall.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [surface_water, drainage, roads, flood]
+    hot_days_35c:
+      label: "Days above 35 C"
+      unit_hint: "days"
+      path: climate.rcpssp.RCP85.hot_weather.days_with_maximum_temperature_greater_than_35c.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [overview, heat, agriculture, labour, livestock]
+    hot_days_40c:
+      label: "Days above 40 C"
+      unit_hint: "days"
+      path: climate.rcpssp.RCP85.hot_weather.days_with_maximum_temperature_greater_than_40c.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [heat, agriculture, labour, health]
+    warm_nights:
+      label: "Warm nights"
+      unit_hint: "days"
+      path: climate.rcpssp.RCP85.hot_weather.unusually_warm_nights.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [heat, health, livestock, crop_recovery]
+    drought_severity:
+      label: "6-month drought severity"
+      unit_hint: "index"
+      path: climate.rcpssp.RCP85.precipitation.derived_metrics.6_month_drought_severity.annual
+      default_periods: ["2011-2024", "2031-2050", "2051-2070"]
+      display: compact_stat
+      section_relevance: [drought, groundwater, agriculture]
+
+  risk_chips:
+    risk_heat:
+      label: "Heat risk"
+      path: risk.risk_heat
+      show_when_score_at_least: 3
+      section_relevance: [overview, heat, agriculture, health, labour]
+    risk_flood:
+      label: "Flood risk"
+      path: risk.risk_flood
+      show_when_score_at_least: 3
+      section_relevance: [overview, surface_water, drainage, flood]
+    risk_lightning:
+      label: "Lightning risk"
+      path: risk.risk_lightning
+      show_when_score_at_least: 3
+      section_relevance: [overview, agriculture, labour, safety]
+    risk_landslide:
+      label: "Landslide risk"
+      path: risk.risk_landslide
+      show_when_score_at_least: 3
+      section_relevance: [overview, terrain, roads]
+    risk_forest_fire:
+      label: "Forest-fire risk"
+      path: risk.risk_forest_fire
+      show_when_score_at_least: 3
+      section_relevance: [overview, forest, biodiversity, ecological]
+    risk_cyclone:
+      label: "Cyclone risk"
+      path: risk.risk_cyclone
+      show_when_score_at_least: 3
+      section_relevance: [overview, coastal, disaster]
+
+  sectoral_context:
+    flood_susceptibility_area:
+      label: "Flood susceptible area"
+      path: sectoral.zonal_observations.extreme_event_flood_susceptibility_area
+      display: optional_compact_stat
+      section_relevance: [surface_water, drainage, flood]
+    lightning_days:
+      label: "Lightning days"
+      path: sectoral.zonal_observations.extreme_event_number_of_lightning_days
+      display: optional_compact_stat
+      section_relevance: [labour, safety, agriculture]
+    landslides:
+      label: "Landslide count"
+      path: sectoral.zonal_observations.extreme_event_total_number_of_landslides
+      display: optional_compact_stat
+      section_relevance: [terrain, roads]
+    forest_fires:
+      label: "Forest-fire frequency"
+      path: sectoral.zonal_observations.extreme_event_frequency_of_forest_fires
+      display: optional_compact_stat
+      section_relevance: [forest, ecological]
+
+report_context_builder:
+  python_module_target: dpr.ceew_report_context
+  function_name: build_ceew_report_context
+  context_key: ceew_district_context
+  fail_closed: true
+  max_climate_cards_per_report: 6
+  max_risk_chips_per_report: 5
+  include_source_trace: true
+
+reports:
+  tehsil:
+    enabled: true
+    endpoint: /api/v1/generate_tehsil_report
+    backend_handler: dpr/api.py::generate_tehsil_report
+    backend_data_modules:
+      - dpr/gen_tehsil_report.py
+    template: templates/block-report.html
+    frontend_callers:
+      - repo: landscape-explorer
+        path: src/components/kyl_rightSidebar.jsx
+        line_hint: 1002
+    insertions:
+      overview_panel:
+        enabled: true
+        anchor: after_tehsil_overview_patterns
+        template_location_hint: "templates/block-report.html after the first overview/stress-pattern map section"
+        metrics: [annual_rainfall, monsoon_rainfall, longest_dry_spell, hot_days_35c]
+        risks: [risk_heat, risk_flood, risk_lightning, risk_forest_fire, risk_landslide]
+      agriculture_note:
+        enabled: true
+        anchor: agriculture_section_intro
+        metrics: [monsoon_rainfall, longest_dry_spell, drought_severity, hot_days_35c]
+        risks: [risk_heat, risk_flood]
+      drought_note:
+        enabled: true
+        anchor: drought_section
+        metrics: [longest_dry_spell, drought_severity, wet_days]
+        risks: [risk_heat]
+      forest_note:
+        enabled: true
+        anchor: forest_section
+        metrics: [hot_days_35c, longest_dry_spell]
+        risks: [risk_forest_fire]
+
+  mws:
+    enabled: true
+    endpoint: /api/v1/generate_mws_report
+    backend_handler: dpr/api.py::generate_mws_report
+    backend_data_modules:
+      - dpr/gen_mws_report.py
+    template: templates/mws-report.html
+    frontend_callers:
+      - repo: landscape-explorer
+        path: src/components/kyl_MWSProfilePanel.jsx
+        line_hint: 30
+      - repo: landscape-explorer
+        path: src/components/kyl_rightSidebar.jsx
+        line_hint: 1900
+    insertions:
+      overview_panel:
+        enabled: true
+        anchor: after_mws_landscape_overview
+        template_location_hint: "templates/mws-report.html after Landscape Overview map group"
+        metrics: [annual_rainfall, monsoon_rainfall, heaviest_1_day_rainfall, longest_dry_spell, hot_days_35c]
+        risks: [risk_heat, risk_flood, risk_lightning, risk_landslide, risk_forest_fire]
+      hydrology_note:
+        enabled: true
+        anchor: hydro_table_section
+        metrics: [annual_rainfall, wet_days, longest_dry_spell]
+        risks: [risk_flood]
+      water_availability_note:
+        enabled: true
+        anchor: water_availability_section
+        metrics: [annual_rainfall, wet_days, heaviest_1_day_rainfall]
+        risks: [risk_flood]
+      drought_note:
+        enabled: true
+        anchor: drought_analysis_section
+        metrics: [longest_dry_spell, drought_severity, hot_days_35c]
+        risks: [risk_heat]
+
+  village:
+    enabled: true
+    endpoint: /api/v1/generate_village_report
+    backend_handler: dpr/api.py::generate_village_report
+    backend_data_modules:
+      - dpr/gen_village_report.py
+    template: templates/village-report.html
+    unavailable_template: templates/village-report-unavailable.html
+    frontend_callers:
+      - repo: landscape-explorer
+        path: src/pages/PlanViewPage.jsx
+        line_hint: 830
+    insertions:
+      overview_panel:
+        enabled: true
+        anchor: after_village_overview
+        template_location_hint: "templates/village-report.html after Village Overview"
+        metrics: [annual_rainfall, longest_dry_spell, hot_days_35c, heaviest_1_day_rainfall]
+        risks: [risk_heat, risk_flood, risk_lightning]
+      irrigation_note:
+        enabled: true
+        anchor: irrigation_section
+        metrics: [monsoon_rainfall, wet_days, longest_dry_spell]
+        risks: [risk_flood, risk_heat]
+      ecological_note:
+        enabled: true
+        anchor: ecological_section
+        metrics: [longest_dry_spell, heaviest_1_day_rainfall, hot_days_35c]
+        risks: [risk_flood, risk_heat, risk_forest_fire]
+
+frontend_policy:
+  report_url_generation:
+    prefer_env_api_url: true
+    avoid_hardcoded_localhost: true
+    avoid_hardcoded_geoserver: true
+  route_ownership:
+    note: "The frontend opens report URLs; CEEW report content is built in backend context/templates."
+
+validation:
+  sample_requests:
+    tehsil: "http://localhost:8000/api/v1/generate_tehsil_report/?state=bihar&district=jamui&block=jamui"
+    mws: "http://localhost:8000/api/v1/generate_mws_report/?state=bihar&district=jamui&block=jamui&uid=12_325505"
+    village: "http://localhost:8000/api/v1/generate_village_report/?state=bihar&district=jamui&block=jamui&villageId=259074"
+  checks:
+    - "YAML parses cleanly."
+    - "Each enabled report receives ceew_district_context or an empty object without failing the report."
+    - "CEEW District Context appears at most once per rendered report."
+    - "No CEEW value is labelled as village, tehsil, block, or MWS scale."
+    - "Existing report sections still render when CEEW profile is unavailable."

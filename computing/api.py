@@ -49,6 +49,11 @@ from .drought.drought import calculate_drought
 from .terrain_descriptor.terrain_clusters import generate_terrain_clusters
 from .terrain_descriptor.terrain_raster_fabdem import generate_terrain_raster_clip
 from computing.misc.drainage_lines import clip_drainage_lines
+from computing.misc.ceew import (
+    CEEWProfileNotFound,
+    get_ceew_data as load_ceew_data,
+    get_ceew_district_map_index,
+)
 from .lulc_X_terrain.lulc_on_slope_cluster import lulc_on_slope_cluster
 from .lulc_X_terrain.lulc_on_plain_cluster import lulc_on_plain_cluster
 from .clart.clart import generate_clart_layer
@@ -99,6 +104,13 @@ from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
 from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
 from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
+
+
+def _query_bool(request, key, default=False):
+    raw = request.query_params.get(key)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 @api_security_check(allowed_methods="POST")
@@ -1781,6 +1793,71 @@ def generate_stac_collection(request):
 # ---------------------------------------------------------------------------
 # STAC catalog read helpers
 # ---------------------------------------------------------------------------
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def get_ceew_data(request):
+    """Return generated CEEW/CRAVIS district or grid data from local profiles."""
+
+    try:
+        include_metadata = _query_bool(request, "include_metadata", False)
+        include_summary = _query_bool(request, "include_summary", True)
+        include_file_info = _query_bool(request, "include_file_info", True)
+
+        if _query_bool(request, "map_index", False):
+            return Response(
+                get_ceew_district_map_index(
+                    resolve_file_links=not _query_bool(request, "raw", False)
+                ),
+                status=status.HTTP_200_OK,
+            )
+
+        state = request.query_params.get("state")
+        district = request.query_params.get("district")
+        bbox = request.query_params.get("bbox")
+        latitude = request.query_params.get("latitude")
+        longitude = request.query_params.get("longitude")
+
+        if bbox:
+            bundle = load_ceew_data(
+                bbox=bbox,
+                include_metadata=include_metadata,
+                include_summary=include_summary,
+                include_file_info=include_file_info,
+            )
+        elif latitude is not None and longitude is not None:
+            bundle = load_ceew_data(
+                latitude=latitude,
+                longitude=longitude,
+                include_metadata=include_metadata,
+                include_summary=include_summary,
+                include_file_info=include_file_info,
+            )
+        elif state and district:
+            bundle = load_ceew_data(
+                state,
+                district,
+                include_metadata=include_metadata,
+                include_summary=include_summary,
+                include_file_info=include_file_info,
+            )
+        else:
+            return Response(
+                {
+                    "error": "Provide state+district, latitude+longitude, bbox, or map_index=true."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(bundle, status=status.HTTP_200_OK)
+    except CEEWProfileNotFound as e:
+        return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 _STAC_ROOT = os.path.join(
     BASE_DIR,

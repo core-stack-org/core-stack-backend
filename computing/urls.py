@@ -201,6 +201,7 @@ urlpatterns = [
         api.get_stac_catalog,
         name="get_stac_catalog",
     ),
+    path("get_ceew_data/", api.get_ceew_data, name="get_ceew_data"),
     path(
         "stac/",
         api.stac_root_catalog,
