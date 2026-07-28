@@ -77,7 +77,7 @@ outputs:
   taxonomy_csv: data/facilities/outputs/facility_taxonomy.csv
   source_summary_csv: data/facilities/outputs/source_summary.csv
   invalid_coordinates_csv: data/facilities/outputs/invalid_coordinates.csv
-  facilities_gpkg: data/facilities/outputs/pan_india_facilities.gpkg
+  facilities_gpkg: data/base_resources/cs_pan_india_facilities.gpkg
   proximity_gpkg: data/facilities/outputs/cs_village_facility_proximity.gpkg
   metadata_monitor_yaml: utilities/scripts/facilities_utils/config/facilities_metadata_monitor.yaml
 
@@ -85,7 +85,7 @@ references:
   pincode_centroids: data/facilities/reference/india_pincodes_centroid.csv
 
 proximity:
-  village_gpkg: data/admin-boundary/cs_admin_standard.gpkg
+  village_gpkg: data/base_resources/cs_admin_standard.gpkg
   village_layer: cs_admin_standard
   village_id_col: cs_feature_id
   village_context_cols:

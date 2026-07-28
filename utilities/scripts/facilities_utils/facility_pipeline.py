@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -199,7 +200,12 @@ def write_large_attribute_table(gpkg_path: Path, table_name: str, csv_path: Path
         con.commit()
 
 
-def write_gpkg(repo_root: Path, config: Dict[str, Any], chunksize: int) -> None:
+def write_gpkg(
+    repo_root: Path,
+    config: Dict[str, Any],
+    chunksize: int,
+    output_gpkg: Optional[Path] = None,
+) -> None:
     try:
         import geopandas as gpd
         import pyogrio
@@ -211,8 +217,15 @@ def write_gpkg(repo_root: Path, config: Dict[str, Any], chunksize: int) -> None:
     taxonomy_csv = resolve_path(config["outputs"]["taxonomy_csv"], repo_root)
     source_summary_csv = resolve_path(config["outputs"]["source_summary_csv"], repo_root)
     invalid_csv = resolve_path(config["outputs"]["invalid_coordinates_csv"], repo_root)
-    gpkg_path = resolve_path(config["outputs"]["facilities_gpkg"], repo_root)
-    gpkg_path.parent.mkdir(parents=True, exist_ok=True)
+    target_gpkg = (
+        resolve_path(output_gpkg, repo_root)
+        if output_gpkg
+        else resolve_path(config["outputs"]["facilities_gpkg"], repo_root)
+    )
+    target_gpkg.parent.mkdir(parents=True, exist_ok=True)
+    gpkg_path = target_gpkg.with_name(
+        f".{target_gpkg.stem}.building{target_gpkg.suffix}"
+    )
     if gpkg_path.exists():
         gpkg_path.unlink()
 
@@ -256,7 +269,8 @@ def write_gpkg(repo_root: Path, config: Dict[str, Any], chunksize: int) -> None:
     if invalid_csv.exists():
         add_attribute_table_to_gpkg(gpkg_path, config["schema"]["invalid_table"], pd.read_csv(invalid_csv, low_memory=False))
     ensure_sqlite_indexes(gpkg_path)
-    log.info("Saved facilities GeoPackage: %s (%d points)", gpkg_path, total)
+    os.replace(gpkg_path, target_gpkg)
+    log.info("Saved facilities GeoPackage: %s (%d points)", target_gpkg, total)
 
 
 def run_build(args: argparse.Namespace) -> None:
@@ -265,7 +279,12 @@ def run_build(args: argparse.Namespace) -> None:
     if not getattr(args, "gpkg_only", False):
         build_facility_csv(repo_root, config)
     if not args.skip_gpkg:
-        write_gpkg(repo_root, config, args.gpkg_chunksize)
+        write_gpkg(
+            repo_root,
+            config,
+            args.gpkg_chunksize,
+            getattr(args, "facilities_gpkg", None),
+        )
     if not getattr(args, "skip_monitor", False):
         from facility_metadata_monitor import write_monitor
 
@@ -321,6 +340,12 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--skip-gpkg", action="store_true")
     build.add_argument("--gpkg-only", action="store_true")
     build.add_argument("--gpkg-chunksize", type=int, default=250_000)
+    build.add_argument(
+        "--facilities-gpkg",
+        type=Path,
+        default=None,
+        help="Override the canonical data/base_resources output, for smoke tests.",
+    )
     build.add_argument("--skip-monitor", action="store_true")
     build.set_defaults(func=run_build)
 
@@ -335,6 +360,12 @@ def build_parser() -> argparse.ArgumentParser:
     all_cmd.add_argument("--force", action="store_true")
     all_cmd.add_argument("--skip-gpkg", action="store_true")
     all_cmd.add_argument("--gpkg-chunksize", type=int, default=250_000)
+    all_cmd.add_argument(
+        "--facilities-gpkg",
+        type=Path,
+        default=None,
+        help="Override the canonical data/base_resources output, for smoke tests.",
+    )
     all_cmd.add_argument("--with-proximity", action="store_true")
     add_proximity_args(all_cmd, include_force=False)
     all_cmd.set_defaults(func=run_all)

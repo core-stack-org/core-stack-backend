@@ -22,7 +22,7 @@ Useful subcommands:
 uv run --with pandas --with numpy --with pyyaml \
   python utilities/scripts/facilities_utils/facility_pipeline.py clean
 
-# Build lean CSV outputs and data/facilities/outputs/pan_india_facilities.gpkg.
+# Build lean CSV outputs and the canonical runtime GeoPackage.
 uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely --with pyogrio \
   python utilities/scripts/facilities_utils/facility_pipeline.py build
 
@@ -34,7 +34,7 @@ uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely 
 
 ## Outputs
 
-`data/facilities/outputs/pan_india_facilities.gpkg`
+`data/base_resources/cs_pan_india_facilities.gpkg`
 
 - `facilities`: one valid facility point per physical facility.
 - `facility_memberships`: non-spatial class membership table.
@@ -55,6 +55,11 @@ uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely 
 
 The L1/L2 views are retained as rebuildable derivations. The API source asset
 also keeps physical L1/L2 tables for repeated local reads.
+
+This is the same file read by the local Facilities pipeline through
+`utilities/constants.py`; there is no separate promotion or copy step.
+The builder writes a sibling staging GeoPackage first and replaces the
+canonical file only after all tables and indexes have been written.
 
 ## Adding Data
 
@@ -111,7 +116,9 @@ uv run --with pandas --with numpy --with pyyaml \
   python utilities/scripts/facilities_utils/facility_pipeline.py clean --sample-rows 1000 --force
 
 uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely --with pyogrio \
-  python utilities/scripts/facilities_utils/facility_pipeline.py build --gpkg-chunksize 5000
+  python utilities/scripts/facilities_utils/facility_pipeline.py build \
+  --gpkg-chunksize 5000 \
+  --facilities-gpkg /tmp/cs_pan_india_facilities.smoke.gpkg
 
 uv run --with pandas --with numpy --with pyyaml --with geopandas --with shapely --with pyogrio --with scipy \
   python utilities/scripts/facilities_utils/facility_pipeline.py proximity \

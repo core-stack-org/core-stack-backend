@@ -33,7 +33,7 @@ def setup_logging(debug: bool = False, log_path: Optional[Path] = None) -> loggi
 
 def find_repo_root(start: Path) -> Path:
     for candidate in [start, *start.parents]:
-        if (candidate / "data").is_dir() and (candidate / "utilities").is_dir():
+        if (candidate / ".git").exists() and (candidate / "utilities").is_dir():
             return candidate
     raise RuntimeError(f"Could not find repo root from {start}")
 
