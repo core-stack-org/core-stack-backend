@@ -720,7 +720,9 @@ def get_args(iterator_name, global_args, gee_account_id, compute="gee"):
     """
     arg = iterator_name.get("args", {})
     args = dict(arg)
-    if normalize_compute(compute) == "gee":
+    if normalize_compute(compute) == "gee" or iterator_name.get(
+        "pass_gee_account_id", False
+    ):
         args["gee_account_id"] = gee_account_id
     if iterator_name.get("use_global_args", False):
         args = {
