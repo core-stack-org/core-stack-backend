@@ -75,6 +75,14 @@ contain a normalized value and a cluster label. This allows users to begin
 with a small set of category indices, then inspect the specific variables
 driving a village's profile.
 
+**Current Excel and KYL flow.** The analytical source and the published
+GeoPackage/GeoServer layer still retain the 64 `*_feat_value` fields. They are
+not carried into the generated Excel sheet or the village KYL JSON. Those
+report-facing outputs use the 21 `*_cat_cluster` fields, the corresponding 21
+`*_cat_value` fields, and the 109 raw survey fields. This keeps the handoff
+readable and lets a category result be checked against the survey values
+without making future report code depend on the intermediate feature columns.
+
 ## What the Indices Make Possible
 
 The category indices provide a consistent way to filter villages across
@@ -234,8 +242,9 @@ python -m computing.misc.antyodaya --state Jharkhand --district Ranchi --tehsil 
 
 ## References and Data
 
+- [Two-page Mission Antyodaya analysis note](../../../docs/antyodaya_reports/antyodaya_cluster_analysis_blog.pdf)
 - [Mission Antyodaya 2020 Village Cluster Analysis Report](https://drive.google.com/file/d/1WpxzwZ-Kjsf1c1aY7U3VQg-JMAFC2ljg/view?usp=sharing)
-  (also tracked at `docs/reports/antyodaya_cluster_analysis_report.pdf`)
+  (also tracked at `docs/antyodaya_reports/antyodaya_cluster_analysis_report.pdf`)
 - [Village-level normalized values and cluster labels](https://drive.google.com/file/d/1cknoBS24yvOCBZEylHeiYJtWe966uM6I/view?usp=sharing)
 - [Pan-India GeoPackage](https://drive.google.com/file/d/1RY8ualBzeCk3nN_0IStcYFEl_P3OhtH1/view?usp=sharing)
 - [Mission Antyodaya 2020 raw data files](https://drive.google.com/drive/folders/1pmVGOh_VEWIHey7QTdFUhXEIcLEXvdNZ?usp=sharing)

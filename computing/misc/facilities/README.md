@@ -22,7 +22,8 @@ data.
 ## Where the Facility Points Come From
 
 Public facility registries were cleaned and consolidated into one pan-India
-Core Stack GeoPackage (`cs_pan_india_facilities.gpkg`, ~4.19 million facility
+Core Stack GeoPackage
+(`data/base_resources/cs_pan_india_facilities.gpkg`, 4,209,378 facility
 points), keeping one row per physical facility with a stable identifier:
 
 - **Education**: UDISE-style school records (primary through higher
