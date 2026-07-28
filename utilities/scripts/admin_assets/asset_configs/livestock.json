@@ -3,7 +3,7 @@
   "name": "livestock",
   "description": "Pan-India village livestock totals joined to the standardized Core Stack village admin boundaries.",
   "admin": {
-    "gpkg": "data/admin-boundary/cs_admin_standard.gpkg",
+    "gpkg": "data/base_resources/cs_admin_standard.gpkg",
     "layer": "cs_admin_standard",
     "left_key": "pc11_village_id"
   },

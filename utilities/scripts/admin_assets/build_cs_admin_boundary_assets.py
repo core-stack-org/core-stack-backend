@@ -10,7 +10,7 @@ The script intentionally does not import or call ``build_admin_boundary_assets``
 The older script remains useful as implementation history, but this path is
 anchored on:
 
-    data/admin-boundary/cs_admin_standard.gpkg
+    data/base_resources/cs_admin_standard.gpkg
 
 Examples:
 
@@ -56,7 +56,7 @@ else:
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
-DEFAULT_ADMIN_GPKG = Path("data/admin-boundary/cs_admin_standard.gpkg")
+DEFAULT_ADMIN_GPKG = Path("data/base_resources/cs_admin_standard.gpkg")
 DEFAULT_ADMIN_LAYER = "cs_admin_standard"
 DEFAULT_ASSET_CONFIG_DIR = Path(__file__).resolve().parent / "asset_configs"
 ASSET_CONFIG_SCHEMA_VERSION = 1
@@ -1609,7 +1609,7 @@ def add_common_asset_args(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Build configured assets from data/admin-boundary/cs_admin_standard.gpkg."
+        description="Build configured assets from data/base_resources/cs_admin_standard.gpkg."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     asset_parser = subparsers.add_parser("asset", help="Build an asset from a config")
