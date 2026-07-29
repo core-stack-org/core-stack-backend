@@ -44,7 +44,8 @@
         },
         {
             "name": "generate_swb",
-            "use_global_args": true
+            "use_global_args": true,
+            "pass_gee_account_id": true
         },
         {
             "name": "tree_health_ch_raster",

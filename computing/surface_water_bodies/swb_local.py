@@ -16,9 +16,14 @@ from computing.local_compute_helper import (
     write_vector_output,
 )
 from computing.surface_water_bodies.clip_swb_local import _clip_gdf, _to_geom
+from computing.surface_water_bodies.swb3 import (
+    waterbody_catchment_streamorder_properties,
+)
+from computing.surface_water_bodies.swb4 import waterbody_wbc_intersection
 from computing.utils import (
     push_shape_to_geoserver,
     save_layer_info_to_db,
+    sync_fc_to_geoserver,
     update_layer_sync_status,
 )
 from nrm_app.celery import app
@@ -104,6 +109,10 @@ def _resolve_asset_suffix(state, district, block, asset_suffix):
 
 def _layer_name(asset_suffix):
     return f"surface_waterbodies_{asset_suffix}_local"
+
+
+def _final_layer_name(asset_suffix):
+    return f"surface_waterbodies_{asset_suffix}"
 
 
 def _gee_description(asset_suffix):
@@ -272,6 +281,131 @@ def _push_local_swb_to_geoserver(output_path, layer_name):
     return bool(geoserver_response) and geoserver_response.get("status_code") in (200, 201)
 
 
+def _continue_swb_in_gee(
+    state,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
+    gee_account_id,
+    roi,
+):
+    swb2_asset_suffix = f"{asset_suffix}_local"
+    swb3_task_id, swb3_asset_id = waterbody_catchment_streamorder_properties(
+        roi=roi,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        app_type=app_type,
+        gee_account_id=gee_account_id,
+        supporting_asset_suffix=asset_suffix,
+        swb2_asset_suffix=swb2_asset_suffix,
+    )
+    if swb3_task_id:
+        check_task_status([swb3_task_id])
+    if not is_gee_asset_exists(swb3_asset_id):
+        raise RuntimeError(f"SWB3 GEE asset was not created: {swb3_asset_id}")
+
+    swb4_task_id, swb4_asset_id = waterbody_wbc_intersection(
+        roi=roi,
+        state=state,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        app_type=app_type,
+    )
+    if swb4_task_id:
+        check_task_status([swb4_task_id])
+    if not is_gee_asset_exists(swb4_asset_id):
+        raise RuntimeError(f"SWB4 GEE asset was not created: {swb4_asset_id}")
+
+    make_asset_public(swb3_asset_id)
+    make_asset_public(swb4_asset_id)
+    return asset_suffix, swb3_asset_id
+
+
+def _sync_final_swb(
+    state,
+    district,
+    block,
+    layer_name,
+    asset_suffix,
+    asset_id,
+    start_year,
+    end_year,
+    push_to_geoserver,
+    sync_layer_metadata,
+):
+    layer_id = None
+    if sync_layer_metadata:
+        misc = {
+            "is_generated_locally": True,
+            "source_stage": "swb3_gee_from_swb2_local",
+        }
+        if start_year is not None:
+            misc["start_year"] = start_year
+        if end_year is not None:
+            misc["end_year"] = end_year
+        layer_id = save_layer_info_to_db(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=layer_name,
+            asset_id=asset_id,
+            dataset_name=DATASET_NAME,
+            misc=misc,
+            algorithm=LOCAL_ALGORITHM,
+            algorithm_version=LOCAL_ALGORITHM_VERSION,
+        )
+
+    if not push_to_geoserver:
+        return True
+
+    response = sync_fc_to_geoserver(
+        ee.FeatureCollection(asset_id),
+        asset_suffix,
+        layer_name,
+        workspace=GEOSERVER_WORKSPACE,
+    )
+    synced = bool(response) and response.get("status_code") in (200, 201)
+    if synced and layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+    return synced
+
+
+def _complete_swb_pipeline(
+    state,
+    district,
+    block,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
+    gee_account_id,
+    roi,
+    start_year,
+    end_year,
+    push_to_geoserver,
+    sync_layer_metadata,
+):
+    final_asset_suffix, final_asset_id = _continue_swb_in_gee(
+        state=state,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        app_type=app_type,
+        gee_account_id=gee_account_id,
+        roi=roi,
+    )
+    return _sync_final_swb(
+        state=state,
+        district=district,
+        block=block,
+        layer_name=_final_layer_name(asset_suffix),
+        asset_suffix=final_asset_suffix,
+        asset_id=final_asset_id,
+        start_year=start_year,
+        end_year=end_year,
+        push_to_geoserver=push_to_geoserver,
+        sync_layer_metadata=sync_layer_metadata,
+    )
+
+
 def run_swb_local(
     state=None,
     district=None,
@@ -284,6 +418,8 @@ def run_swb_local(
     sync_layer_metadata=True,
     gee_account_id=None,
     app_type="MWS",
+    start_year=None,
+    end_year=None,
 ):
     state = str(state).strip().lower() if state else None
     district = str(district).strip().lower() if district else None
@@ -337,6 +473,9 @@ def run_swb_local(
     )
     logger.info("Local SWB output path: %s", output_path)
 
+    ee_initialize(gee_account_id)
+    gee_roi = gdf_to_ee_fc(_prepare_gdf_for_gee(roi_gdf[["geometry"]]))
+
     if is_gee_asset_exists(gee_asset_id):
         logger.info("GEE asset already exists, reusing: %s", gee_asset_id)
         layer_id = None
@@ -361,7 +500,20 @@ def run_swb_local(
             if layer_at_geoserver and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 logger.info("Sync to GeoServer flag updated for existing local SWB layer")
-        return True
+        return _complete_swb_pipeline(
+            state=state,
+            district=district,
+            block=block,
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+            gee_account_id=gee_account_id,
+            roi=gee_roi,
+            start_year=start_year,
+            end_year=end_year,
+            push_to_geoserver=push_to_geoserver,
+            sync_layer_metadata=sync_layer_metadata,
+        )
 
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
@@ -384,7 +536,6 @@ def run_swb_local(
     )
     logger.info("Saved local SWB vector to disk: %s", local_asset_path)
 
-    ee_initialize(gee_account_id)
     logger.info(
         "Initialized Earth Engine for local SWB export: gee_account_id=%s",
         gee_account_id,
@@ -474,7 +625,20 @@ def run_swb_local(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             logger.info("Sync to GeoServer flag updated for local SWB layer: %s", layer_name)
 
-    return True
+    return _complete_swb_pipeline(
+        state=state,
+        district=district,
+        block=block,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        app_type=app_type,
+        gee_account_id=gee_account_id,
+        roi=gee_roi,
+        start_year=start_year,
+        end_year=end_year,
+        push_to_geoserver=push_to_geoserver,
+        sync_layer_metadata=sync_layer_metadata,
+    )
 
 
 def _generate_swb_local_task(
@@ -489,7 +653,6 @@ def _generate_swb_local_task(
     gee_account_id=None,
     app_type="MWS",
 ):
-    _ = start_year, end_year
     return run_swb_local(
         state=state,
         district=district,
@@ -501,6 +664,8 @@ def _generate_swb_local_task(
         sync_layer_metadata=True,
         gee_account_id=gee_account_id,
         app_type=app_type,
+        start_year=start_year,
+        end_year=end_year,
     )
 
 

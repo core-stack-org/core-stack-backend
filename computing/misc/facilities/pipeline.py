@@ -46,7 +46,7 @@ from utilities.pipelines.outputs import (
     frame_profile,
     input_signatures,
     mark_cached_result,
-    scope_output_identity,
+    resolved_scope_output_identity,
     slug,
     stable_hash,
     utc_now_text,
@@ -66,7 +66,7 @@ from utilities.constants import (
 
 CONFIG_PATH = Path(__file__).with_name("facilities_pipeline.yaml")
 ALGORITHM = "local-facilities-live-proximity"
-ALGORITHM_VERSION = "2.0"
+ALGORITHM_VERSION = "2.1"
 SOURCE_DEFAULTS = {
     "admin_gpkg": ADMIN_BOUNDARY_GPKG,
     "facilities_gpkg": FACILITIES_GPKG,
@@ -90,10 +90,6 @@ def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
         sources[name] = sources.get(name) or default
     resolved["sources"] = sources
     return resolved
-
-
-def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
-    return f"{prefix}_{slug(district)}_{slug(tehsil)}".strip("_")
 
 
 def _cli_request(state: str, district: str, tehsil: str, sync_to_geoserver: bool = True) -> StandardRequest:
@@ -901,7 +897,22 @@ def run_facilities_pipeline(
     config = _apply_source_defaults(load_config(config_path))
     outputs = resolve_output_options(request, config)
     output_config = config["output"]
-    output_parts, layer_name = scope_output_identity(output_config["layer_prefix"], request.scope)
+
+    t0 = time.perf_counter()
+    admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
+    (
+        admin_selection,
+        registration_scope,
+        output_parts,
+        layer_name,
+    ) = resolved_scope_output_identity(
+        admin_source,
+        output_config["layer_prefix"],
+        AdminScope.from_mapping(asdict(request.scope)),
+        include_geometry=True,
+    )
+    timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
+
     output_root = _repo_path(output_config["root"]).joinpath(*output_parts)
     bundle = OutputBundle(
         output_root,
@@ -924,13 +935,9 @@ def run_facilities_pipeline(
     created_facility_indexes = _ensure_facility_indexes(config)
     timings["ensure_facility_indexes_seconds"] = round(time.perf_counter() - t0, 3)
 
-    t0 = time.perf_counter()
-    admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
-    admin_selection = admin_source.read_scope(AdminScope.from_mapping(asdict(request.scope)), include_geometry=True)
     admin_rows = admin_selection.rows
     bounds = _bbox(admin_rows)
     village_points = _village_points(admin_rows)
-    timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
     classification = _classification(config)
@@ -1134,13 +1141,9 @@ def run_facilities_pipeline(
         }
     ).as_posix()
     if request.publish.register_layers and published_layers:
-        state = request.scope.state_name
-        district = request.scope.district_name
-        block = request.scope.tehsil_name
-        if not (state and district and block):
-            raise ValueError(
-                "Layer registration requires state, district, and tehsil names."
-            )
+        state = registration_scope.state_name
+        district = registration_scope.district_name
+        block = registration_scope.tehsil_name
         registrations: dict[str, dict[str, Any]] = {}
         for role, published in published_layers.items():
             dataset_name = (

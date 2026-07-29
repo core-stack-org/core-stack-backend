@@ -131,12 +131,12 @@ base_layers:
           source: ""
           type: file
 
-        - name: soil health
+        - name: soil_health
           local_path: "{DATA_DIR}/base_layers/soil_health/soil_health.tif"
           source: ""
           type: file
 
-        - name: soil type
+        - name: soil_type
           local_path: "{DATA_DIR}/base_layers/soil_type/"
           source: ""
           type: directory
@@ -161,7 +161,7 @@ base_layers:
         - name: Agroecological Natural Farming
           aliases:
               - aez
-          local_path: "{DATA_DIR}/base_layers/AEZs/Agro_Ecological_Regions.shp"
+          local_path: "{DATA_DIR}/base_layers/AEZ_GeoJSON.geojson"
           source: s3://corestack-datasets/base_layers/AEZs/Agro_Ecological_Regions.shp
           type: file
 

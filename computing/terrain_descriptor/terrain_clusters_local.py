@@ -119,6 +119,7 @@ def run_terrain_clusters_local(
             layer_name=layer_name,
             asset_id=local_vector_path,
             dataset_name="Terrain Vector",
+            misc={"is_generated_locally": True},
             algorithm="FABDEM",
             algorithm_version="2.0",
         )
