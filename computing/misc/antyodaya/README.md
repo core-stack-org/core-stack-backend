@@ -244,8 +244,7 @@ python -m computing.misc.antyodaya --state Jharkhand --district Ranchi --tehsil 
 
 - [Two-page Mission Antyodaya analysis note](https://github.com/core-stack-org/core-stack-backend/blob/main/docs/antyodaya_reports/antyodaya_cluster_analysis_blog.pdf)
 - [Mission Antyodaya 2020 Village Cluster Analysis Report](https://github.com/core-stack-org/core-stack-backend/blob/main/docs/antyodaya_reports/antyodaya_cluster_analysis_report.pdf)
-- [Village-level normalized values and cluster labels](https://drive.google.com/file/d/1cknoBS24yvOCBZEylHeiYJtWe966uM6I/view?usp=sharing)
-- [Pan-India GeoPackage](https://drive.google.com/file/d/1RY8ualBzeCk3nN_0IStcYFEl_P3OhtH1/view?usp=sharing)
+- [Prepared CoRE Stack base resources, including the Antyodaya CSV, SQLite sidecar and pan-India GeoPackage](https://drive.google.com/drive/folders/1-WD9t2t9C1OrF7P24MhBXA7tNfUK4N-q?usp=sharing)
 - [Mission Antyodaya 2020 raw data files](https://drive.google.com/drive/folders/1pmVGOh_VEWIHey7QTdFUhXEIcLEXvdNZ?usp=sharing)
 - [GEE Antyodaya 2020 Explorer App](https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer)
 

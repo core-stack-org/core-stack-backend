@@ -183,3 +183,8 @@ python -m computing.misc.facilities --state "MADHYA PRADESH" --district DAMOH --
 Outputs (`gpkg`, `readme`, `metadata`, `geoserver`) can each be
 toggled per request under `outputs`, or by default in
 `facilities_pipeline.yaml` `default_outputs`.
+
+## Data
+
+- [Prepared CoRE Stack base resources, including the indexed facilities GeoPackage](https://drive.google.com/drive/folders/1-WD9t2t9C1OrF7P24MhBXA7tNfUK4N-q?usp=sharing)
+- [Facilities raw data files](https://drive.google.com/drive/folders/1ikMZoxGxTVHHGdgf95t4TbH_1LAtBRSj?usp=sharing)
