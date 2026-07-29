@@ -38,12 +38,12 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
 
-    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
-    aoi = (
-        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-        .filter(ee.Filter.eq("Name", "Odisha"))
-        .geometry()
-    )
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
 
     # Set your wind speed threshold here (in m/s)
     WIND_THRESHOLD = 10.0
@@ -55,7 +55,7 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     era5Hourly = (
         ee.ImageCollection("ECMWF/ERA5_LAND/HOURLY")
         .filterBounds(aoi)
-        .filterDate("2000-01-01", f"{end_year}-12-31")
+        .filterDate("2000-01-01", ee.Date.fromYMD(end_year, 12, 31))
         .select(["u_component_of_wind_10m", "v_component_of_wind_10m"])
     )
 
@@ -130,14 +130,16 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
             ee.String("WSmeanGT_").cat(year_str)
         )
 
-        return ee.Image(image).addBands(ee.Image([ws_max, ws_hours, ws_mean]))
+        return ee.Image(image).addBands(ws_max).addBands(ws_hours).addBands(ws_mean)
 
     empty_image = ee.Image().mask(ee.Image(0))
     output_image = ee.Image(years.iterate(add_year_bands, empty_image))
 
+    output_image = output_image.select(output_image.bandNames().remove("constant"))
+
     #  Export execution block
     task_id = export_raster_asset_to_gee(
-        output_image.clip(aoi), OUTPUT_DESC, OUTPUT_ASSET_ID, scale=1000, region=aoi
+        output_image.clip(aoi), OUTPUT_DESC, OUTPUT_ASSET_ID, scale=11132, region=aoi
     )
 
     return task_id

@@ -66,12 +66,12 @@ def generate_rainfall_resilience(
     BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
 
-    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
-    aoi = (
-        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-        .filter(ee.Filter.eq("Name", "Odisha"))
-        .geometry()
-    )
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
     startYearTree = treeMeta.select("start_year")

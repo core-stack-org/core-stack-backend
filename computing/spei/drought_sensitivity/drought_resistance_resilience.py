@@ -1,5 +1,6 @@
 import ee
 
+from utilities.constants import AEZ
 from utilities.gee_utils import (
     ee_initialize,
     is_gee_asset_exists,
@@ -50,12 +51,12 @@ def generate_drought_resistance(
     BASELINE_START_YEAR = 2004  # SPEI has no data before 2004
     BASELINE_END_YEAR = 2024
 
-    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
-    aoi = (
-        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-        .filter(ee.Filter.eq("Name", "Odisha"))
-        .geometry()
-    )
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
     # Loading the assets :=
 
     treeMeta = ee.Image(TREE_COVER_ASSET)

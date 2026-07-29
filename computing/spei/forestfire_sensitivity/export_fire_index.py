@@ -36,12 +36,12 @@ def fire_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
 
-    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    aoi = (
-        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-        .filter(ee.Filter.eq("Name", "Odisha"))
-        .geometry()
-    )
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
     FRP_THRESHOLD = 30
     """
     Fixed baseline window for zScore normalization — independent of START_YEAR/END_YEAR. 
@@ -148,12 +148,19 @@ def fire_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
         )
         maxFRPBand = yearImg.select("maxFRP").rename(ee.String("maxFRP_").cat(yearStr))
 
-        return ee.Image(acc).addBands(
-            [frpBand, zBand, fireDaysBand, fireAvgBand, maxFRPBand]
+        return (
+            ee.Image(acc)
+            .addBands(frpBand)
+            .addBands(zBand)
+            .addBands(fireDaysBand)
+            .addBands(fireAvgBand)
+            .addBands(maxFRPBand)
         )
 
     empty_image = ee.Image().mask(ee.Image(0))
     output_image = ee.Image(analysisYears.iterate(add_bands_for_year, empty_image))
+
+    output_image = output_image.select(output_image.bandNames().remove("constant"))
 
     #  Export execution block
     task_id = export_raster_asset_to_gee(
