@@ -10,10 +10,10 @@ sources:
   admin_layer: cs_admin_standard
   # csv: data/tests/fixtures/cs_antyodaya_2020_cluster_analysis.csv
   mapping_yaml: computing/misc/antyodaya/antyodaya_2020_mapping.yaml
-  report_pdf: docs/reports/antyodaya_cluster_analysis_report.pdf
-  blog_pdf: docs/reports/antyodaya_cluster_analysis_blog.pdf
-  report_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_report.pdf
-  blog_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/reports/antyodaya_cluster_analysis_blog.pdf
+  report_pdf: docs/antyodaya_reports/antyodaya_cluster_analysis_report.pdf
+  blog_pdf: docs/antyodaya_reports/antyodaya_cluster_analysis_blog.pdf
+  report_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/antyodaya_reports/antyodaya_cluster_analysis_report.pdf
+  blog_url: https://github.com/core-stack-org/core-stack-backend/blob/main/docs/antyodaya_reports/antyodaya_cluster_analysis_blog.pdf
   gee_explorer_url: https://core-stack-learn.projects.earthengine.app/view/antyodaya2020explorer
 
 keys:
