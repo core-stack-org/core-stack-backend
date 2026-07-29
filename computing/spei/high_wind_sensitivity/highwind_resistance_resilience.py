@@ -49,12 +49,12 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
 
-    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
-    aoi = (
-        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-        .filter(ee.Filter.eq("Name", "Odisha"))
-        .geometry()
-    )
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
     # Loading the assets :=
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
@@ -74,7 +74,7 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     wsImages = []
     for y in range(wsMinYear, wsMaxYear + 1):
         wsImages.append(
-            windIndex_raw.select("WSmax_").cat(y).rename("windspeed").set("year", y)
+            windIndex_raw.select(f"WSmax_{y}").rename("windspeed").set("year", y)
         )
     wsCol = ee.ImageCollection(wsImages)
 
@@ -167,6 +167,7 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
     kndviMinYear = min(start_year, BASELINE_START_YEAR)
     kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 

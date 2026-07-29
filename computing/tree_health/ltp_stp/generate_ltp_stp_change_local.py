@@ -20,11 +20,14 @@ ACZS = {
     "Trans Gangetic Plain Region": "TGPR",
     "Eastern Himalayan Region": "EHR",
     "Western Himalayan Region": "WHR",
+    "West Coast Plains & Ghat Region": "WCPGR",
+    "Gujarat Plains & Hills Region": "GPHR",
+    "Western Dry Region": "WDR",
 }
 
 
 @app.task(bind=True)
-def generate_ltp_stp_change_local(self, start_year, end_year):
+def generate_ltp_stp_change_local(self, year_1: int, year_2: int, scale=25):
     """Generate LTP-STP change rasters for the given year pair.
 
     For each ACZ, this function loads the LTP raster for year_1 and year_2,
@@ -37,15 +40,17 @@ def generate_ltp_stp_change_local(self, start_year, end_year):
         # Input file paths for both years.
         ltp_file_1 = os.path.join(
             LOCAL_OUTPUT_BASE_DIR,
-            f"ltp_{start_year}",
+            f"{scale}",
+            f"ltp_{year_1}",
             acronym,
-            f"ltp_{start_year}_{acronym}.tif",
+            f"ltp_{year_1}_{acronym}.tif",
         )
         ltp_file_2 = os.path.join(
             LOCAL_OUTPUT_BASE_DIR,
-            f"ltp_{end_year}",
+            f"{scale}",
+            f"ltp_{year_2}",
             acronym,
-            f"ltp_{end_year}_{acronym}.tif",
+            f"ltp_{year_2}_{acronym}.tif",
         )
 
         if not (os.path.exists(ltp_file_1) and os.path.exists(ltp_file_2)):
@@ -56,7 +61,7 @@ def generate_ltp_stp_change_local(self, start_year, end_year):
         with rasterio.open(ltp_file_1) as src1:
             ltp1 = src1.read(1)
             profile = src1.profile.copy()
-            nodata = src1.nodata if src1.nodata is not None else -9999
+            nodata = src1.nodata if src1.nodata is not None else 255
 
         # Read second year raster.
         with rasterio.open(ltp_file_2) as src2:
@@ -93,15 +98,22 @@ def generate_ltp_stp_change_local(self, start_year, end_year):
             driver="GTiff", dtype="uint8", count=1, compress="lzw", nodata=nodata
         )
 
-        outdir = os.path.join(
-            LOCAL_OUTPUT_BASE_DIR, f"ltp_change_{start_year}_{end_year}", acronym
-        )
+        outdir = os.path.join(LOCAL_OUTPUT_BASE_DIR, f"ltp_change_{year_1}_{year_2}")
         os.makedirs(outdir, exist_ok=True)
-        outfile = os.path.join(
-            outdir, f"ltp_change_{start_year}_{end_year}_{acronym}.tif"
-        )
+        outfile = os.path.join(outdir, f"ltp_change_{year_1}_{year_2}_{acronym}.tif")
 
         with rasterio.open(outfile, "w", **profile) as dst:
             dst.write(change, 1)
 
         print("Saved:", outfile)
+
+
+# To merge the files in the output directory and run the following command in terminal:
+# gdal_merge.py \
+# -o ltp_stp_change_2017_2024.tif \
+# -co COMPRESS=LZW \
+# -co TILED=YES \
+# -co BIGTIFF=YES \
+# -n 255 \
+# -a_nodata 255 \
+# *.tif

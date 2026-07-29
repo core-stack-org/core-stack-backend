@@ -30,7 +30,6 @@ from computing.change_detection.change_detection_vector import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
-from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from computing.layer_dependency.layer_generation_in_order import (
     layer_generate_map,
     normalize_compute as _normalize_layer_order_compute,
@@ -56,6 +55,7 @@ from .cropping_intensity.cropping_intensity import generate_cropping_intensity
 from .cropping_intensity.cropping_intesity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
+from .forest_fire.forest_fire import generate_forest_fire_layer
 from .soil_health.soil_health import soil_health_local
 
 from .drought.drought import calculate_drought
@@ -209,12 +209,7 @@ from .tree_health.local.canopy_height_local import tree_health_ch_raster_local
 from .tree_health.local.canopy_height_vector_local import tree_health_ch_vector_local
 from .tree_health.local.ccd_local import tree_health_ccd_raster_local
 from .tree_health.local.ccd_vector_local import tree_health_ccd_vector_local
-from .tree_health.local.overall_change_local import (
-    tree_health_overall_change_raster_local,
-)
-from .tree_health.local.overall_change_vector_local import (
-    tree_health_overall_change_vector_local,
-)
+
 from .tree_health.ltp_stp.generate_ltp_stp_change_local import (
     generate_ltp_stp_change_local,
 )
@@ -2780,7 +2775,7 @@ def generate_forest_fire(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fire_layer_updated.apply_async(
+        generate_forest_fire_layer.apply_async(
             kwargs={
                 "state": state,
                 "district": district,

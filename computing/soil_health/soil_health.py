@@ -43,9 +43,14 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 
 def _get_lulc_mask_classes(nutrient):
     nutrient = str(nutrient).strip().upper()
-    if nutrient in {"OC", "OLM"}:
-        return {6}
-    if nutrient in {"N", "P", "K"}:
+    if nutrient == "OLM":
+        return {6, 12}
+    if nutrient in {
+        "N",
+        "P",
+        "K",
+        "OC",
+    }:
         return {8, 9, 10, 11}
     raise ValueError(f"Unsupported nutrient for LULC masking: {nutrient}")
 

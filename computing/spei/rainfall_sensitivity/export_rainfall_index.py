@@ -47,12 +47,12 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
     BASELINE_END_YEAR = 2024
 
     # 1. AOI
-    # aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry() # TODO
-    aoi = (
-        ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-        .filter(ee.Filter.eq("Name", "Odisha"))
-        .geometry()
-    )
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
 
     # 2. BASELINE HEAVY RAINFALL THRESHOLD
     chirps = (
@@ -159,12 +159,19 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
         )
         maxDayBand = yearImg.select("maxDay").rename(ee.String("maxDay_").cat(yearStr))
 
-        return ee.Image(acc).addBands(
-            [hmBand, zBand, heavyDaysBand, heavyAvgBand, maxDayBand]
+        return (
+            ee.Image(acc)
+            .addBands(hmBand)
+            .addBands(zBand)
+            .addBands(heavyDaysBand)
+            .addBands(heavyAvgBand)
+            .addBands(maxDayBand)
         )
 
     empty_image = ee.Image().mask(ee.Image(0))
     output_image = ee.Image(analysisYears.iterate(add_bands_for_year, empty_image))
+
+    output_image = output_image.select(output_image.bandNames().remove("constant"))
 
     task_id = export_raster_asset_to_gee(
         output_image.clip(aoi), OUTPUT_DESC, OUTPUT_ASSET_ID, scale=5566, region=aoi

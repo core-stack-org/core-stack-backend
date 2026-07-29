@@ -43,12 +43,6 @@ TREE_CLASS = 6
 # Patches below this are classified as Short-term Tree Patches (STP)
 AREA_THRESHOLD_HA = 1.0
 
-# Source LULC data resolution in meters
-SOURCE_RESOLUTION_M = 10
-
-# Target output resolution in meters (1:2.5 resampling ratio)
-TARGET_RESOLUTION_M = 25
-
 # Base output directory for LTP/STP raster files
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ltp_stp"
 
@@ -68,11 +62,14 @@ ACZS = {
     "Western Himalayan Region": "WHR",
     "Upper Gangetic Plain Region": "UGPR",
     "Trans Gangetic Plain Region": "TGPR",
+    "West Coast Plains & Ghat Region": "WCPGR",
+    "Gujarat Plains & Hills Region": "GPHR",
+    "Western Dry Region": "WDR",
 }
 
 
 @app.task(bind=True)
-def generate_ltp_stp_local(self, start_year, end_year):
+def generate_ltp_stp_local(self, start_year, end_year, scale=25):
     """
     Main function to generate LTP/STP classification rasters.
 
@@ -83,6 +80,7 @@ def generate_ltp_stp_local(self, start_year, end_year):
     Args:
         start_year: Beginning year for analysis period
         end_year: End year for analysis period
+        scale: Scaling factor for LTP/STP
     """
     # Load district boundary geometries from GeoJSON
     district_boundaries = gpd.read_file(
@@ -117,6 +115,7 @@ def generate_ltp_stp_local(self, start_year, end_year):
             # Create output directory for this ACZ and year
             output_dir = os.path.join(
                 LOCAL_OUTPUT_BASE_DIR,
+                f"{scale}",
                 f"ltp_{year}",
                 acronym,
             )
@@ -137,6 +136,7 @@ def generate_ltp_stp_local(self, start_year, end_year):
                 lulc_sources,
                 output_dir,
                 year,
+                scale,
             )
 
             # Merge individual district rasters into single ACZ mosaic
@@ -147,7 +147,7 @@ def generate_ltp_stp_local(self, start_year, end_year):
                 src.close()
 
 
-def get_lulc_mode(lulc_sources, district):
+def get_lulc_mode(lulc_sources, district, scale):
     """
     Extract and process LULC data for a district.
 
@@ -157,6 +157,7 @@ def get_lulc_mode(lulc_sources, district):
     Args:
         lulc_sources: List of opened rasterio LULC source files (3 files)
         district: GeoDataFrame containing the district geometry
+        scale: Scaling factor for LTP/STP
 
     Returns:
         tree: Binary array (1 = tree, 0 = non-tree)
@@ -223,42 +224,48 @@ def get_lulc_mode(lulc_sources, district):
         ),
     ).astype(np.uint8)
 
-    # Resample modal LULC from 10m to 25m resolution
-    modal, transform = resample_to_25m(
-        modal,
-        transform,
-        source_transform,
-        crs,
-        nodata,
-    )
+    if scale == 25:
+        # Resample modal LULC from 10m to 25m resolution
+        modal, transform = resample_tiff(
+            modal,
+            transform,
+            source_transform,
+            crs,
+            nodata,
+            source_resolution_m=10,
+            target_resolution_m=25,
+        )
 
     # Extract only tree class pixels as binary mask
     tree = (modal == TREE_CLASS).astype(np.uint8)
     return tree, transform, profile
 
 
-def resample_to_25m(
+def resample_tiff(
     clipped,
     transform,
     source_transform,
     src_crs,
     nodata,
+    source_resolution_m,
+    target_resolution_m,
 ):
     """
-    Resample raster from 10m to 25m resolution using MODE resampling.
+    Resample raster using MODE resampling.
 
     Snaps the output to the original LULC grid to ensure alignment with
     other datasets. This maintains consistency across multiple processing runs.
 
     Args:
-        clipped: Input raster array at 10m resolution
+        clipped: Input raster array
         transform: Current Affine transform of clipped data
         source_transform: Original Affine transform of LULC source
         src_crs: Coordinate reference system
         nodata: Nodata value
-
+        source_resolution_m: Source resolution in m
+        target_resolution_m: Target resolution in m
     Returns:
-        dst: Resampled raster array at 25m resolution
+        dst: Resampled raster array
         dst_transform: Affine transform of output raster
     """
     # Extract coordinates from current transform
@@ -275,7 +282,7 @@ def resample_to_25m(
     src_top = source_transform.f
 
     # Calculate resampling scale factor (2.5x for 10m -> 25m)
-    scale = TARGET_RESOLUTION_M / SOURCE_RESOLUTION_M
+    scale = target_resolution_m / source_resolution_m
 
     # Calculate target pixel resolution
     target_res_x = abs(source_transform.a) * scale
@@ -323,7 +330,7 @@ def resample_to_25m(
 
 
 def generate_district_tiff(
-    acronym, district_boundaries, district_names, lulc_sources, output_dir, year
+    acronym, district_boundaries, district_names, lulc_sources, output_dir, year, scale
 ):
     """
     Generate LTP/STP classification rasters for each district.
@@ -339,6 +346,7 @@ def generate_district_tiff(
         lulc_sources: List of opened LULC rasterio objects
         output_dir: Directory to save output GeoTIFFs
         year: Year for file naming
+        scale: Scale factor for patch size
     """
     for district_name in district_names:
         print("  Processing district:", district_name)
@@ -351,10 +359,7 @@ def generate_district_tiff(
             continue
 
         # Get modal LULC tree mask for the district
-        tree, transform, profile = get_lulc_mode(
-            lulc_sources,
-            district,
-        )
+        tree, transform, profile = get_lulc_mode(lulc_sources, district, scale)
 
         # Polygonize tree patches - convert raster to vector polygons
         # shapes() returns (geometry, value) tuples for connected regions
