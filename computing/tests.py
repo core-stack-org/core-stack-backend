@@ -266,6 +266,42 @@ class BulkLayerCommandTests(SimpleTestCase):
             },
             queue="layer_bulk",
         )
+        get_locations.assert_called_once_with(
+            blocks=["Masalia"],
+            limit=None,
+        )
+
+    @patch(
+        "computing.management.commands.bulk_generate_layers."
+        "bulk_generate_layer.apply_async"
+    )
+    @patch(
+        "computing.management.commands.bulk_generate_layers.get_active_locations"
+    )
+    def test_command_accepts_multiple_blocks(self, get_locations, apply_async):
+        get_locations.return_value = [
+            Location("Jharkhand", "Dumka", "Jarmundi"),
+            Location("Jharkhand", "Dumka", "Masalia"),
+        ]
+        apply_async.return_value.id = "task-id"
+
+        call_command(
+            "bulk_generate_layers",
+            "lulc_v3",
+            "--district=Dumka",
+            "--block=Jarmundi",
+            "--block=Masalia",
+            "--start-year=2018",
+            "--end-year=2024",
+            stdout=StringIO(),
+        )
+
+        get_locations.assert_called_once_with(
+            district="Dumka",
+            blocks=["Jarmundi", "Masalia"],
+            limit=None,
+        )
+        self.assertEqual(apply_async.call_count, 2)
 
 
 class BulkLayerGenerationTests(TestCase):
@@ -336,4 +372,16 @@ class BulkLayerGenerationTests(TestCase):
                 "district": "Dumka",
                 "block": "Jarmundi",
             },
+        )
+
+    def test_active_locations_accept_multiple_blocks(self):
+        locations = get_active_locations(
+            state="jharkhand",
+            district="dumka",
+            blocks=["masalia", "JARMUNDI"],
+        )
+
+        self.assertEqual(
+            [location.block for location in locations],
+            ["Jarmundi", "Masalia"],
         )

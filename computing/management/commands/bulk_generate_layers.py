@@ -19,7 +19,12 @@ class Command(BaseCommand):
         parser.add_argument("--all-active", action="store_true")
         parser.add_argument("--state")
         parser.add_argument("--district")
-        parser.add_argument("--block")
+        parser.add_argument(
+            "--block",
+            dest="blocks",
+            action="append",
+            help="Tehsil/block name. Repeat to select multiple blocks.",
+        )
         parser.add_argument("--limit", type=int)
         parser.add_argument("--queue", default=DEFAULT_QUEUE)
         parser.add_argument("--compute", choices=("local", "gee"), default="local")
@@ -60,9 +65,11 @@ class Command(BaseCommand):
 
         filters = {
             name: options[name]
-            for name in ("state", "district", "block")
+            for name in ("state", "district")
             if options[name]
         }
+        if options["blocks"]:
+            filters["blocks"] = options["blocks"]
         if not options["all_active"] and not filters:
             raise CommandError(
                 "Specify --all-active or at least one of "

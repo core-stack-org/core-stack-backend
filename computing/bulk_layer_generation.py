@@ -1,7 +1,10 @@
 import inspect
 from dataclasses import asdict, dataclass
+from functools import reduce
+from operator import or_
 from typing import Any, Callable, Mapping
 
+from django.db.models import Q
 from django.utils.module_loading import import_string
 
 from geoadmin.models import TehsilSOI
@@ -193,8 +196,12 @@ def get_active_locations(
     state: str | None = None,
     district: str | None = None,
     block: str | None = None,
+    blocks: list[str] | None = None,
     limit: int | None = None,
 ) -> list[Location]:
+    if block and blocks:
+        raise ValueError("Use either block or blocks, not both.")
+
     queryset = (
         TehsilSOI.objects.filter(
             active_status=True,
@@ -213,8 +220,14 @@ def get_active_locations(
         queryset = queryset.filter(district__state__state_name__iexact=state)
     if district:
         queryset = queryset.filter(district__district_name__iexact=district)
-    if block:
-        queryset = queryset.filter(tehsil_name__iexact=block)
+    selected_blocks = [block] if block else list(dict.fromkeys(blocks or []))
+    if selected_blocks:
+        queryset = queryset.filter(
+            reduce(
+                or_,
+                (Q(tehsil_name__iexact=name) for name in selected_blocks),
+            )
+        )
     if limit is not None:
         queryset = queryset[:limit]
 
