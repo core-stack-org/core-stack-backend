@@ -246,19 +246,19 @@ def clip_soil_health_raster(
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("Sync to GeoServer flag updated for Soil health raster")
 
-                try:
-                    layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                        state=state,
-                        district=district,
-                        block=block,
-                        layer_name=layer_name,
-                    )
-                    update_layer_sync_status(
-                        layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-                    )
-                    print("STAC metadata updated for Soil health raster")
-                except Exception as e:
-                    print(f"Error generating STAC: {e}")
+                # try:
+                #     layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
+                #         state=state,
+                #         district=district,
+                #         block=block,
+                #         layer_name=layer_name,
+                #     )
+                #     update_layer_sync_status(
+                #         layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+                #     )
+                #     print("STAC metadata updated for Soil health raster")
+                # except Exception as e:
+                #     print(f"Error generating STAC: {e}")
 
     return all(geoserver_statuses) if push_to_geoserver else True
 
@@ -304,86 +304,95 @@ def vectorize_soil_health(
         state,
         precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     )
-    layer_name = f"{asset_suffix}_soil_health"
-    geoserver_statuses = []
+    base_layer_name = f"{asset_suffix}_soil_health"
+    output_layer_name = f"{base_layer_name}_vector"
+    result_gdf = roi_gdf.copy()
+
     for nutrient in NUTRIENTS:
-        # This produces one output feature per ROI geometry with Nitrogen summary columns.
         raster_path = build_output_raster_path(
-            layer_name=f"{layer_name}_raster_{nutrient}",
+            layer_name=f"{base_layer_name}_raster_{nutrient}",
             output_base_dir=LOCAL_OUTPUT_BASE_DIR,
             state=state,
             district=district,
             block=block,
         )
 
-        result_gdf = nutrient_stats_for_geometries(
+        nutrient_gdf = nutrient_stats_for_geometries(
             roi_gdf=roi_gdf,
             raster_path=raster_path,
             percentiles=tuple(NUTRIENT_PERCENTILES),
             nutrient=nutrient,
         )
-        output_layer_name = f"{layer_name}_vector_{nutrient}"
-        output_path = build_output_vector_path(
+        nutrient_columns = [
+            column
+            for column in nutrient_gdf.columns
+            if column.startswith(f"{nutrient}_")
+        ]
+        for column in nutrient_columns:
+            result_gdf[column] = nutrient_gdf[column]
+
+    output_path = build_output_vector_path(
+        layer_name=output_layer_name,
+        state=state,
+        district=district,
+        block=block,
+        output_base_dir=LOCAL_OUTPUT_BASE_DIR,
+    )
+    asset_id = write_vector_output(
+        gdf=result_gdf,
+        output_path=output_path,
+        layer_name=output_layer_name,
+    )
+    print(f"Saved soil health vector: {output_path}")
+
+    geoserver_status = False
+    if push_to_geoserver:
+        geoserver_response = push_local_vector_to_geoserver(
+            path=os.path.splitext(output_path)[0],
             layer_name=output_layer_name,
+            workspace=GEOSERVER_VECTOR_WORKSPACE,
+            file_type="gpkg",
+        )
+        print(f"GeoServer response: {geoserver_response}")
+
+        if not isinstance(geoserver_response, dict) or geoserver_response.get(
+            "status_code"
+        ) not in (200, 201):
+            return False
+        geoserver_status = True
+
+    if sync_layer_metadata:
+        layer_id = save_layer_info_to_db(
             state=state,
             district=district,
             block=block,
-            output_base_dir=LOCAL_OUTPUT_BASE_DIR,
-        )
-        asset_id = write_vector_output(
-            gdf=result_gdf,
-            output_path=output_path,
             layer_name=output_layer_name,
+            asset_id=asset_id,
+            dataset_name="Soil Health Vector",
+            misc={"is_generated_locally": True},
+            algorithm=LOCAL_ALGORITHM,
+            algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
-        print(f"Saved soil health vector: {output_path}")
+        logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
+        if layer_id and push_to_geoserver:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("Sync to GeoServer flag updated for Soil health vector")
 
-        if push_to_geoserver:
-            geoserver_response = push_local_vector_to_geoserver(
-                path=os.path.splitext(output_path)[0],
-                layer_name=output_layer_name,
-                workspace=GEOSERVER_VECTOR_WORKSPACE,
-                file_type="gpkg",
-            )
-            print(f"GeoServer response for {nutrient}: {geoserver_response}")
+            # try:
+            #     layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
+            #         state=state,
+            #         district=district,
+            #         block=block,
+            #         layer_name=output_layer_name,
+            #     )
+            #     update_layer_sync_status(
+            #         layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
+            #     )
+            #     print("STAC metadata updated for Soil health vector")
+            # except Exception as e:
+            #     print(f"Error generating STAC: {e}")
 
-            if not isinstance(geoserver_response, dict) or geoserver_response.get(
-                "status_code"
-            ) not in (200, 201):
-                return False
-            geoserver_statuses.append(True)
-
-        if sync_layer_metadata:
-            layer_id = save_layer_info_to_db(
-                state=state,
-                district=district,
-                block=block,
-                layer_name=output_layer_name,
-                asset_id=asset_id,
-                dataset_name="Soil Health Vector",
-                misc={"is_generated_locally": True},
-                algorithm=LOCAL_ALGORITHM,
-                algorithm_version=LOCAL_ALGORITHM_VERSION,
-            )
-            logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-            if layer_id and push_to_geoserver:
-                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-                print("Sync to GeoServer flag updated for Soil health vector")
-
-                try:
-                    layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                        state=state,
-                        district=district,
-                        block=block,
-                        layer_name="soil_health_vector",
-                    )
-                    update_layer_sync_status(
-                        layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-                    )
-                    print("STAC metadata updated for Soil health vector")
-                except Exception as e:
-                    print(f"Error generating STAC: {e}")
-
-    return all(geoserver_statuses) if push_to_geoserver else True
+    return geoserver_status if push_to_geoserver else True
 
 
 @app.task(bind=True)
