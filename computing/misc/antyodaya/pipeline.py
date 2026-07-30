@@ -396,8 +396,8 @@ def _readme_lines(
         "",
         "## Reports And Explorer",
         "",
-        f"- Full report PDF: `{config['sources'].get('report_pdf')}`",
-        f"- Blog/short PDF: `{config['sources'].get('blog_pdf')}`",
+        f"- Full report PDF: {config['sources'].get('report_url')}",
+        f"- Blog/short PDF: {config['sources'].get('blog_url')}",
         f"- GEE explorer: {config['sources'].get('gee_explorer_url')}",
         "",
     ]
