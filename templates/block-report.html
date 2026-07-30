@@ -112,19 +112,18 @@
             left: 10px;
             z-index: 1000;
             margin-top: 0;
-            max-width: 280px;
+            width: 340px;
+            max-width: 60%;
         }
 
         .stress-yellow {
             font-weight: bold;
-            text-decoration: underline;
-            text-decoration-color: #d4ac0d;
+            background-color: yellow;
         }
 
         .stress-red {
             font-weight: bold;
-            text-decoration: underline;
-            text-decoration-color: #c0392b;
+            background-color: rgb(244, 67, 54);
         }
 
         .legend-below-map h4 {
@@ -160,7 +159,7 @@
         .legend-gradient-labels {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
+            font-size: 10px;
             color: #666;
         }
 
@@ -813,8 +812,8 @@
                     <div class="legend-gradient-container">
                         <div class="legend-gradient-bar"></div>
                         <div class="legend-gradient-labels">
-                            <span>No Stress Pattern (<span id="legend-min-value">0</span>)</span>
-                            <span>Max Stress Pattern (<span id="legend-max-value">0</span>)</span>
+                            <span>No Stress Pattern</span>
+                            <span>Max Stress Pattern</span>
                         </div>
                     </div>
                 </div>
@@ -887,7 +886,7 @@
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
-                        <h4>Suggested Actions:</h4>
+                        <h4>Suggestions:</h4>
                         <ul>
                             <li>Changes in cropping patterns</li>
                             <li>Creation of groundwater recharge structures</li>
@@ -935,7 +934,7 @@
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
-                        <h4>Suggested Actions:</h4>
+                        <h4>Suggestions:</h4>
                         <ul>
                             <li>Changes in cropping patterns</li>
                             <li>Creation of rainwater harvesting structures</li>
@@ -986,7 +985,7 @@
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
-                        <h4>Suggested Actions:</h4>
+                        <h4>Suggestions:</h4>
                         <ul>
                             <li>De-silting of waterbodies</li>
                             <li>Regular maintenance tasks</li>
@@ -1037,7 +1036,7 @@
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
-                        <h4>Suggested Actions:</h4>
+                        <h4>Suggestions:</h4>
                         <ul>
                             <li>Investigate the reasons for reduction</li>
                             <li>Changes in cropping patterns</li>
@@ -1083,7 +1082,7 @@
                     </ul>
                 </div>
                 <div class="pattern-recommendations">
-                    <h4>Suggested Actions:</h4>
+                    <h4>Suggestions:</h4>
                     <ul>
                         <li>Formation of forest protection committees</li>
                         <li>Strengthening of collective norms</li>
@@ -1120,7 +1119,7 @@
                     </ul>
                 </div>
                 <div class="pattern-recommendations">
-                    <h4>Suggested Actions:</h4>
+                    <h4>Suggestions:</h4>
                     <ul>
                         <li>Regular pollution tests as a safety measure</li>
                         <li>Monitor air, water, and soil quality</li>
@@ -1156,7 +1155,7 @@
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
-                        <h4>Suggested Actions:</h4>
+                        <h4>Suggestions:</h4>
                         <ul>
                             <li>Examine access to social entitlements</li>
                             <li>Address any incidence of discrimination</li>
@@ -1190,7 +1189,7 @@
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
-                        <h4>Suggested Actions:</h4>
+                        <h4>Suggestions:</h4>
                         <ul>
                             <li>Positive discrimination in access to NREGA assets</li>
                             <li>Increase awareness of NREGA work opportunities</li>
@@ -1325,9 +1324,6 @@
         const intensityValues = Object.values(mwsPatternIntensity);
         const minIntensity = Math.min(...intensityValues);
         const maxIntensity = Math.max(...intensityValues);
-
-        document.getElementById('legend-min-value').textContent = minIntensity;
-        document.getElementById('legend-max-value').textContent = maxIntensity;
 
         // Update all area texts
         document.getElementById('groundwater-area').textContent = groundwaterStress.total_area.toFixed(2);
@@ -2022,7 +2018,7 @@
                 let fillColor;
 
                 if (intensity === 0) {
-                    fillColor = 'rgba(135, 206, 235, 0.3)';
+                    fillColor = 'rgba(135, 206, 235, 0.001)';
                 } else if (intensity <= 0.25) {
                     fillColor = 'rgba(100, 200, 100, 0.5)';
                 } else if (intensity <= 0.5) {
@@ -2054,7 +2050,7 @@
                 let fillColor;
 
                 if (intensity === 0) {
-                    fillColor = 'rgba(135, 206, 235, 0.3)';  // Light blue - no pattern
+                    fillColor = 'rgba(135, 206, 235, 0.001)';  // Light blue - no pattern
                 } else {
                     fillColor = 'rgba(244, 67, 54, 0.8)';    // Red - low NREGA works
                 }
