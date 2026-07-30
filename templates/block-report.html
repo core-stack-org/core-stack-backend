@@ -106,6 +106,27 @@
             max-width: 100%;
         }
 
+        .map-legend-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            margin-top: 0;
+            max-width: 280px;
+        }
+
+        .stress-yellow {
+            font-weight: bold;
+            text-decoration: underline;
+            text-decoration-color: #d4ac0d;
+        }
+
+        .stress-red {
+            font-weight: bold;
+            text-decoration: underline;
+            text-decoration-color: #c0392b;
+        }
+
         .legend-below-map h4 {
             margin: 0 0 10px 0;
             font-size: 14px;
@@ -764,7 +785,7 @@
                 <!-- MWS-level patterns — yellow -->
                 {% if active_pattern %}
                 <div class="pattern-conditions">
-                    <h4>Current MWS stress patterns in the tehsil include:</h4>
+                    <h4>Various Stress Pattern Across Microwatersheds</h4>
                     <ul>
                         {% for pattern in active_pattern %}
                         <li><strong>{{ pattern }}</strong></li>
@@ -776,7 +797,7 @@
                 <!-- Village-level patterns — blue -->
                 {% if village_active_pattern %}
                 <div class="pattern-recommendations">
-                    <h4>Current village-level stress patterns in the tehsil include:</h4>
+                    <h4>Various Stress Pattern Across Villages</h4>
                     <ul>
                         {% for pattern in village_active_pattern %}
                         <li><strong>{{ pattern }}</strong></li>
@@ -786,23 +807,24 @@
                 {% endif %}
             </div>
 
-            <div id="mainMap" class="map"></div>
-
-            <div class="legend-below-map">
-                <h4>Stress Pattern Intensity</h4>
-                <div class="legend-gradient-container">
-                    <div class="legend-gradient-bar"></div>
-                    <div class="legend-gradient-labels">
-                        <span>Low (<span id="legend-min-value">0</span>)</span>
-                        <span>High (<span id="legend-max-value">0</span>)</span>
+            <div id="mainMap" class="map">
+                <div class="legend-below-map map-legend-overlay">
+                    <h4>Stress Pattern Intensity</h4>
+                    <div class="legend-gradient-container">
+                        <div class="legend-gradient-bar"></div>
+                        <div class="legend-gradient-labels">
+                            <span>No Stress Pattern (<span id="legend-min-value">0</span>)</span>
+                            <span>Max Stress Pattern (<span id="legend-max-value">0</span>)</span>
+                        </div>
                     </div>
                 </div>
-                <p class="legend-note">
-                    This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate
-                    compounding stresses. In this report we highlight areas in tehsil that seems to have various
-                    stresses.
-                </p>
             </div>
+
+            <p class="legend-note">
+                This chart shows the number of stressor patterns in a micro-watershed. Darker shades of red indicate
+                compounding stresses. In this report we highlight areas in tehsil that seems to have various
+                stresses.
+            </p>
         </section>
 
         <!-- Grid Maps Section -->
@@ -854,12 +876,11 @@
                 <p class="pattern-summary">
                     <span id="groundwater-area" class="number-class"></span> hectares out of
                     <span id="groundwater-area-1" class="number-class"></span> hectares of total cropping area in the
-                    tehsil appears to be groundwater stressed. Changes in cropping patterns, creation of groundwater
-                    recharge structures, and groundwater collectives should be considered.
+                    tehsil appears to be groundwater stressed.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
-                        <h4>Pattern identified where:</h4>
+                        <h4>Stress Pattern identified where:</h4>
                         <ul>
                             <li>Stage of groundwater extraction is <strong>unsafe</strong></li>
                             <li>Water balance trend is <strong>negative</strong></li>
@@ -877,8 +898,8 @@
                 <p>
                     Areas where either stage of groundwater stress is unsafe or water balance trend over the years
                     <span id="GWStressyearRange"></span>
-                    is negative, are color coded as yellow. Areas with an unsafe groundwater stress and negative water
-                    balance trend are shown in red.
+                    is negative, are color coded as <span class="stress-yellow">yellow</span>. Areas with an unsafe groundwater stress and negative water
+                    balance trend are shown in <span class="stress-red">red</span>.
                 </p>
                 <br>
                 <br>
@@ -903,12 +924,11 @@
                 <p class="pattern-summary">
                     <span id="drought-area" class="number-class"></span> hectares out of
                     <span id="drought-area-1" class="number-class"></span> hectares of cropping area in the tehsil
-                    appears to have a high drought incidence. Changes in cropping patterns, creation of rainwater
-                    harvesting structures, and water user associations should be considered.
+                    appears to have a high drought incidence.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
-                        <h4>Pattern identified where:</h4>
+                        <h4>Stress Pattern identified where:</h4>
                         <ul>
                             <li>Drought frequency is <strong>high</strong></li>
                             <li>Dry spells length is <strong>long</strong></li>
@@ -924,9 +944,9 @@
                     </div>
                 </div>
                 <p>Areas where there have been at least two drought years or at least two intensive dry-spell years
-                    during the <span class="HDIncidenceyearRange"></span>, are color coded as yellow. Areas which
+                    during the <span class="HDIncidenceyearRange"></span>, are color coded as <span class="stress-yellow">yellow</span>. Areas which
                     experienced both of these conditions
-                    are shown in red.</p>
+                    are shown in <span class="stress-red">red</span>.</p>
 
                 <div class="map-chart-container">
                     <div id="agriDroughtMap" class="map"></div>
@@ -955,12 +975,11 @@
                 <p class="pattern-summary">
                     <span id="irrigation-area" class="number-class"></span> hectares out of
                     <span id="irrigation-area-1" class="number-class"></span> hectares of cropping area in the tehsil
-                    appears to have a high irrigation risk. De-silting of waterbodies, other maintenance tasks, water
-                    user associations, and construction of new waterbodies should be considered.
+                    appears to have a high irrigation risk.
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
-                        <h4>Pattern identified where:</h4>
+                        <h4>Stress Pattern identified where:</h4>
                         <ul>
                             <li>Surface water during Rabi is <strong>low</strong></li>
                             <li>Surface water trends over the years are <strong>negative</strong></li>
@@ -978,7 +997,7 @@
                 </div>
                 <p>Areas where the surface water availability during Rabi season is less than 30% or where surface water
                     availability trend is negative over the years <span id="HIrriRiskyearRange"></span>, are color coded
-                    as yellow. Areas which experienced both of these conditions are shown in red.</p>
+                    as <span class="stress-yellow">yellow</span>. Areas which experienced both of these conditions are shown in <span class="stress-red">red</span>.</p>
                 <div class="map-chart-container">
                     <div id="agriIrrigationMap" class="map"></div>
                     <div class="chart-container">
@@ -995,13 +1014,12 @@
             <div id="yield-section">
                 <h3>Likely stress in cropping yield</h3>
                 <p>Likely stress in cropping yield is assessed based on degradation of farmland into barren or shrub
-                    areas and areas with reduced cropping intensity. The reasons should be investigated and changes in
-                    cropping patterns and methods to improve soil health or water availability could be considered.
+                    areas and areas with reduced cropping intensity.
                     Micro-watersheds where the extent of either of these conditions over the years <span
                         id="CRPYieldyearRange"></span> exceed
-                    30 hectares have been highlighted in yellow. Similarly, micro-watersheds where farmland areas that
+                    30 hectares have been highlighted in <span class="stress-yellow">yellow</span>. Similarly, micro-watersheds where farmland areas that
                     have undergone degradation and reduction in the number of crop cycles both exceeding 30 hectares are
-                    marked in red.</p>
+                    marked in <span class="stress-red">red</span>.</p>
                 <p class="pattern-summary">
                     <span id="yield-area" class="number-class"></span> hectares in the tehsil appears to have had a
                     reduction in cropping area.
@@ -1012,7 +1030,7 @@
                 </p>
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
-                        <h4>Pattern identified where:</h4>
+                        <h4>Stress Pattern identified where:</h4>
                         <ul>
                             <li>Reduction in cropping area over the years is <strong>&gt; 30 ha</strong></li>
                             <li>Reduction in cropping intensity over the years is <strong>&gt; 30 ha</strong></li>
@@ -1050,17 +1068,16 @@
         </section>
 
         <section class="section" id="forest-section">
-            <h2>Stress patterns affecting forests and biodiversity</h2>
-            <h3>Tree Health Degradation</h3>
+            <h2>Stress patterns affecting Tree cover</h2>
+            <h3>Reduction in Tree Cover</h3>
             <p class="pattern-summary">
                 <span id="forest-area" class="number-class"></span> hectares out of
                 <span id="forest-area-1" class="number-class"></span> hectares of area under tree cover in the tehsil
-                appears to have been lost. Forest protection committees and strengthening of collective norms should be
-                considered. The data is computed over the years <span id="CRPyearRange"></span> .
+                appears to have been lost. The data is computed over the years <span id="CRPyearRange"></span>.
             </p>
             <div class="pattern-info-container">
                 <div class="pattern-conditions">
-                    <h4>Pattern identified where:</h4>
+                    <h4>Stress Pattern identified where:</h4>
                     <ul>
                         <li>Reduction in tree cover over the years is <strong>&gt; 50 ha</strong></li>
                     </ul>
@@ -1093,12 +1110,11 @@
             <h3>Mining Presence</h3>
             <p class="pattern-summary">
                 <span id="mining-area" class="number-class"></span> hectares could be at risk of air, water, or soil
-                pollution from industries. Water safety and soil, air pollution tests should be considered as a safety
-                measure.
+                pollution from industries.
             </p>
             <div class="pattern-info-container">
                 <div class="pattern-conditions">
-                    <h4>Pattern identified where:</h4>
+                    <h4>Stress Pattern identified where:</h4>
                     <ul>
                         <li>Mining or industrial activities are <strong>present</strong></li>
                     </ul>
@@ -1130,8 +1146,23 @@
             <div id="caste-section">
                 <h3>High density of marginalized caste communities</h3>
                 <p><span id="caste-population" class="number-class"></span> population in <span id="caste-villages"
-                        class="number-class"></span> villages are from marginalized groups. Any incidence of
-                    discrimination in access to social entitlements should be examined.</p>
+                        class="number-class"></span> villages are from marginalized groups.</p>
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Stress Pattern identified where:</h4>
+                        <ul>
+                            <li>SC population is <strong>&gt; 17%</strong></li>
+                            <li>ST population is <strong>&gt; 33%</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pattern-recommendations">
+                        <h4>Suggested Actions:</h4>
+                        <ul>
+                            <li>Examine access to social entitlements</li>
+                            <li>Address any incidence of discrimination</li>
+                        </ul>
+                    </div>
+                </div>
 
                 <div class="map-chart-container">
                     <div id="casteMap" class="map"></div>
@@ -1150,8 +1181,22 @@
                 <h3>Poor uptake of MGNREGA works</h3>
                 <p><span id="nrega-villages" class="number-class"></span> villages out of <span id="nrega-villages-1"
                         class="number-class"></span> have had a low (less than 100 NREGA work) number of NREGA works
-                    during <span id="NREGAyearRange"></span>.
-                    Positive discrimination in access to NREGA assets should be considered.</p>
+                    during <span id="NREGAyearRange"></span>.</p>
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Stress Pattern identified where:</h4>
+                        <ul>
+                            <li>Number of NREGA works is <strong>&lt; 100</strong></li>
+                        </ul>
+                    </div>
+                    <div class="pattern-recommendations">
+                        <h4>Suggested Actions:</h4>
+                        <ul>
+                            <li>Positive discrimination in access to NREGA assets</li>
+                            <li>Increase awareness of NREGA work opportunities</li>
+                        </ul>
+                    </div>
+                </div>
 
                 <div class="map-chart-container">
                     <div id="nregaMap" class="map"></div>
@@ -1179,8 +1224,8 @@
                 availability during Zaid season similarly being more than 30%, and a non declining trend in annual
                 surface water availability observed over the years <span id="FishryyearRange"></span>. In the map below,
                 the micro-watersheds are mapped to a gradient of green, depending on the number of conditions satisfied
-                for a particular micro-watershed (light green corresponds to one of the conditions being met, and dark
-                green corresponds to all the conditions being true).</p>
+                for a particular micro-watershed (light blue corresponds to one of the conditions being met, and dark
+                blue corresponds to all the conditions being true).</p>
 
             <div class="map-chart-container">
                 <div id="fishingMap" class="map"></div>
@@ -2177,9 +2222,12 @@
                 plugins: {
                     title: {
                         display: true,
-                        text: 'Timeline chart of weighted average of drought affected area to cropping area of the micro-watersheds over the years.',
+                        text: [
+                            'Timeline chart of weighted average of drought affected area',
+                            'to cropping area of the micro-watersheds over the years.'
+                        ],
                         font: {
-                            size: 16
+                            size: 20
                         }
                     },
                     legend: {
