@@ -84,7 +84,7 @@ def reproject_modis_to_chirps_grid(
 def ppet_multiband(
     aez=None,
     start: int = 2004,
-    end: int = 2024,
+    end: int = 2024,  # TODO remove hardcoding
 ) -> Path:
     """
     SPEI Pipeline - Step 1 (Local P-PET)

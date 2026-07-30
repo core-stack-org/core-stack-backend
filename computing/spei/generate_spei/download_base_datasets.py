@@ -27,7 +27,6 @@ from utilities.constants import AEZ
 
 CHIRPS_COLLECTION = "UCSB-CHG/CHIRPS/DAILY"
 MODIS_PET_COLLECTION = "MODIS/061/MOD16A2GF"
-DEFAULT_PROJECT = "ee-corestackdev"
 DATASET_CHOICES = ("chirps", "modis_pet", "both")
 
 
@@ -172,16 +171,16 @@ def get_last_downloaded_date(
     Returns the latest date as a string (YYYYMMDD or YYYYMM format).
     """
     dataset_output_dir = output_dir / str(aez) / frequency / dataset
-    
+
     if not dataset_output_dir.exists():
         return None
-    
+
     # Get all .tif files in the directory
     tif_files = list(dataset_output_dir.glob("*.tif"))
-    
+
     if not tif_files:
         return None
-    
+
     # Extract dates from filenames (e.g., "CHIRPS_20240101.tif" or "CHIRPS_202401.tif")
     dates = []
     for file_path in tif_files:
@@ -196,10 +195,10 @@ def get_last_downloaded_date(
                     dates.append(date_str)
             except (ValueError, IndexError):
                 continue
-    
+
     if not dates:
         return None
-    
+
     # Sort and return the latest date
     return sorted(dates)[-1]
 
@@ -312,17 +311,19 @@ def download_dataset_images(
     name = dataset_label(dataset)
     print(output_dir, aez, frequency, dataset)
     dataset_output_dir = Path(output_dir) / str(aez) / frequency / dataset
-    print("start_date",start_date)
+    print("start_date", start_date)
     # Check if files already exist and find the last downloaded date
-    last_downloaded = get_last_downloaded_date(Path(output_dir), aez, frequency, dataset)
-    
+    last_downloaded = get_last_downloaded_date(
+        Path(output_dir), aez, frequency, dataset
+    )
+
     if last_downloaded and not overwrite:
         # Convert last downloaded date to next date
         next_date_str = get_next_date(last_downloaded, frequency)
         print(f"Last downloaded date: {last_downloaded}")
         print(f"Resuming downloads from: {next_date_str}")
         start_date = next_date_str
-    
+
     collection, region, _, labeled_dates = build_dataset_image(
         aez=aez,
         dataset=dataset,
