@@ -18,7 +18,6 @@ from computing.tree_health.local.overall_change_local import (
     LOCAL_OUTPUT_BASE_DIR as OVERALL_CHANGE_RASTER_DIR,
 )
 
-
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "tree_overall_vector"
 
@@ -60,6 +59,7 @@ def _resolve_overall_change_raster(asset_suffix, state=None, district=None, bloc
         "Run overall_change_local.py first."
     )
 
+
 @app.task(bind=True)
 def tree_health_overall_change_vector_local(
     self,
@@ -79,8 +79,7 @@ def tree_health_overall_change_vector_local(
     # Vector outputs are generated over watershed polygons, same as reduceRegions in GEE.
     if state and district and block:
         asset_suffix = (
-            f"{_slug(district, 'unknown_district')}_"
-            f"{_slug(block, 'unknown_block')}"
+            f"{_slug(district, 'unknown_district')}_" f"{_slug(block, 'unknown_block')}"
         )
         result_gdf, _ = load_precomputed_watersheds(
             state=state,
@@ -140,6 +139,7 @@ def tree_health_overall_change_vector_local(
         if not isinstance(res, dict) or res.get("status_code") not in (200, 201):
             return False
 
+    layer_at_geoserver = False
     if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -154,5 +154,6 @@ def tree_health_overall_change_vector_local(
         )
         if layer_id and push_to_geoserver:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            layer_at_geoserver = True
 
-    return True
+    return layer_at_geoserver

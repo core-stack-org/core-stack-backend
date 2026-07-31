@@ -407,7 +407,7 @@ def soil_health_local(
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
-    clip_soil_health_raster(
+    soil_health_raster_on_geoserver = clip_soil_health_raster(
         state,
         district,
         block,
@@ -418,7 +418,7 @@ def soil_health_local(
         sync_layer_metadata,
     )
 
-    vectorize_soil_health(
+    soil_health_vector_on_geoserver = vectorize_soil_health(
         state,
         district,
         block,
@@ -426,4 +426,9 @@ def soil_health_local(
         roi,
         push_to_geoserver,
         sync_layer_metadata,
+    )
+    return (
+        True
+        if soil_health_vector_on_geoserver and soil_health_raster_on_geoserver
+        else False
     )
