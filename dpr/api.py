@@ -604,6 +604,122 @@ def generate_tehsil_report(request):
 @api_view(["GET"])
 @auth_free
 @schema(None)
+@api_security_check(auth_type="Auth_free")
+def generate_tehsil_patterns_data(request):
+    try:
+        # ? district, block, mwsId
+        params = request.GET
+        result = {}
+
+        for key, value in params.items():
+            result[key] = value
+
+        # ? OSM description generation
+        parameter_block = get_tehsil_data(
+            result["state"], result["district"], result["block"]
+        )
+
+        # ? Pattern intensity
+        mws_pattern_intensity_with_active_pattern = get_pattern_intensity(
+            result["state"], result["district"], result["block"]
+        )
+
+        mws_pattern_intensity = mws_pattern_intensity_with_active_pattern.get(
+            "intensity", None
+        )
+
+        mws_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "mws_active_patterns", []
+        )
+
+        pattern_display_mapping = mws_pattern_intensity_with_active_pattern.get(
+            "pattern_display_mapping", []
+        )
+
+        # ? Agriculture data
+        groundwater_stress = get_agri_water_stress_data(
+            result["state"], result["district"], result["block"]
+        )
+        high_drought_incidence, weighted_drought_timeline = get_agri_water_drought_data(
+            result["state"], result["district"], result["block"]
+        )
+        high_irrigation_risk, irrigation_timeline = get_agri_water_irrigation_data(
+            result["state"], result["district"], result["block"]
+        )
+        low_yield, yield_sankey = get_agri_low_yield_data(
+            result["state"], result["district"], result["block"]
+        )
+        forest_degradation, forest_sankey = get_forest_degrad_data(
+            result["state"], result["district"], result["block"]
+        )
+        mining_presence, mining_pie = get_mining_presence_data(
+            result["state"], result["district"], result["block"]
+        )
+        socio_caste, caste_pie = get_socio_economic_caste_data(
+            result["state"], result["district"], result["block"]
+        )
+        socio_nrega, nrega_pie = get_socio_economic_nrega_data(
+            result["state"], result["district"], result["block"]
+        )
+        fishery_potential, fishery_timeline = get_fishery_water_potential_data(
+            result["state"], result["district"], result["block"]
+        )
+        agroforestry_transition, agroforestry_sankey = get_agroforestry_transition_data(
+            result["state"], result["district"], result["block"]
+        )
+
+        # print("Active Patterns", active_pattern)
+        active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "active_patterns", []
+        )
+
+        village_active_pattern = mws_pattern_intensity_with_active_pattern.get(
+            "village_active_patterns", []
+        )
+
+        # =====================================================
+
+        context = {
+            "state": result["state"],
+            "district": result["district"],
+            "block": result["block"],
+            "block_osm": parameter_block,
+            "mws_pattern_intensity_json": json.dumps(mws_pattern_intensity),
+            "active_pattern": active_pattern,
+            "village_active_pattern": village_active_pattern,
+            "pattern_display_mapping_json": pattern_display_mapping,
+            "mws_active_patterns_json": json.dumps(mws_active_pattern),
+            "groundwater_stress_json": json.dumps(groundwater_stress),
+            "high_drought_incidence_json": json.dumps(high_drought_incidence),
+            "drought_timeline_json": json.dumps(weighted_drought_timeline),
+            "high_irrigation_risk_json": json.dumps(high_irrigation_risk),
+            "irrigation_timeline_json": json.dumps(irrigation_timeline),
+            "low_yield_json": json.dumps(low_yield),
+            "yield_sankey_json": json.dumps(yield_sankey),
+            "forest_degradation_json": json.dumps(forest_degradation),
+            "forest_sankey_json": json.dumps(forest_sankey),
+            "mining_presence_json": json.dumps(mining_presence),
+            "mining_pie_json": json.dumps(mining_pie),
+            "socio_caste_json": json.dumps(socio_caste),
+            "caste_pie_json": json.dumps(caste_pie),
+            "socio_nrega_json": json.dumps(socio_nrega),
+            "nrega_pie_json": json.dumps(nrega_pie),
+            "fishery_potential_json": json.dumps(fishery_potential),
+            "fishery_timeline_json": json.dumps(fishery_timeline),
+            "agroforestry_transition_json": json.dumps(agroforestry_transition),
+            "agroforestry_sankey_json": json.dumps(agroforestry_sankey),
+        }
+
+        return Response(context, status=status.HTTP_200_OK) 
+
+    except Exception as e:
+        logger.exception("Exception in generate_tehsil_patterns_data api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@auth_free
+@schema(None)
 def generate_village_report(request):
     """
     Generate comprehensive village report with all sections.

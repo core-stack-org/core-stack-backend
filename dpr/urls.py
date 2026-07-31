@@ -28,6 +28,11 @@ urlpatterns = [
         name="generate_tehsil_report",
     ),
     path(
+        "generate_tehsil_patterns_data/",
+        api.generate_tehsil_patterns_data,
+        name="generate_tehsil_patterns_data",
+    ),
+    path(
         "generate_village_report/",
         api.generate_village_report,
         name="generate_village_report",
