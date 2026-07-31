@@ -266,12 +266,30 @@ def create_excel_for_soil_health(data, writer):
         features = data["features"]
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
-        exclude_cols = ["STATE", "District", "TEHSIL", "bacode", "sbcode", "wsconc"]
+        exclude_cols = [
+            "STATE",
+            "District",
+            "TEHSIL",
+            "bacode",
+            "sbcode",
+            "wsconc",
+            "N_count",
+            "K_count",
+            "P_count",
+        ]
         df = df.drop(columns=exclude_cols, errors="ignore")
         rename_cols = {"uid": "UID"}
         df = df.rename(columns=rename_cols)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
+        df.rename(
+            columns={
+                col: f"{col}_in_kg_per_ha"
+                for col in df.columns
+                if col.startswith(("N_p", "K_p", "P_p", "N_mean", "K_mean", "P_mean"))
+            },
+            inplace=True,
+        )
         df.to_excel(writer, sheet_name="soil_health", index=False)
         print("Excel file created for soil_health")
     except Exception as e:
