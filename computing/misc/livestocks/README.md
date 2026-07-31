@@ -193,8 +193,10 @@ POST /api/v1/generate_livestocks/
 python -m computing.misc.livestocks --state Jharkhand --district Ranchi --tehsil Angara --no-geoserver
 ```
 
-## Source
+## Data and Source
 
+- [Prepared CoRE Stack base resources, including the livestock CSV, SQLite sidecar and pan-India GeoPackage](https://drive.google.com/drive/folders/1-WD9t2t9C1OrF7P24MhBXA7tNfUK4N-q?usp=sharing)
+- [20th Livestock Census raw files](https://drive.google.com/drive/folders/14Gx-ebpS3tq11CS1pjxHCh-TJ7vipEez?usp=sharing)
 - Official village/ward release: <https://dahd.gov.in/sites/default/files/2023-07/VillageAndWardLevelDataMale-Female.xlsx>
 - 20th Livestock Census, Department of Animal Husbandry & Dairying,
   Government of India (2019).

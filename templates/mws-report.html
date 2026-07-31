@@ -748,6 +748,54 @@
             margin: 0 !important;
         }
 
+        /* Info button + one-line description tooltip, shown on each map in the map grid */
+        .map-info-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #9ca3af;
+            color: #374151;
+            font-size: 12px;
+            font-weight: 700;
+            font-style: italic;
+            font-family: Georgia, 'Times New Roman', serif;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .map-info-btn:hover {
+            background: #fff;
+            border-color: #6b7280;
+        }
+
+        .map-info-tooltip {
+            position: absolute;
+            top: 30px;
+            right: 6px;
+            max-width: 70%;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-size: 11px;
+            line-height: 1.4;
+            padding: 6px 10px;
+            border-radius: 4px;
+            z-index: 1001;
+            display: none;
+        }
+
+        .map-info-tooltip.show {
+            display: block;
+        }
+
         .legend-section {
             padding: 8px 0;
             border-bottom: 1px solid #e8e8e8;
@@ -1212,6 +1260,17 @@
                 visibility: hidden !important;
             }
 
+            /* LULC year slider is interactive-only; keep the year label, hide the control in print */
+            .lulc-year-control input[type="range"] {
+                display: none !important;
+            }
+
+            /* Info buttons/tooltips are interactive-only, not useful in print */
+            .map-info-btn,
+            .map-info-tooltip {
+                display: none !important;
+            }
+
             /* Raster/class legends always fully expanded in print, regardless of on-screen collapse state */
             .raster-legend .raster-legend-body {
                 display: block !important;
@@ -1393,6 +1452,8 @@
 
             <div class="map-group-3">
                 <div id="demMap" class="map" style="position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Ground elevation across the microwatershed, from lowest (blue) to highest (brown/white), with contour lines.</div>
                     <div class="raster-legend"
                         style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; transform: scale(0.75); transform-origin: bottom left;">
                         <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
@@ -1459,8 +1520,13 @@
                         </div>
                     </div>
                 </div>
-                <div id="drainageMap" class="map"></div>
+                <div id="drainageMap" class="map" style="position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">The natural drainage/stream network within the microwatershed.</div>
+                </div>
                 <div id="terrainRasterMap" class="map" style="position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Landscape classified into terrain forms such as valleys, ridges, flat areas, and slopes.</div>
                     <div class="raster-legend"
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 60%;">
                         <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
@@ -1536,6 +1602,8 @@
 
             <div class="map-group">
                 <div id="landscapeLulcMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Land use and land cover classes (cropping, forest, built-up, water, etc.); use the slider to change year.</div>
                     <div class="raster-legend"
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
                         <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
@@ -1616,8 +1684,15 @@
                         </div>
                         </div>
                     </div>
+                    <div class="lulc-year-control"
+                        style="position: absolute; bottom: 6px; right: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; display: flex; align-items: center; gap: 8px;">
+                        <span id="lulcYearLabel" style="font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap;">2024-25</span>
+                        <input type="range" id="lulcYearSlider" min="0" max="7" step="1" value="7" style="width: 110px;">
+                    </div>
                 </div>
                 <div id="hydroVectorMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Surface waterbodies, rivers, and canals mapped within the microwatershed.</div>
                     <div
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
                         <!-- <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Hydrology Features</h4> -->
@@ -1656,11 +1731,12 @@
 
             <div class="map-group">
                 <div id="farmLossMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Farmland that degraded into barren land, shrubs, or built-up area between 2017 and 2024.</div>
                     <div class="raster-legend"
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
                         <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
-                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Farm Cover
-                                Loss</h4>
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Cropping Degradation</h4>
                             <span class="raster-legend-chevron">&#9660;</span>
                         </div>
                         <div class="raster-legend-body">
@@ -1695,11 +1771,12 @@
                     </div>
                 </div>
                 <div id="treeLossMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Tree cover lost to barren land, shrubs, cropland, or built-up area between 2017 and 2024.</div>
                     <div class="raster-legend"
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
                         <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
-                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Tree Cover
-                                Loss</h4>
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Reduction in Tree Cover</h4>
                             <span class="raster-legend-chevron">&#9660;</span>
                         </div>
                         <div class="raster-legend-body">
@@ -1760,6 +1837,8 @@
             </div>
         </section>
 
+        <hr style="border: none; border-top: 2px solid #ddd; margin: 0 0 30px;">
+
         <section class="section" id="hydro-table-section">
             <h2>Hydrology and Land Use Land Cover in this Microwatershed</h2>
 
@@ -1812,7 +1891,7 @@
                         <td style="padding: 10px; border: 1px solid black; width: 20%;">State of Groundwater Extraction (2020)</td>
                         <td style="padding: 10px; border: 1px solid black; width: 20%;">SOGE dev %</td>
                         <td style="padding: 10px; border: 1px solid black; width: 20%;">Water Balance Trend</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Mean Annual Water Balance</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Mean Annual Water Balance (mm)</td>
                     </tr>
                     <tr>
                         <td id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">
@@ -1886,6 +1965,7 @@
 
                     const getOption = (data) => ({
                         tooltip: {
+                            trigger: 'item',
                             formatter: function (info) {
                                 return [
                                     '<div class="tooltip-title">' + info.name + '</div>',
@@ -1893,24 +1973,25 @@
                                 ].join('');
                             }
                         },
+                        legend: {
+                            show: true,
+                            bottom: 0,
+                            textStyle: { fontSize: 11 }
+                        },
                         series: [
                             {
-                                type: 'treemap',
-                                width: '100%',
-                                height: '100%',
-                                roam: false,
-                                nodeClick: false,
-                                breadcrumb: { show: false },
+                                type: 'pie',
+                                radius: '60%',
+                                center: ['50%', '45%'],
                                 label: {
                                     show: true,
                                     formatter: '{b}\n{c}%',
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     color: '#333'
                                 },
                                 itemStyle: {
                                     borderWidth: 2,
-                                    borderColor: '#fff',
-                                    gapWidth: 2
+                                    borderColor: '#fff'
                                 },
                                 data: data
                             }
@@ -1950,7 +2031,7 @@
         </section>
 
         <section class="section" id="cropping-water-table-section">
-            <h5 style="margin-bottom: 5px;">CROPPING LAND USE AND WATER AVAILABILITY</h5>
+            <h5 style="margin-bottom: 5px;">SEASONAL WATER AVAILABILITY AND CROPPING AREA</h5>
             <table
                 style="width: 100%; border-collapse: collapse; text-align: left; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
@@ -2725,6 +2806,78 @@
             return '';
         };
 
+        const getVillageId = feature => {
+            const candidates = ['vill_ID', 'vill_id', 'VILL_ID', 'village_id'];
+            for (const key of candidates) {
+                const val = feature.get(key);
+                if (val !== undefined && val !== null && val !== '') return val;
+            }
+            return null;
+        };
+
+        const getVillageReportUrl = villageId => {
+            const base = '{{ base_url }}'.replace(/\/$/, '');
+            const state = encodeURIComponent('{{ state }}');
+            const district = encodeURIComponent('{{ district }}');
+            const block = encodeURIComponent('{{ block }}');
+            return `${base}/generate_village_report/?state=${state}&district=${district}&block=${block}&villageId=${encodeURIComponent(villageId)}`;
+        };
+
+        const villagesIdForLinks = JSON.parse('{{ villages_id|safe }}');
+        const villagesIntersectPctForPopup = JSON.parse('{{ villages_intersect_pct|safe }}');
+        const villageNamesForPopup = JSON.parse('{{ villages_name|safe }}');
+
+        // Click popup: village name + "Show Village Report" button, on the given map/layer.
+        // Reused across every map that renders villages. When showIntersectPct is true, also
+        // shows the % of MWS area falling within the clicked village.
+        const attachVillageClickPopup = (map, villageLayer, showIntersectPct = false) => {
+            const targetEl = map.getTargetElement ? map.getTargetElement() : document.getElementById(map.get('target'));
+            if (!targetEl || targetEl.querySelector('.village-click-popup')) return;
+
+            const popupEl = document.createElement('div');
+            popupEl.className = 'village-click-popup';
+            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; z-index: 25; display: none;';
+            targetEl.appendChild(popupEl);
+
+            const popupOverlay = new ol.Overlay({
+                element: popupEl,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+            });
+            map.addOverlay(popupOverlay);
+
+            map.on('click', evt => {
+                const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, { layerFilter: l => l === villageLayer });
+                if (!feature) {
+                    popupEl.style.display = 'none';
+                    return;
+                }
+
+                const villageId = getVillageId(feature);
+                const name = getVillageLabelName(feature) || 'This village';
+
+                let pctLine = '';
+                if (showIntersectPct && villageId !== null) {
+                    const idx = villagesIdForLinks.findIndex(id => String(id) === String(villageId));
+                    if (idx !== -1) {
+                        pctLine = `<br/>${villagesIntersectPctForPopup[idx]}% of this MWS's area falls within this village.`;
+                    }
+                }
+
+                popupEl.innerHTML = `<strong>${name}</strong>${pctLine}`;
+                if (villageId !== null) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = 'Show Village Report';
+                    btn.style.cssText = 'display: block; margin-top: 6px; padding: 4px 10px; background: #3498db; color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;';
+                    btn.onclick = () => window.open(getVillageReportUrl(villageId), '_blank');
+                    popupEl.appendChild(btn);
+                }
+                popupEl.style.display = 'block';
+                popupOverlay.setPosition(evt.coordinate);
+            });
+        };
+
         // Shows a small floating tooltip with the village name while hovering over a village
         // boundary feature on the given map/layer. Reused across every map that renders villages.
         const attachVillageHoverTooltip = (map, villageLayer) => {
@@ -2762,7 +2915,7 @@
             });
         };
 
-        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false) => {
+        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false, showIntersectPct = false) => {
             try {
                 const mwsGeometry = mwsFeature.getGeometry();
                 const mwsUid = mwsFeature.get('uid');
@@ -2839,6 +2992,7 @@
                 // Add layer to map
                 map.addLayer(villageLayer);
                 attachVillageHoverTooltip(map, villageLayer);
+                attachVillageClickPopup(map, villageLayer, showIntersectPct);
 
                 // Handle errors silently
                 villageSource.on('change', (e) => {
@@ -2852,31 +3006,34 @@
             }
         };
 
+        // Cream -> Red (5 buckets, low to high)
         const getPopColor = (val) => {
             if (!val) return 'rgba(0,0,0,0)';
-            if (val < 500) return '#ffb3ba';
-            if (val < 1000) return '#ffdfba';
-            if (val < 2000) return '#ffffba';
-            if (val < 4000) return '#baffc9';
-            return '#bae1ff';
+            if (val < 500) return '#fff5cc';
+            if (val < 1000) return '#ffb899';
+            if (val < 2000) return '#ff7b66';
+            if (val < 4000) return '#ff3d33';
+            return '#ff0000';
         };
 
+        // White -> Red (5 buckets, low to high)
         const getLitColor = (val) => {
             if (!val) return 'rgba(0,0,0,0)';
-            if (val < 40) return '#f3c5ff';
-            if (val < 55) return '#c5ebff';
-            if (val < 70) return '#e2ffc5';
-            if (val < 85) return '#ffc5d9';
-            return '#ffe8c5';
+            if (val < 40) return '#ffffff';
+            if (val < 55) return '#ffbfbf';
+            if (val < 70) return '#ff8080';
+            if (val < 85) return '#ff4040';
+            return '#ff0000';
         };
 
+        // Red -> White (5 buckets, low to high)
         const getMargColor = (val) => {
             if (!val) return 'rgba(0,0,0,0)';
-            if (val < 20) return '#d4a5a5';
-            if (val < 40) return '#a5c4d4';
-            if (val < 60) return '#d4d4a5';
-            if (val < 80) return '#a5d4a5';
-            return '#d4a5d4';
+            if (val < 20) return '#ffffff';
+            if (val < 40) return '#ffbfbf';
+            if (val < 60) return '#ff8080';
+            if (val < 80) return '#ff4040';
+            return '#ff0000';
         };
 
         const withOpacity = (color, alpha) => {
@@ -2979,11 +3136,11 @@
                 popLegend.innerHTML = `
                     <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Total Population</span><span class="raster-legend-chevron">&#9660;</span></div>
                     <div class="raster-legend-body">
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffb3ba; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 500</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffdfba; border: 1px solid #999; margin-right: 4px;"></div><span>500-1000</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffba; border: 1px solid #999; margin-right: 4px;"></div><span>1000-2000</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #baffc9; border: 1px solid #999; margin-right: 4px;"></div><span>2000-4000</span></div>
-                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #bae1ff; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 4000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #fff5cc; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 500</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffb899; border: 1px solid #999; margin-right: 4px;"></div><span>500-1000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff7b66; border: 1px solid #999; margin-right: 4px;"></div><span>1000-2000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff3d33; border: 1px solid #999; margin-right: 4px;"></div><span>2000-4000</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ff0000; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 4000</span></div>
                     </div>
                 `;
                 demographicPopMap.addControl(new ol.control.Control({ element: popLegend }));
@@ -2994,11 +3151,11 @@
                 litLegend.innerHTML = `
                     <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Literacy (%)</span><span class="raster-legend-chevron">&#9660;</span></div>
                     <div class="raster-legend-body">
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #f3c5ff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 40%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #c5ebff; border: 1px solid #999; margin-right: 4px;"></div><span>40-55%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #e2ffc5; border: 1px solid #999; margin-right: 4px;"></div><span>55-70%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffc5d9; border: 1px solid #999; margin-right: 4px;"></div><span>70-85%</span></div>
-                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ffe8c5; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 85%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 40%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffbfbf; border: 1px solid #999; margin-right: 4px;"></div><span>40-55%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff8080; border: 1px solid #999; margin-right: 4px;"></div><span>55-70%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff4040; border: 1px solid #999; margin-right: 4px;"></div><span>70-85%</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ff0000; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 85%</span></div>
                     </div>
                 `;
                 demographicLitMap.addControl(new ol.control.Control({ element: litLegend }));
@@ -3007,13 +3164,13 @@
                 margLegend.className = 'ol-unselectable ol-control raster-legend';
                 margLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 margLegend.innerHTML = `
-                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>SC + ST population %</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Marginal Communities (%)</span><span class="raster-legend-chevron">&#9660;</span></div>
                     <div class="raster-legend-body">
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4a5a5; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 20%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5c4d4; border: 1px solid #999; margin-right: 4px;"></div><span>20-40%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>40-60%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>60-80%</span></div>
-                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #d4a5d4; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 80%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 20%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffbfbf; border: 1px solid #999; margin-right: 4px;"></div><span>20-40%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff8080; border: 1px solid #999; margin-right: 4px;"></div><span>40-60%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff4040; border: 1px solid #999; margin-right: 4px;"></div><span>60-80%</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ff0000; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 80%</span></div>
                     </div>
                 `;
                 demographicMargMap.addControl(new ol.control.Control({ element: margLegend }));
@@ -3113,7 +3270,7 @@
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wms',
                 params: {
-                    'LAYERS': "LULC_level_1:LULC_17_18_{{district}}_{{block}}_level_1"
+                    'LAYERS': "LULC_level_1:LULC_24_25_{{district}}_{{block}}_level_1"
                 },
                 ratio: 1,
                 serverType: 'geoserver',
@@ -3442,6 +3599,22 @@
             ])
         })
 
+        // LULC year slider (defaults to the most recent year, 2024-25)
+        const lulcYears = ['17_18', '18_19', '19_20', '20_21', '21_22', '22_23', '23_24', '24_25'];
+        const lulcYearLabels = ['2017-18', '2018-19', '2019-20', '2020-21', '2021-22', '2022-23', '2023-24', '2024-25'];
+        const lulcYearSlider = document.getElementById('lulcYearSlider');
+        const lulcYearLabel = document.getElementById('lulcYearLabel');
+
+        if (lulcYearSlider) {
+            lulcYearSlider.addEventListener('input', () => {
+                const idx = parseInt(lulcYearSlider.value, 10);
+                lulcYearLabel.textContent = lulcYearLabels[idx];
+                landscapeLulcRasterLayer.getSource().updateParams({
+                    'LAYERS': `LULC_level_1:LULC_${lulcYears[idx]}_{{district}}_{{block}}_level_1`
+                });
+            });
+        }
+
         const farmLossRasterMapLayer = new ol.layer.Image({
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/change_detection/wms',
@@ -3556,6 +3729,21 @@
                 new ol.interaction.KeyboardPan(),
                 new ol.interaction.KeyboardZoom(),
             ])
+        });
+
+        // Info buttons for the demographic maps (built dynamically, so no static HTML to hook into)
+        const demographicMapInfo = [
+            ['demographicPopMap', 'Total village population from Census 2011, shaded low (cream) to high (red).'],
+            ['demographicLitMap', 'Village literacy rate from Census 2011, shaded low (white) to high (red).'],
+            ['demographicMargMap', '% of SC + ST population per village from Census 2011, shaded low (white) to high (red).'],
+        ];
+        demographicMapInfo.forEach(([mapId, infoText]) => {
+            const el = document.getElementById(mapId);
+            if (!el) return;
+            el.insertAdjacentHTML('beforeend', `
+                <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                <div class="map-info-tooltip">${infoText}</div>
+            `);
         });
 
         const hydroVectorMap = new ol.Map({
@@ -3908,7 +4096,7 @@
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature);
-                        addVillageBoundariesToMap(villageIntersectMap, feature);
+                        addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
                         addDemographicBoundariesToMap(feature);
 
                     }
@@ -4099,6 +4287,22 @@
         }
         window.toggleRasterLegend = toggleRasterLegend;
 
+        // Toggle the one-line info tooltip for a map's info (i) button
+        function toggleMapInfo(btn) {
+            const tooltip = btn.nextElementSibling;
+            if (!tooltip || !tooltip.classList.contains('map-info-tooltip')) return;
+            const isShown = tooltip.classList.contains('show');
+            document.querySelectorAll('.map-info-tooltip.show').forEach(el => el.classList.remove('show'));
+            if (!isShown) tooltip.classList.add('show');
+        }
+        window.toggleMapInfo = toggleMapInfo;
+
+        document.addEventListener('click', evt => {
+            if (!evt.target.closest('.map-info-btn')) {
+                document.querySelectorAll('.map-info-tooltip.show').forEach(el => el.classList.remove('show'));
+            }
+        });
+
         const addGoogleMapsLegend = (mapElement) => {
             if (mapElement.querySelector('.google-maps-legend')) {
                 return;
@@ -4176,7 +4380,7 @@
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['mainMap', 'compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
+            const boundaryMaps = ['compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
@@ -4638,6 +4842,7 @@
         const st_pop = JSON.parse('{{ villages_st|safe }}')
         const tot_pop = JSON.parse('{{ villages_pop|safe }}')
         const villagesIntersectPct = JSON.parse('{{ villages_intersect_pct|safe }}')
+        const villagesIdList = JSON.parse('{{ villages_id|safe }}')
 
         // Iterate and append villages as list items
         villageNames.forEach(function (village) {
@@ -4651,8 +4856,13 @@
         villageNames.map((item, idx) => {
             var row = document.createElement("tr");
 
+            const villageId = villagesIdList[idx];
+            const nameCell = villageId !== undefined && villageId !== null
+                ? `<a href="${getVillageReportUrl(villageId)}" target="_blank">${item}</a>`
+                : item;
+
             row.innerHTML = `
-                <td>${item}</td>
+                <td>${nameCell}</td>
                 <td>${tot_pop[idx]}</td>
                 <td>${sc_pop[idx]}</td>
                 <td>${st_pop[idx]}</td>
@@ -4667,44 +4877,6 @@
 
             tableBody.appendChild(row);
         })
-
-        // Village intersection click popup
-        (function () {
-            const mapEl = document.getElementById('villageIntersectMap');
-            if (!mapEl || typeof villageIntersectMap === 'undefined') return;
-
-            const popupEl = document.createElement('div');
-            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; pointer-events: none;';
-            mapEl.appendChild(popupEl);
-
-            const popupOverlay = new ol.Overlay({
-                element: popupEl,
-                positioning: 'bottom-center',
-                offset: [0, -10],
-            });
-            villageIntersectMap.addOverlay(popupOverlay);
-
-            villageIntersectMap.on('click', function (evt) {
-                const feature = villageIntersectMap.forEachFeatureAtPixel(evt.pixel, f => f);
-                if (!feature) {
-                    popupEl.style.display = 'none';
-                    return;
-                }
-
-                const clickedName = getVillageLabelName(feature);
-                const idx = villageNames.findIndex(name => name && clickedName && name.toLowerCase() === clickedName.toLowerCase());
-
-                if (idx === -1) {
-                    popupEl.style.display = 'none';
-                    return;
-                }
-
-                const pct = villagesIntersectPct[idx];
-                popupEl.innerHTML = `<strong>${villageNames[idx]}</strong><br/>${pct}% of this MWS's area falls within this village.`;
-                popupEl.style.display = 'block';
-                popupOverlay.setPosition(evt.coordinate);
-            });
-        })();
 
         // Toggle show more/less for collapsible lists
         function toggleList(listId, button) {

@@ -15,6 +15,35 @@ logger = setup_logger(__name__)
 DATA_DIR_TEMP = EXCEL_DIR
 
 
+def _build_file_path(state, district, block):
+    return (
+        DATA_DIR_TEMP
+        + state.upper() + "/"
+        + district.upper() + "/"
+        + district.lower() + "_" + block.lower() + ".xlsx"
+    )
+
+
+def load_block_sheets(state, district, block):
+    """Load all Excel sheets for a block once. Returns (df, df_facilities, df_nrega, df_livestock)."""
+    try:
+        excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+        df = pd.read_excel(excel_file, sheet_name="antyodaya")
+        df["village_id"] = df["village_id"].astype(str).str.strip()
+        df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
+        df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
+        df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+        df_nrega["vill_id"] = df_nrega["vill_id"].astype(str).str.strip()
+        df_livestock = pd.read_excel(excel_file, sheet_name="livestock")
+        df_livestock["village_id"] = df_livestock["village_id"].astype(str).str.strip()
+        return df, df_facilities, df_nrega, df_livestock
+    except Exception as e:
+        logger.error(
+            "Failed to load block sheets for %s/%s/%s: %s", state, district, block, str(e)
+        )
+        return None, None, None, None
+
+
 # ? MARK: HELPER FUNCTIONS
 def get_geojson(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
@@ -230,7 +259,7 @@ def get_village_polygon_and_info(state, district, block, village_id):
         }
     
 
-def get_development_data(state, district, block, village_id):
+def get_development_data(state, district, block, village_id, df=None, df_facilities=None, df_nrega=None):
 
     def normalize_column(df, column):
         df[column] = df[column].astype(str).str.strip()
@@ -281,28 +310,16 @@ def get_development_data(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None or df_facilities is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
 
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(excel_file, sheet_name="antyodaya")
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
         normalize_column(df, "village_id")
-        normalize_column(df_facilities, "censuscode2011")
+        normalize_column(df_facilities, "village_id")
 
         village_id = str(village_id).strip()
 
@@ -320,7 +337,7 @@ def get_development_data(state, district, block, village_id):
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -363,8 +380,8 @@ def get_development_data(state, district, block, village_id):
             essential_distance = get_distance_logic(
                 facility_row,
                 [
-                    "health_sub_cen_distance",
-                    "health_phc_distance"
+                    "health_sub_cen_distance_in_km",
+                    "health_phc_distance_in_km"
                 ],
                 logic="max"
             )
@@ -378,9 +395,9 @@ def get_development_data(state, district, block, village_id):
             advanced_distance = get_distance_logic(
                 facility_row,
                 [
-                    "health_chc_distance",
-                    "health_dis_h_distance",
-                    "health_s_t_h_distance"
+                    "health_chc_distance_in_km",
+                    "health_dis_h_distance_in_km",
+                    "health_s_t_h_distance_in_km"
                 ],
                 logic="min"
             )
@@ -408,9 +425,9 @@ def get_development_data(state, district, block, village_id):
             essential_education_distance = get_distance_logic(
                 facility_row,
                 [
-                    "school_primary_distance",
-                    "school_upper_primary_distance",
-                    "school_secondary_distance"
+                    "school_primary_distance_in_km",
+                    "school_upper_primary_distance_in_km",
+                    "school_secondary_distance_in_km"
                 ],
                 logic="max"
             )
@@ -418,9 +435,9 @@ def get_development_data(state, district, block, village_id):
             higher_education_distance = get_distance_logic(
                 facility_row,
                 [
-                    "school_higher_secondary_distance",
-                    "college_distance",
-                    "universities_distance"
+                    "school_higher_secondary_distance_in_km",
+                    "college_distance_in_km",
+                    "universities_distance_in_km"
                 ],
                 logic="min"
             )
@@ -455,10 +472,10 @@ def get_development_data(state, district, block, village_id):
             financial_distance = get_distance_logic(
                 facility_row,
                 [
-                    "csc_distance",
-                    "bank_mitra_distance",
-                    "bank_branch_distance",
-                    "bank_atm_distance"
+                    "csc_distance_in_km",
+                    "bank_mitra_distance_in_km",
+                    "bank_branch_distance_in_km",
+                    "bank_atm_distance_in_km"
                 ],
                 logic="max"
             )
@@ -481,7 +498,7 @@ def get_development_data(state, district, block, village_id):
 
             pds_distance = get_numeric(
                 facility_row,
-                "pds_distance"
+                "pds_distance_in_km"
             )
 
             pds_score = 1 if (
@@ -504,7 +521,7 @@ def get_development_data(state, district, block, village_id):
         scores.append(calculate_band_score(community_avg_score))
 
         #* Livelihood Diversification Score
-        livelihood_farm_score = safe_float(row.get("farm_employment_feat_value", 0))
+        livelihood_farm_score = safe_float(row.get("livelihoods_employment_cat_value", 0))
         livelihood_forest_score = safe_float(row.get("livelihoods_forest_resources_cat_value", 0))
         livelihood_fish_score = safe_float(row.get("livelihoods_fisheries_cat_value", 0))
         livelihood_alternate_score = safe_float(row.get("livelihoods_alternative_farming_cat_value", 0))
@@ -524,7 +541,7 @@ def get_development_data(state, district, block, village_id):
         if facility_row is not None:
             husbandry_distance = get_numeric(
                 facility_row,
-                "agri_industry_dairy_animal_husbandry_distance"
+                "agri_industry_dairy_animal_husbandry_distance_in_km"
             )
 
             # High: < 10 km
@@ -561,22 +578,22 @@ def get_development_data(state, district, block, village_id):
 
             agri_facility_configs = [
                 {
-                    "column": "agri_industry_agri_support_infrastructure_distance",
+                    "column": "agri_industry_agri_support_infrastructure_distance_in_km",
                     "high_limit": 10,
                     "medium_limit": 50,
                 },
                 {
-                    "column": "agri_industry_agri_processing_distance",
+                    "column": "agri_industry_agri_processing_distance_in_km",
                     "high_limit": 5,
                     "medium_limit": 20,
                 },
                 {
-                    "column": "agri_industry_co_operatives_societies_distance",
+                    "column": "agri_industry_co_operatives_societies_distance_in_km",
                     "high_limit": 10,
                     "medium_limit": 30,
                 },
                 {
-                    "column": "agri_industry_markets_trading_distance",
+                    "column": "agri_industry_markets_trading_distance_in_km",
                     "high_limit": 3,
                     "medium_limit": 10,
                 },
@@ -598,10 +615,11 @@ def get_development_data(state, district, block, village_id):
 
         #* Ecology and Climate Resilience
         organic_farm_score = safe_float(row.get("agriculture_organic_farming_cat_value", 0))
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
-        )
+        if df_nrega is None:
+            df_nrega = pd.read_excel(
+                pd.ExcelFile(_build_file_path(state, district, block)),
+                sheet_name="nrega_assets_village"
+            )
 
         normalize_column(df_nrega, "vill_id")
 
@@ -663,7 +681,7 @@ def get_development_data(state, district, block, village_id):
         return []
     
 
-def get_block_development_data(state, district, block):
+def get_block_development_data(state, district, block, df=None, df_facilities=None, df_nrega=None):
 
     def normalize_column(df, column):
         df[column] = df[column].astype(str).str.strip()
@@ -716,33 +734,18 @@ def get_block_development_data(state, district, block):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None or df_facilities is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
 
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(excel_file, sheet_name="antyodaya")
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
-
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
-        )
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
         normalize_column(df, "village_id")
-        normalize_column(df_facilities, "censuscode2011")
+        normalize_column(df_facilities, "village_id")
         normalize_column(df_nrega, "vill_id")
 
         block_scores = []
@@ -790,8 +793,8 @@ def get_block_development_data(state, district, block):
             essential_distance = get_distance_logic(
                 facility_row,
                 [
-                    "health_sub_cen_distance",
-                    "health_phc_distance"
+                    "health_sub_cen_distance_in_km",
+                    "health_phc_distance_in_km"
                 ],
                 logic="max"
             )
@@ -807,9 +810,9 @@ def get_block_development_data(state, district, block):
             advanced_distance = get_distance_logic(
                 facility_row,
                 [
-                    "health_chc_distance",
-                    "health_dis_h_distance",
-                    "health_s_t_h_distance"
+                    "health_chc_distance_in_km",
+                    "health_dis_h_distance_in_km",
+                    "health_s_t_h_distance_in_km"
                 ],
                 logic="min"
             )
@@ -844,9 +847,9 @@ def get_block_development_data(state, district, block):
             essential_education_distance = get_distance_logic(
                 facility_row,
                 [
-                    "school_primary_distance",
-                    "school_upper_primary_distance",
-                    "school_secondary_distance"
+                    "school_primary_distance_in_km",
+                    "school_upper_primary_distance_in_km",
+                    "school_secondary_distance_in_km"
                 ],
                 logic="max"
             )
@@ -854,9 +857,9 @@ def get_block_development_data(state, district, block):
             higher_education_distance = get_distance_logic(
                 facility_row,
                 [
-                    "school_higher_secondary_distance",
-                    "college_distance",
-                    "universities_distance"
+                    "school_higher_secondary_distance_in_km",
+                    "college_distance_in_km",
+                    "universities_distance_in_km"
                 ],
                 logic="min"
             )
@@ -901,10 +904,10 @@ def get_block_development_data(state, district, block):
             financial_distance = get_distance_logic(
                 facility_row,
                 [
-                    "csc_distance",
-                    "bank_mitra_distance",
-                    "bank_branch_distance",
-                    "bank_atm_distance"
+                    "csc_distance_in_km",
+                    "bank_mitra_distance_in_km",
+                    "bank_branch_distance_in_km",
+                    "bank_atm_distance_in_km"
                 ],
                 logic="max"
             )
@@ -941,7 +944,7 @@ def get_block_development_data(state, district, block):
 
             pds_distance = get_numeric(
                 facility_row,
-                "pds_distance"
+                "pds_distance_in_km"
             )
 
             pds_scores.append(
@@ -983,7 +986,7 @@ def get_block_development_data(state, district, block):
         livelihood_avg = (
             df[
                 [
-                    "farm_employment_feat_value",
+                    "livelihoods_employment_cat_value",
                     "livelihoods_forest_resources_cat_value",
                     "livelihoods_fisheries_cat_value",
                     "livelihoods_alternative_farming_cat_value",
@@ -1012,7 +1015,7 @@ def get_block_development_data(state, district, block):
 
             husbandry_distance = get_numeric(
                 facility_row,
-                "agri_industry_dairy_animal_husbandry_distance"
+                "agri_industry_dairy_animal_husbandry_distance_in_km"
             )
 
             if pd.notnull(husbandry_distance) and husbandry_distance < 10:
@@ -1041,7 +1044,7 @@ def get_block_development_data(state, district, block):
 
         for _, facility_row in df_facilities.iterrows():
 
-            village_id = facility_row["censuscode2011"]
+            village_id = facility_row["village_id"]
 
             village_match = df[
                 df["village_id"] == village_id
@@ -1068,22 +1071,22 @@ def get_block_development_data(state, district, block):
 
                 agri_facility_configs = [
                     {
-                        "column": "agri_industry_agri_support_infrastructure_distance",
+                        "column": "agri_industry_agri_support_infrastructure_distance_in_km",
                         "high_limit": 10,
                         "medium_limit": 50,
                     },
                     {
-                        "column": "agri_industry_agri_processing_distance",
+                        "column": "agri_industry_agri_processing_distance_in_km",
                         "high_limit": 5,
                         "medium_limit": 20,
                     },
                     {
-                        "column": "agri_industry_co_operatives_societies_distance",
+                        "column": "agri_industry_co_operatives_societies_distance_in_km",
                         "high_limit": 10,
                         "medium_limit": 30,
                     },
                     {
-                        "column": "agri_industry_markets_trading_distance",
+                        "column": "agri_industry_markets_trading_distance_in_km",
                         "high_limit": 3,
                         "medium_limit": 10,
                     },
@@ -1249,7 +1252,7 @@ def get_basic_infrastructure(state, district, block, village_id, df=None):
         return []
 
 
-def get_health_and_wash(state, district, block, village_id):
+def get_health_and_wash(state, district, block, village_id, df=None, df_facilities=None):
 
     def safe_float(value, default=0):
         try:
@@ -1276,29 +1279,13 @@ def get_health_and_wash(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None or df_facilities is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
 
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
-
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
         df["village_id"] = (
             df["village_id"]
@@ -1306,8 +1293,8 @@ def get_health_and_wash(state, district, block, village_id):
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -1330,7 +1317,7 @@ def get_health_and_wash(state, district, block, village_id):
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -1352,8 +1339,8 @@ def get_health_and_wash(state, district, block, village_id):
             essential_distance = get_distance_logic(
                 facility_row,
                 [
-                    "health_sub_cen_distance",
-                    "health_phc_distance"
+                    "health_sub_cen_distance_in_km",
+                    "health_phc_distance_in_km"
                 ],
                 logic="max"
             )
@@ -1361,9 +1348,9 @@ def get_health_and_wash(state, district, block, village_id):
             advanced_distance = get_distance_logic(
                 facility_row,
                 [
-                    "health_chc_distance",
-                    "health_dis_h_distance",
-                    "health_s_t_h_distance"
+                    "health_chc_distance_in_km",
+                    "health_dis_h_distance_in_km",
+                    "health_s_t_h_distance_in_km"
                 ],
                 logic="min"
             )
@@ -1427,8 +1414,8 @@ def get_education_institutions(state, district, block, village_id, df_facilities
                 sheet_name="facilities_proximity"
             )
 
-            df_facilities["censuscode2011"] = (
-                df_facilities["censuscode2011"]
+            df_facilities["village_id"] = (
+                df_facilities["village_id"]
                 .astype(str)
                 .str.strip()
             )
@@ -1436,7 +1423,7 @@ def get_education_institutions(state, district, block, village_id, df_facilities
         village_id = str(village_id).strip()
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         if facility_match.empty:
@@ -1453,9 +1440,9 @@ def get_education_institutions(state, district, block, village_id, df_facilities
         essential_education_distance = get_distance_logic(
             facility_row,
             [
-                "school_primary_distance",
-                "school_upper_primary_distance",
-                "school_secondary_distance"
+                "school_primary_distance_in_km",
+                "school_upper_primary_distance_in_km",
+                "school_secondary_distance_in_km"
             ],
             logic="max"
         )
@@ -1463,9 +1450,9 @@ def get_education_institutions(state, district, block, village_id, df_facilities
         higher_education_distance = get_distance_logic(
             facility_row,
             [
-                "school_higher_secondary_distance",
-                "college_distance",
-                "universities_distance"
+                "school_higher_secondary_distance_in_km",
+                "college_distance_in_km",
+                "universities_distance_in_km"
             ],
             logic="min"
         )
@@ -1562,8 +1549,8 @@ def get_financial_inclusion(state, district, block, village_id, df_facilities=No
                 sheet_name="facilities_proximity"
             )
 
-            df_facilities["censuscode2011"] = (
-                df_facilities["censuscode2011"]
+            df_facilities["village_id"] = (
+                df_facilities["village_id"]
                 .astype(str)
                 .str.strip()
             )
@@ -1571,7 +1558,7 @@ def get_financial_inclusion(state, district, block, village_id, df_facilities=No
         village_id = str(village_id).strip()
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         if facility_match.empty:
@@ -1586,10 +1573,10 @@ def get_financial_inclusion(state, district, block, village_id, df_facilities=No
         financial_distance = get_distance_logic(
             facility_row,
             [
-                "csc_distance",
-                "bank_mitra_distance",
-                "bank_branch_distance",
-                "bank_atm_distance"
+                "csc_distance_in_km",
+                "bank_mitra_distance_in_km",
+                "bank_branch_distance_in_km",
+                "bank_atm_distance_in_km"
             ],
             logic="max"
         )
@@ -1672,8 +1659,8 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
                     sheet_name="facilities_proximity"
                 )
 
-                df_facilities["censuscode2011"] = (
-                    df_facilities["censuscode2011"]
+                df_facilities["village_id"] = (
+                    df_facilities["village_id"]
                     .astype(str)
                     .str.strip()
                 )
@@ -1684,8 +1671,8 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -1706,7 +1693,7 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -1725,7 +1712,7 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
 
             pds_distance = get_numeric(
                 facility_row,
-                "pds_distance"
+                "pds_distance_in_km"
             )
 
         if social_protection_score <= 0.33:
@@ -1855,7 +1842,7 @@ def get_community_institutes(state, district, block, village_id, df=None):
         return []
 
 
-def get_livelihood_diversification(state, district, block, village_id):
+def get_livelihood_diversification(state, district, block, village_id, df=None):
 
     def safe_float(value, default=0):
         try:
@@ -1865,24 +1852,9 @@ def get_livelihood_diversification(state, district, block, village_id):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+        if df is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            df = pd.read_excel(excel_file, sheet_name="antyodaya")
 
         df["village_id"] = (
             df["village_id"]
@@ -1908,7 +1880,7 @@ def get_livelihood_diversification(state, district, block, village_id):
         row = matched_rows.iloc[0]
 
         return [
-            safe_float(row.get("farm_employment_feat_value", 0)),
+            safe_float(row.get("livelihoods_employment_cat_value", 0)),
             safe_float(row.get("livelihoods_forest_resources_cat_value", 0)),
             safe_float(row.get("livelihoods_alternative_farming_cat_value", 0)),
             safe_float(row.get("livelihoods_fisheries_cat_value", 0)),
@@ -1974,8 +1946,8 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -1996,7 +1968,7 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -2017,19 +1989,23 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
 
             husbandry_distance = get_numeric(
                 facility_row,
-                "agri_industry_dairy_animal_husbandry_distance"
+                "agri_industry_dairy_animal_husbandry_distance_in_km"
             )
 
         veterinary_color = (
-            "green"
+            "red"
+            if livestock_support_score < 0.33
+            else "green"
             if livestock_support_score > 0.66
-            else "red"
+            else "yellow"
         )
 
         pasture_color = (
-            "green"
+            "red"
+            if livestock_pasture_score < 0.33
+            else "green"
             if livestock_pasture_score > 0.66
-            else "red"
+            else "yellow"
         )
 
         return [
@@ -2054,33 +2030,128 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
         return []
 
 
-def get_land_cultivation(state, district, block, village_id):
-    
+def get_livestock_count(state, district, block, village_id, df_livestock=None):
+
+    def safe_int(value):
+        try:
+            if value is None or pd.isna(value):
+                return None
+            v = int(float(value))
+            return v if v >= 0 else None
+        except:
+            return None
+
+    try:
+
+        if df_livestock is None:
+
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
+
+            excel_file = pd.ExcelFile(file_path)
+
+            df_livestock = pd.read_excel(
+                excel_file,
+                sheet_name="livestock"
+            )
+
+        df_livestock["village_id"] = (
+            df_livestock["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_id = str(village_id).strip()
+
+        matched_rows = df_livestock[
+            df_livestock["village_id"] == village_id
+        ]
+
+        if matched_rows.empty:
+            logger.info(
+                "No livestock count data found for village_id %s in %s district, %s block",
+                village_id,
+                district,
+                block,
+            )
+            return {}
+
+        row = matched_rows.iloc[0]
+
+        status = str(row.get("data_availability_status", "")).strip().lower()
+        if status != "matched":
+            logger.info(
+                "Livestock data not available for village_id %s in %s district, %s block: %s",
+                village_id, district, block, status,
+            )
+            return {}
+
+        return {
+            "large_animals_total": safe_int(row.get("large_animals_total")),
+            "cattle_total":        safe_int(row.get("cattle_total")),
+            "buffalo_total":       safe_int(row.get("buffalo_total")),
+            "small_animals_total": safe_int(row.get("small_animals_total")),
+            "sheep_total":         safe_int(row.get("sheep_total")),
+            "goat_total":          safe_int(row.get("goat_total")),
+            "pig_total":           safe_int(row.get("pig_total")),
+            "all_livestock_total": safe_int(row.get("all_livestock_total")),
+        }
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access livestock count data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
+
+
+def get_land_cultivation(state, district, block, village_id, df=None):
+
     def safe_float(value, default=0):
         try:
             return float(value)
         except:
             return default
-    
+
     try:
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df is None:
+            file_path = (
+                DATA_DIR_TEMP
+                + state.upper()
+                + "/"
+                + district.upper()
+                + "/"
+                + district.lower()
+                + "_"
+                + block.lower()
+                + ".xlsx"
+            )
 
-        excel_file = pd.ExcelFile(file_path)
+            excel_file = pd.ExcelFile(file_path)
 
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+            df = pd.read_excel(
+                excel_file,
+                sheet_name="antyodaya"
+            )
+
+            df["village_id"] = (
+                df["village_id"]
+                .astype(str)
+                .str.strip()
+            )
 
         village_id = str(village_id).strip()
 
@@ -2097,10 +2168,50 @@ def get_land_cultivation(state, district, block, village_id):
 
         row = matched_rows.iloc[0]
 
-        land_utilization_score = safe_float(row.get("agriculture_land_cultivation_cat_value", 0))
+        land_utilization_score = safe_float(
+            row.get("agriculture_land_cultivation_cat_value", 0)
+        )
 
+        # Seasonal cultivation score: kharif sown / total cultivable, clamped to [0, 1]
+        kharif_ha = safe_float(row.get("net_sown_area_kharif_in_hac", 0))
+        cultivable_ha = safe_float(row.get("total_cultivable_area_in_hac", 0))
+        if cultivable_ha > 0:
+            seasonal_cultivation_score = min(kharif_ha / cultivable_ha, 1.0)
+        else:
+            seasonal_cultivation_score = 0.0
 
-    
+        # Map color from agriculture_land_cultivation_cat_cluster
+        land_utilization_cluster = str(
+            row.get("agriculture_land_cultivation_cat_cluster", "Low")
+        ).strip()
+        if land_utilization_cluster == "High":
+            land_utilization_color = "green"
+        elif land_utilization_cluster == "Medium":
+            land_utilization_color = "yellow"
+        else:
+            land_utilization_color = "red"
+
+        # Seasonal cultivation color (score-based, 3 levels)
+        if seasonal_cultivation_score <= 0.33:
+            seasonal_cultivation_color = "red"
+        elif seasonal_cultivation_score <= 0.66:
+            seasonal_cultivation_color = "yellow"
+        else:
+            seasonal_cultivation_color = "green"
+
+        # Text cluster
+        cultivation_cluster = str(
+            row.get("agriculture_land_cultivation_cat_cluster", "Low")
+        ).strip()
+
+        return [
+            round(land_utilization_score, 4),       # index 0
+            round(seasonal_cultivation_score, 4),   # index 1
+            land_utilization_color,                 # index 2
+            cultivation_cluster,                    # index 3
+            seasonal_cultivation_color,             # index 4
+        ]
+
     except Exception as e:
 
         logger.info(
@@ -2111,6 +2222,64 @@ def get_land_cultivation(state, district, block, village_id):
         )
 
         return []
+
+
+def get_all_villages_land_cultivation(state, district, block, df=None):
+
+    try:
+
+        if df is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            df = pd.read_excel(excel_file, sheet_name="antyodaya")
+
+        df["village_id"] = (
+            df["village_id"]
+            .astype(str)
+            .str.strip()
+        )
+
+        village_ids = [
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
+        ]
+
+        village_data = {}
+
+        for village_id in village_ids:
+
+            cultivation_info = get_land_cultivation(
+                state,
+                district,
+                block,
+                village_id,
+                df=df
+            )
+
+            if not cultivation_info:
+                village_data[village_id] = {
+                    "land_utilization_color": "black",
+                    "seasonal_cultivation_color": "black"
+                }
+                continue
+
+            village_data[village_id] = {
+                "land_utilization_color": cultivation_info[2],
+                "seasonal_cultivation_color": cultivation_info[4]
+            }
+
+        return village_data
+
+    except Exception as e:
+
+        logger.info(
+            "Not able to access land cultivation map data for %s district, %s block. Error: %s",
+            district,
+            block,
+            str(e),
+        )
+
+        return {}
 
 
 def get_irrigation_Infra(state, district, block, village_id, df=None):
@@ -2174,35 +2343,16 @@ def get_irrigation_Infra(state, district, block, village_id, df=None):
             )
         )
 
-        modern_irrigation_score = safe_float(
-            row.get(
-                "modern_irrigation_feat_value",
-                0
-            )
-        )
-
-        # Irrigation Watershed Color
-        irrigation_watershed_color = (
-            "green"
-            if irrigation_watershed_score > 0.66
-            else "red"
-        )
-
-        # Modern Irrigation Color
-        if modern_irrigation_score <= 0.33:
-            modern_irrigation_color = "red"
-
-        elif modern_irrigation_score <= 0.66:
-            modern_irrigation_color = "yellow"
-
+        if irrigation_watershed_score < 0.33:
+            irrigation_watershed_color = "red"
+        elif irrigation_watershed_score <= 0.66:
+            irrigation_watershed_color = "yellow"
         else:
-            modern_irrigation_color = "green"
+            irrigation_watershed_color = "green"
 
         return [
             irrigation_watershed_score,
-            modern_irrigation_score,
-            irrigation_watershed_color,
-            modern_irrigation_color
+            irrigation_watershed_color
         ]
 
     except Exception as e:
@@ -2278,8 +2428,8 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
             .str.strip()
         )
 
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -2302,7 +2452,7 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
         row = matched_rows.iloc[0]
 
         facility_match = df_facilities[
-            df_facilities["censuscode2011"] == village_id
+            df_facilities["village_id"] == village_id
         ]
 
         facility_row = (
@@ -2335,16 +2485,19 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
 
         post_harvest_distance = None
         apmc_access_distance = None
+        agri_support_socities_distance = None
+        agri_support_infra_distance = None
+        agri_processing_distance = None
 
         if facility_row is not None:
 
             post_harvest_distance = get_distance_logic(
                 facility_row,
                 [
-                    "agri_industry_storage_warehousing_distance",
-                    "agri_industry_distribution_utilities_distance",
-                    "agri_industry_agri_processing_distance",
-                    "agri_industry_industrial_manufacturing_distance"
+                    "agri_industry_storage_warehousing_distance_in_km",
+                    "agri_industry_distribution_utilities_distance_in_km",
+                    "agri_industry_agri_processing_distance_in_km",
+                    "agri_industry_industrial_manufacturing_distance_in_km"
                 ],
                 logic="min"
             )
@@ -2352,8 +2505,32 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
             apmc_access_distance = get_distance_logic(
                 facility_row,
                 [
-                    "apmc_distance",
-                    "agri_industry_markets_trading_distance"
+                    "apmc_markets_distance_in_km",
+                    "agri_industry_markets_trading_distance_in_km"
+                ],
+                logic="min"
+            )
+
+            agri_support_socities_distance = get_distance_logic(
+                facility_row,
+                [
+                    "agri_industry_co_operatives_societies_distance_in_km",
+                ],
+                logic="min"
+            )
+
+            agri_support_infra_distance = get_distance_logic(
+                facility_row,
+                [
+                    "agri_industry_agri_support_infrastructure_distance_in_km",
+                ],
+                logic="min"
+            )
+
+            agri_processing_distance = get_distance_logic(
+                facility_row,
+                [
+                    "agri_industry_agri_processing_distance_in_km",
                 ],
                 logic="min"
             )
@@ -2387,7 +2564,16 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
             if apmc_access_distance is not None
             else None,                                         # index 3
             agri_support_color,                                # index 4
-            agri_market_color                                  # index 5
+            agri_market_color,                                 # index 5
+            round(agri_support_socities_distance, 2)
+            if agri_support_socities_distance is not None
+            else None,                                         # index 6
+            round(agri_support_infra_distance, 2)
+            if agri_support_infra_distance is not None
+            else None,                                         # index 7
+            round(agri_processing_distance, 2)
+            if agri_processing_distance is not None
+            else None,                                         # index 8
         ]
 
     except Exception as e:
@@ -2578,37 +2764,19 @@ def get_ecological_climate_resiliance(state, district, block, village_id, df=Non
 
 
 #? Get Tehsil Map Data
-def get_all_villages_basic_infrastructure(state, district, block):
+def get_all_villages_basic_infrastructure(state, district, block, df=None, df_nrega=None):
     try:
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        # Read once
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+        if df is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
         df["village_id"] = (
             df["village_id"]
             .astype(str)
             .str.strip()
-        )
-
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
         )
 
         village_ids = (
@@ -2645,15 +2813,19 @@ def get_all_villages_basic_infrastructure(state, district, block):
             result[village_id] = {
 
                 "road_color": (
-                    "green"
+                    "red"
+                    if road_score <= 0.33
+                    else "green"
                     if road_score > 0.66
-                    else "red"
+                    else "yellow"
                 ),
 
                 "energy_color": (
-                    "green"
+                    "red"
+                    if energy_score <= 0.33
+                    else "green"
                     if energy_score > 0.66
-                    else "red"
+                    else "yellow"
                 ),
 
                 "housing_color": (
@@ -2677,7 +2849,7 @@ def get_all_villages_basic_infrastructure(state, district, block):
         return {}
 
 
-def get_all_villages_health_and_wash(state, district, block):
+def get_all_villages_health_and_wash(state, district, block, df=None):
 
     def safe_float(value, default=0):
         try:
@@ -2687,24 +2859,9 @@ def get_all_villages_health_and_wash(state, district, block):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+        if df is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            df = pd.read_excel(excel_file, sheet_name="antyodaya")
 
         df["village_id"] = (
             df["village_id"]
@@ -2796,35 +2953,18 @@ def get_all_villages_health_and_wash(state, district, block):
         return {}    
 
 
-def get_all_villages_education_institutions( state, district, block):
+def get_all_villages_education_institutions(state, district, block, df_facilities=None, df_nrega=None):
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df_facilities is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
-        excel_file = pd.ExcelFile(file_path)
-
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
-        )
-
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
-
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -2872,36 +3012,19 @@ def get_all_villages_education_institutions( state, district, block):
         return {}
 
 
-def get_all_villages_financial_inclusion(state, district, block):
+def get_all_villages_financial_inclusion(state, district, block, df_facilities=None, df_nrega=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
+        if df_facilities is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
-        excel_file = pd.ExcelFile(file_path)
-
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
-        )
-
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
-
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
         )
@@ -2955,28 +3078,18 @@ def get_all_villages_financial_inclusion(state, district, block):
         return {}
 
 
-def get_all_villages_welfare_inclusion(state, district, block):
+def get_all_villages_welfare_inclusion(state, district, block, df=None, df_facilities=None, df_nrega=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+        if df is None or df_facilities is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
         df["village_id"] = (
             df["village_id"]
@@ -2984,20 +3097,10 @@ def get_all_villages_welfare_inclusion(state, district, block):
             .str.strip()
         )
 
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
-
-        df_facilities["censuscode2011"] = (
-            df_facilities["censuscode2011"]
+        df_facilities["village_id"] = (
+            df_facilities["village_id"]
             .astype(str)
             .str.strip()
-        )
-
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
         )
 
         village_ids = [
@@ -3043,28 +3146,13 @@ def get_all_villages_welfare_inclusion(state, district, block):
         return {}
 
 
-def get_all_villages_community_institutes(state, district, block):
+def get_all_villages_community_institutes(state, district, block, df=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+        if df is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            df = pd.read_excel(excel_file, sheet_name="antyodaya")
 
         df["village_id"] = (
             df["village_id"]
@@ -3118,33 +3206,16 @@ def get_all_villages_community_institutes(state, district, block):
         return {}
 
 
-def get_all_villages_livestock_management(state, district, block):
+def get_all_villages_livestock_management(state, district, block, df=None, df_facilities=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
-
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+        if df is None or df_facilities is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
         df["village_id"] = (
             df["village_id"]
@@ -3199,28 +3270,13 @@ def get_all_villages_livestock_management(state, district, block):
         return {}
 
 
-def get_all_villages_irrigation_infra(state, district, block):
+def get_all_villages_irrigation_infra(state, district, block, df=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
+        if df is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            df = pd.read_excel(excel_file, sheet_name="antyodaya")
 
         df["village_id"] = (
             df["village_id"]
@@ -3249,15 +3305,13 @@ def get_all_villages_irrigation_infra(state, district, block):
             if not irrigation_info:
 
                 village_data[village_id] = {
-                    "irrigation_watershed_color": "black",
-                    "modern_irrigation_color": "black"
+                    "irrigation_watershed_color": "black"
                 }
 
                 continue
 
             village_data[village_id] = {
-                "irrigation_watershed_color": irrigation_info[2],
-                "modern_irrigation_color": irrigation_info[3]
+                "irrigation_watershed_color": irrigation_info[1]
             }
 
         return village_data
@@ -3274,33 +3328,16 @@ def get_all_villages_irrigation_infra(state, district, block):
         return {}
 
 
-def get_all_villages_agri_support_service(state, district, block):
+def get_all_villages_agri_support_service(state, district, block, df=None, df_facilities=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
-
-        df_facilities = pd.read_excel(
-            excel_file,
-            sheet_name="facilities_proximity"
-        )
+        if df is None or df_facilities is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
 
         df["village_id"] = (
             df["village_id"]
@@ -3355,33 +3392,16 @@ def get_all_villages_agri_support_service(state, district, block):
         return {}
 
 
-def get_all_villages_ecological_climate_resiliance(state, district, block):
+def get_all_villages_ecological_climate_resiliance(state, district, block, df=None, df_nrega=None):
 
     try:
 
-        file_path = (
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        excel_file = pd.ExcelFile(file_path)
-
-        df = pd.read_excel(
-            excel_file,
-            sheet_name="antyodaya"
-        )
-
-        df_nrega = pd.read_excel(
-            excel_file,
-            sheet_name="nrega_assets_village"
-        )
+        if df is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
         df["village_id"] = (
             df["village_id"]
