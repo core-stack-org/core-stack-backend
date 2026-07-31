@@ -72,7 +72,6 @@ from .gen_mws_report import (
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
-    get_intersecting_village_ids
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
@@ -351,6 +350,7 @@ def generate_mws_report(request):
             ca_works,
             ofw_works,
             villages_intersect_pct,
+            villages_id,
         ) = get_village_data(state, district, block, uid)
 
         # ? Cropping Intensity Description
@@ -445,6 +445,7 @@ def generate_mws_report(request):
             "sev_drought": json.dumps(sev_drought.astype(int).tolist()),
             "villages_name": json.dumps(villages_name),
             "villages_intersect_pct": json.dumps(villages_intersect_pct),
+            "villages_id": json.dumps(villages_id),
             "villages_sc": json.dumps(villages_sc),
             "villages_st": json.dumps(villages_st),
             "villages_pop": json.dumps(villages_pop),
@@ -461,7 +462,6 @@ def generate_mws_report(request):
             "factory_desc": factory_desc,
             "mining_desc": mining_desc,
             "green_credit_desc": green_credits,
-            "village_ids" : json.dumps(village_ids)
         }
 
         # print("Api Processing End 1", datetime.now())

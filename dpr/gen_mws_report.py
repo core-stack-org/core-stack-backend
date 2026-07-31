@@ -2962,7 +2962,7 @@ def get_village_data(state, district, block, uid):
                 district,
                 block
             )
-            return [], [], [], [], [], [], [], [], [], [], [], []
+            return [], [], [], [], [], [], [], [], [], [], [], [], []
 
         # Load the main sheet
         df = read_excel_sheet(file_path, "mws_intersect_villages")
@@ -3006,6 +3006,7 @@ def get_village_data(state, district, block, uid):
                     village_details = {}
 
         villages_name = []
+        villages_id = []
         villages_sc = []
         villages_st = []
         villages_pop = []
@@ -3047,6 +3048,7 @@ def get_village_data(state, district, block, uid):
                             village_name = name[0] if name else None
                 
                 villages_name.append(village_name)
+                villages_id.append(id)
 
                 detail = village_details.get(id) or village_details.get(str(id)) or {}
                 villages_intersect_pct.append(detail.get("percentage_of_area", 0))
@@ -3250,6 +3252,7 @@ def get_village_data(state, district, block, uid):
             ca_works,
             ofw_works,
             villages_intersect_pct,
+            villages_id,
         )
 
     except Exception as e:
@@ -3258,4 +3261,4 @@ def get_village_data(state, district, block, uid):
             district,
             block,
         )
-        return [], [], [], [], [], [], [], [], [], [], [], []
+        return [], [], [], [], [], [], [], [], [], [], [], [], []
