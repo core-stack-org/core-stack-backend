@@ -2806,6 +2806,78 @@
             return '';
         };
 
+        const getVillageId = feature => {
+            const candidates = ['vill_ID', 'vill_id', 'VILL_ID', 'village_id'];
+            for (const key of candidates) {
+                const val = feature.get(key);
+                if (val !== undefined && val !== null && val !== '') return val;
+            }
+            return null;
+        };
+
+        const getVillageReportUrl = villageId => {
+            const base = '{{ base_url }}'.replace(/\/$/, '');
+            const state = encodeURIComponent('{{ state }}');
+            const district = encodeURIComponent('{{ district }}');
+            const block = encodeURIComponent('{{ block }}');
+            return `${base}/generate_village_report/?state=${state}&district=${district}&block=${block}&villageId=${encodeURIComponent(villageId)}`;
+        };
+
+        const villagesIdForLinks = JSON.parse('{{ villages_id|safe }}');
+        const villagesIntersectPctForPopup = JSON.parse('{{ villages_intersect_pct|safe }}');
+        const villageNamesForPopup = JSON.parse('{{ villages_name|safe }}');
+
+        // Click popup: village name + "Show Village Report" button, on the given map/layer.
+        // Reused across every map that renders villages. When showIntersectPct is true, also
+        // shows the % of MWS area falling within the clicked village.
+        const attachVillageClickPopup = (map, villageLayer, showIntersectPct = false) => {
+            const targetEl = map.getTargetElement ? map.getTargetElement() : document.getElementById(map.get('target'));
+            if (!targetEl || targetEl.querySelector('.village-click-popup')) return;
+
+            const popupEl = document.createElement('div');
+            popupEl.className = 'village-click-popup';
+            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; z-index: 25; display: none;';
+            targetEl.appendChild(popupEl);
+
+            const popupOverlay = new ol.Overlay({
+                element: popupEl,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+            });
+            map.addOverlay(popupOverlay);
+
+            map.on('click', evt => {
+                const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, { layerFilter: l => l === villageLayer });
+                if (!feature) {
+                    popupEl.style.display = 'none';
+                    return;
+                }
+
+                const villageId = getVillageId(feature);
+                const name = getVillageLabelName(feature) || 'This village';
+
+                let pctLine = '';
+                if (showIntersectPct && villageId !== null) {
+                    const idx = villagesIdForLinks.findIndex(id => String(id) === String(villageId));
+                    if (idx !== -1) {
+                        pctLine = `<br/>${villagesIntersectPctForPopup[idx]}% of this MWS's area falls within this village.`;
+                    }
+                }
+
+                popupEl.innerHTML = `<strong>${name}</strong>${pctLine}`;
+                if (villageId !== null) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = 'Show Village Report';
+                    btn.style.cssText = 'display: block; margin-top: 6px; padding: 4px 10px; background: #3498db; color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;';
+                    btn.onclick = () => window.open(getVillageReportUrl(villageId), '_blank');
+                    popupEl.appendChild(btn);
+                }
+                popupEl.style.display = 'block';
+                popupOverlay.setPosition(evt.coordinate);
+            });
+        };
+
         // Shows a small floating tooltip with the village name while hovering over a village
         // boundary feature on the given map/layer. Reused across every map that renders villages.
         const attachVillageHoverTooltip = (map, villageLayer) => {
@@ -2843,7 +2915,7 @@
             });
         };
 
-        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false) => {
+        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false, showIntersectPct = false) => {
             try {
                 const mwsGeometry = mwsFeature.getGeometry();
                 const mwsUid = mwsFeature.get('uid');
@@ -2920,6 +2992,7 @@
                 // Add layer to map
                 map.addLayer(villageLayer);
                 attachVillageHoverTooltip(map, villageLayer);
+                attachVillageClickPopup(map, villageLayer, showIntersectPct);
 
                 // Handle errors silently
                 villageSource.on('change', (e) => {
@@ -4023,7 +4096,7 @@
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature);
-                        addVillageBoundariesToMap(villageIntersectMap, feature);
+                        addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
                         addDemographicBoundariesToMap(feature);
 
                     }
@@ -4769,6 +4842,7 @@
         const st_pop = JSON.parse('{{ villages_st|safe }}')
         const tot_pop = JSON.parse('{{ villages_pop|safe }}')
         const villagesIntersectPct = JSON.parse('{{ villages_intersect_pct|safe }}')
+        const villagesIdList = JSON.parse('{{ villages_id|safe }}')
 
         // Iterate and append villages as list items
         villageNames.forEach(function (village) {
@@ -4782,8 +4856,13 @@
         villageNames.map((item, idx) => {
             var row = document.createElement("tr");
 
+            const villageId = villagesIdList[idx];
+            const nameCell = villageId !== undefined && villageId !== null
+                ? `<a href="${getVillageReportUrl(villageId)}" target="_blank">${item}</a>`
+                : item;
+
             row.innerHTML = `
-                <td>${item}</td>
+                <td>${nameCell}</td>
                 <td>${tot_pop[idx]}</td>
                 <td>${sc_pop[idx]}</td>
                 <td>${st_pop[idx]}</td>
@@ -4798,44 +4877,6 @@
 
             tableBody.appendChild(row);
         })
-
-        // Village intersection click popup
-        (function () {
-            const mapEl = document.getElementById('villageIntersectMap');
-            if (!mapEl || typeof villageIntersectMap === 'undefined') return;
-
-            const popupEl = document.createElement('div');
-            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; pointer-events: none;';
-            mapEl.appendChild(popupEl);
-
-            const popupOverlay = new ol.Overlay({
-                element: popupEl,
-                positioning: 'bottom-center',
-                offset: [0, -10],
-            });
-            villageIntersectMap.addOverlay(popupOverlay);
-
-            villageIntersectMap.on('click', function (evt) {
-                const feature = villageIntersectMap.forEachFeatureAtPixel(evt.pixel, f => f);
-                if (!feature) {
-                    popupEl.style.display = 'none';
-                    return;
-                }
-
-                const clickedName = getVillageLabelName(feature);
-                const idx = villageNames.findIndex(name => name && clickedName && name.toLowerCase() === clickedName.toLowerCase());
-
-                if (idx === -1) {
-                    popupEl.style.display = 'none';
-                    return;
-                }
-
-                const pct = villagesIntersectPct[idx];
-                popupEl.innerHTML = `<strong>${villageNames[idx]}</strong><br/>${pct}% of this MWS's area falls within this village.`;
-                popupEl.style.display = 'block';
-                popupOverlay.setPosition(evt.coordinate);
-            });
-        })();
 
         // Toggle show more/less for collapsible lists
         function toggleList(listId, button) {
