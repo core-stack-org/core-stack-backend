@@ -144,9 +144,13 @@ def export_ndvi_percentiles(gee_account_id, overwrite=False, poll_seconds=30):
 
 
 def export_vci_timeseries(gee_account_id, overwrite=False, poll_seconds=30):
-    """Export VCI for every historical composite (~575, one per 16-day
-    period, 2000-present) as individually queryable GEE assets - needed
-    for the operational analog-year lookup (see module docstring).
+    """Export VCI as one multi-band asset PER YEAR (up to 23 bands, named
+    period_00..period_22, one per 16-day period-of-year present that
+    year) rather than one asset per individual composite - ~26 export
+    tasks instead of ~575, to stay within GEE's per-account processing
+    quota. Still gives the operational analog-year lookup everything it
+    needs (any historical year's VCI at any phenological period), just
+    organised as one image per year instead of one per composite.
     """
     ee_initialize(gee_account_id)
     ensure_farm_stress_folders(gee_account_id, subfolders=["vci_timeseries"])
@@ -157,24 +161,37 @@ def export_vci_timeseries(gee_account_id, overwrite=False, poll_seconds=30):
     percentiles_col = build_percentiles_collection(ndvi_col)
     vci_col = build_vci_collection(ndvi_col, percentiles_col)
 
-    # Export.image.toAsset needs a concrete Python asset_id per image, so
-    # every composite's timestamp is fetched client-side in one call
-    # rather than looping through the lazy collection blindly.
+    # Two aligned aggregate_array calls on the same (unfiltered/unsorted
+    # in between) collection return values in the same underlying image
+    # order, so zipping them client-side is safe.
     time_starts = ndvi_col.aggregate_array("system:time_start").getInfo()
-    print(f"{len(time_starts)} composites to process")
+    periods = ndvi_col.aggregate_array("period_of_year").getInfo()
+
+    by_year = {}
+    for ts, period in zip(time_starts, periods):
+        year = datetime.utcfromtimestamp(ts / 1000).year
+        by_year.setdefault(year, []).append((int(period), ts))
+
+    print(f"{len(time_starts)} composites across {len(by_year)} years")
 
     pending, skipped = [], []
-    for i, ts in enumerate(time_starts, start=1):
-        label = datetime.utcfromtimestamp(ts / 1000).strftime("%Y%m%d")
-        asset_id = f"{VCI_TIMESERIES_FOLDER}/vci_{label}"
+    for year in sorted(by_year):
+        asset_id = f"{VCI_TIMESERIES_FOLDER}/vci_{year}"
         if not overwrite and is_gee_asset_exists(asset_id):
             skipped.append(asset_id)
             continue
 
-        img = ee.Image(vci_col.filter(ee.Filter.eq("system:time_start", ts)).first())
+        band_images = [
+            ee.Image(vci_col.filter(ee.Filter.eq("system:time_start", ts)).first()).rename(
+                f"period_{period:02d}"
+            )
+            for period, ts in sorted(by_year[year])
+        ]
+        combined = ee.Image.cat(band_images)
+
         task = ee.batch.Export.image.toAsset(
-            image=img,
-            description=f"vci_{label}",
+            image=combined,
+            description=f"vci_{year}",
             assetId=asset_id,
             scale=EXPORT_SCALE_M,
             region=region,
@@ -183,7 +200,7 @@ def export_vci_timeseries(gee_account_id, overwrite=False, poll_seconds=30):
         )
         task.start()
         task_id = task.status()["id"]
-        print(f"[{i}/{len(time_starts)}] submitted {asset_id} (task {task_id})")
+        print(f"Submitted {asset_id} ({len(band_images)} bands, task {task_id})")
         pending.append((asset_id, task_id))
 
     print(f"Submitted {len(pending)}, skipped {len(skipped)}. Waiting for the batch...")
