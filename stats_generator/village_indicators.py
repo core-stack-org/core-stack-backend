@@ -114,14 +114,10 @@ def extract_soc_eco(df_soc_eco_indi, v_id):
 
 def extract_livestock(df_livestock, v_id):
     village_row = df_livestock[df_livestock["village_id"] == v_id]
-    livestock_cols = [
-        "cattle_total",
-        "buffalo_total",
-        "sheep_total",
-        "goat_total",
-        "pig_total",
-    ]
-    return village_row[livestock_cols].fillna(0).sum(axis=1).iloc[0]
+    return {
+        "large_animals_total": village_row["large_animals_total"].iloc[0],
+        "small_animals_total": village_row["small_animals_total"].iloc[0],
+    }
 
 
 # def extract_antyodaya(df_antyodaya, v_id):
@@ -578,7 +574,7 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
                 **soc_eco,
                 "total_assets": total_assets,
                 **fac_data,
-                "total_livestock_available": int(livestock_data),
+                **livestock_data,
                 **antyodaya_data,
             }
         )

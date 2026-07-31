@@ -265,7 +265,7 @@
             <!-- Methodology Note -->
             <div class="text-sm p-3 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
                 <p>Most of these indicators are computed using data collected as part of Mission Antyodaya 2020. See a detailed methodology report 
-                    <a href="https://drive.google.com/file/d/1WpxzwZ-Kjsf1c1aY7U3VQg-JMAFC2ljg/view?usp=sharing" target="_blank" style="color: var(--primary-accent); text-decoration: underline; font-weight: 600;">here</a>.
+                    <a href="https://github.com/core-stack-org/core-stack-backend/blob/main/docs/antyodaya_reports/antyodaya_cluster_analysis_report.pdf" target="_blank" style="color: var(--primary-accent); text-decoration: underline; font-weight: 600;">here</a>.
                 </p>
             </div>
         </section>
@@ -335,15 +335,7 @@
                         <!-- Literacy Stats -->
                         <tr style="background-color: rgba(232, 220, 200, 0.3);">
                             <td class="px-4 py-3 font-semibold" style="border: 1px solid var(--supporting-beige); color: var(--primary-dark);">Literate Population</td>
-                            <td class="px-4 py-3 text-center" style="border: 1px solid var(--supporting-beige); color: var(--primary-dark);">{{ demographic_data.P_LIT }} ({{ demographic_data.literacy_percentage }}%)</td>
-                        </tr>
-                        <tr>
-                            <td class="px-4 py-3 text-sm" style="border: 1px solid var(--supporting-beige); color: var(--supporting-gray);">Male</td>
-                            <td class="px-4 py-3 text-center text-sm" style="border: 1px solid var(--supporting-beige); color: var(--supporting-gray);">{{ demographic_data.M_LIT }}</td>
-                        </tr>
-                        <tr style="background-color: rgba(232, 220, 200, 0.15);">
-                            <td class="px-4 py-3 text-sm" style="border: 1px solid var(--supporting-beige); color: var(--supporting-gray);">Female</td>
-                            <td class="px-4 py-3 text-center text-sm" style="border: 1px solid var(--supporting-beige); color: var(--supporting-gray);">{{ demographic_data.F_LIT }}</td>
+                            <td class="px-4 py-3 text-center" style="border: 1px solid var(--supporting-beige); color: var(--primary-dark);">{{ demographic_data.literacy_percentage }}</td>
                         </tr>
                         
                         {% if demographic_data.ADI_2011 >= 6 and demographic_data.ADI_2011 <= 18 %}
@@ -389,18 +381,11 @@
                     <div id="basicInfraMap" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
                 </div>
                 <!-- Chart -->
-                <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
-                    <div class="chart-container" style="width: 100%; margin-bottom: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div class="chart-container" style="width: 100%; height: 380px; margin-bottom: 0;">
                         <canvas id="basicInfraChart"></canvas>
                     </div>
                 </div>
-            </div>
-
-            <!-- Info Box — full width below both columns -->
-            <div id="infraInfoBox" class="p-4 rounded text-sm leading-relaxed border-l-4"
-                style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark); margin-bottom: 1.5rem;">
-                <p id="infraTitle" class="font-semibold mb-2">Road Connectivity</p>
-                <p id="infraDesc" class="text-xs mb-2" style="color: var(--supporting-gray);">The road connectivity indicator takes into account the availability of all weather roads, internal pucca roads, public transport system and access to railway stations.</p>
             </div>
 
             <!-- Detailed Descriptions -->
@@ -410,9 +395,9 @@
                     {% if basic_infra_performance.0 == 'Low' %}
                         <p>This village has issues with road connectivity such as potential absence of an all-weather road, pucca roads, and lack of public transport. The village likely faces significant mobility constraints affecting service delivery, employment access, and market participation.</p>
                     {% elif basic_infra_performance.0 == 'High' %}
-                        <p>This village has good public transport infrastructure such as availability of all-weather roads, internal pucca road networks, and railway connectivity.</p>
+                        <p>This village has good public transport infrastructure such as availability of all-weather roads, and internal pucca road networks.</p>
                     {% else %}
-                        <p>This village has moderate road connectivity with some all-weather roads and basic public transport access, though there may be room for improvement in last-mile connectivity.</p>
+                        <p>This village may have an external road connection but weaker internal roads, or they may have some transport availability but uneven road quality.</p>
                     {% endif %}
                 </div>
             </div>
@@ -421,11 +406,11 @@
                 <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-dark);">Electricity Supply</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;">
                     {% if basic_infra_performance.1 == 'Low' %}
-                        <p>The village has poor access to electricity such as lower levels of electrification, limited energy supply for enterprises, and minimal usage of clean cooking fuel.</p>
+                        <p>The village has poor access to electricity and clean energy such as lower levels of electrification, limited energy supply for enterprises, and minimal usage of clean cooking fuel.</p>
                     {% elif basic_infra_performance.1 == 'High' %}
                         <p>This village likely has good electrification, access to energy for enterprises, and high adoption of clean cooking solutions.</p>
                     {% else %}
-                        <p>This village has moderate electricity access and moderate adoption of clean energy, with opportunities for further expansion of electrification and clean cooking fuel adoption.</p>
+                        <p>This village may have moderate domestic electricity but incomplete clean fuel coverage or limited productive electricity.</p>
                     {% endif %}
                 </div>
             </div>
@@ -434,7 +419,7 @@
                 <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-dark);">Housing Quality</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;">
                     {% if basic_infra_performance.2 == 'Low' %}
-                        <p>Many housing demands under PMAY seem to be unmet in this village along with limited coverage under PMAY and Ujjwala schemes.</p>
+                        <p>Many housing demands under PMAY seem to be unmet in this village along with limited coverage under PMAY and Ujjwala schemes. As a result, there is a possibility that many households are living in kutcha houses.</p>
                     {% elif basic_infra_performance.2 == 'Medium' %}
                         <p>This village exhibits moderate housing permanence and scheme coverage. While pucca housing rates seem to be decent, gaps remain in PMAY saturation and clean cooking fuel adoption.</p>
                     {% elif basic_infra_performance.2 == 'High' %}
@@ -469,28 +454,16 @@
                 <div id="healthWashMap" class="map-container" style="height: 400px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
             </div>
 
-            <!-- Info Box — full width -->
-            <div class="p-4 rounded text-sm leading-relaxed border-l-4"
-                style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark); margin-bottom: 1.5rem;">
-                <p id="healthWashTitle" class="font-semibold mb-2">Maternal and Child Health</p>
-                <p id="healthWashDesc" class="text-xs mb-2" style="color: var(--supporting-gray);">Captures Anganwadi coverage, maternity service utilization, institutional deliveries, child registration and immunization coverage.</p>
-                <p id="healthWashLegend" class="text-xs font-semibold" style="color: var(--supporting-gray);">
-                    <span style="color: #22c55e;">Green:</span> High |
-                    <span style="color: #eab308;">Yellow:</span> Moderate |
-                    <span style="color: #ef4444;">Red:</span> Low
-                </p>
-            </div>
-
             <!-- Maternal and Child Health -->
             <div class="mb-8 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
                 <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-dark);">Maternal and Child Health</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;">
                     {% if health_wash_performance.0 == 'Low' %}
-                        <p>There are concerns with access to maternal and child health services, including weak Anganwadi coverage, low service utilization for pregnant and lactating mothers, and poor health outcomes like anemia and low birth weight. The village may be prioritized for strengthening ICDS services, Anganwadi functionality, nutrition programs, and maternal care outreach.</p>
+                        <p>There are concerns with access to maternal and child health services, including weak Anganwadi coverage, low service utilization for pregnant and lactating mothers, and poor health outcomes like anemia and low birth weight.</p>
                     {% elif health_wash_performance.0 == 'High' %}
                         <p>This village likely has adequate Anganwadi availability, good coverage of maternity services, high institutional deliveries, high rates of child registration and enrollment, and effective immunization coverage.</p>
                     {% else %}
-                        <p>This village shows moderate maternal and child health service coverage. While some infrastructure exists, there is room for improvement in Anganwadi services, maternal care, and immunization programs.</p>
+                        <p>This village likely has functioning maternal-child systems in terms of moderate service utilization for pregnant and lactating mothers and Anganwadi coverage. However, outcome translation in terms of newborn health and sustained utilization of health schemes might be weak in this village.</p>
                     {% endif %}
                     <p class="mt-3" style="color: var(--primary-dark); font-size: 0.95rem;">
                         <strong>Healthcare Infrastructure Access:</strong> Primary health centers / sub-centers in this village are accessible within <span id="distancePrimary">--</span> kms. Community health centers, district hospitals and tertiary hospitals are accessible at a distance of <span id="distanceCommunity">--</span> kms and beyond.
@@ -503,9 +476,9 @@
                 <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-dark);">Water and Sanitation</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;">
                     {% if health_wash_performance.1 == 'Low' %}
-                        <p>The village has weak infrastructure for piped water and sanitation facilities. Drainage and waste management systems might need strengthening.</p>
+                        <p>The village has weak infrastructure for piped water and sanitation facilities. Drainage and waste management systems should be investigated.</p>
                     {% elif health_wash_performance.1 == 'Medium' %}
-                        <p>This village shows moderate piped water access and sanitation coverage. The drainage and waste management infrastructure should be checked for quality and accordingly prioritized for improvement.</p>
+                        <p>This village shows moderate piped water access and sanitation coverage.</p>
                     {% elif health_wash_performance.1 == 'High' %}
                         <p>This village has good access to piped water, sanitation facilities, covered drainage systems and better adoption of waste recycling or biogas facilities, indicating advanced WASH outcomes.</p>
                     {% endif %}
@@ -523,7 +496,7 @@
 
             <!-- Education Access Text -->
             <div class="text-base leading-relaxed mb-8" style="color: var(--primary-dark); line-height: 1.8;">
-                <p>This village has primary education institutions covered within the reach of <span id="essentialEducationDistance">--</span> kms. Higher educational institutions, including access to higher secondary schools, colleges, and universities are accessible at a distance of <span id="higherEducationDistance">--</span> kms and beyond.</p>
+                <p>This village has primary education institutions covered within the reach of <span id="essentialEducationDistance">--</span> kms. Primary education comprises access to primary, upper primary, and secondary education. Higher educational institutions, including access to higher secondary schools, colleges, and universities are accessible at a distance of <span id="higherEducationDistance">--</span> kms and beyond.</p>
             </div>
 
             <!-- Map Container -->
@@ -559,18 +532,6 @@
             <!-- Map Container -->
             <div class="mb-6">
                 <div id="financialInclusionMap" class="map-container" style="width: 100%; height: 400px; margin-bottom: 1rem; border-radius: 0.5rem; overflow: hidden;"></div>
-                
-                <!-- Map Caption -->
-                <div class="map-caption" style="background-color: var(--primary-light); border-left-color: var(--primary-accent);">
-                    <p><strong>Financial Inclusion - Access Quality:</strong></p>
-                    <p style="font-size: 0.95rem; margin-top: 0.5rem;">
-                        Financial inclusion indicates presence of a bank branch, presence of ATM services, availability of business correspondent services, proportion of SHGs accessing bank loans, minority households receiving bank credit, proportion of households with PMJDY accounts.
-                    </p>
-                    <p style="font-size: 0.95rem; margin-top: 0.5rem;">
-                        <span style="color: #22c55e; font-weight: bold;">Green:</span> Strong access to financial services (High financial inclusion)<br>
-                        <span style="color: #ef4444; font-weight: bold;">Red:</span> Limited access to formal banking services (Low financial inclusion)
-                    </p>
-                </div>
             </div>
 
             <!-- Data Source Note -->
@@ -591,19 +552,6 @@
             <!-- Map Container -->
             <div class="mb-6">
                 <div id="welfareInclusionMap" class="map-container" style="width: 100%; height: 400px; margin-bottom: 1rem; border-radius: 0.5rem; overflow: hidden;"></div>
-                
-                <!-- Map Caption -->
-                <div class="map-caption" style="background-color: var(--primary-light); border-left-color: var(--primary-accent);">
-                    <p><strong>Social Protection - Scheme Coverage Quality:</strong></p>
-                    <p style="font-size: 0.95rem; margin-top: 0.5rem;">
-                        Social protection accounts for BPL, NFSA, and pension coverage along with PDS utilization.
-                    </p>
-                    <p style="font-size: 0.95rem; margin-top: 0.5rem;">
-                        <span style="color: #22c55e; font-weight: bold;">Green:</span> Good coverage of welfare schemes (High social protection)<br>
-                        <span style="color: #eab308; font-weight: bold;">Yellow:</span> Moderate coverage with scope for improvement (Medium social protection)<br>
-                        <span style="color: #ef4444; font-weight: bold;">Red:</span> Weak coverage of welfare schemes (Low social protection)
-                    </p>
-                </div>
             </div>
 
             <!-- Data Source Note -->
@@ -633,23 +581,11 @@
                 <div style="flex: 1; min-width: 0;">
                     <div id="communityMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
                 </div>
-                <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
-                    <div class="chart-container" style="width: 100%; margin-bottom: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div class="chart-container" style="width: 100%; height: 380px; margin-bottom: 0;">
                         <canvas id="communityChart"></canvas>
                     </div>
                 </div>
-            </div>
-
-            <!-- Info Box — full width -->
-            <div id="communityInfoBox" class="p-4 rounded text-sm leading-relaxed border-l-4"
-                style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark); margin-bottom: 1.5rem;">
-                <p id="communityTitle" class="font-semibold mb-2">Institutionalization Strength</p>
-                <p id="communityDesc" class="text-xs mb-2" style="color: var(--supporting-gray);">Captured in terms of the proportion of households mobilized into Self-Help Groups, the share of SHGs federated into Village Organizations, household participation in producer groups, presence of a Farmer Producer Organization.</p>
-                <p id="communityLegend" class="text-xs font-semibold" style="color: var(--supporting-gray);">
-                    <span style="color: #22c55e;">Green:</span> High |
-                    <span style="color: #eab308;">Yellow:</span> Moderate |
-                    <span style="color: #ef4444;">Red:</span> Low
-                </p>
             </div>
 
             <div class="mb-8 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
@@ -674,23 +610,6 @@
             <!-- Chart Container -->
             <div class="chart-container" style="height: 400px;">
                 <canvas id="livelihoodChart"></canvas>
-            </div>
-
-            <!-- Performance Color Scale -->
-            <div class="flex flex-wrap gap-8 p-4 rounded mb-8" 
-                 style="background-color: rgba(232, 220, 200, 0.3); border: 1px solid var(--supporting-beige);">
-                <div class="flex items-center gap-2">
-                    <div style="width: 16px; height: 16px; background-color: #22c55e; border-radius: 2px;"></div>
-                    <span class="text-sm font-semibold" style="color: var(--primary-dark);">High</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <div style="width: 16px; height: 16px; background-color: #eab308; border-radius: 2px;"></div>
-                    <span class="text-sm font-semibold" style="color: var(--primary-dark);">Medium</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <div style="width: 16px; height: 16px; background-color: #ef4444; border-radius: 2px;"></div>
-                    <span class="text-sm font-semibold" style="color: var(--primary-dark);">Low</span>
-                </div>
             </div>
 
             <!-- Livelihood Diversification Text Sections -->
@@ -762,22 +681,11 @@
                 <div style="flex: 1; min-width: 0;">
                     <div id="livestockMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
                 </div>
-                <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
-                    <div class="chart-container" style="width: 100%; margin-bottom: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div class="chart-container" style="width: 100%; height: 380px; margin-bottom: 0;">
                         <canvas id="livestockChart"></canvas>
                     </div>
                 </div>
-            </div>
-
-            <!-- Info Box — full width -->
-            <div id="livestockInfoBox" class="p-4 rounded text-sm leading-relaxed border-l-4"
-                style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark); margin-bottom: 1.5rem;">
-                <p id="livestockTitle" class="font-semibold mb-2">Livestock Service Quality</p>
-                <p id="livestockDesc" class="text-xs mb-2" style="color: var(--supporting-gray);">Availability of veterinary services, livestock development projects, and milk collection routes.</p>
-                <p id="livestockLegend" class="text-xs font-semibold" style="color: var(--supporting-gray);">
-                    <span style="color: #22c55e;">Green:</span> High |
-                    <span style="color: #ef4444;">Red:</span> Low
-                </p>
             </div>
 
             <div class="mb-8 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
@@ -790,58 +698,82 @@
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="pastureAccessText"></div>
             </div>
 
+            <div class="mb-8" id="livestockCountTableContainer" style="display:none;">
+                <p class="text-base mb-3" style="color: var(--primary-dark); line-height: 1.8;">Here is a total livestock count in this village:</p>
+                <table style="width: 100%; border-collapse: collapse; font-family: 'Georgia', 'Garamond', serif; font-size: 0.95rem;">
+                    <thead>
+                        <tr style="background-color: var(--primary-accent); color: white;">
+                            <th style="padding: 0.6rem 1rem; text-align: left; border: 1px solid rgba(255,255,255,0.2);">Animal</th>
+                            <th style="padding: 0.6rem 1rem; text-align: center; border: 1px solid rgba(255,255,255,0.2);">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="livestockCountTableBody">
+                    </tbody>
+                </table>
+            </div>
+
             <div class="text-sm p-4 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
-                <p><strong>Note:</strong> Indicators describing the common pasture access of this village are taken from publicly available data from Mission Antyodaya, 2020. Indicator on distance from dairy processing and animal husbandry centers is fetched from the Pradhan Mantri Gram Sadak Yojana (PMGSY) project, released publicly in 2023.</p>
+                <p><strong>Note:</strong> Indicators describing the common pasture access of this village are taken from publicly available data from Mission Antyodaya, 2020. Indicator on distance from dairy processing and animal husbandry centers is fetched from the Pradhan Mantri Gram Sadak Yojana (PMGSY) project, released publicly in 2023. The livestock count for the village is derived from the 20th Livestock Census held in 2019.</p>
             </div>
         </section>
 
-        <!-- ===== SECTION 12: IRRIGATION INFRASTRUCTURE AND FARMING TECHNIQUES ===== -->
-        <section id="section-irrigation" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
-            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Irrigation Infrastructure and Farming Techniques</h2>
+        <!-- ===== SECTION 12: AGRICULTURAL LAND CULTIVATION PATTERNS ===== -->
+        <section id="section-land-cultivation" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
+            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Agricultural Land Cultivation Patterns</h2>
 
             <!-- Tab Buttons — full width -->
             <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <button id="irrigationWatershedBtn" onclick="switchIrrigationMap('watershed')"
+                <button id="landUtilizationBtn" onclick="switchLandCultivationMap('utilization')"
                     style="padding: 0.75rem 1.5rem; background-color: var(--primary-accent); color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                    Watershed Access
+                    Land Utilization
                 </button>
-                <button id="modernIrrigationBtn" onclick="switchIrrigationMap('modern')"
+                <button id="seasonalCultivationBtn" onclick="switchLandCultivationMap('seasonal')"
                     style="padding: 0.75rem 1.5rem; background-color: #bbb; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                    Modern Irrigation
+                    Seasonal Cultivation
                 </button>
             </div>
 
             <!-- Side by side: Map (left) + Chart (right) -->
             <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
                 <div style="flex: 1; min-width: 0;">
+                    <div id="landCultivationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
+                </div>
+                <div style="flex: 1; min-width: 0;">
+                    <div class="chart-container" style="width: 100%; height: 380px; margin-bottom: 0;">
+                        <canvas id="landCultivationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Agricultural Land Cultivation Patterns</h3>
+                <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="landCultivationText"></div>
+            </div>
+
+            <div class="text-sm p-4 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
+                <p><strong>Note:</strong> Source of these indicators is the publicly available data from Mission Antyodaya, 2020.</p>
+            </div>
+        </section>
+
+        <!-- ===== SECTION 13: IRRIGATION INFRASTRUCTURE AND FARMING TECHNIQUES ===== -->
+        <section id="section-irrigation" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
+            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Irrigation Infrastructure and Farming Techniques</h2>
+
+            <!-- Side by side: Map (left) + Chart (right) -->
+            <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
+                <div style="flex: 1; min-width: 0;">
                     <div id="irrigationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
                 </div>
-                <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
-                    <div class="chart-container" style="width: 100%; margin-bottom: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div class="chart-container" style="width: 100%; height: 380px; margin-bottom: 0;">
                         <canvas id="irrigationChart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <!-- Info Box — full width -->
-            <div id="irrigationInfoBox" class="p-4 rounded text-sm leading-relaxed border-l-4"
-                style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark); margin-bottom: 1.5rem;">
-                <p id="irrigationTitle" class="font-semibold mb-2">Irrigation Watershed Access</p>
-                <p id="irrigationDesc" class="text-xs mb-2" style="color: var(--supporting-gray);">Presence of irrigation canals, rainwater harvesting structures, and watershed projects supporting water management.</p>
-                <p id="irrigationLegend" class="text-xs font-semibold" style="color: var(--supporting-gray);">
-                    <span style="color: #22c55e;">Green:</span> Good |
-                    <span style="color: #ef4444;">Red:</span> Poor
-                </p>
-            </div>
-
-            <div class="mb-8 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
+            <div class="mb-8">
                 <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Irrigation Watershed Access</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="irrigationWatershedText"></div>
-            </div>
-
-            <div class="mb-8">
-                <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Modern Irrigation Adoption</h3>
-                <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="modernIrrigationText"></div>
             </div>
 
             <div class="text-sm p-4 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
@@ -870,23 +802,11 @@
                 <div style="flex: 1; min-width: 0;">
                     <div id="agriSupportMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
                 </div>
-                <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
-                    <div class="chart-container" style="width: 100%; margin-bottom: 0;">
+                <div style="flex: 1; min-width: 0;">
+                    <div class="chart-container" style="width: 100%; height: 380px; margin-bottom: 0;">
                         <canvas id="agriSupportChart"></canvas>
                     </div>
                 </div>
-            </div>
-
-            <!-- Info Box — full width -->
-            <div id="agriSupportInfoBox" class="p-4 rounded text-sm leading-relaxed border-l-4"
-                style="background-color: var(--primary-light); border-color: var(--primary-accent); color: var(--primary-dark); margin-bottom: 1.5rem;">
-                <p id="agriSupportTitle" class="font-semibold mb-2">Agricultural Support Services</p>
-                <p id="agriSupportDesc" class="text-xs mb-2" style="color: var(--supporting-gray);">Agricultural support services are assessed in terms of proportion of farmers registered under farmer pension schemes, coverage of pension support for young farmers, and proportion of farmers who have undertaken soil testing.</p>
-                <p id="agriSupportLegend" class="text-xs font-semibold" style="color: var(--supporting-gray);">
-                    <span style="color: #22c55e;">Green:</span> High |
-                    <span style="color: #eab308;">Yellow:</span> Moderate |
-                    <span style="color: #ef4444;">Red:</span> Low
-                </p>
             </div>
 
             <div class="mb-8 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
@@ -921,13 +841,6 @@
                     <!-- Map -->
                     <div style="flex: 1; min-width: 0;">
                         <div id="mgnregaMap" class="map-container" style="height: 340px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
-                        <div class="map-caption" style="background-color: var(--primary-light); border-left-color: var(--primary-accent); margin-top: 0.5rem;">
-                            <p><strong>MGNREGA Work Uptake:</strong></p>
-                            <p style="font-size: 0.9rem; margin-top: 0.25rem;">
-                                <span style="color: #22c55e; font-weight: bold;">Green:</span> Good uptake (&gt;100 assets)<br>
-                                <span style="color: #ef4444; font-weight: bold;">Red:</span> Poor uptake (≤100 assets)
-                            </p>
-                        </div>
                     </div>
                     <!-- Table -->
                     <div style="flex: 1; min-width: 0;">
@@ -984,14 +897,6 @@
                 <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
                     <div style="flex: 1; min-width: 0;">
                         <div id="organicFarmingMap" class="map-container" style="height: 320px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
-                        <div class="map-caption" style="background-color: var(--primary-light); border-left-color: var(--primary-accent); margin-top: 0.5rem;">
-                            <p><strong>Organic Farming Adoption:</strong></p>
-                            <p style="font-size: 0.9rem; margin-top: 0.25rem;">
-                                <span style="color: #22c55e; font-weight: bold;">Green:</span> High adoption
-                                <span style="color: #eab308; font-weight: bold;">Yellow:</span> Moderate adoption
-                                <span style="color: #ef4444; font-weight: bold;">Red:</span> Low adoption
-                            </p>
-                        </div>
                     </div>
                 </div>
                 <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
@@ -1004,13 +909,6 @@
             </div>
         </section>
 
-        {% comment %} <section class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
-            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Climate Vulnerability</h2>
-
-            <div id="climateVulnerabilityMap" class="map-container" style="height: 400px;"></div>
-
-        </section> {% endcomment %}
-
         </div>
     </div>
 
@@ -1019,6 +917,8 @@
     <script>{% include "js/village_map_utils.js" %}</script>
 
     <script>{% include "js/climate_vulnerability_section.js" %}</script>
+
+    <script>{% include "js/vertical_charts_fixes.js" %}</script>
 
     <script>
         const MWSES_JSON = '{{ mwses_polygon|escapejs }}';
@@ -1141,7 +1041,7 @@
             {
                 label: '🌱 Agricultural Productivity',
                 anchor: 'section-agri-support',
-                subindicators: ['Watershed Access', 'Modern Irrigation Adoption', 'Support Services', 'Market Access']
+                subindicators: ['Watershed Access', 'Support Services', 'Market Access']
             },
             {
                 label: '🍃 Ecological Resilience',
@@ -1363,83 +1263,8 @@
         }
 
         if (basicInfraScores && Array.isArray(basicInfraScores) && basicInfraScores.length > 0) {
-            const infraCtx = document.getElementById('basicInfraChart').getContext('2d');
-            const infraChart = new Chart(infraCtx, {
-                type: 'bar',
-                data: {
-                    labels: basicInfraLabels,
-                    datasets: [
-                        {
-                            label: 'Infrastructure Score',
-                            data: basicInfraScores,
-                            backgroundColor: basicInfraScores.map(value => {
-                                if (value <= 0.33) return '#ef4444';
-                                if (value <= 0.66) return '#eab308';
-                                return '#22c55e';
-                            }),
-                            borderColor: basicInfraScores.map(value => {
-                                if (value <= 0.33) return '#dc2626';
-                                if (value <= 0.66) return '#ca8a04';
-                                return '#16a34a';
-                            }),
-                            borderWidth: 1.5,
-                            borderRadius: 4,
-                            minBarLength: 5
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    aspectRatio: 1.8,
-                    layout: {padding: {top: 10, right: 20, bottom: 10, left: 10}},
-                    plugins: {
-                        legend: {display: false},
-                        tooltip: {
-                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
-                            titleFont: {family: "'Georgia', 'Garamond', serif", size: 12, weight: 'bold'},
-                            bodyFont: {family: "'Georgia', 'Garamond', serif", size: 12},
-                            padding: 12,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x.toFixed(2);
-                                    let performance = 'Low';
-                                    if (value > 0.33 && value <= 0.66) performance = 'Medium';
-                                    if (value > 0.66) performance = 'High';
-                                    return 'Score: ' + value + ' (' + performance + ')';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: 0,
-                            max: 1,
-                            ticks: {
-                                stepSize: 0.25,
-                                font: {family: "'Georgia', 'Garamond', serif", size: 11},
-                                color: '#6b7280',
-                                callback: function(value) {
-                                    if (value === 0) return 'Low';
-                                    if (value === 0.5) return 'Medium';
-                                    if (value === 1) return 'High';
-                                    return '';
-                                }
-                            },
-                            grid: {color: 'rgba(0, 0, 0, 0.1)', drawBorder: true, borderColor: '#000000'}
-                        },
-                        y: {
-                            ticks: {
-                                font: {family: "'Georgia', 'Garamond', serif", size: 12, weight: '500'},
-                                color: '#3e2723'
-                            },
-                            grid: {display: false, drawBorder: false}
-                        }
-                    }
-                }
-            });
+            const basicInfraLabels = ['Road Connectivity', 'Electricity supply', 'Housing Quality'];
+            initBasicInfraChart(basicInfraScores, basicInfraLabels);
         }
 
         const basicInfraResult = createTabbedVillageMap({
@@ -1651,7 +1476,7 @@
             
             if (financialInclusionLevel === 'Low') {
                 textContent = `
-                    <p>The village has access issues with formal banking services in this village. Bank branches, ATMs, and banking correspondents are likely scarce. SHG credit linkage, minority credit access, and Jan Dhan penetration are also possibly low.</p>
+                    <p>The village has access issues with formal banking services in this village. Bank branches, ATMs, and banking correspondents are likely scarce. SHG credit linkage, minority credit access, and Jan Dhan penetration are also possibly low. This might lead to dependence on informal or distant banking service.</p>
                     <p style="margin-top: 0.75rem;">Banks, ATMs, bank mitra centers, and common services centers are accessible beyond <span style="font-weight: bold;">${bankingServicesDistance}</span> kms.</p>
                 `;
             } else if (financialInclusionLevel === 'High') {
@@ -1661,7 +1486,7 @@
                 `;
             } else {
                 textContent = `
-                    <p>This village shows moderate access to financial services. While some banking infrastructure exists, there is room for improvement in service availability and credit linkage programs.</p>
+                    <p>They may have Jan Dhan accounts but weak banking infrastructure, or SHG credit access without strong bank/ATM/BC availability.</p>
                     <p style="margin-top: 0.75rem;">Banking services are accessible at a distance of <span style="font-weight: bold;">${bankingServicesDistance}</span> kms.</p>
                 `;
             }
@@ -1717,7 +1542,7 @@
             if (socialProtectionLevel === 'Low') {
                 textContent = `<p>There seems to be weak coverage of welfare schemes in this village, including limited pension access, poor PDS coverage, and low BPL/NFSA inclusion. Public distribution facility can be availed within <span style="font-weight: bold;">${pdsDistance}</span> kms in this village.</p>`;
             } else if (socialProtectionLevel === 'Medium') {
-                textContent = `<p>This village has moderate coverage across PDS, BPL and NFSA inclusion, and pension uptake. Public distribution facility can be availed within <span style="font-weight: bold;">${pdsDistance}</span> kms in this village.</p>`;
+                textContent = `<p>This village likely has functioning components of the social protection system but incomplete convergence. For example, PDS delivery may be working, but pension coverage may be low; or NFSA eligibility may be moderate, but BPL coverage may not fully reflect household vulnerability. Public distribution facility can be availed within <span style="font-weight: bold;">${pdsDistance}</span> kms in this village.</p>`;
             } else if (socialProtectionLevel === 'High') {
                 textContent = `<p>This village shows good coverage of welfare schemes such as PDS utilization, pension access, and widespread inclusion under BPL and NFSA. Public distribution facility can be availed within <span style="font-weight: bold;">${pdsDistance}</span> kms in this village.</p>`;
             }
@@ -1771,8 +1596,10 @@
                 }
                 
                 // Determine civic infrastructure level from score
-                if (civicInfraScore >= 0.5) {
+                if (civicInfraScore >= 0.67) {
                     civicLevel = 'High';
+                } else if (civicInfraScore >= 0.34) {
+                    civicLevel = 'Medium';
                 } else {
                     civicLevel = 'Low';
                 }
@@ -1796,7 +1623,7 @@
                 `;
             } else if (institutionLevel === 'High') {
                 institutionTextContent = `
-                    <p>This village has a strong institutional presence such as good SHG penetration, active federations, robust producer group participation, and availability of FPOs. These structures enable collective action, credit access, and improved market linkages.</p>
+                    <p>This village likely has a strong institutional presence such as good SHG penetration and active federations, but producer group participation and availability of FPOs remains suboptimal. These structures enable collective action, credit access, and improved market linkages.</p>
                 `;
             }
             
@@ -1809,11 +1636,15 @@
             
             if (civicLevel === 'Low') {
                 civicInfraTextContent = `
-                    <p>There are concerns with core governance infrastructure like panchayat buildings, post offices, public information boards, libraries and training of elected representatives. This reflects weak governance capacity and low transparency. The village should be prioritized for infrastructure creation and capacity-building of representatives.</p>
+                    <p>There are concerns with core governance infrastructure like panchayat buildings, post offices, public information boards, libraries and training of elected representatives. This reflects weak governance capacity and low transparency. </p>
                 `;
             } else if (civicLevel === 'High') {
                 civicInfraTextContent = `
                     <p>This village likely has a good civic infrastructure with functional governance buildings, access to public services, and well-trained elected representatives, enabling effective administration and transparency.</p>
+                `;
+            } else {
+                civicInfraTextContent = `
+                    <p>There is likely partial governance capacity in this village. The village might be lacking an updated public information board, refresher training of elected representatives, use of Panchayat Bhawan for service camps, or linkage with post-office/banking services.</p>
                 `;
             }
             
@@ -1828,106 +1659,9 @@
 
         // ===== INITIALIZE COMMUNITY CHART =====
         if (institutionalizationScore !== '--') {
-            const communityCtx = document.getElementById('communityChart').getContext('2d');
             const communityScores = [institutionalizationScore, civicInfraScore];
-            
-            const communityChart = new Chart(communityCtx, {
-                type: 'bar',
-                data: {
-                    labels: communityLabels,
-                    datasets: [
-                        {
-                            label: 'Community Score',
-                            data: communityScores,
-                            backgroundColor: communityScores.map(value => {
-                                if (value <= 0.33) return '#ef4444'; // Red - Low
-                                if (value <= 0.66) return '#eab308'; // Yellow - Medium
-                                return '#22c55e'; // Green - High
-                            }),
-                            borderColor: communityScores.map(value => {
-                                if (value <= 0.33) return '#dc2626';
-                                if (value <= 0.66) return '#ca8a04';
-                                return '#16a34a';
-                            }),
-                            borderWidth: 1.5,
-                            borderRadius: 4,
-                            minBarLength: 5
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
-                            titleFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12
-                            },
-                            padding: 12,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x.toFixed(2);
-                                    let performance = 'Low';
-                                    if (value > 0.33 && value <= 0.66) performance = 'Medium';
-                                    if (value > 0.66) performance = 'High';
-                                    return 'Score: ' + value + ' (' + performance + ')';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: 0,
-                            max: 1,
-                            ticks: {
-                                stepSize: 0.25,
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11
-                                },
-                                color: '#6b7280',
-                                callback: function(value) {
-                                    if (value === 0) return 'Low';
-                                    if (value === 0.5) return 'Medium';
-                                    if (value === 1) return 'High';
-                                    return '';
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)',
-                                drawBorder: true,
-                                borderColor: '#000000'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 12,
-                                    weight: '500'
-                                },
-                                color: '#3e2723'
-                            },
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            }
-                        }
-                    }
-                }
-            });
+            const communityLabels = ['SHG and FPO led Federation Networks', 'Civic Infrastructure'];
+            initCommunityChart(communityScores, communityLabels);
         }
 
         // ===== COMMUNITY MAP (Tabbed, Using Utility) =====
@@ -2008,11 +1742,17 @@
                 } else {
                     farmLevel = 'Low';
                 }
+                if (fisheriesScore >= 0.67) {
+                    fisheriesLevel = 'High';
+                } else if (fisheriesScore >= 0.34) {
+                    fisheriesLevel = 'Medium';
+                } else {
+                    fisheriesLevel = 'Low';
+                }
                 
                 // Determine other levels (2 levels each)
                 forestLevel = forestLivelihoodScore >= 0.5 ? 'High' : 'Low';
                 altFarmingLevel = altFarmingScore >= 0.5 ? 'High' : 'Low';
-                fisheriesLevel = fisheriesScore >= 0.5 ? 'High' : 'Low';
                 cottageLevel = cottageIndustryScore >= 0.5 ? 'High' : 'Low';
                 
                 console.log('Livelihood Data:', livelihoodData);
@@ -2031,43 +1771,46 @@
             // Farm Employment Text
             const farmTextEl = document.getElementById('farmEmploymentText');
             if (farmLevel === 'Low') {
-                farmTextEl.innerHTML = '<p>Agriculture does not seem to be the main livelihood for many households. People likely depend more on non-farm work, wage labour, seasonal work or migration. The village should be supported with skill development and non-farm employment opportunities.</p>';
+                farmTextEl.innerHTML = '<p>Agriculture does not seem to be the main livelihood for many households. People likely depend more on non-farm work, wage labour, seasonal work or migration. </p>';
             } else if (farmLevel === 'Medium') {
-                farmTextEl.innerHTML = '<p>This village exhibits moderate levels of farm employment, indicating a balanced livelihood structure in which agriculture remains important but is perhaps not the sole source of income. Households may combine farming with other economic activities, reflecting partially diversified rural livelihoods. The village can benefit from strengthening non-farm enterprises.</p>';
+                farmTextEl.innerHTML = '<p>This village exhibits moderate levels of farm employment, indicating a balanced livelihood structure in which agriculture remains important but is perhaps not the sole source of income. Households may combine farming with other economic activities, reflecting partially diversified rural livelihoods.</p>';
             } else if (farmLevel === 'High') {
-                farmTextEl.innerHTML = '<p>Most households likely depend on agriculture, indicating a farm-based rural economy. This village should focus on productivity enhancement within ecological limits, support natural farming practices, and strengthen value-chain integration.</p>';
+                farmTextEl.innerHTML = '<p>Most households likely depend on agriculture, indicating a farm-based rural economy.</p>';
             }
 
             // Forest-based Livelihood Text
             const forestTextEl = document.getElementById('forestLivelihoodText');
+
             if (forestLevel === 'Low') {
                 forestTextEl.innerHTML = '<p>Forest resources are likely limited, and households have little dependence on forest-based livelihoods.</p>';
             } else if (forestLevel === 'High') {
-                forestTextEl.innerHTML = '<p>This village seems to exhibit a widespread availability of community forests and minor forest produce activities, along with moderate household dependence on forests. Sustainable forest management, value addition to minor forest produce, and livelihood security interventions under forest rights and tribal development programmes should be prioritized in this village.</p>';
+                forestTextEl.innerHTML = '<p>This village seems to exhibit a widespread availability of community forests and minor forest produce activities, along with moderate household dependence on forests.</p>';
             }
 
             // Alternative Farming Text
             const altTextEl = document.getElementById('altFarmingText');
             if (altFarmingLevel === 'Low') {
-                altTextEl.innerHTML = '<p>There is poor adoption of alternative farming like bee-farming or sericulture. This village requires awareness, training, and starter support to adopt such activities and diversify household incomes.</p>';
+                altTextEl.innerHTML = '<p>There is poor adoption of alternative farming like bee-farming or sericulture</p>';
             } else if (altFarmingLevel === 'High') {
-                altTextEl.innerHTML = '<p>Alternative farming practices like bee-farming and sericulture are present, likely contributing to income diversification. These activities should be strengthened through market linkages, value addition, and technical extension services to scale income gains.</p>';
+                altTextEl.innerHTML = '<p>Alternative farming practices like bee-farming and sericulture are present, likely contributing to income diversification.</p>';
             }
 
             // Fisheries Text
             const fisheriesTextEl = document.getElementById('fisheriesText');
             if (fisheriesLevel === 'Low') {
-                fisheriesTextEl.innerHTML = '<p>There are no fisheries or aquaculture activities. As a consequence, livelihoods are unable to utilize water resources. This village requires water resource development and feasibility assessment before intervention.</p>';
+                fisheriesTextEl.innerHTML = '<p>There are no fisheries or aquaculture activities. As a consequence, livelihoods are unable to utilize water resources.</p>';
             } else if (fisheriesLevel === 'High') {
-                fisheriesTextEl.innerHTML = '<p>Fisheries and aquaculture activities are present, supporting water-based livelihoods, including inland fisheries, pond-based aquaculture, and supported extension services. This village should be prioritised for productivity enhancement, cold-chain support, input supply, and market linkages to maximise livelihood returns.</p>';
+                fisheriesTextEl.innerHTML = '<p>Fisheries and aquaculture activities are present, supporting water-based livelihoods, including inland fisheries, pond-based aquaculture, and supported extension services. </p>';
+            } else {
+                fisheriesTextEl.innerHTML = '<p>This village may have one or two components of the fisheries ecosystem but not all, which means that there could be issues with water body availability, community pond management, extension services, seed/fingerling supply, feed, credit, cold-chain, or market linkage.</p>';
             }
 
             // Cottage Industry Text
             const cottageTextEl = document.getElementById('cottageIndustryText');
             if (cottageLevel === 'Low') {
-                cottageTextEl.innerHTML = '<p>There is minimal presence of cottage industry units, minimal household participation in such activities, and a very limited presence of handloom and handicrafts. The village should be supported with skill development, credit access and market linkage for livelihood diversification.</p>';
+                cottageTextEl.innerHTML = '<p>There is minimal presence of cottage industry units, minimal household participation in such activities, and a very limited presence of handloom and handicrafts.</p>';
             } else if (cottageLevel === 'High') {
-                cottageTextEl.innerHTML = '<p>This village has active cottage industries and strong participation in traditional livelihoods like handloom and handicrafts. The village should be supported with value addition, branding, and supply-chain integration to enhance income sustainability.</p>';
+                cottageTextEl.innerHTML = '<p>This village has active cottage industries and strong participation in traditional livelihoods like handloom and handicrafts.</p>';
             }
         } catch (error) {
             console.warn('Error populating livelihood texts:', error);
@@ -2075,133 +1818,8 @@
 
         // ===== CREATE LIVELIHOOD CHART =====
         if (farmEmploymentScore !== '--') {
-            const livelihoodCtx = document.getElementById('livelihoodChart').getContext('2d');
             const livelihoodScores = [farmEmploymentScore, forestLivelihoodScore, altFarmingScore, fisheriesScore, cottageIndustryScore];
-            
-            // Helper function to get color based on score and whether it's farm (3 levels) or other (2 levels)
-            function getBarColor(score, isFarm) {
-                if (isFarm) {
-                    // 3 levels: Low, Medium, High
-                    if (score <= 0.33) return '#ef4444'; // Red - Low
-                    if (score <= 0.66) return '#eab308'; // Yellow - Medium
-                    return '#22c55e'; // Green - High
-                } else {
-                    // 2 levels: Low, High
-                    if (score < 0.5) return '#ef4444'; // Red - Low
-                    return '#22c55e'; // Green - High
-                }
-            }
-
-            function getBorderColor(score, isFarm) {
-                if (isFarm) {
-                    if (score <= 0.33) return '#dc2626';
-                    if (score <= 0.66) return '#ca8a04';
-                    return '#16a34a';
-                } else {
-                    if (score < 0.5) return '#dc2626';
-                    return '#16a34a';
-                }
-            }
-
-            const livelihoodChart = new Chart(livelihoodCtx, {
-                type: 'bar',
-                data: {
-                    labels: livelihoodLabels,
-                    datasets: [
-                        {
-                            label: 'Livelihood Score',
-                            data: livelihoodScores,
-                            backgroundColor: livelihoodScores.map((value, index) => {
-                                const isFarm = index === 0;
-                                return getBarColor(value, isFarm);
-                            }),
-                            borderColor: livelihoodScores.map((value, index) => {
-                                const isFarm = index === 0;
-                                return getBorderColor(value, isFarm);
-                            }),
-                            borderWidth: 1.5,
-                            borderRadius: 4,
-                            minBarLength: 5
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
-                            titleFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12
-                            },
-                            padding: 12,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x.toFixed(2);
-                                    const isFarm = context.dataIndex === 0;
-                                    let performance = 'Low';
-                                    if (isFarm) {
-                                        if (value > 0.33 && value <= 0.66) performance = 'Medium';
-                                        if (value > 0.66) performance = 'High';
-                                    } else {
-                                        if (value >= 0.5) performance = 'High';
-                                    }
-                                    return 'Score: ' + value + ' (' + performance + ')';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: 0,
-                            max: 1,
-                            ticks: {
-                                stepSize: 0.25,
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11
-                                },
-                                color: '#6b7280',
-                                callback: function(value) {
-                                    if (value === 0) return 'Low';
-                                    if (value === 0.5) return 'High';
-                                    return '';
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)',
-                                drawBorder: true,
-                                borderColor: '#000000'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11,
-                                    weight: '500'
-                                },
-                                color: '#3e2723'
-                            },
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            }
-                        }
-                    }
-                }
-            });
+            initLivelihoodChart(livelihoodScores, livelihoodLabels);
         }
 
 
@@ -2266,12 +1884,16 @@
                 livestockServiceTextEl.innerHTML = `
                     <p>Villages exhibit widespread availability of veterinary services, active livestock development projects, and well-established milk routes. There is strong institutional and market support for livestock-based livelihoods. Centers for dairy processing and animal husbandry (such as Cattle Farm, Cattle Feed, Chicken Center, Dairy Farm, Honey Farm, Milk Centre, Milk Co Operative Society, Poultry) are accessible at a distance of <span style="font-weight: bold;">${distanceToCenters}</span> kms and beyond.</p>
                 `;
+            } else  {
+                livestockServiceTextEl.innerHTML = `
+                    <p>This village likely has a partial livestock system. Centers for dairy processing and animal husbandry (such as Cattle Farm, Cattle Feed, Chicken Center, Dairy Farm, Honey Farm, Milk Centre, Milk Co Operative Society, Poultry) are accessible at a minimum distance of <span style="font-weight: bold;">${distanceToCenters}</span> kms and beyond.</p>
+                `;
             }
 
             // Common Pasture Access Text
             const pastureAccessTextEl = document.getElementById('pastureAccessText');
             if (pastureAccessLevel === 'Low') {
-                pastureAccessTextEl.innerHTML = '<p>This village lacks shared grazing land. Livestock rearing mainly depends on private land, stall-feeding, or grazing outside the village.</p>';
+                pastureAccessTextEl.innerHTML = '<p>This village lacks shared grazing land. Livestock rearing mainly depends on private land, stall-feeding, or grazing outside the village. This limits livelihood options and reduces resilience, especially for small and marginal households.</p>';
             } else if (pastureAccessLevel === 'High') {
                 pastureAccessTextEl.innerHTML = '<p>This village has access to shared grazing land. Common pastures support livestock-based livelihoods and provide an important safety net for land-poor households through shared access to natural resources.</p>';
             }
@@ -2281,132 +1903,8 @@
 
         // ===== CREATE LIVESTOCK MANAGEMENT CHART =====
         if (livestockServiceScore !== '--') {
-            const livestockCtx = document.getElementById('livestockChart').getContext('2d');
             const livestockScores = [livestockServiceScore, pastureAccessScore];
-            
-            function getLivestockBarColor(score, isService) {
-                if (isService) {
-                    // 3 levels: Low, Medium, High
-                    if (score <= 0.33) return '#ef4444'; // Red - Low
-                    if (score <= 0.66) return '#eab308'; // Yellow - Medium
-                    return '#22c55e'; // Green - High
-                } else {
-                    // 2 levels: Low, High
-                    if (score < 0.5) return '#ef4444'; // Red - Low
-                    return '#22c55e'; // Green - High
-                }
-            }
-
-            function getLivestockBorderColor(score, isService) {
-                if (isService) {
-                    if (score <= 0.33) return '#dc2626';
-                    if (score <= 0.66) return '#ca8a04';
-                    return '#16a34a';
-                } else {
-                    if (score < 0.5) return '#dc2626';
-                    return '#16a34a';
-                }
-            }
-
-            const livestockChart = new Chart(livestockCtx, {
-                type: 'bar',
-                data: {
-                    labels: livestockLabels,
-                    datasets: [
-                        {
-                            label: 'Livestock Score',
-                            data: livestockScores,
-                            backgroundColor: livestockScores.map((value, index) => {
-                                const isService = index === 0;
-                                return getLivestockBarColor(value, isService);
-                            }),
-                            borderColor: livestockScores.map((value, index) => {
-                                const isService = index === 0;
-                                return getLivestockBorderColor(value, isService);
-                            }),
-                            borderWidth: 1.5,
-                            borderRadius: 4,
-                            minBarLength: 5
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
-                            titleFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12
-                            },
-                            padding: 12,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x.toFixed(2);
-                                    const isService = context.dataIndex === 0;
-                                    let performance = 'Low';
-                                    if (isService) {
-                                        if (value > 0.33 && value <= 0.66) performance = 'Medium';
-                                        if (value > 0.66) performance = 'High';
-                                    } else {
-                                        if (value >= 0.5) performance = 'High';
-                                    }
-                                    return 'Score: ' + value + ' (' + performance + ')';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: 0,
-                            max: 1,
-                            ticks: {
-                                stepSize: 0.25,
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11
-                                },
-                                color: '#6b7280',
-                                callback: function(value) {
-                                    if (value === 0) return 'Low';
-                                    if (value === 0.5) return 'High';
-                                    return '';
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)',
-                                drawBorder: true,
-                                borderColor: '#000000'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11,
-                                    weight: '500'
-                                },
-                                color: '#3e2723'
-                            },
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            }
-                        }
-                    }
-                }
-            });
+            initLivestockChart(livestockScores, livestockLabels);
         }
 
         // ===== LIVESTOCK MAP (Tabbed, Using Utility) =====
@@ -2446,41 +1944,147 @@
             if (livestockResult) livestockResult.switchTab(type);
         }
 
+        // ===== LIVESTOCK COUNT TABLE =====
+        try {
+            const livestockCount = JSON.parse('{{ livestock_count_data|escapejs }}');
+            if (livestockCount && Object.keys(livestockCount).length > 0) {
+                const rows = [
+                    { label: 'Large Animals',  key: 'large_animals_total', bold: true },
+                    { label: '  Cattle',   key: 'cattle_total',         bold: false },
+                    { label: '  Buffalo',  key: 'buffalo_total',        bold: false },
+                    { label: 'Small Animals',  key: 'small_animals_total', bold: true },
+                    { label: '  Sheep',    key: 'sheep_total',          bold: false },
+                    { label: '  Goat',     key: 'goat_total',           bold: false },
+                    { label: '  Pig',      key: 'pig_total',            bold: false },
+                    { label: 'All Livestock',  key: 'all_livestock_total', bold: true },
+                ];
+                const tbody = document.getElementById('livestockCountTableBody');
+                rows.forEach((row, i) => {
+                    const tr = document.createElement('tr');
+                    const bg = row.bold
+                        ? 'background-color: rgba(232, 220, 200, 0.45);'
+                        : (i % 2 === 0 ? 'background-color: rgba(232, 220, 200, 0.10);' : 'background-color: rgba(232, 220, 200, 0.25);');
+                    tr.style.cssText = bg;
+                    const val = livestockCount[row.key] != null ? livestockCount[row.key] : '-';
+                    const fw = row.bold ? 'font-weight: 600;' : '';
+                    tr.innerHTML =
+                        `<td style="padding: 0.5rem 1rem; border: 1px solid #d4c4a8; color: var(--primary-dark); ${fw}">${row.label}</td>` +
+                        `<td style="padding: 0.5rem 1rem; text-align: center; border: 1px solid #d4c4a8; color: var(--primary-dark); ${fw}">${val}</td>`;
+                    tbody.appendChild(tr);
+                });
+                document.getElementById('livestockCountTableContainer').style.display = 'block';
+            }
+        } catch (error) {
+            console.warn('Error populating livestock count table:', error);
+        }
+
+        // ===== INITIALIZE LAND CULTIVATION DATA =====
+        const landCultivationLabels = [
+            'Land Utilization Pattern',
+            'Seasonal Cultivation (Kharif)'
+        ];
+
+        let landCultivationData = [];
+        let landUtilizationScore = '--';
+        let seasonalCultivationScore = '--';
+        let landCultivationCluster = 'Low';
+
+        try {
+            landCultivationData = JSON.parse('{{ land_cultivation_data|escapejs }}');
+
+            if (landCultivationData && Array.isArray(landCultivationData) && landCultivationData.length >= 4) {
+                landUtilizationScore = landCultivationData[0];
+                seasonalCultivationScore = landCultivationData[1];
+                landCultivationCluster = landCultivationData[3];
+            }
+        } catch (error) {
+            console.warn('Land cultivation data not available:', error);
+        }
+
+        // ===== LAND CULTIVATION TEXT =====
+        try {
+            const landCultivationTextEl = document.getElementById('landCultivationText');
+            if (landCultivationCluster === 'Low') {
+                landCultivationTextEl.innerHTML = '<p>Land utilization and irrigation are likely low, indicating that agriculture might be largely rainfed. Large portions of land seem to be uncultivated during kharif. This may indicate that the cultivable land is underused in this village and the agricultural productivity is constrained by water availability and infrastructure gaps.</p>';
+            } else if (landCultivationCluster === 'Medium') {
+                landCultivationTextEl.innerHTML = '<p>This village shows moderate land utilization and irrigation coverage. Land utilization during Kharif seems to be moderate. This indicates a transitional agricultural system where a significant share of cultivable land is used, but irrigation expansion and efficiency improvements remain necessary.</p>';
+            } else {
+                landCultivationTextEl.innerHTML = '<p>This village likely has high land utilization and good irrigation coverage, exhibiting agricultural intensification and resilience to rainfall variability. Most cultivable land seems to be actively used during the kharif season, suggesting better basic land utilization.</p>';
+            }
+        } catch (error) {
+            console.warn('Error populating land cultivation text:', error);
+        }
+
+        // ===== CREATE LAND CULTIVATION CHART =====
+        if (landUtilizationScore !== '--') {
+            initLandCultivationChart(
+                [landUtilizationScore, seasonalCultivationScore],
+                landCultivationLabels
+            );
+        }
+
+        // ===== LAND CULTIVATION MAP =====
+        const landCultivationResult = createTabbedVillageMap({
+            targetId: 'landCultivationMapContainer',
+            mapDataJson: '{{ land_cultivation_map|escapejs }}',
+            label: 'Land Cultivation',
+            defaultTab: 'utilization',
+            tabs: {
+                utilization: {
+                    colorKey: 'land_utilization_color',
+                    name: 'Land Utilization Pattern',
+                    desc: 'Land utilization level relative to total cultivable land, derived from Mission Antyodaya data.',
+                    legend: '<span style="color: #22c55e;">● Green:</span> High | <span style="color: #eab308;">● Yellow:</span> Medium | <span style="color: #ef4444;">● Red:</span> Low'
+                },
+                seasonal: {
+                    colorKey: 'seasonal_cultivation_color',
+                    name: 'Seasonal Cultivation (Kharif)',
+                    desc: 'Share of cultivable land sown during the kharif season.',
+                    legend: '<span style="color: #22c55e;">● Green:</span> High | <span style="color: #eab308;">● Yellow:</span> Medium | <span style="color: #ef4444;">● Red:</span> Low'
+                }
+            },
+            buttonIds: {
+                utilization: 'landUtilizationBtn',
+                seasonal: 'seasonalCultivationBtn'
+            },
+            infoIds: {
+                title: 'landCultivationTitle',
+                desc: 'landCultivationDesc',
+                legend: 'landCultivationLegend'
+            },
+            mwsesJson: MWSES_JSON,
+            villageJson: VILLAGE_JSON
+        });
+
+        function switchLandCultivationMap(type) {
+            if (landCultivationResult) landCultivationResult.switchTab(type);
+        }
 
         // ===== INITIALIZE IRRIGATION DATA =====
         const irrigationLabels = [
-            'Irrigation Watershed Access',
-            'Modern Irrigation Adoption'
+            'Irrigation Watershed Access'
         ];
 
         let irrigationData = [];
         let irrigationWatershedScore = '--';
-        let modernIrrigationScore = '--';
         let irrigationWatershedColor = '#ef4444';
-        let modernIrrigationColor = '#ef4444';
 
         let irrigationWatershedLevel = 'Low';
-        let modernIrrigationLevel = 'Low';
 
         try {
             irrigationData = JSON.parse('{{ irrigation_data|escapejs }}');
-            
-            if (irrigationData && Array.isArray(irrigationData) && irrigationData.length >= 4) {
+
+            if (irrigationData && Array.isArray(irrigationData) && irrigationData.length >= 1) {
                 irrigationWatershedScore = irrigationData[0];
-                modernIrrigationScore = irrigationData[1];
-                irrigationWatershedColor = irrigationData[2];
-                modernIrrigationColor = irrigationData[3];
-                
-                // Determine irrigation watershed level (2 levels)
-                irrigationWatershedLevel = irrigationWatershedScore >= 0.5 ? 'High' : 'Low';
-                
-                // Determine modern irrigation level (3 levels)
-                if (modernIrrigationScore >= 0.67) {
-                    modernIrrigationLevel = 'High';
-                } else if (modernIrrigationScore >= 0.34) {
-                    modernIrrigationLevel = 'Medium';
+                irrigationWatershedColor = irrigationData[1];
+
+                // Determine irrigation watershed level (3 levels)
+                if (irrigationWatershedScore >= 0.67) {
+                    irrigationWatershedLevel = 'High';
+                } else if (irrigationWatershedScore >= 0.34) {
+                    irrigationWatershedLevel = 'Medium';
                 } else {
-                    modernIrrigationLevel = 'Low';
+                    irrigationWatershedLevel = 'Low';
                 }
             }
         } catch (error) {
@@ -2492,19 +2096,13 @@
             // Irrigation Watershed Text
             const irrigationWatershedTextEl = document.getElementById('irrigationWatershedText');
             if (irrigationWatershedLevel === 'Low') {
-                irrigationWatershedTextEl.innerHTML = '<p>There is poor irrigation or watershed infrastructure in this village, likely making farming rainfall-dependent and vulnerable to rainfall variability and climate shocks.</p>';
-            } else if (irrigationWatershedLevel === 'High') {
-                irrigationWatershedTextEl.innerHTML = '<p>This village exhibits a good presence of canals, rainwater harvesting structures, and/or watershed projects, indicating a strong water management system supporting agricultural stability and productivity.</p>';
+                irrigationWatershedTextEl.innerHTML = '<p>There is poor irrigation or watershed infrastructure in this village, likely making farming rainfall-dependent and vulnerable to rainfall variability and climate shocks. Adoption of drip or sprinkler systems is low in this village. Farmers rely on traditional methods, often associated with higher water losses and lower efficiency.</p>';
             }
-
-            // Modern Irrigation Text
-            const modernIrrigationTextEl = document.getElementById('modernIrrigationText');
-            if (modernIrrigationLevel === 'Low') {
-                modernIrrigationTextEl.innerHTML = '<p>Adoption of drip or sprinkler systems is low in this village. Farmers rely on traditional methods, often associated with higher water losses and lower efficiency.</p>';
-            } else if (modernIrrigationLevel === 'Medium') {
-                modernIrrigationTextEl.innerHTML = '<p>This village exhibits moderate adoption of modern irrigation technologies, indicating that some farmers have probably adopted drip or sprinkler systems, but coverage likely remains partial and uneven.</p>';
-            } else if (modernIrrigationLevel === 'High') {
-                modernIrrigationTextEl.innerHTML = '<p>Farmers in this village use drip/sprinkler systems, improving water efficiency. This indicates good irrigation practices, typically supported by subsidies, awareness, and better access to technical services.</p>';
+            else if(irrigationWatershedLevel === 'Medium'){
+                irrigationWatershedTextEl.innerHTML = '<p>This village may have some watershed infrastructure or NREGA investment but a weak adoption of modern irrigation technologies, indicating that some farmers have probably adopted drip or sprinkler systems, but coverage likely remains partial and uneven.</p>';
+            } 
+            else {
+                irrigationWatershedTextEl.innerHTML = '<p>This village exhibits a good presence of canals, rainwater harvesting structures, and/or watershed projects, indicating a strong water management system supporting agricultural stability and productivity. Farmers in this village use drip/sprinkler systems, improving water efficiency.</p>';
             }
         } catch (error) {
             console.warn('Error populating irrigation texts:', error);
@@ -2512,132 +2110,8 @@
 
         // ===== CREATE IRRIGATION CHART =====
         if (irrigationWatershedScore !== '--') {
-            const irrigationCtx = document.getElementById('irrigationChart').getContext('2d');
-            const irrigationScores = [irrigationWatershedScore, modernIrrigationScore];
-            
-            function getIrrigationBarColor(score, isWatershed) {
-                if (isWatershed) {
-                    // 2 levels: Low, High
-                    if (score < 0.5) return '#ef4444'; // Red - Low
-                    return '#22c55e'; // Green - High
-                } else {
-                    // 3 levels: Low, Medium, High
-                    if (score <= 0.33) return '#ef4444'; // Red - Low
-                    if (score <= 0.66) return '#eab308'; // Yellow - Medium
-                    return '#22c55e'; // Green - High
-                }
-            }
-
-            function getIrrigationBorderColor(score, isWatershed) {
-                if (isWatershed) {
-                    if (score < 0.5) return '#dc2626';
-                    return '#16a34a';
-                } else {
-                    if (score <= 0.33) return '#dc2626';
-                    if (score <= 0.66) return '#ca8a04';
-                    return '#16a34a';
-                }
-            }
-
-            const irrigationChart = new Chart(irrigationCtx, {
-                type: 'bar',
-                data: {
-                    labels: irrigationLabels,
-                    datasets: [
-                        {
-                            label: 'Irrigation Score',
-                            data: irrigationScores,
-                            backgroundColor: irrigationScores.map((value, index) => {
-                                const isWatershed = index === 0;
-                                return getIrrigationBarColor(value, isWatershed);
-                            }),
-                            borderColor: irrigationScores.map((value, index) => {
-                                const isWatershed = index === 0;
-                                return getIrrigationBorderColor(value, isWatershed);
-                            }),
-                            borderWidth: 1.5,
-                            borderRadius: 4,
-                            minBarLength: 5
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
-                            titleFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12
-                            },
-                            padding: 12,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x.toFixed(2);
-                                    const isWatershed = context.dataIndex === 0;
-                                    let performance = 'Low';
-                                    if (isWatershed) {
-                                        if (value >= 0.5) performance = 'High';
-                                    } else {
-                                        if (value > 0.33 && value <= 0.66) performance = 'Medium';
-                                        if (value > 0.66) performance = 'High';
-                                    }
-                                    return 'Score: ' + value + ' (' + performance + ')';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: 0,
-                            max: 1,
-                            ticks: {
-                                stepSize: 0.25,
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11
-                                },
-                                color: '#6b7280',
-                                callback: function(value) {
-                                    if (value === 0) return 'Low';
-                                    if (value === 0.5) return 'High';
-                                    return '';
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)',
-                                drawBorder: true,
-                                borderColor: '#000000'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11,
-                                    weight: '500'
-                                },
-                                color: '#3e2723'
-                            },
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            }
-                        }
-                    }
-                }
-            });
+            const irrigationScores = [irrigationWatershedScore];
+            initIrrigationChart(irrigationScores, irrigationLabels);
         }
 
         // ===== IRRIGATION MAP (Tabbed, Using Utility) =====
@@ -2651,18 +2125,11 @@
                     colorKey: 'irrigation_watershed_color',
                     name: 'Irrigation Watershed Access',
                     desc: 'Presence of irrigation canals, rainwater harvesting structures, and watershed projects supporting water management.',
-                    legend: '<span style="color: #22c55e;">● Green:</span> Good | <span style="color: #ef4444;">● Red:</span> Poor'
-                },
-                modern: {
-                    colorKey: 'modern_irrigation_color',
-                    name: 'Modern Irrigation Adoption',
-                    desc: 'Adoption of drip or sprinkler irrigation systems among farmers.',
-                    legend: '<span style="color: #22c55e;">● Green:</span> High | <span style="color: #eab308;">● Yellow:</span> Moderate | <span style="color: #ef4444;">● Red:</span> Low'
+                    legend: '<span style="color: #22c55e;">● Green:</span> High | <span style="color: #eab308;">● Yellow:</span> Medium | <span style="color: #ef4444;">● Red:</span> Low'
                 }
             },
             buttonIds: {
-                watershed: 'irrigationWatershedBtn',
-                modern: 'modernIrrigationBtn'
+                watershed: 'irrigationWatershedBtn'
             },
             infoIds: {
                 title: 'irrigationTitle',
@@ -2688,6 +2155,7 @@
         let agriMarketScore = '--';
         let postHarvestDistance = '--';
         let apmcAccessDistance = '--';
+        let agriProcessingDistance = '--';
         let agriSupportColor = '#ef4444';
         let agriMarketColor = '#ef4444';
 
@@ -2704,6 +2172,9 @@
                 apmcAccessDistance = agriSupportData[3];
                 agriSupportColor = agriSupportData[4];
                 agriMarketColor = agriSupportData[5];
+                agriSocietiesDistance = agriSupportData[6];
+                agriSupportInfraDistance = agriSupportData[7];
+                agriProcessingDistance = agriSupportData[8];
                 
                 // Determine agricultural support level (3 levels)
                 if (agriSupportScore >= 0.67) {
@@ -2714,8 +2185,14 @@
                     agriSupportLevel = 'Low';
                 }
                 
-                // Determine agricultural market level (2 levels)
-                agriMarketLevel = agriMarketScore >= 0.5 ? 'High' : 'Low';
+                // Determine agricultural market level (3 levels)
+                if (agriMarketScore >= 0.67) {
+                    agriMarketLevel = 'High';
+                } else if (agriMarketScore >= 0.34) {
+                    agriMarketLevel = 'Medium';
+                } else {
+                    agriMarketLevel = 'Low';
+                }
                 
                 console.log('Agricultural Support Data:', agriSupportData);
                 console.log('Agri Support Score:', agriSupportScore, '->', agriSupportLevel);
@@ -2736,23 +2213,23 @@
             if (agriSupportLevel === 'Low') {
                 agriSupportTextEl.innerHTML = `
                     <p>There are issues with pension coverage and adoption of soil testing services amongst farmers of this village. Agricultural support systems are likely weak and underutilized.</p>
-                    <p>People in this village have access to agricultural support infrastructure in terms of fertilizer and pesticide depots, crop research centers and KVKs, IFFCO centre, soil testing labs at a minimum distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms.</p>
+                    <p>People in this village have access to agricultural support infrastructure in terms of fertilizer and pesticide depots, crop research centers and KVKs, IFFCO centre, soil testing labs at a minimum distance of <span style="font-weight: bold;">${agriSupportInfraDistance}</span> kms.</p>
                     <p>Access to storage, distribution and processing units for agricultural produce post harvesting are available at a minimum distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms.</p>
-                    <p>Farmers in this village can access or join agri-cooperatives at a distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms and beyond.</p>
+                    <p>Farmers in this village can access or join agri-cooperatives at a distance of <span style="font-weight: bold;">${agriSocietiesDistance}</span> kms and beyond.</p>
                 `;
             } else if (agriSupportLevel === 'Medium') {
                 agriSupportTextEl.innerHTML = `
-                    <p>This village exhibits moderate farmer pension coverage and soil testing adoption, while young farmer pension coverage remains limited. This is a case of partial integration of support services, often driven by selective scheme uptake.</p>
-                    <p>People in this village have access to agricultural support infrastructure in terms of fertilizer and pesticide depots, crop research centers and KVKs, IFFCO centers, soil testing labs at a minimum distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms.</p>
+                    <p>This village exhibits moderate farmer pension coverage and soil testing adoption, while young farmer pension coverage remains limited.</p>
+                    <p>People in this village have access to agricultural support infrastructure in terms of fertilizer and pesticide depots, crop research centers and KVKs, IFFCO centers, soil testing labs at a minimum distance of <span style="font-weight: bold;">${agriSupportInfraDistance}</span> kms.</p>
                     <p>Access to storage, distribution and processing units for agricultural produce post harvesting are available at a minimum distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms.</p>
-                    <p>Farmers in this village can access or join agri-cooperatives at a distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms and beyond.</p>
+                    <p>Farmers in this village can access or join agri-cooperatives at a distance of <span style="font-weight: bold;">${agriSocietiesDistance}</span> kms and beyond.</p>
                 `;
             } else if (agriSupportLevel === 'High') {
                 agriSupportTextEl.innerHTML = `
                     <p>This village likely has a good coverage for farmer pension and adoption of soil testing. The agricultural support service ecosystem contributing to farm stability and informed input use seems to be mature.</p>
-                    <p>People in this village have access to agricultural support infrastructure in terms of fertilizer and pesticide depots, crop research centers and KVKs, IFFCO centre, soil testing labs at a distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms and beyond.</p>
+                    <p>People in this village have access to agricultural support infrastructure in terms of fertilizer and pesticide depots, crop research centers and KVKs, IFFCO centre, soil testing labs at a distance of <span style="font-weight: bold;">${agriSupportInfraDistance}</span> kms and beyond.</p>
                     <p>Access to storage, distribution and processing units for agricultural produce post harvesting are available at a distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms and beyond.</p>
-                    <p>Farmers in this village can access or join agri-cooperatives at a distance of <span style="font-weight: bold;">${postHarvestDistance}</span> kms and beyond.</p>
+                    <p>Farmers in this village can access or join agri-cooperatives at a distance of <span style="font-weight: bold;">${agriSocietiesDistance}</span> kms and beyond.</p>
                 `;
             }
 
@@ -2761,11 +2238,18 @@
             if (agriMarketLevel === 'Low') {
                 agriMarketTextEl.innerHTML = `
                     <p>The village likely lacks access to nearby markets and storage facilities, leading to poor price realization among farmers, high transaction costs and increased post-harvest losses. Farmers here have market access in terms of agricultural produce market committees and mandis at a minimum distance of <span style="font-weight: bold;">${apmcAccessDistance}</span> kms.</p>
+                    <p>Access to storage, distribution and processing units for agricultural produce post harvesting are available at a minimum distance of <span style="font-weight: bold;">${agriProcessingDistance}</span> kms </p>
                 `;
             } else if (agriMarketLevel === 'High') {
                 agriMarketTextEl.innerHTML = `
                     <p>This village seems to have good access to markets and storage infrastructure, enabling better income from agriculture. Farmers here have market access in terms of agricultural produce market committees and mandis at a distance of <span style="font-weight: bold;">${apmcAccessDistance}</span> kms and beyond.</p>
                     <p>There is likely a strong market integration in this village leading to reduced distress sales and improved post-harvest management.</p>
+                    <p>Access to storage, distribution and processing units for agricultural produce post harvesting are available at a minimum distance of <span style="font-weight: bold;">${agriProcessingDistance}</span> kms </p>
+                `;
+            } else {
+                agriMarketTextEl.innerHTML = `
+                    <p>This village likely has partial market access, such as a weekly haat but no regular market or storage. Farmers here have market access in terms of agricultural produce market committees and mandis at a minimum distance of <span style="font-weight: bold;">${apmcAccessDistance}</span> kms and beyond.</p>
+                    <p>Access to storage, distribution and processing units for agricultural produce post harvesting are available at a minimum distance of <span style="font-weight: bold;">${agriProcessingDistance}</span> kms </p>
                 `;
             }
 
@@ -2776,132 +2260,8 @@
 
         // ===== CREATE AGRICULTURAL SUPPORT CHART =====
         if (agriSupportScore !== '--') {
-            const agriSupportCtx = document.getElementById('agriSupportChart').getContext('2d');
             const agriScores = [agriSupportScore, agriMarketScore];
-            
-            function getAgriBarColor(score, isSupport) {
-                if (isSupport) {
-                    // 3 levels: Low, Medium, High
-                    if (score <= 0.33) return '#ef4444'; // Red - Low
-                    if (score <= 0.66) return '#eab308'; // Yellow - Medium
-                    return '#22c55e'; // Green - High
-                } else {
-                    // 2 levels: Low, High
-                    if (score < 0.5) return '#ef4444'; // Red - Low
-                    return '#22c55e'; // Green - High
-                }
-            }
-
-            function getAgriBorderColor(score, isSupport) {
-                if (isSupport) {
-                    if (score <= 0.33) return '#dc2626';
-                    if (score <= 0.66) return '#ca8a04';
-                    return '#16a34a';
-                } else {
-                    if (score < 0.5) return '#dc2626';
-                    return '#16a34a';
-                }
-            }
-
-            const agriSupportChart = new Chart(agriSupportCtx, {
-                type: 'bar',
-                data: {
-                    labels: agriSupportLabels,
-                    datasets: [
-                        {
-                            label: 'Agricultural Support Score',
-                            data: agriScores,
-                            backgroundColor: agriScores.map((value, index) => {
-                                const isSupport = index === 0;
-                                return getAgriBarColor(value, isSupport);
-                            }),
-                            borderColor: agriScores.map((value, index) => {
-                                const isSupport = index === 0;
-                                return getAgriBorderColor(value, isSupport);
-                            }),
-                            borderWidth: 1.5,
-                            borderRadius: 4,
-                            minBarLength: 5
-                        }
-                    ]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(62, 39, 35, 0.9)',
-                            titleFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12,
-                                weight: 'bold'
-                            },
-                            bodyFont: {
-                                family: "'Georgia', 'Garamond', serif",
-                                size: 12
-                            },
-                            padding: 12,
-                            displayColors: true,
-                            callbacks: {
-                                label: function(context) {
-                                    const value = context.parsed.x.toFixed(2);
-                                    const isSupport = context.dataIndex === 0;
-                                    let performance = 'Low';
-                                    if (isSupport) {
-                                        if (value > 0.33 && value <= 0.66) performance = 'Medium';
-                                        if (value > 0.66) performance = 'High';
-                                    } else {
-                                        if (value >= 0.5) performance = 'High';
-                                    }
-                                    return 'Score: ' + value + ' (' + performance + ')';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            min: 0,
-                            max: 1,
-                            ticks: {
-                                stepSize: 0.25,
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11
-                                },
-                                color: '#6b7280',
-                                callback: function(value) {
-                                    if (value === 0) return 'Low';
-                                    if (value === 0.5) return 'High';
-                                    return '';
-                                }
-                            },
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.1)',
-                                drawBorder: true,
-                                borderColor: '#000000'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                font: {
-                                    family: "'Georgia', 'Garamond', serif",
-                                    size: 11,
-                                    weight: '500'
-                                },
-                                color: '#3e2723'
-                            },
-                            grid: {
-                                display: false,
-                                drawBorder: false
-                            }
-                        }
-                    }
-                }
-            });
+            initAgriSupportChart(agriScores, agriSupportLabels);
         }
 
         // ===== AGRI SUPPORT MAP (Tabbed, Using Utility) =====
