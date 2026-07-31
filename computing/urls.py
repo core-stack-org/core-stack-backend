@@ -248,4 +248,24 @@ urlpatterns = [
         "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
     ),
     path("missing_excel/", api.missing_excel, name="missing_excel"),
+    path(
+        "generate_tree_in_grassland/",
+        api.generate_tree_in_grassland,
+        name="generate_tree_in_grassland",
+    ),
+    path(
+        "forest_fringe_degradation/",
+        api.forest_fringe_degradation,
+        name="forest_fringe_degradation",
+    ),
+    path(
+        "generate_forest_fire/",
+        api.generate_forest_fire,
+        name="generate_forest_fire",
+    ),
+    path(
+        "generate_et_downscale/",
+        api.et_downscale,
+        name="et_downscale",
+    ),
 ]

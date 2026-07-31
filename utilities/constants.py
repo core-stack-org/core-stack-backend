@@ -5,11 +5,16 @@ from nrm_app.settings import GEE_STORAGE_PROJECT, GEE_STORAGE_PROJECT_HELPER
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
 
+# Canonical local pipeline resources. Runtime pipelines read these defaults
+# directly; their YAML `sources` entries are optional test overrides.
+BASE_RESOURCES_DIR = "data/base_resources"
+ADMIN_BOUNDARY_GPKG = f"{BASE_RESOURCES_DIR}/cs_admin_standard.gpkg"
+FACILITIES_GPKG = f"{BASE_RESOURCES_DIR}/cs_pan_india_facilities.gpkg"
+ANTYODAYA_2020_CSV = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020_cluster_analysis.csv"
+LIVESTOCK_CENSUS_20_CSV = f"{BASE_RESOURCES_DIR}/cs_livestock_census_20.csv"
+
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
-
-ANTYODAYA_2020 = "data/antyodaya/output/pan_india_antyodaya_2020.gpkg"
-LIVESTOCKS = "data/livestock/pan_india_livestock.gpkg"
 
 MERGE_MWS_PATH = "data/merge_mws"
 
@@ -334,6 +339,8 @@ DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
 
 # workspace
 FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
+ANTYODAYA_GEOSERVER_WORKSPACE = "antyodaya_2020"
+LIVESTOCK_GEOSERVER_WORKSPACE = "livestocks"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"

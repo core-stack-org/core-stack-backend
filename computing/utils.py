@@ -353,8 +353,15 @@ def get_agri_year_key(season_key):
 
 
 def calculate_precipitation_season(
-        geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
+        geojson_filepath, draught_asset_id, start_year=None, end_year=None
 ):
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year are required for calculate_precipitation_season."
+        )
+    start_year = int(start_year)
+    end_year = int(end_year)
+
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
         feature_collection = json.load(f)

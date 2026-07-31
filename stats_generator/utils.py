@@ -49,10 +49,10 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
 
     # Use append mode with if_sheet_exists='replace'
     with pd.ExcelWriter(
-            xlsx_file,
-            engine="openpyxl",
-            mode=mode,
-            if_sheet_exists="replace" if mode == "a" else None,
+        xlsx_file,
+        engine="openpyxl",
+        mode=mode,
+        if_sheet_exists="replace" if mode == "a" else None,
     ) as writer:
         for layer in fetch_layers_for_excel_generation():
             workspace = layer["workspace"]
@@ -88,13 +88,13 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             if workspace == "terrain":
                 create_excel_for_terrain(geojson_data, xlsx_file, writer)
             elif (
-                    workspace == "terrain_lulc"
-                    and layer_name == f"{district}_{block}_lulc_slope"
+                workspace == "terrain_lulc"
+                and layer_name == f"{district}_{block}_lulc_slope"
             ):
                 create_excel_for_terrain_lulc_slope(geojson_data, xlsx_file, writer)
             elif (
-                    workspace == "terrain_lulc"
-                    and layer_name == f"{district}_{block}_lulc_plain"
+                workspace == "terrain_lulc"
+                and layer_name == f"{district}_{block}_lulc_plain"
             ):
                 create_excel_for_terrain_lulc_plain(geojson_data, xlsx_file, writer)
             elif workspace == "swb":
@@ -140,8 +140,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
             elif (
-                    workspace == "mws_layers"
-                    and layer_name == f"deltaG_well_depth_{district}_{block}"
+                workspace == "mws_layers"
+                and layer_name == f"deltaG_well_depth_{district}_{block}"
             ):
                 parsed_data_annual_mws = parse_geojson_annual_mws(geojson_data)
                 create_excel_annual_mws(parsed_data_annual_mws, xlsx_file, writer)
@@ -152,8 +152,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 except Exception as e:
                     print("Exception", str(e))
             elif (
-                    workspace == "mws_layers"
-                    and layer_name == f"deltaG_fortnight_{district}_{block}"
+                workspace == "mws_layers"
+                and layer_name == f"deltaG_fortnight_{district}_{block}"
             ):
                 processed_data = [
                     process_feature(feature) for feature in geojson_data["features"]
@@ -167,45 +167,45 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_drought_causality(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-            elif workspace == "ccd":
+            elif workspace == "tree_ccd_vector":
                 create_excel_for_ccd(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-            elif workspace == "canopy_height":
+            elif workspace == "canopy_height_vector":
                 create_excel_for_ch(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-            elif workspace == "tree_overall_ch":
+            elif workspace == "tree_overall_vector":
                 create_excel_for_overall_tree_change(geojson_data, xlsx_file, writer)
             elif (
-                    workspace == "change_detection"
-                    and layer_name == f"change_vector_{district}_{block}_Afforestation"
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_Afforestation"
             ):
                 create_excel_chan_detection_afforestation(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                    workspace == "change_detection"
-                    and layer_name == f"change_vector_{district}_{block}_CropIntensity"
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_CropIntensity"
             ):
                 create_excel_chan_detection_cropintensity(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                    workspace == "change_detection"
-                    and layer_name == f"change_vector_{district}_{block}_Deforestation"
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_Deforestation"
             ):
                 create_excel_chan_detection_deforestation(
                     geojson_data, xlsx_file, writer
                 )
             elif (
-                    workspace == "change_detection"
-                    and layer_name == f"change_vector_{district}_{block}_Degradation"
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_Degradation"
             ):
                 create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
             elif (
-                    workspace == "change_detection"
-                    and layer_name == f"change_vector_{district}_{block}_Urbanization"
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_Urbanization"
             ):
                 create_excel_chan_detection_urbanization(
                     geojson_data, xlsx_file, writer
@@ -248,12 +248,78 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_antyodaya_20(geojson_data, writer)
             elif workspace == "livestocks":
                 create_excel_for_livestock(geojson_data, writer)
+            elif workspace == "soil_type":
+                create_excel_for_soil_type(geojson_data, writer)
+            elif workspace == "soil_health_vector":
+                create_excel_for_soil_health(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_soil_health(data, writer):
+    print("Inside excel generation of Soil health")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = [
+            "STATE",
+            "District",
+            "TEHSIL",
+            "bacode",
+            "sbcode",
+            "wsconc",
+            "N_count",
+            "K_count",
+            "P_count",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        rename_cols = {"uid": "UID"}
+        df = df.rename(columns=rename_cols)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.rename(
+            columns={
+                col: f"{col}_in_kg_per_ha"
+                for col in df.columns
+                if col.startswith(("N_p", "K_p", "P_p", "N_mean", "K_mean", "P_mean"))
+            },
+            inplace=True,
+        )
+        df.to_excel(writer, sheet_name="soil_health", index=False)
+        print("Excel file created for soil_health")
+    except Exception as e:
+        print("issue while generating excel for Soil Type:: ", e)
+
+
+def create_excel_for_soil_type(data, writer):
+    print("Inside excel generation of Soil Type")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = ["STATE", "District", "TEHSIL", "bacode", "sbcode", "wsconc"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+
+        rename_cols = {
+            "uid": "UID",
+            "available_water_capacity": "available_water_capacity_in_mm_per_m",
+            "subsoil_bulk_density": "subsoil_bulk_density_in_kg_per_dm3",
+            "subsoil_exchange_capacity": "subsoil_exchange_capacity_in_cmol_per_kg",
+            "topsoil_bulk_density": "topsoil_bulk_density_in_kg_per_dm3",
+            "topsoil_exchange_capacity": "topsoil_exchange_capacity_in_cmol_per_kg",
+        }
+        df = df.rename(columns=rename_cols)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="soil_type", index=False)
+        print("Excel file created for soil_type")
+    except Exception as e:
+        print("issue while generating excel for Soil Type:: ", e)
 
 
 def create_excel_for_livestock(data, writer):
@@ -263,16 +329,30 @@ def create_excel_for_livestock(data, writer):
         df = pd.DataFrame(df_data)
 
         # Columns to exclude
-        exclude_cols = ["state_name", "district_name", "TEHSIL"]
+        exclude_cols = [
+            "cattle_female",
+            "cattle_male",
+            "buffalo_female",
+            "buffalo_male",
+            "sheep_female",
+            "sheep_male",
+            "goat_female",
+            "goat_male",
+            "pig_female",
+            "pig_male",
+        ]
         df = df.drop(columns=exclude_cols, errors="ignore")
 
-        if "pc11_village_id" in df.columns:
-            df = df[df["pc11_village_id"].notna() &(df["pc11_village_id"].astype(str).str.strip() != "") &(df["pc11_village_id"] != 0)]
-
-        # Keep important columns first if they exist
-        first_cols = [c for c in ["pc11_village_id", "NAME"] if c in df.columns]
-        other_cols = [c for c in df.columns if c not in first_cols]
-        df = df[first_cols + other_cols]
+        if "village_id" in df.columns:
+            df = df[
+                df["village_id"].notna()
+                & (df["village_id"].astype(str).str.strip() != "")
+                & (df["village_id"] != 0)
+            ]
+        rename_cols = {
+            "livestock_status": "data_availability_status",
+        }
+        df = df.rename(columns=rename_cols)
 
         df.to_excel(writer, sheet_name="livestock", index=False)
         print("Excel file created for livestock")
@@ -287,16 +367,86 @@ def create_excel_for_antyodaya_20(data, writer):
         df = pd.DataFrame(df_data)
 
         if "village_id" in df.columns:
-            df = df[df["village_id"].notna() &(df["village_id"].astype(str).str.strip() != "") &(df["village_id"] != 0)]
+            df = df[
+                df["village_id"].notna()
+                & (df["village_id"].astype(str).str.strip() != "")
+                & (df["village_id"] != 0)
+            ]
 
-        # Keep important columns first if they exist
-        first_cols = [c for c in ["village_id", "village_name"] if c in df.columns]
-        other_cols = [c for c in df.columns if c not in first_cols]
-        df = df[first_cols + other_cols]
-
-        # Round numeric columns
+        exclude_cols = [
+            "shg_pen_feat_value",
+            "shg_fed_feat_value",
+            "pg_pen_feat_value",
+            "fpo_feat_value",
+            "pds_util_feat_value",
+            "bpl_cov_feat_value",
+            "nfsa_cov_feat_value",
+            "pension_cov_feat_value",
+            "panchayat_bhawan_feat_value",
+            "post_office_feat_value",
+            "rep_training_feat_value",
+            "rep_orientation_feat_value",
+            "info_board_feat_value",
+            "public_library_feat_value",
+            "bank_feat_value",
+            "atm_feat_value",
+            "bank_correspondent_feat_value",
+            "shg_credit_feat_value",
+            "jan_dhan_pen_feat_value",
+            "electrification_rate_feat_value",
+            "electricity_supply_to_msme_feat_value",
+            "clean_energy_penetration_feat_value",
+            "all_weather_road_feat_value",
+            "internal_pucca_road_feat_value",
+            "public_transport_feat_value",
+            "railway_station_feat_value",
+            "pucca_housing_rate_feat_value",
+            "housing_scheme_coverage_feat_value",
+            "pmay_demand_met_feat_value",
+            "ujjwala_coverage_feat_value",
+            "awc_infra_enrollment_coverage_feat_value",
+            "maternal_health_care_access_feat_value",
+            "child_nutrition_development_feat_value",
+            "newborn_health_outcomes_feat_value",
+            "health_schemes_utilization_feat_value",
+            "piped_water_coverage_feat_value",
+            "sanitation_coverage_feat_value",
+            "drainage_quality_feat_value",
+            "waste_disposal_feat_value",
+            "biogas_waste_recycling_feat_value",
+            "cottage_units_available_feat_value",
+            "cottage_industry_participation_feat_value",
+            "handloom_feat_value",
+            "handicrafts_feat_value",
+            "farm_employment_feat_value",
+            "community_forest_feat_value",
+            "minor_forest_production_feat_value",
+            "forest_dependence_feat_value",
+            "common_pastures_feat_value",
+            "alternative_farming_feat_value",
+            "fisheries_aquaculture_feat_value",
+            "veterinary_services_feat_value",
+            "development_projects_feat_value",
+            "milk_routes_feat_value",
+            "land_utilization_feat_value",
+            "irrigation_infra_watershed_dev_feat_value",
+            "nrega_nrm_exp_feat_value",
+            "modern_irrigation_feat_value",
+            "organic_farming_feat_value",
+            "agri_inputs_availability_feat_value",
+            "agri_risk_support_feat_value",
+            "soil_testing_adoption_feat_value",
+            "market_access_feat_value",
+            "food_storage_feat_value",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        rename_cols = {
+            "antyodaya_status": "data_availability_status",
+        }
+        df = df.rename(columns=rename_cols)
         numeric_cols = df.select_dtypes(include=["number"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
+
         df.to_excel(writer, sheet_name="antyodaya", index=False)
         print("Excel file created for antyodaya")
     except Exception as e:
@@ -523,33 +673,143 @@ def create_excel_for_facilities(data, writer):
         df_data = [feature["properties"] for feature in features]
 
         df = pd.DataFrame(df_data)
-        if "censuscode2011" in df.columns:
-            df = df[df["censuscode2011"].notna() &(df["censuscode2011"].astype(str).str.strip() != "") &(df["censuscode2011"] != 0)]
+        if "village_id" in df.columns:
+            df = df[
+                df["village_id"].notna()
+                & (df["village_id"].astype(str).str.strip() != "")
+                & (df["village_id"] != 0)
+            ]
+        exclude_cols = [
+            "l2_essential_education_selected_l3",
+            "l2_essential_education_facility_uid",
+            "l3_school_primary_facility_uid",
+            "l3_school_primary_inside_scope",
+            "l3_school_upper_primary_facility_uid",
+            "l3_school_upper_primary_inside_scope",
+            "l3_school_secondary_facility_uid",
+            "l3_school_secondary_inside_scope",
+            "l2_higher_education_selected_l3",
+            "l2_higher_education_facility_uid",
+            "l3_school_higher_secondary_facility_uid",
+            "l3_school_higher_secondary_inside_scope",
+            "l3_college_facility_uid",
+            "l3_college_inside_scope",
+            "l3_universities_facility_uid",
+            "l3_universities_inside_scope",
+            "l2_essential_health_selected_l3",
+            "l2_essential_health_facility_uid",
+            "l3_health_sub_cen_facility_uid",
+            "l3_health_sub_cen_inside_scope",
+            "l3_health_phc_facility_uid",
+            "l3_health_phc_inside_scope",
+            "l2_advanced_health_selected_l3",
+            "l2_advanced_health_facility_uid",
+            "l3_health_chc_facility_uid",
+            "l3_health_chc_inside_scope",
+            "l3_health_dis_h_facility_uid",
+            "l3_health_dis_h_inside_scope",
+            "l3_health_s_t_h_facility_uid",
+            "l3_health_s_t_h_inside_scope",
+            "l2_essential_services_selected_l3",
+            "l2_essential_services_facility_uid",
+            "l3_pds_facility_uid",
+            "l3_pds_inside_scope",
+            "l2_financial_inclusion_selected_l3",
+            "l2_financial_inclusion_facility_uid",
+            "l3_csc_facility_uid",
+            "l3_csc_inside_scope",
+            "l3_bank_mitra_facility_uid",
+            "l3_bank_mitra_inside_scope",
+            "l3_bank_branch_facility_uid",
+            "l3_bank_branch_inside_scope",
+            "l3_bank_atm_facility_uid",
+            "l3_bank_atm_inside_scope",
+            "l2_apmc_access_selected_l3",
+            "l2_apmc_access_facility_uid",
+            "l3_apmc_facility_uid",
+            "l3_apmc_inside_scope",
+            "l3_agri_industry_markets_trading_facility_uid",
+            "l3_agri_industry_markets_trading_inside_scope",
+            "l2_post_harvest_selected_l3",
+            "l2_post_harvest_facility_uid",
+            "l3_agri_industry_storage_warehousing_facility_uid",
+            "l3_agri_industry_storage_warehousing_inside_scope",
+            "l3_agri_industry_distribution_utilities_facility_uid",
+            "l3_agri_industry_distribution_utilities_inside_scope",
+            "l3_agri_industry_agri_processing_facility_uid",
+            "l3_agri_industry_agri_processing_inside_scope",
+            "l3_agri_industry_industrial_manufacturing_facility_uid",
+            "l3_agri_industry_industrial_manufacturing_inside_scope",
+            "l2_cooperative_selected_l3",
+            "l2_cooperative_facility_uid",
+            "l3_agri_industry_co_operatives_societies_facility_uid",
+            "l3_agri_industry_co_operatives_societies_inside_scope",
+            "l2_livestock_selected_l3",
+            "l2_livestock_facility_uid",
+            "l3_agri_industry_dairy_animal_husbandry_facility_uid",
+            "l3_agri_industry_dairy_animal_husbandry_inside_scope",
+            "l2_agri_support_infra_selected_l3",
+            "l2_agri_support_infra_facility_uid",
+            "l3_agri_industry_agri_support_infrastructure_facility_uid",
+            "l3_agri_industry_agri_support_infrastructure_inside_scope",
+            "facilities_layer_kind",
+            "title",
+        ]
 
-        first_cols = ["censuscode2011", "censusname"]
-        other_cols = [c for c in df.columns if c not in first_cols]
-        df = df[first_cols + other_cols]
-
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        rename_cols = {
+            "facilities_status": "data_availability_status",
+            "l2_essential_education_distance_km": "essential_education_cat_distance_in_km",
+            "l2_essential_education_selected_l3_label": "essential_education_facility_label",
+            "l3_school_primary_distance_km": "school_primary_distance_in_km",
+            "l3_school_upper_primary_distance_km": "school_upper_primary_distance_in_km",
+            "l3_school_secondary_distance_km": "school_secondary_distance_in_km",
+            "l2_higher_education_distance_km": "higher_education_cat_distance_in_km",
+            "l2_higher_education_selected_l3_label": "higher_education_facility_label",
+            "l3_school_higher_secondary_distance_km": "school_higher_secondary_distance_in_km",
+            "l3_college_distance_km": "college_distance_in_km",
+            "l3_universities_distance_km": "universities_distance_in_km",
+            "l2_essential_health_distance_km": "essential_health_cat_distance_in_km",
+            "l2_essential_health_selected_l3_label": "essential_health_facility_label",
+            "l3_health_sub_cen_distance_km": "health_sub_cen_distance_in_km",
+            "l3_health_phc_distance_km": "health_phc_distance_in_km",
+            "l2_advanced_health_distance_km": "advanced_health_cat_distance_in_km",
+            "l2_advanced_health_selected_l3_label": "advanced_health_facility_label",
+            "l3_health_chc_distance_km": "health_chc_distance_in_km",
+            "l3_health_dis_h_distance_km": "health_dis_h_distance_in_km",
+            "l3_health_s_t_h_distance_km": "health_s_t_h_distance_in_km",
+            "l2_essential_services_distance_km": "essential_services_cat_distance_in_km",
+            "l2_essential_services_selected_l3_label": "essential_services_facility_label",
+            "l3_pds_distance_km": "pds_distance_in_km",
+            "l2_financial_inclusion_distance_km": "financial_inclusion_cat_distance_in_km",
+            "l2_financial_inclusion_selected_l3_label": "financial_inclusion_facility_label",
+            "l3_csc_distance_km": "csc_distance_in_km",
+            "l3_bank_mitra_distance_km": "bank_mitra_distance_in_km",
+            "l3_bank_branch_distance_km": "bank_branch_distance_in_km",
+            "l3_bank_atm_distance_km": "bank_atm_distance_in_km",
+            "l2_apmc_access_distance_km": "apmc_markets_cat_distance_in_km",
+            "l2_apmc_access_selected_l3_label": "apmc_markets_facility_label",
+            "l3_apmc_distance_km": "apmc_markets_distance_in_km",
+            "l3_agri_industry_markets_trading_distance_km": "agri_industry_markets_trading_distance_in_km",
+            "l2_post_harvest_distance_km": "post_harvest_cat_distance_in_km",
+            "l2_post_harvest_selected_l3_label": "post_harvest_facility_label",
+            "l3_agri_industry_storage_warehousing_distance_km": "agri_industry_storage_warehousing_distance_in_km",
+            "l3_agri_industry_distribution_utilities_distance_km": "agri_industry_distribution_utilities_distance_in_km",
+            "l3_agri_industry_agri_processing_distance_km": "agri_industry_agri_processing_distance_in_km",
+            "l3_agri_industry_industrial_manufacturing_distance_km": "agri_industry_industrial_manufacturing_distance_in_km",
+            "l2_cooperative_distance_km": "cooperative_cat_distance_in_km",
+            "l2_cooperative_selected_l3_label": "cooperative_facility_label",
+            "l3_agri_industry_co_operatives_societies_distance_km": "agri_industry_co_operatives_societies_distance_in_km",
+            "l2_livestock_distance_km": "livestock_cat_distance_in_km",
+            "l2_livestock_selected_l3_label": "livestock_facility_label",
+            "l3_agri_industry_dairy_animal_husbandry_distance_km": "agri_industry_dairy_animal_husbandry_distance_in_km",
+            "l2_agri_support_infra_distance_km": "agri_support_infra_cat_distance_in_km",
+            "l2_agri_support_infra_selected_l3_label": "agri_support_infra_facility_label",
+            "l3_agri_industry_agri_support_infrastructure_distance_km": "agri_industry_agri_support_infrastructure_distance_in_km",
+        }
+        df = df.rename(columns=rename_cols)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
-
-        exclude_cols = [
-            "censuscode2011",
-            "censusname",
-            "district",
-            "core_admin_uid",
-            "shrid2",
-            "state",
-            "tehsil",
-        ]
-        df.rename(
-            columns={
-                col: f"{col}_in_km" for col in df.columns if col not in exclude_cols
-            },
-            inplace=True,
-        )
-
-        # Write to Excel
         df.to_excel(writer, sheet_name="facilities_proximity", index=False)
 
         print("Excel file created for facilities_proximity")
@@ -1529,7 +1789,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
 
 def create_excel_for_nrega_assets(
-        nrega_data, mws_data, output_file, writer, start_year, end_year
+    nrega_data, mws_data, output_file, writer, start_year, end_year
 ):
     workCategoryMapping = {
         "SWC - Landscape level impact": "Soil and water conservation",
@@ -1633,7 +1893,7 @@ def create_excel_for_nrega_assets(
 
 
 def create_excel_village_nrega_assets(
-        result_df, output_file, writer, all_villages_df, start_year, end_year
+    result_df, output_file, writer, all_villages_df, start_year, end_year
 ):
     workCategoryMapping = {
         "SWC - Landscape level impact": "Soil and water conservation",
@@ -1678,7 +1938,7 @@ def create_excel_village_nrega_assets(
             continue
 
         mask = (final_df["vill_id"] == row["vill_ID"]) & (
-                final_df["vill_name"] == row["vill_name"]
+            final_df["vill_name"] == row["vill_name"]
         )
         col_name = f"{category}_count_{year}"
         final_df.loc[mask, col_name] += 1
@@ -1698,7 +1958,7 @@ def create_excel_village_nrega_assets(
 
 
 def fetch_village_asset_count(
-        state, district, block, writer, output_file, start_year, end_year
+    state, district, block, writer, output_file, start_year, end_year
 ):
     # 1. Read village data
     village_gdf = gpd.read_file(get_url("panchayat_boundaries", f"{district}_{block}"))[
