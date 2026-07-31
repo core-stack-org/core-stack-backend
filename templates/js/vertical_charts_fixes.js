@@ -271,7 +271,7 @@ function initLivestockChart(livestockScores, livestockLabels) {
                 backgroundColor: livestockScores.map((value, index) => {
                     const isService = index === 0;
                     if (isService) {
-                        if (value <= 0.33) return '#ef4444';
+                        if (value < 0.33) return '#ef4444';
                         if (value <= 0.66) return '#eab308';
                         return '#22c55e';
                     } else {
@@ -282,7 +282,7 @@ function initLivestockChart(livestockScores, livestockLabels) {
                 borderColor: livestockScores.map((value, index) => {
                     const isService = index === 0;
                     if (isService) {
-                        if (value <= 0.33) return '#dc2626';
+                        if (value < 0.33) return '#dc2626';
                         if (value <= 0.66) return '#ca8a04';
                         return '#16a34a';
                     } else {
@@ -312,7 +312,7 @@ function initLivestockChart(livestockScores, livestockLabels) {
                             const isService = context.dataIndex === 0;
                             let performance = 'Low';
                             if (isService) {
-                                if (value > 0.33 && value <= 0.66) performance = 'Medium';
+                                if (value >= 0.33 && value <= 0.66) performance = 'Medium';
                                 if (value > 0.66) performance = 'High';
                             } else {
                                 if (value >= 0.5) performance = 'High';

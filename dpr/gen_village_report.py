@@ -1993,15 +1993,19 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
             )
 
         veterinary_color = (
-            "green"
+            "red"
+            if livestock_support_score < 0.33
+            else "green"
             if livestock_support_score > 0.66
-            else "red"
+            else "yellow"
         )
 
         pasture_color = (
-            "green"
+            "red"
+            if livestock_pasture_score < 0.33
+            else "green"
             if livestock_pasture_score > 0.66
-            else "red"
+            else "yellow"
         )
 
         return [
@@ -2082,6 +2086,14 @@ def get_livestock_count(state, district, block, village_id, df_livestock=None):
             return {}
 
         row = matched_rows.iloc[0]
+
+        status = str(row.get("data_availability_status", "")).strip().lower()
+        if status != "matched":
+            logger.info(
+                "Livestock data not available for village_id %s in %s district, %s block: %s",
+                village_id, district, block, status,
+            )
+            return {}
 
         return {
             "large_animals_total": safe_int(row.get("large_animals_total")),
@@ -2331,7 +2343,7 @@ def get_irrigation_Infra(state, district, block, village_id, df=None):
             )
         )
 
-        if irrigation_watershed_score <= 0.33:
+        if irrigation_watershed_score < 0.33:
             irrigation_watershed_color = "red"
         elif irrigation_watershed_score <= 0.66:
             irrigation_watershed_color = "yellow"
@@ -2801,15 +2813,19 @@ def get_all_villages_basic_infrastructure(state, district, block, df=None, df_nr
             result[village_id] = {
 
                 "road_color": (
-                    "green"
+                    "red"
+                    if road_score <= 0.33
+                    else "green"
                     if road_score > 0.66
-                    else "red"
+                    else "yellow"
                 ),
 
                 "energy_color": (
-                    "green"
+                    "red"
+                    if energy_score <= 0.33
+                    else "green"
                     if energy_score > 0.66
-                    else "red"
+                    else "yellow"
                 ),
 
                 "housing_color": (
