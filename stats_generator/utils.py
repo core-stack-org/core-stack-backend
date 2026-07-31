@@ -248,12 +248,60 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_antyodaya_20(geojson_data, writer)
             elif workspace == "livestocks":
                 create_excel_for_livestock(geojson_data, writer)
+            elif workspace == "soil_type":
+                create_excel_for_soil_type(geojson_data, writer)
+            elif workspace == "soil_health_vector":
+                create_excel_for_soil_health(geojson_data, writer)
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_soil_health(data, writer):
+    print("Inside excel generation of Soil health")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = ["STATE", "District", "TEHSIL", "bacode", "sbcode", "wsconc"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        rename_cols = {"uid": "UID"}
+        df = df.rename(columns=rename_cols)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="soil_health", index=False)
+        print("Excel file created for soil_health")
+    except Exception as e:
+        print("issue while generating excel for Soil Type:: ", e)
+
+
+def create_excel_for_soil_type(data, writer):
+    print("Inside excel generation of Soil Type")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = ["STATE", "District", "TEHSIL", "bacode", "sbcode", "wsconc"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+
+        rename_cols = {
+            "uid": "UID",
+            "available_water_capacity": "available_water_capacity_in_mm_per_m",
+            "subsoil_bulk_density": "subsoil_bulk_density_in_kg_per_dm3",
+            "subsoil_exchange_capacity": "subsoil_exchange_capacity_in_cmol_per_kg",
+            "topsoil_bulk_density": "topsoil_bulk_density_in_kg_per_dm3",
+            "topsoil_exchange_capacity": "topsoil_exchange_capacity_in_cmol_per_kg",
+        }
+        df = df.rename(columns=rename_cols)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="soil_type", index=False)
+        print("Excel file created for soil_type")
+    except Exception as e:
+        print("issue while generating excel for Soil Type:: ", e)
 
 
 def create_excel_for_livestock(data, writer):
