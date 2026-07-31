@@ -7,7 +7,7 @@ from utilities.gee_utils import (
 )
 
 
-def generate_hybrid_tree_mask(aez, start_year=2003, end_year=None, gee_account_id=None):
+def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_id=None):
     """
     Forest Sensitivity Analysis Pipeline — Script 1
     Hybrid 30m Annual Tree Cover Mask + Contiguous Forest Period
@@ -32,7 +32,7 @@ def generate_hybrid_tree_mask(aez, start_year=2003, end_year=None, gee_account_i
 
     TEMPORAL_WINDOW = 2
 
-    start_year = 2003
+    start_year = 2004
     LULC_START_YEAR = 2017
 
     OUTPUT_DESC = f"Hybrid_Tree_AEZ_{aez}_{str(start_year)}_{str(end_year)}"
