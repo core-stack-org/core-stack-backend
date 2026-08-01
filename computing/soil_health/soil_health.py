@@ -35,7 +35,7 @@ LOCAL_OUTPUT_BASE_DIR = "data/soil_health"
 GEOSERVER_STYLE = ""
 GEOSERVER_RASTER_WORKSPACE = "soil_health_raster"
 GEOSERVER_VECTOR_WORKSPACE = "soil_health_vector"
-NUTRIENTS = ["N", "K", "P", "OC", "OLM"]
+NUTRIENTS = ["N", "K", "P", "OC", "OLM_OC"]
 NUTRIENT_PERCENTILES = (5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95)
 LOCAL_ALGORITHM = "local_soil_health"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
@@ -43,7 +43,7 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 
 def _get_lulc_mask_classes(nutrient):
     nutrient = str(nutrient).strip().upper()
-    if nutrient == "OLM":
+    if nutrient == "OLM_OC":
         return {6, 12}
     if nutrient in {
         "N",
