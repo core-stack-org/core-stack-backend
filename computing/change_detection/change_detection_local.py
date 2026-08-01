@@ -11,7 +11,9 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
-from computing.config_loader import CHANGE_DETECTION_RASTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
+from computing.config_loader import (
+    CHANGE_DETECTION_RASTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
+)
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
@@ -22,6 +24,7 @@ from computing.local_compute_helper import (
     validate_geometry,
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
+
 GEOSERVER_WORKSPACE = "change_detection"
 
 CHANGE_STAC_LAYER_NAMES = {
@@ -88,6 +91,20 @@ CROP_INTENSITY_REMAP = {
     12: 8,
 }
 
+SHRUB_REMAP = {
+    1: 1,
+    2: 2,
+    3: 2,
+    4: 2,
+    6: 3,
+    7: 4,
+    8: 5,
+    9: 5,
+    10: 5,
+    11: 5,
+    12: 6,
+}
+
 
 def _build_lookup_table(mapping, size=13):
     lookup = np.zeros(size, dtype=np.int16)
@@ -102,6 +119,7 @@ DEFORESTATION_AFFORESTATION_LOOKUP = _build_lookup_table(
     DEFORESTATION_AFFORESTATION_REMAP
 )
 CROP_INTENSITY_LOOKUP = _build_lookup_table(CROP_INTENSITY_REMAP)
+SHRUB_LOOKUP = _build_lookup_table(SHRUB_REMAP)
 
 CHANGE_PARAM_FUNCTIONS = {
     "Urbanization": "_compute_built_up_change",
@@ -109,6 +127,7 @@ CHANGE_PARAM_FUNCTIONS = {
     "Deforestation": "_compute_deforestation_change",
     "Afforestation": "_compute_afforestation_change",
     "CropIntensity": "_compute_crop_intensity_change",
+    "ShrubChange": "_compute_shrub_change",
 }
 
 ZERO_NODATA = 0
@@ -147,7 +166,9 @@ def _combine_transitions(shape, transitions):
 
 
 def _base_description(district, block):
-    return f"change_{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
+    return (
+        f"change_{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
+    )
 
 
 def _published_layer_name(district, block, param_name):
@@ -155,7 +176,9 @@ def _published_layer_name(district, block, param_name):
 
 
 def _output_stub(district, block, param_name, start_year, end_year):
-    return f"{_published_layer_name(district, block, param_name)}_{start_year}_{end_year}"
+    return (
+        f"{_published_layer_name(district, block, param_name)}_{start_year}_{end_year}"
+    )
 
 
 def _select_change_detection_raster_paths(start_year, end_year):
@@ -182,7 +205,9 @@ def _build_roi_shapes_by_crs(roi_gdf, raster_paths):
             clip_gdf = roi_gdf if src.crs is None else roi_gdf.to_crs(src.crs)
             clip_union = get_union_geometry(clip_gdf)
             if clip_union is None or clip_union.is_empty:
-                raise ValueError("ROI union geometry is empty for local change detection.")
+                raise ValueError(
+                    "ROI union geometry is empty for local change detection."
+                )
             roi_shapes_by_crs[crs_key] = mapping(clip_union)
 
     return roi_shapes_by_crs
@@ -354,10 +379,24 @@ def _compute_built_up_change(lulc_arrays):
     )
 
 
+def _compute_shrub_change(lulc_arrays):
+    remapped_arrays = [_remap_array(array, SHRUB_LOOKUP) for array in lulc_arrays]
+    now, then = _compute_then_now_modes(remapped_arrays)
+
+    return _combine_transitions(
+        then.shape,
+        [
+            (1, (then == 6) & (now == 6)),
+            (2, (then == 6) & (now == 5)),
+            (3, (then == 6) & (now == 3)),
+            (4, (then == 6) & (now == 1)),
+            (5, (then == 6) & (now == 2)),
+        ],
+    )
+
+
 def _compute_degradation_change(lulc_arrays):
-    remapped_arrays = [
-        _remap_array(array, DEGRADATION_LOOKUP) for array in lulc_arrays
-    ]
+    remapped_arrays = [_remap_array(array, DEGRADATION_LOOKUP) for array in lulc_arrays]
     now, then = _compute_then_now_modes(remapped_arrays)
     return _combine_transitions(
         then.shape,
@@ -372,8 +411,7 @@ def _compute_degradation_change(lulc_arrays):
 
 def _compute_deforestation_afforestation_modes(lulc_arrays):
     remapped_arrays = [
-        _remap_array(array, DEFORESTATION_AFFORESTATION_LOOKUP)
-        for array in lulc_arrays
+        _remap_array(array, DEFORESTATION_AFFORESTATION_LOOKUP) for array in lulc_arrays
     ]
     return _compute_then_now_modes(remapped_arrays)
 

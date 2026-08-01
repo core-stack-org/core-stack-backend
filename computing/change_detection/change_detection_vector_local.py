@@ -21,6 +21,7 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+
 GEOSERVER_WORKSPACE = "change_detection"
 
 CHANGE_VECTOR_CLASS_DEFINITIONS = {
@@ -66,6 +67,14 @@ CHANGE_VECTOR_CLASS_DEFINITIONS = {
         {"value": 9, "label": "tr_tr"},
         {"value": [1, 2, 3, 4, 5, 6], "label": "total_change"},
     ],
+    "ShrubChange": [
+        {"value": 1, "label": "sh_sh"},
+        {"value": 2, "label": "sh_fa"},
+        {"value": 3, "label": "sh_tr"},
+        {"value": 4, "label": "sh_bu"},
+        {"value": 5, "label": "sh_wa"},
+        {"value": [2, 3, 4, 5], "label": "total_change"},
+    ],
 }
 
 
@@ -81,10 +90,14 @@ def _published_layer_name(district, block, param_name):
 
 
 def _output_stub(district, block, param_name, start_year, end_year):
-    return f"{_published_layer_name(district, block, param_name)}_{start_year}_{end_year}"
+    return (
+        f"{_published_layer_name(district, block, param_name)}_{start_year}_{end_year}"
+    )
 
 
-def _resolve_local_change_raster_path(state, district, block, param_name, start_year, end_year):
+def _resolve_local_change_raster_path(
+    state, district, block, param_name, start_year, end_year
+):
     raster_path = build_output_raster_path(
         layer_name=(
             f"change_{_slug(district, 'unknown_district')}_"

@@ -40,6 +40,7 @@ def vectorise_change_detection(
         degradation_vector(roi, state, district, block, start_year, end_year),
         urbanization_vector(roi, state, district, block, start_year, end_year),
         crop_intensity_vector(roi, state, district, block, start_year, end_year),
+        shrub_change_vector(roi, state, district, block, start_year, end_year),
     ]
 
     print(task_list)
@@ -52,6 +53,7 @@ def vectorise_change_detection(
         "Deforestation",
         "Afforestation",
         "CropIntensity",
+        "ShrubChange",
     ]
     layer_at_geoserver = False
     for param in param_list:
@@ -137,6 +139,22 @@ def urbanization_vector(roi, state, district, block, start_year, end_year):
     )
 
 
+# Shrub Change
+def shrub_change_vector(roi, state, district, block, start_year, end_year):
+    args = [
+        {"value": 1, "label": "sh_sh"},
+        {"value": 2, "label": "sh_fa"},
+        {"value": 3, "label": "sh_tr"},
+        {"value": 4, "label": "sh_bu"},
+        {"value": 5, "label": "sh_wa"},
+        {"value": [2, 3, 4, 5], "label": "total_change"},
+    ]  # Classes in shrub change raster layer
+
+    return generate_vector(
+        roi, args, state, district, block, "ShrubChange", start_year, end_year
+    )
+
+
 # CropnIntensity
 def crop_intensity_vector(roi, state, district, block, start_year, end_year):
 
@@ -211,13 +229,6 @@ def generate_vector(
 
 
 def sync_change_to_geoserver(block, district, state, asset_id, param, layer_id):
-    # stac_spec_layer_name_dict = {
-    #     "Urbanization": "change_urbanization_vector",
-    #     "Degradation": "change_cropping_reduction_vector",
-    #     "Deforestation": "change_tree_cover_loss_vector",
-    #     "Afforestation": "change_tree_cover_gain_vector",
-    #     "CropIntensity": "change_cropping_intensity_vector",
-    # }
     fc = ee.FeatureCollection(asset_id).getInfo()
     fc = {"features": fc["features"], "type": fc["type"]}
     res = sync_layer_to_geoserver(
