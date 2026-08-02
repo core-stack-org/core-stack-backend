@@ -358,6 +358,7 @@ def change_shrub(roi_boundary, l1_asset):
     trans_sh_tr = then.eq(6).And(now.eq(3)).multiply(3)
     trans_sh_bu = then.eq(6).And(now.eq(1)).multiply(4)
     trans_sh_wa = then.eq(6).And(now.eq(2)).multiply(5)
+    trans_sh_ba = then.eq(6).And(now.eq(4)).multiply(6)
 
     # Create a zero image and add transitions
     change_shr = (
@@ -371,6 +372,7 @@ def change_shrub(roi_boundary, l1_asset):
         .add(trans_sh_tr)
         .add(trans_sh_bu)
         .add(trans_sh_wa)
+        .add(trans_sh_ba)
     )
     return change_shr
 

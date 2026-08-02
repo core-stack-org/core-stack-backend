@@ -391,6 +391,7 @@ def _compute_shrub_change(lulc_arrays):
             (3, (then == 6) & (now == 3)),
             (4, (then == 6) & (now == 1)),
             (5, (then == 6) & (now == 2)),
+            (6, (then == 6) & (now == 4)),
         ],
     )
 

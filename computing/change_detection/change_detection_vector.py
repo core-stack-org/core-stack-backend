@@ -147,7 +147,8 @@ def shrub_change_vector(roi, state, district, block, start_year, end_year):
         {"value": 3, "label": "sh_tr"},
         {"value": 4, "label": "sh_bu"},
         {"value": 5, "label": "sh_wa"},
-        {"value": [2, 3, 4, 5], "label": "total_change"},
+        {"value": 6, "label": "sh_ba"},
+        {"value": [2, 3, 4, 5, 6], "label": "total_change"},
     ]  # Classes in shrub change raster layer
 
     return generate_vector(

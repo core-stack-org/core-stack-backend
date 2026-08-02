@@ -73,7 +73,8 @@ CHANGE_VECTOR_CLASS_DEFINITIONS = {
         {"value": 3, "label": "sh_tr"},
         {"value": 4, "label": "sh_bu"},
         {"value": 5, "label": "sh_wa"},
-        {"value": [2, 3, 4, 5], "label": "total_change"},
+        {"value": 6, "label": "sh_ba"},
+        {"value": [2, 3, 4, 5, 6], "label": "total_change"},
     ],
 }
 
