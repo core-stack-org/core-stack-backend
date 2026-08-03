@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 from computing.bulk_layer_generation import (
     get_active_locations,
+    get_active_locations_from_api,
     pipeline_names,
     validate_pipeline,
 )
@@ -17,6 +18,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("pipeline", nargs="?")
         parser.add_argument("--all-active", action="store_true")
+        parser.add_argument(
+            "--from-prod-api",
+            action="store_true",
+            help=(
+                "Load active locations from PROD_BACKEND_URL instead of "
+                "the local database."
+            ),
+        )
         parser.add_argument("--state")
         parser.add_argument("--district")
         parser.add_argument(
@@ -85,10 +94,18 @@ class Command(BaseCommand):
         if not queue:
             raise CommandError("--queue cannot be empty.")
 
-        locations = get_active_locations(
-            **filters,
-            limit=options["limit"],
+        location_loader = (
+            get_active_locations_from_api
+            if options["from_prod_api"]
+            else get_active_locations
         )
+        try:
+            locations = location_loader(
+                **filters,
+                limit=options["limit"],
+            )
+        except ValueError as exc:
+            raise CommandError(str(exc)) from exc
         if not locations:
             raise CommandError("No active locations matched the requested scope.")
 

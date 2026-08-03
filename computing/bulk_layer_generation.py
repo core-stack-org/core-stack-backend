@@ -4,6 +4,8 @@ from functools import reduce
 from operator import or_
 from typing import Any, Callable, Mapping
 
+import requests
+from django.conf import settings
 from django.db.models import Q
 from django.utils.module_loading import import_string
 
@@ -239,3 +241,69 @@ def get_active_locations(
         )
         for tehsil in queryset
     ]
+
+
+def get_active_locations_from_api(
+    *,
+    state: str | None = None,
+    district: str | None = None,
+    block: str | None = None,
+    blocks: list[str] | None = None,
+    limit: int | None = None,
+) -> list[Location]:
+    if block and blocks:
+        raise ValueError("Use either block or blocks, not both.")
+
+    backend_url = getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
+    if not backend_url:
+        raise ValueError("PROD_BACKEND_URL is not configured.")
+
+    endpoint = f"{backend_url}/api/v1/proposed_blocks/"
+    try:
+        response = requests.get(endpoint, timeout=30)
+        response.raise_for_status()
+        payload = response.json()
+    except requests.RequestException as exc:
+        raise ValueError(
+            f"Failed to fetch active locations from {endpoint}: {exc}"
+        ) from exc
+    if not isinstance(payload, list):
+        raise ValueError("Active locations API returned an invalid response.")
+
+    state_filter = state.casefold() if state else None
+    district_filter = district.casefold() if district else None
+    selected_blocks = {
+        name.casefold() for name in ([block] if block else blocks or [])
+    }
+    locations = []
+
+    try:
+        for state_data in payload:
+            state_name = state_data["label"]
+            if state_filter and state_name.casefold() != state_filter:
+                continue
+            for district_data in state_data["district"]:
+                district_name = district_data["label"]
+                if (
+                    district_filter
+                    and district_name.casefold() != district_filter
+                ):
+                    continue
+                for block_data in district_data["blocks"]:
+                    block_name = block_data["label"]
+                    if (
+                        selected_blocks
+                        and block_name.casefold() not in selected_blocks
+                    ):
+                        continue
+                    locations.append(
+                        Location(state_name, district_name, block_name)
+                    )
+                    if limit is not None and len(locations) >= limit:
+                        return locations
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError(
+            "Active locations API returned an invalid response."
+        ) from exc
+
+    return locations

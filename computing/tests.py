@@ -3,9 +3,14 @@ from unittest.mock import call, patch
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
-from computing.bulk_layer_generation import Location, get_active_locations, run_pipeline
+from computing.bulk_layer_generation import (
+    Location,
+    get_active_locations,
+    get_active_locations_from_api,
+    run_pipeline,
+)
 from computing.layer_dependency.layer_generation_in_order import get_args
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
@@ -302,6 +307,79 @@ class BulkLayerCommandTests(SimpleTestCase):
             limit=None,
         )
         self.assertEqual(apply_async.call_count, 2)
+
+    @patch(
+        "computing.management.commands.bulk_generate_layers."
+        "get_active_locations_from_api"
+    )
+    def test_command_loads_locations_from_prod_api(self, get_locations):
+        get_locations.return_value = [
+            Location("Jharkhand", "Dumka", "Masalia")
+        ]
+
+        call_command(
+            "bulk_generate_layers",
+            "livestocks",
+            "--all-active",
+            "--from-prod-api",
+            "--dry-run",
+            stdout=StringIO(),
+        )
+
+        get_locations.assert_called_once_with(limit=None)
+
+
+@override_settings(PROD_BACKEND_URL="https://geoserver.core-stack.org/")
+class ActiveLocationsApiTests(SimpleTestCase):
+    @patch("computing.bulk_layer_generation.requests.get")
+    def test_filters_and_limits_api_locations(self, get):
+        get.return_value.json.return_value = [
+            {
+                "label": "Jharkhand",
+                "district": [
+                    {
+                        "label": "Dumka",
+                        "blocks": [
+                            {"label": "Jarmundi"},
+                            {"label": "Masalia"},
+                        ],
+                    }
+                ],
+            },
+            {
+                "label": "Odisha",
+                "district": [
+                    {
+                        "label": "Mayurbhanj",
+                        "blocks": [{"label": "Baripada"}],
+                    }
+                ],
+            },
+        ]
+
+        locations = get_active_locations_from_api(
+            state="jharkhand",
+            district="dumka",
+            blocks=["MASALIA", "jarmundi"],
+            limit=1,
+        )
+
+        self.assertEqual(
+            locations,
+            [Location("Jharkhand", "Dumka", "Jarmundi")],
+        )
+        get.assert_called_once_with(
+            "https://geoserver.core-stack.org/api/v1/proposed_blocks/",
+            timeout=30,
+        )
+        get.return_value.raise_for_status.assert_called_once_with()
+
+    @override_settings(PROD_BACKEND_URL="")
+    def test_requires_prod_backend_url(self):
+        with self.assertRaisesMessage(
+            ValueError, "PROD_BACKEND_URL is not configured"
+        ):
+            get_active_locations_from_api()
 
 
 class BulkLayerGenerationTests(TestCase):
