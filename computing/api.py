@@ -57,6 +57,7 @@ from .cropping_intensity.cropping_intesity_local import (
 )
 from .forest_fire.forest_fire import generate_forest_fire_layer
 from .soil_health.soil_health import soil_health_local
+from .soil_type.soil_type_local import generate_soil_type_local
 
 from .drought.drought import calculate_drought
 from .drought.drought_causality import drought_causality
@@ -2823,6 +2824,45 @@ def generate_soil_health(request):
     except Exception as e:
         print("Exception in generate_soil_health api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_soil_type(request):
+    try:
+        location = {
+            field: request.data.get(field)
+            for field in ("state", "district", "block")
+        }
+        compute = request.data.get("compute")
+        missing_fields = [field for field, value in location.items() if not value]
+        if not compute:
+            missing_fields.append("compute")
+        if missing_fields:
+            return Response(
+                {"Exception": f"Missing required fields: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if compute.lower() != "local":
+            return Response(
+                {"Exception": "Soil type only supports compute=local"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        generate_soil_type_local.apply_async(
+            kwargs={field: value.lower() for field, value in location.items()},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_soil_type task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        logger.exception("Exception in generate_soil_type api")
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["POST"])

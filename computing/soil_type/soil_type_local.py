@@ -267,12 +267,6 @@ def run_soil_type_local(
             dataset_name=DATASET_NAME,
             misc={
                 "is_generated_locally": True,
-                "geoserver_available": geoserver_ok,
-                "geoserver_sync_response": geoserver_response,
-                "source_rasters": [
-                    str(raster_paths[spec["column"]])
-                    for spec in SOIL_PROPERTY_SPECS
-                ],
             },
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,

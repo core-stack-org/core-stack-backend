@@ -21,7 +21,6 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
-
 LOCAL_CCD_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ccd"
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "tree_ccd_raster"
@@ -47,9 +46,7 @@ def _resolve_ccd_raster(year, ccd_dir=LOCAL_CCD_BASE_DIR):
     if path.exists():
         return str(path)
 
-    raise FileNotFoundError(
-        f"Local CCD raster for {year} not found in {ccd_dir}. "
-    )
+    raise FileNotFoundError(f"Local CCD raster for {year} not found in {ccd_dir}. ")
 
 
 def _pick_output_nodata(dtype, source_nodata):
@@ -153,6 +150,7 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
 
     return str(output_path)
 
+
 @app.task(bind=True)
 def tree_health_ccd_raster_local(
     self,
@@ -181,8 +179,7 @@ def tree_health_ccd_raster_local(
     # Admin runs use the precomputed watershed boundary. Custom runs use the ROI path.
     if state and district and block:
         asset_suffix = (
-            f"{_slug(district, 'unknown_district')}_"
-            f"{_slug(block, 'unknown_block')}"
+            f"{_slug(district, 'unknown_district')}_" f"{_slug(block, 'unknown_block')}"
         )
         roi_gdf = load_precomputed_roi(
             state=state,
@@ -264,6 +261,7 @@ def tree_health_ccd_raster_local(
             )
             print(f"GeoServer upload response for {layer_name}: {upload_res}")
             print(f"GeoServer style response for {layer_name}: {style_res}")
+            layer_at_geoserver = True
         except Exception as error:
             print(f"Failed to sync local CCD raster {layer_name}: {error}")
             layer_at_geoserver = False

@@ -2,6 +2,8 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import numpy as np
+from django.urls import reverse
+from rest_framework.test import APISimpleTestCase
 
 from computing.soil_type.soil_type_local import (
     _aggregate_values,
@@ -110,3 +112,66 @@ class SoilTypePublicationTests(TestCase):
         self.assertFalse(success)
         mocks[5].assert_not_called()
         mocks[6].assert_not_called()
+
+
+class SoilTypeAPITests(APISimpleTestCase):
+    def setUp(self):
+        self.client.force_authenticate(user=MagicMock(is_authenticated=True))
+
+    @patch("computing.api.generate_soil_type_local.apply_async")
+    def test_generate_soil_type_queues_local_task(self, apply_async):
+        response = self.client.post(
+            reverse("generate_soil_type"),
+            {
+                "state": "Puducherry",
+                "district": "Puducherry",
+                "block": "Bahur",
+                "compute": "local",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        apply_async.assert_called_once_with(
+            kwargs={
+                "state": "puducherry",
+                "district": "puducherry",
+                "block": "bahur",
+            },
+            queue="nrm",
+        )
+
+    @patch("computing.api.generate_soil_type_local.apply_async")
+    def test_generate_soil_type_rejects_missing_location(self, apply_async):
+        response = self.client.post(
+            reverse("generate_soil_type"),
+            {"state": "Puducherry", "compute": "local"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"Exception": "Missing required fields: district, block"},
+        )
+        apply_async.assert_not_called()
+
+    @patch("computing.api.generate_soil_type_local.apply_async")
+    def test_generate_soil_type_rejects_non_local_compute(self, apply_async):
+        response = self.client.post(
+            reverse("generate_soil_type"),
+            {
+                "state": "Puducherry",
+                "district": "Puducherry",
+                "block": "Bahur",
+                "compute": "gee",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {"Exception": "Soil type only supports compute=local"},
+        )
+        apply_async.assert_not_called()

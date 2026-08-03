@@ -15,7 +15,7 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
-GEOSERVER_WORKSPACE = "LULC_v3"
+GEOSERVER_WORKSPACE = "LULC_level_3"
 GEOSERVER_STYLE = "lulc_level_3_style"
 LOCAL_ALGORITHM = "local_lulc_v3_clip"
 LOCAL_ALGORITHM_VERSION = "local-1.0"

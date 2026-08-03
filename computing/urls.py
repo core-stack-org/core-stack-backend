@@ -309,6 +309,11 @@ urlpatterns = [
         name="generate_soil_health",
     ),
     path(
+        "generate_soil_type/",
+        api.generate_soil_type,
+        name="generate_soil_type",
+    ),
+    path(
         "generate_ltp_stp/",
         api.generate_ltp_stp,
         name="generate_ltp_stp",

@@ -75,7 +75,8 @@
             "use_global_args": true,
             "children": [
                 {
-                    "name": "tree_health_overall_change_vector"
+                    "name": "tree_health_overall_change_vector",
+		    "use_global_args": false
                 }
             ]
         },
