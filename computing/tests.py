@@ -11,10 +11,11 @@ from computing.bulk_layer_generation import (
     get_active_locations_from_api,
     run_pipeline,
 )
-from computing.layer_dependency.layer_generation_in_order import get_args
+from computing.layer_dependency.layer_generation_in_order import get_args, load_map_config
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
     _final_layer_name,
+    ensure_swb_gee_dependencies,
 )
 from computing.tasks import bulk_generate_layer
 from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
@@ -47,6 +48,51 @@ class LocalSwbContinuationTests(SimpleTestCase):
                 "gee_account_id": "22",
             },
         )
+
+    def test_local_map_runs_gee_dependencies_before_swb(self):
+        swb_node = next(
+            node
+            for node in load_map_config("dynamic_layers", compute="local")
+            if node["name"] == "ensure_swb_gee_dependencies"
+        )
+
+        self.assertEqual(swb_node["children"][0]["name"], "generate_swb")
+
+    @patch("computing.surface_water_bodies.swb_local.clip_drainage_lines_gee")
+    @patch(
+        "computing.surface_water_bodies.swb_local.generate_catchment_area_singleflow_gee"
+    )
+    @patch("computing.surface_water_bodies.swb_local.generate_stream_order_gee")
+    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
+    @patch("computing.surface_water_bodies.swb_local.ee_initialize")
+    def test_generates_missing_swb_gee_dependencies(
+        self,
+        ee_initialize,
+        is_gee_asset_exists,
+        generate_stream_order,
+        generate_catchment_area,
+        generate_drainage_lines,
+    ):
+        is_gee_asset_exists.side_effect = [False, True, False, True, False, True]
+
+        result = ensure_swb_gee_dependencies(
+            state="Madhya Pradesh",
+            district="Dhar",
+            block="Kukshi",
+            gee_account_id="account",
+        )
+
+        expected_kwargs = {
+            "state": "madhya pradesh",
+            "district": "dhar",
+            "block": "kukshi",
+            "gee_account_id": "account",
+        }
+        ee_initialize.assert_called_once_with("account")
+        generate_stream_order.run.assert_called_once_with(**expected_kwargs)
+        generate_catchment_area.run.assert_called_once_with(**expected_kwargs)
+        generate_drainage_lines.run.assert_called_once_with(**expected_kwargs)
+        self.assertTrue(result)
 
     @patch("computing.surface_water_bodies.swb_local.make_asset_public")
     @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")

@@ -15,6 +15,13 @@ from computing.local_compute_helper import (
     read_validated_vector_file,
     write_vector_output,
 )
+from computing.misc.catchment_area import (
+    generate_catchment_area_singleflow as generate_catchment_area_singleflow_gee,
+)
+from computing.misc.drainage_lines import (
+    clip_drainage_lines as clip_drainage_lines_gee,
+)
+from computing.misc.stream_order import generate_stream_order as generate_stream_order_gee
 from computing.surface_water_bodies.clip_swb_local import _clip_gdf, _to_geom
 from computing.surface_water_bodies.swb3 import (
     waterbody_catchment_streamorder_properties,
@@ -146,6 +153,50 @@ def _resolve_gee_asset_id(state, district, block, asset_suffix, app_type):
             "Check GEE_STORAGE_PROJECT / GEE_PATHS configuration."
         )
     return description, asset_id, asset_folder_list
+
+
+def ensure_swb_gee_dependencies(
+    state,
+    district,
+    block,
+    gee_account_id=None,
+):
+    state = str(state).strip().lower()
+    district = str(district).strip().lower()
+    block = str(block).strip().lower()
+    asset_suffix = f"{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
+    asset_base = get_gee_dir_path(
+        [state, district, block],
+        asset_path=GEE_PATHS["MWS"]["GEE_ASSET_PATH"],
+    )
+    dependencies = [
+        (
+            f"{asset_base}stream_order_{asset_suffix}_raster",
+            generate_stream_order_gee,
+        ),
+        (
+            f"{asset_base}catchment_area_{asset_suffix}_raster",
+            generate_catchment_area_singleflow_gee,
+        ),
+        (
+            f"{asset_base}drainage_lines_{asset_suffix}",
+            clip_drainage_lines_gee,
+        ),
+    ]
+
+    ee_initialize(gee_account_id)
+    for asset_id, task in dependencies:
+        if is_gee_asset_exists(asset_id):
+            continue
+        task.run(
+            state=state,
+            district=district,
+            block=block,
+            gee_account_id=gee_account_id,
+        )
+        if not is_gee_asset_exists(asset_id):
+            raise RuntimeError(f"SWB GEE dependency was not created: {asset_id}")
+    return True
 
 
 def _prepare_gdf_for_gee(gdf):

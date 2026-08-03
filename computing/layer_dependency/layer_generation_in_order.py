@@ -123,6 +123,7 @@ from computing.misc.soge_vector_local_compute import generate_soge_vector_local
 from computing.mws.mws_centroid_local_compute import generate_mws_centroid_data_local
 from computing.mws.mws_connectivity_local_compute import mws_connectivity_vector
 from computing.surface_water_bodies.swb_local import (
+    ensure_swb_gee_dependencies,
     generate_swb_layer as generate_swb_layer_local,
 )
 from computing.terrain_descriptor.terrain_clusters_local import (
@@ -251,6 +252,7 @@ LOCAL_TASK_REGISTRY = {
     "lulc_vector": vectorise_lulc_local,
     "generate_cropping_intensity": generate_cropping_intensity_local,
     "generate_ci_layer": generate_cropping_intensity_local,
+    "ensure_swb_gee_dependencies": ensure_swb_gee_dependencies,
     "generate_swb_layer": generate_swb_layer_local,
     "generate_swb": generate_swb_layer_local,
     "get_change_detection": get_change_detection_local,

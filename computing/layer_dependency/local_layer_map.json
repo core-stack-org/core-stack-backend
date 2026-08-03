@@ -43,9 +43,15 @@
             "use_global_args": true
         },
         {
-            "name": "generate_swb",
-            "use_global_args": true,
-            "pass_gee_account_id": true
+            "name": "ensure_swb_gee_dependencies",
+            "pass_gee_account_id": true,
+            "children": [
+                {
+                    "name": "generate_swb",
+                    "use_global_args": true,
+                    "pass_gee_account_id": true
+                }
+            ]
         },
         {
             "name": "tree_health_ch_raster",
