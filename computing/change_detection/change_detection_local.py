@@ -33,6 +33,7 @@ CHANGE_STAC_LAYER_NAMES = {
     "Deforestation": "change_tree_cover_loss_raster",
     "Afforestation": "change_tree_cover_gain_raster",
     "CropIntensity": "change_cropping_intensity_raster",
+    "ShrubChange": "change_shrub_change_raster",
 }
 
 BUILT_UP_REMAP = {
@@ -495,7 +496,12 @@ def _compute_change_outputs(lulc_arrays):
     with ThreadPoolExecutor(max_workers=cpu_workers) as executor:
         futures = [
             executor.submit(_compute_single_change_output, param_name, lulc_arrays)
-            for param_name in ("Urbanization", "Degradation", "CropIntensity")
+            for param_name in (
+                "Urbanization",
+                "Degradation",
+                "CropIntensity",
+                "ShrubChange",
+            )
         ]
         futures.append(executor.submit(_compute_forest_change_outputs, lulc_arrays))
 
