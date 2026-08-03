@@ -43,7 +43,7 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 
 def _get_lulc_mask_classes(nutrient):
     nutrient = str(nutrient).strip().upper()
-    if nutrient == "OLM_OC":
+    if nutrient == "OC_OLM":
         return {6, 12}
     if nutrient in {
         "N",
