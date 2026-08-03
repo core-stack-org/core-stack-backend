@@ -30,6 +30,7 @@ def get_change_detection(
         "Deforestation": change_deforestation,
         "Afforestation": change_afforestation,
         "CropIntensity": change_cropping_intensity,
+        "ShrubChange": change_shrub,
     }
     description = (
         f"change_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
@@ -331,6 +332,49 @@ def change_cropping_intensity(roi_boundary, l1_asset):
         .add(tr_tr)
     )
     return change_far
+
+
+def change_shrub(roi_boundary, l1_asset):
+    lulc_projection = l1_asset[0].projection()
+    # shrub -> shrub, shrub -> crops, shrub -> tree, shrub -> built-up, shrub -> water
+
+    # Remap values function
+    def remap_values(image):
+        return image.remap(
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
+            [1, 2, 2, 2, 3, 4, 5, 5, 5, 5, 6],
+            0,
+            "predicted_label",
+        ).setDefaultProjection(lulc_projection)
+
+    l1_asset_remapped = [remap_values(asset) for asset in l1_asset]
+
+    now, then = _compute_then_now_modes(
+        l1_asset_remapped, lulc_projection, roi_boundary
+    )
+
+    trans_sh_sh = then.eq(6).And(now.eq(6))
+    trans_sh_fa = then.eq(6).And(now.eq(5)).multiply(2)
+    trans_sh_tr = then.eq(6).And(now.eq(3)).multiply(3)
+    trans_sh_bu = then.eq(6).And(now.eq(1)).multiply(4)
+    trans_sh_wa = then.eq(6).And(now.eq(2)).multiply(5)
+    trans_sh_ba = then.eq(6).And(now.eq(4)).multiply(6)
+
+    # Create a zero image and add transitions
+    change_shr = (
+        ee.Image.constant(0)
+        .setDefaultProjection(lulc_projection)
+        .clip(roi_boundary.geometry())
+    )
+    change_shr = (
+        change_shr.add(trans_sh_sh)
+        .add(trans_sh_fa)
+        .add(trans_sh_tr)
+        .add(trans_sh_bu)
+        .add(trans_sh_wa)
+        .add(trans_sh_ba)
+    )
+    return change_shr
 
 
 def sync_to_gcs_geoserver(
