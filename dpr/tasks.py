@@ -96,8 +96,8 @@ def generate_dpr_task(
         f"https://geoserver.core-stack.org/api/v1/download_report/"
         f"?report_type=resource&district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
     )
-    resource_report_view_url = f"{resource_report_base_url}&mode=view"
-    resource_report_download_url = f"{resource_report_base_url}&mode=download"
+    resource_report_view_url = f"https://geoserver.core-stack.org/api/v1/generate_resource_report/?report_type=resource&district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
+    resource_report_download_url = f"{resource_report_base_url}"
     send_dpr_email(
         email_id=email_id,
         plan_name=plan.plan,
