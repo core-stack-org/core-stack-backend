@@ -352,9 +352,15 @@ function initLivestockChart(livestockScores, livestockLabels) {
 
 // 5. IRRIGATION CHART - VERTICAL
 // 5a. LAND CULTIVATION CHART - VERTICAL
-function initLandCultivationChart(scores, labels) {
+function initLandCultivationChart(scores, labels, colorKeys) {
     const ctx = document.getElementById('landCultivationChart');
     if (!ctx) return;
+
+    function colorToHex(c, border) {
+        if (c === 'green')  return border ? '#16a34a' : '#22c55e';
+        if (c === 'yellow') return border ? '#ca8a04' : '#eab308';
+        return border ? '#dc2626' : '#ef4444';
+    }
 
     const chartCtx = ctx.getContext('2d');
     new Chart(chartCtx, {
@@ -364,16 +370,8 @@ function initLandCultivationChart(scores, labels) {
             datasets: [{
                 label: 'Score',
                 data: scores,
-                backgroundColor: scores.map((value) => {
-                    if (value <= 0.33) return '#ef4444';
-                    if (value <= 0.66) return '#eab308';
-                    return '#22c55e';
-                }),
-                borderColor: scores.map((value) => {
-                    if (value <= 0.33) return '#dc2626';
-                    if (value <= 0.66) return '#ca8a04';
-                    return '#16a34a';
-                }),
+                backgroundColor: scores.map((_, i) => colorToHex(colorKeys && colorKeys[i], false)),
+                borderColor: scores.map((_, i) => colorToHex(colorKeys && colorKeys[i], true)),
                 borderWidth: 1.5,
                 borderRadius: 4,
                 minBarLength: 5
@@ -430,9 +428,15 @@ function initLandCultivationChart(scores, labels) {
     });
 }
 
-function initIrrigationChart(irrigationScores, irrigationLabels) {
+function initIrrigationChart(irrigationScores, irrigationLabels, colorKeys) {
     const ctx = document.getElementById('irrigationChart');
     if (!ctx) return;
+
+    function colorToHex(c, border) {
+        if (c === 'green')  return border ? '#16a34a' : '#22c55e';
+        if (c === 'yellow') return border ? '#ca8a04' : '#eab308';
+        return border ? '#dc2626' : '#ef4444';
+    }
 
     const chartCtx = ctx.getContext('2d');
     new Chart(chartCtx, {
@@ -442,16 +446,8 @@ function initIrrigationChart(irrigationScores, irrigationLabels) {
             datasets: [{
                 label: 'Irrigation Score',
                 data: irrigationScores,
-                backgroundColor: irrigationScores.map((value) => {
-                    if (value <= 0.33) return '#ef4444';
-                    if (value <= 0.66) return '#eab308';
-                    return '#22c55e';
-                }),
-                borderColor: irrigationScores.map((value) => {
-                    if (value <= 0.33) return '#dc2626';
-                    if (value <= 0.66) return '#ca8a04';
-                    return '#16a34a';
-                }),
+                backgroundColor: irrigationScores.map((_, i) => colorToHex(colorKeys && colorKeys[i], false)),
+                borderColor: irrigationScores.map((_, i) => colorToHex(colorKeys && colorKeys[i], true)),
                 borderWidth: 1.5,
                 borderRadius: 4,
                 minBarLength: 5
@@ -471,9 +467,8 @@ function initIrrigationChart(irrigationScores, irrigationLabels) {
                     callbacks: {
                         label: function(context) {
                             const value = context.parsed.y.toFixed(2);
-                            let performance = 'Low';
-                            if (value > 0.66) performance = 'High';
-                            else if (value > 0.33) performance = 'Medium';
+                            const color = colorKeys && colorKeys[context.dataIndex];
+                            const performance = color === 'green' ? 'High' : color === 'yellow' ? 'Medium' : 'Low';
                             return 'Score: ' + value + ' (' + performance + ')';
                         }
                     }
