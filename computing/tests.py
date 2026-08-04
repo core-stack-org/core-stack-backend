@@ -1,7 +1,9 @@
 from io import StringIO
 from inspect import signature
-from unittest.mock import call, patch
+from pathlib import Path
+from unittest.mock import MagicMock, call, patch
 
+import pandas as pd
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -17,8 +19,10 @@ from computing.layer_dependency.layer_generation_in_order import get_args, load_
 from computing.models import Dataset, Layer
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
+    _convert_area_columns_to_hectares,
     _final_layer_name,
     _layer_name,
+    run_swb_local,
 )
 from computing.surface_water_bodies.swb3 import (
     waterbody_catchment_streamorder_properties,
@@ -34,6 +38,98 @@ from utilities.constants import (
 
 
 class LocalSwbContinuationTests(SimpleTestCase):
+    @patch("computing.surface_water_bodies.swb_local._complete_swb_pipeline")
+    @patch("computing.surface_water_bodies.swb_local._push_local_swb_to_geoserver")
+    @patch("computing.surface_water_bodies.swb_local.make_asset_public")
+    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
+    @patch("computing.surface_water_bodies.swb_local._create_local_swb_output")
+    @patch("computing.surface_water_bodies.swb_local.build_output_vector_path")
+    @patch("computing.surface_water_bodies.swb_local._resolve_gee_asset_id")
+    @patch("computing.surface_water_bodies.swb_local.gdf_to_ee_fc")
+    @patch("computing.surface_water_bodies.swb_local.ee_initialize")
+    @patch("computing.surface_water_bodies.swb_local._union_geometry")
+    @patch("computing.surface_water_bodies.swb_local._resolve_roi_gdf")
+    def test_existing_swb2_asset_recreates_and_syncs_missing_local_output(
+        self,
+        resolve_roi,
+        union_geometry,
+        ee_initialize,
+        gdf_to_ee_fc,
+        resolve_asset,
+        build_output_path,
+        create_local_output,
+        asset_exists,
+        make_public,
+        push_swb2,
+        complete_pipeline,
+    ):
+        roi_gdf = MagicMock()
+        roi_gdf.__len__.return_value = 1
+        resolve_roi.return_value = roi_gdf
+        union_geometry.return_value.is_empty = False
+        gdf_to_ee_fc.return_value = MagicMock()
+        resolve_asset.return_value = (
+            "swb2_bid_bid_local",
+            "projects/example/swb2_bid_bid_local",
+            ["maharashtra", "bid", "bid"],
+        )
+        output_path = Path("/tmp/nonexistent-swb2-output.gpkg")
+        build_output_path.return_value = output_path
+        create_local_output.return_value = (MagicMock(), str(output_path))
+        asset_exists.return_value = True
+        events = []
+        push_swb2.side_effect = lambda **kwargs: events.append("swb2") or True
+        complete_pipeline.side_effect = (
+            lambda **kwargs: events.append("complete") or True
+        )
+
+        result = run_swb_local(
+            state="Maharashtra",
+            district="Bid",
+            block="Bid",
+            sync_layer_metadata=False,
+        )
+
+        create_local_output.assert_called_once()
+        push_swb2.assert_called_once_with(
+            output_path=str(output_path),
+            layer_name="surface_waterbodies_bid_bid",
+        )
+        complete_pipeline.assert_called_once()
+        self.assertEqual(events, ["swb2", "complete"])
+        self.assertTrue(result)
+
+    def test_reconstructs_area_ored_before_converting_annual_areas(self):
+        source = pd.DataFrame(
+            {
+                "area_2020": [500, 0],
+                "k_2020": [83.3333, 0],
+                "area_2021": [600, 240],
+                "k_2021": [100, 20],
+                "total_area_m2": [550, 1200],
+            }
+        )
+
+        converted, _ = _convert_area_columns_to_hectares(source)
+
+        self.assertAlmostEqual(converted.loc[0, "area_ored"], 0.06, places=6)
+        self.assertAlmostEqual(converted.loc[1, "area_ored"], 0.12, places=6)
+        self.assertEqual(converted["area_2020"].tolist(), [0.05, 0])
+        self.assertEqual(converted["total_area"].tolist(), [0.055, 0.12])
+
+    def test_preserves_existing_area_ored(self):
+        source = pd.DataFrame(
+            {
+                "area_ored": [0.25],
+                "area_2025": [500],
+                "k_2025": [100],
+            }
+        )
+
+        converted, _ = _convert_area_columns_to_hectares(source)
+
+        self.assertEqual(converted.loc[0, "area_ored"], 0.25)
+
     def test_swb_enrichment_defaults_to_pan_india_assets(self):
         raster_parameters = signature(
             generate_swb_layer_with_max_so_catchment

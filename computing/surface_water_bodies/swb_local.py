@@ -15,6 +15,10 @@ from computing.local_compute_helper import (
     read_validated_vector_file,
     write_vector_output,
 )
+from computing.surface_water_bodies.area_utils import (
+    SQM_PER_HECTARE,
+    add_area_ored_to_gdf,
+)
 from computing.surface_water_bodies.clip_swb_local import _clip_gdf, _to_geom
 from computing.surface_water_bodies.swb3 import (
     waterbody_catchment_streamorder_properties,
@@ -45,7 +49,6 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 DATASET_NAME = "Surface Water Bodies"
 GEOSERVER_WORKSPACE = "swb"
 logger = logging.getLogger(__name__)
-SQM_PER_HECTARE = 10000.0
 GEE_EXPORT_CHUNK_SIZE = 1000
 
 
@@ -163,7 +166,7 @@ def _prepare_gdf_for_gee(gdf):
 
 
 def _convert_area_columns_to_hectares(gdf):
-    converted = gdf.copy()
+    converted = add_area_ored_to_gdf(gdf)
     converted_columns = {}
 
     for column in list(converted.columns):
@@ -173,7 +176,7 @@ def _convert_area_columns_to_hectares(gdf):
         target_column = None
         if column == "total_area_m2":
             target_column = "total_area"
-        elif column.startswith("area_"):
+        elif column.startswith("area_") and column != "area_ored":
             target_column = column
 
         if target_column is None:
@@ -185,6 +188,33 @@ def _convert_area_columns_to_hectares(gdf):
         converted_columns[column] = "converted_in_place_to_hectares"
 
     return converted, converted_columns
+
+
+def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
+    clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
+    if clipped_gdf.empty:
+        raise ValueError("No surface water body features intersect the provided ROI.")
+
+    clipped_gdf, converted_area_columns = _convert_area_columns_to_hectares(
+        clipped_gdf
+    )
+    logger.info(
+        "Clipped SWB features: count=%s columns=%s",
+        len(clipped_gdf),
+        list(clipped_gdf.columns),
+    )
+    logger.info(
+        "Converted SWB area columns from square meters to hectares: %s",
+        converted_area_columns,
+    )
+
+    local_asset_path = write_vector_output(
+        gdf=clipped_gdf,
+        output_path=output_path,
+        layer_name=layer_name,
+    )
+    logger.info("Saved local SWB vector to disk: %s", local_asset_path)
+    return clipped_gdf, local_asset_path
 
 
 def _union_geometry(gdf):
@@ -278,7 +308,11 @@ def _push_local_swb_to_geoserver(output_path, layer_name):
         file_type="gpkg",
     )
     logger.info("GeoServer response for local SWB layer %s: %s", layer_name, geoserver_response)
-    return bool(geoserver_response) and geoserver_response.get("status_code") in (200, 201)
+    return bool(geoserver_response) and geoserver_response.get("status_code") in (
+        200,
+        201,
+        202,
+    )
 
 
 def _continue_swb_in_gee(
@@ -363,7 +397,9 @@ def _sync_final_swb(
         layer_name,
         workspace=GEOSERVER_WORKSPACE,
     )
-    synced = bool(response) and response.get("status_code") in (200, 201)
+    synced = bool(response) and response.get("status_code") in (200, 201, 202)
+    if not synced:
+        raise RuntimeError(f"Failed to sync final SWB layer to GeoServer: {layer_name}")
     if synced and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
     return synced
@@ -477,6 +513,16 @@ def run_swb_local(
 
     if is_gee_asset_exists(gee_asset_id):
         logger.info("GEE asset already exists, reusing: %s", gee_asset_id)
+        if output_path.exists():
+            local_asset_path = str(output_path)
+        else:
+            _, local_asset_path = _create_local_swb_output(
+                swb_path=swb_path,
+                roi_geometry=roi_geometry,
+                output_path=output_path,
+                layer_name=layer_name,
+            )
+
         layer_id = None
         if sync_layer_metadata:
             layer_id = save_layer_info_to_db(
@@ -486,16 +532,24 @@ def run_swb_local(
                 layer_name=layer_name,
                 asset_id=gee_asset_id,
                 dataset_name=DATASET_NAME,
-                misc={"is_generated_locally": True, "source_stage": "swb2_local"},
+                misc={
+                    "is_generated_locally": True,
+                    "local_vector_path": local_asset_path,
+                    "source_stage": "swb2_local",
+                },
                 algorithm=LOCAL_ALGORITHM,
                 algorithm_version=LOCAL_ALGORITHM_VERSION,
             )
         make_asset_public(gee_asset_id)
 
-        if push_to_geoserver and output_path.exists():
+        if push_to_geoserver:
             layer_at_geoserver = _push_local_swb_to_geoserver(
-                output_path=output_path, layer_name=layer_name
+                output_path=local_asset_path, layer_name=layer_name
             )
+            if not layer_at_geoserver:
+                raise RuntimeError(
+                    f"Failed to sync SWB2 layer to GeoServer: {layer_name}"
+                )
             if layer_at_geoserver and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 logger.info("Sync to GeoServer flag updated for existing local SWB layer")
@@ -514,26 +568,12 @@ def run_swb_local(
             sync_layer_metadata=sync_layer_metadata,
         )
 
-    clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
-    if clipped_gdf.empty:
-        raise ValueError("No surface water body features intersect the provided ROI.")
-    clipped_gdf, converted_area_columns = _convert_area_columns_to_hectares(clipped_gdf)
-    logger.info(
-        "Clipped SWB features: count=%s columns=%s",
-        len(clipped_gdf),
-        list(clipped_gdf.columns),
-    )
-    logger.info(
-        "Converted SWB area columns from square meters to hectares: %s",
-        converted_area_columns,
-    )
-
-    local_asset_path = write_vector_output(
-        gdf=clipped_gdf,
+    clipped_gdf, local_asset_path = _create_local_swb_output(
+        swb_path=swb_path,
+        roi_geometry=roi_geometry,
         output_path=output_path,
         layer_name=layer_name,
     )
-    logger.info("Saved local SWB vector to disk: %s", local_asset_path)
 
     logger.info(
         "Initialized Earth Engine for local SWB export: gee_account_id=%s",
@@ -620,6 +660,8 @@ def run_swb_local(
         layer_at_geoserver = _push_local_swb_to_geoserver(
             output_path=local_asset_path, layer_name=layer_name
         )
+        if not layer_at_geoserver:
+            raise RuntimeError(f"Failed to sync SWB2 layer to GeoServer: {layer_name}")
         if layer_at_geoserver and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             logger.info("Sync to GeoServer flag updated for local SWB layer: %s", layer_name)

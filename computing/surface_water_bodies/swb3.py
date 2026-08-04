@@ -1,4 +1,5 @@
 from computing.utils import generate_swb_layer_with_max_so_catchment
+from computing.surface_water_bodies.area_utils import ensure_gee_area_ored
 from utilities.constants import (
     CATCHMENT_AREA,
     GEE_PATHS,
@@ -266,7 +267,7 @@ def waterbody_catchment_streamorder_properties(
         + swb2_asset_suffix
     )
     # As requested: SWB3 always uses SWB2 as input.
-    water_bodies = ee.FeatureCollection(swb2_asset)
+    water_bodies = ee.FeatureCollection(swb2_asset).map(ensure_gee_area_ored)
 
     print(f"asset_i{water_bodies}")
     swb4_fs = generate_swb_layer_with_max_so_catchment(
