@@ -344,7 +344,7 @@ LIVESTOCK_GEOSERVER_WORKSPACE = "livestocks"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
-WBC = "projects/ext-datasets/assets/datasets/WBC_"
+WBC = "projects/ext-datasets/assets/datasets/WBC/WBC_"
 WATERREJUVENATION_PROJECT = GEE_STORAGE_PROJECT
 
 # Plantation
