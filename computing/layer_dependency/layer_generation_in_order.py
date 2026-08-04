@@ -1,4 +1,5 @@
 from nrm_app.celery import app
+from computing.base_layer_setup import with_tehsil_watershed
 from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
 from computing.mws.mws import mws_layer
@@ -323,6 +324,7 @@ TASK_REGISTRIES = {
 
 
 @app.task(bind=True)
+@with_tehsil_watershed
 def layer_generate_map(
     self,
     state,

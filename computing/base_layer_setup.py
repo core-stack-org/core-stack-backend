@@ -1,6 +1,7 @@
 import logging
 import subprocess
 from functools import wraps
+from inspect import signature
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -410,14 +411,172 @@ def ensure_microwatershed():
         raise
 
 
-def ensure_tehsil_watersheds():
+def _active_tehsil_locations():
+    from geoadmin.models import TehsilSOI
+
+    return TehsilSOI.objects.filter(
+        active_status=True,
+        district__active_status=True,
+        district__state__active_status=True,
+    ).values_list(
+        "district__state__state_name",
+        "district__district_name",
+        "tehsil_name",
+    ).order_by(
+        "district__state__state_name",
+        "district__district_name",
+        "tehsil_name",
+    )
+
+
+def _tehsil_watershed_details(state, district, tehsil):
+    from utilities.gee_utils import valid_gee_text
+
+    state_slug = valid_gee_text(state.strip().lower())
+    district_slug = valid_gee_text(district.strip().lower())
+    tehsil_slug = valid_gee_text(tehsil.strip().lower())
+    destination = (
+        TEHSIL_WATERSHEDS_DIR
+        / state_slug
+        / district_slug
+        / f"{tehsil_slug}.gpkg"
+    )
+    layer_name = f"mws:mws_{district_slug}_{tehsil_slug}"
+    return destination, layer_name
+
+
+def ensure_tehsil_watershed(state, district, tehsil, force=False):
+    import geopandas as gpd
+
+    from utilities.constants import GEOSERVER_BASE
+
+    destination, layer_name = _tehsil_watershed_details(state, district, tehsil)
+    if destination.exists() and not force:
+        return destination
+
+    wfs_url = f"{GEOSERVER_BASE}mws/ows"
+    params = {
+        "service": "WFS",
+        "version": "1.0.0",
+        "request": "GetFeature",
+        "typeName": layer_name,
+        "outputFormat": "application/json",
+        "srsName": "EPSG:4326",
+    }
+    temp_destination = destination.with_suffix(".tmp.gpkg")
+
+    try:
+        response = requests.get(wfs_url, params=params, timeout=600)
+        response.raise_for_status()
+        payload = response.json()
+        if (
+            not isinstance(payload, dict)
+            or payload.get("type") != "FeatureCollection"
+        ):
+            raise ValueError("GeoServer did not return a FeatureCollection")
+
+        watersheds = gpd.GeoDataFrame.from_features(
+            payload.get("features", []),
+            crs="EPSG:4326",
+        )
+        if watersheds.empty:
+            raise ValueError("GeoServer layer is empty")
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if temp_destination.exists():
+            temp_destination.unlink()
+        watersheds.to_file(
+            temp_destination,
+            layer="watersheds",
+            driver="GPKG",
+        )
+        temp_destination.replace(destination)
+    except Exception:
+        if temp_destination.exists():
+            temp_destination.unlink()
+        raise
+
+    logger.info("Saved %s to %s", layer_name, destination)
+    return destination
+
+
+def _download_active_tehsil_watersheds(force=False):
+    locations = list(_active_tehsil_locations())
+    if not locations:
+        logger.warning("No active tehsils found; no watershed files downloaded.")
+        return
+
+    written = 0
+    skipped = 0
+    failures = []
+
+    for state, district, tehsil in locations:
+        destination, layer_name = _tehsil_watershed_details(
+            state,
+            district,
+            tehsil,
+        )
+        if destination.exists() and not force:
+            skipped += 1
+            continue
+
+        try:
+            ensure_tehsil_watershed(
+                state=state,
+                district=district,
+                tehsil=tehsil,
+                force=force,
+            )
+            written += 1
+        except Exception as exc:
+            failures.append(f"{layer_name}: {exc}")
+            logger.error("Failed to download %s: %s", layer_name, exc)
+
+    logger.info(
+        "GeoServer tehsil watersheds complete: %d written, %d skipped, %d failed.",
+        written,
+        skipped,
+        len(failures),
+    )
+    if failures:
+        raise RuntimeError(
+            "Failed to download watershed layers for active tehsils: "
+            + "; ".join(failures)
+        )
+
+
+def with_tehsil_watershed(func):
+    func_signature = signature(func)
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        call = func_signature.bind_partial(*args, **kwargs)
+        call.apply_defaults()
+        compute = str(call.arguments.get("compute", "local")).strip().lower()
+        if compute == "local":
+            ensure_tehsil_watershed(
+                state=call.arguments["state"],
+                district=call.arguments["district"],
+                tehsil=call.arguments.get("block") or call.arguments.get("tehsil"),
+            )
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def ensure_tehsil_watersheds(geoserver=False, force=False):
     """
     Generates per-tehsil watershed .gpkg files by spatially intersecting the
     microwatershed dataset against SOI tehsil boundaries.
-    Skipped entirely if the output directory is already populated.
+    Existing files are skipped unless force is true. When geoserver is true,
+    only active tehsils are downloaded from the mws workspace.
     Both source files (SOI tehsil + microwatershed) must exist first.
     """
-    if _is_dir_populated(TEHSIL_WATERSHEDS_DIR):
+    if geoserver:
+        _download_active_tehsil_watersheds(force=force)
+        return
+
+    if _is_dir_populated(TEHSIL_WATERSHEDS_DIR) and not force:
         logger.info(
             "Tehsil watershed files already present at %s, skipping.",
             TEHSIL_WATERSHEDS_DIR,
@@ -450,7 +609,7 @@ def ensure_tehsil_watersheds():
         tehsil_path=str(SOI_TEHSIL_PATH),
         output_dir=str(TEHSIL_WATERSHEDS_DIR),
         output_format="gpkg",
-        overwrite=False,
+        overwrite=force,
         clip_to_tehsil=False,
     )
     logger.info("Tehsil watershed files ready at %s", TEHSIL_WATERSHEDS_DIR)
@@ -479,13 +638,16 @@ DEFAULT_BASE_LAYERS = (
 )
 
 
-def setup_base_layers(*layers):
+def setup_base_layers(*layers, geoserver=False, force=False):
     selected_layers = layers or DEFAULT_BASE_LAYERS
     manifest_index = _manifest_layer_index()
 
     for layer in selected_layers:
         if layer in _BASE_LAYER_ENSURERS:
-            _BASE_LAYER_ENSURERS[layer]()
+            if layer == "tehsil_watersheds":
+                ensure_tehsil_watersheds(geoserver=geoserver, force=force)
+            else:
+                _BASE_LAYER_ENSURERS[layer]()
             continue
 
         if _layer_key(layer) in manifest_index:

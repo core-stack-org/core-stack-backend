@@ -21,6 +21,7 @@ from computing.config_loader import (
     PROJECT_ROOT,
     TERRAIN_RASTER_PATH,
 )
+from computing.base_layer_setup import ensure_tehsil_watershed
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 
 PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
@@ -147,7 +148,11 @@ def load_precomputed_watersheds(
 
     except FileNotFoundError:
         print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
-        generate_gpkg(state=state, district=district, block=block, workspace="mws")
+        ensure_tehsil_watershed(
+            state=state,
+            district=district,
+            tehsil=block,
+        )
         watershed_path = resolve_precomputed_vector_file(
             state=state,
             district=district,
@@ -221,7 +226,11 @@ def load_precomputed_roi(
         )
     except FileNotFoundError:
         print(f"Precomputed ROI not found for {state}/{district}/{block}. Downloading...")
-        generate_gpkg(state=state, district=district, block=block, workspace="mws")
+        ensure_tehsil_watershed(
+            state=state,
+            district=district,
+            tehsil=block,
+        )
         roi_path = resolve_precomputed_vector_file(
             state=state,
             district=district,
