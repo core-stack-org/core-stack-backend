@@ -9,6 +9,7 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils.module_loading import import_string
 
+from computing.models import Layer
 from geoadmin.models import TehsilSOI
 from utilities.pipelines import api_request_payload
 
@@ -240,6 +241,59 @@ def get_active_locations(
             block=tehsil.tehsil_name,
         )
         for tehsil in queryset
+    ]
+
+
+def get_locally_generated_locations(
+    *,
+    state: str | None = None,
+    district: str | None = None,
+    block: str | None = None,
+    blocks: list[str] | None = None,
+    limit: int | None = None,
+) -> list[Location]:
+    if block and blocks:
+        raise ValueError("Use either block or blocks, not both.")
+
+    queryset = Layer.objects.filter(
+        misc__is_generated_locally=True,
+    )
+    if state:
+        queryset = queryset.filter(state__state_name__iexact=state)
+    if district:
+        queryset = queryset.filter(district__district_name__iexact=district)
+    selected_blocks = [block] if block else list(dict.fromkeys(blocks or []))
+    if selected_blocks:
+        queryset = queryset.filter(
+            reduce(
+                or_,
+                (Q(block__tehsil_name__iexact=name) for name in selected_blocks),
+            )
+        )
+
+    locations = (
+        queryset.values(
+            "state__state_name",
+            "district__district_name",
+            "block__tehsil_name",
+        )
+        .order_by(
+            "state__state_name",
+            "district__district_name",
+            "block__tehsil_name",
+        )
+        .distinct()
+    )
+    if limit is not None:
+        locations = locations[:limit]
+
+    return [
+        Location(
+            state=location["state__state_name"],
+            district=location["district__district_name"],
+            block=location["block__tehsil_name"],
+        )
+        for location in locations
     ]
 
 

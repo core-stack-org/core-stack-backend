@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from computing.bulk_layer_generation import (
     get_active_locations,
     get_active_locations_from_api,
+    get_locally_generated_locations,
     pipeline_names,
     validate_pipeline,
 )
@@ -18,6 +19,14 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("pipeline", nargs="?")
         parser.add_argument("--all-active", action="store_true")
+        parser.add_argument(
+            "--regenerate-local",
+            action="store_true",
+            help=(
+                "Queue the pipeline for locations with at least one Layer row "
+                "where misc.is_generated_locally is true."
+            ),
+        )
         parser.add_argument(
             "--from-prod-api",
             action="store_true",
@@ -79,14 +88,25 @@ class Command(BaseCommand):
         }
         if options["blocks"]:
             filters["blocks"] = options["blocks"]
-        if not options["all_active"] and not filters:
+        if (
+            not options["all_active"]
+            and not options["regenerate_local"]
+            and not filters
+        ):
             raise CommandError(
-                "Specify --all-active or at least one of "
+                "Specify --all-active, --regenerate-local, or at least one of "
                 "--state, --district, or --block."
             )
-        if options["all_active"] and filters:
+        if options["all_active"] and (options["regenerate_local"] or filters):
             raise CommandError(
-                "--all-active cannot be combined with location filters."
+                "--all-active cannot be combined with --regenerate-local or "
+                "location filters."
+            )
+        if options["regenerate_local"] and options["compute"] != "local":
+            raise CommandError("--regenerate-local requires --compute=local.")
+        if options["regenerate_local"] and options["from_prod_api"]:
+            raise CommandError(
+                "--regenerate-local cannot be combined with --from-prod-api."
             )
         if options["limit"] is not None and options["limit"] < 1:
             raise CommandError("--limit must be greater than zero.")
@@ -94,11 +114,12 @@ class Command(BaseCommand):
         if not queue:
             raise CommandError("--queue cannot be empty.")
 
-        location_loader = (
-            get_active_locations_from_api
-            if options["from_prod_api"]
-            else get_active_locations
-        )
+        if options["regenerate_local"]:
+            location_loader = get_locally_generated_locations
+        elif options["from_prod_api"]:
+            location_loader = get_active_locations_from_api
+        else:
+            location_loader = get_active_locations
         try:
             locations = location_loader(
                 **filters,
@@ -107,12 +128,15 @@ class Command(BaseCommand):
         except ValueError as exc:
             raise CommandError(str(exc)) from exc
         if not locations:
-            raise CommandError("No active locations matched the requested scope.")
+            raise CommandError("No locations matched the requested scope.")
 
         action = "Would queue" if options["dry_run"] else "Queueing"
+        location_source = (
+            "locally generated" if options["regenerate_local"] else "active"
+        )
         self.stdout.write(
             f"{action} {options['compute']} pipeline '{pipeline}' for "
-            f"{len(locations)} active "
+            f"{len(locations)} {location_source} "
             f"location(s) on queue '{queue}'."
         )
 
