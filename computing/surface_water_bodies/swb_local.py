@@ -108,11 +108,11 @@ def _resolve_asset_suffix(state, district, block, asset_suffix):
 
 
 def _layer_name(asset_suffix):
-    return f"surface_waterbodies_{asset_suffix}_local"
+    return f"surface_waterbodies_{asset_suffix}"
 
 
 def _final_layer_name(asset_suffix):
-    return f"surface_waterbodies_{asset_suffix}"
+    return _layer_name(asset_suffix)
 
 
 def _gee_description(asset_suffix):

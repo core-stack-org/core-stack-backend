@@ -16,6 +16,7 @@ from computing.layer_dependency.layer_generation_in_order import get_args, load_
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
     _final_layer_name,
+    _layer_name,
 )
 from computing.surface_water_bodies.swb3 import (
     waterbody_catchment_streamorder_properties,
@@ -52,10 +53,15 @@ class LocalSwbContinuationTests(SimpleTestCase):
             PAN_INDIA_DRAINAGE_LINES_DATASET,
         )
 
-    def test_final_geoserver_layer_has_no_local_suffix(self):
+    def test_geoserver_layers_have_no_local_suffix(self):
+        expected_layer_name = "surface_waterbodies_dumka_jarmundi"
+        self.assertEqual(
+            _layer_name("dumka_jarmundi"),
+            expected_layer_name,
+        )
         self.assertEqual(
             _final_layer_name("dumka_jarmundi"),
-            "surface_waterbodies_dumka_jarmundi",
+            expected_layer_name,
         )
 
     def test_local_map_passes_gee_account_to_swb(self):
