@@ -2180,16 +2180,13 @@ def get_land_cultivation(state, district, block, village_id, df=None):
         else:
             seasonal_cultivation_score = 0.0
 
-        # Map color from agriculture_land_cultivation_cat_cluster
-        land_utilization_cluster = str(
-            row.get("agriculture_land_cultivation_cat_cluster", "Low")
-        ).strip()
-        if land_utilization_cluster == "High":
-            land_utilization_color = "green"
-        elif land_utilization_cluster == "Medium":
+        # Map color from numeric score (consistent with all other sections)
+        if land_utilization_score < 0.33:
+            land_utilization_color = "red"
+        elif land_utilization_score <= 0.66:
             land_utilization_color = "yellow"
         else:
-            land_utilization_color = "red"
+            land_utilization_color = "green"
 
         # Seasonal cultivation color (score-based, 3 levels)
         if seasonal_cultivation_score <= 0.33:
@@ -2343,16 +2340,37 @@ def get_irrigation_Infra(state, district, block, village_id, df=None):
             )
         )
 
-        if irrigation_watershed_score < 0.33:
-            irrigation_watershed_color = "red"
-        elif irrigation_watershed_score <= 0.66:
-            irrigation_watershed_color = "yellow"
+        cluster_raw = row.get("agriculture_irrigation_watershed_cat_cluster", None)
+        try:
+            cluster_valid = cluster_raw is not None and not pd.isna(cluster_raw)
+        except Exception:
+            cluster_valid = False
+
+        if cluster_valid:
+            irrigation_cluster = str(cluster_raw).strip().lower()
+            if irrigation_cluster == "high":
+                irrigation_watershed_color = "green"
+            elif irrigation_cluster == "medium":
+                irrigation_watershed_color = "yellow"
+            else:
+                irrigation_watershed_color = "red"
+            irrigation_cluster_label = str(cluster_raw).strip().title()
         else:
-            irrigation_watershed_color = "green"
+            # fallback to score-based
+            if irrigation_watershed_score < 0.33:
+                irrigation_watershed_color = "red"
+                irrigation_cluster_label = "Low"
+            elif irrigation_watershed_score <= 0.66:
+                irrigation_watershed_color = "yellow"
+                irrigation_cluster_label = "Medium"
+            else:
+                irrigation_watershed_color = "green"
+                irrigation_cluster_label = "High"
 
         return [
             irrigation_watershed_score,
-            irrigation_watershed_color
+            irrigation_watershed_color,
+            irrigation_cluster_label,
         ]
 
     except Exception as e:
