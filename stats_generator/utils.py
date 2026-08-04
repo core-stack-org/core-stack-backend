@@ -276,24 +276,159 @@ def create_excel_for_soil_health(data, writer):
             "N_count",
             "K_count",
             "P_count",
+            "OC_OLM_count",
+            "OC_count",
+            "id",
         ]
         df = df.drop(columns=exclude_cols, errors="ignore")
-        rename_cols = {"uid": "UID"}
-        df = df.rename(columns=rename_cols)
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-        df[numeric_cols] = df[numeric_cols].round(2)
+
+        # Read data from lulc_vector sheet already present in the workbook
+        try:
+            wb = writer.book
+
+            if "lulc_vector" in wb.sheetnames:
+                ws = wb["lulc_vector"]
+
+                headers = [cell.value for cell in ws[1]]
+                header_idx = {h: i for i, h in enumerate(headers)}
+
+                uid_idx = header_idx["UID"]
+
+                years = range(2017, 2025)  # 2017 through 2024 inclusive
+
+                # --- area_under_tree_cover = sum(tree_forest_in_ha) + sum(shrub_scrub_in_ha), 2017-2024 ---
+                tree_forest_cols = [f"tree_forest_in_ha_{y}" for y in years]
+                shrub_scrub_cols = [f"shrub_scrub_in_ha_{y}" for y in years]
+
+                tree_forest_idxs = [
+                    header_idx[c] for c in tree_forest_cols if c in header_idx
+                ]
+                shrub_scrub_idxs = [
+                    header_idx[c] for c in shrub_scrub_cols if c in header_idx
+                ]
+
+                # --- area_under_cropping = sum(single_kharif_in_ha) + sum(single_non_kharif_in_ha)
+                #                         + sum(double_crop_in_ha) + sum(triple_crop_in_ha), 2017-2024 ---
+                single_kharif_cols = [f"single_kharif_in_ha_{y}" for y in years]
+                single_non_kharif_cols = [f"single_non_kharif_in_ha_{y}" for y in years]
+                double_crop_cols = [f"double_crop_in_ha_{y}" for y in years]
+                triple_crop_cols = [f"triple_crop_in_ha_{y}" for y in years]
+
+                single_kharif_idxs = [
+                    header_idx[c] for c in single_kharif_cols if c in header_idx
+                ]
+                single_non_kharif_idxs = [
+                    header_idx[c] for c in single_non_kharif_cols if c in header_idx
+                ]
+                double_crop_idxs = [
+                    header_idx[c] for c in double_crop_cols if c in header_idx
+                ]
+                triple_crop_idxs = [
+                    header_idx[c] for c in triple_crop_cols if c in header_idx
+                ]
+
+                missing = [
+                    c
+                    for c in (
+                        tree_forest_cols
+                        + shrub_scrub_cols
+                        + single_kharif_cols
+                        + single_non_kharif_cols
+                        + double_crop_cols
+                        + triple_crop_cols
+                    )
+                    if c not in header_idx
+                ]
+                if missing:
+                    print("Warning - missing lulc columns:", missing)
+
+                lulc_rows = []
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    # Tree cover
+                    tree_forest_sum = sum((row[i] or 0) for i in tree_forest_idxs)
+                    shrub_scrub_sum = sum((row[i] or 0) for i in shrub_scrub_idxs)
+                    area_under_tree_cover = tree_forest_sum + shrub_scrub_sum
+
+                    # Cropping
+                    single_kharif_sum = sum((row[i] or 0) for i in single_kharif_idxs)
+                    single_non_kharif_sum = sum(
+                        (row[i] or 0) for i in single_non_kharif_idxs
+                    )
+                    double_crop_sum = sum((row[i] or 0) for i in double_crop_idxs)
+                    triple_crop_sum = sum((row[i] or 0) for i in triple_crop_idxs)
+                    area_under_cropping = (
+                        single_kharif_sum
+                        + single_non_kharif_sum
+                        + double_crop_sum
+                        + triple_crop_sum
+                    )
+
+                    lulc_rows.append(
+                        {
+                            "uid": row[uid_idx],
+                            "area_under_cropping": area_under_cropping,
+                            "area_under_tree_cover": area_under_tree_cover,
+                        }
+                    )
+
+                lulc_df = pd.DataFrame(lulc_rows)
+
+                df = df.merge(lulc_df, on="uid", how="left")
+
+        except Exception as e:
+            print("Error while reading lulc_vector sheet:", e)
+
+        # Rename columns
         df.rename(
             columns={
-                col: f"{col}_in_kg_per_ha"
-                for col in df.columns
-                if col.startswith(("N_p", "K_p", "P_p", "N_mean", "K_mean", "P_mean"))
+                "uid": "UID",
+                "area_under_cropping": "area_under_cropping_in_ha",
+                "area_under_tree_cover": "area_under_tree_cover_in_ha",
             },
             inplace=True,
         )
+
+        # Round numeric columns
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+
+        # Rename nutrient columns
+        df.rename(
+            columns={
+                **{
+                    col: f"{col}_in_kg_per_ha"
+                    for col in df.columns
+                    if col.startswith(
+                        ("N_p", "K_p", "P_p", "N_mean", "K_mean", "P_mean")
+                    )
+                },
+                **{
+                    col: f"{col}_in_percent"
+                    for col in df.columns
+                    if col.startswith(("OC_mean", "OC_p", "OC_OLM_mean", "OC_OLM_p"))
+                },
+            },
+            inplace=True,
+        )
+
+        priority_cols = [
+            "UID",
+            "area_in_ha",
+            "area_under_cropping_in_ha",
+            "area_under_tree_cover_in_ha",
+        ]
+        priority_cols = [
+            c for c in priority_cols if c in df.columns
+        ]  # keep only existing ones
+        other_cols = [c for c in df.columns if c not in priority_cols]
+
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+
         df.to_excel(writer, sheet_name="soil_health", index=False)
         print("Excel file created for soil_health")
     except Exception as e:
-        print("issue while generating excel for Soil Type:: ", e)
+        print("Issue while generating excel for Soil Health:", e)
 
 
 def create_excel_for_soil_type(data, writer):
@@ -1610,13 +1745,21 @@ def create_excel_for_terrain(data, output_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "terrain_cluster_id": properties["terrainClu"],
-            "terrain_description": terrain_description.get(properties["terrainClu"]),
-            "hill_slope_area_percent": properties["hill_slope"],
+            "terrain_cluster_id": properties.get(
+                "terrainClu", properties.get("terrainClusters")
+            ),
+            "terrain_description": terrain_description.get(
+                properties.get("terrainClu", properties.get("terrainClusters"))
+            ),
+            "hill_slope_area_percent": properties.get(
+                "hill_slope", properties.get("hill_slopes_area")
+            ),
             "plain_area_percent": properties["plain_area"],
             "ridge_area_percent": properties["ridge_area"],
             "slopy_area_percent": properties["slopy_area"],
-            "valley_area_percent": properties["valley_are"],
+            "valley_area_percent": properties.get(
+                "valley_are", properties.get("valley_area")
+            ),
         }
 
         df_data.append(row)
@@ -1649,14 +1792,24 @@ def create_excel_for_terrain_lulc_slope(data, output_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "terrain_cluster_id": properties["terrain_cl"],
-            "terrain_description": terrain_description.get(properties["terrain_cl"]),
+            "terrain_cluster_id": properties.get(
+                "terrain_cl", properties.get("terrain_cluster")
+            ),
+            "terrain_description": terrain_description.get(
+                properties.get("terrain_cl", properties.get("terrain_cluster"))
+            ),
             "cluster_name": properties["clust_name"],
             "barren_area_percent": properties["barren"],
             "forests_area_percent": properties["forests"],
-            "shrub_scrubs_area_percent": properties["shrub_scru"],
-            "single_kharif_area_percent": properties["sing_khari"],
-            "single_non_kharif_area_percent": properties["sing_non_k"],
+            "shrub_scrubs_area_percent": properties.get(
+                "shrub_scru", properties.get("shrub_scrub")
+            ),
+            "single_kharif_area_percent": properties.get(
+                "sing_khari", properties.get("sing_kharif")
+            ),
+            "single_non_kharif_area_percent": properties.get(
+                "sing_non_k", properties.get("sing_non_kharif")
+            ),
             "double_cropping_area_percent": properties["double"],
             "triple_cropping_area_percent": properties["triple"],
         }
@@ -1690,16 +1843,27 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "terrain_cluster_id": properties["terrain_cl"],
-            "terrain_description": terrain_description.get(properties["terrain_cl"]),
+            "terrain_cluster_id": properties.get(
+                "terrain_cl", properties.get("terrain_cluster")
+            ),
+            "terrain_description": terrain_description.get(
+                properties.get("terrain_cl", properties.get("terrain_cluster"))
+            ),
             "cluster_name": properties["clust_name"],
             "barren_area_percent": properties["barren"],
             "forests_area_percent": properties["forest"],
-            "shrub_scrubs_area_percent": properties["shrubs_scr"],
-            "single_non_kharif_area_percent": properties["sing_non_k"],
-            "single_kharif_area_percent": properties["sing_crop"],
-            "double_cropping_area_percent": properties["double_cro"],
-            "triple_cropping_area_percent": properties["triple_cro"],
+            "shrub_scrubs_area_percent": properties.get(
+                "shrubs_scr", properties.get("shrubs_scrubs")
+            ),
+            "single_non_kharif_area_percent": properties.get(
+                "sing_non_k", properties.get("sing_non_kharif_crop")
+            ),
+            "single_kharif_area_percent": properties.get(
+                "double_cro", properties.get("double_crop")
+            ),
+            "triple_cropping_area_percent": properties.get(
+                "triple_cro", properties.get("triple_crop")
+            ),
         }
 
         df_data.append(row)
