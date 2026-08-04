@@ -114,6 +114,11 @@ def extract_soc_eco(df_soc_eco_indi, v_id):
 
 def extract_livestock(df_livestock, v_id):
     village_row = df_livestock[df_livestock["village_id"] == v_id]
+    if village_row.empty:
+        return {
+            "large_animals_total": 0,
+            "small_animals_total": 0,
+        }
     return {
         "large_animals_total": village_row["large_animals_total"].iloc[0],
         "small_animals_total": village_row["small_animals_total"].iloc[0],
@@ -548,11 +553,11 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
         # ----------------------------------------------
         try:
             livestock_data = (
-                extract_livestock(df_livestock, v_id) if not df_livestock.empty else 0
+                extract_livestock(df_livestock, v_id) if not df_livestock.empty else {}
             )
         except Exception as e:
             print(f"extract_livestock failed " f"for village {v_id}: {e}")
-            livestock_data = 0
+            livestock_data = {}
 
         # ----------------------------------------------
         # Antyodaya data
