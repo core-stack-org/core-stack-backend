@@ -10,9 +10,11 @@ from computing.bulk_layer_generation import (
     Location,
     get_active_locations,
     get_active_locations_from_api,
+    get_locally_generated_locations,
     run_pipeline,
 )
 from computing.layer_dependency.layer_generation_in_order import get_args, load_map_config
+from computing.models import Dataset, Layer
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
     _final_layer_name,
@@ -373,6 +375,36 @@ class BulkLayerCommandTests(SimpleTestCase):
 
         get_locations.assert_called_once_with(limit=None)
 
+    @patch(
+        "computing.management.commands.bulk_generate_layers."
+        "bulk_generate_layer.apply_async"
+    )
+    @patch(
+        "computing.management.commands.bulk_generate_layers."
+        "get_locally_generated_locations"
+    )
+    def test_command_regenerates_locally_generated_locations(
+        self, get_locations, apply_async
+    ):
+        get_locations.return_value = [
+            Location("Jharkhand", "Dumka", "Masalia")
+        ]
+        apply_async.return_value.id = "task-id"
+
+        call_command(
+            "bulk_generate_layers",
+            "livestocks",
+            "--regenerate-local",
+            "--district=Dumka",
+            stdout=StringIO(),
+        )
+
+        get_locations.assert_called_once_with(
+            district="Dumka",
+            limit=None,
+        )
+        apply_async.assert_called_once()
+
 
 @override_settings(PROD_BACKEND_URL="https://geoserver.core-stack.org/")
 class ActiveLocationsApiTests(SimpleTestCase):
@@ -507,4 +539,42 @@ class BulkLayerGenerationTests(TestCase):
         self.assertEqual(
             [location.block for location in locations],
             ["Jarmundi", "Masalia"],
+        )
+
+    def test_locally_generated_locations_are_distinct_and_filterable(self):
+        dataset = Dataset.objects.create(name="Local Dataset")
+        jarmundi = TehsilSOI.objects.get(tehsil_name="Jarmundi")
+        masalia = TehsilSOI.objects.get(tehsil_name="Masalia")
+        for layer_name in ("local_one", "local_two"):
+            Layer.objects.create(
+                dataset=dataset,
+                layer_name=layer_name,
+                state=jarmundi.district.state,
+                district=jarmundi.district,
+                block=jarmundi,
+                misc={"is_generated_locally": True},
+            )
+        Layer.objects.create(
+            dataset=dataset,
+            layer_name="gee_layer",
+            state=masalia.district.state,
+            district=masalia.district,
+            block=masalia,
+            misc={"is_generated_locally": False},
+        )
+
+        locations = get_locally_generated_locations(
+            district="dumka",
+            blocks=["JARMUNDI", "Masalia"],
+        )
+
+        self.assertEqual(
+            [location.asdict() for location in locations],
+            [
+                {
+                    "state": "Jharkhand",
+                    "district": "Dumka",
+                    "block": "Jarmundi",
+                }
+            ],
         )
