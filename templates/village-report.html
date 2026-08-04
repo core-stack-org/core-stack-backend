@@ -1987,6 +1987,8 @@
         let landCultivationData = [];
         let landUtilizationScore = '--';
         let seasonalCultivationScore = '--';
+        let landUtilizationColor = 'red';
+        let seasonalCultivationColor = 'red';
         let landCultivationCluster = 'Low';
 
         try {
@@ -1995,7 +1997,9 @@
             if (landCultivationData && Array.isArray(landCultivationData) && landCultivationData.length >= 4) {
                 landUtilizationScore = landCultivationData[0];
                 seasonalCultivationScore = landCultivationData[1];
+                landUtilizationColor = landCultivationData[2];
                 landCultivationCluster = landCultivationData[3];
+                seasonalCultivationColor = landCultivationData[4];
             }
         } catch (error) {
             console.warn('Land cultivation data not available:', error);
@@ -2019,7 +2023,8 @@
         if (landUtilizationScore !== '--') {
             initLandCultivationChart(
                 [landUtilizationScore, seasonalCultivationScore],
-                landCultivationLabels
+                landCultivationLabels,
+                [landUtilizationColor, seasonalCultivationColor]
             );
         }
 
@@ -2077,15 +2082,7 @@
             if (irrigationData && Array.isArray(irrigationData) && irrigationData.length >= 1) {
                 irrigationWatershedScore = irrigationData[0];
                 irrigationWatershedColor = irrigationData[1];
-
-                // Determine irrigation watershed level (3 levels)
-                if (irrigationWatershedScore >= 0.67) {
-                    irrigationWatershedLevel = 'High';
-                } else if (irrigationWatershedScore >= 0.34) {
-                    irrigationWatershedLevel = 'Medium';
-                } else {
-                    irrigationWatershedLevel = 'Low';
-                }
+                irrigationWatershedLevel = irrigationData[2] || 'Low';
             }
         } catch (error) {
             console.warn('Irrigation data not available:', error);
@@ -2111,7 +2108,7 @@
         // ===== CREATE IRRIGATION CHART =====
         if (irrigationWatershedScore !== '--') {
             const irrigationScores = [irrigationWatershedScore];
-            initIrrigationChart(irrigationScores, irrigationLabels);
+            initIrrigationChart(irrigationScores, irrigationLabels, [irrigationWatershedColor]);
         }
 
         // ===== IRRIGATION MAP (Tabbed, Using Utility) =====
