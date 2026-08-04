@@ -1,4 +1,5 @@
 from io import StringIO
+from inspect import signature
 from unittest.mock import call, patch
 
 from django.core.management import call_command
@@ -15,13 +16,42 @@ from computing.layer_dependency.layer_generation_in_order import get_args, load_
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
     _final_layer_name,
-    ensure_swb_gee_dependencies,
 )
+from computing.surface_water_bodies.swb3 import (
+    waterbody_catchment_streamorder_properties,
+)
+from computing.utils import generate_swb_layer_with_max_so_catchment
 from computing.tasks import bulk_generate_layer
 from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
+from utilities.constants import (
+    CATCHMENT_AREA,
+    PAN_INDIA_DRAINAGE_LINES_DATASET,
+    STREAM_ORDER_ASSET,
+)
 
 
 class LocalSwbContinuationTests(SimpleTestCase):
+    def test_swb_enrichment_defaults_to_pan_india_assets(self):
+        raster_parameters = signature(
+            generate_swb_layer_with_max_so_catchment
+        ).parameters
+        swb3_parameters = signature(
+            waterbody_catchment_streamorder_properties
+        ).parameters
+
+        self.assertEqual(
+            raster_parameters["stream_order_asset_id"].default,
+            STREAM_ORDER_ASSET,
+        )
+        self.assertEqual(
+            raster_parameters["catchment_area_asset_id"].default,
+            CATCHMENT_AREA,
+        )
+        self.assertEqual(
+            swb3_parameters["drainage_lines_asset_id"].default,
+            PAN_INDIA_DRAINAGE_LINES_DATASET,
+        )
+
     def test_final_geoserver_layer_has_no_local_suffix(self):
         self.assertEqual(
             _final_layer_name("dumka_jarmundi"),
@@ -49,50 +79,14 @@ class LocalSwbContinuationTests(SimpleTestCase):
             },
         )
 
-    def test_local_map_runs_gee_dependencies_before_swb(self):
+    def test_local_map_runs_swb_without_generated_gee_dependencies(self):
         swb_node = next(
             node
             for node in load_map_config("dynamic_layers", compute="local")
-            if node["name"] == "ensure_swb_gee_dependencies"
+            if node["name"] == "generate_swb"
         )
 
-        self.assertEqual(swb_node["children"][0]["name"], "generate_swb")
-
-    @patch("computing.surface_water_bodies.swb_local.clip_drainage_lines_gee")
-    @patch(
-        "computing.surface_water_bodies.swb_local.generate_catchment_area_singleflow_gee"
-    )
-    @patch("computing.surface_water_bodies.swb_local.generate_stream_order_gee")
-    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
-    @patch("computing.surface_water_bodies.swb_local.ee_initialize")
-    def test_generates_missing_swb_gee_dependencies(
-        self,
-        ee_initialize,
-        is_gee_asset_exists,
-        generate_stream_order,
-        generate_catchment_area,
-        generate_drainage_lines,
-    ):
-        is_gee_asset_exists.side_effect = [False, True, False, True, False, True]
-
-        result = ensure_swb_gee_dependencies(
-            state="Madhya Pradesh",
-            district="Dhar",
-            block="Kukshi",
-            gee_account_id="account",
-        )
-
-        expected_kwargs = {
-            "state": "madhya pradesh",
-            "district": "dhar",
-            "block": "kukshi",
-            "gee_account_id": "account",
-        }
-        ee_initialize.assert_called_once_with("account")
-        generate_stream_order.run.assert_called_once_with(**expected_kwargs)
-        generate_catchment_area.run.assert_called_once_with(**expected_kwargs)
-        generate_drainage_lines.run.assert_called_once_with(**expected_kwargs)
-        self.assertTrue(result)
+        self.assertTrue(swb_node["pass_gee_account_id"])
 
     @patch("computing.surface_water_bodies.swb_local.make_asset_public")
     @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
@@ -129,7 +123,6 @@ class LocalSwbContinuationTests(SimpleTestCase):
             asset_folder_list=["odisha", "district", "block"],
             app_type="MWS",
             gee_account_id="account",
-            supporting_asset_suffix="district_block",
             swb2_asset_suffix="district_block_local",
         )
         generate_swb4.assert_called_once_with(

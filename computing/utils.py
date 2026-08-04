@@ -27,10 +27,12 @@ from geoadmin.models import (
 from projects.models import Project
 from utilities.constants import (
     ADMIN_BOUNDARY_OUTPUT_DIR,
+    CATCHMENT_AREA,
     GEE_ASSET_PATH,
     GEE_HELPER_PATH,
     GEE_PATHS,
     SHAPEFILE_DIR,
+    STREAM_ORDER_ASSET,
 )
 from utilities.gee_utils import (
     check_task_status,
@@ -860,25 +862,15 @@ def safe_reduce_max(image, geom, scale=30):
 #  MAIN FUNCTION TO PROCESS SWB LAYER
 # ------------------------------------------------------
 def generate_swb_layer_with_max_so_catchment(
-        roi=None,
-        app_type="MWS",
-        asset_suffix=None,
-        asset_folder=None,
-        gee_account_id=None,
+    roi=None,
+    gee_account_id=None,
+    stream_order_asset_id=STREAM_ORDER_ASSET,
+    catchment_area_asset_id=CATCHMENT_AREA,
 ):
     ee_initialize(gee_account_id)
 
-    # Build asset paths
-    base_path = get_gee_dir_path(
-        asset_folder, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-    )
-
-    so_asset = f"{base_path}stream_order_{asset_suffix}_raster"
-    ca_asset = f"{base_path}catchment_area_{asset_suffix}_raster"
-
-    # Load rasters
-    stream_order_band = ee.Image(so_asset).select("b1")
-    catchment_band = ee.Image(ca_asset).select("b1")
+    stream_order_band = ee.Image(stream_order_asset_id).select([0], ["b1"])
+    catchment_band = ee.Image(catchment_area_asset_id).select([0], ["b1"])
 
     # Processing per waterbody
     def compute_for_feature(feature):
