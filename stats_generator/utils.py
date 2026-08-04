@@ -278,6 +278,7 @@ def create_excel_for_soil_health(data, writer):
             "P_count",
             "OC_OLM_count",
             "OC_count",
+            "id",
         ]
         df = df.drop(columns=exclude_cols, errors="ignore")
 
@@ -410,12 +411,18 @@ def create_excel_for_soil_health(data, writer):
             inplace=True,
         )
 
-        priority_cols = ["area_under_cropping_in_ha", "area_under_tree_cover_in_ha"]
-        priority_cols = [c for c in priority_cols if c in df.columns]
+        priority_cols = [
+            "UID",
+            "area_in_ha",
+            "area_under_cropping_in_ha",
+            "area_under_tree_cover_in_ha",
+        ]
+        priority_cols = [
+            c for c in priority_cols if c in df.columns
+        ]  # keep only existing ones
         other_cols = [c for c in df.columns if c not in priority_cols]
 
-        # first 2 existing cols + the 2 priority cols + rest of the columns
-        new_order = other_cols[:2] + priority_cols + other_cols[2:]
+        new_order = priority_cols + other_cols
         df = df[new_order]
 
         df.to_excel(writer, sheet_name="soil_health", index=False)
