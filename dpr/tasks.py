@@ -92,17 +92,19 @@ def generate_dpr_task(
             logger.error(f"Failed to generate MWS report for ID {ids}: {e}")
 
     # Fetch Resource Report PDF
-    resource_report_url = (
+    resource_report_base_url = (
         f"https://geoserver.core-stack.org/api/v1/download_report/"
         f"?report_type=resource&district={district}&block={block}&plan_id={plan_id}&plan_name={plan.plan}"
     )
-
+    resource_report_view_url = f"{resource_report_base_url}&mode=view"
+    resource_report_download_url = f"{resource_report_base_url}&mode=download"
     send_dpr_email(
         email_id=email_id,
         plan_name=plan.plan,
         mws_reports=mws_reports,
         mws_Ids=successful_mws_ids,
-        resource_report_url=resource_report_url,
+        resource_report_url=resource_report_download_url,
+        resource_report_view_url=resource_report_view_url,
         dpr_s3_url=dpr_report.dpr_report_s3_url,
         state_name=plan.state_soi.state_name,
         district_name=plan.district_soi.district_name,
