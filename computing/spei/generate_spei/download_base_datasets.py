@@ -407,8 +407,8 @@ def download_dataset_images(
 def download_data_locally(
     aez: int,
     datasets: list[str] | str | None = None,
-    start_date: str = "2004-01-01",
-    end_date: str = "2025-12-31",
+    start_year: str = None,
+    end_year: str = None,
     frequency: str = "monthly",
     output_dir: str = "data/base_layers/spei/inputs",
     sleep: float = 0.2,
@@ -419,6 +419,9 @@ def download_data_locally(
     # separate CHIRPS and MODIS PET time-step GeoTIFFs.
     selected_datasets = datasets or ["both"]
     # validate_inputs(aez, selected_datasets, frequency)
+
+    start_date = f"{str(start_year)}-07-01"
+    end_date = f"{str(end_year+1)}-06-30"
 
     expanded_datasets = expand_datasets(selected_datasets)
     for dataset in expanded_datasets:

@@ -84,7 +84,7 @@ def reproject_modis_to_chirps_grid(
 def ppet_multiband(
     aez=None,
     start: int = 2004,
-    end: int = 2024,  # TODO remove hardcoding
+    end: int = 2024,
 ) -> Path:
     """
     SPEI Pipeline - Step 1 (Local P-PET)
@@ -113,7 +113,14 @@ def ppet_multiband(
     )
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    months = [(year, month) for year in range(start, end + 1) for month in range(1, 13)]
+    agri_months = list(range(7, 13)) + list(range(1, 7))
+    months = [
+        (year if month >= 7 else year + 1, month)
+        for year in range(start, end + 1)
+        for month in agri_months
+    ]
+
+    # months = [(year, month) for year in range(start, end + 1) for month in range(1, 13)]
     first_chirps = find_monthly_file(chirps_dir, "CHIRPS", *months[0])
 
     with rasterio.open(first_chirps) as template:

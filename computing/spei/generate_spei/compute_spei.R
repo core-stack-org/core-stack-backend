@@ -14,6 +14,7 @@
 
 library(SPEI)
 library(raster)
+library(terra)
 
 run_spei_pipeline <- function(aez, start_year, end_year) {
 
@@ -91,11 +92,37 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     cat(paste("Loaded", nlayers(p_pet_brick), "bands (expected", n_monthly, ")\n"))
 
     # --- Band names ---
-    spei1_names  <- paste0('y', rep(start_year:end_year, each = 12),
-                            '_m', sprintf('%02d', rep(1:12, n_years)))
-    spei3_names  <- paste0('y', rep(start_year:end_year, each = 4),
-                            '_m', sprintf('%02d', rep(c(3,6,9,12), n_years)))
-    spei12_names <- paste0('y', start_year:end_year)
+    agri_months <- c(7:12, 1:6)
+
+    years <- unlist(lapply(start_year:end_year, function(y) {
+      c(rep(y, 6), rep(y + 1, 6))
+    }))
+
+    spei1_names <- paste0(
+      "y",
+      years,
+      "_m",
+      sprintf("%02d", rep(agri_months, n_years))
+    )
+
+    agri_quarter_months <- c("07_09", "10_12", "01_03", "04_06")
+
+    years3 <- unlist(lapply(start_year:end_year, function(y) {
+      c(y, y, y + 1, y + 1)
+    }))
+
+    spei3_names <- paste0(
+      "y",
+      years3,
+      "_m",
+      sprintf("%s", rep(agri_quarter_months, n_years))
+    )
+
+    spei12_names <- paste0(
+        start_year:end_year,
+        "_",
+        (start_year + 1):(end_year + 1)
+    )
 
     # --- Compute block by block ---
     cat("Running SPEI computation...\n")
@@ -136,17 +163,38 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     if (file.exists(spei3_file))  file.remove(spei3_file)
     if (file.exists(spei12_file)) file.remove(spei12_file)
 
-    writeRaster(spei1_b,
-            spei1_file,
-            format = "GTiff", overwrite = TRUE, NAflag = -9999)
+    spei1_t <- rast(spei1_b)
+    names(spei1_t) <- spei1_names
 
-    writeRaster(spei3_b,
-                spei3_file,
-                format = "GTiff", overwrite = TRUE, NAflag = -9999)
+    terra::writeRaster(
+        spei1_t,
+        spei1_file,
+        overwrite = TRUE,
+        NAflag = -9999,
+        gdal = c("COMPRESS=LZW")
+    )
 
-    writeRaster(spei12_b,
-                spei12_file,
-                format = "GTiff", overwrite = TRUE, NAflag = -9999)
+    r <- terra::rast(spei1_file)
+
+    spei3_t <- rast(spei3_b)
+    names(spei3_t) <- spei3_names
+
+    terra::writeRaster(
+        spei3_t,
+        spei3_file,
+        overwrite = TRUE,
+        NAflag = -9999
+    )
+
+    spei12_t <- rast(spei12_b)
+    names(spei12_t) <- spei12_names
+
+    terra::writeRaster(
+        spei12_t,
+        spei12_file,
+        overwrite = TRUE,
+        NAflag = -9999
+    )
 
     file.remove(temp_file)
 

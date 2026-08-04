@@ -31,13 +31,11 @@ def generate_spei_pipeline(
     overwrite=False,
 ):
     ee_initialize(gee_account_id)
-    start_date = f"{str(start_year)}-01-01"
-    end_date = f"{str(end_year)}-12-31"
 
     download_data_locally(
         aez=aez,
-        start_date=start_date,
-        end_date=end_date,
+        start_year=start_year,
+        end_year=end_year,
         frequency="monthly",
         datasets=None,
         overwrite=overwrite,
