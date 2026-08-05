@@ -7,6 +7,7 @@ from computing.spei.forestfire_sensitivity.forest_fire_resistance_resilience imp
 )
 from computing.spei.generate_spei.download_base_datasets import download_data_locally
 from computing.spei.generate_spei.generate_ppet_multiband import ppet_multiband
+from computing.spei.generate_spei.merge_spei import merge_SPEI_rasters
 from computing.spei.generate_spei.spei_runner import run_spei
 from computing.spei.high_wind_sensitivity.export_max_wind_index import max_wind_index
 from computing.spei.high_wind_sensitivity.highwind_resistance_resilience import (
@@ -24,14 +25,23 @@ from nrm_app.celery import app
 @app.task(bind=True)
 def generate_spei_pipeline(
     self,
-    aez,
-    start_year,
-    end_year,
+    aez=None,
+    start_year=2004,
+    end_year=2024,
     gee_account_id=None,
     overwrite=False,
 ):
     ee_initialize(gee_account_id)
+    if aez is None:
+        for aez in range(20):
+            compute_spei(aez, end_year, overwrite, start_year)
+        for spei_type in [1, 3, 12]:
+            merge_SPEI_rasters(spei_type)
+    else:
+        compute_spei(aez, end_year, overwrite, start_year)
 
+
+def compute_spei(aez, end_year, overwrite, start_year):
     download_data_locally(
         aez=aez,
         start_year=start_year,
@@ -40,13 +50,11 @@ def generate_spei_pipeline(
         datasets=None,
         overwrite=overwrite,
     )
-
     ppet_multiband(
         aez=aez,
         start=start_year,
         end=end_year,
     )
-
     run_spei(aez, start_year, end_year)
 
 
