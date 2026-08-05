@@ -75,3 +75,41 @@ def nutrient_stats_for_geometries(roi_gdf, raster_path, percentiles, nutrient):
     for column in rows[0] if rows else []:
         result[column] = [row[column] for row in rows]
     return result
+
+
+def lulc_area_stats_for_geometries(
+    roi_gdf,
+    lulc_mode,
+    lulc_meta,
+):
+    rows = []
+    pixel_area = 0.09
+    transform = lulc_meta["transform"]
+
+    for geom in roi_gdf.geometry:
+
+        mask_arr = rasterio.features.geometry_mask(
+            [mapping(geom)],
+            out_shape=lulc_mode.shape,
+            transform=transform,
+            invert=True,
+        )
+
+        crop_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [8, 9, 10, 11]))
+
+        tree_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [6, 12]))
+
+        rows.append(
+            {
+                "crop_cover_area": crop_pixels * pixel_area,
+                "tree_shrub_area": tree_pixels * pixel_area,
+            }
+        )
+
+    result = roi_gdf.copy()
+
+    result["crop_cover_area"] = [r["crop_cover_area"] for r in rows]
+
+    result["tree_shrub_area"] = [r["tree_shrub_area"] for r in rows]
+
+    return result

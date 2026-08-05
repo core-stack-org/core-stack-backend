@@ -8,9 +8,11 @@ from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
 
-from computing.STAC_specs import generate_STAC_layerwise
 from computing.config_loader import LULC_BASE_DIR
-from computing.soil_health.soil_health_helper import nutrient_stats_for_geometries
+from computing.soil_health.soil_health_helper import (
+    nutrient_stats_for_geometries,
+    lulc_area_stats_for_geometries,
+)
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
@@ -83,14 +85,11 @@ def _resolve_latest_lulc_raster_paths(count=3, lulc_dir=LULC_BASE_DIR):
     return [str(path) for path in selected]
 
 
-def _clip_and_mask_soil_health_raster(
+def _clip_raster_to_roi(
     roi_gdf,
-    soil_raster_path,
-    output_path,
-    nutrient,
-    lulc_paths=None,
+    raster_path,
 ):
-    with rasterio.open(soil_raster_path) as soil_src:
+    with rasterio.open(raster_path) as soil_src:
         roi_gdf = validate_geometry(roi_gdf)
         if roi_gdf.empty:
             raise ValueError(
@@ -143,37 +142,79 @@ def _clip_and_mask_soil_health_raster(
             }
         )
 
-    if lulc_paths:
-        reprojected_arrays = []
-        for lulc_path in lulc_paths:
-            lulc_array = np.zeros(
-                (clipped_meta["height"], clipped_meta["width"]),
-                dtype=np.float32,
-            )
-            with rasterio.open(lulc_path) as lulc_src:
-                reproject(
-                    source=rasterio.band(lulc_src, 1),
-                    destination=lulc_array,
-                    src_transform=lulc_src.transform,
-                    src_crs=lulc_src.crs,
-                    src_nodata=lulc_src.nodata,
-                    dst_transform=clipped_meta["transform"],
-                    dst_crs=clipped_meta["crs"],
-                    dst_nodata=0,
-                    resampling=Resampling.mode,
-                )
-            reprojected_arrays.append(lulc_array)
+    return clipped_data, clipped_meta
 
-        lulc_mode_array = compute_mode_lulc_array(reprojected_arrays)
-        allowed_mask_classes = _get_lulc_mask_classes(nutrient)
-        valid_pixels = np.isin(lulc_mode_array, list(allowed_mask_classes))
-        valid_soil_pixels = clipped_data != nodata
-        output_array = np.where(valid_pixels & valid_soil_pixels, clipped_data, nodata)
-    else:
-        output_array = clipped_data
+
+def _prepare_mode_lulc(
+    reference_meta,
+    lulc_paths,
+):
+    """
+    Reprojects the latest LULC rasters to the reference grid and
+    returns the 3-year mode LULC.
+    """
+
+    reprojected_arrays = []
+
+    for lulc_path in lulc_paths:
+
+        lulc_array = np.zeros(
+            (
+                reference_meta["height"],
+                reference_meta["width"],
+            ),
+            dtype=np.float32,
+        )
+
+        with rasterio.open(lulc_path) as src:
+
+            reproject(
+                source=rasterio.band(src, 1),
+                destination=lulc_array,
+                src_transform=src.transform,
+                src_crs=src.crs,
+                src_nodata=src.nodata,
+                dst_transform=reference_meta["transform"],
+                dst_crs=reference_meta["crs"],
+                dst_nodata=0,
+                resampling=Resampling.mode,
+            )
+
+        reprojected_arrays.append(lulc_array)
+
+    return compute_mode_lulc_array(reprojected_arrays)
+
+
+def _apply_lulc_mask_and_write(
+    clipped_data,
+    clipped_meta,
+    output_path,
+    lulc_mode_array=None,
+    allowed_mask_classes=None,
+):
+    nodata = clipped_meta["nodata"]
+
+    if clipped_data.shape != lulc_mode_array.shape:
+        raise ValueError(
+            f"LULC shape {lulc_mode_array.shape} "
+            f"does not match soil raster {clipped_data.shape}"
+        )
+
+    valid_pixels = np.isin(
+        lulc_mode_array,
+        list(allowed_mask_classes),
+    )
+
+    valid_soil_pixels = clipped_data != nodata
+
+    output_array = np.where(
+        valid_pixels & valid_soil_pixels,
+        clipped_data,
+        nodata,
+    )
 
     with rasterio.open(output_path, "w", **clipped_meta) as dst:
-        dst.write(output_array.astype(clipped_meta["dtype"], copy=False), 1)
+        dst.write(output_array.astype(clipped_meta["dtype"]), 1)
 
     return str(output_path)
 
@@ -198,7 +239,27 @@ def clip_soil_health_raster(
         precomputed_roi_dir=precomputed_roi_dir,
     )
     layer_name = f"{asset_suffix}_soil_health_raster"
+
     lulc_paths = _resolve_latest_lulc_raster_paths()
+
+    if not lulc_paths:
+        raise ValueError("No LULC rasters found to prepare 3-year mode.")
+
+    reference_data, reference_meta = _clip_raster_to_roi(
+        roi_gdf=roi_gdf,
+        raster_path=str(
+            PROJECT_ROOT / "data/base_layers/soil_health/soil_health_N.tif"
+        ),
+    )
+
+    lulc_mode_array = _prepare_mode_lulc(
+        reference_meta=reference_meta,
+        lulc_paths=lulc_paths,
+    )
+
+    if lulc_mode_array.shape != reference_data.shape:
+        raise ValueError("Prepared LULC mode does not match reference raster grid.")
+
     geoserver_statuses = []
     for nutrient in NUTRIENTS:
         SOIL_MAP_PATH = str(
@@ -212,12 +273,22 @@ def clip_soil_health_raster(
             block=block,
         )
 
-        asset_id = _clip_and_mask_soil_health_raster(
-            roi_gdf=roi_gdf,
-            soil_raster_path=SOIL_MAP_PATH,
+        if nutrient == "N":
+            clipped_data = reference_data
+            clipped_meta = reference_meta
+        else:
+            clipped_data, clipped_meta = _clip_raster_to_roi(
+                roi_gdf,
+                SOIL_MAP_PATH,
+            )
+
+        allowed_mask_classes = _get_lulc_mask_classes(nutrient)
+        asset_id = _apply_lulc_mask_and_write(
+            clipped_data=clipped_data,
+            clipped_meta=clipped_meta,
             output_path=output_raster_path,
-            nutrient=nutrient,
-            lulc_paths=lulc_paths,
+            lulc_mode_array=lulc_mode_array,
+            allowed_mask_classes=allowed_mask_classes,
         )
 
         if push_to_geoserver:
@@ -260,7 +331,11 @@ def clip_soil_health_raster(
                 # except Exception as e:
                 #     print(f"Error generating STAC: {e}")
 
-    return all(geoserver_statuses) if push_to_geoserver else True
+    return (
+        all(geoserver_statuses) if push_to_geoserver else True,
+        lulc_mode_array,
+        reference_meta,
+    )
 
 
 def get_roi(asset_suffix, block, district, roi, state, precomputed_roi_dir):
@@ -294,6 +369,8 @@ def vectorize_soil_health(
     roi=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    lulc_mode=None,
+    lulc_meta=None,
 ):
 
     asset_suffix, roi_gdf = get_roi(
@@ -330,6 +407,16 @@ def vectorize_soil_health(
         ]
         for column in nutrient_columns:
             result_gdf[column] = nutrient_gdf[column]
+
+    lulc_area_gdf = lulc_area_stats_for_geometries(
+        roi_gdf=result_gdf,
+        lulc_mode=lulc_mode,
+        lulc_meta=lulc_meta,
+    )
+
+    result_gdf["crop_cover_area"] = lulc_area_gdf["crop_cover_area"]
+
+    result_gdf["tree_shrub_area"] = lulc_area_gdf["tree_shrub_area"]
 
     output_path = build_output_vector_path(
         layer_name=output_layer_name,
@@ -378,20 +465,6 @@ def vectorize_soil_health(
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("Sync to GeoServer flag updated for Soil health vector")
 
-            # try:
-            #     layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-            #         state=state,
-            #         district=district,
-            #         block=block,
-            #         layer_name=output_layer_name,
-            #     )
-            #     update_layer_sync_status(
-            #         layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-            #     )
-            #     print("STAC metadata updated for Soil health vector")
-            # except Exception as e:
-            #     print(f"Error generating STAC: {e}")
-
     return geoserver_status if push_to_geoserver else True
 
 
@@ -407,15 +480,17 @@ def soil_health_local(
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
-    soil_health_raster_on_geoserver = clip_soil_health_raster(
-        state,
-        district,
-        block,
-        asset_suffix,
-        roi,
-        precomputed_roi_dir,
-        push_to_geoserver,
-        sync_layer_metadata,
+    soil_health_raster_on_geoserver, cached_lulc_mode, cached_lulc_meta = (
+        clip_soil_health_raster(
+            state,
+            district,
+            block,
+            asset_suffix,
+            roi,
+            precomputed_roi_dir,
+            push_to_geoserver,
+            sync_layer_metadata,
+        )
     )
 
     soil_health_vector_on_geoserver = vectorize_soil_health(
@@ -426,6 +501,8 @@ def soil_health_local(
         roi,
         push_to_geoserver,
         sync_layer_metadata,
+        lulc_mode=cached_lulc_mode,
+        lulc_meta=cached_lulc_meta,
     )
     return (
         True
