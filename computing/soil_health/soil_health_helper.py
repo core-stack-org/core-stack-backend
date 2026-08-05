@@ -3,7 +3,53 @@ import rasterio
 from rasterio.mask import mask
 from shapely.geometry import mapping
 
+from affine import Affine
+from pyproj import Geod
+from shapely.geometry import Polygon
+
 from computing.local_compute_helper import ensure_file_exists
+
+from pyproj import Geod
+import numpy as np
+
+
+def _compute_row_area(transform, height):
+    """
+    Compute the geodesic area (m²) of one pixel for every raster row.
+
+    Since the raster is north-up in EPSG:4326, every pixel in the same
+    row has identical area. Only latitude changes between rows.
+
+    Returns
+    -------
+    np.ndarray
+        Shape = (height,)
+        Area (m²) of one pixel for each row.
+    """
+
+    geod = Geod(ellps="WGS84")
+
+    row_area = np.zeros(height, dtype=np.float64)
+
+    pixel_width = transform.a  # degrees
+    pixel_height = abs(transform.e)  # degrees
+
+    west = transform.c
+    east = west + pixel_width
+
+    for row in range(height):
+
+        north = transform.f + row * transform.e
+        south = north + transform.e
+
+        area, _ = geod.polygon_area_perimeter(
+            [west, east, east, west],
+            [north, north, south, south],
+        )
+
+        row_area[row] = abs(area)
+
+    return row_area
 
 
 def nutrient_stats_for_geometries(roi_gdf, raster_path, percentiles, nutrient):
@@ -83,7 +129,10 @@ def lulc_area_stats_for_geometries(
     lulc_meta,
 ):
     rows = []
-    pixel_area = 0.09
+    row_area = _compute_row_area(
+        lulc_meta["transform"],
+        lulc_mode.shape[0],
+    )
     transform = lulc_meta["transform"]
 
     for geom in roi_gdf.geometry:
@@ -95,14 +144,36 @@ def lulc_area_stats_for_geometries(
             invert=True,
         )
 
-        crop_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [8, 9, 10, 11]))
+        # crop_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [8, 9, 10, 11]))
 
-        tree_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [6, 12]))
+        # tree_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [6, 12]))
+
+        crop_mask = mask_arr & np.isin(lulc_mode, [8, 9, 10, 11])
+
+        tree_mask = mask_arr & np.isin(lulc_mode, [6, 12])
+
+        crop_area = 0.0
+        tree_area = 0.0
+
+        height = lulc_mode.shape[0]
+
+        for row in range(height):
+
+            crop_pixels = np.count_nonzero(crop_mask[row])
+
+            tree_pixels = np.count_nonzero(tree_mask[row])
+
+            crop_area += crop_pixels * row_area[row]
+
+            tree_area += tree_pixels * row_area[row]
+
+        crop_area /= 10000.0
+        tree_area /= 10000.0
 
         rows.append(
             {
-                "crop_cover_area": crop_pixels * pixel_area,
-                "tree_shrub_area": tree_pixels * pixel_area,
+                "crop_cover_area": crop_area,
+                "tree_shrub_area": tree_area,
             }
         )
 

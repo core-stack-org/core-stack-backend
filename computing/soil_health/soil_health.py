@@ -317,20 +317,6 @@ def clip_soil_health_raster(
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("Sync to GeoServer flag updated for Soil health raster")
 
-                # try:
-                #     layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                #         state=state,
-                #         district=district,
-                #         block=block,
-                #         layer_name=layer_name,
-                #     )
-                #     update_layer_sync_status(
-                #         layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-                #     )
-                #     print("STAC metadata updated for Soil health raster")
-                # except Exception as e:
-                #     print(f"Error generating STAC: {e}")
-
     return (
         all(geoserver_statuses) if push_to_geoserver else True,
         lulc_mode_array,
