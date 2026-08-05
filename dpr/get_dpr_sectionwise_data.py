@@ -974,6 +974,22 @@ RECHARGE_STRUCTURE_MAPPING = {
     "5% model structure": "select_one_model5_structure",
     "30-40 model structure": "select_one_model30_40_structure",
 }
+def flatten_odk_multiselect(value):
+    parts = []
+
+    def _walk(v):
+        if v is None:
+            return
+        if isinstance(v, (list, tuple, set)):
+            for item in v:
+                _walk(item)
+            return
+        s = str(v).strip()
+        if s:
+            parts.append(s)
+
+    _walk(value)
+    return " ".join(parts) or None
 
 
 def get_livelihood_data(plan_id):
@@ -1108,14 +1124,12 @@ def get_livelihood_data(plan_id):
         .exclude(is_deleted=True)
     ):
         data = agrohorti.data_agohorticulture or {}
-        species_parts = filter(
-            None,
+        species = flatten_odk_multiselect(
             [
                 data.get("select_multiple_species"),
                 data.get("select_multiple_species_other"),
-            ],
+            ]
         )
-        species = " ".join(species_parts) or None
         result.append(
             {
                 "livelihood_work": "Plantations",
