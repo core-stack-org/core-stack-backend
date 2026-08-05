@@ -49,14 +49,15 @@ def _compute_nrega_for_watersheds(watersheds_gdf, nrega_gdf):
             cleaned_columns.append(cleaned)
     nrega_in_roi.columns = cleaned_columns
 
-    # Replace NaN
     nrega_in_roi = nrega_in_roi.replace({np.nan: None})
 
-    # Convert datetime columns
     for col in nrega_in_roi.columns:
         if col != "geometry":
-            if pd.api.types.is_datetime64_any_dtype(nrega_in_roi[col]):
-                nrega_in_roi[col] = nrega_in_roi[col].astype(str).replace("NaT", None)
+            nrega_in_roi[col] = nrega_in_roi[col].map(
+                lambda value: value.isoformat()
+                if isinstance(value, pd.Timestamp)
+                else value
+            )
 
     return nrega_in_roi
 

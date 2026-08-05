@@ -4,6 +4,7 @@ from computing.bulk_layer_generation import (
     get_active_locations,
     get_active_locations_from_api,
     get_locally_generated_locations,
+    get_regeneration_dataset_names,
     pipeline_names,
     validate_pipeline,
 )
@@ -121,6 +122,8 @@ class Command(BaseCommand):
         else:
             location_loader = get_active_locations
         try:
+            if options["regenerate_local"]:
+                filters["dataset_names"] = get_regeneration_dataset_names(pipeline)
             locations = location_loader(
                 **filters,
                 limit=options["limit"],

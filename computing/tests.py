@@ -1,21 +1,28 @@
 from io import StringIO
 from inspect import signature
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, call, patch
 
+import geopandas as gpd
 import pandas as pd
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
+from shapely.geometry import Point
 
 from computing.bulk_layer_generation import (
     Location,
     get_active_locations,
     get_active_locations_from_api,
     get_locally_generated_locations,
+    get_regeneration_dataset_names,
+    pipeline_names,
     run_pipeline,
 )
 from computing.layer_dependency.layer_generation_in_order import get_args, load_map_config
+from computing.local_compute_helper import write_vector_output
+from computing.misc.nrega_local_compute import _compute_nrega_for_watersheds
 from computing.models import Dataset, Layer
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
@@ -35,6 +42,29 @@ from utilities.constants import (
     PAN_INDIA_DRAINAGE_LINES_DATASET,
     STREAM_ORDER_ASSET,
 )
+
+
+class LocalNregaTests(SimpleTestCase):
+    def test_timestamp_attributes_can_be_written_to_geopackage(self):
+        watersheds = gpd.GeoDataFrame(
+            geometry=[Point(0, 0)],
+            crs="EPSG:4326",
+        )
+        nrega = gpd.GeoDataFrame(
+            {
+                "work_start": pd.to_datetime(["2026-08-05"]),
+                "geometry": [Point(0, 0)],
+            },
+            crs="EPSG:4326",
+        )
+
+        result = _compute_nrega_for_watersheds(watersheds, nrega)
+
+        self.assertEqual(result.loc[0, "work_start"], "2026-08-05T00:00:00")
+        with TemporaryDirectory() as output_dir:
+            output_path = Path(output_dir) / "nrega.gpkg"
+            write_vector_output(result, output_path, "nrega")
+            self.assertTrue(output_path.exists())
 
 
 class LocalSwbContinuationTests(SimpleTestCase):
@@ -248,6 +278,13 @@ class LocalSwbContinuationTests(SimpleTestCase):
 
 
 class BulkPipelineRegistryTests(SimpleTestCase):
+    def test_all_local_pipelines_define_regeneration_datasets(self):
+        for pipeline in pipeline_names("local"):
+            self.assertTrue(
+                get_regeneration_dataset_names(pipeline),
+                pipeline,
+            )
+
     @patch("computing.bulk_layer_generation.import_string")
     def test_registered_pipeline_builds_standard_payload(self, import_string):
         runner = import_string.return_value
@@ -496,10 +533,17 @@ class BulkLayerCommandTests(SimpleTestCase):
         )
 
         get_locations.assert_called_once_with(
+            dataset_names=("Livestock Census 2019",),
             district="Dumka",
             limit=None,
         )
         apply_async.assert_called_once()
+
+    def test_change_detection_regeneration_uses_vector_dataset(self):
+        self.assertEqual(
+            get_regeneration_dataset_names("change_detection_vector"),
+            ("Change Detection Vector",),
+        )
 
 
 @override_settings(PROD_BACKEND_URL="https://geoserver.core-stack.org/")
@@ -639,6 +683,7 @@ class BulkLayerGenerationTests(TestCase):
 
     def test_locally_generated_locations_are_distinct_and_filterable(self):
         dataset = Dataset.objects.create(name="Local Dataset")
+        other_dataset = Dataset.objects.create(name="Other Local Dataset")
         jarmundi = TehsilSOI.objects.get(tehsil_name="Jarmundi")
         masalia = TehsilSOI.objects.get(tehsil_name="Masalia")
         for layer_name in ("local_one", "local_two"):
@@ -651,15 +696,16 @@ class BulkLayerGenerationTests(TestCase):
                 misc={"is_generated_locally": True},
             )
         Layer.objects.create(
-            dataset=dataset,
-            layer_name="gee_layer",
+            dataset=other_dataset,
+            layer_name="other_local_layer",
             state=masalia.district.state,
             district=masalia.district,
             block=masalia,
-            misc={"is_generated_locally": False},
+            misc={"is_generated_locally": True},
         )
 
         locations = get_locally_generated_locations(
+            dataset_names=("Local Dataset",),
             district="dumka",
             blocks=["JARMUNDI", "Masalia"],
         )
