@@ -210,6 +210,11 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_chan_detection_urbanization(
                     geojson_data, xlsx_file, writer
                 )
+            elif (
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_ShrubChange"
+            ):
+                create_excel_change_detection_ShrubChange(geojson_data, writer)
             elif workspace == "restoration":
                 create_excel_for_restoration(geojson_data, xlsx_file, writer)
             elif workspace == "aquifer":
@@ -1289,7 +1294,7 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
     for feature in features:
         properties = feature["properties"]
         row = {
-            "UID": properties["uid"],
+            "uid": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
             "afforestation_area_in_ha": properties["Afforestation"],
             "deforestation_area_in_ha": properties["Deforestation"],
@@ -1302,6 +1307,65 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
 
         df_data.append(row)
     df = pd.DataFrame(df_data)
+    try:
+        wb = writer.book
+
+        if "lulc_vector" in wb.sheetnames:
+            ws = wb["lulc_vector"]
+
+            headers = [cell.value for cell in ws[1]]
+            header_idx = {h: i for i, h in enumerate(headers)}
+
+            uid_idx = header_idx["UID"]
+
+            years = range(2017, 2020)
+
+            tree_forest_cols = [f"tree_forest_in_ha_{y}" for y in years]
+
+            tree_forest_idxs = [
+                header_idx[c] for c in tree_forest_cols if c in header_idx
+            ]
+
+            missing = [c for c in tree_forest_cols if c not in header_idx]
+            if missing:
+                print("Warning - missing lulc columns:", missing)
+
+            lulc_rows = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                # Tree cover
+                tree_forest_sum = sum((row[i] or 0) for i in tree_forest_idxs)
+                area_under_tree_cover = tree_forest_sum / 3
+
+                lulc_rows.append(
+                    {
+                        "uid": row[uid_idx],
+                        "area_under_tree_cover": area_under_tree_cover,
+                    }
+                )
+
+            lulc_df = pd.DataFrame(lulc_rows)
+
+            df = df.merge(lulc_df, on="uid", how="left")
+
+    except Exception as e:
+        print("Error while reading lulc_vector sheet:", e)
+
+    # Rename columns
+    df.rename(
+        columns={
+            "uid": "UID",
+            "area_under_tree_cover": "area_under_tree_cover_in_ha",
+        },
+        inplace=True,
+    )
+    df["degradation_in_percent"] = (
+        df["degradation_area_in_ha"] / df["area_under_tree_cover_in_ha"]
+    ) * 100
+
+    df["improvement_in_percent"] = (
+        df["improvement_area_in_ha"] / df["area_under_tree_cover_in_ha"]
+    ) * 100
+
     df = df.sort_values(["UID"])
 
     ## for roundoff all numeric value upto 2 decimal
@@ -1574,6 +1638,38 @@ def create_excel_chan_detection_urbanization(data, xlsx_file, writer):
 
     df.to_excel(writer, sheet_name="change_detection_urbanization", index=False)
     print(f"Excel file created for change_detection_urbanization")
+
+
+def create_excel_change_detection_ShrubChange(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        uid = properties.get("uid", "Unknown")
+        df_data.append(
+            {
+                "UID": uid,
+                "area_in_ha": properties.get("area_in_ha", None),
+                "shrub_to_shrub_area_in_ha": properties.get("sh_sh", None),
+                "shrub_to_farm_area_in_ha": properties.get("sh_fa", None),
+                "shrub_to_tree_area_in_ha": properties.get("sh_tr", None),
+                "shrub_to_built_up_area_in_ha": properties.get("sh_bu", None),
+                "shrub_to_water_area_in_ha": properties.get("sh_wa", None),
+                "shrub_to_barren_area_in_ha": properties.get("sh_ba", None),
+                "total_change_area_in_ha": properties.get("total_change", None),
+            }
+        )
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+
+    ## for roundoff all numeric value upto 2 decimal
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+
+    df.to_excel(writer, sheet_name="change_detection_shrubchange", index=False)
+    print(f"Excel file created for change_detection_shrubchange")
 
 
 def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, block):
