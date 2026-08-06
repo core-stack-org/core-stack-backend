@@ -302,8 +302,8 @@ def create_excel_for_soil_health(data, writer):
                     for col in df.columns
                     if col.startswith(("OC_mean", "OC_p", "OC_OLM_mean", "OC_OLM_p"))
                 },
-                "crop_area_ha": "area_under_cropping_in_ha",
-                "tree_shrub_area_ha": "area_under_tree_cover_in_ha",
+                "crop_cover_area": "area_under_cropping_in_ha",
+                "tree_shrub_area": "area_under_tree_cover_in_ha",
                 "uid": "UID",
             },
             inplace=True,
