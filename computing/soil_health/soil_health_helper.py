@@ -1,11 +1,7 @@
-import numpy as np
 import rasterio
 from rasterio.mask import mask
 from shapely.geometry import mapping
 
-from affine import Affine
-from pyproj import Geod
-from shapely.geometry import Polygon
 
 from computing.local_compute_helper import ensure_file_exists
 
