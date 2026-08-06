@@ -6,6 +6,11 @@ construction for forest-edge analysis using Google Earth Engine.
 """
 
 import ee
+from utilities.constants import (
+    TREE_OVERALL_CHANGE,
+    PAN_INDIA_LULC_V3_DATASET,
+    LTP_STP_CHANGE,
+)
 
 # ----------------------------------------
 # PARAMETERS / CONSTANTS
@@ -17,13 +22,6 @@ OUTER_BUFFER = 100
 SCALE = 30
 MAXPIX = 1e12
 
-PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
-
-LTP_CHANGE_PATH = "projects/corestack-datasets/assets/datasets/tree_health/final_ltp_stp_change_2017_2021"
-
-OVERALL_CHANGE_PATH = (
-    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2023"
-)
 
 # LULC years used by the forest fringe pipeline
 LULC_YEARS = [2017, 2018, 2019]
@@ -41,7 +39,7 @@ def load_tree_mode():
     """
     lulc_imgs = ee.ImageCollection(
         [
-            ee.Image(f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year + 1}")
+            ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}_{year + 1}")
             .select("predicted_label")
             .eq(TREE_CLASS)
             for year in LULC_YEARS
@@ -52,12 +50,12 @@ def load_tree_mode():
 
 def load_ltp_change():
     """
-    Load the LTP/STP change product (2017-2021).
+    Load the LTP/STP change product
 
     Returns:
         ee.Image – mean of the ltp_stp_change image collection.
     """
-    return ee.ImageCollection(LTP_CHANGE_PATH).mean()
+    return ee.ImageCollection(LTP_STP_CHANGE).mean()
 
 
 def load_overall_change():
@@ -67,7 +65,7 @@ def load_overall_change():
     Returns:
         ee.Image – mean of the overall_change image collection.
     """
-    return ee.ImageCollection(OVERALL_CHANGE_PATH).mean()
+    return ee.ImageCollection(TREE_OVERALL_CHANGE).mean()
 
 
 def make_fringe(patch, fringe_width=FRINGE_WIDTH):

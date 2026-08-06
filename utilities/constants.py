@@ -370,7 +370,10 @@ PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
 CCD_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ccd_"
 CH_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ch_"
 TREE_OVERALL_CHANGE = (
-    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2022"
+    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2023"
+)
+LTP_STP_CHANGE = (
+    "projects/corestack-trees/assets/tree_characteristics/ltp_stp_change_2017_2024"
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
