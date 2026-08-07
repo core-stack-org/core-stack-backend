@@ -34,14 +34,17 @@ from .tree_in_grassland_utils import (
 
 @app.task(bind=True)
 def generate_tree_in_grassland_layer(
-        self,
-        state,
-        district,
-        block,
-        start_year,
-        end_year,
-        gee_account_id=None,
-        app_type="MWS",
+    self,
+    state,
+    district,
+    block,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=None,
+    end_year=None,
+    gee_account_id=None,
+    app_type="MWS",
 ):
     """
     Generate tree-in-grassland context metrics as a vector layer.
@@ -75,45 +78,42 @@ def generate_tree_in_grassland_layer(
         app_type:       str – application type key in GEE_PATHS (default "MWS").
     """
     # ------------------------------------------------------------------
-    # STEP 1: Initialize GEE and set up paths
+    # Initialize GEE and set up paths
     # ------------------------------------------------------------------
     ee_initialize(gee_account_id)
 
     start_year = int(start_year)
     end_year = int(end_year)
 
-    asset_suffix = (
+    if state and district and block:
+        asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_folder_list = [state, district, block]
+        )
+        asset_folder_list = [state, district, block]
 
-    description = f"tree_in_grassland_{asset_suffix}_{start_year}_{end_year}"
-    layer_name = f"{asset_suffix}_tree_in_grassland"
-
-    asset_id = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + description
-    )
-    print(f"Tree in Grassland pipeline started: {asset_id=}")
-
-    # ------------------------------------------------------------------
-    # STEP 2: Set up ROI (MWS boundaries from GEE)
-    # ------------------------------------------------------------------
-    roi_path = (
+        roi = ee.FeatureCollection(
             get_gee_dir_path(
                 asset_folder_list,
                 asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
             )
             + f"filtered_mws_{valid_gee_text(district.lower())}"
             + f"_{valid_gee_text(block.lower())}_uid"
+        )
+
+    description = f"tree_in_grassland_{asset_suffix}_{start_year}_{end_year}"
+    layer_name = f"{asset_suffix}_tree_in_grassland"
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + description
     )
-    mws_fc = ee.FeatureCollection(roi_path)
+    print(f"Tree in Grassland pipeline started: {asset_id=}")
 
     # ------------------------------------------------------------------
-    # STEP 3: Compute tree-in-grassland metrics
+    # Compute tree-in-grassland metrics
     # ------------------------------------------------------------------
     if not is_gee_asset_exists(asset_id):
 
@@ -211,10 +211,10 @@ def generate_tree_in_grassland_layer(
                 }
             )
 
-        fc = mws_fc.map(compute_stats)
+        fc = roi.map(compute_stats)
 
         # --------------------------------------------------------------
-        # STEP 4: Export to GEE
+        # Export to GEE
         # --------------------------------------------------------------
         task_id = export_vector_asset_to_gee(fc, description, asset_id)
         if task_id:
@@ -222,7 +222,7 @@ def generate_tree_in_grassland_layer(
             print("Tree in Grassland layer exported to GEE.")
 
     # ------------------------------------------------------------------
-    # STEP 5: Publish to GeoServer and save metadata to DB
+    # Publish to GeoServer and save metadata to DB
     # ------------------------------------------------------------------
     layer_at_geoserver = _save_to_db_and_sync_to_geoserver(
         layer_name=layer_name,
@@ -243,14 +243,14 @@ def generate_tree_in_grassland_layer(
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        start_year=None,
-        end_year=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
+    layer_name=None,
+    asset_id=None,
+    start_year=None,
+    end_year=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Tree in Grassland: save_to_db_and_sync_to_geoserver")
@@ -272,11 +272,11 @@ def _save_to_db_and_sync_to_geoserver(
 
     make_asset_public(asset_id)
 
+    layer_at_geoserver = False
     fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, "tree_in_grassland")
+    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "tree_in_grassland")
     print(res)
 
-    layer_at_geoserver = False
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("Tree in Grassland: sync to geoserver flag updated")

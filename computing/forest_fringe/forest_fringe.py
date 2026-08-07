@@ -47,12 +47,15 @@ from .forest_fringe_utils import (
 
 @app.task(bind=True)
 def generate_forest_fringe_degradation(
-        self,
-        state,
-        district,
-        block,
-        gee_account_id=None,
-        app_type="MWS",
+    self,
+    state,
+    district,
+    block,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    gee_account_id=None,
+    app_type="MWS",
 ):
     """
     Generate forest-fringe metrics as a vector layer.
@@ -78,43 +81,40 @@ def generate_forest_fringe_degradation(
     """
 
     # ------------------------------------------------------------------
-    # STEP 1: Initialize GEE and set up paths
+    # Initialize GEE and set up paths
     # ------------------------------------------------------------------
     ee_initialize(gee_account_id)
 
-    asset_suffix = (
+    if state and district and block:
+        asset_suffix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_folder_list = [state, district, block]
+        )
+        asset_folder_list = [state, district, block]
 
-    description = f"forest_fringe_{asset_suffix}"
-    layer_name = f"{asset_suffix}_forest_fringe"
-
-    asset_id = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + description
-    )
-
-    print(f"Forest Fringe pipeline started: {asset_id=}")
-
-    # ------------------------------------------------------------------
-    # STEP 2: Set up ROI (MWS boundaries from GEE)
-    # ------------------------------------------------------------------
-    roi_path = (
+        roi = ee.FeatureCollection(
             get_gee_dir_path(
                 asset_folder_list,
                 asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
             )
             + f"filtered_mws_{valid_gee_text(district.lower())}"
             + f"_{valid_gee_text(block.lower())}_uid"
+        )
+
+    description = f"forest_fringe_{asset_suffix}"
+    layer_name = f"{asset_suffix}_forest_fringe"
+
+    asset_id = (
+        get_gee_dir_path(
+            asset_folder_list,
+            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+        )
+        + description
     )
-    mws_fc = ee.FeatureCollection(roi_path)
+
+    print(f"Forest Fringe pipeline started: {asset_id=}")
 
     # ------------------------------------------------------------------
-    # STEP 3: Compute forest-fringe metrics
+    # Compute forest-fringe metrics
     # ------------------------------------------------------------------
     if not is_gee_asset_exists(asset_id):
 
@@ -253,7 +253,7 @@ def generate_forest_fringe_degradation(
             )
 
         # ---- map compute over all MWS features ----
-        results_fc = mws_fc.map(compute_metrics_per_mws)
+        results_fc = roi.map(compute_metrics_per_mws)
 
         fc = results_fc.select(
             [
@@ -271,7 +271,7 @@ def generate_forest_fringe_degradation(
         )
 
         # --------------------------------------------------------------
-        # STEP 4: Export to GEE
+        # Export to GEE
         # --------------------------------------------------------------
         task_id = export_vector_asset_to_gee(fc, description, asset_id)
 
@@ -280,7 +280,7 @@ def generate_forest_fringe_degradation(
             print("Forest Fringe layer exported to GEE.")
 
     # ------------------------------------------------------------------
-    # STEP 5: Publish to GeoServer and save metadata to DB
+    # Publish to GeoServer and save metadata to DB
     # ------------------------------------------------------------------
     layer_at_geoserver = _save_to_db_and_sync_to_geoserver(
         layer_name=layer_name,
@@ -299,12 +299,12 @@ def generate_forest_fringe_degradation(
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
+    layer_name=None,
+    asset_id=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fringe: save_to_db_and_sync_to_geoserver")
