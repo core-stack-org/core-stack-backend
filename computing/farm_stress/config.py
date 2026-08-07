@@ -75,6 +75,25 @@ LOCAL_DIR_SPEI3_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries")
 # climatological median.
 LOCAL_DIR_MONSOON_ONSET = os.path.join(LOCAL_EXPORT_ROOT, "monsoon_onset")
 
+# VCI (Script 03a) - the 26 yearly multi-band VCI COGs (one file per year,
+# up to 23 bands = 16-day periods) were exported to GEE, downloaded via
+# Drive, merged, and converted to COG manually (not via this repo's
+# GCS-export path, since these are full-India 500m rasters). The local
+# climatology (Script 03a Part D) reads from here and writes 23 mean/std
+# rasters, computed locally rather than via another round of GEE exports
+# now that the full archive is already on disk.
+LOCAL_DIR_VCI_RASTERS = os.path.join(LOCAL_EXPORT_ROOT, "vci_rasters")
+LOCAL_DIR_VCI_CLIMATOLOGY = os.path.join(LOCAL_EXPORT_ROOT, "vci_climatology")
+
+# Phenology curve fitting (Script 03b) - local, double-logistic per pixel
+# per year on the VCI timeseries. Not in plan.md, decided with the user:
+# a pixel/year needs at least this many valid (non-NaN) periods out of 23
+# to attempt a fit - roughly a third of the year's data, a floor against
+# fitting 6 free parameters to near-nothing without being so strict that
+# heavily cloud-masked pixels (periods 9-14) never get fit at all.
+PHENOLOGY_MIN_VALID_PERIODS = 8
+LOCAL_DIR_PHENOLOGY = os.path.join(LOCAL_EXPORT_ROOT, "phenology")
+
 # GCS is still used for the much larger weekly 500m operational alert
 # rasters (a later phase), which are too big for a direct download.
 GCS_PATH_GSMAP_MONTHLY = "ksheetiz/farm_stress/gsmap_monthly/"
