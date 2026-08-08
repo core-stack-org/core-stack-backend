@@ -1,656 +1,599 @@
 """
 Phase 3 — Intersect AET & PET rasters with farm boundary polygons.
 
-Downloads the AET (Actual Evapotranspiration) and PET (Potential
-Evapotranspiration) rasters from Google Earth Engine for the tehsil's
-bounding box, runs zonal statistics against each farm polygon, computes
-MAI (Moisture Adequacy Index = AET/PET), and produces an enhanced
-GeoParquet with per-farm monthly AET, PET, MAI values and water stress
-indicators.
+Reads locally stored COG (Cloud Optimized GeoTIFF) rasters for AET and PET,
+runs zonal statistics against each farm polygon, computes MAI (Moisture
+Adequacy Index = AET/PET), and produces three parquets per the core-lens schema:
+
+    farm_static.parquet    — one row per farm (geometry + static properties)
+    farm_annual.parquet    — one row per farm per year (annual ET metrics)
+    farm_monthly.parquet   — one row per farm per month (date, AET, PET, MAI)
 
 Data sources:
-    AET asset:  projects/corestack-datasets-alpha/assets/datasets/
-                et_downscale/aet_aez_<zone>_<year>
-    PET asset:  projects/core-stack-dev-3-helper/assets/
-                et_downscale/pet_aez_<zone>_<year>
-    13 bands:   b1–b12 (monthly in mm/day), b13 (annual)
-    Resolution: 30 meters
-    NoData:     -9999
+    Local COG rasters at LOCAL_ET_RASTERS_PATH:
+        merge_AET_<aez>_<year>_cog.tif   (13 bands: b1-b12 monthly mm/day, b13 annual)
+        merge_PET_<aez>_<year>_cog.tif   (same structure)
+    Resolution: 30 metres | NoData: -9999 | CRS: EPSG:4326
 
-Water stress methodology (Drought Manual 2016 / Shivani-Shuvam):
-    MAI thresholds:  76–100% no stress, 51–75% mild, 26–50% moderate, 0–25% severe
-    Kharif water stress: MAI in moderate/severe range (MAI ≤ 50%) during Jul–Oct
-    Frequency:       Return period = N / #kharif_water_stress_years
-    Intensity:       Mean MAI over Kharif months in water stress years
-    Note: MAI-based classification indicates crop water stress, not drought.
-          Drought requires additional indicators (SPI/SPEI, VCI) per GoI definition.
+Water stress methodology (aligned with Shuvam Chakraborty / ET Applications):
+    MAI = AET / PET  (ratio, per pixel, only where both AET & PET are valid and PET > 0)
+    Moderate kharif stress : mean kharif MAI <= 0.50
+    Severe kharif stress   : mean kharif MAI <= 0.25
+    Kharif months          : July, August, September, October
 
-Output:
-    data/farm_boundaries/<state>/<district>/<block>/farm_boundaries_et.parquet
-
-Usage (standalone):
-    from computing.farm_boundaries.et_intersection import intersect_et_with_farms
-    result = intersect_et_with_farms("rajasthan", "jaipur", "sanganer", year=2017)
+Missing data protocol (mirrors Shuvam's divide_where_valid approach):
+    - Pixel-level : MAI = NaN if AET is NaN, PET is NaN, or PET = 0
+    - Farm-level  : column = NaN if the farm has zero valid pixels for that band
+    - Annual MAI  : mean of all valid monthly MAI values (NaN months excluded)
+    - No imputation is performed on missing farms or missing months.
 """
 
 import logging
 import os
-import tempfile
-import zipfile
+from datetime import date
 
-import ee
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import rasterio
 import rasterio.features
-import requests
+import rasterio.windows
 
-from utilities.constants import FARM_BOUNDARIES_PATH
+from utilities.constants import FARM_BOUNDARIES_PATH, LOCAL_ET_RASTERS_PATH
 
 logger = logging.getLogger(__name__)
 
-# ── GEE asset path template ──────────────────────────────────────────────────
-AET_ASSET_TEMPLATE = (
-    "projects/corestack-datasets-alpha/assets/datasets/"
-    "et_downscale/aet_aez_{aez}_{year}"
-)
-PET_ASSET_TEMPLATE = (
-    "projects/core-stack-dev-3-helper/assets/"
-    "et_downscale/pet_aez_{aez}_{year}"
-)
-
-# AEZ zone mapping — which zone covers which region
-# (extend this as more zones become available)
+# AEZ zone mapping — extend as more zones are added
 AEZ_ZONE_MAP = {
-    "rajasthan": 2,
-    "gujarat": 2,
-    "punjab": 2,
-    "haryana": 2,
+    "rajasthan":   4,
+    "gujarat":     4,
+    "punjab":      4,
+    "haryana":     4,
+    "maharashtra": 6,
+    "madhya pradesh": 6,
+    "jharkhand":   7,
+    "bihar":       7,
+    "uttar pradesh": 5,
 }
 
-# Default GEE project for authentication
-DEFAULT_GEE_PROJECT = "stackd-conversion123"
-
-# Nodata value used in the AET/PET rasters
 AET_NODATA = -9999
 
-# MAI (Moisture Adequacy Index) thresholds — Drought Manual 2016, Table 3.5
-# MAI = (AET / PET), expressed as ratio (manual uses percentage)
-#   76–100%  (0.76–1.00) → No drought
-#   51–75%   (0.51–0.75) → Mild drought
-#   26–50%   (0.26–0.50) → Moderate drought
-#    0–25%   (0.00–0.25) → Severe drought
-MAI_NO_DROUGHT_THRESHOLD = 0.76   # MAI ≥ 0.76 → no drought
-MAI_MILD_THRESHOLD = 0.51         # 0.51 ≤ MAI < 0.76 → mild drought
-MAI_MODERATE_THRESHOLD = 0.26     # 0.26 ≤ MAI < 0.51 → moderate drought
-# Below 0.26 → severe drought
+# MAI thresholds — aligned with Shuvam Chakraborty / ET Applications (GEE pipeline)
+# Moderate stress : MAI <= 0.50  (farm is water-stressed but not severely)
+# Severe stress   : MAI <= 0.25  (farm is severely water-stressed)
+MAI_MODERATE_THRESHOLD = 0.50
+MAI_SEVERE_THRESHOLD   = 0.25
 
-# Kharif water stress: MAI ∈ {moderate, severe} means MAI ≤ 0.50
-# Note: This indicates crop water stress, not drought (per professor's clarification)
-KHARIF_WATER_STRESS_MAI_THRESHOLD = 0.50
+# Kept for backward compatibility
+KHARIF_WATER_STRESS_MAI_THRESHOLD = MAI_MODERATE_THRESHOLD
 
-# Kharif season months (July–October), 0-indexed for list access
-KHARIF_MONTH_INDICES = [6, 7, 8, 9]  # Jul=6, Aug=7, Sep=8, Oct=9
 KHARIF_MONTH_NAMES = ["jul", "aug", "sep", "oct"]
 
-# Month names for column labeling
+# Calendar month names (used for column naming)
 MONTH_NAMES = [
     "jan", "feb", "mar", "apr", "may", "jun",
     "jul", "aug", "sep", "oct", "nov", "dec",
 ]
 
+# Rasters use crop-year band ordering: band 1 = July, band 2 = August,
+# ..., band 6 = December (year Y), band 7 = January, ..., band 12 = June (year Y+1).
+# This list maps band index 0..11 to the correct calendar month number 1..12.
+CROP_YEAR_BAND_TO_MONTH = [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
+
+# Reverse: calendar month number -> column index in MONTH_NAMES
+_MONTH_NUM_TO_NAME = {
+    1: "jan", 2: "feb", 3: "mar",  4: "apr",  5: "may",  6: "jun",
+    7: "jul", 8: "aug", 9: "sep", 10: "oct", 11: "nov", 12: "dec",
+}
+
 CRS = "EPSG:4326"
-OUTPUT_PARQUET_NAME = "farm_boundaries_et.parquet"
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+# ── path helpers ───────────────────────────────────────────────────────────────
 
+def _block_dir(state, district, block):
+    return os.path.join(FARM_BOUNDARIES_PATH, state, district, block)
 
-def _farm_parquet_path(state: str, district: str, block: str) -> str:
-    return os.path.join(
-        FARM_BOUNDARIES_PATH, state, district, block, "farm_boundaries.parquet"
-    )
+def _farm_parquet_path(state, district, block):
+    return os.path.join(_block_dir(state, district, block), "farm_boundaries.parquet")
 
+def _static_parquet_path(state, district, block):
+    return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
 
-def _output_parquet_path(state: str, district: str, block: str) -> str:
-    return os.path.join(
-        FARM_BOUNDARIES_PATH, state, district, block, OUTPUT_PARQUET_NAME
-    )
+def _annual_parquet_path(state, district, block):
+    return os.path.join(_block_dir(state, district, block), "farm_annual.parquet")
 
+def _monthly_parquet_path(state, district, block):
+    return os.path.join(_block_dir(state, district, block), "farm_monthly.parquet")
 
-def _output_tiff_path(state: str, district: str, block: str, year: int, raster_type: str = "aet") -> str:
-    return os.path.join(
-        FARM_BOUNDARIES_PATH, state, district, block, f"{raster_type}_{year}.tif"
-    )
+def _local_aet_path(aez, year):
+    return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_AET_{aez}_{year}_cog.tif")
 
+def _local_pet_path(aez, year):
+    return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_PET_{aez}_{year}_cog.tif")
 
-def _get_aez_zone(state: str) -> int:
-    """Determine the AEZ zone for a given state."""
+def _get_aez_zone(state):
     zone = AEZ_ZONE_MAP.get(state)
     if zone is None:
         raise ValueError(
-            f"No AEZ zone mapping for state '{state}'. "
-            f"Known states: {list(AEZ_ZONE_MAP.keys())}"
+            f"No AEZ zone mapping for state '{state}'. Known: {list(AEZ_ZONE_MAP.keys())}"
         )
     return zone
 
 
-# ── GEE raster download ──────────────────────────────────────────────────────
+# ── local raster reading ───────────────────────────────────────────────────────
 
-
-def _initialize_gee(gee_project: str):
-    """Initialize Google Earth Engine with the given project."""
-    try:
-        ee.Initialize(project=gee_project)
-        logger.info("GEE initialized with project: %s", gee_project)
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to initialize GEE with project '{gee_project}'. "
-            f"Run 'earthengine authenticate' first. Error: {exc}"
-        ) from exc
-
-
-def _download_single_band(img, band_name, region, tmp_dir, band_idx):
-    """Download a single band from GEE as a GeoTIFF file."""
-    single = img.select(band_name)
-    url = single.getDownloadURL({
-        "scale": 30,
-        "crs": CRS,
-        "region": region,
-        "format": "GEO_TIFF",
-    })
-
-    response = requests.get(url, timeout=120)
-    response.raise_for_status()
-
-    tmp_file = os.path.join(tmp_dir, f"band_{band_idx}.tif")
-
-    # GEE may return a zip or raw tiff
-    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False, dir=tmp_dir) as tmp:
-        tmp.write(response.content)
-        tmp_path = tmp.name
-
-    if zipfile.is_zipfile(tmp_path):
-        with zipfile.ZipFile(tmp_path, "r") as zf:
-            tif_files = [f for f in zf.namelist() if f.endswith(".tif")]
-            if tif_files:
-                zf.extract(tif_files[0], tmp_dir)
-                extracted = os.path.join(tmp_dir, tif_files[0])
-                os.rename(extracted, tmp_file)
-        os.remove(tmp_path)
-    else:
-        os.rename(tmp_path, tmp_file)
-
-    return tmp_file
-
-
-def _download_gee_raster(
-    asset_path: str,
-    tiff_path: str,
-    bbox: tuple,
-    gee_project: str,
-    label: str = "raster",
-) -> str:
+def _read_raster_clipped(raster_path, bbox):
     """
-    Generic: download any GEE image asset to a local multi-band GeoTIFF.
-
-    Downloads each band individually to stay under the 50MB GEE download
-    limit, then merges them into a single multi-band GeoTIFF locally.
-
-    Parameters
-    ----------
-    asset_path : str
-        Full GEE asset path (e.g. projects/.../aet_aez_2_2017).
-    tiff_path : str
-        Local path to save the merged multi-band GeoTIFF.
-    bbox : tuple
-        (minx, miny, maxx, maxy) in EPSG:4326.
-    gee_project : str
-        GEE cloud project ID for authentication.
-    label : str
-        Human-readable label for log messages (e.g. 'AET', 'PET').
+    Read a local COG raster clipped to bbox using windowed reading.
+    Converts the raster's nodata value (-9999 per spec, confirmed via src.nodata)
+    to NaN immediately so all downstream code works cleanly with NaN semantics.
 
     Returns
     -------
-    str
-        Path to the downloaded multi-band GeoTIFF file.
+    data      : np.ndarray  shape (bands, height, width), float32
+    transform : affine transform for the clipped window
     """
-    # Skip download if already cached
-    if os.path.exists(tiff_path):
-        logger.info("%s raster already cached at %s — skipping download.", label, tiff_path)
-        return tiff_path
-
-    _initialize_gee(gee_project)
-    logger.info("Loading GEE asset: %s", asset_path)
-
-    img = ee.Image(asset_path)
-
     minx, miny, maxx, maxy = bbox
-    region = ee.Geometry.Rectangle([minx, miny, maxx, maxy])
+    with rasterio.open(raster_path) as src:
+        window    = rasterio.windows.from_bounds(minx, miny, maxx, maxy, src.transform)
+        transform = rasterio.windows.transform(window, src.transform)
+        data      = src.read(window=window).astype("float32")
 
-    band_names = img.bandNames().getInfo()
-    logger.info(
-        "Downloading %s: %d bands (bbox=%.3f,%.3f,%.3f,%.3f, 30m)",
-        label, len(band_names), minx, miny, maxx, maxy,
-    )
+        # Resolve nodata: use raster metadata first, fall back to AET_NODATA (-9999)
+        nodata_val = float(src.nodata) if src.nodata is not None else float(AET_NODATA)
+        n_nodata   = int(np.sum(data == nodata_val))
+        if n_nodata > 0:
+            logger.debug("%s: masking %d nodata pixels (value=%.0f)",
+                         os.path.basename(raster_path), n_nodata, nodata_val)
 
-    os.makedirs(os.path.dirname(tiff_path), exist_ok=True)
+        # Convert nodata sentinel AND any residual AET_NODATA values to NaN
+        data[data == nodata_val] = np.nan
+        data[data <= float(AET_NODATA)] = np.nan   # belt-and-suspenders for -9999 variants
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        band_files = []
-        for idx, band_name in enumerate(band_names, 1):
-            logger.info("  [%s] Downloading band %d/%d: %s", label, idx, len(band_names), band_name)
-            band_file = _download_single_band(
-                img, band_name, region, tmp_dir, idx,
-            )
-            band_files.append(band_file)
-
-        logger.info("Merging %d bands into single GeoTIFF...", len(band_files))
-
-        with rasterio.open(band_files[0]) as src0:
-            meta = src0.meta.copy()
-            meta.update(count=len(band_files), dtype="float32")
-
-            with rasterio.open(tiff_path, "w", **meta) as dst:
-                for band_idx, band_file in enumerate(band_files, 1):
-                    with rasterio.open(band_file) as src:
-                        dst.write(src.read(1).astype("float32"), band_idx)
-
-    with rasterio.open(tiff_path) as src:
-        logger.info(
-            "%s raster saved: %s — %d bands, shape=%s, crs=%s",
-            label, tiff_path, src.count, src.shape, src.crs,
-        )
-
-    return tiff_path
+    return data, transform
 
 
-def _download_aet_raster(state, district, block, year, bbox, gee_project):
-    """Download AET raster from GEE for the given tehsil and year."""
-    aez = _get_aez_zone(state)
-    asset_path = AET_ASSET_TEMPLATE.format(aez=aez, year=year)
-    tiff_path = _output_tiff_path(state, district, block, year, "aet")
-    return _download_gee_raster(asset_path, tiff_path, bbox, gee_project, label="AET")
-
-
-def _download_pet_raster(state, district, block, year, bbox, gee_project):
-    """Download PET raster from GEE for the given tehsil and year."""
-    aez = _get_aez_zone(state)
-    asset_path = PET_ASSET_TEMPLATE.format(aez=aez, year=year)
-    tiff_path = _output_tiff_path(state, district, block, year, "pet")
-    return _download_gee_raster(asset_path, tiff_path, bbox, gee_project, label="PET")
-
-
-# ── zonal statistics ──────────────────────────────────────────────────────────
-
+# ── zonal statistics ───────────────────────────────────────────────────────────
 
 def _rasterize_farms(gdf, transform, out_shape):
-    """
-    Burn all farm polygons into a single labelled raster.
-
-    Each pixel gets the 1-based index of the farm polygon it falls within.
-    Pixels that don't overlap any farm get 0.
-
-    Returns
-    -------
-    np.ndarray
-        Integer array of shape *out_shape* with farm labels (0 = background).
-    """
     shapes = (
         (geom, idx)
         for idx, geom in enumerate(gdf.geometry, start=1)
     )
-    labels = rasterio.features.rasterize(
+    return rasterio.features.rasterize(
         shapes,
         out_shape=out_shape,
         transform=transform,
         fill=0,
         dtype="int32",
-        all_touched=True,  # include pixels that even partially overlap
+        all_touched=True,
     )
-    return labels
 
 
 def _extract_band_means(labels, band_data, num_farms):
     """
-    Given a labelled raster and a band's pixel values, compute the
-    mean value per farm label using vectorised NumPy operations.
-
-    Parameters
-    ----------
-    labels : np.ndarray (int32)
-        Farm-label raster (0 = background, 1..N = farm index).
-    band_data : np.ndarray (float32)
-        AET pixel values for one band.
-    num_farms : int
-        Total number of farms (N).
-
-    Returns
-    -------
-    np.ndarray of shape (num_farms,)
-        Mean AET for each farm.  NaN where no valid pixels exist.
+    Compute per-farm mean of band_data, ignoring NaN/Inf and negative values.
+    Nodata pixels are already NaN at this point (converted in _read_raster_clipped).
+    Farms with zero valid pixels get NaN (not imputed).
     """
-    # Mask invalid AET values
-    valid = (
-        ~np.isnan(band_data) &
-        ~np.isinf(band_data) &
-        (band_data > AET_NODATA) &
-        (band_data >= 0)
-    )
-
-    # Only work with valid pixels
+    # Valid = finite, non-negative (AET and PET are always >= 0 physically)
+    valid        = np.isfinite(band_data) & (band_data >= 0)
     valid_labels = labels[valid]
     valid_values = band_data[valid]
 
-    # Accumulate sums and counts per label using np.bincount
-    # Labels are 1-based (farm 0 doesn't exist), so index 0 = background
-    sums = np.bincount(valid_labels, weights=valid_values, minlength=num_farms + 1)
-    counts = np.bincount(valid_labels, minlength=num_farms + 1)
+    sums   = np.bincount(valid_labels, weights=valid_values, minlength=num_farms + 1)
+    counts = np.bincount(valid_labels,                       minlength=num_farms + 1)
 
-    # Compute mean (farms are at indices 1..N)
     with np.errstate(invalid="ignore", divide="ignore"):
         means = sums[1:] / counts[1:]
 
-    # Farms with zero valid pixels → NaN
-    means[counts[1:] == 0] = np.nan
-
+    means[counts[1:] == 0] = np.nan   # farms with no valid pixels → NaN
     return means
 
 
-def _run_zonal_stats(
-    gdf: gpd.GeoDataFrame, aet_tiff_path: str, pet_tiff_path: str = None,
-) -> gpd.GeoDataFrame:
+# ── temporal gap-filling ───────────────────────────────────────────────────────
+# Mirrors Shuvam Chakraborty's fill_monthly_collection() in ET_Applications/helper.py.
+# Crop year: July (agri-month 1) → June (agri-month 12).
+# Rules:
+#   July  (agri_month 1)  → neighbour: August only  (no backward crossing crop-year start)
+#   June  (agri_month 12) → neighbour: May only     (no forward crossing crop-year end)
+#   All others            → previous and next calendar month (±1 month)
+# NaN farm-months with no valid neighbour remain NaN.
+
+# Calendar-month index (0=Jan … 11=Dec) → list of neighbour indices
+_GAP_FILL_NEIGHBOURS: dict = {
+    0:  [11, 1],   # Jan: Dec, Feb
+    1:  [0,  2],   # Feb: Jan, Mar
+    2:  [1,  3],   # Mar: Feb, Apr
+    3:  [2,  4],   # Apr: Mar, May
+    4:  [3,  5],   # May: Apr, Jun
+    5:  [4],       # Jun: May only  (crop-year end  — no forward crossing)
+    6:  [7],       # Jul: Aug only  (crop-year start — no backward crossing)
+    7:  [6,  8],   # Aug: Jul, Sep
+    8:  [7,  9],   # Sep: Aug, Oct
+    9:  [8, 10],   # Oct: Sep, Nov
+    10: [9, 11],   # Nov: Oct, Dec
+    11: [10, 0],   # Dec: Nov, Jan
+}
+
+
+def _gap_fill_monthly_farms(monthly_matrix: np.ndarray) -> np.ndarray:
     """
-    Extract per-farm monthly AET (and optionally PET) values using vectorised
-    rasterisation, then compute MAI and water stress indicators.
+    Gap-fill a (n_farms × 12) monthly matrix following Shuvam's crop-year rules.
 
-    Approach:
-      1. Rasterise ALL farm polygons into a single labelled grid at the
-         same resolution as the raster image (30 m).
-      2. For each band, compute the mean of all pixels that fall within
-         each farm polygon using fast NumPy bincount operations.
-      3. If PET is available, compute MAI = AET / PET per month and
-         classify water stress using Drought Manual 2016 thresholds.
+    Parameters
+    ----------
+    monthly_matrix : np.ndarray, shape (n_farms, 12)
+        Columns are calendar months Jan–Dec (indices 0–11).
+        NaN = missing / nodata.
 
-    New columns added to gdf:
-        aet_jan..aet_dec, aet_annual             (AET monthly + annual)
-        pet_jan..pet_dec, pet_annual              (PET monthly + annual, if available)
-        mai_jan..mai_dec, mai_annual              (MAI = AET/PET, if PET available)
-        water_stress_months                       (count of stressed months)
-        kharif_water_stress                       (bool: does this farm have Kharif water stress?)
-        kharif_mai                                (mean MAI over Kharif months)
+    Returns
+    -------
+    filled : np.ndarray, same shape.
+        NaN cells replaced with the nanmean of valid neighbours.
+        Cells with no valid neighbour remain NaN.
     """
-    logger.info("Running vectorised zonal statistics for %d farms...", len(gdf))
+    filled = monthly_matrix.copy()
 
-    # ── AET processing ──────────────────────────────────────────────────
-    with rasterio.open(aet_tiff_path) as src:
-        num_bands = src.count
-        transform = src.transform
-        out_shape = (src.height, src.width)
-        logger.info(
-            "AET raster: %d bands, shape=%s, crs=%s",
-            num_bands, out_shape, src.crs,
-        )
+    for m, neighbours in _GAP_FILL_NEIGHBOURS.items():
+        missing = np.isnan(filled[:, m])
+        if not missing.any():
+            continue
+        neighbour_vals = np.stack([filled[:, n] for n in neighbours], axis=1)
+        fill_vals      = np.nanmean(neighbour_vals, axis=1)
+        can_fill       = missing & np.isfinite(fill_vals)
+        filled[can_fill, m] = fill_vals[can_fill]
 
-        # Step 1: Rasterise all farm polygons at once
-        logger.info(
-            "Rasterising %d farm polygons into a labelled grid (%d×%d)...",
-            len(gdf), out_shape[0], out_shape[1],
-        )
-        labels = _rasterize_farms(gdf, transform, out_shape)
-        labelled_count = np.unique(labels[labels > 0]).size
-        logger.info(
-            "Labelled grid ready: %d/%d farms have at least one pixel.",
-            labelled_count, len(gdf),
-        )
+    return filled
 
-        # Step 2: Extract mean AET per farm for each band
-        aet_monthly_cols = []
-        num_farms = len(gdf)
 
-        for band_idx in range(1, min(num_bands, 12) + 1):
-            col_name = f"aet_{MONTH_NAMES[band_idx - 1]}"
-            logger.info("  Processing AET band %d/%d → %s", band_idx, num_bands, col_name)
+def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=None):
+    """
+    Compute per-farm monthly AET, PET, MAI from pre-loaded raster arrays.
+    Adds wide-format columns (aet_jan..aet_dec, pet_jan..pet_dec, mai_jan..mai_dec,
+    aet_annual, pet_annual, mai_annual, kharif_mai, kharif_water_stress) to gdf.
+    """
+    num_farms = len(gdf)
+    out_shape  = (aet_data.shape[1], aet_data.shape[2])
 
-            band_data = src.read(band_idx).astype("float32")
-            means = _extract_band_means(labels, band_data, num_farms)
+    logger.info("Rasterising %d farm polygons (%d×%d grid)...", num_farms, *out_shape)
+    labels = _rasterize_farms(gdf, aet_transform, out_shape)
+    logger.info(
+        "%d/%d farms have at least one pixel.",
+        np.unique(labels[labels > 0]).size, num_farms,
+    )
 
-            gdf[col_name] = np.round(means, 4)
-            aet_monthly_cols.append(col_name)
+    # AET monthly — map each crop-year band to its correct calendar month column
+    # Band 0=Jul, 1=Aug, ..., 5=Dec, 6=Jan, ..., 11=Jun  (CROP_YEAR_BAND_TO_MONTH)
+    aet_monthly_cols = [f"aet_{m}" for m in MONTH_NAMES]   # ordered jan..dec
+    num_aet_bands = aet_data.shape[0]
+    for band_idx in range(min(num_aet_bands, 12)):
+        cal_month = CROP_YEAR_BAND_TO_MONTH[band_idx]
+        col = f"aet_{_MONTH_NUM_TO_NAME[cal_month]}"
+        gdf[col] = np.round(_extract_band_means(labels, aet_data[band_idx], num_farms), 4)
 
-        # Band 13 = annual average (if present)
-        if num_bands >= 13:
-            logger.info("  Processing AET band 13/%d → aet_annual", num_bands)
-            band_data = src.read(13).astype("float32")
-            means = _extract_band_means(labels, band_data, num_farms)
-            gdf["aet_annual"] = np.round(means, 4)
-        else:
-            gdf["aet_annual"] = gdf[aet_monthly_cols].mean(axis=1).round(4)
+    # ── Temporal gap-fill AET — matrix in calendar order (jan=col0..dec=col11) ──
+    aet_matrix  = gdf[aet_monthly_cols].values.astype("float64")
+    aet_filled  = _gap_fill_monthly_farms(aet_matrix)
+    n_filled_aet = int(np.sum(np.isnan(aet_matrix) & np.isfinite(aet_filled)))
+    logger.info("Gap-fill AET: filled %d farm-month NaN values.", n_filled_aet)
+    for i, col in enumerate(aet_monthly_cols):
+        gdf[col] = np.round(aet_filled[:, i], 4)
 
-    # ── PET processing (if available) ────────────────────────────────────
-    pet_monthly_cols = []
-    has_pet = pet_tiff_path is not None and os.path.exists(pet_tiff_path)
-
-    if has_pet:
-        logger.info("Processing PET raster: %s", pet_tiff_path)
-        with rasterio.open(pet_tiff_path) as pet_src:
-            pet_bands = pet_src.count
-            pet_transform = pet_src.transform
-            pet_shape = (pet_src.height, pet_src.width)
-
-            # Re-rasterise farms if PET raster has different grid
-            if pet_shape != out_shape or pet_transform != transform:
-                logger.info("PET grid differs from AET — re-rasterising farms...")
-                pet_labels = _rasterize_farms(gdf, pet_transform, pet_shape)
-            else:
-                pet_labels = labels
-
-            for band_idx in range(1, min(pet_bands, 12) + 1):
-                col_name = f"pet_{MONTH_NAMES[band_idx - 1]}"
-                logger.info("  Processing PET band %d/%d → %s", band_idx, pet_bands, col_name)
-
-                band_data = pet_src.read(band_idx).astype("float32")
-                means = _extract_band_means(pet_labels, band_data, num_farms)
-
-                gdf[col_name] = np.round(means, 4)
-                pet_monthly_cols.append(col_name)
-
-            if pet_bands >= 13:
-                logger.info("  Processing PET band 13/%d → pet_annual", pet_bands)
-                band_data = pet_src.read(13).astype("float32")
-                means = _extract_band_means(pet_labels, band_data, num_farms)
-                gdf["pet_annual"] = np.round(means, 4)
-            else:
-                gdf["pet_annual"] = gdf[pet_monthly_cols].mean(axis=1).round(4)
+    if num_aet_bands >= 13:
+        gdf["aet_annual"] = np.round(_extract_band_means(labels, aet_data[12], num_farms), 4)
     else:
-        logger.info("No PET raster available — skipping MAI computation.")
+        gdf["aet_annual"] = gdf[aet_monthly_cols].mean(axis=1).round(4)
 
-    # ── MAI and water stress indicators ──────────────────────────────────
-    if has_pet and len(pet_monthly_cols) == 12:
-        logger.info("Computing MAI (AET/PET) and water stress indicators...")
+    # PET monthly
+    pet_monthly_cols = [f"pet_{m}" for m in MONTH_NAMES]
+    if pet_data is not None:
+        pet_out_shape = (pet_data.shape[1], pet_data.shape[2])
+        pet_labels = (
+            _rasterize_farms(gdf, pet_transform, pet_out_shape)
+            if (pet_out_shape != out_shape or pet_transform != aet_transform)
+            else labels
+        )
+        num_pet_bands = pet_data.shape[0]
+        for band_idx in range(min(num_pet_bands, 12)):
+            cal_month = CROP_YEAR_BAND_TO_MONTH[band_idx]
+            col = f"pet_{_MONTH_NUM_TO_NAME[cal_month]}"
+            gdf[col] = np.round(_extract_band_means(pet_labels, pet_data[band_idx], num_farms), 4)
 
-        # Compute monthly MAI = AET / PET
+        # ── Temporal gap-fill PET ─────────────────────────────────────────────
+        pet_matrix  = gdf[pet_monthly_cols].values.astype("float64")
+        pet_filled  = _gap_fill_monthly_farms(pet_matrix)
+        n_filled_pet = int(np.sum(np.isnan(pet_matrix) & np.isfinite(pet_filled)))
+        logger.info("Gap-fill PET: filled %d farm-month NaN values.", n_filled_pet)
+        for i, col in enumerate(pet_monthly_cols):
+            gdf[col] = np.round(pet_filled[:, i], 4)
+
+        if num_pet_bands >= 13:
+            gdf["pet_annual"] = np.round(_extract_band_means(pet_labels, pet_data[12], num_farms), 4)
+        else:
+            gdf["pet_annual"] = gdf[pet_monthly_cols].mean(axis=1).round(4)
+
+    # MAI + water stress
+    if len(pet_monthly_cols) == 12:
         mai_monthly_cols = []
-        for i, month in enumerate(MONTH_NAMES):
-            aet_col = f"aet_{month}"
-            pet_col = f"pet_{month}"
-            mai_col = f"mai_{month}"
-
-            # Safe division: NaN where PET is 0 or missing
+        for month in MONTH_NAMES:
+            col = f"mai_{month}"
+            aet_vals = gdf[f"aet_{month}"].values
+            pet_vals = gdf[f"pet_{month}"].values
             with np.errstate(invalid="ignore", divide="ignore"):
-                mai_values = gdf[aet_col].values / gdf[pet_col].values
-            # Replace inf/nan from division by zero
-            mai_values = np.where(np.isfinite(mai_values), mai_values, np.nan)
+                v = aet_vals / pet_vals
+            # MAI is physically bounded to [0, 1]: AET cannot exceed PET.
+            # Values > 1 indicate raster misalignment or model artifacts → cap at 1.
+            n_invalid = int(np.sum(np.isfinite(v) & (v > 1)))
+            if n_invalid > 0:
+                logger.warning(
+                    "MAI[%s]: %d farms have MAI > 1 (raster artifact) — capped at 1.0",
+                    month, n_invalid,
+                )
+            # Set to NaN where not finite, cap valid values to [0, 1]
+            v = np.where(np.isfinite(v), np.clip(v, 0.0, 1.0), np.nan)
+            gdf[col] = np.round(v, 4)
+            mai_monthly_cols.append(col)
 
-            gdf[mai_col] = np.round(mai_values, 4)
-            mai_monthly_cols.append(mai_col)
-
-        # MAI annual = mean of monthly MAIs
         gdf["mai_annual"] = gdf[mai_monthly_cols].mean(axis=1).round(4)
 
-        # Water stress classification per month using Drought Manual 2016, Table 3.5
-        # Count months in moderate or severe crop water stress (MAI ≤ 0.50)
-        mai_df = gdf[mai_monthly_cols]
-        gdf["water_stress_months"] = (
-            (mai_df <= KHARIF_WATER_STRESS_MAI_THRESHOLD) & (mai_df.notna())
-        ).sum(axis=1).astype(int)
+        kharif_cols = [f"mai_{m}" for m in KHARIF_MONTH_NAMES]
+        kharif_df   = gdf[kharif_cols]
+        gdf["kharif_mai"] = kharif_df.mean(axis=1).round(4)
 
-        # Kharif water stress indicator
-        # A farm has Kharif water stress if MAI ∈ {moderate, severe}
-        # during any Kharif month (Jul, Aug, Sep, Oct)
-        # Moderate + Severe = MAI ≤ 50% (ratio ≤ 0.50)
-        # Note: This is crop water stress, not drought (per GoI definition)
-        kharif_mai_cols = [f"mai_{m}" for m in KHARIF_MONTH_NAMES]
-        kharif_mai_df = gdf[kharif_mai_cols]
-
-        # Kharif water stress: any Kharif month has MAI ≤ 0.50 (moderate/severe)
+        # Moderate stress: any kharif month with MAI <= 0.50
         gdf["kharif_water_stress"] = (
-            (kharif_mai_df <= KHARIF_WATER_STRESS_MAI_THRESHOLD) & (kharif_mai_df.notna())
+            (kharif_df <= MAI_MODERATE_THRESHOLD) & kharif_df.notna()
         ).any(axis=1)
 
-        # Mean MAI over Kharif months (for intensity computation in multi-year)
-        gdf["kharif_mai"] = kharif_mai_df.mean(axis=1).round(4)
+        # Severe stress: any kharif month with MAI <= 0.25
+        gdf["kharif_severe_stress"] = (
+            (kharif_df <= MAI_SEVERE_THRESHOLD) & kharif_df.notna()
+        ).any(axis=1)
 
-        # Summary logging
-        valid = gdf["mai_annual"].notna().sum()
-        stress_count = gdf["kharif_water_stress"].sum()
+        n_nan   = int(gdf["mai_annual"].isna().sum())
+        n_valid = int(gdf["mai_annual"].notna().sum())
         logger.info(
-            "MAI stats complete: %d/%d farms with valid data, "
-            "avg MAI=%.3f, Kharif water stress farms=%d, avg stress months=%.1f",
-            valid, len(gdf),
-            gdf["mai_annual"].mean() if valid > 0 else 0,
-            stress_count,
-            gdf["water_stress_months"].mean(),
+            "MAI complete: avg_annual=%.4f | kharif_stress=%d | severe=%d | nan_farms=%d | valid_farms=%d",
+            gdf["mai_annual"].mean() if n_valid > 0 else float("nan"),
+            int(gdf["kharif_water_stress"].sum()),
+            int(gdf["kharif_severe_stress"].sum()),
+            n_nan, n_valid,
         )
     else:
-        # Fallback: no PET available, use simple AET threshold
-        STRESS_THRESHOLD = 0.5  # mm/day — placeholder
-        monthly_df = gdf[aet_monthly_cols]
-        gdf["water_stress_months"] = (
-            (monthly_df < STRESS_THRESHOLD) & (monthly_df.notna())
-        ).sum(axis=1).astype(int)
-
-        valid = gdf["aet_annual"].notna().sum()
-        logger.info(
-            "Zonal stats complete (AET only, no PET): %d/%d farms with valid data, "
-            "avg annual AET=%.3f mm/day, avg stress months=%.1f",
-            valid, len(gdf),
-            gdf["aet_annual"].mean() if valid > 0 else 0,
-            gdf["water_stress_months"].mean(),
-        )
+        logger.warning("PET not available — MAI not computed.")
 
     return gdf
 
 
-# ── public entry point ────────────────────────────────────────────────────────
+# ── output writers ─────────────────────────────────────────────────────────────
 
+def _save_static_parquet(gdf, state, district, block):
+    """
+    Write farm_static.parquet — one row per farm, geometry + static properties.
+    Skips if file already exists (static data never changes).
+    """
+    out_path = _static_parquet_path(state, district, block)
+    if os.path.exists(out_path):
+        logger.info("farm_static.parquet already exists — skipping.")
+        return out_path
+
+    keep = ["farm_id", "farm_uid", "cell_token", "alu_type",
+            "class_confidence", "capture_date", "geometry"]
+    static = gdf[[c for c in keep if c in gdf.columns]].copy()
+    static.insert(0, "state",    state)
+    static.insert(0, "district", district)
+    static.insert(0, "tehsil",   block)
+    if "area_m2" in gdf.columns:
+        static["area_in_ha"] = (gdf["area_m2"] / 10_000).round(4)
+
+    # Bounding box struct
+    static["bbox"] = static.geometry.apply(
+        lambda g: {
+            "xmin": round(g.bounds[0], 6), "ymin": round(g.bounds[1], 6),
+            "xmax": round(g.bounds[2], 6), "ymax": round(g.bounds[3], 6),
+        }
+    )
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    static.to_parquet(out_path, index=False)
+    logger.info("farm_static.parquet saved → %s  (%d farms)", out_path, len(static))
+    return out_path
+
+
+def _save_annual_parquet(gdf, state, district, block, year):
+    """
+    Append one year of annual ET metrics to farm_annual.parquet.
+    Replaces any existing rows for the same year (idempotent).
+    """
+    out_path = _annual_parquet_path(state, district, block)
+
+    keep = ["farm_id", "aet_annual", "pet_annual",
+            "mai_annual", "kharif_mai", "kharif_water_stress", "kharif_severe_stress"]
+    annual = gdf[[c for c in keep if c in gdf.columns]].copy()
+    annual["tehsil"]   = block
+    annual["district"] = district
+    annual["state"]    = state
+    annual["year"]     = int(year)
+    if "area_m2" in gdf.columns:
+        annual["area_in_ha"] = (gdf["area_m2"] / 10_000).round(4)
+
+    col_order = ["farm_id", "tehsil", "district", "state", "area_in_ha", "year",
+                 "aet_annual", "pet_annual", "mai_annual", "kharif_mai", 
+                 "kharif_water_stress", "kharif_severe_stress"]
+    annual = annual[[c for c in col_order if c in annual.columns]]
+
+    if os.path.exists(out_path):
+        existing = pd.read_parquet(out_path)
+        existing = existing[existing["year"] != int(year)]
+        combined = pd.concat([existing, annual], ignore_index=True)
+    else:
+        combined = annual
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    combined.to_parquet(out_path, index=False)
+    logger.info(
+        "farm_annual.parquet updated → %s  (%d total rows)", out_path, len(combined)
+    )
+    return out_path
+
+
+def _save_monthly_parquet(gdf, state, district, block, year):
+    """
+    Melt monthly AET/PET/MAI wide columns into long format and
+    append to farm_monthly.parquet.  One row per farm per month.
+    """
+    out_path = _monthly_parquet_path(state, district, block)
+
+    farm_ids  = gdf["farm_id"].values if "farm_id" in gdf.columns else np.arange(len(gdf))
+    area_vals = (gdf["area_m2"] / 10_000).round(4).values if "area_m2" in gdf.columns else np.full(len(gdf), np.nan)
+
+    rows = []
+    for month in MONTH_NAMES:   # month = 'jan','feb',...'dec' (calendar order)
+        month_num = list(_MONTH_NUM_TO_NAME.keys())[
+            list(_MONTH_NUM_TO_NAME.values()).index(month)
+        ]  # calendar month number 1-12
+        # Months Jul-Dec belong to `year`; Jan-Jun belong to the next calendar year
+        # (crop year starting July spans two calendar years)
+        cal_year = int(year) if month_num >= 7 else int(year) + 1
+        rows.append(pd.DataFrame({
+            "farm_id":   farm_ids,
+            "tehsil":    block,
+            "district":  district,
+            "state":     state,
+            "area_in_ha": area_vals,
+            "year":      int(year),
+            "date":      date(cal_year, month_num, 1),
+            "aet":       gdf[f"aet_{month}"].values if f"aet_{month}" in gdf.columns else np.nan,
+            "pet":       gdf[f"pet_{month}"].values if f"pet_{month}" in gdf.columns else np.nan,
+            "mai":       gdf[f"mai_{month}"].values if f"mai_{month}" in gdf.columns else np.nan,
+        }))
+
+    monthly = pd.concat(rows, ignore_index=True)
+    monthly["date"] = pd.to_datetime(monthly["date"])
+
+    if os.path.exists(out_path):
+        existing = pd.read_parquet(out_path)
+        existing = existing[existing["year"] != int(year)]
+        combined = pd.concat([existing, monthly], ignore_index=True)
+    else:
+        combined = monthly
+
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    combined.to_parquet(out_path, index=False)
+    logger.info(
+        "farm_monthly.parquet updated → %s  (%d total rows)", out_path, len(combined)
+    )
+    return out_path
+
+
+# ── main entry point ───────────────────────────────────────────────────────────
 
 def intersect_et_with_farms(
     state: str,
     district: str,
     block: str,
-    year: int = 2017,
-    gee_project: str = DEFAULT_GEE_PROJECT,
+    year: int = 2018,
     overwrite: bool = False,
 ) -> dict:
     """
-    Phase 3 pipeline: intersect AET & PET raster data with farm polygons.
+    Phase 3: intersect local AET/PET COG rasters with farm polygons.
 
-    Downloads the AET and PET rasters from Google Earth Engine (clipped to
-    the tehsil bounding box), runs zonal statistics for each farm polygon,
-    computes MAI (AET/PET), and saves an enhanced GeoParquet with monthly
-    AET, PET, MAI values and water stress indicators.
+    Reads local rasters from LOCAL_ET_RASTERS_PATH, runs vectorised zonal
+    statistics, computes MAI, and writes/updates the three core-lens parquets:
+        farm_static.parquet, farm_annual.parquet, farm_monthly.parquet
 
     Parameters
     ----------
     state, district, block : str
         Lower-cased administrative names.
     year : int
-        Year of ET data to use (2017–2024).
-    gee_project : str
-        GEE cloud project ID for authentication.
+        Year of ET data to process (e.g. 2018).
     overwrite : bool
-        If False and output parquet exists, skip processing.
+        Re-process even if this year's data already exists.
 
     Returns
     -------
-    dict
-        Summary with output path and statistics.
+    dict  summary with paths and key statistics.
     """
-    out_path = _output_parquet_path(state, district, block)
-
-    if not overwrite and os.path.exists(out_path):
-        logger.info("ET parquet already exists at %s — skipping Phase 3.", out_path)
-        return {"path": out_path, "skipped": True}
+    # Skip if year already in annual parquet
+    annual_path = _annual_parquet_path(state, district, block)
+    if not overwrite and os.path.exists(annual_path):
+        existing = pd.read_parquet(annual_path)
+        if "year" in existing.columns and int(year) in existing["year"].values:
+            logger.info("Year %d already processed — skipping Phase 3.", year)
+            return {"skipped": True, "year": year, "path": annual_path}
 
     logger.info(
-        "Phase 3 — ET intersection for %s/%s/%s (year=%d)",
-        state, district, block, year,
+        "Phase 3 — ET intersection: %s/%s/%s  year=%d", state, district, block, year
     )
 
-    # 1. Load farm boundaries ------------------------------------------------
+    # 1. Load farm boundaries
     farm_path = _farm_parquet_path(state, district, block)
     if not os.path.exists(farm_path):
         raise FileNotFoundError(
             f"Farm boundaries parquet not found at {farm_path}. "
             "Run Phases 1 & 2 first."
         )
-
     gdf = gpd.read_parquet(farm_path)
-    logger.info("Loaded %d farm polygons from %s", len(gdf), farm_path)
+    logger.info("Loaded %d farm polygons.", len(gdf))
 
-    # 2. Download AET raster from GEE ----------------------------------------
-    bbox = gdf.total_bounds  # (minx, miny, maxx, maxy)
-    logger.info("Farm bounding box: %s", bbox)
+    bbox = gdf.total_bounds   # (minx, miny, maxx, maxy)
+    aez  = _get_aez_zone(state)
 
-    aet_tiff_path = _download_aet_raster(
-        state, district, block, year, bbox, gee_project,
-    )
-
-    # 3. Download PET raster from GEE ----------------------------------------
-    try:
-        pet_tiff_path = _download_pet_raster(
-            state, district, block, year, bbox, gee_project,
+    # 2. Load local AET raster
+    aet_path = _local_aet_path(aez, year)
+    if not os.path.exists(aet_path):
+        raise FileNotFoundError(
+            f"Local AET raster not found: {aet_path}\n"
+            f"Place the file at: {LOCAL_ET_RASTERS_PATH}/merge_AET_{aez}_{year}_cog.tif"
         )
-        logger.info("PET raster downloaded successfully.")
-    except Exception as exc:
+    logger.info("Reading local AET raster: %s", aet_path)
+    aet_data, aet_transform = _read_raster_clipped(aet_path, bbox)
+    logger.info("AET loaded: %d bands, shape=%s", aet_data.shape[0], aet_data.shape[1:])
+
+    # 3. Load local PET raster (optional)
+    pet_data, pet_transform = None, None
+    pet_path = _local_pet_path(aez, year)
+    if os.path.exists(pet_path):
+        logger.info("Reading local PET raster: %s", pet_path)
+        pet_data, pet_transform = _read_raster_clipped(pet_path, bbox)
+        logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
+    else:
         logger.warning(
-            "PET download failed (%s). Proceeding with AET only.", exc
+            "Local PET raster not found at %s — MAI will not be computed.", pet_path
         )
-        pet_tiff_path = None
 
-    # 4. Run zonal statistics (AET + PET + MAI) ------------------------------
-    gdf = _run_zonal_stats(gdf, aet_tiff_path, pet_tiff_path)
+    # 4. Zonal statistics
+    gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
 
-    # 5. Save enhanced parquet -----------------------------------------------
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    gdf.to_parquet(out_path, index=False)
-    logger.info("Enhanced parquet saved → %s", out_path)
+    # 5. Write 3-file schema
+    static_path  = _save_static_parquet(gdf, state, district, block)
+    annual_path  = _save_annual_parquet(gdf, state, district, block, year)
+    monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
 
-    # 6. Summary statistics --------------------------------------------------
     summary = {
-        "state": state,
-        "district": district,
-        "block": block,
-        "year": year,
+        "state": state, "district": district, "block": block, "year": year,
         "farm_count": len(gdf),
-        "columns": list(gdf.columns),
-        "avg_aet_annual": round(gdf["aet_annual"].mean(), 4) if gdf["aet_annual"].notna().any() else None,
-        "avg_water_stress_months": round(gdf["water_stress_months"].mean(), 1),
-        "has_pet": pet_tiff_path is not None,
-        "path": out_path,
+        "paths": {
+            "static":  static_path,
+            "annual":  annual_path,
+            "monthly": monthly_path,
+        },
     }
-
-    if "mai_annual" in gdf.columns:
-        summary["avg_mai_annual"] = round(gdf["mai_annual"].mean(), 4) if gdf["mai_annual"].notna().any() else None
-        summary["kharif_water_stress_farms"] = int(gdf["kharif_water_stress"].sum()) if "kharif_water_stress" in gdf.columns else 0
+    if "aet_annual" in gdf.columns and gdf["aet_annual"].notna().any():
+        summary["avg_aet_annual"] = round(float(gdf["aet_annual"].mean()), 4)
+    if "mai_annual" in gdf.columns and gdf["mai_annual"].notna().any():
+        summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
+    if "kharif_water_stress" in gdf.columns:
+        summary["kharif_stress_farms"] = int(gdf["kharif_water_stress"].sum())
 
     logger.info("Phase 3 complete: %s", summary)
     return summary
 
 
-# ── multi-year water stress indicators ────────────────────────────────────────
-
+# ── multi-year analysis ────────────────────────────────────────────────────────
 
 def compute_multi_year_water_stress(
     state: str,
@@ -658,140 +601,115 @@ def compute_multi_year_water_stress(
     block: str,
     start_year: int = 2017,
     end_year: int = 2024,
-    gee_project: str = DEFAULT_GEE_PROJECT,
 ) -> dict:
     """
-    Compute cross-year water stress indicators (frequency & intensity)
-    as prescribed by the Drought Manual 2016 and approved by the professor.
-    Note: MAI-based classification indicates crop water stress, not drought.
-    Drought requires SPI/SPEI + VCI in addition to MAI (per GoI definition).
+    Run Phase 3 for each year in [start_year, end_year] and compute
+    cross-year frequency and intensity indicators:
 
-    For each year in [start_year, end_year]:
-      - Downloads AET & PET rasters
-      - Computes per-farm monthly MAI = AET / PET
-      - Classifies Kharif water stress years (any Kharif month MAI ≤ 0.50)
+        kharif_water_stress_years  — number of years with kharif stress
+        return_period_years        — N / stress_years  (NaN if 0 stress years)
+        water_stress_intensity_mai — mean kharif MAI over stress years
 
-    Then across all years:
-      - Frequency:  Return period = N / #kharif_water_stress_years  (NA if 0)
-      - Intensity:  Mean MAI over Kharif months in water stress years,
-                    averaged across all water stress years
-
-    Parameters
-    ----------
-    state, district, block : str
-        Lower-cased administrative names.
-    start_year, end_year : int
-        Year range (inclusive) for multi-year analysis.
-    gee_project : str
-        GEE cloud project ID for authentication.
+    The annual parquet is updated with per-year rows.
+    A separate farm_water_stress_summary.parquet is written with the
+    cross-year indicators appended to the static columns.
 
     Returns
     -------
-    dict
-        Summary with output path, indicators, and statistics.
+    dict  summary with paths and aggregate statistics.
     """
-    out_path = os.path.join(
-        FARM_BOUNDARIES_PATH, state, district, block,
-        "farm_boundaries_water_stress.parquet",
-    )
-
     logger.info(
-        "Multi-year water stress analysis for %s/%s/%s (%d–%d)",
+        "Multi-year water stress: %s/%s/%s  %d–%d",
         state, district, block, start_year, end_year,
     )
 
-    # 1. Load farm boundaries ------------------------------------------------
     farm_path = _farm_parquet_path(state, district, block)
     if not os.path.exists(farm_path):
-        raise FileNotFoundError(
-            f"Farm boundaries parquet not found at {farm_path}. "
-            "Run Phases 1 & 2 first."
-        )
+        raise FileNotFoundError(f"Farm parquet not found: {farm_path}")
 
-    base_gdf = gpd.read_parquet(farm_path)
+    base_gdf  = gpd.read_parquet(farm_path)
     num_farms = len(base_gdf)
-    logger.info("Loaded %d farm polygons.", num_farms)
+    bbox      = base_gdf.total_bounds
+    aez       = _get_aez_zone(state)
+    years     = list(range(start_year, end_year + 1))
 
-    bbox = base_gdf.total_bounds
-    years = list(range(start_year, end_year + 1))
-    N = len(years)
+    kharif_stress_count    = np.zeros(num_farms, dtype=int)
+    kharif_mai_sum_stress  = np.zeros(num_farms, dtype=float)
+    years_processed        = 0
 
-    # Per-farm accumulators: track Kharif water stress years and their MAI
-    kharif_stress_count = np.zeros(num_farms, dtype=int)
-    kharif_mai_sum_stress = np.zeros(num_farms, dtype=float)
-    years_processed = 0
-
-    # 2. Process each year ---------------------------------------------------
     for year in years:
         logger.info("── Processing year %d ──", year)
-        try:
-            aet_tiff = _download_aet_raster(
-                state, district, block, year, bbox, gee_project,
-            )
-            pet_tiff = _download_pet_raster(
-                state, district, block, year, bbox, gee_project,
-            )
-        except Exception as exc:
-            logger.warning("Skipping year %d — download failed: %s", year, exc)
+
+        aet_path = _local_aet_path(aez, year)
+        pet_path = _local_pet_path(aez, year)
+
+        if not os.path.exists(aet_path):
+            logger.warning("AET raster missing for year %d — skipping.", year)
             continue
 
-        # Run zonal stats on a copy (we only need MAI columns)
+        try:
+            aet_data, aet_transform = _read_raster_clipped(aet_path, bbox)
+            pet_data, pet_transform = (
+                _read_raster_clipped(pet_path, bbox)
+                if os.path.exists(pet_path)
+                else (None, None)
+            )
+        except Exception as exc:
+            logger.warning("Year %d: raster read failed — %s", year, exc)
+            continue
+
         year_gdf = base_gdf.copy()
-        year_gdf = _run_zonal_stats(year_gdf, aet_tiff, pet_tiff)
+        year_gdf = _run_zonal_stats(year_gdf, aet_data, aet_transform, pet_data, pet_transform)
 
         if "kharif_water_stress" not in year_gdf.columns:
             logger.warning("Year %d: MAI not computed (PET missing?). Skipping.", year)
             continue
 
+        # Save this year into annual + monthly parquets
+        _save_annual_parquet(year_gdf, state, district, block, year)
+        _save_monthly_parquet(year_gdf, state, district, block, year)
+
         years_processed += 1
-
-        # Accumulate water stress counts and intensity values
-        is_drought = year_gdf["kharif_water_stress"].values.astype(bool)
-        kharif_mai_values = year_gdf["kharif_mai"].values
-
-        kharif_stress_count += is_drought.astype(int)
-
-        # Add Kharif MAI only for water stress years (for intensity averaging)
-        stress_mask = is_drought & np.isfinite(kharif_mai_values)
+        is_stress          = year_gdf["kharif_water_stress"].values.astype(bool)
+        kharif_mai_values  = year_gdf["kharif_mai"].values
+        kharif_stress_count += is_stress.astype(int)
+        stress_mask = is_stress & np.isfinite(kharif_mai_values)
         kharif_mai_sum_stress[stress_mask] += kharif_mai_values[stress_mask]
 
-    # 3. Compute cross-year indicators ---------------------------------------
+    # Cross-year indicators
     result_gdf = base_gdf.copy()
-
-    result_gdf["total_years"] = years_processed
+    result_gdf["total_years"]              = years_processed
     result_gdf["kharif_water_stress_years"] = kharif_stress_count
 
-    # Frequency: Return period = N / #kharif_water_stress_years
     with np.errstate(invalid="ignore", divide="ignore"):
-        return_period = years_processed / kharif_stress_count.astype(float)
-    return_period[kharif_stress_count == 0] = np.nan  # NA for zero water stress years
-    result_gdf["return_period_years"] = np.round(return_period, 2)
+        rp = years_processed / kharif_stress_count.astype(float)
+    rp[kharif_stress_count == 0] = np.nan
+    result_gdf["return_period_years"] = np.round(rp, 2)
 
-    # Intensity: Mean MAI over Kharif months in water stress years
     with np.errstate(invalid="ignore", divide="ignore"):
-        stress_intensity = kharif_mai_sum_stress / kharif_stress_count.astype(float)
-    stress_intensity[kharif_stress_count == 0] = np.nan
-    result_gdf["water_stress_intensity_mai"] = np.round(stress_intensity, 4)
+        intensity = kharif_mai_sum_stress / kharif_stress_count.astype(float)
+    intensity[kharif_stress_count == 0] = np.nan
+    result_gdf["water_stress_intensity_mai"] = np.round(intensity, 4)
 
-    # 4. Save water stress parquet -------------------------------------------
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    result_gdf.to_parquet(out_path, index=False)
-    logger.info("Multi-year water stress parquet saved → %s", out_path)
+    # Save summary parquet
+    out_path = os.path.join(
+        _block_dir(state, district, block), "farm_water_stress_summary.parquet"
+    )
+    # keep static cols + cross-year indicators, no geometry duplication
+    summary_cols = [c for c in result_gdf.columns if not c.startswith(("aet_", "pet_", "mai_"))]
+    result_gdf[summary_cols].to_parquet(out_path, index=False)
+    logger.info("Water stress summary parquet saved → %s", out_path)
 
-    # 5. Summary -------------------------------------------------------------
     valid = result_gdf["return_period_years"].notna().sum()
     summary = {
-        "state": state,
-        "district": district,
-        "block": block,
+        "state": state, "district": district, "block": block,
         "years_range": f"{start_year}–{end_year}",
         "years_processed": years_processed,
         "farm_count": num_farms,
-        "farms_with_water_stress": int((kharif_stress_count > 0).sum()),
-        "avg_return_period": round(result_gdf["return_period_years"].mean(), 2) if valid > 0 else None,
-        "avg_water_stress_intensity": round(result_gdf["water_stress_intensity_mai"].mean(), 4) if valid > 0 else None,
-        "columns": list(result_gdf.columns),
+        "farms_with_any_stress": int((kharif_stress_count > 0).sum()),
+        "avg_return_period": round(float(result_gdf["return_period_years"].mean()), 2) if valid > 0 else None,
+        "avg_stress_intensity_mai": round(float(result_gdf["water_stress_intensity_mai"].mean()), 4) if valid > 0 else None,
         "path": out_path,
     }
-    logger.info("Multi-year water stress analysis complete: %s", summary)
+    logger.info("Multi-year analysis complete: %s", summary)
     return summary
