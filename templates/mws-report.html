@@ -2210,6 +2210,15 @@
                 cropping, double cropping and triple cropping using pixels which are classified as single kharif, single
                 non-kharif, double and triple classes of LULC classifier to determine cropping intensity. The data used
                 is from {{year_range_text}}.</p>
+
+            {% if ndvi_labels %}
+            <div class="chart-container">
+                <canvas id="lineChart-ndvi"></canvas>
+            </div>
+            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over cropped areas
+                in this microwatershed at ~14-day intervals using Sentinel-2 imagery, and reflects the vigour of
+                vegetation/crop growth over time.</p>
+            {% endif %}
         </section>
 
         {% if land_degrad or tree_degrad %}
@@ -4526,6 +4535,50 @@
                 },
             }
         });
+
+        // NDVI Timeseries (Crops)
+        const ndviLabels = JSON.parse('{{ndvi_labels|safe}}')
+        const ndviData = JSON.parse('{{ndvi_data|safe}}')
+
+        if (ndviLabels.length > 0 && document.getElementById('lineChart-ndvi')) {
+            new Chart(document.getElementById('lineChart-ndvi'), {
+                type: 'line',
+                data: {
+                    labels: ndviLabels,
+                    datasets: [{
+                        label: 'NDVI (Crops)',
+                        data: ndviData,
+                        borderColor: '#2e7d32',
+                        backgroundColor: 'rgba(46, 125, 50, 0.15)',
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'NDVI' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Date' },
+                            ticks: { maxTicksLimit: 12 }
+                        }
+                    },
+                    animation: { duration: 0 },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'NDVI Time Series (Cropped Area)'
+                        },
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
 
         // WaterBalance Graphs and descriptions
         const dgData = JSON.parse('{{dg_data|safe}}')
