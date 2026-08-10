@@ -95,16 +95,14 @@ from computing.misc.distancetonearestdrainage_local_compute import (
 from computing.misc.drainage_lines_local_compute import (
     clip_drainage_lines as clip_drainage_lines_local,
 )
-from computing.misc.facilities_proximity_local_compute import (
-    generate_facilities_proximity_local,
-)
-from computing.misc.antyodaya_local_compute import generate_antyodaya_data_local
+from computing.misc.facilities.pipeline import generate_facilities_proximity_task
+from computing.misc.antyodaya.pipeline import generate_antyodaya_layer_task
 from computing.misc.canal_local_compute import canal_vector as canal_vector_local
 from computing.misc.digital_elevation_model_local import (
     generate_febdem_raster_vector_clip,
 )
 from computing.misc.drainage_density_local_compute import drainage_density
-from computing.misc.livestocks_local_compute import generate_livestocks_data_local
+from computing.misc.livestocks.pipeline import generate_livestocks_layer_task
 from computing.misc.river_local_compute import river_vector as river_vector_local
 from computing.misc.factory_csr_local_compute import generate_factory_csr_data_local
 from computing.misc.green_credit_local_compute import generate_green_credit_data_local
@@ -294,10 +292,9 @@ LOCAL_TASK_REGISTRY = {
     "restoration_opportunity": generate_restoration_opportunity_local,
     "generate_mws_connectivity_data": mws_connectivity_vector,
     "generate_mws_connectivity": mws_connectivity_vector,
-    "generate_facilities_proximity_task": generate_facilities_proximity_local,
-    "generate_facilities_proximity": generate_facilities_proximity_local,
-    "generate_livestocks": generate_livestocks_data_local,
-    "generate_antyodaya": generate_antyodaya_data_local,
+    "generate_facilities_proximity": generate_facilities_proximity_task,
+    "generate_livestocks": generate_livestocks_layer_task,
+    "generate_antyodaya": generate_antyodaya_layer_task,
     "generate_density_vector": drainage_density,
     "generate_river_data": river_vector_local,
     "generate_canal_vector": canal_vector_local,
