@@ -916,7 +916,8 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
     def safe_float(value, default=0):
         try:
-            return float(value)
+            f = float(value)
+            return default if pd.isna(f) else f
         except:
             return default
 
@@ -991,6 +992,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
                 ]
             ]
             .apply(pd.to_numeric, errors="coerce")
+            .fillna(0)
             .mean()
             .mean()
         )
@@ -1006,59 +1008,14 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
         maternal_child_avg = pd.to_numeric(
             df["maternal_child_health_cat_value"],
             errors="coerce"
-        ).mean()
+        ).fillna(0).mean()
 
         water_sanitation_avg = pd.to_numeric(
             df["water_sanitation_cat_value"],
             errors="coerce"
-        ).mean()
+        ).fillna(0).mean()
 
-        essential_health_scores = []
-        advanced_health_scores = []
-
-        for _, facility_row in df_facilities.iterrows():
-
-            essential_distance = get_distance_logic(
-                facility_row,
-                [
-                    "health_sub_cen_distance_in_km",
-                    "health_phc_distance_in_km"
-                ],
-                logic="max"
-            )
-
-            essential_health_scores.append(
-                distance_score(
-                    essential_distance,
-                    high_limit=2,
-                    medium_limit=5
-                )
-            )
-
-            advanced_distance = get_distance_logic(
-                facility_row,
-                [
-                    "health_chc_distance_in_km",
-                    "health_dis_h_distance_in_km",
-                    "health_s_t_h_distance_in_km"
-                ],
-                logic="min"
-            )
-
-            advanced_health_scores.append(
-                distance_score(
-                    advanced_distance,
-                    high_limit=10,
-                    medium_limit=25
-                )
-            )
-
-        health_avg = (
-            maternal_child_avg
-            + water_sanitation_avg
-            + (sum(essential_health_scores) / len(essential_health_scores))
-            + (sum(advanced_health_scores) / len(advanced_health_scores))
-        ) / 4
+        health_avg = (maternal_child_avg + water_sanitation_avg) / 2
 
         block_scores.append(
             calculate_band_score(health_avg)
@@ -1072,14 +1029,17 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
         for _, facility_row in df_facilities.iterrows():
 
-            essential_education_distance = get_distance_logic(
-                facility_row,
-                [
-                    "school_primary_distance_in_km",
-                    "school_upper_primary_distance_in_km",
-                    "school_secondary_distance_in_km"
-                ],
-                logic="max"
+            # Nulls treated as 999 (unknown = assume far away) before taking MAX.
+            # Prevents a missing secondary/upper-primary distance from falsely
+            # making a village look like it has good essential education access.
+            _essential_cols = [
+                "school_primary_distance_in_km",
+                "school_upper_primary_distance_in_km",
+                "school_secondary_distance_in_km",
+            ]
+            essential_education_distance = max(
+                999 if pd.isnull(get_numeric(facility_row, col)) else get_numeric(facility_row, col)
+                for col in _essential_cols
             )
 
             higher_education_distance = get_distance_logic(
@@ -1092,66 +1052,44 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
                 logic="min"
             )
 
-            if (
-                essential_education_distance is not None
-                and higher_education_distance is not None
+            # essential_education_distance is always a number (nulls → 999).
+            # higher_education_distance can still be None if all higher-ed columns are blank.
+            if higher_education_distance is None:
+                # No higher-ed data at all → treat as poor access
+                education_scores.append(0.33)
+            elif (
+                essential_education_distance > 2
+                and higher_education_distance > 8
             ):
+                education_scores.append(0.33)
+            elif (
+                essential_education_distance < 2
+                and higher_education_distance < 8
+            ):
+                education_scores.append(1)
+            else:
+                # 0.66 (not 0.67) so calculate_band_score maps this correctly to medium (≤ 0.66)
+                education_scores.append(0.66)
 
-                if (
-                    essential_education_distance > 2
-                    and higher_education_distance > 8
-                ):
-                    education_scores.append(0.33)
-
-                elif (
-                    essential_education_distance < 2
-                    and higher_education_distance < 8
-                ):
-                    education_scores.append(1)
-
-                else:
-                    education_scores.append(0.67)
-
+        # Per-village education scores are already discretised to {0.33, 0.66, 1.0}.
+        # Applying calculate_band_score to their average causes double-banding
+        # (e.g. avg=0.6685 snaps to 1.0 even though most villages are yellow).
+        # Use the raw average directly so the spider chart shows the true distribution.
         education_avg = (
             sum(education_scores) / len(education_scores)
             if education_scores else 0.33
         )
 
-        block_scores.append(
-            calculate_band_score(education_avg)
-        )
+        block_scores.append(round(education_avg, 4))
 
         # =========================================================
         # Financial Inclusion Score
         # =========================================================
 
-        financial_scores = []
-
-        for _, facility_row in df_facilities.iterrows():
-
-            financial_distance = get_distance_logic(
-                facility_row,
-                [
-                    "csc_distance_in_km",
-                    "bank_mitra_distance_in_km",
-                    "bank_branch_distance_in_km",
-                    "bank_atm_distance_in_km"
-                ],
-                logic="max"
-            )
-
-            financial_scores.append(
-                distance_score(
-                    financial_distance,
-                    high_limit=2,
-                    medium_limit=5
-                )
-            )
-
-        financial_avg = (
-            sum(financial_scores) / len(financial_scores)
-            if financial_scores else 0.33
-        )
+        financial_avg = pd.to_numeric(
+            df["financial_inclusion_cat_value"],
+            errors="coerce"
+        ).fillna(0).mean()
 
         block_scores.append(
             calculate_band_score(financial_avg)
@@ -1164,31 +1102,10 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
         social_protection_avg = pd.to_numeric(
             df["social_protection_cat_value"],
             errors="coerce"
-        ).mean()
-
-        pds_scores = []
-
-        for _, facility_row in df_facilities.iterrows():
-
-            pds_distance = get_numeric(
-                facility_row,
-                "pds_distance_in_km"
-            )
-
-            pds_scores.append(
-                1 if (
-                    pd.notnull(pds_distance)
-                    and pds_distance < 2
-                ) else 0.5
-            )
-
-        welfare_avg = (
-            social_protection_avg
-            + (sum(pds_scores) / len(pds_scores))
-        ) / 2
+        ).fillna(0).mean()
 
         block_scores.append(
-            calculate_band_score(welfare_avg)
+            calculate_band_score(social_protection_avg)
         )
 
         
@@ -1196,12 +1113,12 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
         community_score = pd.to_numeric(
             df["institutionalization_cat_value"],
             errors="coerce"
-        ).mean()
+        ).fillna(0).mean()
 
         civic_score = pd.to_numeric(
             df["civic_infrastructure_cat_value"],
             errors="coerce"
-        ).mean()
+        ).fillna(0).mean()
 
         community_avg = (community_score + civic_score) / 2
 
@@ -1222,6 +1139,7 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
                 ]
             ]
             .apply(pd.to_numeric, errors="coerce")
+            .fillna(0)
             .mean()
             .mean()
         )
@@ -1232,120 +1150,47 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
 
         # Livestock
-        livestock_support_avg = pd.to_numeric(
+        livestock_veterinary_avg = pd.to_numeric(
             df["livestock_veterinary_cat_value"],
             errors="coerce"
-        ).mean()
+        ).fillna(0).mean()
 
-        husbandry_scores = []
+        common_resources_avg = pd.to_numeric(
+            df["livelihoods_common_resources_cat_value"],
+            errors="coerce"
+        ).fillna(0).mean()
 
-        for _, facility_row in df_facilities.iterrows():
-
-            husbandry_distance = get_numeric(
-                facility_row,
-                "agri_industry_dairy_animal_husbandry_distance_in_km"
-            )
-
-            if pd.notnull(husbandry_distance) and husbandry_distance < 10:
-                husbandry_scores.append(1)
-
-            elif (
-                pd.notnull(husbandry_distance)
-                and 10 <= husbandry_distance <= 30
-            ):
-                husbandry_scores.append(0.67)
-
-            else:
-                husbandry_scores.append(0.33)
-
-        livestock_avg = (
-            livestock_support_avg
-            + sum(husbandry_scores)/len(husbandry_scores)
-        ) / 2
+        livestock_avg = (livestock_veterinary_avg + common_resources_avg) / 2
 
         block_scores.append(
             calculate_band_score(livestock_avg)
         )
 
         # Agricultural Productivity
-        agri_scores = []
-
-        for _, facility_row in df_facilities.iterrows():
-
-            village_id = facility_row["village_id"]
-
-            village_match = df[
-                df["village_id"] == village_id
+        agri_avg = (
+            df[
+                [
+                    "agricultural_markets_cat_value",
+                    "agriculture_land_cultivation_cat_value",
+                    "agriculture_irrigation_watershed_cat_value",
+                    "agriculture_support_services_cat_value",
+                ]
             ]
-
-            if village_match.empty:
-                continue
-
-            row = village_match.iloc[0]
-
-            # reuse same logic from village function
-            # compute agri_produce_resource_score
-            agri_avg_score = (
-                safe_float(row.get("agricultural_markets_cat_value", 0))
-                + safe_float(row.get("agriculture_land_cultivation_cat_value", 0))
-                + safe_float(row.get("agriculture_irrigation_watershed_cat_value", 0))
-                + safe_float(row.get("agriculture_support_services_cat_value", 0))
-            ) / 4
-
-
-            facility_scores = []
-
-            if facility_row is not None:
-
-                agri_facility_configs = [
-                    {
-                        "column": "agri_industry_agri_support_infrastructure_distance_in_km",
-                        "high_limit": 10,
-                        "medium_limit": 50,
-                    },
-                    {
-                        "column": "agri_industry_agri_processing_distance_in_km",
-                        "high_limit": 5,
-                        "medium_limit": 20,
-                    },
-                    {
-                        "column": "agri_industry_co_operatives_societies_distance_in_km",
-                        "high_limit": 10,
-                        "medium_limit": 30,
-                    },
-                    {
-                        "column": "agri_industry_markets_trading_distance_in_km",
-                        "high_limit": 3,
-                        "medium_limit": 10,
-                    },
-                ]
-
-                facility_scores = [
-                    distance_score(
-                        get_numeric(facility_row, config["column"]),
-                        high_limit=config["high_limit"],
-                        medium_limit=config["medium_limit"],
-                    )
-                    for config in agri_facility_configs
-                ]
-
-            agri_produce_resource_score = (agri_avg_score + sum(facility_scores)) / (1 + len(facility_scores))
-
-            agri_scores.append(
-                agri_produce_resource_score
-            )
+            .apply(pd.to_numeric, errors="coerce")
+            .fillna(0)
+            .mean()
+            .mean()
+        )
 
         block_scores.append(
-            calculate_band_score(
-                sum(agri_scores)/len(agri_scores)
-            )
+            calculate_band_score(agri_avg)
         )
 
         #Ecology & Climate Resilience
         organic_farm_avg = pd.to_numeric(
             df["agriculture_organic_farming_cat_value"],
             errors="coerce"
-        ).mean()
+        ).fillna(0).mean()
 
         nrega_scores = []
 
