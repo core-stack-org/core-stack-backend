@@ -103,8 +103,29 @@ def _build_raw_params(row, param_list):
     return result
 
 
+def _calculate_band_score(value):
+    """Map a 0-1 continuous score to Low/Medium/High band: 0.33 / 0.66 / 1.0."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return 0.33
+    if pd.isna(v) or v <= 0.33:
+        return 0.33
+    if v <= 0.66:
+        return 0.66
+    return 1.0
+
+
+def _color_to_score(color):
+    """Convert a traffic-light color string to its band score."""
+    c = str(color).strip().lower()
+    if c == "green":  return 1.0
+    if c == "yellow": return 0.66
+    return 0.33
+
+
 # ---------------------------------------------------------------------------
-# Raw parameter display config for each section sub-category (all remaining).
+# Raw parameter display config for each section sub-category
 # Same repr convention as BASIC_INFRA_RAW_PARAMS.
 # ---------------------------------------------------------------------------
 SECTION_RAW_PARAMS = {
@@ -488,484 +509,13 @@ def get_village_polygon_and_info(state, district, block, village_id):
     
 
 def get_development_data(state, district, block, village_id, df=None, df_facilities=None, df_nrega=None):
-
-    def normalize_column(df, column):
-        df[column] = df[column].astype(str).str.strip()
-
-    def safe_float(value, default=0):
-        try:
-            return float(value)
-        except:
-            return default
-
-    def get_numeric(row, column):
-        return pd.to_numeric(row.get(column, None), errors="coerce")
-
-    def calculate_band_score(value):
-        if value <= 0.33:
-            return 0.33
-        elif value <= 0.66:
-            return 0.66
-        return 1
-
-    def distance_score(distance, high_limit, medium_limit=None):
-
-        if pd.isnull(distance):
-            return 0.33
-
-        if medium_limit is None:
-            return 1 if distance < high_limit else 0.33
-
-        if distance < high_limit:
-            return 1
-        elif high_limit <= distance <= medium_limit:
-            return 0.66
-        return 0.33
-
-    def get_distance_logic(row, columns, logic="max"):
-
-        values = [
-            get_numeric(row, col)
-            for col in columns
-        ]
-
-        values = [v for v in values if pd.notnull(v)]
-
-        if not values:
-            return None
-
-        return max(values) if logic == "max" else min(values)
-
+    """
+    Returns the 10-element spider chart scores for a single village by delegating
+    to the individual section functions and reading their composite_score.
+    """
     try:
-
-        if df is None or df_facilities is None:
-            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
-
-            if df is None:
-                df = pd.read_excel(excel_file, sheet_name="antyodaya")
-            if df_facilities is None:
-                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
-
-        normalize_column(df, "village_id")
-        normalize_column(df_facilities, "village_id")
-
-        village_id = str(village_id).strip()
-
-        matched_rows = df[df["village_id"] == village_id]
-
-        if matched_rows.empty:
-            logger.info(
-                "No data found for village_id %s in %s district, %s block",
-                village_id,
-                district,
-                block,
-            )
-            return []
-
-        row = matched_rows.iloc[0]
-
-        facility_match = df_facilities[
-            df_facilities["village_id"] == village_id
-        ]
-
-        facility_row = (
-            facility_match.iloc[0]
-            if not facility_match.empty
-            else None
-        )
-
-        scores = []
-
-        # =========================================================
-        # Infrastructure Score
-        # =========================================================
-
-        infrastructure_avg = (
-            safe_float(row.get("road_connectivity_cat_value", 0))
-            + safe_float(row.get("energy_access_cat_value", 0))
-            + safe_float(row.get("housing_quality_cat_value", 0))
-        ) / 3
-
-        scores.append(calculate_band_score(infrastructure_avg))
-
-        # =========================================================
-        # Health Score
-        # =========================================================
-
-        maternal_child_score = safe_float(
-            row.get("maternal_child_health_cat_value", 0)
-        )
-
-        water_sanitation_score = safe_float(
-            row.get("water_sanitation_cat_value", 0)
-        )
-
-        essential_health_services_score = 0.33
-        advanced_health_services_score = 0.33
-
-        if facility_row is not None:
-
-            essential_distance = get_distance_logic(
-                facility_row,
-                [
-                    "health_sub_cen_distance_in_km",
-                    "health_phc_distance_in_km"
-                ],
-                logic="max"
-            )
-
-            essential_health_services_score = distance_score(
-                essential_distance,
-                high_limit=2,
-                medium_limit=5
-            )
-
-            advanced_distance = get_distance_logic(
-                facility_row,
-                [
-                    "health_chc_distance_in_km",
-                    "health_dis_h_distance_in_km",
-                    "health_s_t_h_distance_in_km"
-                ],
-                logic="min"
-            )
-
-            advanced_health_services_score = distance_score(
-                advanced_distance,
-                high_limit=10,
-                medium_limit=25
-            )
-
-        health_avg = (
-            maternal_child_score
-            + water_sanitation_score
-            + essential_health_services_score
-            + advanced_health_services_score
-        ) / 4
-
-        scores.append(calculate_band_score(health_avg))
-
-        #* Education Score
-        education_score = 0.33
-
-        if facility_row is not None:
-
-            essential_education_distance = get_distance_logic(
-                facility_row,
-                [
-                    "school_primary_distance_in_km",
-                    "school_upper_primary_distance_in_km",
-                    "school_secondary_distance_in_km"
-                ],
-                logic="max"
-            )
-
-            higher_education_distance = get_distance_logic(
-                facility_row,
-                [
-                    "school_higher_secondary_distance_in_km",
-                    "college_distance_in_km",
-                    "universities_distance_in_km"
-                ],
-                logic="min"
-            )
-
-            if (
-                essential_education_distance is not None
-                and higher_education_distance is not None
-            ):
-
-                if (
-                    essential_education_distance > 2
-                    and higher_education_distance > 8
-                ):
-                    education_score = 0.33
-
-                elif (
-                    essential_education_distance < 2
-                    and higher_education_distance < 8
-                ):
-                    education_score = 1
-
-                else:
-                    education_score = 0.67
-
-        scores.append(education_score)
-
-        #* Financial Inclusion Score
-        financial_inclusion_score = 0.33
-
-        if facility_row is not None:
-
-            financial_distance = get_distance_logic(
-                facility_row,
-                [
-                    "csc_distance_in_km",
-                    "bank_mitra_distance_in_km",
-                    "bank_branch_distance_in_km",
-                    "bank_atm_distance_in_km"
-                ],
-                logic="max"
-            )
-
-            financial_inclusion_score = distance_score(
-                financial_distance,
-                high_limit=2,
-                medium_limit=5
-            )
-
-        scores.append(financial_inclusion_score)
-
-
-        #* Welfare Inclusion Score
-        social_protection_score = safe_float(row.get("social_protection_cat_value", 0))
-
-        pds_score = 0.5
-
-        if facility_row is not None:
-
-            pds_distance = get_numeric(
-                facility_row,
-                "pds_distance_in_km"
-            )
-
-            pds_score = 1 if (
-                pd.notnull(pds_distance)
-                and pds_distance < 2
-            ) else 0.5
-
-        welfare_avg = (
-            social_protection_score + pds_score
-        ) / 2
-
-        scores.append(calculate_band_score(welfare_avg))
-
-        #* Community Institutions
-        community_score = safe_float(row.get("institutionalization_cat_value", 0))
-        civic_score = safe_float(row.get("civic_infrastructure_cat_value", 0))
-
-        community_avg_score = (community_score + civic_score) / 2
-
-        scores.append(calculate_band_score(community_avg_score))
-
-        #* Livelihood Diversification Score
-        livelihood_farm_score = safe_float(row.get("livelihoods_employment_cat_value", 0))
-        livelihood_forest_score = safe_float(row.get("livelihoods_forest_resources_cat_value", 0))
-        livelihood_fish_score = safe_float(row.get("livelihoods_fisheries_cat_value", 0))
-        livelihood_alternate_score = safe_float(row.get("livelihoods_alternative_farming_cat_value", 0))
-        livelihood_cottage_score = safe_float(row.get("livelihoods_cottage_traditional_industry_cat_value", 0))
-
-        livelihood_avg_score = (livelihood_farm_score + livelihood_forest_score + livelihood_fish_score + livelihood_alternate_score + livelihood_cottage_score)/5
-        
-        scores.append(calculate_band_score(livelihood_avg_score))
-
-
-        #* Livestock
-        livestock_support_score = safe_float(row.get("livestock_veterinary_cat_value", 0))
-        livestock_pasture_score = safe_float(row.get("livelihoods_common_resources_cat_value", 0))
-
-        livestock_support_avg = (livestock_support_score + livestock_pasture_score) / 2
-
-        if facility_row is not None:
-            husbandry_distance = get_numeric(
-                facility_row,
-                "agri_industry_dairy_animal_husbandry_distance_in_km"
-            )
-
-            # High: < 10 km
-            if pd.notnull(husbandry_distance) and husbandry_distance < 10:
-                husbandry_score = 1
-
-            # Moderate: 10 - 30 km
-            elif (
-                pd.notnull(husbandry_distance)
-                and 10 <= husbandry_distance <= 30
-            ):
-                husbandry_score = 0.67
-
-            # Low: > 30 km
-            else:
-                husbandry_score = 0.33
-
-        livestock_avg_score = (livestock_support_avg + husbandry_score) / 2
-
-        scores.append(calculate_band_score(livestock_avg_score))
-
-        #* Agricultural Productivity and Resource Use
-        agri_avg_score = (
-            safe_float(row.get("agricultural_markets_cat_value", 0))
-            + safe_float(row.get("agriculture_land_cultivation_cat_value", 0))
-            + safe_float(row.get("agriculture_irrigation_watershed_cat_value", 0))
-            + safe_float(row.get("agriculture_support_services_cat_value", 0))
-        ) / 4
-
-
-        facility_scores = []
-
-        if facility_row is not None:
-
-            agri_facility_configs = [
-                {
-                    "column": "agri_industry_agri_support_infrastructure_distance_in_km",
-                    "high_limit": 10,
-                    "medium_limit": 50,
-                },
-                {
-                    "column": "agri_industry_agri_processing_distance_in_km",
-                    "high_limit": 5,
-                    "medium_limit": 20,
-                },
-                {
-                    "column": "agri_industry_co_operatives_societies_distance_in_km",
-                    "high_limit": 10,
-                    "medium_limit": 30,
-                },
-                {
-                    "column": "agri_industry_markets_trading_distance_in_km",
-                    "high_limit": 3,
-                    "medium_limit": 10,
-                },
-            ]
-
-            facility_scores = [
-                distance_score(
-                    get_numeric(facility_row, config["column"]),
-                    high_limit=config["high_limit"],
-                    medium_limit=config["medium_limit"],
-                )
-                for config in agri_facility_configs
-            ]
-
-
-        agri_produce_resource_score = (agri_avg_score + sum(facility_scores)) / (1 + len(facility_scores))
-
-        scores.append(calculate_band_score(agri_produce_resource_score))
-
-        #* Ecology and Climate Resilience
-        organic_farm_score = safe_float(row.get("agriculture_organic_farming_cat_value", 0))
-        if df_nrega is None:
-            df_nrega = pd.read_excel(
-                pd.ExcelFile(_build_file_path(state, district, block)),
-                sheet_name="nrega_assets_village"
-            )
-
-        normalize_column(df_nrega, "vill_id")
-
-        nrega_match = df_nrega[
-            df_nrega["vill_id"] == village_id
-        ]
-
-        nrega_score = 0.33
-
-        if not nrega_match.empty:
-
-            nrega_row = nrega_match.iloc[0]
-
-            # Exclude non-numeric columns
-            exclude_columns = ["vill_id", "vill_name"]
-
-            year_columns = [
-                col for col in df_nrega.columns
-                if col not in exclude_columns
-            ]
-
-            # Sum all yearly NREGA asset columns
-            total_nrega_assets = sum([
-                safe_float(nrega_row.get(col, 0))
-                for col in year_columns
-            ])
-
-            # Assign score
-            if total_nrega_assets < 100:
-                nrega_score = 0.33
-
-            elif 100 <= total_nrega_assets <= 300:
-                nrega_score = 0.67
-
-            else:
-                nrega_score = 1
-
-        # Final Ecology and Climate Resilience Score
-
-        ecology_climate_avg = (
-            organic_farm_score + nrega_score
-        ) / 2
-
-        scores.append(
-            calculate_band_score(ecology_climate_avg)
-        )
-
-        return scores
-
-    except Exception as e:
-
-        logger.info(
-            "Not able to access excel for %s district, %s block. Error: %s",
-            district,
-            block,
-            str(e),
-        )
-
-        return []
-    
-
-def get_block_development_data(state, district, block, df=None, df_facilities=None, df_nrega=None):
-
-    def normalize_column(df, column):
-        df[column] = df[column].astype(str).str.strip()
-
-    def safe_float(value, default=0):
-        try:
-            f = float(value)
-            return default if pd.isna(f) else f
-        except:
-            return default
-
-    def get_numeric(row, column):
-        return pd.to_numeric(row.get(column, None), errors="coerce")
-
-    def calculate_band_score(value):
-        if value <= 0.33:
-            return 0.33
-        elif value <= 0.66:
-            return 0.66
-        return 1
-
-    def distance_score(distance, high_limit, medium_limit=None):
-
-        if pd.isnull(distance):
-            return 0.33
-
-        if medium_limit is None:
-            return 1 if distance < high_limit else 0.33
-
-        if distance < high_limit:
-            return 1
-
-        elif high_limit <= distance <= medium_limit:
-            return 0.67
-
-        return 0.33
-
-    def get_distance_logic(row, columns, logic="max"):
-
-        values = [
-            get_numeric(row, col)
-            for col in columns
-        ]
-
-        values = [v for v in values if pd.notnull(v)]
-
-        if not values:
-            return None
-
-        return max(values) if logic == "max" else min(values)
-
-    try:
-
         if df is None or df_facilities is None or df_nrega is None:
             excel_file = pd.ExcelFile(_build_file_path(state, district, block))
-
             if df is None:
                 df = pd.read_excel(excel_file, sheet_name="antyodaya")
             if df_facilities is None:
@@ -973,275 +523,130 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
             if df_nrega is None:
                 df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
-        normalize_column(df, "village_id")
-        normalize_column(df_facilities, "village_id")
-        normalize_column(df_nrega, "vill_id")
+        df["village_id"]            = df["village_id"].astype(str).str.strip()
+        df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
+        df_nrega["vill_id"]         = df_nrega["vill_id"].astype(str).str.strip()
 
-        block_scores = []
+        village_id = str(village_id).strip()
 
-        # =========================================================
-        # Infrastructure Score
-        # =========================================================
+        # Verify village exists
+        if df[df["village_id"] == village_id].empty:
+            logger.info("No data found for village_id %s in %s %s", village_id, district, block)
+            return []
 
-        infrastructure_avg = (
-            df[
-                [
-                    "road_connectivity_cat_value",
-                    "energy_access_cat_value",
-                    "housing_quality_cat_value"
-                ]
-            ]
-            .apply(pd.to_numeric, errors="coerce")
-            .fillna(0)
-            .mean()
-            .mean()
-        )
+        edu = get_education_institutions(state, district, block, village_id, df_facilities=df_facilities)
 
-        block_scores.append(
-            calculate_band_score(infrastructure_avg)
-        )
+        return [
+            get_basic_infrastructure(state, district, block, village_id, df=df)
+                .get("composite_score", 0.33),
 
-        # =========================================================
-        # Health Score
-        # =========================================================
+            get_health_and_wash(state, district, block, village_id, df=df, df_facilities=df_facilities)
+                .get("composite_score", 0.33),
 
-        maternal_child_avg = pd.to_numeric(
-            df["maternal_child_health_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
+            edu[3] if len(edu) >= 4 else 0.33,  # education returns a list; index 3 = composite_score
 
-        water_sanitation_avg = pd.to_numeric(
-            df["water_sanitation_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
+            get_financial_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
+                .get("composite_score", 0.33),
 
-        health_avg = (maternal_child_avg + water_sanitation_avg) / 2
+            get_welfare_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
+                .get("composite_score", 0.33),
 
-        block_scores.append(
-            calculate_band_score(health_avg)
-        )
+            get_community_institutes(state, district, block, village_id, df=df)
+                .get("composite_score", 0.33),
 
-        # =========================================================
-        # Education Score
-        # =========================================================
+            get_livelihood_diversification(state, district, block, village_id, df=df)
+                .get("composite_score", 0.33),
 
-        education_scores = []
+            get_livestock_management(state, district, block, village_id, df=df, df_facilities=df_facilities)
+                .get("composite_score", 0.33),
 
-        for _, facility_row in df_facilities.iterrows():
+            get_agri_support_service(state, district, block, village_id, df=df, df_facilities=df_facilities)
+                .get("composite_score", 0.33),
 
-            # Nulls treated as 999 (unknown = assume far away) before taking MAX.
-            # Prevents a missing secondary/upper-primary distance from falsely
-            # making a village look like it has good essential education access.
-            _essential_cols = [
-                "school_primary_distance_in_km",
-                "school_upper_primary_distance_in_km",
-                "school_secondary_distance_in_km",
-            ]
-            essential_education_distance = max(
-                999 if pd.isnull(get_numeric(facility_row, col)) else get_numeric(facility_row, col)
-                for col in _essential_cols
-            )
-
-            higher_education_distance = get_distance_logic(
-                facility_row,
-                [
-                    "school_higher_secondary_distance_in_km",
-                    "college_distance_in_km",
-                    "universities_distance_in_km"
-                ],
-                logic="min"
-            )
-
-            # essential_education_distance is always a number (nulls → 999).
-            # higher_education_distance can still be None if all higher-ed columns are blank.
-            if higher_education_distance is None:
-                # No higher-ed data at all → treat as poor access
-                education_scores.append(0.33)
-            elif (
-                essential_education_distance > 2
-                and higher_education_distance > 8
-            ):
-                education_scores.append(0.33)
-            elif (
-                essential_education_distance < 2
-                and higher_education_distance < 8
-            ):
-                education_scores.append(1)
-            else:
-                # 0.66 (not 0.67) so calculate_band_score maps this correctly to medium (≤ 0.66)
-                education_scores.append(0.66)
-
-        # Per-village education scores are already discretised to {0.33, 0.66, 1.0}.
-        # Applying calculate_band_score to their average causes double-banding
-        # (e.g. avg=0.6685 snaps to 1.0 even though most villages are yellow).
-        # Use the raw average directly so the spider chart shows the true distribution.
-        education_avg = (
-            sum(education_scores) / len(education_scores)
-            if education_scores else 0.33
-        )
-
-        block_scores.append(round(education_avg, 4))
-
-        # =========================================================
-        # Financial Inclusion Score
-        # =========================================================
-
-        financial_avg = pd.to_numeric(
-            df["financial_inclusion_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        block_scores.append(
-            calculate_band_score(financial_avg)
-        )
-
-        # =========================================================
-        # Welfare Inclusion Score
-        # =========================================================
-
-        social_protection_avg = pd.to_numeric(
-            df["social_protection_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        block_scores.append(
-            calculate_band_score(social_protection_avg)
-        )
-
-        
-        # Community Score
-        community_score = pd.to_numeric(
-            df["institutionalization_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        civic_score = pd.to_numeric(
-            df["civic_infrastructure_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        community_avg = (community_score + civic_score) / 2
-
-        block_scores.append(
-            calculate_band_score(community_avg)
-        )
-
-        
-        # Livelihood
-        livelihood_avg = (
-            df[
-                [
-                    "livelihoods_employment_cat_value",
-                    "livelihoods_forest_resources_cat_value",
-                    "livelihoods_fisheries_cat_value",
-                    "livelihoods_alternative_farming_cat_value",
-                    "livelihoods_cottage_traditional_industry_cat_value"
-                ]
-            ]
-            .apply(pd.to_numeric, errors="coerce")
-            .fillna(0)
-            .mean()
-            .mean()
-        )
-
-        block_scores.append(
-            calculate_band_score(livelihood_avg)
-        )
-
-
-        # Livestock
-        livestock_veterinary_avg = pd.to_numeric(
-            df["livestock_veterinary_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        common_resources_avg = pd.to_numeric(
-            df["livelihoods_common_resources_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        livestock_avg = (livestock_veterinary_avg + common_resources_avg) / 2
-
-        block_scores.append(
-            calculate_band_score(livestock_avg)
-        )
-
-        # Agricultural Productivity
-        agri_avg = (
-            df[
-                [
-                    "agricultural_markets_cat_value",
-                    "agriculture_land_cultivation_cat_value",
-                    "agriculture_irrigation_watershed_cat_value",
-                    "agriculture_support_services_cat_value",
-                ]
-            ]
-            .apply(pd.to_numeric, errors="coerce")
-            .fillna(0)
-            .mean()
-            .mean()
-        )
-
-        block_scores.append(
-            calculate_band_score(agri_avg)
-        )
-
-        #Ecology & Climate Resilience
-        organic_farm_avg = pd.to_numeric(
-            df["agriculture_organic_farming_cat_value"],
-            errors="coerce"
-        ).fillna(0).mean()
-
-        nrega_scores = []
-
-        exclude_columns = ["vill_id", "vill_name"]
-
-        year_columns = [
-            col for col in df_nrega.columns
-            if col not in exclude_columns
+            get_ecological_climate_resiliance(state, district, block, village_id, df=df, df_nrega=df_nrega)
+                .get("composite_score", 0.33),
         ]
 
-        for _, nrega_row in df_nrega.iterrows():
-
-            total_nrega_assets = sum(
-                safe_float(nrega_row.get(col, 0))
-                for col in year_columns
-            )
-
-            if total_nrega_assets < 100:
-                nrega_scores.append(0.33)
-
-            elif 100 <= total_nrega_assets <= 300:
-                nrega_scores.append(0.67)
-
-            else:
-                nrega_scores.append(1)
-
-        nrega_avg = (
-            sum(nrega_scores) / len(nrega_scores)
-            if nrega_scores
-            else 0.33
+    except Exception as e:
+        logger.info(
+            "Not able to compute development scores for %s district, %s block, village %s. Error: %s",
+            district, block, village_id, str(e),
         )
+        return []
 
-        ecology_avg = (
-            organic_farm_avg + nrega_avg
-        ) / 2
 
-        block_scores.append(
-            calculate_band_score(ecology_avg)
-        )
+def get_block_development_data(state, district, block, df=None, df_facilities=None, df_nrega=None):
+    """
+    Returns the 10-element spider chart scores for the whole block (Tehsil average)
+    by calling each section function per village and averaging composite_scores.
+    """
+    try:
+        if df is None or df_facilities is None or df_nrega is None:
+            excel_file = pd.ExcelFile(_build_file_path(state, district, block))
+            if df is None:
+                df = pd.read_excel(excel_file, sheet_name="antyodaya")
+            if df_facilities is None:
+                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
+            if df_nrega is None:
+                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
-        return block_scores
+        df["village_id"]            = df["village_id"].astype(str).str.strip()
+        df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
+        df_nrega["vill_id"]         = df_nrega["vill_id"].astype(str).str.strip()
+
+        village_ids = df["village_id"].unique().tolist()
+
+        # Collect per-village composite scores for each of the 10 sections
+        section_scores = [[] for _ in range(10)]
+
+        for vid in village_ids:
+            edu = get_education_institutions(state, district, block, vid, df_facilities=df_facilities)
+
+            per_village = [
+                get_basic_infrastructure(state, district, block, vid, df=df)
+                    .get("composite_score", 0.33),
+
+                get_health_and_wash(state, district, block, vid, df=df, df_facilities=df_facilities)
+                    .get("composite_score", 0.33),
+
+                edu[3] if len(edu) >= 4 else 0.33,
+
+                get_financial_inclusion(state, district, block, vid, df=df, df_facilities=df_facilities)
+                    .get("composite_score", 0.33),
+
+                get_welfare_inclusion(state, district, block, vid, df=df, df_facilities=df_facilities)
+                    .get("composite_score", 0.33),
+
+                get_community_institutes(state, district, block, vid, df=df)
+                    .get("composite_score", 0.33),
+
+                get_livelihood_diversification(state, district, block, vid, df=df)
+                    .get("composite_score", 0.33),
+
+                get_livestock_management(state, district, block, vid, df=df, df_facilities=df_facilities)
+                    .get("composite_score", 0.33),
+
+                get_agri_support_service(state, district, block, vid, df=df, df_facilities=df_facilities)
+                    .get("composite_score", 0.33),
+
+                get_ecological_climate_resiliance(state, district, block, vid, df=df, df_nrega=df_nrega)
+                    .get("composite_score", 0.33),
+            ]
+
+            for i, score in enumerate(per_village):
+                section_scores[i].append(score)
+
+        # Average each section across all villages
+        return [
+            round(sum(s) / len(s), 4) if s else 0.33
+            for s in section_scores
+        ]
 
     except Exception as e:
-
         logger.info(
             "Not able to calculate block scores for %s district, %s block. Error: %s",
-            district,
-            block,
-            str(e),
+            district, block, str(e),
         )
-
         return []
     
 
@@ -1337,10 +742,11 @@ def get_basic_infrastructure(state, district, block, village_id, df=None):
         }
 
         return {
-            "scores":      scores,
-            "colors":      colors,
-            "performance": performance,
-            "raw_params":  raw_params,
+            "scores":          scores,
+            "colors":          colors,
+            "performance":     performance,
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score(sum(scores) / len(scores)) if scores else 0.33,
         }
 
     except Exception as e:
@@ -1467,15 +873,16 @@ def get_health_and_wash(state, district, block, village_id, df=None, df_faciliti
         }
 
         return {
-            "data":        [
+            "data":            [
                 maternal_child_score,
                 water_sanitation_score,
                 round(essential_distance, 2) if essential_distance is not None else None,
                 round(advanced_distance, 2)   if advanced_distance   is not None else None,
             ],
-            "colors":      [maternal_color, water_color],
-            "performance": [maternal_perf, water_perf],
-            "raw_params":  raw_params,
+            "colors":          [maternal_color, water_color],
+            "performance":     [maternal_perf, water_perf],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score((maternal_child_score + water_sanitation_score) / 2),
         }
 
     except Exception as e:
@@ -1553,14 +960,15 @@ def get_education_institutions(state, district, block, village_id, df_facilities
 
         facility_row = facility_match.iloc[0]
 
-        essential_education_distance = get_distance_logic(
-            facility_row,
-            [
-                "school_primary_distance_in_km",
-                "school_upper_primary_distance_in_km",
-                "school_secondary_distance_in_km"
-            ],
-            logic="max"
+        # Nulls → 999 before MAX so a missing secondary school isn't treated as nearby
+        _essential_cols = [
+            "school_primary_distance_in_km",
+            "school_upper_primary_distance_in_km",
+            "school_secondary_distance_in_km",
+        ]
+        essential_education_distance = max(
+            999 if pd.isnull(get_numeric(facility_row, col)) else get_numeric(facility_row, col)
+            for col in _essential_cols
         )
 
         higher_education_distance = get_distance_logic(
@@ -1573,29 +981,20 @@ def get_education_institutions(state, district, block, village_id, df_facilities
             logic="min"
         )
 
-        color = "yellow"
-
-        if (essential_education_distance is not None and higher_education_distance is not None):
-
-            if (essential_education_distance > 2 and higher_education_distance > 8):
-                color = "red"
-
-            elif (essential_education_distance < 2 and higher_education_distance < 8):
-                color = "green"
-
-            else:
-                color = "yellow"
+        if higher_education_distance is None:
+            color = "red"
+        elif essential_education_distance > 2 and higher_education_distance > 8:
+            color = "red"
+        elif essential_education_distance < 2 and higher_education_distance < 8:
+            color = "green"
+        else:
+            color = "yellow"
 
         return [
-            round(essential_education_distance, 2)
-            if essential_education_distance is not None
-            else None,
-
-            round(higher_education_distance, 2)
-            if higher_education_distance is not None
-            else None,
-
-            color
+            round(essential_education_distance, 2) if essential_education_distance != 999 else None,
+            round(higher_education_distance, 2) if higher_education_distance is not None else None,
+            color,
+            _color_to_score(color),   # composite_score for spider chart
         ]
 
     except Exception as e:
@@ -1698,22 +1097,16 @@ def get_financial_inclusion(state, district, block, village_id, df=None, df_faci
             logic="max"
         )
 
-        financial_inclusion_score = distance_score(
-            financial_distance,
-            high_limit=2,
-            medium_limit=5
-        )
-
-        # Cluster-based color from antyodaya
+        # Antyodaya row for cluster-based color, label, score and raw params
         anty_match = df[df["village_id"] == village_id]
         anty_row   = anty_match.iloc[0] if not anty_match.empty else None
 
-        if anty_row is not None and _safe_cluster(anty_row.get("financial_inclusion_cat_cluster")):
-            color = _cluster_to_color(anty_row.get("financial_inclusion_cat_cluster"))
-            perf  = _cluster_label(anty_row.get("financial_inclusion_cat_cluster"))
-        else:
-            color = "green" if financial_inclusion_score == 1 else "red"
-            perf  = "High"  if financial_inclusion_score == 1 else "Low"
+        financial_inclusion_score = float(
+            pd.to_numeric(anty_row.get("financial_inclusion_cat_value", 0), errors="coerce") or 0
+        ) if anty_row is not None else 0.0
+
+        color = _cluster_to_color(anty_row.get("financial_inclusion_cat_cluster")) if anty_row is not None else "red"
+        perf  = _cluster_label(anty_row.get("financial_inclusion_cat_cluster"))    if anty_row is not None else "Low"
 
         raw_params = {
             "financial_inclusion": _build_raw_params(
@@ -1728,9 +1121,10 @@ def get_financial_inclusion(state, district, block, village_id, df=None, df_faci
                 round(financial_distance, 2) if financial_distance is not None else None,
                 color,
             ],
-            "colors":      [color],
-            "performance": [perf],
-            "raw_params":  raw_params,
+            "colors":          [color],
+            "performance":     [perf],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score(financial_inclusion_score),
         }
 
     except Exception as e:
@@ -1860,9 +1254,10 @@ def get_welfare_inclusion(state, district, block, village_id, df=None, df_facili
                 round(pds_distance, 2) if pd.notnull(pds_distance) else None,
                 color,
             ],
-            "colors":      [color],
-            "performance": [perf],
-            "raw_params":  raw_params,
+            "colors":          [color],
+            "performance":     [perf],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score(social_protection_score),
         }
 
     except Exception as e:
@@ -1950,10 +1345,11 @@ def get_community_institutes(state, district, block, village_id, df=None):
         }
 
         return {
-            "data":        [community_score, civic_score, community_color, civic_color],
-            "colors":      [community_color, civic_color],
-            "performance": [community_perf, civic_perf],
-            "raw_params":  raw_params,
+            "data":            [community_score, civic_score, community_color, civic_color],
+            "colors":          [community_color, civic_color],
+            "performance":     [community_perf, civic_perf],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score((community_score + civic_score) / 2),
         }
 
     except Exception as e:
@@ -2032,10 +1428,11 @@ def get_livelihood_diversification(state, district, block, village_id, df=None):
         }
 
         return {
-            "data":        scores,
-            "colors":      colors,
-            "performance": performance,
-            "raw_params":  raw_params,
+            "data":            scores,
+            "colors":          colors,
+            "performance":     performance,
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score(sum(scores) / len(scores)) if scores else 0.33,
         }
 
     except Exception as e:
@@ -2161,9 +1558,10 @@ def get_livestock_management(state, district, block, village_id, df=None, df_fac
                 veterinary_color,
                 pasture_color,
             ],
-            "colors":      [veterinary_color, pasture_color],
-            "performance": [veterinary_perf, pasture_perf],
-            "raw_params":  raw_params,
+            "colors":          [veterinary_color, pasture_color],
+            "performance":     [veterinary_perf, pasture_perf],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score((livestock_support_score + livestock_pasture_score) / 2),
         }
 
     except Exception as e:
@@ -2273,6 +1671,12 @@ def get_land_cultivation(state, district, block, village_id, df=None):
             return float(value)
         except:
             return default
+        
+    def cluster_to_color(raw):
+        c = str(raw).strip().upper() if raw is not None else ""
+        if c == "HIGH":   return "green"
+        if c == "MEDIUM": return "yellow"
+        return "red"
 
     try:
         if df is None:
@@ -2328,13 +1732,10 @@ def get_land_cultivation(state, district, block, village_id, df=None):
         else:
             seasonal_cultivation_score = 0.0
 
-        # Map color from numeric score (consistent with all other sections)
-        if land_utilization_score < 0.33:
-            land_utilization_color = "red"
-        elif land_utilization_score <= 0.66:
-            land_utilization_color = "yellow"
-        else:
-            land_utilization_color = "green"
+        # Color and label from cluster column (same pattern as all other sections)
+        land_cluster_raw       = row.get("agriculture_land_cultivation_cat_cluster")
+        land_utilization_color = _cluster_to_color(land_cluster_raw)
+        cultivation_cluster    = _cluster_label(land_cluster_raw)
 
         # Seasonal cultivation color (score-based, 3 levels)
         if seasonal_cultivation_score <= 0.33:
@@ -2343,11 +1744,6 @@ def get_land_cultivation(state, district, block, village_id, df=None):
             seasonal_cultivation_color = "yellow"
         else:
             seasonal_cultivation_color = "green"
-
-        # Text cluster
-        cultivation_cluster = str(
-            row.get("agriculture_land_cultivation_cat_cluster", "Low")
-        ).strip()
 
         raw_params = {
             "agriculture_land_cultivation": _build_raw_params(row, SECTION_RAW_PARAMS["agriculture_land_cultivation"]),
@@ -2413,13 +1809,14 @@ def get_all_villages_land_cultivation(state, district, block, df=None):
             if not cultivation_info:
                 village_data[village_id] = {
                     "land_utilization_color": "black",
-                    "seasonal_cultivation_color": "black"
+                    "seasonal_cultivation_color": "black",
                 }
                 continue
 
+            colors = cultivation_info.get("colors", ["black", "black"])
             village_data[village_id] = {
-                "land_utilization_color": cultivation_info[2],
-                "seasonal_cultivation_color": cultivation_info[4]
+                "land_utilization_color":    colors[0] if len(colors) > 0 else "black",
+                "seasonal_cultivation_color": colors[1] if len(colors) > 1 else "black",
             }
 
         return village_data
@@ -2741,9 +2138,10 @@ def get_agri_support_service(state, district, block, village_id, df=None, df_fac
                 round(agri_support_infra_distance, 2)  if agri_support_infra_distance  is not None else None,  # index 7
                 round(agri_processing_distance, 2)     if agri_processing_distance     is not None else None,  # index 8
             ],
-            "colors":      [agri_support_color, agri_market_color],
-            "performance": [agri_support_perf, agri_market_perf],
-            "raw_params":  raw_params,
+            "colors":          [agri_support_color, agri_market_color],
+            "performance":     [agri_support_perf, agri_market_perf],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score((agri_support_score + agri_market_score) / 2),
         }
 
     except Exception as e:
@@ -2857,9 +2255,10 @@ def get_ecological_climate_resiliance(state, district, block, village_id, df=Non
                     organic_farming_score,
                     organic_farming_color,
                 ],
-                "colors":      [organic_farming_color, "red"],
-                "performance": [organic_farming_perf, "Low"],
-                "raw_params":  raw_params,
+                "colors":          [organic_farming_color, "red"],
+                "performance":     [organic_farming_perf, "Low"],
+                "raw_params":      raw_params,
+                "composite_score": _calculate_band_score((organic_farming_score + 0.33) / 2),
             }
 
         nrega_row = nrega_match.iloc[0]
@@ -2924,9 +2323,12 @@ def get_ecological_climate_resiliance(state, district, block, village_id, df=Non
                 organic_farming_score,  # index 4
                 organic_farming_color,  # index 5
             ],
-            "colors":      [organic_farming_color, nrega_work_color],
-            "performance": [organic_farming_perf, "High" if nrega_work_color == "green" else "Low"],
-            "raw_params":  raw_params,
+            "colors":          [organic_farming_color, nrega_work_color],
+            "performance":     [organic_farming_perf, "High" if nrega_work_color == "green" else "Low"],
+            "raw_params":      raw_params,
+            "composite_score": _calculate_band_score(
+                (organic_farming_score + (1.0 if nrega_work_color == "green" else 0.33)) / 2
+            ),
         }
 
     except Exception as e:
@@ -3348,11 +2750,6 @@ def get_all_villages_ecological_climate_resiliance(state, district, block, df=No
 
         df["village_id"] = df["village_id"].astype(str).str.strip()
 
-        # NREGA-based color is computed per-village via get_ecological_climate_resiliance;
-        # for the map we read organic_farming cluster from antyodaya and compute nrega
-        # color via the full function — but to keep the map fast we approximate nrega as
-        # "red" here (the full per-village data is still shown in the report itself).
-        # For the organic farming map color we use the cluster column directly.
         village_data = {}
         for _, row in df.iterrows():
             village_id = str(row.get("village_id", "")).strip()

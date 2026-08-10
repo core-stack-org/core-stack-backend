@@ -966,7 +966,7 @@
                 <div style="flex: 1; min-width: 0;">
                     <div id="landCultivationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
                 </div>
-                <div style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
+                <div id="landRawParamsBox" style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
                     <div id="rawParams-land_utilization">
                         <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Land Utilization</h4>
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
@@ -2350,6 +2350,9 @@
         function switchLandCultivationMap(type) {
             if (landCultivationResult) landCultivationResult.switchTab(type);
             var key = LAND_TAB_MAP[type] || type;
+            // Hide the entire raw-params box for Seasonal Cultivation (no data to show)
+            var box = document.getElementById('landRawParamsBox');
+            if (box) box.style.display = (type === 'seasonal') ? 'none' : '';
             LAND_RAW_TABS.forEach(function(k) {
                 var el = document.getElementById('rawParams-' + k);
                 if (el) el.style.display = (k === key) ? 'block' : 'none';
