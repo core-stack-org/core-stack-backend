@@ -48,7 +48,7 @@ from utilities.constants import (
     LIVESTOCK_CENSUS_20_CSV,
     LIVESTOCK_GEOSERVER_WORKSPACE,
 )
-
+from utilities.pipelines import api_request_payload
 
 CONFIG_PATH = Path(__file__).with_name("livestocks_pipeline.yaml")
 ALGORITHM = "local-livestock-csv-admin-join"
@@ -81,7 +81,9 @@ def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
     return resolved
 
 
-def _cli_request(state: str, district: str, tehsil: str, sync_to_geoserver: bool = True) -> StandardRequest:
+def _cli_request(
+    state: str, district: str, tehsil: str, sync_to_geoserver: bool = True
+) -> StandardRequest:
     return StandardRequest.from_mapping(
         {
             "scope": {
@@ -119,7 +121,9 @@ def _schema(config: Mapping[str, Any]) -> dict[str, Any]:
     return load_config(_repo_path(path)) if path else {}
 
 
-def _derive_livestock_metrics(frame: pd.DataFrame, schema: Mapping[str, Any]) -> pd.DataFrame:
+def _derive_livestock_metrics(
+    frame: pd.DataFrame, schema: Mapping[str, Any]
+) -> pd.DataFrame:
     derived = frame.copy()
     for _, animals in schema.get("livestock", {}).items():
         for fields in animals.values():
@@ -127,27 +131,37 @@ def _derive_livestock_metrics(frame: pd.DataFrame, schema: Mapping[str, Any]) ->
             female = fields.get("female")
             total = fields.get("total")
             if male in derived.columns and female in derived.columns and total:
-                derived[total] = (
-                    pd.to_numeric(derived[male], errors="coerce").fillna(0)
-                    + pd.to_numeric(derived[female], errors="coerce").fillna(0)
-                )
+                derived[total] = pd.to_numeric(derived[male], errors="coerce").fillna(
+                    0
+                ) + pd.to_numeric(derived[female], errors="coerce").fillna(0)
     for metric, spec in schema.get("derived_metrics", {}).items():
         sources = spec.get("sources", [])
         if sources and all(source in derived.columns for source in sources):
-            derived[metric] = sum(pd.to_numeric(derived[source], errors="coerce").fillna(0) for source in sources)
+            derived[metric] = sum(
+                pd.to_numeric(derived[source], errors="coerce").fillna(0)
+                for source in sources
+            )
     return derived
 
 
-def _validate_livestock(frame: pd.DataFrame, config: Mapping[str, Any]) -> list[ValidationIssue]:
+def _validate_livestock(
+    frame: pd.DataFrame, config: Mapping[str, Any]
+) -> list[ValidationIssue]:
     return validate_numeric_range(
         frame,
-        columns=[column for column in config["metrics"]["count_columns"] if column in frame.columns],
+        columns=[
+            column
+            for column in config["metrics"]["count_columns"]
+            if column in frame.columns
+        ],
         minimum=0,
         allow_null=True,
     )
 
 
-def _merge_admin_livestock(admin_rows, source_rows: pd.DataFrame, config: Mapping[str, Any]):
+def _merge_admin_livestock(
+    admin_rows, source_rows: pd.DataFrame, config: Mapping[str, Any]
+):
     admin = admin_rows.copy()
     attrs = source_rows.copy()
     attrs = attrs.drop(columns=["state_name", "district_name"], errors="ignore")
@@ -160,7 +174,9 @@ def _merge_admin_livestock(admin_rows, source_rows: pd.DataFrame, config: Mappin
     )
 
 
-def _ordered_columns(frame: pd.DataFrame, config: Mapping[str, Any], columns: Mapping[str, list[str]]) -> list[str]:
+def _ordered_columns(
+    frame: pd.DataFrame, config: Mapping[str, Any], columns: Mapping[str, list[str]]
+) -> list[str]:
     ordered = []
     ordered.extend([col for col in columns["location"] if col not in ordered])
     ordered.extend([col for col in columns["metrics"] if col not in ordered])
@@ -168,19 +184,29 @@ def _ordered_columns(frame: pd.DataFrame, config: Mapping[str, Any], columns: Ma
     return [col for col in ordered if col in frame.columns]
 
 
-def _focused_frame(frame: pd.DataFrame, value_columns: list[str], status_name: str | None) -> pd.DataFrame:
+def _focused_frame(
+    frame: pd.DataFrame, value_columns: list[str], status_name: str | None
+) -> pd.DataFrame:
     """Return the report CSV frame: admin columns, the status column, then the
     configured value columns for matched villages."""
 
-    focused = admin_presentation_frame(frame.drop(columns=["geometry"], errors="ignore"))
+    focused = admin_presentation_frame(
+        frame.drop(columns=["geometry"], errors="ignore")
+    )
     source = frame.set_index("fid", drop=False) if "fid" in frame.columns else frame
     output_rows: list[dict[str, Any]] = []
     for _, admin_row in focused.iterrows():
         row = admin_row.to_dict()
         admin_index = row.get("index")
-        values = source.loc[admin_index] if admin_index in source.index else pd.Series(dtype=object)
+        values = (
+            source.loc[admin_index]
+            if admin_index in source.index
+            else pd.Series(dtype=object)
+        )
         has_village_id = pd.notna(row.get("village_id"))
-        has_livestock = pd.notna(values.get("village_code")) if not values.empty else False
+        has_livestock = (
+            pd.notna(values.get("village_code")) if not values.empty else False
+        )
         status = STATUS_MATCHED
         if not has_village_id:
             status = STATUS_NO_VILLAGE_ID
@@ -220,18 +246,26 @@ def _column_describer(schema: Mapping[str, Any], config: Mapping[str, Any]):
                     f"20th Livestock Census (2019), {group_label} group."
                 )
             if fields.get("female"):
-                descriptions[fields["female"]] = f"Female {animal} count for the village, 20th Livestock Census (2019)."
+                descriptions[fields["female"]] = (
+                    f"Female {animal} count for the village, 20th Livestock Census (2019)."
+                )
             if fields.get("male"):
-                descriptions[fields["male"]] = f"Male {animal} count for the village, 20th Livestock Census (2019)."
+                descriptions[fields["male"]] = (
+                    f"Male {animal} count for the village, 20th Livestock Census (2019)."
+                )
     for metric, spec in (schema.get("derived_metrics") or {}).items():
         sources = ", ".join(spec.get("sources", []))
         label = spec.get("label", metric.replace("_", " ").title())
         descriptions[metric] = f"{label}: sum of {sources}."
-    descriptions["village_code"] = "Census village code used to join livestock census records."
+    descriptions["village_code"] = (
+        "Census village code used to join livestock census records."
+    )
     return descriptions
 
 
-def _overview(frame: pd.DataFrame, group_columns: list[str], config: Mapping[str, Any]) -> pd.DataFrame:
+def _overview(
+    frame: pd.DataFrame, group_columns: list[str], config: Mapping[str, Any]
+) -> pd.DataFrame:
     groups = [col for col in group_columns if col in frame.columns]
     if not groups:
         return pd.DataFrame()
@@ -242,10 +276,14 @@ def _overview(frame: pd.DataFrame, group_columns: list[str], config: Mapping[str
             keys = (keys,)
         row = dict(zip(groups, keys))
         row["admin_village_rows"] = int(len(group))
-        row["matched_livestock_rows"] = int(group["village_code"].notna().sum()) if "village_code" in group else 0
+        row["matched_livestock_rows"] = (
+            int(group["village_code"].notna().sum()) if "village_code" in group else 0
+        )
         for metric in metrics:
             if metric in group.columns:
-                row[f"{metric}_sum"] = int(pd.to_numeric(group[metric], errors="coerce").fillna(0).sum())
+                row[f"{metric}_sum"] = int(
+                    pd.to_numeric(group[metric], errors="coerce").fillna(0).sum()
+                )
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -258,8 +296,12 @@ def _column_reference_lines(column_entries: list[Mapping[str, Any]]) -> list[str
         "| --- | --- | --- |",
     ]
     for entry in column_entries:
-        description = str(entry.get("description") or "").replace("|", "\\|").replace("\n", " ")
-        lines.append(f"| `{entry['column']}` | {entry.get('datatype', '')} | {description} |")
+        description = (
+            str(entry.get("description") or "").replace("|", "\\|").replace("\n", " ")
+        )
+        lines.append(
+            f"| `{entry['column']}` | {entry.get('datatype', '')} | {description} |"
+        )
     lines.append("")
     return lines
 
@@ -322,7 +364,9 @@ def _readme_lines(
     return lines
 
 
-def _cache_input_signatures(config: Mapping[str, Any], config_path: str | Path) -> dict[str, dict[str, Any]]:
+def _cache_input_signatures(
+    config: Mapping[str, Any], config_path: str | Path
+) -> dict[str, dict[str, Any]]:
     sources = config.get("sources", {})
     paths: dict[str, str | Path] = {
         "pipeline_config": _repo_path(config_path),
@@ -348,7 +392,9 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
     )
 
 
-def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
+def _required_result_paths(
+    outputs: OutputOptions, request: StandardRequest
+) -> tuple[str, ...]:
     required: list[str] = ["links_path"]
     if outputs.metadata:
         required.append("run_metadata_path")
@@ -373,7 +419,10 @@ def run_livestocks_pipeline(
     output_config = config["output"]
 
     t0 = time.perf_counter()
-    admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
+    admin_source = CSAdminSource(
+        _repo_path(config["sources"]["admin_gpkg"]),
+        table_name=config["sources"]["admin_layer"],
+    )
     include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
     (
         admin_selection,
@@ -410,7 +459,9 @@ def run_livestocks_pipeline(
     t0 = time.perf_counter()
     sidecar = _sidecar(config)
     sidecar_status = sidecar.materialize()
-    source_rows = sidecar.fetch_by_values(config["keys"]["source_join_key"], admin_selection.pc11_village_ids)
+    source_rows = sidecar.fetch_by_values(
+        config["keys"]["source_join_key"], admin_selection.pc11_village_ids
+    )
     timings["read_livestock_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
@@ -419,20 +470,36 @@ def run_livestocks_pipeline(
     joined = _derive_livestock_metrics(joined, schema)
     status_name, status_outputs = status_column_config(config)
     if status_name:
-        village_codes = joined["village_code"] if "village_code" in joined.columns else pd.Series([None] * len(joined), index=joined.index)
+        village_codes = (
+            joined["village_code"]
+            if "village_code" in joined.columns
+            else pd.Series([None] * len(joined), index=joined.index)
+        )
         joined[status_name] = [
-            STATUS_NO_VILLAGE_ID
-            if pd.isna(village_id)
-            else (STATUS_MATCHED if pd.notna(village_code) else STATUS_NO_DATA)
+            (
+                STATUS_NO_VILLAGE_ID
+                if pd.isna(village_id)
+                else (STATUS_MATCHED if pd.notna(village_code) else STATUS_NO_DATA)
+            )
             for village_id, village_code in zip(joined["village_id"], village_codes)
         ]
     ordered = _ordered_columns(joined, config, columns)
-    villages_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered)
-    matched_rows = int(villages_frame["village_code"].notna().sum()) if "village_code" in villages_frame else 0
-    gpkg_value_columns = [column for column in schema.get("gpkg_columns", []) if column in joined.columns] or ordered
+    villages_frame = admin_output_frame(
+        joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered
+    )
+    matched_rows = (
+        int(villages_frame["village_code"].notna().sum())
+        if "village_code" in villages_frame
+        else 0
+    )
+    gpkg_value_columns = [
+        column for column in schema.get("gpkg_columns", []) if column in joined.columns
+    ] or ordered
     if status_name and {"gpkg", "geoserver"} & status_outputs:
         gpkg_value_columns = [status_name, *gpkg_value_columns]
-    gpkg_frame = admin_output_frame(joined, value_columns=gpkg_value_columns, include_geometry=True)
+    gpkg_frame = admin_output_frame(
+        joined, value_columns=gpkg_value_columns, include_geometry=True
+    )
     gpkg_frame = normalize_unicode_frame(gpkg_frame)
     describe = _column_describer(schema, config)
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
@@ -453,7 +520,9 @@ def run_livestocks_pipeline(
         "layer_name": layer_name,
         "rows": int(len(villages_frame)),
         "matched_rows": matched_rows,
-        "join_coverage": round(matched_rows / len(villages_frame), 6) if len(villages_frame) else 0,
+        "join_coverage": (
+            round(matched_rows / len(villages_frame), 6) if len(villages_frame) else 0
+        ),
         "validation_issues": [asdict(issue) for issue in validation_issues],
         "sidecar": sidecar_status,
         "admin_created_indexes": admin_selection.created_indexes,
@@ -523,10 +592,10 @@ def run_livestocks_pipeline(
             is_override=request.publish.overwrite,
         )
         if layer_id is None:
-            raise RuntimeError(f"Database registration failed for layer {layer_name!r}.")
-        if update_layer_sync_status(
-            layer_id=layer_id, sync_to_geoserver=True
-        ) is None:
+            raise RuntimeError(
+                f"Database registration failed for layer {layer_name!r}."
+            )
+        if update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True) is None:
             raise RuntimeError(
                 f"GeoServer sync status update failed for layer ID {layer_id}."
             )
@@ -548,7 +617,9 @@ def run_livestocks_pipeline(
                 issues=validation_issues,
                 geoserver=geoserver,
                 column_entries=column_dictionary(
-                    pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")),
+                    pd.DataFrame(
+                        gpkg_frame.drop(columns=["geometry"], errors="ignore")
+                    ),
                     describe,
                 ),
             )
@@ -574,7 +645,9 @@ def run_livestocks_pipeline(
                 "config_path": str(config_path),
                 "outputs": {
                     "villages": frame_profile(
-                        pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")),
+                        pd.DataFrame(
+                            gpkg_frame.drop(columns=["geometry"], errors="ignore")
+                        ),
                         describe,
                     ),
                 },
@@ -596,9 +669,19 @@ def run_livestocks_request(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 @app.task(bind=True)
-def generate_livestocks_layer_task(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+def generate_livestocks_layer_task(
+    self,
+    state: str | None = None,
+    district: str | None = None,
+    block: str | None = None,
+    payload: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Generate livestock census outputs for a standard request payload."""
-
+    if payload is None:
+        payload = api_request_payload(
+            {"state": state, "district": district, "block": block},
+            overwrite=True,
+        )
     return run_livestocks_request(payload)
 
 
