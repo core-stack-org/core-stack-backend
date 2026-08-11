@@ -55,7 +55,7 @@ def load_ltp_change():
     Returns:
         ee.Image – mean of the ltp_stp_change image collection.
     """
-    return ee.ImageCollection(LTP_STP_CHANGE).mean()
+    return ee.Image(LTP_STP_CHANGE)
 
 
 def load_overall_change():

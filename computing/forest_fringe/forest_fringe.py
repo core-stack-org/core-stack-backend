@@ -22,7 +22,8 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from utilities.constants import GEE_PATHS
+from gee_computing.models import GEEAccount
+from utilities.constants import GEE_PATHS, AEZ, MWS_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -45,17 +46,40 @@ from .forest_fringe_utils import (
 )
 
 
+def forest_fringes_on_AEZ(aez_no, gee_account_id=7):
+    ee_initialize(gee_account_id)
+    aez = ee.FeatureCollection(AEZ)
+    mwses = ee.FeatureCollection(MWS_DATASET)
+
+    filter_aez = aez.filter(ee.Filter.eq("ae_regcode", aez_no))
+    roi = mwses.filterBounds(filter_aez.geometry())
+
+    asset_suffix = f"AEZ_{aez_no}"
+    asset_folder_list = ["forest_fringes"]
+    generate_forest_fringe_degradation(
+        roi=roi,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        gee_account_id=gee_account_id,
+        app_type="forest_fringes",
+        sync_to_db=False,
+        sync_to_geoserver=False,
+    )
+
+
 @app.task(bind=True)
 def generate_forest_fringe_degradation(
     self,
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
     gee_account_id=None,
     app_type="MWS",
+    sync_to_db=True,
+    sync_to_geoserver=True,
 ):
     """
     Generate forest-fringe metrics as a vector layer.
@@ -101,15 +125,13 @@ def generate_forest_fringe_degradation(
         )
 
     description = f"forest_fringe_{asset_suffix}"
-    layer_name = f"{asset_suffix}_forest_fringe"
+    if app_type in GEE_PATHS:
+        asset_path = GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    else:
+        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+        asset_path = f"projects/{gee_obj.name}/assets/"
 
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + description
-    )
+    asset_id = get_gee_dir_path(asset_folder_list, asset_path=asset_path) + description
 
     print(f"Forest Fringe pipeline started: {asset_id=}")
 
@@ -283,12 +305,14 @@ def generate_forest_fringe_degradation(
     # Publish to GeoServer and save metadata to DB
     # ------------------------------------------------------------------
     layer_at_geoserver = _save_to_db_and_sync_to_geoserver(
-        layer_name=layer_name,
+        layer_name=description,
         asset_id=asset_id,
         asset_suffix=asset_suffix,
         state=state,
         district=district,
         block=block,
+        sync_to_db=sync_to_db,
+        sync_to_geoserver=sync_to_geoserver,
     )
     return layer_at_geoserver
 
@@ -305,12 +329,14 @@ def _save_to_db_and_sync_to_geoserver(
     state=None,
     district=None,
     block=None,
+    sync_to_db=True,
+    sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fringe: save_to_db_and_sync_to_geoserver")
 
     layer_id = None
-    if state and district and block:
+    if sync_to_db and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,
@@ -321,15 +347,16 @@ def _save_to_db_and_sync_to_geoserver(
         )
 
     make_asset_public(asset_id)
+    if sync_to_geoserver:
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fringes")
+        print(res)
 
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fringes")
-    print(res)
+        layer_at_geoserver = False
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("Forest Fringe: sync to geoserver flag updated")
+            layer_at_geoserver = True
 
-    layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("Forest Fringe: sync to geoserver flag updated")
-        layer_at_geoserver = True
-
-    return layer_at_geoserver
+        return layer_at_geoserver
+    return False
