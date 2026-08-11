@@ -1303,7 +1303,7 @@ def run_facilities_pipeline(
             dataset_name = (
                 output_config.get("dataset_name", "Facilities Proximity")
                 if role == "village_properties"
-                else output_config.get("points_dataset_name", "Facilities Points")
+                else output_config.get("points_dataset_name", "Facilities Proximity")
             )
             layer_id = save_layer_info_to_db(
                 state=state,
