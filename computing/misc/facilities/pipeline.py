@@ -1311,7 +1311,7 @@ def run_facilities_pipeline(
                 block=block,
                 layer_name=published["layer_name"],
                 asset_id="not applicable: local compute GeoServer layer",
-                dataset_name=dataset_name,
+                dataset_name="Facilities Proximity",
                 algorithm=ALGORITHM,
                 algorithm_version=ALGORITHM_VERSION,
                 misc={"is_generated_locally": True},
