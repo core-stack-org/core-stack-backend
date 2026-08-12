@@ -403,6 +403,131 @@ def calculate_zoi_area(zoi):
     return ee.Number.parse(area_hectares.format("%.2f"))
 
 
+def is_nan_value(value):
+    return (
+        value is None
+        or (isinstance(value, float) and math.isnan(value))
+        or pd.isna(value)
+    )
+
+
+def id_text(value):
+    """Normalize an identifier value to a clean string."""
+    if is_nan_value(value):
+        return None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, int):
+        text = str(value)
+    else:
+        text = str(value).strip()
+    if not text or text.upper() in ("N/A", "NAN", "NONE"):
+        return None
+    if text.endswith(".0"):
+        stem = text[:-2]
+        if stem.replace("_", "").isdigit():
+            text = stem
+    if "e" in text.lower():
+        try:
+            as_float = float(text)
+            if as_float.is_integer():
+                text = str(int(as_float))
+        except ValueError:
+            pass
+    return text
+
+
+def format_waterbody_uid_value(mws_uid, uid):
+    """
+    Restore SWB UID format: <MWS_UID>_<index>, e.g. 25_34833_101.
+
+    GEE/pandas may coerce this to a number (12129065580), dropping the underscore
+    before the per-waterbody index (12129065_580).
+    """
+    mws_str = id_text(mws_uid)
+    uid_str = id_text(uid)
+    if not uid_str:
+        return None, mws_str
+    if "_" in uid_str:
+        return uid_str, mws_str
+    if not mws_str:
+        return uid_str, mws_str
+
+    mws_digits = mws_str.replace("_", "")
+    uid_digits = uid_str.replace("_", "")
+    if uid_digits.startswith(mws_digits) and len(uid_digits) > len(mws_digits):
+        suffix = uid_digits[len(mws_digits) :]
+        if suffix.isdigit():
+            return f"{mws_str}_{suffix}", mws_str
+    return uid_str, mws_str
+
+
+def ensure_uid_on_fc(fc):
+    """Ensure every feature has a canonical UID for NDVI / merge steps."""
+
+    def ensure_uid(feature):
+        uid = ee.Algorithms.If(
+            feature.get("UID"),
+            feature.get("UID"),
+            ee.Algorithms.If(
+                feature.get("uid"),
+                feature.get("uid"),
+                ee.Algorithms.If(
+                    feature.get("MWS_UID"),
+                    feature.get("MWS_UID"),
+                    feature.get("system:index"),
+                ),
+            ),
+        )
+        return feature.set("UID", uid)
+
+    return fc.map(ensure_uid)
+
+
+def resolve_zoi_ndvi_input(
+    asset_folder_list, app_type, asset_suffix, zoi_roi=None
+):
+    """
+    Pick polygons for ZOI NDVI: prefer cropping_intensity_zoi, else zoi_ rings.
+    """
+    if zoi_roi:
+        fc = ee.FeatureCollection(zoi_roi)
+        count = fc.size().getInfo()
+        logger.info("NDVI input: explicit roi (%s features)", count)
+        if count == 0:
+            raise ValueError(f"NDVI input roi is empty: {zoi_roi}")
+        return ensure_uid_on_fc(fc)
+
+    base = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    ci_asset = base + f"cropping_intensity_zoi_{asset_suffix}"
+    zoi_asset = base + f"zoi_{asset_suffix}"
+
+    ci_fc = ee.FeatureCollection(ci_asset)
+    ci_size = ci_fc.size().getInfo()
+    if ci_size > 0:
+        logger.info(
+            "NDVI input: cropping_intensity_zoi (%s features) from %s",
+            ci_size,
+            ci_asset,
+        )
+        return ensure_uid_on_fc(ci_fc)
+
+    zoi_fc = ee.FeatureCollection(zoi_asset)
+    zoi_size = zoi_fc.size().getInfo()
+    logger.info(
+        "NDVI input: fallback zoi_ (%s features) from %s",
+        zoi_size,
+        zoi_asset,
+    )
+    if zoi_size == 0:
+        raise ValueError(
+            f"No ZOI features for NDVI (tried {ci_asset} and {zoi_asset})"
+        )
+    return ensure_uid_on_fc(zoi_fc)
+
+
 def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
     """
     Extracts and exports NDVI data for a set of features by aggregating NDVI values
