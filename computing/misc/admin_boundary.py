@@ -105,7 +105,7 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
                 asset_id=asset_id,
                 **ctx,
             )
-            upload_shp_to_gee(layer_path, layer_name, asset_id)
+            upload_shp_to_gee(layer_path, layer_name, asset_id, gee_account_id)
 
         if is_gee_asset_exists(asset_id):
             log_task_step(TASK_NAME, "make_asset_public", asset_id=asset_id, **ctx)
