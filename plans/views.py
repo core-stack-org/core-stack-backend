@@ -1,13 +1,25 @@
 # plans/views.py
-from django.db.models import Avg, Case, CharField as CharFieldOutput, Count, F, Max, Min, Q, Value, When
-from django.db.models.functions import Concat, Length, Substr, Trim
+from django.db.models import Avg, Case, Count, F, Max, Min, Q, Value, When
+from django.db.models import CharField as CharFieldOutput
+from django.db.models.functions import Coalesce, Concat, Length, Substr, Trim
 from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from dpr.mapping import classify_demand_type
+from dpr.models import (
+    Agri_maintenance,
+    DPR_Report,
+    GW_maintenance,
+    ODK_agri,
+    ODK_groundwater,
+    SWB_maintenance,
+    SWB_RS_maintenance,
+)
 from geoadmin.models import UserAPIKey
 from organization.models import Organization
 from projects.models import AppType, Project
@@ -67,8 +79,155 @@ TEST_FACILITATOR_EXCLUSIONS = (
     | Q(facilitator_name__icontains="facilitator")
 )
 
+CFPT_ORG_ID = "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6"
 
-def _build_steward_meta_stats(queryset):
+STEWARD_FULL_NAME = Trim(
+    Concat("first_name", Value(" "), Coalesce("last_name", Value("")))
+)
+
+
+# MARK: Demand Type Counting
+def _count_demand_types(plan_id_strs):
+    from dpr.mapping import classify_demand_type
+    from dpr.models import (
+        Agri_maintenance,
+        GW_maintenance,
+        ODK_agri,
+        ODK_agrohorticulture,
+        ODK_groundwater,
+        ODK_livelihood,
+        SWB_maintenance,
+        SWB_RS_maintenance,
+    )
+
+    community = 0
+    individual = 0
+    total = 0
+
+    def _tally(raw_values):
+        nonlocal community, individual, total
+        for raw in raw_values:
+            total += 1
+            classified = classify_demand_type(raw)
+            if classified == "Community Demand":
+                community += 1
+            elif classified == "Individual Demand":
+                individual += 1
+
+    # Section E — maintenance models
+    # Fetch full JSON dict and extract key in Python to avoid ->operator issues on text columns
+    _tally(
+        (d or {}).get("demand_type")
+        for d in GW_maintenance.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .values_list("data_gw_maintenance", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type")
+        for d in Agri_maintenance.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .values_list("data_agri_maintenance", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type")
+        for d in SWB_maintenance.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .values_list("data_swb_maintenance", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type")
+        for d in SWB_RS_maintenance.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .values_list("data_swb_rs_maintenance", flat=True)
+    )
+
+    # Section F — NRM works models
+    _tally(
+        (d or {}).get("demand_type")
+        for d in ODK_groundwater.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .exclude(status_re="rejected")
+        .values_list("data_groundwater", flat=True)
+    )
+    _tally(
+        (d or {}).get("demand_type_irrigation")
+        for d in ODK_agri.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .exclude(status_re="rejected")
+        .values_list("data_agri", flat=True)
+    )
+
+    # Section G — Livelihood works (G.1 Livestock/Fisheries, G.2 Plantations/Kitchen Gardens)
+    def _livelihood_demand_types():
+        for dl in (
+            d or {}
+            for d in ODK_livelihood.objects.filter(plan_id__in=plan_id_strs)
+            .exclude(is_deleted=True)
+            .exclude(status_re="rejected")
+            .values_list("data_livelihood", flat=True)
+        ):
+            livestock = dl.get("Livestock") or {}
+            fisheries = dl.get("fisheries") or {}
+            plantations = dl.get("plantations") or {}
+            kitchen_garden = dl.get("kitchen_gardens") or {}
+
+            if (
+                str(livestock.get("is_demand_livestock", "")).lower() == "yes"
+                or str(dl.get("select_one_demand_promoting_livestock", "")).lower()
+                == "yes"
+            ):
+                yield livestock.get("livestock_demand")
+
+            if (
+                str(fisheries.get("is_demand_fisheris", "")).lower() == "yes"
+                or str(dl.get("select_one_demand_promoting_fisheries", "")).lower()
+                == "yes"
+            ):
+                yield fisheries.get("demand_type_fisheries")
+
+            if (
+                str(dl.get("select_one_demand_plantation", "")).lower() == "yes"
+                or str(plantations.get("select_plantation_demands", "")).lower()
+                == "yes"
+            ):
+                yield plantations.get("demand_type_plantations")
+
+            if (
+                str(dl.get("indi_assets", "")).lower() == "yes"
+                or str(kitchen_garden.get("assets_kg", "")).lower() == "yes"
+            ):
+                yield kitchen_garden.get("demand_type_kitchen_garden")
+
+    _tally(_livelihood_demand_types())
+
+    _tally(
+        (d or {}).get("demand_type_plantations")
+        for d in ODK_agrohorticulture.objects.filter(plan_id__in=plan_id_strs)
+        .exclude(is_deleted=True)
+        .exclude(status_re="rejected")
+        .values_list("data_agohorticulture", flat=True)
+    )
+
+    return {
+        "community_demands": community,
+        "individual_demands": individual,
+        "total_demands": total,
+    }
+
+
+def _build_steward_meta_stats(queryset, organization_id=None):
+    valid_steward_qs = User.objects.filter(groups__name="App User").exclude(
+        organization_id=CFPT_ORG_ID
+    )
+    if organization_id:
+        valid_steward_qs = valid_steward_qs.filter(organization_id=organization_id)
+    total_stewards = valid_steward_qs.count()
+
+    valid_steward_names = valid_steward_qs.annotate(
+        full_name=STEWARD_FULL_NAME
+    ).values_list("full_name", flat=True)
+    queryset = queryset.filter(facilitator_name__in=valid_steward_names)
+
     effective_village = Case(
         When(
             ~Q(village_name="") & Q(village_name__isnull=False),
@@ -83,17 +242,12 @@ def _build_steward_meta_stats(queryset):
     )
     qs = queryset.annotate(effective_village=effective_village)
 
-    total_stewards = qs.values("facilitator_name").distinct().count()
-
-    per_steward = (
-        qs.values("facilitator_name")
-        .annotate(
-            plan_count=Count("id"),
-            completed_count=Count("id", filter=Q(is_completed=True)),
-            in_progress_count=Count("id", filter=Q(is_completed=False)),
-            dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
-            dpr_reviewed=Count("id", filter=Q(is_dpr_reviewed=True)),
-        )
+    per_steward = qs.values("facilitator_name").annotate(
+        plan_count=Count("id"),
+        completed_count=Count("id", filter=Q(is_completed=True)),
+        in_progress_count=Count("id", filter=Q(is_completed=False)),
+        dpr_generated=Count("id", filter=Q(is_dpr_generated=True)),
+        dpr_reviewed=Count("id", filter=Q(is_dpr_reviewed=True)),
     )
 
     agg = per_steward.aggregate(
@@ -102,7 +256,10 @@ def _build_steward_meta_stats(queryset):
         max_plans=Max("plan_count"),
         avg_completion=Avg(
             Case(
-                When(plan_count__gt=0, then=F("completed_count") * 100.0 / F("plan_count")),
+                When(
+                    plan_count__gt=0,
+                    then=F("completed_count") * 100.0 / F("plan_count"),
+                ),
                 default=Value(0.0),
             )
         ),
@@ -122,27 +279,6 @@ def _build_steward_meta_stats(queryset):
         ),
     )
 
-    top_stewards_qs = per_steward.order_by("-plan_count")[:10]
-    top_steward_names = [s["facilitator_name"] for s in top_stewards_qs]
-    village_map = {}
-    for entry in (
-        qs.filter(facilitator_name__in=top_steward_names)
-        .values("facilitator_name", "effective_village")
-        .distinct()
-    ):
-        village_map.setdefault(entry["facilitator_name"], []).append(
-            entry["effective_village"]
-        )
-    top_stewards = [
-        {
-            "facilitator_name": s["facilitator_name"],
-            "plan_count": s["plan_count"],
-            "completed_count": s["completed_count"],
-            "villages": village_map.get(s["facilitator_name"], []),
-        }
-        for s in top_stewards_qs
-    ]
-
     by_organization = [
         {
             "organization_id": s["organization"],
@@ -150,8 +286,9 @@ def _build_steward_meta_stats(queryset):
             "steward_count": s["steward_count"],
         }
         for s in (
-            qs.values("organization", "organization__name")
-            .annotate(steward_count=Count("facilitator_name", distinct=True))
+            valid_steward_qs.filter(organization__isnull=False)
+            .values("organization", "organization__name")
+            .annotate(steward_count=Count("id"))
             .order_by("-steward_count")
         )
     ]
@@ -179,7 +316,9 @@ def _build_steward_meta_stats(queryset):
         }
         for s in (
             qs.filter(district_soi__isnull=False)
-            .values("district_soi", "district_soi__district_name", "state_soi__state_name")
+            .values(
+                "district_soi", "district_soi__district_name", "state_soi__state_name"
+            )
             .annotate(steward_count=Count("facilitator_name", distinct=True))
             .order_by("-steward_count")
         )
@@ -235,7 +374,6 @@ def _build_steward_meta_stats(queryset):
         "dpr_stats": dpr_agg,
         "active_stewards": active_stewards,
         "inactive_stewards": inactive_stewards,
-        "top_stewards": top_stewards,
         "by_organization": by_organization,
         "state_level": state_level,
         "district_level": district_level,
@@ -245,6 +383,16 @@ def _build_steward_meta_stats(queryset):
 
 
 def _build_steward_listing(queryset):
+    valid_steward_qs = User.objects.filter(groups__name="App User").exclude(
+        organization_id=CFPT_ORG_ID
+    )
+    total_stewards = valid_steward_qs.count()
+
+    valid_steward_names = valid_steward_qs.annotate(
+        full_name=STEWARD_FULL_NAME
+    ).values_list("full_name", flat=True)
+    queryset = queryset.filter(facilitator_name__in=valid_steward_names)
+
     effective_village = Case(
         When(
             ~Q(village_name="") & Q(village_name__isnull=False),
@@ -272,8 +420,24 @@ def _build_steward_listing(queryset):
 
     plans_by_steward = {}
     villages_by_steward = {}
+    orgs_by_steward = {}
+    projects_by_steward = {}
+    states_by_steward = {}
+    all_states = {}
     for row in qs.filter(facilitator_name__in=steward_names).values(
-        "facilitator_name", "id", "plan", "is_completed", "effective_village"
+        "facilitator_name",
+        "id",
+        "plan",
+        "is_completed",
+        "effective_village",
+        "organization",
+        "organization__name",
+        "project",
+        "project__name",
+        "state_soi",
+        "state_soi__state_name",
+        "latitude",
+        "longitude",
     ):
         name = row["facilitator_name"]
         plans_by_steward.setdefault(name, []).append(
@@ -282,23 +446,58 @@ def _build_steward_listing(queryset):
                 "plan": row["plan"],
                 "is_completed": row["is_completed"],
                 "village_name": row["effective_village"],
+                "latitude": row["latitude"],
+                "longitude": row["longitude"],
             }
         )
         villages_by_steward.setdefault(name, set()).add(row["effective_village"])
+        if row["organization"]:
+            orgs_by_steward.setdefault(name, {})[row["organization"]] = row[
+                "organization__name"
+            ]
+        if row["project"]:
+            projects_by_steward.setdefault(name, {})[row["project"]] = row[
+                "project__name"
+            ]
+        if row["state_soi"]:
+            states_by_steward.setdefault(name, {})[row["state_soi"]] = row[
+                "state_soi__state_name"
+            ]
+            all_states[row["state_soi"]] = row["state_soi__state_name"]
 
     stewards = [
         {
             "facilitator_name": s["facilitator_name"],
             "plan_count": s["plan_count"],
             "completed_count": s["completed_count"],
+            "organization": next(
+                (
+                    {"id": k, "name": v}
+                    for k, v in orgs_by_steward.get(s["facilitator_name"], {}).items()
+                ),
+                None,
+            ),
+            "projects": [
+                {"id": k, "name": v}
+                for k, v in projects_by_steward.get(s["facilitator_name"], {}).items()
+            ],
+            "states": [
+                {"id": k, "name": v}
+                for k, v in states_by_steward.get(s["facilitator_name"], {}).items()
+            ],
             "villages": sorted(villages_by_steward.get(s["facilitator_name"], [])),
             "plans": plans_by_steward.get(s["facilitator_name"], []),
         }
         for s in per_steward
     ]
 
+    working_states = [
+        {"id": k, "name": v} for k, v in sorted(all_states.items(), key=lambda x: x[1])
+    ]
+
     return {
-        "total_stewards": len(steward_names),
+        "total_stewards": total_stewards,
+        "working_states": working_states,
         "stewards": stewards,
     }
 
@@ -434,7 +633,7 @@ class GlobalPlanPermission(permissions.BasePermission):
 
 class SuperAdminPlanPermission(permissions.BasePermission):
     """
-    Custom permission for superadmin only plan endpoints
+    Custom permission for superadmin or org admin plan endpoints
     """
 
     schema = None
@@ -443,13 +642,23 @@ class SuperAdminPlanPermission(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
 
-        return request.user.is_superadmin or request.user.is_superuser
+        if request.user.is_superadmin or request.user.is_superuser:
+            return True
+
+        return request.user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
 
     def has_object_permission(self, request, view, obj):
         if hasattr(obj, "enabled") and not obj.enabled:
             return False
 
-        return request.user.is_superadmin or request.user.is_superuser
+        if request.user.is_superadmin or request.user.is_superuser:
+            return True
+
+        return request.user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
 
 
 class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
@@ -465,11 +674,12 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [GlobalPlanPermission]
 
     def get_queryset(self):
-        """
-        Return all plans for superadmins and API key users
-        """
-
-        queryset = PlanApp.objects.filter(enabled=True)
+        # FIX 1: add select_related to prevent N+1 queries
+        queryset = PlanApp.objects.filter(enabled=True).select_related(
+            "project",
+            "organization",
+            "created_by",
+        )
 
         tehsil_id = self.request.query_params.get("tehsil", None)
         district_id = self.request.query_params.get("district", None)
@@ -482,7 +692,11 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             queryset = queryset.filter(state_soi_id=state_id)
 
-        filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        # FIX 2: icontains is slow — only run when rows are already filtered
+        # by state/district/tehsil so it scans fewer rows
+        filter_test_demo = (
+            self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        )
         if filter_test_demo:
             queryset = queryset.exclude(
                 Q(plan__icontains="test") | Q(plan__icontains="demo")
@@ -533,6 +747,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         elif state_id:
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
+        plan_id_strs = [str(pid) for pid in base_queryset.values_list("id", flat=True)]
+
         total_plans = base_queryset.count()
         completed_plans = base_queryset.filter(is_completed=True).count()
         dpr_generated = base_queryset.filter(is_dpr_generated=True).count()
@@ -559,22 +775,52 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             cc_operational_queryset.values("state_soi").distinct().count()
         )
 
+        demand_type_counts = _count_demand_types(plan_id_strs)
+
+        valid_steward_qs = User.objects.filter(groups__name="App User").exclude(
+            organization__name__iexact="CFPT"
+        )
+        if organization_id:
+            valid_steward_qs = valid_steward_qs.filter(organization_id=organization_id)
+        total_stewards = valid_steward_qs.count()
+
+        valid_steward_names = valid_steward_qs.annotate(
+            full_name=STEWARD_FULL_NAME
+        ).values_list("full_name", flat=True)
+
         steward_queryset = base_queryset.exclude(
             Q(facilitator_name__isnull=True)
             | Q(facilitator_name="")
             | Q(facilitator_name__icontains="test")
             | Q(facilitator_name__icontains="demo")
-        )
-        total_stewards = steward_queryset.values("facilitator_name").distinct().count()
+        ).filter(facilitator_name__in=valid_steward_names)
+
+        active_facilitator_names = steward_queryset.values_list(
+            "facilitator_name", flat=True
+        ).distinct()
+        gender_counts = {
+            row["gender"]: row["count"]
+            for row in (
+                valid_steward_qs.annotate(full_name=STEWARD_FULL_NAME)
+                .filter(full_name__in=active_facilitator_names)
+                .values("gender")
+                .annotate(count=Count("id"))
+            )
+        }
+        steward_gender_breakdown = {
+            "male": gender_counts.get("M", 0),
+            "female": gender_counts.get("F", 0),
+            "other": gender_counts.get("O", 0),
+        }
 
         steward_by_org = []
         if not organization_id:
-            org_steward_stats = (
-                steward_queryset.values("organization", "organization__name")
-                .annotate(steward_count=Count("facilitator_name", distinct=True))
+            for stat in (
+                valid_steward_qs.filter(organization__isnull=False)
+                .values("organization", "organization__name")
+                .annotate(steward_count=Count("id"))
                 .order_by("-steward_count")
-            )
-            for stat in org_steward_stats:
+            ):
                 steward_by_org.append(
                     {
                         "organization_id": stat["organization"],
@@ -590,7 +836,8 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         if not organization_id:
             org_stats = (
-                base_queryset.values("organization", "organization__name")
+                base_queryset.exclude(organization__name__iexact="CFPT")
+                .values("organization", "organization__name")
                 .annotate(
                     total=Count("id"),
                     completed=Count("id", filter=Q(is_completed=True)),
@@ -692,6 +939,7 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
                 "pending_dpr_generation": pending_dpr_generation,
                 "pending_dpr_review": pending_dpr_review,
             },
+            "demand_overview": demand_type_counts,
             "commons_connect_operational": {
                 "active_tehsils": cc_active_tehsils,
                 "active_districts": cc_active_districts,
@@ -699,14 +947,17 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             },
             "landscape_stewards": {
                 "total_stewards": total_stewards,
+                "gender_breakdown": steward_gender_breakdown,
                 "by_organization": steward_by_org if steward_by_org else None,
             },
-            "completion_rate": round((completed_plans / total_plans * 100), 2)
-            if total_plans > 0
-            else 0,
-            "dpr_generation_rate": round((dpr_generated / total_plans * 100), 2)
-            if total_plans > 0
-            else 0,
+            "completion_rate": (
+                round((completed_plans / total_plans * 100), 2)
+                if total_plans > 0
+                else 0
+            ),
+            "dpr_generation_rate": (
+                round((dpr_generated / total_plans * 100), 2) if total_plans > 0 else 0
+            ),
         }
 
         if organization_breakdown:
@@ -752,7 +1003,9 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
         steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
-        response_data = _build_steward_meta_stats(steward_qs)
+        response_data = _build_steward_meta_stats(
+            steward_qs, organization_id=organization_id
+        )
         response_data["filters_applied"] = {
             "organization_id": organization_id,
             "project_id": project_id,
@@ -787,6 +1040,15 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
         response_data = _build_steward_listing(steward_qs)
+
+        if organization_id:
+            org = (
+                Organization.objects.filter(pk=organization_id)
+                .values("id", "name")
+                .first()
+            )
+            response_data["organization"] = org
+
         response_data["filters_applied"] = {
             "organization_id": organization_id,
             "project_id": project_id,
@@ -797,29 +1059,45 @@ class GlobalPlanViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(response_data, status=status.HTTP_200_OK)
 
 
+class OrganizationPlanPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
     """
     ViewSet for organization level watershed planning ops
     Allows superadmins to view plans for a specific organization
-    URL: /api/v1/organization/{organization_id}/watershed/plans/
+    URL: /api/v1/organizations/{organization_id}/watershed/plans/
     """
 
     schema = None
 
     serializer_class = PlanAppSerializer
-    permissions_classes = [permissions.IsAuthenticated, SuperAdminPlanPermission]
+    permission_classes = [permissions.IsAuthenticated, SuperAdminPlanPermission]
+    pagination_class = OrganizationPlanPagination
 
     def get_queryset(self):
         """
-        Filter plans by organizations for superadmins
+        Filter plans by organizations for superadmins and org admins
         """
-        if not (self.request.user.is_superadmin or self.request.user.is_superuser):
+        user = self.request.user
+        is_superadmin = user.is_superadmin or user.is_superuser
+        is_org_admin = user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
+
+        if not (is_superadmin or is_org_admin):
             return PlanApp.objects.none()
 
         organization_id = self.kwargs.get("organization_pk")
         if organization_id:
             try:
                 organization = Organization.objects.get(pk=organization_id)
+                if is_org_admin and not is_superadmin:
+                    if user.organization != organization:
+                        return PlanApp.objects.none()
                 queryset = PlanApp.objects.filter(
                     organization=organization, enabled=True
                 )
@@ -828,13 +1106,132 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         else:
             return PlanApp.objects.none()
 
-        filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        filter_test_demo = (
+            self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        )
+        filter_dpr_reviewed = (
+            self.request.query_params.get("is_dpr_reviewed", "").lower() == "true"
+        )
+        filter_is_completed = (
+            self.request.query_params.get("is_completed", "").lower() == "true"
+        )
         if filter_test_demo:
             queryset = queryset.exclude(
                 Q(plan__icontains="test") | Q(plan__icontains="demo")
             )
+        if filter_dpr_reviewed:
+            queryset = queryset.filter(is_dpr_reviewed=True)
+        if filter_is_completed:
+            queryset = queryset.filter(is_completed=True)
 
         return queryset.order_by("-created_at")
+
+    def _check_organization_access(self, organization_id):
+        """
+        Resolve the organization for this request and ensure org admins are
+        scoped to their own organization. Returns (organization, error_response).
+        """
+        user = self.request.user
+        is_superadmin = user.is_superadmin or user.is_superuser
+        is_org_admin = user.groups.filter(
+            name__in=["Organization Admin", "Org Admin", "Administrator"]
+        ).exists()
+
+        try:
+            organization = Organization.objects.get(pk=organization_id)
+        except Organization.DoesNotExist:
+            return None, Response(
+                {"message": "Organization not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if is_org_admin and not is_superadmin and user.organization != organization:
+            return None, Response(
+                {"message": "You do not have access to this organization."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return organization, None
+
+    @action(detail=False, methods=["get"], url_path="steward-meta-stats")
+    def steward_meta_stats(self, request, *args, **kwargs):
+        """
+        Get steward meta statistics scoped to an organization.
+
+        URL: /api/v1/organizations/{organization_id}/watershed/plans/steward-meta-stats/
+        """
+        organization_id = self.kwargs.get("organization_pk")
+        organization, error_response = self._check_organization_access(
+            organization_id
+        )
+        if error_response:
+            return error_response
+
+        base_queryset = PlanApp.objects.filter(
+            enabled=True, organization=organization
+        ).exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_meta_stats(
+            steward_qs, organization_id=organization_id
+        )
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["get"], url_path="steward-listing")
+    def steward_listing(self, request, *args, **kwargs):
+        """
+        Get steward listing scoped to an organization.
+
+        URL: /api/v1/organizations/{organization_id}/watershed/plans/steward-listing/
+        """
+        organization_id = self.kwargs.get("organization_pk")
+        organization, error_response = self._check_organization_access(
+            organization_id
+        )
+        if error_response:
+            return error_response
+
+        base_queryset = PlanApp.objects.filter(
+            enabled=True, organization=organization
+        ).exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
+
+        state_id = request.query_params.get("state")
+        district_id = request.query_params.get("district")
+        tehsil_id = request.query_params.get("tehsil")
+
+        if tehsil_id:
+            base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
+        elif district_id:
+            base_queryset = base_queryset.filter(district_soi_id=district_id)
+        elif state_id:
+            base_queryset = base_queryset.filter(state_soi_id=state_id)
+
+        steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
+        response_data = _build_steward_listing(steward_qs)
+        response_data["filters_applied"] = {
+            "organization_id": organization_id,
+            "state_id": state_id,
+            "district_id": district_id,
+            "tehsil_id": tehsil_id,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
 
     @action(
         detail=False,
@@ -849,7 +1246,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
         Query Parameters:
         - facilitator_name: The facilitator's full name (required)
 
-        URL: /api/v1/organization/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx
+        URL: /api/v1/organizations/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx
         """
         facilitator_name = request.query_params.get("facilitator_name")
         if not facilitator_name:
@@ -860,7 +1257,7 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
 
         user = (
             User.objects.select_related("organization")
-            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .annotate(full_name=STEWARD_FULL_NAME)
             .filter(full_name__iexact=facilitator_name)
             .first()
         )
@@ -901,7 +1298,11 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             if p["project"]:
                 projects[p["project"]] = p["project__name"]
 
-        plans = list(plans_queryset.values("id", "plan", "is_completed"))
+        plans = list(
+            plans_queryset.values(
+                "id", "plan", "is_completed", "latitude", "longitude"
+            )
+        )
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -915,15 +1316,23 @@ class OrganizationPlanViewSet(viewsets.ReadOnlyModelViewSet):
             "age": user.age if user else None,
             "gender": user.get_gender_display() if user and user.gender else None,
             "education_qualification": user.education_qualification if user else None,
-            "organization": {
-                "id": user.organization.id,
-                "name": user.organization.name,
-            }
-            if user and user.organization
-            else None,
+            "organization": (
+                {
+                    "id": user.organization.id,
+                    "name": user.organization.name,
+                }
+                if user and user.organization
+                else None
+            ),
             "projects": [{"id": k, "name": v} for k, v in projects.items()],
             "plans": [
-                {"id": p["id"], "name": p["plan"], "is_completed": p["is_completed"]}
+                {
+                    "id": p["id"],
+                    "name": p["plan"],
+                    "is_completed": p["is_completed"],
+                    "latitude": p["latitude"],
+                    "longitude": p["longitude"],
+                }
                 for p in plans
             ],
             "profile_picture": profile_picture_url,
@@ -1024,7 +1433,9 @@ class PlanViewSet(viewsets.ModelViewSet):
         if tehsil_id:
             base_queryset = base_queryset.filter(tehsil_soi_id=tehsil_id)
 
-        filter_test_demo = self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        filter_test_demo = (
+            self.request.query_params.get("filter_test_plan", "").lower() == "true"
+        )
         if filter_test_demo:
             base_queryset = base_queryset.exclude(
                 Q(plan__icontains="test") | Q(plan__icontains="demo")
@@ -1086,12 +1497,22 @@ class PlanViewSet(viewsets.ModelViewSet):
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
 
+        was_approved = instance.is_dpr_approved
+
         update_serializer = PlanUpdateSerializer(
             instance, data=request.data, partial=partial, context={"request": request}
         )
         update_serializer.is_valid(raise_exception=True)
 
         updated_instance = update_serializer.save()
+
+        # If is_dpr_approved just flipped to True, mirror that onto DPR_Report.status
+        if not was_approved and updated_instance.is_dpr_approved:
+            DPR_Report.objects.filter(plan_id=updated_instance.pk).update(
+                status="APPROVED",
+                last_updated_at=timezone.now(),
+                last_updated_by=request.user,
+            )
 
         response_data = {
             "plan_data": PlanAppSerializer(updated_instance).data,
@@ -1188,9 +1609,9 @@ class PlanViewSet(viewsets.ModelViewSet):
         Excludes Test/Demo plans from counts.
 
         Query Parameters:
-        - state: Filter by state ID
-        - district: Filter by district ID
-        - block: Filter by block ID
+        - state: Filter by state_soi ID
+        - district: Filter by district_soi ID
+        - tehsil: Filter by tehsil_soi ID
         - project: Filter by project ID (optional when called from project context)
 
         URL: /api/v1/projects/{project_id}/watershed/plans/meta-stats/
@@ -1202,7 +1623,7 @@ class PlanViewSet(viewsets.ModelViewSet):
         - DPR generated count
         - DPR reviewed count
         - DPR approved count
-        - Plans by state/district/block breakdown
+        - Plans by state/district/tehsil breakdown
         """
         user = request.user
         project_id = self.kwargs.get("project_pk") or request.query_params.get(
@@ -1232,11 +1653,17 @@ class PlanViewSet(viewsets.ModelViewSet):
 
                     if not (user.is_superadmin or user.is_superuser):
                         if user.groups.filter(
-                            name__in=["Organization Admin", "Org Admin", "Administrator"]
+                            name__in=[
+                                "Organization Admin",
+                                "Org Admin",
+                                "Administrator",
+                            ]
                         ).exists():
                             if project.organization != user.organization:
                                 return Response(
-                                    {"message": "You do not have access to this project."},
+                                    {
+                                        "message": "You do not have access to this project."
+                                    },
                                     status=status.HTTP_403_FORBIDDEN,
                                 )
                         else:
@@ -1245,7 +1672,9 @@ class PlanViewSet(viewsets.ModelViewSet):
                             ).exists()
                             if not user_project_exists:
                                 return Response(
-                                    {"message": "You do not have access to this project."},
+                                    {
+                                        "message": "You do not have access to this project."
+                                    },
                                     status=status.HTTP_403_FORBIDDEN,
                                 )
 
@@ -1260,12 +1689,16 @@ class PlanViewSet(viewsets.ModelViewSet):
                     if user.groups.filter(
                         name__in=["Organization Admin", "Org Admin", "Administrator"]
                     ).exists():
-                        base_queryset = base_queryset.filter(organization=user.organization)
+                        base_queryset = base_queryset.filter(
+                            organization=user.organization
+                        )
                     else:
                         user_projects = UserProjectGroup.objects.filter(
                             user=user
                         ).values_list("project_id", flat=True)
-                        base_queryset = base_queryset.filter(project_id__in=user_projects)
+                        base_queryset = base_queryset.filter(
+                            project_id__in=user_projects
+                        )
 
         state_id = request.query_params.get("state")
         district_id = request.query_params.get("district")
@@ -1304,26 +1737,23 @@ class PlanViewSet(viewsets.ModelViewSet):
             cc_operational_queryset.values("state_soi").distinct().count()
         )
 
-        steward_queryset = base_queryset.exclude(
-            Q(facilitator_name__isnull=True)
-            | Q(facilitator_name="")
-            | Q(facilitator_name__icontains="test")
-            | Q(facilitator_name__icontains="demo")
+        valid_steward_qs = User.objects.filter(groups__name="App User").exclude(
+            organization__name__iexact="CFPT"
         )
-        total_stewards = steward_queryset.values("facilitator_name").distinct().count()
+        total_stewards = valid_steward_qs.count()
 
-        steward_by_org = (
-            steward_queryset.values("organization", "organization__name")
-            .annotate(steward_count=Count("facilitator_name", distinct=True))
-            .order_by("-steward_count")
-        )
         steward_by_org_list = [
             {
                 "organization_id": stat["organization"],
                 "organization_name": stat["organization__name"],
                 "steward_count": stat["steward_count"],
             }
-            for stat in steward_by_org
+            for stat in (
+                valid_steward_qs.filter(organization__isnull=False)
+                .values("organization", "organization__name")
+                .annotate(steward_count=Count("id"))
+                .order_by("-steward_count")
+            )
         ]
 
         state_breakdown = []
@@ -1419,12 +1849,14 @@ class PlanViewSet(viewsets.ModelViewSet):
                 "total_stewards": total_stewards,
                 "by_organization": steward_by_org_list if steward_by_org_list else None,
             },
-            "completion_rate": round((completed_plans / total_plans * 100), 2)
-            if total_plans > 0
-            else 0,
-            "dpr_generation_rate": round((dpr_generated / total_plans * 100), 2)
-            if total_plans > 0
-            else 0,
+            "completion_rate": (
+                round((completed_plans / total_plans * 100), 2)
+                if total_plans > 0
+                else 0
+            ),
+            "dpr_generation_rate": (
+                round((dpr_generated / total_plans * 100), 2) if total_plans > 0 else 0
+            ),
         }
 
         if state_breakdown:
@@ -1473,11 +1905,17 @@ class PlanViewSet(viewsets.ModelViewSet):
 
                     if not (user.is_superadmin or user.is_superuser):
                         if user.groups.filter(
-                            name__in=["Organization Admin", "Org Admin", "Administrator"]
+                            name__in=[
+                                "Organization Admin",
+                                "Org Admin",
+                                "Administrator",
+                            ]
                         ).exists():
                             if project.organization != user.organization:
                                 return Response(
-                                    {"message": "You do not have access to this project."},
+                                    {
+                                        "message": "You do not have access to this project."
+                                    },
                                     status=status.HTTP_403_FORBIDDEN,
                                 )
                         else:
@@ -1486,7 +1924,9 @@ class PlanViewSet(viewsets.ModelViewSet):
                             ).exists()
                             if not user_project_exists:
                                 return Response(
-                                    {"message": "You do not have access to this project."},
+                                    {
+                                        "message": "You do not have access to this project."
+                                    },
                                     status=status.HTTP_403_FORBIDDEN,
                                 )
 
@@ -1501,12 +1941,16 @@ class PlanViewSet(viewsets.ModelViewSet):
                     if user.groups.filter(
                         name__in=["Organization Admin", "Org Admin", "Administrator"]
                     ).exists():
-                        base_queryset = base_queryset.filter(organization=user.organization)
+                        base_queryset = base_queryset.filter(
+                            organization=user.organization
+                        )
                     else:
                         user_projects = UserProjectGroup.objects.filter(
                             user=user
                         ).values_list("project_id", flat=True)
-                        base_queryset = base_queryset.filter(project_id__in=user_projects)
+                        base_queryset = base_queryset.filter(
+                            project_id__in=user_projects
+                        )
 
         state_id = request.query_params.get("state")
         district_id = request.query_params.get("district")
@@ -1520,7 +1964,17 @@ class PlanViewSet(viewsets.ModelViewSet):
             base_queryset = base_queryset.filter(state_soi_id=state_id)
 
         steward_qs = base_queryset.exclude(TEST_FACILITATOR_EXCLUSIONS)
-        response_data = _build_steward_meta_stats(steward_qs)
+
+        effective_org_id = None
+        if not (user.is_superadmin or user.is_superuser):
+            if user.groups.filter(
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
+            ).exists():
+                effective_org_id = user.organization_id
+
+        response_data = _build_steward_meta_stats(
+            steward_qs, organization_id=effective_org_id
+        )
         response_data["filters_applied"] = {
             "project_id": project_id,
             "state_id": state_id,
@@ -1559,11 +2013,17 @@ class PlanViewSet(viewsets.ModelViewSet):
 
                     if not (user.is_superadmin or user.is_superuser):
                         if user.groups.filter(
-                            name__in=["Organization Admin", "Org Admin", "Administrator"]
+                            name__in=[
+                                "Organization Admin",
+                                "Org Admin",
+                                "Administrator",
+                            ]
                         ).exists():
                             if project.organization != user.organization:
                                 return Response(
-                                    {"message": "You do not have access to this project."},
+                                    {
+                                        "message": "You do not have access to this project."
+                                    },
                                     status=status.HTTP_403_FORBIDDEN,
                                 )
                         else:
@@ -1572,7 +2032,9 @@ class PlanViewSet(viewsets.ModelViewSet):
                             ).exists()
                             if not user_project_exists:
                                 return Response(
-                                    {"message": "You do not have access to this project."},
+                                    {
+                                        "message": "You do not have access to this project."
+                                    },
                                     status=status.HTTP_403_FORBIDDEN,
                                 )
 
@@ -1587,12 +2049,16 @@ class PlanViewSet(viewsets.ModelViewSet):
                     if user.groups.filter(
                         name__in=["Organization Admin", "Org Admin", "Administrator"]
                     ).exists():
-                        base_queryset = base_queryset.filter(organization=user.organization)
+                        base_queryset = base_queryset.filter(
+                            organization=user.organization
+                        )
                     else:
                         user_projects = UserProjectGroup.objects.filter(
                             user=user
                         ).values_list("project_id", flat=True)
-                        base_queryset = base_queryset.filter(project_id__in=user_projects)
+                        base_queryset = base_queryset.filter(
+                            project_id__in=user_projects
+                        )
 
         state_id = request.query_params.get("state")
         district_id = request.query_params.get("district")
@@ -1644,7 +2110,7 @@ class PlanViewSet(viewsets.ModelViewSet):
 
         user = (
             User.objects.select_related("organization")
-            .annotate(full_name=Concat("first_name", Value(" "), "last_name"))
+            .annotate(full_name=STEWARD_FULL_NAME)
             .filter(full_name__iexact=facilitator_name)
             .first()
         )
@@ -1685,7 +2151,11 @@ class PlanViewSet(viewsets.ModelViewSet):
             if p["project"]:
                 projects[p["project"]] = p["project__name"]
 
-        plans = list(plans_queryset.values("id", "plan", "is_completed"))
+        plans = list(
+            plans_queryset.values(
+                "id", "plan", "is_completed", "latitude", "longitude"
+            )
+        )
 
         profile_picture_url = None
         if user and user.profile_picture:
@@ -1699,15 +2169,23 @@ class PlanViewSet(viewsets.ModelViewSet):
             "age": user.age if user else None,
             "gender": user.get_gender_display() if user and user.gender else None,
             "education_qualification": user.education_qualification if user else None,
-            "organization": {
-                "id": user.organization.id,
-                "name": user.organization.name,
-            }
-            if user and user.organization
-            else None,
+            "organization": (
+                {
+                    "id": user.organization.id,
+                    "name": user.organization.name,
+                }
+                if user and user.organization
+                else None
+            ),
             "projects": [{"id": k, "name": v} for k, v in projects.items()],
             "plans": [
-                {"id": p["id"], "name": p["plan"], "is_completed": p["is_completed"]}
+                {
+                    "id": p["id"],
+                    "name": p["plan"],
+                    "is_completed": p["is_completed"],
+                    "latitude": p["latitude"],
+                    "longitude": p["longitude"],
+                }
                 for p in plans
             ],
             "profile_picture": profile_picture_url,

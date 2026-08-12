@@ -17,6 +17,7 @@ from utilities.constants import (
     GCS_BUCKET_NAME,
     GEE_PATHS,
 )
+from utilities.constants import GEE_ASSET_PATH
 import ee, geetools
 import time
 import re
@@ -95,7 +96,6 @@ def ee_initialize(
             )
 
         key_dict = json.loads(credentials_blob.decode("utf-8"))
-        key_dict["private_key"] = key_dict["private_key"].replace("\\n", "\n")
         credentials = service_account.Credentials.from_service_account_info(
             key_dict,
             scopes=[
@@ -381,16 +381,21 @@ def gdf_to_ee_fc(gdf):
     return ee.FeatureCollection(features)
 
 
-def create_gee_folder(folder_path, gee_project_path=GEE_ASSET_PATH):
-    try:
-        res = ee.data.createAsset(
-            {"type": "Folder"},
-            gee_project_path + folder_path,
-        )
-        print(res)
-        time.sleep(10)
-    except Exception as e:
-        print("Error:", e)
+def create_gee_folder(folder_path, gee_project_path):
+    full_path = gee_project_path + folder_path
+    parts = full_path.split("/")
+    for i in range(1, len(parts) + 1):
+        sub_path = "/".join(parts[:i])
+        try:
+            ee.data.getAsset(sub_path)
+            print(f"Exists: {sub_path}")
+        except:
+            try:
+                ee.data.createAsset({"type": "Folder"}, sub_path)
+                print(f"Created: {sub_path}")
+                time.sleep(1)
+            except Exception as e:
+                print(f"Failed: {sub_path} -> {e}")
 
 
 def create_gee_directory(
@@ -628,7 +633,7 @@ def download_tif_from_gcs(source_blob_name, destination_file_name):
     print(f"Downloaded {source_blob_name} to {destination_file_name}")
 
 
-def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name):
+def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name=None):
     print("inside sync_raster_to_geoserver")
     geo = Geoserver()
     geo.delete_raster_store(workspace=workspace, store=layer_name)
@@ -888,7 +893,7 @@ def upload_shp_to_gee(
             upload_file_to_gcs(component_path, dest_blob)
 
     # GCS URI to the shapefile
-    gcs_uri = f"gs://core_stack/{gcs_blob_name}"
+    gcs_uri = f"gs://{GCS_BUCKET_NAME}/{gcs_blob_name}"
 
     # Upload from GCS to GEE
     task_id = gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id)

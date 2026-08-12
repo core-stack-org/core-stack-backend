@@ -17,12 +17,14 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from utilities.constants import GEE_DATASET_PATH
-from computing.STAC_specs import generate_STAC_layerwise
+from utilities.constants import WRI_LAND_RESTORATION_DATASET
 
 
 @app.task(bind=True)
 def generate_restoration_opportunity(self, state, district, block, gee_account_id):
+    """
+    It will generate restoration opportunity layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     roi = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
@@ -55,9 +57,7 @@ def generate_restoration_opportunity(self, state, district, block, gee_account_i
 def clip_raster(roi, state, district, block, description):
     asset_id = get_gee_asset_path(state, district, block) + description + "_raster"
 
-    restoration_raster = ee.Image(
-        GEE_DATASET_PATH + "/WRI/LandscapeRestorationOpportunities"
-    )
+    restoration_raster = ee.Image(WRI_LAND_RESTORATION_DATASET)
 
     if not is_gee_asset_exists(asset_id):
         clipped_raster = restoration_raster.clip(roi.geometry())
@@ -93,18 +93,6 @@ def clip_raster(roi, state, district, block, description):
         if res and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
-
-            layer_STAC_generated = False
-            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="wri_restoration_raster",
-            )
-
-            update_layer_sync_status(
-                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-            )
 
         return asset_id
     return None

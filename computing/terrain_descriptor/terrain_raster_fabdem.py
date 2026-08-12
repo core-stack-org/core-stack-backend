@@ -17,8 +17,7 @@ from utilities.gee_utils import (
     get_gee_dir_path,
 )
 from nrm_app.celery import app
-from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
-from computing.STAC_specs import generate_STAC_layerwise
+from utilities.constants import GEE_PATHS, PAN_INDIA_RASTER_FABDEM
 
 
 @app.task(bind=True)
@@ -67,25 +66,24 @@ def generate_terrain_raster_clip(
             )
             + f"terrain_raster_{asset_suffix}"
         )
-    # Load ROI geometry
-    roi = ee.FeatureCollection(roi_asset_id)
 
-    # Load the raster image and clip to ROI
-    pan_india_raster = ee.Image(
-        f"{GEE_DATASET_PATH}/terrain/pan_india_terrain_raster_fabdem"
-    )
+    if not is_gee_asset_exists(asset_id):
+        # Load ROI geometry
+        roi = ee.FeatureCollection(roi_asset_id)
 
-    task = export_raster_asset_to_gee(
-        image=pan_india_raster.clip(roi.union().geometry()),
-        description=asset_suffix,
-        asset_id=asset_id,
-        scale=30,
-        region=roi.geometry(),
-    )
+        # Load the raster image and clip to ROI
+        pan_india_raster = ee.Image(PAN_INDIA_RASTER_FABDEM)
 
-    # Check task status
-    task_id_list = check_task_status([task])
-    print(f"Task completed. Task IDs: {task_id_list}")
+        task = export_raster_asset_to_gee(
+            image=pan_india_raster.clip(roi.union().geometry()),
+            description=asset_suffix,
+            asset_id=asset_id,
+            scale=30,
+            region=roi.geometry(),
+        )
+        # Check task status
+        task_id_list = check_task_status([task])
+        print(f"Task completed. Task IDs: {task_id_list}")
 
     # Check if asset was created
     layer_id = None
@@ -116,17 +114,5 @@ def generate_terrain_raster_clip(
             if state and district and block:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("sync to geoserver flag is updated")
-
-                layer_STAC_generated = False
-                layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                    state=state,
-                    district=district,
-                    block=block,
-                    layer_name="terrain_raster",
-                )
-
-                update_layer_sync_status(
-                    layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-                )
         layer_at_geoserver = True
     return layer_at_geoserver

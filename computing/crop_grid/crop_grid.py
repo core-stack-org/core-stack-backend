@@ -17,7 +17,7 @@ from utilities.gee_utils import (
 )
 from .crop_gridXlulc import crop_grids_lulc
 from nrm_app.celery import app
-from utilities.constants import ADMIN_BOUNDARY_INPUT_DIR, CROP_GRID_PATH, CRS_4326
+from utilities.constants import SOI_TEHSIL, CROP_GRID_PATH, CRS_4326
 
 
 @app.task(bind=True)
@@ -68,7 +68,7 @@ def create_crop_grids(self, state, district, block, gee_account_id):
 
 
 def get_block_coordinates(state, district, block):
-    soi = gpd.read_file(ADMIN_BOUNDARY_INPUT_DIR + "/soi_tehsil.geojson")
+    soi = gpd.read_file(SOI_TEHSIL)
 
     soi = soi[(soi["STATE"].str.lower() == state)]
     soi = soi[(soi["District"].str.lower() == district)]

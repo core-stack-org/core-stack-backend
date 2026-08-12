@@ -26,7 +26,6 @@ from computing.utils import (
     get_layer_object,
 )
 
-from computing.STAC_specs import generate_STAC_layerwise
 from utilities.constants import PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
 
 
@@ -269,27 +268,6 @@ def sync_lulc_to_geoserver(
             )
             if res and layer_ids:
                 update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
-                print("STAC: Name array check", name_arr[1])
-
-                if workspace == "LULC_level_3":
-                    start_year_STAC = "20" + str(
-                        s_year
-                    )  # TODO: these are temp fixes, based on current implementations of the pipelines
-
-                    if state_name and block_name and district_name:
-                        layer_STAC_generated = (
-                            generate_STAC_layerwise.generate_raster_stac(
-                                state=state_name,
-                                district=district_name,
-                                block=block_name,
-                                layer_name="land_use_land_cover_raster",
-                                start_year=str(start_year_STAC),
-                            )
-                        )
-                        update_layer_sync_status(
-                            layer_id=layer_ids[i],
-                            is_stac_specs_generated=layer_STAC_generated,
-                        )
                 print("geoserver flag is updated")
                 layer_at_geoserver = True
     return layer_at_geoserver

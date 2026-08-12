@@ -36,8 +36,9 @@ GEOSERVER_BASE_URL = "https://geoserver.core-stack.org:8443/geoserver"
 AGRI_YEAR_START_DATE = "07-01"
 AGRI_YEAR_END_DATE = "06-30"
 
-LAYER_DESC_GITHUB_URL = "https://github.com/core-stack-org/layers_metadata/blob/main/layer_descriptions.csv?raw=true"
-VECTOR_COLUMN_DESC_GITHUB_URL = "https://github.com/core-stack-org/layers_metadata/blob/main/vector_column_descriptions.csv?raw=true"
+LAYER_MAP_GITHUB_URL = "https://raw.githubusercontent.com/core-stack-org/layers_metadata/main/layer_mapping.csv"
+LAYER_DESC_GITHUB_URL = "https://raw.githubusercontent.com/core-stack-org/layers_metadata/main/layer_descriptions.csv"
+VECTOR_COLUMN_DESC_GITHUB_URL = "https://raw.githubusercontent.com/core-stack-org/layers_metadata/main/vector_column_descriptions.csv"
 
 # Ground sample distance (aka Raster spatial resolution) in meters for different layers
 # specifying here because no easy way to get these from geoserver data

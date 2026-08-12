@@ -17,7 +17,6 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
-
 env = environ.Env()
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 environ.Env.read_env(str(ENV_FILE))
@@ -42,6 +41,7 @@ def resolve_env_path(name, default="", *, trailing_sep=False):
         resolved = resolved.rstrip("/\\") + os.sep
     return resolved
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -53,7 +53,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
 
 # TMP File location
-TMP_LOCATION = resolve_env_path("TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True)
+TMP_LOCATION = resolve_env_path(
+    "TMP_LOCATION", default="$BACKEND_DIR/tmp", trailing_sep=True
+)
 
 # MARK: ODK Login Creds
 ODK_USERNAME = env("ODK_USERNAME")
@@ -76,16 +78,7 @@ STATIC_ROOT = "static/"
 GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
 GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
 ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
-ALLOWED_HOSTS = [
-    "geoserver.core-stack.org",
-    "127.0.0.1",
-    "localhost",
-    "0.0.0.0",
-    "api-doc.core-stack.org",
-    "2f2de623c34b.ngrok-free.app",
-    "odk.core-stack.org",
-    "unrecognizably-deft-aimee.ngrok-free.dev",
-]
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
 CE_API_URL = env("CE_API_URL")
 CE_BUCKET_NAME = env("CE_BUCKET_NAME")
 # MARK: Django Apps
@@ -131,22 +124,9 @@ INSTALLED_APPS = [
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
-    CORS_ALLOWED_ORIGINS = [
-        "http://gramvaanimoderationtest.s3-website.ap-south-1.amazonaws.com",
-        "https://nrm.core-stack.org",
-        "https://nrm.gramvaanidev.org",
-        "https://dashboard.core-stack.org",
-        "https://feature-logout-functionality.d2u6quqcimqsuk.amplifyapp.com",
-        "https://uat.dashboard.core-stack.org",
-        "https://www.explorer.core-stack.org",
-        "https://www.explorer.core-stack.org/landscape_explorer",
-        "https://development.d2s4eeyazvtd2g.amplifyapp.com",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1",
-        "http://localhost:3000",
-        "http://localhost:3001",
-    ]
+    CORS_ALLOWED_ORIGINS = (
+        env.list("CORS_ALLOWED_ORIGINS") if "CORS_ALLOWED_ORIGINS" in os.environ else []
+    )
 
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://localhost:\d+$",
@@ -354,21 +334,30 @@ LOGGING = {
 
 # MARK: Report requirements
 OVERPASS_URL = env("OVERPASS_URL")
+BASE_API_URL = env("BASE_API_URL")
 
 # MARK: Email Settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtpout.secureserver.net"
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True
-EMAIL_USE_TLS = False
+EMAIL_HOST = env("EMAIL_HOST", default="smtpout.secureserver.net")
+EMAIL_PORT = env.int("EMAIL_PORT", default=465)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=True)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=False)
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-EMAIL_TIMEOUT = 30
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=100)
+MISSING_LAYER_RECIPIENTS = env.list("MISSING_LAYER_RECIPIENTS")
 PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 
-GEOSERVER_URL = env("GEOSERVER_URL")
-GEOSERVER_USERNAME = env("GEOSERVER_USERNAME")
-GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD")
+GEOSERVER_URL = env("GEOSERVER_URL", default="")
+GEOSERVER_USERNAME = env("GEOSERVER_USERNAME", default="")
+GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD", default="")
+
+PROD_GEOSERVER_URL = env("PROD_GEOSERVER_URL", default="")
+PROD_GEOSERVER_USERNAME = env("PROD_GEOSERVER_USERNAME", default="")
+PROD_GEOSERVER_PASSWORD = env("PROD_GEOSERVER_PASSWORD", default="")
+
+PROD_BACKEND_URL = env("PROD_BACKEND_URL", default="")
+PROD_BACKEND_API_KEY = env("PROD_BACKEND_API_KEY", default="")
 
 
 CE_BUCKET_URL = env("CE_BUCKET_URL")
@@ -378,6 +367,9 @@ EARTH_DATA_PASSWORD = env("EARTH_DATA_PASSWORD")
 GEE_SERVICE_ACCOUNT_KEY_PATH = env("GEE_SERVICE_ACCOUNT_KEY_PATH")
 GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH = env("GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH")
 GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH")
+
+# gcs bucket
+GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
 
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
 
@@ -393,11 +385,11 @@ S3_BUCKET = env("S3_BUCKET")
 S3_REGION = env("S3_REGION")
 
 # DPR S3 settings
-DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY")
-DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY")
-DPR_S3_REGION = env("DPR_S3_REGION")
-DPR_S3_BUCKET = env("DPR_S3_BUCKET")
-DPR_S3_FOLDER = env("DPR_S3_FOLDER")
+DPR_S3_SECRET_KEY = env("DPR_S3_SECRET_KEY", default="")
+DPR_S3_ACCESS_KEY = env("DPR_S3_ACCESS_KEY", default="")
+DPR_S3_REGION = env("DPR_S3_REGION", default="")
+DPR_S3_BUCKET = env("DPR_S3_BUCKET", default="")
+DPR_S3_FOLDER = env("DPR_S3_FOLDER", default="")
 
 # bot_interface settings
 AUTH_TOKEN_360 = env("AUTH_TOKEN_360")
@@ -412,13 +404,14 @@ WHATSAPP_MEDIA_PATH = resolve_env_path(
 )
 
 BASE_URL = "https://geoserver.core-stack.org/"
-DEFAULT_FROM_EMAIL = "CoreStackSupport <contact@core-stack.org>"
+DEFAULT_FROM_EMAIL = "CoRE Stack Support <support@core-stack.org>"
 
 PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 
 FERNET_KEY = env("FERNET_KEY")
 
 API_KEY = env("API_KEY", default="")
+RECAPTCHA_SECRET_KEY = env("RECAPTCHA_SECRET_KEY", default="")
 
 
 lulc_years = [
@@ -431,3 +424,6 @@ lulc_years = [
     "2023_2024",
 ]
 water_classes = [2, 3, 4]
+
+GEE_STORAGE_PROJECT = env("GEE_STORAGE_PROJECT")
+GEE_STORAGE_PROJECT_HELPER = env("GEE_STORAGE_PROJECT_HELPER")

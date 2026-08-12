@@ -1,6 +1,5 @@
 import ee
 
-from constants.pan_india_path import PAN_INDIA_SO
 from nrm_app.celery import app
 from computing.utils import (
     save_layer_info_to_db,
@@ -8,7 +7,7 @@ from computing.utils import (
     sync_layer_to_geoserver,
 )
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, STREAM_ORDER_ASSET
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -37,6 +36,9 @@ def generate_stream_order(
     asset_folder=None,
     app_type="MWS",
 ):
+    """
+    It will generate stream order layer for given location at tehsil level or region of intrest
+    """
 
     ee_initialize(gee_account_id)
     if state and district and block:
@@ -75,7 +77,7 @@ def generate_stream_order(
             + "_raster"
         )
 
-    stream_order_raster = ee.Image(PAN_INDIA_SO)
+    stream_order_raster = ee.Image(STREAM_ORDER_ASSET)
     raster = stream_order_raster.clip(roi.geometry())
 
     # Generate raster Layer
@@ -192,7 +194,7 @@ def stream_order_vector_generation(
     asset_suffix=None,
     asset_folder=None,
 ):
-    layer_id = None  # ✅ ensure defined
+    layer_id = None  #  ensure defined
 
     # -------------------------------
     # Build asset path

@@ -11,7 +11,6 @@ from computing.utils import (
     update_dashboard_geojson,
     sync_project_fc_to_geoserver,
 )
-from constants.pan_india_path import CATCHMENT_AREA, STREAM_ORDER_RASTER
 from geoadmin.models import (
     District,
     State_Disritct_Block_Properties,
@@ -21,12 +20,11 @@ from geoadmin.models import (
 )
 from nrm_app.celery import app
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, STREAM_ORDER_ASSET, CATCHMENT_AREA
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     get_gee_dir_path,
-    is_gee_asset_exists,
     export_vector_asset_to_gee,
     make_asset_public,
     check_task_status,
@@ -37,6 +35,7 @@ from waterrejuvenation.utils import (
     calculate_zoi_area,
     wait_for_task_completion,
     delete_asset_on_GEE,
+    _waterbody_area_ha,
 )
 from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 
@@ -51,8 +50,14 @@ def generate_zoi1(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
+    start_date=None,
+    end_date=None,
 ):
     print("insdie zoi")
+    if not start_date or not end_date:
+        raise ValueError(
+            "start_date and end_date are required for ZOI generation (YYYY-MM-DD)."
+        )
     ee_initialize(gee_account_id)
     description = "swb3_" + asset_suffix
     asset_id = (
@@ -75,15 +80,12 @@ def generate_zoi1(
         + description_zoi
     )
     delete_asset_on_GEE(asset_id_zoi)
-    start_date = "2017-07-01"
-    end_date = "2025-06-30"
     zoi_fc = roi.map(compute_zoi)
     zoi_fc = ee.FeatureCollection(zoi_fc)
     zoi_rings = zoi_fc.filter(ee.Filter.gt("zoi_wb", 0)).map(create_ring)
-    if not is_gee_asset_exists(asset_id_zoi):
-        zoi_task = export_vector_asset_to_gee(zoi_rings, description_zoi, asset_id_zoi)
-        check_task_status([zoi_task])
-        make_asset_public(asset_id_zoi)
+    zoi_task = export_vector_asset_to_gee(zoi_rings, description_zoi, asset_id_zoi)
+    check_task_status([zoi_task])
+    make_asset_public(asset_id_zoi)
     if state and district and block:
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         print(layer_name)
@@ -106,7 +108,7 @@ def generate_zoi1(
 
 def compute_zoi(feature):
 
-    area_of_wb = ee.Number(feature.get("area_ored"))  # assumes area field exists
+    area_of_wb = _waterbody_area_ha(feature)
 
     # logistic_weight
     def logistic_weight(x, x0=0.2, k=50):
@@ -130,13 +132,32 @@ def compute_zoi(feature):
         .add(s.multiply(y_large_bodies(area_of_wb)).round())
     )
 
-    return feature.set("zoi_wb", zoi)
+    return feature.set("zoi_wb", zoi).set(
+        "UID",
+        ee.Algorithms.If(
+            feature.get("UID"),
+            feature.get("UID"),
+            ee.Algorithms.If(
+                feature.get("uid"),
+                feature.get("uid"),
+                feature.get("MWS_UID"),
+            ),
+        ),
+    )
 
 
 def create_ring(feature):
     geom = feature.geometry()  # can be point or polygon
     zoi = ee.Number(feature.get("zoi_wb"))
-    uid = feature.get("UID")
+    uid = ee.Algorithms.If(
+        feature.get("UID"),
+        feature.get("UID"),
+        ee.Algorithms.If(
+            feature.get("uid"),
+            feature.get("uid"),
+            feature.get("MWS_UID"),
+        ),
+    )
 
     # Make circle buffer from centroid
     centroid = geom.centroid()

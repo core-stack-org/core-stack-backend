@@ -1,9 +1,8 @@
 from computing.utils import sync_fc_to_geoserver, sync_project_fc_to_geoserver
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, STREAM_ORDER_ASSET, CATCHMENT_AREA
 from utilities.gee_utils import ee_initialize, get_gee_asset_path, get_gee_dir_path
 import ee
-from constants.pan_india_path import CATCHMENT_AREA, STREAM_ORDER_RASTER
 from waterrejuvenation.utils import delete_asset_on_GEE, wait_for_task_completion
 
 
@@ -19,7 +18,7 @@ def compute_max_stream_order_and_catchment_for_swb(swb_layer_asset, proj_id):
     catchment_band = catchemnt_area_raster.select(
         "b1"
     )  # Adjust based on the band you need
-    stream_order_raster = ee.Image(STREAM_ORDER_RASTER)
+    stream_order_raster = ee.Image(STREAM_ORDER_ASSET)
     stream_order_band = stream_order_raster.select("b1")
 
     # Function to compute max B1 inside each feature

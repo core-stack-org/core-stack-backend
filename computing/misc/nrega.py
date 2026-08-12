@@ -11,9 +11,7 @@ from computing.utils import (
 from utilities.constants import (
     NREGA_ASSETS_OUTPUT_DIR,
 )
-import boto3
-from io import BytesIO
-from nrm_app.settings import NREGA_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY
+from nrm_app.settings import NREGA_BUCKET
 from utilities.gee_utils import (
     gdf_to_ee_fc,
     export_vector_asset_to_gee,
@@ -29,8 +27,6 @@ import ee
 import numpy as np
 import shutil
 
-from computing.STAC_specs import generate_STAC_layerwise
-
 
 def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
     print("Inside export shp to gee")
@@ -45,23 +41,25 @@ def export_shp_to_gee(district, block, layer_path, asset_id, gee_account_id):
 
 @app.task(bind=True)
 def clip_nrega_district_block(self, state, district, block, gee_account_id):
-    print("Start nrega asset clipping")
+    print(f"Start nrega asset clipping for {state} - {district} - {block}")
+    """
+    It will generate nrega layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
-    s3 = boto3.resource(
-        "s3",
-        region_name="ap-south-1",
-        aws_access_key_id=S3_ACCESS_KEY,
-        aws_secret_access_key=S3_SECRET_KEY,
-    )
 
-    key = f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+    nrega_geojson_file = (
+        f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+    )
+    nrega_file_url = (
+        f"https://{NREGA_BUCKET}.s3.ap-south-1.amazonaws.com/{nrega_geojson_file}"
+    )
     layer_at_geoserver = False
 
     try:
-        file_obj = s3.Object(NREGA_BUCKET, key).get()
-        gdf = gpd.read_file(BytesIO(file_obj["Body"].read()))
+        gdf = gpd.read_file(nrega_file_url)
+        print("File loaded successfully")
     except Exception as e:
-        print("Error while reading file from S3:", e)
+        print("Error while reading public file:", e)
         return layer_at_geoserver
 
     # Ensure CRS
@@ -120,10 +118,9 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     # Convert datetime columns
     for col in block_metadata_df.columns:
         if col != "geometry":
-            if pd.api.types.is_datetime64_any_dtype(block_metadata_df[col]):
-                block_metadata_df[col] = (
-                    block_metadata_df[col].astype(str).replace("NaT", None)
-                )
+            block_metadata_df[col] = block_metadata_df[col].apply(
+                lambda x: str(x) if pd.notnull(x) else None
+            )
 
     # Save Shapefile
     nrega_folder_name = (
@@ -176,24 +173,10 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
         )
 
         make_asset_public(nrega_asset_id)
-
         res = push_shape_to_geoserver(output_dir, workspace="nrega_assets")
 
         if res["status_code"] == 201 and layer_id:
-
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-
-            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="nrega_vector",
-            )
-
-            update_layer_sync_status(
-                layer_id=layer_id,
-                is_stac_specs_generated=layer_STAC_generated,
-            )
 
             layer_at_geoserver = True
             print("nrega data sync to geoserver")

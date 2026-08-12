@@ -1,9 +1,18 @@
 # plans/tests.py
+import csv
+import os
+import tempfile
+from datetime import datetime, timezone
+from unittest.mock import patch
+
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
+
+from dpr.models import ODK_settlement
 from .models import Plan
+from .utils import fetch_db_data
 from projects.models import Project, AppType
 from organization.models import Organization
 from users.models import User, UserProjectGroup
@@ -312,3 +321,260 @@ class PlanAPITest(APITestCase):
 
         # Verify plan was not deleted
         self.assertEqual(Plan.objects.count(), 1)
+
+
+# Minimal valid ODK settlement JSON (same structure as ODK submissions stored in data_settlement)
+def _make_settlement_json(plan_id, block_name, settlement_id="SETT001", review_state="hasIssues"):
+    return {
+        "__id": f"uuid:{settlement_id}",
+        "__system": {"reviewState": review_state, "submissionDate": "2024-01-01T00:00:00Z"},
+        "block_name": block_name,
+        "plan_id": str(plan_id),
+        "GPS_point": {
+            "point_mapsappearance": {
+                "coordinates": [78.5, 20.5]
+            }
+        },
+        "Settlements_id": settlement_id,
+        "Settlements_name": "Test Settlement",
+        "MNREGA_INFORMATION": {
+            "NREGA_aware": 10,
+            "NREGA_applied": 5,
+            "NREGA_job_card": 3,
+            "total_household": 2,
+            "NREGA_work_days": 100,
+            "q1": "yes",
+            "select_one_Y_N": "yes",
+            "select_one_demands": "wages",
+            "select_multiple_issues": "delayed_payment",
+            "select_one_contributions": "labour",
+        },
+    }
+
+
+def _create_settlement(plan_id, block_name, settlement_id="SETT001",
+                       is_deleted=False, is_moderated=False, review_state="hasIssues",
+                       data_override=None):
+    data = data_override or _make_settlement_json(plan_id, block_name, settlement_id, review_state)
+    return ODK_settlement.objects.create(
+        settlement_id=settlement_id,
+        settlement_name="Test Settlement",
+        submission_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        submitted_by="test_user",
+        status_re=review_state,
+        latitude=20.5,
+        longitude=78.5,
+        block_name=block_name,
+        number_of_households=10,
+        largest_caste="General",
+        smallest_caste="SC",
+        settlement_status="active",
+        plan_id=str(plan_id),
+        plan_name="Test Plan",
+        uuid=f"uuid:{settlement_id}",
+        farmer_family={},
+        livestock_census={},
+        nrega_job_aware=10,
+        nrega_job_applied=5,
+        nrega_past_work="yes",
+        nrega_raise_demand="yes",
+        nrega_demand="wages",
+        nrega_issues="delayed_payment",
+        nrega_community="labour",
+        data_settlement=data,
+        is_deleted=is_deleted,
+        is_moderated=is_moderated,
+    )
+
+
+class FetchDbDataTest(TestCase):
+
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp()
+
+    def _csv_path(self, name="test.csv"):
+        return os.path.join(self.tmp_dir, name)
+
+    def test_returns_true_and_writes_csv_for_valid_settlement(self):
+        _create_settlement(plan_id="42", block_name="test block")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
+
+        self.assertTrue(result)
+        self.assertTrue(os.path.exists(csv_path))
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        self.assertEqual(len(rows), 1)
+        self.assertIn("latitude", rows[0])
+        self.assertIn("longitude", rows[0])
+        self.assertEqual(rows[0]["sett_id"], "SETT001")
+        self.assertEqual(rows[0]["sett_name"], "Test Settlement")
+
+    def test_moderated_record_uses_moderated_json(self):
+        moderated_data = _make_settlement_json("42", "test block")
+        moderated_data["Settlements_name"] = "Moderated Settlement Name"
+        _create_settlement(
+            plan_id="42",
+            block_name="test block",
+            settlement_id="SETT002",
+            is_moderated=True,
+            data_override=moderated_data,
+        )
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
+
+        self.assertTrue(result)
+        with open(csv_path) as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["sett_name"], "Moderated Settlement Name")
+
+    def test_deleted_records_excluded(self):
+        _create_settlement(plan_id="42", block_name="test block", is_deleted=True)
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
+
+        self.assertFalse(result)
+        self.assertFalse(os.path.exists(csv_path))
+
+    def test_rejected_submissions_excluded_by_transform(self):
+        _create_settlement(
+            plan_id="42", block_name="test block",
+            settlement_id="SETT003", review_state="rejected"
+        )
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
+
+        self.assertFalse(result)
+
+    def test_returns_false_for_no_matching_records(self):
+        csv_path = self._csv_path()
+        result = fetch_db_data(csv_path, "settlement", "nonexistent_block", "99")
+        self.assertFalse(result)
+
+    def test_returns_false_for_unknown_resource_type(self):
+        csv_path = self._csv_path()
+        result = fetch_db_data(csv_path, "unknown_type", "test_block", "42")
+        self.assertFalse(result)
+
+    def test_block_name_with_spaces_matches_underscore_block_param(self):
+        _create_settlement(plan_id="42", block_name="test block")
+        csv_path = self._csv_path()
+
+        # block param uses underscore; DB has spaces — should still match
+        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
+
+        self.assertTrue(result)
+
+    def test_block_name_with_parentheses_matches_normalized_block_param(self):
+        _create_settlement(plan_id="42", block_name="Keonjhar (Kendujhar)")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "keonjhar_kendujhar", "42")
+
+        self.assertTrue(result)
+
+    def test_block_name_with_extra_spaces_matches_normalized_block_param(self):
+        _create_settlement(plan_id="42", block_name="Keonjhar  (Kendujhar)")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "keonjhar_kendujhar", "42")
+
+        self.assertTrue(result)
+
+    def test_block_name_with_multiple_parenthesized_segments_matches_normalized_block_param(self):
+        _create_settlement(plan_id="42", block_name="(Keonjhar) (Kendujhar)")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "keonjhar_kendujhar", "42")
+
+        self.assertTrue(result)
+
+    def test_only_matching_plan_id_returned(self):
+        _create_settlement(plan_id="42", block_name="test block", settlement_id="S1")
+        _create_settlement(plan_id="99", block_name="test block", settlement_id="S2")
+        csv_path = self._csv_path()
+
+        result = fetch_db_data(csv_path, "settlement", "test_block", "42")
+
+        self.assertTrue(result)
+        with open(csv_path) as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["sett_id"], "S1")
+
+
+class AddResourcesAPITest(APITestCase):
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("add_resources")
+
+    @patch("plans.api.build_layer", return_value=True)
+    @patch("plans.api.sync_form_type", return_value=True)
+    def test_returns_201_when_db_data_exists(self, mock_sync, mock_build):
+        _create_settlement(plan_id="42", block_name="test block")
+
+        response = self.client.post(self.url, {
+            "layer_name": "test_layer",
+            "resource_type": "settlement",
+            "plan_id": "42",
+            "plan_name": "test plan",
+            "district_name": "test district",
+            "block_name": "test block",
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_sync.assert_called_once_with("settlement")
+        mock_build.assert_called_once()
+
+    @patch("plans.api.sync_form_type", return_value=True)
+    def test_returns_404_when_no_db_data(self, mock_sync):
+        response = self.client.post(self.url, {
+            "layer_name": "test_layer",
+            "resource_type": "settlement",
+            "plan_id": "99",
+            "plan_name": "test plan",
+            "district_name": "test district",
+            "block_name": "no block",
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("plans.api.build_layer", return_value=True)
+    @patch("plans.api.sync_form_type", return_value=False)
+    def test_proceeds_with_db_data_even_when_sync_fails(self, mock_sync, mock_build):
+        _create_settlement(plan_id="42", block_name="test block")
+
+        response = self.client.post(self.url, {
+            "layer_name": "test_layer",
+            "resource_type": "settlement",
+            "plan_id": "42",
+            "plan_name": "test plan",
+            "district_name": "test district",
+            "block_name": "test block",
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_build.assert_called_once()
+
+    @patch("plans.api.build_layer", return_value=False)
+    @patch("plans.api.sync_form_type", return_value=True)
+    def test_returns_500_when_build_layer_fails(self, mock_sync, mock_build):
+        _create_settlement(plan_id="42", block_name="test block")
+
+        response = self.client.post(self.url, {
+            "layer_name": "test_layer",
+            "resource_type": "settlement",
+            "plan_id": "42",
+            "plan_name": "test plan",
+            "district_name": "test district",
+            "block_name": "test block",
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)

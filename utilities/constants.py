@@ -1,6 +1,17 @@
+# import
+from nrm_app.settings import GEE_STORAGE_PROJECT, GEE_STORAGE_PROJECT_HELPER
+
 # Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
+
+# Canonical local pipeline resources. Runtime pipelines read these defaults
+# directly; their YAML `sources` entries are optional test overrides.
+BASE_RESOURCES_DIR = "data/base_resources"
+ADMIN_BOUNDARY_GPKG = f"{BASE_RESOURCES_DIR}/cs_admin_standard.gpkg"
+FACILITIES_GPKG = f"{BASE_RESOURCES_DIR}/cs_pan_india_facilities.gpkg"
+ANTYODAYA_2020_CSV = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020_cluster_analysis.csv"
+LIVESTOCK_CENSUS_20_CSV = f"{BASE_RESOURCES_DIR}/cs_livestock_census_20.csv"
 
 NREGA_ASSETS_INPUT_DIR = "data/nrega_assets/input"
 NREGA_ASSETS_OUTPUT_DIR = "data/nrega_assets/output"
@@ -113,6 +124,10 @@ ODK_SYNC_URL_LIVELIHOOD = (
     ODK_BASE_URL + ODK_PROJECT_ID + "/forms/NRM%20Livelihood%20Form/submissions"
 )
 
+ODK_SYNC_URL_AGROHORTICULTURE = (
+    ODK_BASE_URL + ODK_PROJECT_ID + "/forms/Agrohorticulture/submissions"
+)
+
 ODK_SYNC_URL_RS_WATERBODY_MAINTENANCE = (
     ODK_BASE_URL
     + ODK_PROJECT_ID
@@ -158,18 +173,28 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 # MARK: GEE Paths
 GCS_BUCKET_NAME = "core_stack"
 
-GEE_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
-GEE_HELPER_PATH = "projects/ee-corestack-helper/assets/apps/mws/"
+GEE_LITHOLOGY_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
-GEE_PATH_PLANTATION = "projects/ee-corestackdev/assets/apps/plantation/"
-GEE_PATH_PLANTATION_HELPER = "projects/ee-corestack-helper/assets/apps/plantation/"
+GEE_ASSET_PATH = f"projects/{GEE_STORAGE_PROJECT}/assets/apps/mws/"
+GEE_HELPER_PATH = f"projects/{GEE_STORAGE_PROJECT_HELPER}/assets/apps/mws/"
 
-GEE_BASE_PATH = "projects/ee-corestackdev/assets/apps"
-GEE_HELPER_BASE_PATH = "projects/ee-corestack-helper/assets/apps"
+GEE_PATH_PLANTATION = f"projects/{GEE_STORAGE_PROJECT}/assets/apps/plantation/"
+GEE_PATH_PLANTATION_HELPER = (
+    f"projects/{GEE_STORAGE_PROJECT_HELPER}/assets/apps/plantation/"
+)
+
+GEE_BASE_PATH = f"projects/{GEE_STORAGE_PROJECT}/assets/apps"
+GEE_HELPER_BASE_PATH = f"projects/{GEE_STORAGE_PROJECT_HELPER}/assets/apps"
 
 GEE_DATASET_PATH = "projects/corestack-datasets/assets/datasets"
-
+AQUIFER_DATASET_PATH = "projects/corestack-datasets/assets/datasets/Aquifer_vector"
+PAN_INDIA_DRAINAGE_LINES_DATASET = (
+    "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
+)
 GEE_EXT_DATASET_PATH = "projects/ext-datasets/assets/datasets"
+AGROECOLOGICAL_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Agroecological_space_pan_india"
+)
 
 GEE_FACILITIES_DATASET_PATH = (
     "projects/corestack-datasets/assets/datasets/pan_india_facilities"
@@ -215,13 +240,13 @@ filter_query = (
 )
 project_id = 2
 
-
 # demand vaidator constants
 DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
 GLOBAL_DRAINAGE_EPS_M = 10.0
 GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
+WORKSPACE_URL_END = "wms?service=WMS&request=GetCapabilities"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
 LULC_ASSET = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2024_2025"
@@ -248,9 +273,104 @@ VEGETATION_INDEX_OF_16_DAY = "MODIS/061/MOD13Q1"
 PAN_INDIA_L3_LULC_CLUSTERS = (
     "projects/ee-indiasat/assets/L3_LULC_Clusters/Final_Level3_PanIndia_Clusters"
 )
-
+AEZ = "projects/ext-datasets/assets/datasets/Agro_Ecological_Zones"
+FACILITIES_DATASET_NAME = "Facilities Proximity"
+LCW_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/lcw_conflict_pan_india"
+MINING_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/Mining_data_pan_india"
+FACTORY_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Factory_CSR_pan_india"
+)
+GREEN_CREDIT_PAN_INDIA_DATASET = (
+    "projects/ext-datasets/assets/datasets/Green_credit_pan_india"
+)
+HARMONIZED_LANDSAT_SENTINEL = "NASA/HLS/HLSL30/v002"
+NBAR_MSI = "NASA/HLS/HLSS30/v002"
+SOGE_DATASET = "projects/corestack-datasets/assets/datasets/SOGE_vector_2020"
+WRI_LAND_RESTORATION_DATASET = (
+    "projects/corestack-datasets/assets/datasets/WRI/LandscapeRestorationOpportunities"
+)
+MWS_DATASET = (
+    "projects/corestack-datasets/assets/datasets/hydrological_boundaries/microwatershed"
+)
+MWS_CONNECTIVITY_DATASET = (
+    "projects/corestack-datasets/assets/datasets/India_mws_connectivity"
+)
+ET_FLDAS_BOUNDING_BOX = "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_20200111_20200124"
+ET_FLDAS_ANNUAL = (
+    "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_annual/ET_"
+)
+ET_FLDAS_FORTNIGHT = (
+    "projects/corestack-datasets-alpha/assets/datasets/ET_FLDAS/ET_fortnight/Hydro_"
+)
+GLDAS = "NASA/FLDAS/NOAH01/C/GL/M/V001"
+JAXA_PPT = "JAXA/GPM_L3/GSMaP/v6/operational"
+GLOBAL_HYDROLOGIC_SOIL_GROUPS = "projects/ext-datasets/assets/datasets/HYSOGs250m"
+PRINCIPAL_AQUIFER = "projects/ext-datasets/assets/datasets/principalAquifer"
+INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
+ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
+WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
+PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
+SOI_TEHSIL = "data/admin-boundary/input/soi_tehsil.geojson"
+FABDEM = "projects/sat-io/open-datasets/FABDEM"
+WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
+WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
+WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
+PAN_INDIA_LULC_V3_DATASET = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+)
+DISTANCE_TO_UPSTREAM_DL = (
+    "projects/ext-datasets/assets/datasets/distance_to_nearest_upstream_DL_raster"
+)
+SLOPE_PERCENTAGE = "projects/ext-datasets/assets/datasets/slope_percentage_fabdem"
+NATURAL_DEPRESSION_EXTERNAL_DATASET = (
+    "projects/ext-datasets/assets/datasets/Natural_depression_raster"
+)
+PAN_INDIA_MWS_PATH = "projects/corestack-datasets/assets/datasets/India_mws_UID_Merged"
+NATURAL_DEPRESSION = (
+    "projects/corestack-datasets/assets/datasets/Natural_depression_raster"
+)
+CATCHMENT_AREA = "projects/ext-datasets/assets/datasets/catchment_area_singleflow"
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
 # CRS
 CRS_4326 = "EPSG:4326"
 
 # Algorithm
 DROUGHT_ALGORITHM = "MOD09A1-NDVI/NDWI"
+
+# workspace
+FACILITIES_GEOSERVER_WORKSPACE = "facilities_proximity"
+ANTYODAYA_GEOSERVER_WORKSPACE = "antyodaya_2020"
+LIVESTOCK_GEOSERVER_WORKSPACE = "livestocks"
+
+# other
+FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
+WBC = "projects/ext-datasets/assets/datasets/WBC_"
+WATERREJUVENATION_PROJECT = GEE_STORAGE_PROJECT
+
+# Plantation
+ANNUAL_PPT = "projects/ee-plantationsitescores/assets/AnnualPrecipitation"
+MEAN_ANNUAL_TEMP = "projects/ee-plantationsitescores/assets/MeanAnnualTemp"
+ARDITY_INDEX = "projects/ee-plantationsitescores/assets/India-AridityIndex"
+REFERENCE_ET = "projects/ee-plantationsitescores/assets/ReferenceEvapotranspiration"
+AWC = "projects/ee-plantationsitescores/assets/Raster-AWC_CLASS"
+TOPOSOILPH = "projects/ee-plantationsitescores/assets/Raster-T_PH_H2O"
+TOPOSOILBD = "projects/ee-plantationsitescores/assets/Raster-T_BULK_DEN"
+TOPOSOILOC = "projects/ee-plantationsitescores/assets/Raster-T_OC"
+TOPOSOILEC = "projects/ee-plantationsitescores/assets/Raster-T_CEC_SOIL"
+TOPOSOILTEXTURE = "projects/ee-plantationsitescores/assets/Raster-T_TEXTURE"
+SUBSOILPH = "projects/ee-plantationsitescores/assets/Raster-S_PH_H2O"
+SUBSOILBD = "projects/ee-plantationsitescores/assets/Raster-S_BULK_DEN"
+SUBSOILOC = "projects/ee-plantationsitescores/assets/Raster-S_OC"
+SUBSOILEC = "projects/ee-plantationsitescores/assets/Raster-S_CEC_SOIL"
+SUBSOILTEXTURE = "projects/ee-plantationsitescores/assets/Raster-S_USDA_TEX_CLASS"
+RASTER_DRAINAGE = "projects/ee-plantationsitescores/assets/Raster-Drainage"
+PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
+
+# TREE HEALTH
+CCD_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ccd_"
+CH_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ch_"
+TREE_OVERALL_CHANGE = (
+    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2022"
+)
+
+CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"

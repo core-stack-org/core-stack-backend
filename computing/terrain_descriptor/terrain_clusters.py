@@ -14,7 +14,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
-from computing.STAC_specs import generate_STAC_layerwise
+from utilities.constants import FABDEM
 
 
 @app.task(bind=True)
@@ -39,7 +39,7 @@ def generate_terrain_clusters(self, state, district, block, gee_account_id):
 
 def compute_on_gee(state, district, block, asset_id, asset_name):
     # dem = ee.Image("USGS/SRTMGL1_003")
-    fabdem = ee.ImageCollection("projects/sat-io/open-datasets/FABDEM")
+    fabdem = ee.ImageCollection(FABDEM)
     dem = (
         fabdem.mosaic().setDefaultProjection("EPSG:3857", None, 30).rename("elevation")
     )
@@ -400,13 +400,5 @@ def sync_to_geoserver(state, district, block, asset_id, layer_id):
     if res["status_code"] == 201 and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
         print("sync to geoserver flag is updated")
-
-        layer_STAC_generated = False
-        layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-            state=state, district=district, block=block, layer_name="terrain_vector"
-        )
-        update_layer_sync_status(
-            layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-        )
         layer_at_geoserver = True
     return layer_at_geoserver

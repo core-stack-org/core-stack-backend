@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
-
+from utilities.constants import FIRST_COMPUTING_API_PATH, ADMIN_BOUNDARY_INPUT_DIR
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -34,7 +34,6 @@ for env_name in (
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
 
 ADMIN_BOUNDARY_INPUT_DIR = ROOT_DIR / "data" / "admin-boundary" / "input"
-FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
 
 SUCCESS_STATUSES = {200, 201, 202, 204, 301, 302, 400, 401, 403, 404, 405}
 
@@ -67,10 +66,7 @@ def print_result(result: CheckResult) -> None:
 
 
 def format_sample_location(sample: SampleLocation) -> str:
-    return (
-        f"state={sample.state}, district={sample.district}, "
-        f"block={sample.block}"
-    )
+    return f"state={sample.state}, district={sample.district}, " f"block={sample.block}"
 
 
 def normalize_path(path: str) -> str:
@@ -87,7 +83,9 @@ def normalize_path(path: str) -> str:
         lambda match: sample_value(match.group("name"), match.group("kind")),
         path,
     )
-    path = re.sub(r"<(?P<name>[^:>]+)>", lambda match: sample_value(match.group("name")), path)
+    path = re.sub(
+        r"<(?P<name>[^:>]+)>", lambda match: sample_value(match.group("name")), path
+    )
     path = path.replace("?", "")
     path = re.sub(r"/+", "/", path)
     if not path.startswith("/"):
@@ -139,9 +137,13 @@ def run_configuration_checks(require_gee: bool) -> list[CheckResult]:
 
     try:
         connection.ensure_connection()
-        results.append(CheckResult("PASS", "database", "Database connection succeeded."))
+        results.append(
+            CheckResult("PASS", "database", "Database connection succeeded.")
+        )
     except Exception as exc:
-        results.append(CheckResult("FAIL", "database", f"Database connection failed: {exc}"))
+        results.append(
+            CheckResult("FAIL", "database", f"Database connection failed: {exc}")
+        )
         return results
 
     for env_name in ("GEE_DEFAULT_ACCOUNT_ID", "GEE_HELPER_ACCOUNT_ID"):
@@ -462,7 +464,9 @@ def run_endpoint_initialisation_checks():
 
 
 def summarize_route_results(route_results: list[RouteResult]) -> list[CheckResult]:
-    failures = [result for result in route_results if result.status not in SUCCESS_STATUSES]
+    failures = [
+        result for result in route_results if result.status not in SUCCESS_STATUSES
+    ]
 
     summary = [
         CheckResult(
@@ -493,7 +497,9 @@ def discover_admin_boundary_sample() -> SampleLocation | None:
 
     seen_paths: set[Path] = set()
     candidate_paths: list[Path] = []
-    for path in preferred_candidates + sorted(ADMIN_BOUNDARY_INPUT_DIR.glob("*/*.geojson")):
+    for path in preferred_candidates + sorted(
+        ADMIN_BOUNDARY_INPUT_DIR.glob("*/*.geojson")
+    ):
         if not path.is_file() or path.name == "soi_tehsil.geojson":
             continue
         resolved = path.resolve()
@@ -529,7 +535,10 @@ def discover_admin_boundary_sample() -> SampleLocation | None:
 def run_admin_boundary_compute_check() -> tuple[CheckResult, SampleLocation | None]:
     import shutil
 
-    from computing.misc.admin_boundary import clip_block_from_admin_boundary, create_shp_files
+    from computing.misc.admin_boundary import (
+        clip_block_from_admin_boundary,
+        create_shp_files,
+    )
     from utilities.gee_utils import valid_gee_text
 
     sample = discover_admin_boundary_sample()
@@ -766,7 +775,12 @@ def run_first_computing_api_check(
     output_shape_dir_ready = output_shape_dir.is_dir()
     shape_parts_ready = all(path.exists() for path in expected_shape_parts)
 
-    if response.status_code in {200, 201, 202} and output_json_ready and output_shape_dir_ready and shape_parts_ready:
+    if (
+        response.status_code in {200, 201, 202}
+        and output_json_ready
+        and output_shape_dir_ready
+        and shape_parts_ready
+    ):
         return CheckResult(
             "PASS",
             "first-computing-api",
@@ -842,7 +856,9 @@ def build_next_step_guidance(
         )
 
     if gee_probe_result.level == "PASS" and first_api_result.level == "PASS":
-        sample_text = format_sample_location(sample) if sample else "the verified sample block"
+        sample_text = (
+            format_sample_location(sample) if sample else "the verified sample block"
+        )
         return CheckResult(
             "PASS",
             "setup-next-step",

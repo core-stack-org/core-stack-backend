@@ -1,4 +1,9 @@
 import ee
+from utilities.constants import (
+    VEGETATION_INDEX_OF_16_DAY,
+    NBAR_MSI,
+    HARMONIZED_LANDSAT_SENTINEL,
+)
 
 
 # Function to create NDVI time series from harmonized image collection
@@ -44,7 +49,7 @@ def pairLSModis(lsRenameBands, roi_boundary):
 
         # ------ MODIS VI ( We can add EVI to the band list later )
         modis = (
-            ee.ImageCollection("MODIS/061/MOD13Q1")
+            ee.ImageCollection(VEGETATION_INDEX_OF_16_DAY)
             .filterDate(startDateT, endDateT)
             .select(["NDVI", "SummaryQA"])
             .filterBounds(roi_boundary)
@@ -220,13 +225,13 @@ def interpolate_timeseries(S1_TS):
 
 def get_hls_collection(start_date, end_date, roi_boundary):
     hls_l30 = (
-        ee.ImageCollection("NASA/HLS/HLSL30/v002")
+        ee.ImageCollection(HARMONIZED_LANDSAT_SENTINEL)
         .filterDate(start_date, end_date)
         .filterBounds(roi_boundary)
     )
 
     hls_s30 = (
-        ee.ImageCollection("NASA/HLS/HLSS30/v002")
+        ee.ImageCollection(NBAR_MSI)
         .filterDate(start_date, end_date)
         .filterBounds(roi_boundary)
     )

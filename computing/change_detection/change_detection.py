@@ -13,12 +13,11 @@ from utilities.gee_utils import (
 )
 from nrm_app.celery import app
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
-from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
 def get_change_detection(
-    self, state, district, block, start_year, end_year, gee_account_id
+        self, state, district, block, start_year, end_year, gee_account_id
 ):
     """
     This function will generate change detection raster for urbanization, Degradation,
@@ -135,7 +134,7 @@ def built_up(roi_boundary, l1_asset):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -175,7 +174,7 @@ def change_degradation(roi_boundary, l1_asset):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -339,7 +338,7 @@ def change_deforestation_afforestation(roi_boundary, l1_asset, lulc_projection):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -416,7 +415,7 @@ def change_cropping_intensity(roi_boundary, l1_asset):
 
     # Create image collections
     then = ee.ImageCollection(l1_asset_remapped[:3]).mode().reproject(lulc_projection)
-    now = ee.ImageCollection(l1_asset_remapped[3:]).mode().reproject(lulc_projection)
+    now = ee.ImageCollection(l1_asset_remapped[-3:]).mode().reproject(lulc_projection)
 
     # Compute mode and clip
     then = then.clip(roi_boundary.geometry())
@@ -459,17 +458,9 @@ def change_cropping_intensity(roi_boundary, l1_asset):
 
 
 def sync_to_gcs_geoserver(
-    state, district, block, description, param_list, layer_ids, start_year, end_year
+        state, district, block, description, param_list, layer_ids, start_year, end_year
 ):
     task_list = []
-
-    stac_spec_layer_name_dict = {
-        "Urbanization": "change_urbanization_raster",
-        "Degradation": "change_cropping_reduction_raster",
-        "Deforestation": "change_tree_cover_loss_raster",
-        "Afforestation": "change_tree_cover_gain_raster",
-        "CropIntensity": "change_cropping_intensity_raster",
-    }
 
     for change in param_list:
         image = ee.Image(
@@ -492,21 +483,10 @@ def sync_to_gcs_geoserver(
             change.lower(),
         )
         if res and layer_ids[change]:
-            # update flag in db whether layer sync to geoserver or not
             sync_status = update_layer_sync_status(
                 layer_id=layer_ids[change], sync_to_geoserver=True
             )
             print("sync to geoserver flag updated")
-
-            layer_name = stac_spec_layer_name_dict[change]
-            layer_STAC_generated = False
-            layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                state=state, district=district, block=block, layer_name=layer_name
-            )
-            update_layer_sync_status(
-                layer_id=layer_ids[change], is_stac_specs_generated=layer_STAC_generated
-            )
-
             if sync_status:
                 layer_at_geoserver.append(sync_status)
 

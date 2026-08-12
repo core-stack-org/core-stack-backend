@@ -41,13 +41,24 @@ The API uses JWT (JSON Web Tokens) for authentication. Here's how the authentica
     "first_name": "John",
     "last_name": "Doe",
     "contact_number": "1234567890",
-    "organization": "optional-organization-uuid"
+    "organization": "optional-organization-uuid-or-name",
+    "age": 30,
+    "education_qualification": "Graduate",
+    "gender": "M",
+    "profile_picture": "<file upload>",
+    "account_type": "individual",
+    "user_consent": true
   }
   ```
 - **Response**: Returns the created user object along with access and refresh tokens
-- **Notes**: 
-  - Organization ID is optional
-  - If provided, the user will be associated with that organization
+- **Notes**:
+  - `organization` is optional; accepts either a UUID or an organization name string
+    - If a UUID is provided, the user is linked to that organization
+    - If a name is provided and matches an existing organization, the user is linked to it
+    - If a name is provided and no match exists, a new organization is created
+  - `age`, `education_qualification`, `gender`, `profile_picture`, `account_type`, and `user_consent` are all optional
+  - `gender` accepts single-character codes: `"M"` (Male), `"F"` (Female), `"O"` (Other)
+  - `user_consent` is a boolean indicating the user's consent; defaults to `false` if not provided
 
 ### Get Available Organizations for Registration
 - **URL**: `/api/v1/auth/register/available_organizations/`
@@ -869,6 +880,92 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Authentication**: Required
 - **Permissions**: User must have delete permission for the project
 
+### Meta Stats (Global Level)
+- **URL**: `/api/v1/watershed/plans/meta-stats/`
+- **Method**: GET
+- **Description**: Get comprehensive statistics about all watershed plans globally. Excludes test/demo plans. Only accessible to superadmins and API key users.
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins and API key users only
+- **Query Parameters**:
+    - `organization` (optional): Filter by organization ID
+    - `project` (optional): Filter by project ID
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**:
+  ```json
+  {
+      "summary": {
+          "total_plans": 500,
+          "completed_plans": 300,
+          "in_progress_plans": 200,
+          "dpr_generated": 150,
+          "dpr_reviewed": 80,
+          "pending_dpr_generation": 150,
+          "pending_dpr_review": 70
+      },
+      "demand_overview": {
+          "community_demands": 320,
+          "individual_demands": 215
+      },
+      "commons_connect_operational": {
+          "active_tehsils": 25,
+          "active_districts": 10,
+          "active_states": 5
+      },
+      "landscape_stewards": {
+          "total_stewards": 120,
+          "gender_breakdown": {
+              "male": 85,
+              "female": 32,
+              "other": 3
+          },
+          "by_organization": [
+              {"organization_id": 1, "organization_name": "Org X", "steward_count": 40}
+          ]
+      },
+      "completion_rate": 60.0,
+      "dpr_generation_rate": 30.0,
+      "organization_breakdown": [
+          {
+              "organization_id": 1,
+              "organization_name": "Org X",
+              "total_plans": 200,
+              "completed_plans": 120,
+              "dpr_generated": 60,
+              "dpr_reviewed": 30
+          }
+      ],
+      "state_breakdown": [
+          {
+              "state_id": 1,
+              "state_name": "Bihar",
+              "total_plans": 150,
+              "completed_plans": 90,
+              "dpr_generated": 45,
+              "centroid": {"lat": 25.0961, "lon": 85.3131}
+          }
+      ],
+      "filters_applied": {
+          "organization_id": null,
+          "project_id": null,
+          "state_id": null,
+          "district_id": null,
+          "tehsil_id": null
+      }
+  }
+  ```
+- **Notes**:
+    - `demand_overview`: counts Community Demands and Individual Demands across all NRM maintenance (Section E) and NRM works (Section F) records for the filtered plans
+    - `landscape_stewards.total_stewards`: only counts facilitators who are **App User** group members and do **not** belong to the CFPT organization
+    - `landscape_stewards.gender_breakdown`: male/female/other counts from the User table for the active stewards; users without a gender set are excluded from all buckets
+    - `by_organization` in `landscape_stewards` is omitted when `?organization` filter is applied
+    - `organization_breakdown` is only present when no `?organization` filter is applied
+    - `state_breakdown` is present when no tehsil or district filter is applied
+    - `district_breakdown` is present when a state or district filter is applied (but not tehsil)
+    - `tehsil_breakdown` is present when any of state, district, or tehsil filter is applied
+    - All filters also scope `demand_overview` and `landscape_stewards` counts
+
 ### Steward Meta Stats (Global Level)
 - **URL**: `/api/v1/watershed/plans/steward-meta-stats/`
 - **Method**: GET
@@ -945,6 +1042,23 @@ Superadmins must specify the organization ID since they can create projects for 
     - `top_stewards`: top 10 stewards ranked by plan count, with their villages
     - Village name is resolved from `village_name` field; if blank, extracted from plan name (e.g., "Plan Villagename" yields "Villagename")
 
+### Steward Meta Stats (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/steward-meta-stats/`
+- **Method**: GET
+- **Description**: Get steward statistics scoped to a specific organization
+- **Authentication**: Required
+- **Permissions**:
+    - Superadmins: Full access to any organization
+    - Org Admins: Access to their own organization only (`403` if requesting another organization)
+- **Query Parameters**:
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**: Same structure as Global Level (see above), with `filters_applied` containing `organization_id` (from the URL) instead of `project_id`
+- **Error Responses**:
+    - `404 Not Found` — organization does not exist
+    - `403 Forbidden` — org admin requesting an organization other than their own
+
 ### Steward Meta Stats (Project Level)
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-meta-stats/`
 - **Method**: GET
@@ -963,7 +1077,7 @@ Superadmins must specify the organization ID since they can create projects for 
 ### Steward Listing (Global Level)
 - **URL**: `/api/v1/watershed/plans/steward-listing/`
 - **Method**: GET
-- **Description**: List all stewards with their individual plans and villages. Unlike `steward-meta-stats` which returns aggregates, this returns the full per-steward breakdown.
+- **Description**: List all stewards with their individual plans, villages, organization, and projects. Unlike `steward-meta-stats` which returns aggregates, this returns the full per-steward breakdown.
 - **Authentication**: Required (JWT or API Key)
 - **Permissions**: Superadmins and API key users only
 - **Query Parameters**:
@@ -975,23 +1089,60 @@ Superadmins must specify the organization ID since they can create projects for 
 - **Response**:
   ```json
   {
+      "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
       "total_stewards": 150,
+      "working_states": [
+          {"id": 3, "name": "Bihar"},
+          {"id": 7, "name": "Uttar Pradesh"}
+      ],
       "stewards": [
           {
               "facilitator_name": "John Doe",
               "plan_count": 3,
               "completed_count": 2,
+              "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
+              "projects": [
+                  {"id": 10, "name": "Delhi Watershed Project"},
+                  {"id": 15, "name": "Bihar Watershed Project"}
+              ],
+              "states": [
+                  {"id": 3, "name": "Bihar"}
+              ],
               "villages": ["Village A", "Village B"],
               "plans": [
-                  {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A"},
-                  {"id": 2, "plan": "Plan Village B", "is_completed": true, "village_name": "Village B"},
-                  {"id": 5, "plan": "Plan Village A Phase 2", "is_completed": false, "village_name": "Village A"}
+                  {"id": 1, "plan": "Plan Village A", "is_completed": true, "village_name": "Village A", "latitude": 25.1234, "longitude": 82.5678},
+                  {"id": 2, "plan": "Plan Village B", "is_completed": true, "village_name": "Village B", "latitude": 25.2345, "longitude": 82.6789},
+                  {"id": 5, "plan": "Plan Village A Phase 2", "is_completed": false, "village_name": "Village A", "latitude": null, "longitude": null}
               ]
           }
       ],
       "filters_applied": {}
   }
   ```
+- **Notes**:
+    - Top-level `organization` (`id` and `name`) is only present when `?organization=<id>` filter is applied
+    - Top-level `working_states`: all distinct states (from `state_soi`) covered by any steward in the filtered context, sorted by name
+    - Per-steward `organization`: the organization the steward belongs to, derived from their plans (single object)
+    - Per-steward `projects`: all distinct projects the steward has plans in
+    - Per-steward `states`: all distinct states that steward has plans in
+    - Per-plan `latitude`/`longitude`: coordinates of the plan (nullable if not set on the plan)
+
+### Steward Listing (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/steward-listing/`
+- **Method**: GET
+- **Description**: List all stewards and their plans scoped to a specific organization
+- **Authentication**: Required
+- **Permissions**:
+    - Superadmins: Full access to any organization
+    - Org Admins: Access to their own organization only (`403` if requesting another organization)
+- **Query Parameters**:
+    - `state` (optional): Filter by state SOI ID
+    - `district` (optional): Filter by district SOI ID
+    - `tehsil` (optional): Filter by tehsil SOI ID
+- **Response**: Same structure as Global Level (see above), with `filters_applied` containing `organization_id` (from the URL) instead of `project_id`
+- **Error Responses**:
+    - `404 Not Found` — organization does not exist
+    - `403 Forbidden` — org admin requesting an organization other than their own
 
 ### Steward Listing (Project Level)
 - **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-listing/`
@@ -1007,6 +1158,62 @@ Superadmins must specify the organization ID since they can create projects for 
     - `district` (optional): Filter by district SOI ID
     - `tehsil` (optional): Filter by tehsil SOI ID
 - **Response**: Same structure as Global Level (see above), with `filters_applied` containing `project_id` instead of `organization_id`
+
+### Steward Details (Organization Level)
+- **URL**: `/api/v1/organizations/{organization_id}/watershed/plans/steward-details/?facilitator_name=xxx`
+- **Method**: GET
+- **Description**: Get full profile and plan details for a single facilitator (steward), scoped to an organization
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins and org admins (of the organization in the URL)
+- **Query Parameters**:
+    - `facilitator_name` (required): The facilitator's full name (case-insensitive exact match)
+- **Response**:
+  ```json
+  {
+      "facilitator_name": "Dr. Rajesh Kumar",
+      "username": "rajesh.kumar",
+      "first_name": "Rajesh",
+      "last_name": "Kumar",
+      "age": 34,
+      "gender": "Male",
+      "education_qualification": "Graduate",
+      "organization": {"id": "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6", "name": "Org X"},
+      "projects": [
+          {"id": 10, "name": "Delhi Watershed Project"}
+      ],
+      "plans": [
+          {"id": 1, "name": "Plan Village A", "is_completed": true, "latitude": 25.1234, "longitude": 82.5678}
+      ],
+      "profile_picture": "https://.../media/profile_pictures/rajesh.jpg",
+      "statistics": {
+          "total_plans": 3,
+          "dpr_completed": 2
+      },
+      "working_locations": {
+          "states": [{"id": 3, "name": "Bihar"}],
+          "districts": [{"id": 12, "name": "Nalanda"}],
+          "tehsils": [{"id": 55, "name": "Hilsa"}]
+      }
+  }
+  ```
+- **Notes**:
+    - `plans` includes every plan by this facilitator within the organization, with per-plan `latitude`/`longitude` (nullable)
+    - `statistics.dpr_completed` counts plans with `is_dpr_approved=True`
+    - `profile_picture` is `null` if the user has none uploaded
+- **Error Responses**:
+    - `400 Bad Request` — `facilitator_name` query parameter missing
+
+### Steward Details (Project Level)
+- **URL**: `/api/v1/projects/{project_id}/watershed/plans/steward-details/?facilitator_name=xxx`
+- **Method**: GET
+- **Description**: Get full profile and plan details for a single facilitator (steward), scoped to a project
+- **Authentication**: Required (JWT or API Key)
+- **Permissions**: Superadmins, org admins, and users with access to the project
+- **Query Parameters**:
+    - `facilitator_name` (required): The facilitator's full name (case-insensitive exact match)
+- **Response**: Same structure as Steward Details (Organization Level) above, scoped to plans within the given project
+- **Error Responses**:
+    - `400 Bad Request` — `facilitator_name` query parameter missing
 
 ## Legacy Plan Endpoints
 
@@ -1731,6 +1938,8 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 
 | Endpoint | Paginated | Data Source |
 |---|---|---|
+| `GET dpr_data/report-status-summary/` | No | Count of `DPR_Report` records grouped by workflow status |
+| `GET dpr_data/status-tracking/` | No | Global totals by status across all plans (no per-plan detail) |
 | `GET dpr_data/{id}/summary/` | No | All ODK models (counts only) |
 | `GET dpr_data/{id}/team-details/` | No | `PlanApp` |
 | `GET dpr_data/{id}/village-brief/` | No | `PlanApp` + `ODK_settlement` |
@@ -1742,14 +1951,101 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 | `GET dpr_data/{id}/maintenance/?type=gw\|agri\|swb\|swb_rs` | Yes | `GW_maintenance`, `Agri_maintenance`, `SWB_maintenance`, `SWB_RS_maintenance` |
 | `GET dpr_data/{id}/nrm-works/` | Yes | `ODK_groundwater` + `ODK_agri` |
 | `GET dpr_data/{id}/livelihood/` | Yes | `ODK_livelihood` + `ODK_agrohorticulture` |
-| `GET dpr_data/{id}/status-tracking/` | No | All resource + demand models (counts by status) |
+| `GET dpr_data/{id}/status-tracking/` | No | All resource + demand models (counts by status, scoped to one plan) |
 | `PATCH dpr_data/{id}/demand-status/` | No | Any resource/demand model (single record update) |
 | `GET dpr_data/{id}/report-status/` | No | `DPR_Report` (current workflow status) |
 | `PATCH dpr_data/{id}/report-status/` | No | `DPR_Report` (update workflow status) |
 
 ---
 
-### Status Tracking
+### DPR Report Status Summary
+
+- **URL**: `/api/v1/dpr_data/report-status-summary/`
+- **Method**: GET
+- **Description**: Returns the count of `DPR_Report` records grouped by their workflow status. Use this to render summary badges or a dashboard card (e.g. "55 DPRs submitted, 40 approved").
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Query Parameters** (all optional):
+
+| Parameter | Type | Description |
+|---|---|---|
+| `state_id` | integer | Filter to DPR reports whose plan belongs to this state |
+| `district_id` | integer | Filter to DPR reports whose plan belongs to this district |
+| `block_id` | integer | Filter to DPR reports whose plan belongs to this block |
+| `organization_id` | integer | Filter to DPR reports whose plan belongs to this organization |
+
+- **Response**:
+  ```json
+  {
+    "total": 150,
+    "breakdown": {
+      "PENDING":   42,
+      "SUBMITTED": 55,
+      "APPROVED":  40,
+      "REVERTED":  8,
+      "REJECTED":  5
+    }
+  }
+  ```
+- **Notes**:
+  - All statuses from `DPR_STATUS_CHOICES` are always present in `breakdown`, even if their count is `0`.
+  - `total` is the sum of all status counts within the filtered scope.
+- **Error Responses**:
+  - `400 Bad Request` — non-integer value passed for any filter parameter
+
+---
+
+### Global Status Tracking
+
+- **URL**: `/api/v1/dpr_data/status-tracking/`
+- **Method**: GET
+- **Description**: Returns a per-plan breakdown of resource and demand counts by status, across **all** plans. Runs one `GROUP BY` query per model (12 total) regardless of plan count — designed for dashboard/review queue views.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Query Parameters** (all optional):
+
+| Parameter | Type | Description |
+|---|---|---|
+| `state_id` | integer | Filter to plans in this state |
+| `district_id` | integer | Filter to plans in this district |
+| `block_id` | integer | Filter to plans in this block |
+| `organization_id` | integer | Filter to plans belonging to this organization |
+| `status` | string | Only return plans that have ≥1 resource or demand in this status. One of `PENDING`, `SUBMITTED`, `APPROVED`, `REVERTED`, `REJECTED` |
+
+- **Response**:
+  ```json
+  {
+    "plan_count": 120,
+    "totals": {
+      "PENDING":   { "resources": 30, "demands": 20 },
+      "SUBMITTED": { "resources": 20, "demands": 10 },
+      "APPROVED":  { "resources": 15, "demands": 8 },
+      "REJECTED":  { "resources": 2,  "demands": 1 },
+      "REVERTED":  { "resources": 0,  "demands": 0 }
+    }
+  }
+  ```
+- **Notes**:
+  - `plan_count` is the number of plans included in the aggregation (after applying any filters).
+  - `totals` are scoped to the filtered plan set, not all plans globally.
+  - When `?status=SUBMITTED` is passed, `plan_count` and `totals` are computed over only the plans that have at least one resource or demand in `SUBMITTED` state — useful for a review queue summary badge.
+  - For per-plan breakdown, use `GET /api/v1/dpr_data/{plan_id}/status-tracking/` per plan.
+  - **Resources**: `ODK_settlement`, `ODK_well`, `ODK_waterbody`, `ODK_crop`
+  - **Demands**: `ODK_groundwater`, `ODK_agri`, `ODK_livelihood`, `ODK_agrohorticulture`, `GW_maintenance`, `SWB_RS_maintenance`, `SWB_maintenance`, `Agri_maintenance`
+  - Only `enabled=True` plans are included. Deleted records (`is_deleted=True`) are excluded from all counts.
+- **Examples**:
+  ```
+  GET /api/v1/dpr_data/status-tracking/
+  GET /api/v1/dpr_data/status-tracking/?state_id=3
+  GET /api/v1/dpr_data/status-tracking/?district_id=12&organization_id=1
+  GET /api/v1/dpr_data/status-tracking/?status=SUBMITTED
+  GET /api/v1/dpr_data/status-tracking/?block_id=55&status=APPROVED
+  ```
+- **Error Responses**:
+  - `400 Bad Request` — non-integer value passed for `state_id`, `district_id`, `block_id`, or `organization_id`
+  - `400 Bad Request` — `status` value not in `DEMAND_STATUS_CHOICES`
+
+---
+
+### Status Tracking (Per Plan)
 
 - **URL**: `/api/v1/dpr_data/{plan_id}/status-tracking/`
 - **Method**: GET
@@ -1895,6 +2191,16 @@ Approve the DPR without touching individual records:
 }
 ```
 
+**Side effects on the linked `PlanApp`** (one-way — fields are never automatically reset to `False`):
+
+| `status` set to | `PlanApp` fields auto-updated |
+|---|---|
+| `SUBMITTED` | `is_completed = True`, `is_dpr_reviewed = True` |
+| `APPROVED` | `is_dpr_approved = True` |
+| `REJECTED` | _(no change to plan fields)_ |
+
+**Reverse sync**: When `PlanApp.is_dpr_approved` is set to `True` via the Update Watershed Plan endpoint (`PUT`/`PATCH`), the linked `DPR_Report.status` is automatically set to `APPROVED`. This only fires when the field transitions from `False` → `True`, not on repeated updates.
+
 **Error Responses**:
 - `400 Bad Request` — no fields provided, or invalid value for any field
 - `404 Not Found` — plan or DPR report not found
@@ -2031,7 +2337,8 @@ All names are case-insensitive. Collections are only available after `generate_s
     "layer_type": "raster",
     "start_year": "2023",
     "upload_to_s3": false,
-    "overwrite": false
+    "overwrite": false,
+    "overwrite_metadata": false
   }
   ```
 - **Required Fields**:
@@ -2043,7 +2350,8 @@ All names are case-insensitive. Collections are only available after `generate_s
 - **Optional Fields**:
   - `start_year` (string, default: `""`): Starting year for the collection
   - `upload_to_s3` (boolean, default: `false`): Whether to upload the generated collection to S3
-  - `overwrite` (boolean, default: `false`): Whether to overwrite an existing collection
+  - `overwrite` (boolean, default: `false`): Whether to re-generate and replace an existing STAC item on disk
+  - `overwrite_metadata` (boolean, default: `false`): Whether to re-download shared reference CSVs (layer descriptions, vector column descriptions) from GitHub. Use this when the upstream metadata has changed; otherwise the locally cached copies are used.
 - **Success Response** (`200 OK`):
   ```json
   {
@@ -2066,4 +2374,5 @@ All names are case-insensitive. Collections are only available after `generate_s
 - **Notes**:
   - The generation runs asynchronously; a `200` response only confirms the task was enqueued.
   - Use `upload_to_s3: true` to persist the output to S3 after generation.
-  - Use `overwrite: true` to regenerate and replace an existing collection.
+  - Use `overwrite: true` to re-generate and replace an existing STAC item without touching the cached metadata CSVs.
+  - Use `overwrite_metadata: true` to force a fresh download of the shared layer-description and vector-column-description CSVs from GitHub. This is independent of `overwrite` — you can refresh metadata without re-generating the STAC item, or combine both flags.

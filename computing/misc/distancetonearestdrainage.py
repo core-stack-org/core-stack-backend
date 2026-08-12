@@ -15,13 +15,16 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from constants.pan_india_urls import DISTANCE_TO_UPSTREAM_DL
+from utilities.constants import DISTANCE_TO_UPSTREAM_DL
 
 
 @app.task(bind=True)
 def generate_distance_to_nearest_drainage_line(
     self, state, district, block, gee_account_id
 ):
+    """
+    It will generate distance to nearest drainage line layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     description = (
         "distance_to_drainage_line_"

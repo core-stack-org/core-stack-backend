@@ -15,11 +15,14 @@ from utilities.gee_utils import (
     export_raster_asset_to_gee,
     make_asset_public,
 )
-from constants.pan_india_urls import NATURAL_DEPRESSION
+from utilities.constants import NATURAL_DEPRESSION_EXTERNAL_DATASET
 
 
 @app.task(bind=True)
 def generate_natural_depression_data(self, state, district, block, gee_account_id):
+    """
+    It will generate natural depression layer for given location at tehsil level
+    """
     ee_initialize(gee_account_id)
     description = (
         "natural_depression_" + valid_gee_text(district) + "_" + valid_gee_text(block)
@@ -34,7 +37,7 @@ def generate_natural_depression_data(self, state, district, block, gee_account_i
         + "_uid"
     )
 
-    natural_depression = ee.Image(NATURAL_DEPRESSION)
+    natural_depression = ee.Image(NATURAL_DEPRESSION_EXTERNAL_DATASET)
     raster = natural_depression.clip(roi.geometry())
 
     # Generate raster Layer

@@ -111,9 +111,12 @@ class MaintenanceSerializer(serializers.Serializer):
     repair_activities = serializers.CharField(allow_null=True)
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
+    resource_type = serializers.CharField()
+    status = serializers.CharField()
 
 
 class NRMWorkSerializer(serializers.Serializer):
+    id = serializers.CharField()
     work_category = serializers.CharField()
     demand_type = serializers.CharField(allow_null=True)
     work_demand = serializers.CharField(allow_null=True)
@@ -123,9 +126,12 @@ class NRMWorkSerializer(serializers.Serializer):
     beneficiary_father_name = serializers.CharField(allow_null=True)
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
+    resource_type = serializers.CharField()
+    status = serializers.CharField()
 
 
 class LivelihoodSerializer(serializers.Serializer):
+    id = serializers.CharField()
     livelihood_work = serializers.CharField()
     demand_type = serializers.CharField(allow_null=True)
     work_demand = serializers.CharField(allow_null=True)
@@ -136,3 +142,5 @@ class LivelihoodSerializer(serializers.Serializer):
     total_acres = serializers.CharField(allow_null=True)
     latitude = serializers.FloatField(allow_null=True)
     longitude = serializers.FloatField(allow_null=True)
+    resource_type = serializers.CharField()
+    status = serializers.CharField()

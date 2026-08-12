@@ -2,7 +2,12 @@ from computing.plantation.utils.harmonized_ndvi import Get_Padded_NDVI_TS_Image
 from computing.utils import sync_project_fc_to_geoserver
 
 from projects.models import Project
-from utilities.constants import GEE_PATHS
+from utilities.constants import (
+    GEE_PATHS,
+    PAN_INDIA_LULC_V3_DATASET,
+    WATER_REJ_GEE_ASSET,
+    WATERREJUVENATION_PROJECT,
+)
 from utilities.gee_utils import (
     ee_initialize,
     get_distance_between_two_lan_long,
@@ -18,32 +23,20 @@ from utilities.gee_utils import (
 import numpy as np
 from nrm_app.settings import MEDIA_ROOT
 
-WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-WATER_REJ_TEST_GEE_ASSET = "projects/ee-kapil-test/assets/apps/waterbody/"
+
 import time
 import ee
 import logging
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from nrm_app.settings import lulc_years, water_classes
+from nrm_app.settings import water_classes
 import pandas as pd
 import math
 
 import os
 import requests
 import json
-
-
-years = [
-    "2017_2018",
-    "2018_2019",
-    "2019_2020",
-    "2020_2021",
-    "2021_2022",
-    "2022_2023",
-    "2023_2024",
-]
 
 # utils.py
 
@@ -62,7 +55,9 @@ EXPECTED_EXCEL_HEADERS = {
 }
 
 
-def get_filtered_mws_layer_name(project_name, layer_name, project_id="ee-corestackdev"):
+def get_filtered_mws_layer_name(
+    project_name, layer_name, project_id=WATERREJUVENATION_PROJECT
+):
     WATER_REJ_GEE_ASSET = f"projects/{project_id}/assets/apps/waterbody/"
     return (
         WATER_REJ_GEE_ASSET
@@ -141,10 +136,7 @@ def get_waterbody_id_for_lat_long(excel_hash, water_body_asset_id):
 def get_water_mask(year):
     # Define your water classes
     water_classes = [2, 3, 4]
-    image = ee.Image(
-        "projects/ee-corestackdev/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
-        + year
-    )
+    image = ee.Image(PAN_INDIA_LULC_V3_DATASET + year)
     water_mask = (
         image.select("predicted_label")
         .remap(water_classes, [1] * len(water_classes), 0)
@@ -158,16 +150,16 @@ def fine_closest_wb_pixel(lon, lat):
     ee_initialize()
 
 
-def find_nearest_water_pixel(lat, lon, distance_threshold):
+def find_nearest_water_pixel(lat, lon, distance_threshold, start_year=None, end_year=None):
     """
     Finds the nearest water pixel within a given threshold.
 
     Parameters:
         lat (float): Latitude of the input location.
         lon (float): Longitude of the input location.
-        lulc_years (list of str): List of LULC year identifiers (e.g., '2017_2018').
-        water_classes (list of int): List of LULC class codes considered as water.
         distance_threshold (float): Maximum distance (in meters) to consider.
+        start_year (int): First hydrological year start (required).
+        end_year (int): Last hydrological year start (required).
 
     Returns:
         dict: {
@@ -177,6 +169,16 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
             'distance_m': float (if success)
         }
     """
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year are required for find_nearest_water_pixel."
+        )
+    start_year = int(start_year)
+    end_year = int(end_year)
+    if start_year > end_year:
+        raise ValueError("start_year must be less than or equal to end_year.")
+
+    lulc_year_ids = [f"{y}_{y + 1}" for y in range(start_year, end_year + 1)]
 
     print("Given lat long")
     print(f"-----{lat}----{lon}---")
@@ -184,10 +186,8 @@ def find_nearest_water_pixel(lat, lon, distance_threshold):
 
     # Create water masks from each LULC year
     water_masks = []
-    for year in lulc_years:
-        image = ee.Image(
-            f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}"
-        )
+    for year in lulc_year_ids:
+        image = ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}")
         water_mask = (
             image.select("predicted_label")
             .remap(water_classes, [1] * len(water_classes), 0)
@@ -340,7 +340,15 @@ def create_ring(feature):
     zoi = ee.Number(feature.get("zoi_wb"))
     waterbody_name = feature.get("waterbody_name")
     impactfull = feature.get("impactful")
-    uid = feature.get("UID")
+    uid = ee.Algorithms.If(
+        feature.get("UID"),
+        feature.get("UID"),
+        ee.Algorithms.If(
+            feature.get("uid"),
+            feature.get("uid"),
+            feature.get("MWS_UID"),
+        ),
+    )
 
     # Make circle buffer from centroid
     centroid = geom.centroid()
@@ -403,6 +411,131 @@ def calculate_zoi_area(zoi):
     return ee.Number.parse(area_hectares.format("%.2f"))
 
 
+def is_nan_value(value):
+    return (
+        value is None
+        or (isinstance(value, float) and math.isnan(value))
+        or pd.isna(value)
+    )
+
+
+def id_text(value):
+    """Normalize an identifier value to a clean string."""
+    if is_nan_value(value):
+        return None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, int):
+        text = str(value)
+    else:
+        text = str(value).strip()
+    if not text or text.upper() in ("N/A", "NAN", "NONE"):
+        return None
+    if text.endswith(".0"):
+        stem = text[:-2]
+        if stem.replace("_", "").isdigit():
+            text = stem
+    if "e" in text.lower():
+        try:
+            as_float = float(text)
+            if as_float.is_integer():
+                text = str(int(as_float))
+        except ValueError:
+            pass
+    return text
+
+
+def format_waterbody_uid_value(mws_uid, uid):
+    """
+    Restore SWB UID format: <MWS_UID>_<index>, e.g. 25_34833_101.
+
+    GEE/pandas may coerce this to a number (12129065580), dropping the underscore
+    before the per-waterbody index (12129065_580).
+    """
+    mws_str = id_text(mws_uid)
+    uid_str = id_text(uid)
+    if not uid_str:
+        return None, mws_str
+    if "_" in uid_str:
+        return uid_str, mws_str
+    if not mws_str:
+        return uid_str, mws_str
+
+    mws_digits = mws_str.replace("_", "")
+    uid_digits = uid_str.replace("_", "")
+    if uid_digits.startswith(mws_digits) and len(uid_digits) > len(mws_digits):
+        suffix = uid_digits[len(mws_digits) :]
+        if suffix.isdigit():
+            return f"{mws_str}_{suffix}", mws_str
+    return uid_str, mws_str
+
+
+def ensure_uid_on_fc(fc):
+    """Ensure every feature has a canonical UID for NDVI / merge steps."""
+
+    def ensure_uid(feature):
+        uid = ee.Algorithms.If(
+            feature.get("UID"),
+            feature.get("UID"),
+            ee.Algorithms.If(
+                feature.get("uid"),
+                feature.get("uid"),
+                ee.Algorithms.If(
+                    feature.get("MWS_UID"),
+                    feature.get("MWS_UID"),
+                    feature.get("system:index"),
+                ),
+            ),
+        )
+        return feature.set("UID", uid)
+
+    return fc.map(ensure_uid)
+
+
+def resolve_zoi_ndvi_input(
+    asset_folder_list, app_type, asset_suffix, zoi_roi=None
+):
+    """
+    Pick polygons for ZOI NDVI: prefer cropping_intensity_zoi, else zoi_ rings.
+    """
+    if zoi_roi:
+        fc = ee.FeatureCollection(zoi_roi)
+        count = fc.size().getInfo()
+        logger.info("NDVI input: explicit roi (%s features)", count)
+        if count == 0:
+            raise ValueError(f"NDVI input roi is empty: {zoi_roi}")
+        return ensure_uid_on_fc(fc)
+
+    base = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    ci_asset = base + f"cropping_intensity_zoi_{asset_suffix}"
+    zoi_asset = base + f"zoi_{asset_suffix}"
+
+    ci_fc = ee.FeatureCollection(ci_asset)
+    ci_size = ci_fc.size().getInfo()
+    if ci_size > 0:
+        logger.info(
+            "NDVI input: cropping_intensity_zoi (%s features) from %s",
+            ci_size,
+            ci_asset,
+        )
+        return ensure_uid_on_fc(ci_fc)
+
+    zoi_fc = ee.FeatureCollection(zoi_asset)
+    zoi_size = zoi_fc.size().getInfo()
+    logger.info(
+        "NDVI input: fallback zoi_ (%s features) from %s",
+        zoi_size,
+        zoi_asset,
+    )
+    if zoi_size == 0:
+        raise ValueError(
+            f"No ZOI features for NDVI (tried {ci_asset} and {zoi_asset})"
+        )
+    return ensure_uid_on_fc(zoi_fc)
+
+
 def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_id):
     """
     Extracts and exports NDVI data for a set of features by aggregating NDVI values
@@ -421,6 +554,13 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
     Returns:
         ee.FeatureCollection: Merged NDVI time series across years.
     """
+    suitability_vector = ensure_uid_on_fc(suitability_vector)
+    feature_count = suitability_vector.size().getInfo()
+    print("total")
+    print(feature_count)
+    if feature_count == 0:
+        raise ValueError("Cannot generate NDVI: suitability vector has 0 features")
+
     task_ids = []
     asset_ids = []
     # Loop over each year
@@ -465,39 +605,18 @@ def get_ndvi_data(suitability_vector, start_year, end_year, description, asset_i
         # Map image-wise extraction and flatten to a single FeatureCollection
         all_ndvi = ndvi.map(map_image).flatten()
 
-        # Extract all unique UIDs from the input feature collection
-        uids = suitability_vector.aggregate_array("UID")
-        count = uids.size()  # Server-side count
-        print("total")
-        print(count.getInfo())
-
-        # For each UID, filter NDVI features and aggregate to dict
-        def build_feature(uid):
-            """
-            Reconstruct a single feature by merging its NDVI values across all images
-            into one property NDVI_<year> as a JSON dictionary {date: value}.
-            """
-            # Get the geometry and properties of the original feature
-            feature_geom = ee.Feature(
-                suitability_vector.filter(ee.Filter.eq("UID", uid)).first()
-            )
-
-            # Filter all NDVI records related to this UID
+        # Reconstruct one row per input polygon with NDVI_<year> JSON property
+        def build_feature(input_feature):
+            uid = input_feature.get("UID")
             filtered = all_ndvi.filter(ee.Filter.eq("UID", uid))
-
-            # Create dictionary: {date: ndvi}
             date_ndvi_list = filtered.aggregate_array("ndvi_date").zip(
                 filtered.aggregate_array("ndvi")
             )
-
-            # Convert to dictionary and encode as JSON string
             ndvi_dict = ee.Dictionary(date_ndvi_list.flatten())
             ndvi_json = ee.String.encodeJSON(ndvi_dict)
+            return input_feature.set(f"NDVI_{start_year}", ndvi_json)
 
-            return feature_geom.set(f"NDVI_{start_year}", ndvi_json)
-
-        # Apply feature-wise aggregation
-        merged_fc = ee.FeatureCollection(uids.map(build_feature))
+        merged_fc = suitability_vector.map(build_feature)
 
         # Export as single-row-per-feature collection
         try:
@@ -551,8 +670,18 @@ def merge_assets_chunked_on_year(chunk_assets):
 
 
 def get_ndvi_for_zoi(
-    zoi_asset_path, asset_suffix, asset_folder, proj_id=None, app_type="WATER_REJ"
+    zoi_asset_path,
+    asset_suffix,
+    asset_folder,
+    proj_id=None,
+    app_type="WATER_REJ",
+    start_year=None,
+    end_year=None,
 ):
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year are required for get_ndvi_for_zoi."
+        )
     proj_obj = Project.objects.get(pk=proj_id)
     asset_suffix_ndvi = f"zoi_ndvi_{proj_obj.name}_{proj_obj.id}"
     ndvi_asset_path = (
@@ -562,9 +691,13 @@ def get_ndvi_for_zoi(
         + asset_suffix_ndvi
     )
 
-    zoi_collections = ee.FeatureCollection(zoi_asset_path)
+    zoi_collections = resolve_zoi_ndvi_input(
+        asset_folder, app_type, f"{proj_obj.name}_{proj_obj.id}".lower(), zoi_roi=zoi_asset_path
+    )
 
-    fc = get_ndvi_data(zoi_collections, 2017, 2024, asset_suffix_ndvi, ndvi_asset_path)
+    fc = get_ndvi_data(
+        zoi_collections, start_year, end_year, asset_suffix_ndvi, ndvi_asset_path
+    )
     task = ee.batch.Export.table.toAsset(
         collection=fc, description=asset_suffix_ndvi, assetId=ndvi_asset_path
     )
@@ -606,9 +739,23 @@ def generate_draught_with_mws(draught_asset_id, mws_fc, proj_id):
     sync_project_fc_to_geoserver(final_fc, proj_obj.name, layer_name, "waterrej")
 
 
+def _waterbody_area_ha(feature):
+    """Area in hectares; use geometry when area_ored is missing or non-numeric."""
+    geom_area_ha = ee.Number(feature.geometry().area(maxError=1)).divide(10000)
+    raw_area = feature.get("area_ored")
+    # Water-rej exports may store area_ored as a string; coerce before numeric ops.
+    stored_str = ee.String(ee.Algorithms.If(raw_area, raw_area, "0"))
+    is_na = stored_str.compareTo("N/A").eq(0)
+    safe_str = ee.String(ee.Algorithms.If(is_na, "0", stored_str))
+    stored_numeric = ee.Number.parse(safe_str)
+    return ee.Number(
+        ee.Algorithms.If(stored_numeric.gt(0), stored_numeric, geom_area_ha)
+    )
+
+
 def compute_zoi(feature):
 
-    area_of_wb = ee.Number(feature.get("area_ored"))  # assumes area field exists
+    area_of_wb = _waterbody_area_ha(feature)
 
     # logistic_weight
     def logistic_weight(x, x0=0.2, k=50):
@@ -795,7 +942,7 @@ def get_merged_waterbodies_with_zoi(
 
     # If both failed, return None
     if standard_map is None and zoi_map is None:
-        print("❌ Both standard and ZOI fetch failed.")
+        print(" Both standard and ZOI fetch failed.")
         return None
 
     # Merge: union of UIDs from both maps

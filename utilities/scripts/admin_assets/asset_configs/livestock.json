@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "name": "livestock",
+  "description": "Pan-India village livestock totals joined to the standardized Core Stack village admin boundaries.",
+  "admin": {
+    "gpkg": "data/base_resources/cs_admin_standard.gpkg",
+    "layer": "cs_admin_standard",
+    "left_key": "pc11_village_id"
+  },
+  "source": {
+    "path": "data/livestock/processed/livestock_pan_india.csv",
+    "right_key": "village_code",
+    "columns": [
+      "cattle_male",
+      "cattle_female",
+      "cattle_total",
+      "buffalo_male",
+      "buffalo_female",
+      "buffalo_total",
+      "sheep_male",
+      "sheep_female",
+      "sheep_total",
+      "goat_male",
+      "goat_female",
+      "goat_total",
+      "pig_male",
+      "pig_female",
+      "pig_total"
+    ]
+  },
+  "output": {
+    "gpkg": "data/livestock/cs_village_livestock_census_20.gpkg",
+    "geojson": "data/livestock/cs_village_livestock_census_20.geojson",
+    "layer": "cs_village_livestock_census_20",
+    "formats": [
+      "gpkg",
+      "geojson"
+    ],
+    "reports_dir": "data/livestock/cs_village_livestock_census_20_reports",
+    "admin_columns": [
+      "state_name",
+      "district_name",
+      "TEHSIL",
+      "pc11_village_id",
+      "NAME",
+      "pc11_state_id",
+      "pc11_district_id",
+      "pc11_subdistrict_id"
+    ],
+    "include_joined_columns": true,
+    "include_match_status": false
+  },
+  "processing": {
+    "join_storage": "memory",
+    "chunk_size": 25000
+  }
+}

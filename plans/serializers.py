@@ -22,6 +22,7 @@ class PlanAppSerializer(serializers.ModelSerializer):
             "tehsil_soi",
             "village_name",
             "gram_panchayat",
+            "gp",
             "facilitator_name",
             "organization",
             "organization_name",
@@ -92,6 +93,8 @@ class PlanCreateSerializer(serializers.ModelSerializer):
             "is_dpr_generated",
             "is_dpr_reviewed",
             "is_dpr_approved",
+            "latitude",
+            "longitude",
         ]
 
     def validate(self, data):
@@ -161,6 +164,8 @@ class PlanUpdateSerializer(serializers.ModelSerializer):
             "is_dpr_generated",
             "is_dpr_reviewed",
             "is_dpr_approved",
+            "latitude",
+            "longitude",
         ]
 
     def validate(self, data):

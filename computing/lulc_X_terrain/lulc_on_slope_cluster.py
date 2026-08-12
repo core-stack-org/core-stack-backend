@@ -15,6 +15,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
+from utilities.constants import AEZ
 
 
 @app.task(bind=True)
@@ -32,7 +33,7 @@ def lulc_on_slope_cluster(
     asset_id = get_gee_asset_path(state, district, block) + asset_description
 
     if not is_gee_asset_exists(asset_id):
-        aez_india = ee.FeatureCollection("users/mtpictd/agro_eco_regions")
+        aez_india = ee.FeatureCollection(AEZ)
 
         landforms = ee.Image(
             get_gee_asset_path(state, district, block)

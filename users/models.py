@@ -34,9 +34,11 @@ class User(AbstractUser):
     gender = models.CharField(
         max_length=1, choices=GENDER_CHOICES, blank=True, null=True
     )
+    year_of_experience = models.CharField(max_length=255, blank=True, null=True)
     profile_picture = models.ImageField(
         upload_to="profile_pictures/", blank=True, null=True
     )
+    user_consent = models.BooleanField(default=False, blank=True, null=True)
 
     groups = models.ManyToManyField(
         Group,

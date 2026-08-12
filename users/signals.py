@@ -21,9 +21,6 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
             instance.groups.add(group)
         subject = f"New User Registered – Assign to Project"
         user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
-        superuser_emails = list(
-            User.objects.filter(is_superuser=True).values_list("email", flat=True)
-        )
 
         message = f"""
         <html>
@@ -45,7 +42,7 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
           <p style="font-size: 16px; margin-bottom: 15px;">Please take the following action:</p>
           <ol style="padding-left: 20px; font-size: 15px;">
             <li>
-              <a href="{user_approval_url}" 
+              <a href="{user_approval_url}"
                  style="color: #1a73e8; text-decoration: none; font-weight: bold;">
                  Assign user to a project
               </a>
@@ -57,7 +54,7 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
       </tr>
       <tr>
         <td style="background-color: #f9f9f9; padding: 15px; text-align: center; font-size: 12px; color: #888; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
-          © 2025 CoRE Stack. All rights reserved.  
+          © 2025 CoRE Stack. All rights reserved.
         </td>
       </tr>
     </table>
@@ -65,13 +62,5 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
 </html>
         """
 
-        recipients = (
-            superuser_emails
-            if superuser_emails
-            else [
-                "ankit.kumar@oniondev.com",
-                "aman.verma@oniondev.com",
-                "kapil.dadheech@gramvaani.org",
-            ]
-        )
+        recipients = ["support@core-stack.org"]
         send_email_notification.delay(subject, "", message, recipients)

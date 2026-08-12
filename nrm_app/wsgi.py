@@ -17,7 +17,7 @@ env = environ.Env()
 ENV_FILE = Path(__file__).resolve().parent / ".env"
 environ.Env.read_env(str(ENV_FILE))
 
-DEBUG = env("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
 

@@ -1,8 +1,16 @@
 import json
 import os
 import requests
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
 from nrm_app.settings import BASE_DIR, LOCAL_COMPUTE_API_URL
-from rest_framework.decorators import api_view, parser_classes, schema
+from rest_framework.decorators import (
+    api_view,
+    authentication_classes,
+    parser_classes,
+    permission_classes,
+    schema,
+)
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -10,6 +18,12 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from computing.change_detection.change_detection_vector import (
     vectorise_change_detection,
 )
+from .et_downscale.et_downscale import generate_et_downscale
+from .utils import (
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
+from django.conf import settings
 from computing.STAC_specs.stac_collection import sanitize_text, STACConfig
 from .lulc.lulc_vector import vectorise_lulc
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
@@ -57,7 +71,13 @@ from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .surface_water_bodies.merge_swb_ponds import merge_swb_ponds
 from utilities.auth_check_decorator import api_security_check
 from computing.layer_dependency.layer_generation_in_order import layer_generate_map
-from .views import layer_status, get_layers_of_workspace
+from .views import (
+    layer_status,
+    get_layers_of_workspace,
+    missing_layer_for_all_workspace,
+    clear_layer_cache,
+    check_missing_excel_files,
+)
 from .misc.lcw_conflict import generate_lcw_conflict_data
 from .misc.agroecological_space import generate_agroecological_data
 from .misc.factory_csr import generate_factory_csr_data
@@ -70,8 +90,15 @@ from .misc.catchment_area import generate_catchment_area_singleflow
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
-from .STAC_specs.stac_collection import _make_celery_task as _make_stac_task
+from .misc.facilities import generate_facilities_proximity_task
+from utilities.pipelines import api_request_payload
+from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.livestocks import generate_livestocks_layer_task
+from .misc.digital_elevation_model import generate_dem_layer
+from .misc.canal_layer import canal_vector
+from .STAC_specs.stac_collection import generate_stac_collection_task
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 
 
 @api_security_check(allowed_methods="POST")
@@ -1456,6 +1483,8 @@ def generate_ndvi_timeseries(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
+        mws_count = request.data.get("mws_count") or 150
+        chunk_size = request.data.get("chunk_size") or 100
 
         ndvi_timeseries.apply_async(
             kwargs={
@@ -1465,6 +1494,8 @@ def generate_ndvi_timeseries(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "gee_account_id": gee_account_id,
+                "mws_count": mws_count,
+                "chunk_size": chunk_size,
             },
             queue="nrm",
         )
@@ -1482,25 +1513,71 @@ def generate_ndvi_timeseries(request):
 def generate_zoi_to_gee(request):
     print("Inside generate zoi layers")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
+        start_date = request.data.get("start_date") or request.data.get("startDate")
+        end_date = request.data.get("end_date") or request.data.get("endDate")
+        start_year = request.data.get("start_year") or request.data.get("startYear")
+        end_year = request.data.get("end_year") or request.data.get("endYear")
+
+        if not state or not district or not block:
+            return Response(
+                {"error": "state, district, and block are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Allow start_year/end_year as hydrological-year shorthand.
+        if not start_date and start_year is not None:
+            start_date = f"{int(start_year)}-07-01"
+        if not end_date and end_year is not None:
+            end_date = f"{int(end_year) + 1}-06-30"
+
+        if not start_date or not end_date:
+            return Response(
+                {
+                    "error": (
+                        "start_date and end_date are required (YYYY-MM-DD), "
+                        "or provide start_year and end_year (hydrological years)."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from computing.zoi_layers.zoi import _resolve_zoi_time_window
+
+        try:
+            start_date, end_date, _, _ = _resolve_zoi_time_window(start_date, end_date)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state.lower()
+        district = district.lower()
+        block = block.lower()
+
         generate_zoi.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
                 "gee_account_id": gee_account_id,
+                "start_date": start_date,
+                "end_date": end_date,
             },
             queue="waterbody",
         )
 
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "Success": "Successfully initiated",
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_mining_to_gee api :: ", e)
+        print("Exception in generate_zoi_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1549,18 +1626,100 @@ def generate_mws_centroid(request):
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=True,
+        )
+        generate_facilities_proximity_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_facilities_proximity api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_antyodaya(request):
+    print("Inside generate_antyodaya API.")
+    try:
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
+        generate_antyodaya_layer_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_antyodaya api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_livestocks(request):
+    print("Inside generate_livestocks API.")
+    try:
+        payload = api_request_payload(
+            request.data.dict() if hasattr(request.data, "dict") else dict(request.data),
+            overwrite=False,
+        )
+        generate_livestocks_layer_task.apply_async(
+            kwargs={"payload": payload},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated", "request": payload}, status=status.HTTP_200_OK
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_livestocks api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def et_downscale(request):
+    print("Inside generate_et_downscale API.")
+    try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        tehsil = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_facilities_proximity_task.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        application = request.data.get("application") or "all"
+
+        generate_et_downscale.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "tehsil": tehsil,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+                "application": application,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_facilities_proximity api :: ", e)
+        print("Exception in generate_mws_centroid api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1574,8 +1733,10 @@ def generate_stac_collection(request):
         layer_name = request.data.get("layer_name")
         layer_type = request.data.get("layer_type")
         start_year = request.data.get("start_year", "")
+        end_year = request.data.get("end_year", "")
         upload_to_s3 = request.data.get("upload_to_s3", False)
         overwrite = request.data.get("overwrite", False)
+        overwrite_metadata = request.data.get("overwrite_metadata", False)
 
         if not all([state, district, block, layer_name, layer_type]):
             return Response(
@@ -1591,7 +1752,7 @@ def generate_stac_collection(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        _make_stac_task().apply_async(
+        generate_stac_collection_task.apply_async(
             kwargs={
                 "layer_type": layer_type,
                 "state": state,
@@ -1599,8 +1760,10 @@ def generate_stac_collection(request):
                 "block": block,
                 "layer_name": layer_name,
                 "start_year": start_year,
+                "end_year": end_year,
                 "upload_to_s3": upload_to_s3,
                 "overwrite": overwrite,
+                "overwrite_metadata": overwrite_metadata,
             },
             queue="nrm",
         )
@@ -1749,3 +1912,243 @@ def stac_item(request, state, district, block, item_id):
             {"error": f"Item not found: {item_id}"}, status=status.HTTP_404_NOT_FOUND
         )
     return Response(data)
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def update_layer_sync_remote(request):
+    """
+    Called by a local compute instance to update sync/STAC flags on a layer
+    record in this (prod) backend.
+    """
+
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = d.get("layer_id")
+        if layer_id is None:
+            return Response(
+                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        result = update_layer_sync_status(
+            layer_id=layer_id,
+            sync_to_geoserver=d.get("sync_to_geoserver"),
+            is_stac_specs_generated=d.get("is_stac_specs_generated"),
+        )
+        return Response({"layer_id": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def sync_layer_remote(request):
+    """
+    Called by a local compute instance to persist a layer record on this (prod) backend.
+    Validates the request API key against PROD_BACKEND_API_KEY before writing.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        d = request.data
+        layer_id = save_layer_info_to_db(
+            state=d["state"],
+            district=d["district"],
+            block=d["block"],
+            layer_name=d["layer_name"],
+            asset_id=d["asset_id"],
+            dataset_name=d["dataset_name"],
+            sync_to_geoserver=d.get("sync_to_geoserver", False),
+            layer_version=d.get("layer_version", "1.0"),
+            algorithm=d.get("algorithm"),
+            algorithm_version=d.get("algorithm_version", "1.0"),
+            misc=d.get("misc"),
+            is_override=d.get("is_override", False),
+        )
+        if layer_id is None:
+            return Response(
+                {
+                    "error": "Failed to save layer — check state/district/block exist on this server."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"layer_id": layer_id}, status=status.HTTP_201_CREATED)
+    except KeyError as e:
+        return Response(
+            {"error": f"Missing field: {e}"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_layers(request):
+    try:
+        result = missing_layer_for_all_workspace()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in get_layers_for_workspace api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def refresh_layer_cache(request, workspace=None):
+    clear_layer_cache(workspace)
+    return Response({"message": f"Cache cleared for: {workspace or 'all workspaces'}"})
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_fabdem_layer(request):
+    print("Inside generate DEM raster and vector layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_dem_layer.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print(
+            f"Exception in generate DEM raster and vector layer for {district} - {block}:: ",
+            e,
+        )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_canal_vector(request):
+    print("Inside generate canal vector layer API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        canal_vector.apply_async(
+            args=[state, district, block, gee_account_id], queue="nrm"
+        )
+        return Response(
+            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        print(
+            f"Exception in generate canal vector layer for {district} - {block}:: ", e
+        )
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_tree_in_grassland(request):
+    print("Inside generate_tree_in_grassland API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_tree_in_grassland_layer.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Tree in Grassland task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_tree_in_grassland api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def forest_fringe_degradation(request):
+    print("Inside forest_fringe_degradation API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fringe_degradation.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fringe task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fringe api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fire(request):
+    print("Inside generate_forest_fire API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fire_layer_updated.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fire task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fire api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@schema(None)
+def missing_excel(request):
+    try:
+        result = check_missing_excel_files()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in missing_excel api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

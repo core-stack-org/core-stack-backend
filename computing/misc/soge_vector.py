@@ -17,12 +17,14 @@ from computing.utils import (
     update_layer_sync_status,
 )
 from computing.utils import sync_fc_to_geoserver
-from utilities.constants import GEE_DATASET_PATH
-from computing.STAC_specs import generate_STAC_layerwise
+from utilities.constants import SOGE_DATASET
 
 
 @app.task(bind=True)
 def generate_soge_vector(self, state, district, block, gee_account_id):
+    """
+    It will generate soge layer for given location at tehsil level
+    """
     """Generate vector layer for the SOGE - Stage of Ground Water Extraction"""
     ee_initialize(gee_account_id)
 
@@ -30,7 +32,7 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
     asset_path = get_gee_asset_path(state, district, block)
     asset_id = asset_path + description
 
-    soge_fc = ee.FeatureCollection(GEE_DATASET_PATH + "/SOGE_vector_2020")
+    soge_fc = ee.FeatureCollection(SOGE_DATASET)
 
     if not is_gee_asset_exists(asset_id):
         mws_asset_id = (
@@ -147,16 +149,5 @@ def generate_soge_vector(self, state, district, block, gee_account_id):
         if res["status_code"] == 201 and layer_id:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("sync to geoserver flag is updated")
-
-            layer_STAC_generated = False
-            layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                state=state,
-                district=district,
-                block=block,
-                layer_name="stage_of_groundwater_extraction_vector",
-            )
-            update_layer_sync_status(
-                layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-            )
             layer_at_geoserver = True
     return layer_at_geoserver

@@ -122,6 +122,26 @@ class InstallScriptTests(unittest.TestCase):
             ["test-key-1234", "https://example.com"],
         )
 
+    def test_geoserver_config_help_mentions_style_sync(self) -> None:
+        result = subprocess.run(
+            ["bash", "installation/install.sh", "--help"],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("bundled styles", result.stdout)
+
+    def test_configure_geoserver_includes_style_sync_step(self) -> None:
+        install_script = INSTALL_SCRIPT.read_text(encoding="utf-8")
+        configure_section = install_script.split("function configure_geoserver()", 1)[1]
+        configure_section = configure_section.split("function update_data_dir_path()", 1)[0]
+
+        self.assertIn("sync_geoserver_styles_from_bundle", configure_section)
+        self.assertIn("geoserver_config_log_phase", configure_section)
+
     def test_geoserver_optional_inputs_set_runtime_values(self) -> None:
         result = run_bash(
             textwrap.dedent(

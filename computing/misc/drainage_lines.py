@@ -17,9 +17,11 @@ from utilities.gee_utils import (
     export_vector_asset_to_gee,
     get_gee_dir_path,
 )
-from utilities.constants import GEE_DATASET_PATH, GEE_PATHS
+from utilities.constants import (
+    GEE_PATHS,
+    PAN_INDIA_DRAINAGE_LINES_DATASET,
+)
 from nrm_app.celery import app
-from computing.STAC_specs import generate_STAC_layerwise
 
 
 @app.task(bind=True)
@@ -35,11 +37,13 @@ def clip_drainage_lines(
     app_type="MWS",
     proj_id=None,
 ):
+    """
+    It will generate drainage line layer for given location at tehsil level
+
+    """
     print("started drainage line")
     ee_initialize(gee_account_id)
-    pan_india_drainage = ee.FeatureCollection(
-        GEE_DATASET_PATH + "/drainage-line/pan_india_drainage_lines"
-    )
+    pan_india_drainage = ee.FeatureCollection(PAN_INDIA_DRAINAGE_LINES_DATASET)
     description = ""
     if state and district and block:
         roi = ee.FeatureCollection(
@@ -99,20 +103,7 @@ def clip_drainage_lines(
             if res["status_code"] == 201 and layer_id:
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 print("sync to geoserver flag is updated")
-
-                layer_STAC_generated = False
-                if state and district and block:
-                    layer_STAC_generated = generate_STAC_layerwise.generate_vector_stac(
-                        state=state,
-                        district=district,
-                        block=block,
-                        layer_name="drainage_lines_vector",
-                    )
-                    update_layer_sync_status(
-                        layer_id=layer_id, is_stac_specs_generated=layer_STAC_generated
-                    )
-
-                    layer_at_geoserver = True
+                layer_at_geoserver = True
 
         except Exception as e:
             print("Exception in syncing Drainage line to geoserver", e)

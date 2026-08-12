@@ -1,6 +1,6 @@
 import ee
 from nrm_app.celery import app
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, CH_RASTER
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -14,8 +14,6 @@ from utilities.gee_utils import (
     get_gee_dir_path,
 )
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
-from computing.STAC_specs import generate_STAC_layerwise
-from constants.pan_india_urls import CH_RASTER
 
 
 # Celery task to generate canopy height raster
@@ -129,22 +127,11 @@ def tree_health_ch_raster(
 
             # Sync raster from GCS to GeoServer
             res = sync_raster_gcs_to_geoserver(
-                "canopy_height", description, description, "ch_style"
+                "tree_ch_raster", description, description, "tree_ch_style"
             )
 
             if res and layer_id:
                 layer_at_geoserver = True
-
-                # layer_STAC_generated = False
-                # layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                #     state=state,
-                #     district=district,
-                #     block=block,
-                #     layer_name="ch_raster",
-                #     start_year=year,
-                # )
-
-                # Update sync flag in DB
                 update_layer_sync_status(
                     layer_id=layer_id,
                     sync_to_geoserver=layer_at_geoserver,

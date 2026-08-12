@@ -1,6 +1,6 @@
 import ee
 
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import GEE_DATASET_PATH, ROAD_DRRP, INDIA_SAT_LULC_V3_PAN_INDIA
 from utilities.gee_utils import (
     valid_gee_text,
 )
@@ -75,7 +75,7 @@ def get_site_properties(roi, state, start_year, end_year):
 
 def get_dist_to_road(state):
     dataset_collection = ee.FeatureCollection(
-        f"projects/ext-datasets/assets/datasets/Road_DRRP/{valid_gee_text(state.lower())}"
+        f"{ROAD_DRRP}{valid_gee_text(state.lower())}"
     )
     dataset = dataset_collection.reduceToImage(
         properties=["STATE_ID"], reducer=ee.Reducer.first()
@@ -98,7 +98,7 @@ def get_distance_to_drainage():
 def get_distance_to_settlement(start_year, end_year):
     lulc_years = []
     while start_year <= end_year:
-        asset_id = f"{GEE_DATASET_PATH}/LULC_v3_river_basin/pan_india_lulc_v3_{start_year}_{str(start_year + 1)}"
+        asset_id = f"{GEE_DATASET_PATH}{INDIA_SAT_LULC_V3_PAN_INDIA}{start_year}_{str(start_year + 1)}"
         lulc_img = ee.Image(asset_id).select(["predicted_label"])
         lulc_years.append(lulc_img)
         start_year += 1

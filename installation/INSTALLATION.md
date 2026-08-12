@@ -349,6 +349,19 @@ GEOSERVER_URL=https://geoserver.example.com/geoserver
 GEOSERVER_USERNAME=admin
 GEOSERVER_PASSWORD=your-geoserver-password
 
+The installer `geoserver` step creates workspaces and uploads bundled SLD styles from
+`installation/geoserver/styles/`. Refresh that bundle once from production with:
+
+```bash
+python installation/geoserver_style_bundle.py fetch \
+  --url https://geoserver.core-stack.org:8443/geoserver \
+  --username YOUR_USERNAME \
+  --password YOUR_PASSWORD \
+  --insecure
+```
+
+Then commit the updated `*.sld` files and `manifest.json`.
+
 # Public API helper scripts
 PUBLIC_API_X_API_KEY=your-public-api-key
 PUBLIC_API_BASE_URL=https://geoserver.core-stack.org/api/v1

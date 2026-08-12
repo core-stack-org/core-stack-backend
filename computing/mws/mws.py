@@ -7,7 +7,7 @@ from computing.utils import (
     update_layer_sync_status,
 )
 
-from utilities.constants import GEE_DATASET_PATH
+from utilities.constants import MWS_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -46,9 +46,7 @@ def mws_layer(self, state, district, block, gee_account_id):
     )
 
     if not is_gee_asset_exists(asset_id):
-        mwses_uid_fc = ee.FeatureCollection(
-            GEE_DATASET_PATH + "/hydrological_boundaries/microwatershed"
-        )
+        mwses_uid_fc = ee.FeatureCollection(MWS_DATASET)
 
         admin_boundary = ee.FeatureCollection(
             get_gee_asset_path(state, district, block)

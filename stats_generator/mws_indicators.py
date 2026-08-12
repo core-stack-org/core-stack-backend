@@ -88,6 +88,12 @@ def generate_mws_data_for_kyl_filters(
                 "factory_csr": -1,
                 "mining": -1,
                 "green_credit": -1,
+                "mws_intersect_swb": -1,
+                "dem": -1,
+                "canal": -1,
+                "river": -1,
+                "lulc_vector": -1,
+                "drainage_density": -1,
             }
 
             try:
@@ -137,7 +143,7 @@ def generate_mws_data_for_kyl_filters(
                         0
                     ]  # terrain
                 except:
-                    terrainCluster_ID = ""
+                    terrainCluster_ID = -9999
 
                 try:
                     df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
@@ -250,13 +256,15 @@ def generate_mws_data_for_kyl_filters(
 
                 except Exception as e:
                     # Handle exception and ensure all variables are set
-                    cropping_intensity_avg = 0
-                    cropping_intensity_trend = ""
-                    avg_single_cropped = 0
-                    avg_double_cropped = 0
-                    avg_triply_cropped = 0
+                    cropping_intensity_avg = -9999
+                    cropping_intensity_trend = -9999
+                    avg_single_cropped = -9999
+                    avg_double_cropped = -9999
+                    avg_triply_cropped = -9999
                     print(f"Error occurred: {e}")
 
+            
+            ##################### SWB #####################
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -345,21 +353,22 @@ def generate_mws_data_for_kyl_filters(
                     )
 
                 except Exception as e:
-                    avg_wsr_ratio_kharif = 0
-                    avg_wsr_ratio_rabi = 0
-                    avg_wsr_ratio_zaid = 0
+                    avg_wsr_ratio_kharif = -9999
+                    avg_wsr_ratio_rabi = -9999
+                    avg_wsr_ratio_zaid = -9999
                     print(f"Error occurred: {e}")
 
                 ############ Swb_average
-                avg_kharif_surface_water_mws = 0
-                avg_rabi_surface_water_mws = 0
-                avg_zaid_surface_water_mws = 0
-                df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
-                    sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
-                ]
-                if not df_swb_annual_mws_data.empty:
-                    total_swb_area = df_swb_annual_mws_data.iloc[0][
-                        "total_swb_area_in_ha"
+                avg_kharif_surface_water_mws = -9999
+                avg_rabi_surface_water_mws = -9999
+                avg_zaid_surface_water_mws = -9999
+                try:
+                    df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
+                        sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
+                    ]
+                    if not df_swb_annual_mws_data.empty:
+                        total_swb_area = df_swb_annual_mws_data.iloc[0][
+                            "total_swb_area_in_ha"
                     ]
 
                     if total_swb_area != 0:  # Check if total_swb_area is not zero
@@ -414,11 +423,11 @@ def generate_mws_data_for_kyl_filters(
                         avg_perc_kharif_surface_water_mws = (
                             avg_perc_rabi_surface_water_mws
                         ) = avg_perc_zaid_surface_water_mws = 0
-                else:
-                    print("DataFrame is empty. No data to process.")
+                    
+                except:
                     avg_perc_kharif_surface_water_mws = (
                         avg_perc_rabi_surface_water_mws
-                    ) = avg_perc_zaid_surface_water_mws = 0
+                    ) = avg_perc_zaid_surface_water_mws = -9999
 
                 ################# SWB Trend ######################
                 try:
@@ -439,33 +448,36 @@ def generate_mws_data_for_kyl_filters(
                     else:
                         trend_swb = "-1"
                 except:
-                    trend_swb = "-1"
+                    trend_swb = -9999
 
                 ######### G Trend  #################
-                G_Trend = (
-                    hydro_annual_mws_data.filter(like="G")
-                    .drop(columns=hydro_annual_mws_data.filter(like="DeltaG").columns)
-                    .dropna()
-                )
-                G_Trend = G_Trend.squeeze().tolist()
-                result = mk.original_test(G_Trend)
+                try:
+                    G_Trend = (
+                        hydro_annual_mws_data.filter(like="G")
+                        .drop(columns=hydro_annual_mws_data.filter(like="DeltaG").columns)
+                        .dropna()
+                    )
+                    G_Trend = G_Trend.squeeze().tolist()
+                    result = mk.original_test(G_Trend)
 
-                def sens_slope(data):
-                    slopes = []
-                    for i in range(len(data) - 1):
-                        for j in range(i + 1, len(data)):
-                            s = (data[j] - data[i]) / (j - i)
-                            slopes.append(s)
-                    return np.median(slopes)
+                    def sens_slope(data):
+                        slopes = []
+                        for i in range(len(data) - 1):
+                            for j in range(i + 1, len(data)):
+                                s = (data[j] - data[i]) / (j - i)
+                                slopes.append(s)
+                        return np.median(slopes)
 
-                trend_g_value = sens_slope(G_Trend)
-                trend_g = None
-                if result.trend == "no trend":
-                    trend_g = "0"
-                elif result.trend == "increasing":
-                    trend_g = "1"
-                else:
-                    trend_g = "-1"
+                    trend_g_value = sens_slope(G_Trend)
+                    trend_g = None
+                    if result.trend == "no trend":
+                        trend_g = "0"
+                    elif result.trend == "increasing":
+                        trend_g = "1"
+                    else:
+                        trend_g = "-1"
+                except:
+                    trend_g = -9999
 
                 #########  drought_category  ##############
                 try:
@@ -493,7 +505,7 @@ def generate_mws_data_for_kyl_filters(
                                     f"Severe_in_weeks_{year}"
                                 ]
                             )
-                            > 5
+                            >= 5
                             else 0
                         )
                         for year in years
@@ -520,8 +532,8 @@ def generate_mws_data_for_kyl_filters(
                         4,
                     )
                 except:
-                    drought_category = 0
-                    avg_dry_spell_in_weeks = 0
+                    drought_category = -9999
+                    avg_dry_spell_in_weeks = -9999
 
                 ################# avg_runoff
                 runoff_columns = hydro_annual_mws_data.filter(
@@ -543,7 +555,7 @@ def generate_mws_data_for_kyl_filters(
                         .sum()
                     )
                 except:
-                    nrega_assets_sum = 0
+                    nrega_assets_sum = -9999
 
                 ############ MWS Intersect Villages  ########################
                 try:
@@ -597,8 +609,8 @@ def generate_mws_data_for_kyl_filters(
                     )
 
                 except:
-                    degradation_land_area = 0
-                    change_in_cropping_intensity_area = 0
+                    degradation_land_area = -9999
+                    change_in_cropping_intensity_area = -9999
 
                 ############  Change Detection Afforestation  ###################
                 try:
@@ -616,7 +628,7 @@ def generate_mws_data_for_kyl_filters(
                         "total_afforestation_area_in_ha", None
                     ).iloc[0]
                 except:
-                    afforestation_land_area = 0
+                    afforestation_land_area = -9999
 
                 ############  Change Detection Deforestation  ###################
                 try:
@@ -630,7 +642,7 @@ def generate_mws_data_for_kyl_filters(
                         "total_deforestation_area_in_ha", None
                     ).iloc[0]
                 except:
-                    deforestation_land_area = 0
+                    deforestation_land_area = -9999
 
                 ############  Change Detection Urbanization  ###################
                 try:
@@ -641,7 +653,7 @@ def generate_mws_data_for_kyl_filters(
                         "total_urbanization_area_in_ha", None
                     ).iloc[0]
                 except:
-                    urbanization_land_area = 0
+                    urbanization_land_area = -9999
 
                 ############# Terrain lulc slope / plain  #####################
                 try:
@@ -653,8 +665,9 @@ def generate_mws_data_for_kyl_filters(
                         if not df_lulc_slope_mws_data.empty
                         else None
                     )
+
                 except:
-                    lulc_slope_category = ""
+                    lulc_slope_category = -9999
 
                 try:
                     df_lulc_plain_mws_data = sheets["terrain_lulc_plain"][
@@ -665,8 +678,9 @@ def generate_mws_data_for_kyl_filters(
                         if not df_lulc_plain_mws_data.empty
                         else None
                     )
+
                 except:
-                    lulc_plain_category = ""
+                    lulc_plain_category = -9999
 
                 ################# Restoration Vector  #########################
                 try:
@@ -680,8 +694,8 @@ def generate_mws_data_for_kyl_filters(
                         "protection_area_in_ha", None
                     ).iloc[0]
                 except:
-                    wide_scale_restoration = 0
-                    area_protection = 0
+                    wide_scale_restoration = -9999
+                    area_protection = -9999
 
                 ################# Aquifer Vector  #########################
                 aquifer_class_map = {0: "Hard Rock", 1: "Alluvial"}
@@ -698,7 +712,7 @@ def generate_mws_data_for_kyl_filters(
                         aquifer_class_name = "Alluvial"
                     aquifer_class = int(class_to_id.get(aquifer_class_name, ""))
                 except Exception:
-                    aquifer_class = ""
+                    aquifer_class = -9999
 
                 ################# SOGE Vector  #########################
                 Soge_class = {
@@ -721,7 +735,7 @@ def generate_mws_data_for_kyl_filters(
                         class_to_id.get(soge_class_name, "")
                     )  # Returns None if not found
                 except Exception:
-                    soge_class = 4
+                    soge_class = -9999
 
                 ################## LCW Conflict  ######################
                 ## if count is 0 then Areas with no conflicts else Areas with conflicts
@@ -775,6 +789,209 @@ def generate_mws_data_for_kyl_filters(
                 except Exception as e:
                     factory_csr = 0
 
+                ############ MWS Intersect Swb ########################
+                try:
+                    swb_df = sheets["mws_intersect_swb"]
+
+                    if swb_df is not -1 and not swb_df.empty:
+                        mws_swb_data = swb_df[swb_df["UID"] == specific_mws_id]
+
+                        mws_intersect_swb = mws_swb_data.apply(
+                            lambda row: {
+                                "swbId": str(row["SWB_UID"]),
+                                "swbName": (
+                                    str(row["Waterbodies_name"])
+                                    if pd.notna(row["Waterbodies_name"])
+                                    else ""
+                                ),
+                                "latitude": (
+                                    float(row["Latitude"])
+                                    if pd.notna(row["Latitude"])
+                                    else None
+                                ),
+                                "longitude": (
+                                    float(row["Longitude"])
+                                    if pd.notna(row["Longitude"])
+                                    else None
+                                ),
+                            },
+                            axis=1,
+                        ).tolist()
+                    else:
+                        mws_intersect_swb = []
+
+                except Exception as e:
+                    print(f"Error in SWB funda: {e}")
+                    mws_intersect_swb = []
+
+                ############ DEM (Digital Elevation Model) ########################
+                try:
+                    dem_df = sheets["dem"]
+                    if dem_df is not -1 and not dem_df.empty:
+                        mws_dem_data = dem_df[dem_df["UID"] == specific_mws_id]
+
+                        # Average of all UID mean elevations
+                        overall_mean_elevation = dem_df["mean_elevation_in_m"].mean()
+                        if not mws_dem_data.empty:
+                            row = mws_dem_data.iloc[0]
+                            relief = round(
+                                row["max_elevation_in_m"] - row["min_elevation_in_m"], 2
+                            )
+                            mean_elevation = round(row["mean_elevation_in_m"], 2)
+
+                            # Relative mean elevation
+                            if overall_mean_elevation != 0:
+                                relative_mean_elevation = round(
+                                    (mean_elevation - overall_mean_elevation), 2
+                                )
+                            else:
+                                relative_mean_elevation = 0
+
+                        else:
+                            relief = 0
+                            mean_elevation = 0
+                            relative_mean_elevation = 0
+
+                    else:
+                        relief = -9999
+                        mean_elevation = -9999
+                        relative_mean_elevation = -9999
+
+                except Exception as e:
+                    print(f"Error in getting DEM data: {e}")
+                    relief = -9999
+                    mean_elevation = -9999
+                    relative_mean_elevation = -9999
+
+                ############ Canal ########################
+                try:
+                    canal_df = sheets["canal"]
+                    if canal_df is not -1 and not canal_df.empty:
+                        mws_canal_data = canal_df[canal_df["UID"] == specific_mws_id]
+                        if not mws_canal_data.empty:
+                            canal_available = True
+                        else:
+                            canal_available = False
+
+                    else:
+                        canal_available = False
+
+                except Exception as e:
+                    print(f"Error in getting canal data: {e}")
+                    canal_available = False
+
+                ############ Canal ########################
+                try:
+                    river_df = sheets["river"]
+                    if river_df is not -1 and not river_df.empty:
+                        mws_river_data = river_df[river_df["UID"] == specific_mws_id]
+                        if not mws_river_data.empty:
+                            river_available = True
+                        else:
+                            river_available = False
+
+                    else:
+                        river_available = False
+
+                except Exception as e:
+                    print(f"Error in getting canal data: {e}")
+                    river_available = False
+
+                ############ lulc vector ########################
+                try:
+                    lulc_shrub_percent = -9999
+                    lulc_forest_percent = -9999
+                    lulc_crop_percent = -9999
+
+                    lulc_df = sheets["lulc_vector"]
+
+                    if lulc_df is not -1 and not lulc_df.empty:
+
+                        mws_lulc_data = lulc_df[lulc_df["UID"] == specific_mws_id]
+
+                        if not mws_lulc_data.empty:
+
+                            row = mws_lulc_data.iloc[0]
+
+                            # Total area
+                            area_in_ha = float(row.get("area_in_ha", 0))
+
+                            # Shrub
+                            shrub_cols = [
+                                col
+                                for col in lulc_df.columns
+                                if col.startswith("shrub_scrub_in_ha_")
+                            ]
+
+                            lulc_shrub_area = round(
+                                sum(row[col] for col in shrub_cols) / len(shrub_cols), 2
+                            )
+
+                            # Forest
+                            forest_cols = [
+                                col
+                                for col in lulc_df.columns
+                                if col.startswith("tree_forest_in_ha_")
+                            ]
+
+                            lulc_forest_area = round(
+                                sum(row[col] for col in forest_cols) / len(forest_cols),
+                                2,
+                            )
+
+                            if area_in_ha > 0:
+                                lulc_shrub_percent = round(
+                                    (lulc_shrub_area / area_in_ha) * 100, 2
+                                )
+
+                                lulc_forest_percent = round(
+                                    (lulc_forest_area / area_in_ha) * 100, 2
+                                )
+
+                        df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
+                            sheets["croppingIntensity_annual"]["UID"] == specific_mws_id
+                        ]
+
+                        crp_row = df_crp_intensity_mws_data.iloc[0]
+                        area_in_ha = float(crp_row.get("area_in_ha", 0))
+                        cropped_area_in_ha = float(crp_row.get("sum_area_in_ha", 0))
+
+                        lulc_crop_percent = round(
+                            (cropped_area_in_ha / area_in_ha) * 100, 2
+                        )
+
+                    else:
+                        lulc_shrub_percent = -9999
+                        lulc_forest_percent = -9999
+                        lulc_crop_percent = -9999
+                except Exception as e:
+                    print(f"Error in LULC vector: {e}")
+
+                    lulc_shrub_percent = -9999
+                    lulc_forest_percent = -9999
+                    lulc_crop_percent = -9999
+
+                ############ Canal ########################
+                try:
+                    drainage_density_df = sheets["drainage_density"]
+                    if drainage_density_df is not -1 and not drainage_density_df.empty:
+                        mws_drainage_density_data = drainage_density_df[
+                            drainage_density_df["UID"] == specific_mws_id
+                        ]
+                        if not mws_drainage_density_data.empty:
+                            row = mws_drainage_density_data.iloc[0]
+                            drainage_density = round(row["drainage_density_std_in_km_per_km2"], 2)
+                        else:
+                            drainage_density = 0
+
+                    else:
+                        drainage_density = -9999
+
+
+                except Exception as e:
+                    print(f"Error in getting drainage_density data: {e}")
+                    drainage_density = -9999
+
                 results.append(
                     {
                         "mws_id": specific_mws_id,
@@ -815,6 +1032,16 @@ def generate_mws_data_for_kyl_filters(
                         "mining": mining,
                         "green_credit": green_credit,
                         "factory_csr": factory_csr,
+                        "mws_intersect_swb": mws_intersect_swb,
+                        "relief": relief,
+                        "mean_elevation": mean_elevation,
+                        "relative_mean_elevation": relative_mean_elevation,
+                        "canal_available": canal_available,
+                        "river_available": river_available,
+                        "lulc_shrub_percent": lulc_shrub_percent,
+                        "lulc_forest_percent": lulc_forest_percent,
+                        "lulc_crop_percent": lulc_crop_percent,
+                        "drainage_density": drainage_density,
                     }
                 )
 

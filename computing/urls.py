@@ -182,6 +182,16 @@ urlpatterns = [
         name="generate_facilities_proximity",
     ),
     path(
+        "generate_antyodaya/",
+        api.generate_antyodaya,
+        name="generate_antyodaya",
+    ),
+    path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
+    path(
         "generate_stac_collection/",
         api.generate_stac_collection,
         name="generate_stac_collection",
@@ -215,5 +225,47 @@ urlpatterns = [
         "stac/<str:state>/<str:district>/<str:block>/items/<str:item_id>/",
         api.stac_item,
         name="stac_item",
+    ),
+    path("sync_layer_remote/", api.sync_layer_remote, name="sync_layer_remote"),
+    path(
+        "update_layer_sync_remote/",
+        api.update_layer_sync_remote,
+        name="update_layer_sync_remote",
+    ),
+    path("missing_layers/", api.missing_layers, name="missing_layer"),
+    path(
+        "generate_fabdem_layer/",
+        api.generate_fabdem_layer,
+        name="generate-fab-dem-layer",
+    ),
+    path(
+        "generate_canal_vector/",
+        api.generate_canal_vector,
+        name="generate-canal-vector",
+    ),
+    path("refresh_cache/", api.refresh_layer_cache, name="refresh_cache"),
+    path(
+        "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
+    ),
+    path("missing_excel/", api.missing_excel, name="missing_excel"),
+    path(
+        "generate_tree_in_grassland/",
+        api.generate_tree_in_grassland,
+        name="generate_tree_in_grassland",
+    ),
+    path(
+        "forest_fringe_degradation/",
+        api.forest_fringe_degradation,
+        name="forest_fringe_degradation",
+    ),
+    path(
+        "generate_forest_fire/",
+        api.generate_forest_fire,
+        name="generate_forest_fire",
+    ),
+    path(
+        "generate_et_downscale/",
+        api.et_downscale,
+        name="et_downscale",
     ),
 ]

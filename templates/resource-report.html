@@ -294,23 +294,23 @@
                 <span>Barren Lands</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #c6e46d;"></div>
+                <div class="legend-color" style="background-color: #F0F4A3;"></div>
                 <span>Single Kharif</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #eee05d;"></div>
+                <div class="legend-color" style="background-color: #D6E96B;"></div>
                 <span>Single Non-Kharif</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #f9b249;"></div>
+                <div class="legend-color" style="background-color: #B7D43A;"></div>
                 <span>Double Cropping</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #fb5139;"></div>
+                <div class="legend-color" style="background-color: #7FAF2E;"></div>
                 <span>Tripple/Annual/Perennial Cropping</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background-color: #4c4ef5;"></div>
+                <div class="legend-color" style="background-color: #8C7A4F;"></div>
                 <span>Shrubs and Scrubs</span>
             </div>
         </div>
@@ -329,6 +329,7 @@
 
         <section class="section">
             <h2>Well Overview for <strong>Plan :</strong> {{plan_name}}</h2>
+            <p id="noWellsNote" style="display:none; color:#888; font-style:italic; text-align:center; padding: 12px 0;">No wells have been mapped for this plan.</p>
             <div id="wellMap" class="map"></div>
         </section>
         <p class="legend-note">Note: Well Distribution on Stream Order Raster</p>
@@ -416,6 +417,16 @@
             <h2>Demands Overview for <strong>Plan :</strong> {{plan_name}}</h2>
             <div id="demandStructureMap" class="map"></div>
         </section>
+        <div class="legend" style="margin-bottom: 8px;">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #f97316; border-radius: 50%;"></div>
+                <span>Irrigation Demand</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #3b82f6; border-radius: 50%;"></div>
+                <span>Groundwater Recharge</span>
+            </div>
+        </div>
         <div class="legend">
             <div class="legend-item">
                 <div class="legend-color" style="background-color: #313695;"></div>
@@ -462,6 +473,15 @@
                 <span>Mountain tops, high ridges</span>
             </div>
         </div>
+    </div>
+
+    <div class="container">
+
+        <section class="section">
+            <h2>Livelihood Demand Overview for <strong>Plan :</strong> {{plan_name}}</h2>
+            <div id="livelihoodMap" class="map"></div>
+        </section>
+
     </div>
 
     <footer>
@@ -646,6 +666,28 @@
             })
         });
 
+        const livelihoodMap = new ol.Map({
+            target: 'livelihoodMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            })
+        });
+
         function readFeaturesFromGeoJSON(data) {
             return new ol.format.GeoJSON().readFeatures(data, {
                 dataProjection: 'EPSG:4326',         // WFS usually returns EPSG:4326
@@ -688,6 +730,7 @@
             wellMap.addLayer(mwsLayer);
             waterStructureMap.addLayer(mwsLayer);
             demandStructureMap.addLayer(mwsLayer);
+            livelihoodMap.addLayer(mwsLayer);
 
             // Center on MWS extent
             const arr = vectorSource.getExtent();
@@ -696,6 +739,7 @@
             wellMap.getView().setCenter(mapcenter);
             waterStructureMap.getView().setCenter(mapcenter);
             demandStructureMap.getView().setCenter(mapcenter);
+            livelihoodMap.getView().setCenter(mapcenter);
         }
 
         async function addVillageBoundary() {
@@ -788,24 +832,25 @@
                 const resp = await fetch(url);
                 const data = await resp.json();
 
-                const vectorSource = new ol.source.Vector({
-                    features: readFeaturesFromGeoJSON(data) // ensure projections match your map
-                });
+                const features = readFeaturesFromGeoJSON(data);
+
+                if (features.length === 0) {
+                    document.getElementById('noWellsNote').style.display = 'block';
+                    document.getElementById('wellMap').style.display = 'none';
+                    return;
+                }
+
+                const vectorSource = new ol.source.Vector({ features });
 
                 const wellLayer = new ol.layer.Vector({
                     source: vectorSource,
                     style: (feature) => {
                         const name = (feature.get('ben_settle') || '').toString();
                         const status = feature.values_;
-                        let wellMaintenance = false;
-                        if (status.Well_condi !== undefined) {
-                            const m = status.Well_condi.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
-                            wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
-                        }
-                        else {
-                            const m = status.Well_usage.match(/'select_one_maintenance'\s*:\s*'([^']*)'/i);
-                            wellMaintenance = m ? m[1].toLowerCase() === 'yes' : null;
-                        }
+                        const m = status.Well_usage.match(
+                            /'is_maintenance_required'\s*:\s*'([^']*)'/i,
+                        );
+                        const wellMaintenance = m ? m[1].toLowerCase() === "yes" : null;
 
                         if (wellMaintenance) {
                             return new ol.style.Style({
@@ -934,6 +979,7 @@
                 console.log(error);
             }
         }
+        
         async function addDemandLayer() {
             const svgMarkupIrrigation = `{% include 'icons/irrigation_icon.svg' %}`;
             const svgMarkupRecharge = `{% include 'icons/recharge_icon.svg' %}`;
@@ -1058,7 +1104,58 @@
                 console.log(error)
             }
 
+        }
 
+        async function addLivelihoodLayer() {
+            const svgMarkupLivelihood = `{% include 'icons/livelihood_proposed.svg' %}`;
+            const LivelihoodIconsUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgMarkupLivelihood);
+
+            const urlLivelihood =
+                "https://geoserver.core-stack.org:8443/geoserver/works/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=works:livelihood_{{plan_id}}_{{district}}_{{block}}&outputFormat=application/json";
+
+            try {
+                const respLvlh = await fetch(urlLivelihood);
+                const dataLvlh = await respLvlh.json();
+
+                const vectorSourceLvlh = new ol.source.Vector({
+                    features: readFeaturesFromGeoJSON(dataLvlh)
+                });
+
+                const LivelihoodLayer = new ol.layer.Vector({
+                    source: vectorSourceLvlh,
+                    style: (feature) => {
+                        const name = (feature.get('beneficiar') || '').toString();
+                        return new ol.style.Style({
+                            image: new ol.style.Icon({
+                                src: LivelihoodIconsUrl,
+                                anchor: [0.5, 1],
+                                anchorXUnits: 'fraction',
+                                anchorYUnits: 'fraction',
+                                scale: 1.0
+                            }),
+                            text: new ol.style.Text({
+                                text: name,
+                                font: '12px sans-serif',
+                                textAlign: 'center',
+                                fill: new ol.style.Fill({ color: '#111' }),
+                                stroke: new ol.style.Stroke({ color: '#fff', width: 3 }),
+                                overflow: true
+                            })
+                        });
+                    },
+                    zIndex: 20
+                });
+
+                livelihoodMap.addLayer(LivelihoodLayer);
+                if (vectorSourceLvlh.getFeatures().length > 0) {
+                    const arrLvlh = vectorSourceLvlh.getExtent();
+                    const mapcenterLvlh = [(arrLvlh[0] + arrLvlh[2]) / 2, (arrLvlh[1] + arrLvlh[3]) / 2];
+                    livelihoodMap.getView().setZoom(15);
+                    livelihoodMap.getView().setCenter(mapcenterLvlh);
+                }
+            } catch (error) {
+                console.log(error)
+            }
         }
 
         // Run in order
@@ -1069,7 +1166,8 @@
                 await addSettlementLayer();
                 await addWellLayer();
                 await addWaterLayer();
-                await addDemandLayer()
+                await addDemandLayer();
+                await addLivelihoodLayer();
             } catch (err) {
                 console.error('Error building layers:', err);
             }
@@ -1095,7 +1193,7 @@
         });
 
         (function () {
-            const maps = [villageMap, mainMap, wellMap, waterStructureMap, demandStructureMap].filter(Boolean);
+            const maps = [villageMap, mainMap, wellMap, waterStructureMap, demandStructureMap, livelihoodMap].filter(Boolean);
 
             let pending = 0;
             const renderedOnce = new Set();
