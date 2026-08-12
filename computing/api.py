@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 
@@ -96,7 +97,7 @@ from .misc.aquifer_vector_local import (
 )
 from .misc.catchment_area import generate_catchment_area_singleflow
 from .misc.distancetonearestdrainage import generate_distance_to_nearest_drainage_line
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.facilities import generate_facilities_proximity_task
 from .misc.factory_csr import generate_factory_csr_data
 from .misc.green_credit import generate_green_credit_data
 from .misc.lcw_conflict import generate_lcw_conflict_data
@@ -183,11 +184,26 @@ from .mws.mws_connectivity_local_compute import (
     mws_connectivity_vector as generate_mws_connectivity_local_task,
 )
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.facilities import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
+
+from utilities.layer_generation_mode import (
+    format_stac_for_api_response,
+    sync_layer_generation_if_enabled,
+    is_sync_layer_generation_request,
+)
+from utilities.stac_spec_collector import collect_generated_stac_specs
+from utilities.layer_generation_logging import (
+    layer_api_error_response,
+    layer_generation_api_logging,
+)
+from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
+from computing.forest_fire.forest_fire_updated import generate_forest_fire_layer_updated
+from .views import check_missing_excel_files
 from .mws.mws_centroid_local_compute import (
     generate_mws_centroid_data_local as generate_mws_centroid_data_local_task,
 )
@@ -262,7 +278,7 @@ def generate_admin_boundary(request):
         )
     except Exception as e:
         print("Exception in generate_block_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_admin_boundary", e, request=request)
 
 
 @api_security_check(allowed_methods="POST")
@@ -294,7 +310,7 @@ def generate_nrega_layer(request):
         )
     except Exception as e:
         print("Exception in generate_nrega_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_nrega_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -329,7 +345,7 @@ def generate_drainage_layer(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_drainage_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_drainage_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -345,7 +361,7 @@ def create_workspace(request):
         return Response({"Success": response}, status=status.HTTP_201_CREATED)
     except Exception as e:
         print("Exception in create_workspace api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("create_workspace", e, request=request)
 
 
 @api_view(["POST"])
@@ -361,7 +377,7 @@ def delete_layer(request):
         return Response({"Success": response}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in delete_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("delete_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -385,7 +401,7 @@ def upload_kml(request):
         )
     except Exception as e:
         print("Exception in upload_kml api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("upload_kml", e, request=request)
 
 
 @api_security_check(allowed_methods="POST")
@@ -405,7 +421,7 @@ def generate_mws_layer(request):
         )
     except Exception as e:
         print("Exception in generate_mws_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_mws_layer", e, request=request)
 
 
 @api_security_check(allowed_methods="POST")
@@ -436,7 +452,7 @@ def generate_fortnightly_hydrology(request):
         )
     except Exception as e:
         print("Exception in generate_fortnightly_hydrology api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_fortnightly_hydrology", e, request=request)
 
 
 @api_view(["POST"])
@@ -467,7 +483,7 @@ def generate_annual_hydrology(request):
         )
     except Exception as e:
         print("Exception in generate_annual_hydrology api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_annual_hydrology", e, request=request)
 
 
 @api_view(["POST"])
@@ -502,7 +518,7 @@ def lulc_for_tehsil(request):
             )
     except Exception as e:
         print("Exception in lulc_for_tehsil api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("lulc_for_tehsil", e, request=request)
 
 
 @api_view(["POST"])
@@ -529,7 +545,7 @@ def lulc_v2_river_basin(request):
         return Response({"Success": "lulc_v2_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in lulc_v2_river_basin api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("lulc_v2_river_basin", e, request=request)
 
 
 @api_view(["POST"])
@@ -557,7 +573,7 @@ def lulc_v3_river_basin(request):
         return Response({"Success": "lulc_v3_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in lulc_v3_river_basin api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("lulc_v3_river_basin", e, request=request)
 
 
 @api_view(["POST"])
@@ -589,7 +605,7 @@ def lulc_v3(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in lulc_v3 api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("lulc_v3", e, request=request)
 
 
 @api_view(["POST"])
@@ -622,7 +638,7 @@ def lulc_vector(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in lulc_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("lulc_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -646,7 +662,7 @@ def lulc_v4(request):
         )
     except Exception as e:
         print("Exception in lulc_time_series api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("lulc_v4", e, request=request)
 
 
 @api_view(["POST"])
@@ -662,7 +678,7 @@ def get_gee_layer(request):
         return Response({"Success": response}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_gee_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("get_gee_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -702,7 +718,7 @@ def generate_ci_layer(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_cropping_intensity_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_ci_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -750,7 +766,7 @@ def generate_swb(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_swf api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_swb", e, request=request)
 
 
 @api_view(["POST"])
@@ -781,7 +797,7 @@ def generate_drought_layer(request):
         )
     except Exception as e:
         print("Exception in generate_drought_layer api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_drought_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -809,7 +825,7 @@ def generate_terrain_descriptor(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_terrain_descriptor api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_terrain_descriptor", e, request=request)
 
 
 @api_view(["POST"])
@@ -840,7 +856,7 @@ def generate_terrain_compute_all(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_terrain_compute_all api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_terrain_compute_all", e, request=request)
 
 
 @api_view(["POST"])
@@ -877,7 +893,7 @@ def generate_terrain_raster(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_terrain_raster api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_terrain_raster", e, request=request)
 
 
 @api_view(["POST"])
@@ -910,7 +926,7 @@ def terrain_lulc_slope_cluster(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in terrain_lulc_slope_cluster api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("terrain_lulc_slope_cluster", e, request=request)
 
 
 @api_view(["POST"])
@@ -943,7 +959,7 @@ def terrain_lulc_plain_cluster(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in terrain_lulc_plain_cluster api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("terrain_lulc_plain_cluster", e, request=request)
 
 
 @api_view(["POST"])
@@ -964,7 +980,7 @@ def generate_clart(request):
         )
     except Exception as e:
         print("Exception in generate_clart api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_clart", e, request=request)
 
 
 @api_view(["POST"])
@@ -997,7 +1013,7 @@ def change_detection(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in change_detection api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("change_detection", e, request=request)
 
 
 @api_view(["POST"])
@@ -1031,7 +1047,7 @@ def change_detection_vector(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in change_detection_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("change_detection_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -1052,7 +1068,7 @@ def crop_grid(request):
         )
     except Exception as e:
         print("Exception in crop_grid api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("crop_grid", e, request=request)
 
 
 @api_view(["POST"])
@@ -1076,7 +1092,7 @@ def mws_drought_causality(request):
         )
     except Exception as e:
         print("Exception in Drought Causality api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("mws_drought_causality", e, request=request)
 
 
 @api_view(["POST"])
@@ -1145,7 +1161,7 @@ def tree_health_raster(request):
         )
     except Exception as e:
         print("Exception in change_detection api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("tree_health_raster", e, request=request)
 
 
 @api_security_check(allowed_methods="POST")
@@ -1230,7 +1246,7 @@ def tree_health_vector(request):
         )
     except Exception as e:
         print("Exception in Overall_change_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("tree_health_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -1243,7 +1259,7 @@ def gee_task_status(request):
         return Response({"Response": response}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in gee_task_status api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("gee_task_status", e, request=request)
 
 
 @api_view(["POST"])
@@ -1264,7 +1280,7 @@ def stream_order(request):
         )
     except Exception as e:
         print("Exception in stream_order_vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("stream_order", e, request=request)
 
 
 @api_view(["POST"])
@@ -1289,7 +1305,7 @@ def restoration_opportunity(request):
         )
     except Exception as e:
         print("Exception in restoration_opportunity api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("restoration_opportunity", e, request=request)
 
 
 @api_view(["POST"])
@@ -1330,7 +1346,7 @@ def plantation_site_suitability(request):
         )
     except Exception as e:
         print("Exception in Plantation_site_suitability api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("plantation_site_suitability", e, request=request)
 
 
 @api_view(["POST"])
@@ -1358,7 +1374,7 @@ def aquifer_vector(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in aquifer vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("aquifer_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -1383,7 +1399,7 @@ def soge_vector(request):
         )
     except Exception as e:
         print("Exception in SOGE vector api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("soge_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -1453,7 +1469,7 @@ def swb_pond_merging(request):
         )
     except Exception as e:
         print("Exception in merge_swb_ponds api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("swb_pond_merging", e, request=request)
 
 
 @api_view(["POST"])
@@ -1626,7 +1642,7 @@ def generate_layer_in_order(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_layer_order_first api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_layer_in_order", e, request=request)
 
 
 @api_view(["POST"])
@@ -1644,7 +1660,7 @@ def layer_status_dashboard(request):
         )
     except Exception as e:
         print("Exception in layer_staus_dashboard api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("layer_status_dashboard", e, request=request)
 
 
 @api_view(["POST"])
@@ -1668,7 +1684,7 @@ def generate_lcw(request):
         )
     except Exception as e:
         print("Exception in generate_lcw_conflict_data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_lcw", e, request=request)
 
 
 @api_view(["POST"])
@@ -1692,7 +1708,7 @@ def generate_agroecological(request):
         )
     except Exception as e:
         print("Exception in generate_agroecological_data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_agroecological", e, request=request)
 
 
 @api_view(["POST"])
@@ -1716,7 +1732,7 @@ def generate_factory_csr(request):
         )
     except Exception as e:
         print("Exception in generate_factory_csr_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_factory_csr", e, request=request)
 
 
 @api_view(["POST"])
@@ -1740,7 +1756,7 @@ def generate_green_credit(request):
         )
     except Exception as e:
         print("Exception in generate_green_credit_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_green_credit", e, request=request)
 
 
 @api_view(["POST"])
@@ -1764,7 +1780,7 @@ def generate_mining(request):
         )
     except Exception as e:
         print("Exception in generate_mining_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_mining", e, request=request)
 
 
 @api_view(["GET"])
@@ -1777,7 +1793,7 @@ def get_layers_for_workspace(request):
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_layers_for_workspace api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("get_layers_for_workspace", e, request=request)
 
 
 @api_view(["POST"])
@@ -1801,7 +1817,7 @@ def generate_natural_depression(request):
         )
     except Exception as e:
         print("Exception in generate_natural_depression_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_natural_depression", e, request=request)
 
 
 @api_view(["POST"])
@@ -1825,7 +1841,7 @@ def generate_distance_nearest_upstream_DL(request):
         )
     except Exception as e:
         print("Exception in generate_distance_nearest_upstream_DL_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_distance_nearest_upstream_DL", e, request=request)
 
 
 @api_view(["POST"])
@@ -1849,7 +1865,7 @@ def generate_catchment_area_SF(request):
         )
     except Exception as e:
         print("Exception in generate_catchment_area_SF_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_catchment_area_SF", e, request=request)
 
 
 @api_view(["POST"])
@@ -1873,7 +1889,7 @@ def generate_slope_percentage(request):
         )
     except Exception as e:
         print("Exception in generate_slope_percentage_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_slope_percentage", e, request=request)
 
 
 @api_view(["POST"])
@@ -1909,7 +1925,7 @@ def generate_ndvi_timeseries(request):
         )
     except Exception as e:
         print("Exception in generate_ndvi_timeseries api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_ndvi_timeseries", e, request=request)
 
 
 @api_view(["POST"])
@@ -1936,7 +1952,7 @@ def generate_zoi_to_gee(request):
         )
     except Exception as e:
         print("Exception in generate_mining_to_gee api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_zoi_to_gee", e, request=request)
 
 
 @api_view(["POST"])
@@ -1972,7 +1988,7 @@ def generate_mws_connectivity(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_mws_connectivity api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_mws_connectivity", e, request=request)
 
 
 @api_view(["POST"])
@@ -1996,7 +2012,7 @@ def generate_mws_centroid(request):
         )
     except Exception as e:
         print("Exception in generate_mws_centroid api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_mws_centroid", e, request=request)
 
 
 @api_view(["POST"])
@@ -2020,7 +2036,7 @@ def generate_facilities_proximity(request):
         )
     except Exception as e:
         print("Exception in generate_facilities_proximity api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_facilities_proximity", e, request=request)
 
 
 @api_view(["POST"])
@@ -2042,7 +2058,7 @@ def generate_antyodaya(request):
         )
     except Exception as e:
         print("Exception in generate_antyodaya api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_antyodaya", e, request=request)
 
 
 @api_view(["POST"])
@@ -2351,7 +2367,7 @@ def missing_layers(request):
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in get_layers_for_workspace api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("missing_layers", e, request=request)
 
 
 @api_view(["GET"])
@@ -2381,7 +2397,7 @@ def generate_fabdem_layer(request):
             f"Exception in generate DEM raster and vector layer for {district} - {block}:: ",
             e,
         )
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_fabdem_layer", e, request=request)
 
 
 @api_view(["POST"])
@@ -2404,7 +2420,7 @@ def generate_spei(request):
         )
     except Exception as e:
         print("Exception in generate_spei api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_spei", e, request=request)
 
 
 @api_view(["POST"])
@@ -2426,7 +2442,7 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_canal_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -2450,7 +2466,7 @@ def drought_resilience_resistance(request):
         )
     except Exception as e:
         print("Exception in drought_resilience_resistance api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("drought_resilience_resistance", e, request=request)
 
 
 @api_view(["POST"])
@@ -2474,7 +2490,7 @@ def rainfall_resilience_resistance(request):
         )
     except Exception as e:
         print("Exception in rainfall_resilience_resistance api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("rainfall_resilience_resistance", e, request=request)
 
 
 @api_view(["POST"])
@@ -2500,7 +2516,7 @@ def generate_fabdem_raster_vector(request):
         )
     except Exception as e:
         print(f"Exception in generate DEM raster layer for {district} - {block}:: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_fabdem_raster_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -2529,7 +2545,7 @@ def generate_canal_vector(request):
         print(
             f"Exception in generate canal vector layer for {district} - {block}:: ", e
         )
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_canal_vector", e, request=request)
 
 
 @api_view(["POST"])
@@ -2556,7 +2572,7 @@ def generate_river_data(request):
         )
     except Exception as e:
         print("Exception in river data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_river_data", e, request=request)
 
 
 @api_view(["POST"])
@@ -2583,7 +2599,7 @@ def generate_drainage_density_data(request):
         )
     except Exception as e:
         print("Exception in river data api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_drainage_density_data", e, request=request)
 
 
 @api_view(["POST"])
@@ -2610,7 +2626,7 @@ def generate_antyodaya(request):
         )
     except Exception as e:
         print("Exception in generate_antyodaya api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_antyodaya", e, request=request)
 
 
 @api_view(["POST"])
@@ -2637,4 +2653,136 @@ def generate_livestocks(request):
         )
     except Exception as e:
         print("Exception in generate_livestocks api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return layer_api_error_response("generate_livestocks", e, request=request)
+
+@api_view(["POST"])
+@schema(None)
+def generate_tree_in_grassland(request):
+    print("Inside generate_tree_in_grassland API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_tree_in_grassland_layer.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Tree in Grassland task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_tree_in_grassland api :: ", e)
+        return layer_api_error_response("generate_tree_in_grassland", e, request=request)
+
+@api_view(["POST"])
+@schema(None)
+def forest_fringe_degradation(request):
+    print("Inside forest_fringe_degradation API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fringe_degradation.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fringe task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fringe api :: ", e)
+        return layer_api_error_response("forest_fringe_degradation", e, request=request)
+
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fire(request):
+    print("Inside generate_forest_fire API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        gee_account_id = request.data.get("gee_account_id")
+        generate_forest_fire_layer_updated.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Forest Fire task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fire api :: ", e)
+        return layer_api_error_response("generate_forest_fire", e, request=request)
+
+@api_view(["GET"])
+@schema(None)
+def missing_excel(request):
+    try:
+        result = check_missing_excel_files()
+        return Response({"result": result}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in missing_excel api :: ", e)
+        return layer_api_error_response("missing_excel", e, request=request)
+
+
+def _auto_discover_computing_api_views(namespace):
+    """Auto-wrap request handlers for sync layer generation + STAC enrichment."""
+    discovered = []
+    for name, fn in namespace.items():
+        if name.startswith("_") or not callable(fn):
+            continue
+        if getattr(fn, "__module__", None) != __name__:
+            continue
+        if getattr(fn, "__layer_generation_sync_wrapped__", False):
+            continue
+        try:
+            target = inspect.unwrap(fn)
+            sig = inspect.signature(target)
+        except (OSError, TypeError, ValueError):
+            continue
+
+        params = list(sig.parameters.values())
+        if len(params) == 0:
+            continue
+        first_param = params[0]
+        if first_param.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        ) and first_param.name == "request":
+            discovered.append(name)
+    return discovered
+
+
+for _view_name in _auto_discover_computing_api_views(globals()):
+    wrapped = sync_layer_generation_if_enabled(
+        layer_generation_api_logging(globals()[_view_name])
+    )
+    wrapped.__layer_generation_sync_wrapped__ = True
+    globals()[_view_name] = wrapped

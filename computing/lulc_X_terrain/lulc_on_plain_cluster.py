@@ -17,7 +17,8 @@ from utilities.gee_utils import (
     load_gee_asset,
     export_vector_asset_to_gee,
     make_asset_public,
-    get_gee_dir_path,)
+    get_gee_dir_path,
+)
 from .utils import aez_lulcXterrain_cluster_centroids, process_mws, calculate_area
 from utilities.constants import AEZ, GEE_HELPER_PATH
 
@@ -112,11 +113,15 @@ def lulc_on_plain_cluster(
             if task:
                 tasks.append(task)
 
+        if not tasks:
+            raise RuntimeError(
+                f"No chunk export tasks started for LULC plain cluster "
+                f"(state={state}, district={district}, block={block})."
+            )
 
         print("Started all chunk tasks")
         task_id_list = check_task_status(tasks)
         print("All chunk tasks completed:", task_id_list)
-
 
         # Merge all chunks into one feature collection
         print("Starting merge task")
@@ -127,9 +132,12 @@ def lulc_on_plain_cluster(
             chunk_size,
             merge_asset_id=asset_id,
         )
-        if final_task_id:
-            final_task_status = check_task_status([final_task_id])
-            print("Final merge task completed:", final_task_status)
+        if not final_task_id:
+            raise RuntimeError(
+                f"Failed to start merge for LULC plain cluster asset: {asset_id}"
+            )
+        final_task_status = check_task_status([final_task_id])
+        print("Final merge task completed:", final_task_status)
 
 
         # Clean up temporary assets
@@ -142,39 +150,49 @@ def lulc_on_plain_cluster(
                     print(f"Failed to delete {chunk_id}: {e}")
 
 
-    layer_at_geoserver = False
-    if is_gee_asset_exists(asset_id):
-        layer_id = save_layer_info_to_db(
-            state,
-            district,
-            block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_plain",
-            asset_id=asset_id,
-            dataset_name="Terrain LULC",
-            misc={
-                "start_year": start_year,
-                "end_year": end_year,
-            },
+    if not is_gee_asset_exists(asset_id):
+        raise RuntimeError(
+            f"LULC plain cluster GEE asset missing after generation: {asset_id}. "
+            "Chunk export/merge may have failed (check helper project path and task status)."
         )
-        make_asset_public(asset_id)
 
-        fc = load_gee_asset(asset_id).getInfo()
-        fc = {"features": fc["features"], "type": fc["type"]}
-        res = sync_layer_to_geoserver(
-            state,
-            fc,
-            valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
-            + "_lulc_plain",
-            "terrain_lulc",
+    layer_id = save_layer_info_to_db(
+        state,
+        district,
+        block,
+        layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_lulc_plain",
+        asset_id=asset_id,
+        dataset_name="Terrain LULC",
+        misc={
+            "start_year": start_year,
+            "end_year": end_year,
+        },
+    )
+    make_asset_public(asset_id)
+
+    fc = load_gee_asset(asset_id).getInfo()
+    fc = {"features": fc["features"], "type": fc["type"]}
+    res = sync_layer_to_geoserver(
+        state,
+        fc,
+        valid_gee_text(district.lower())
+        + "_"
+        + valid_gee_text(block.lower())
+        + "_lulc_plain",
+        "terrain_lulc",
+    )
+    print(res)
+    if not geoserver_sync_succeeded(res):
+        raise RuntimeError(
+            f"GeoServer sync failed for LULC plain cluster asset {asset_id}: {res}"
         )
-        print(res)
-        if geoserver_sync_succeeded(res) and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag updated")
-            layer_at_geoserver = True
-    return layer_at_geoserver
+    if not layer_id:
+        raise RuntimeError(
+            f"Failed to save LULC plain cluster layer info to DB for asset {asset_id}"
+        )
+    update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+    print("sync to geoserver flag updated")
+    return True
 
 
 def process_feature_collection(fc, landforms, area_lulc, plain_centroids):
