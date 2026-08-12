@@ -33,7 +33,7 @@ from .tree_in_grassland_utils import (
 )
 
 
-def tree_in_grassland_for_AEZ(aez_no, gee_account_id=7):
+def tree_in_grassland_for_AEZ(aez_no, start_year=None, end_year=None, gee_account_id=7):
     ee_initialize(gee_account_id)
     aez = ee.FeatureCollection(AEZ)
     mwses = ee.FeatureCollection(MWS_DATASET)
@@ -47,6 +47,8 @@ def tree_in_grassland_for_AEZ(aez_no, gee_account_id=7):
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
+        start_year=start_year,
+        end_year=end_year,
         gee_account_id=gee_account_id,
         app_type="tree_in_grassland",
         sync_to_db=False,
@@ -57,9 +59,9 @@ def tree_in_grassland_for_AEZ(aez_no, gee_account_id=7):
 @app.task(bind=True)
 def generate_tree_in_grassland_layer(
     self,
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     roi=None,
     asset_suffix=None,
     asset_folder_list=None,
