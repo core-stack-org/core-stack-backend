@@ -47,7 +47,7 @@ from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
 from computing.misc.ndvi_time_series import ndvi_timeseries
 from computing.zoi_layers.zoi import generate_zoi
-from computing.misc.facilities_proximity import generate_facilities_proximity_task
+from computing.misc.facilities import generate_facilities_proximity_task
 from computing.mws.mws_centroid import generate_mws_centroid_data
 from computing.change_detection.change_detection_local import (
     get_change_detection as get_change_detection_local,
