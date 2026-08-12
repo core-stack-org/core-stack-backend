@@ -10,16 +10,23 @@ from urllib.parse import urlencode
 
 import requests
 from django.conf import settings
+import numpy as np
+import rasterio
+from rasterio.fill import fillnodata
 
 
 GESDISC_OTF_URL = "https://hydro1.gesdisc.eosdis.nasa.gov/daac-bin/OTF/HTTP_services.cgi"
 EVAP_VARIABLE = "Evap_tavg"
 FLDAS_FORMAT = "Y29nLw"
 
+FLDAS_CA_DAILY_SOURCE = "fldas_ca_daily"
+FLDAS_CA_DAILY_PATCH_FILLED_SOURCE = "fldas_ca_daily_patch_filled"
 FLDAS_CA_DAILY_SHORTNAME = "FLDAS_NOAHMP001_G_CA_D"
 FLDAS_CA_DAILY_PRODUCT = "FLDAS_NOAHMP001_G_CA_D.001"
 FLDAS_CA_DAILY_BBOX = "21,65.566,37.932,99.844"
 
+FLDAS_GLOBAL_MONTHLY_SOURCE = "fldas_global_monthly"
+FLDAS_GLOBAL_MONTHLY_PATCH_FILLED_SOURCE = "fldas_global_monthly_patch_filled"
 FLDAS_GLOBAL_MONTHLY_SHORTNAME = "FLDAS_NOAH01_C_GL_M"
 FLDAS_GLOBAL_MONTHLY_PRODUCT = "FLDAS_NOAH01_C_GL_M.001"
 PAN_INDIA_BBOX = "6,68,38,98"
@@ -39,6 +46,12 @@ class SourceManifest:
     downloaded_count: int
     skipped_count: int
     failed_count: int
+    patch_filled_source: str | None = None
+    patch_filled_folder: str | None = None
+    patch_filled_count: int = 0
+    patch_fill_skipped_count: int = 0
+    patch_fill_failed_count: int = 0
+    patch_fill_invalid_pixels: int = 0
 
 
 def _coerce_date(value, field_name):
@@ -251,17 +264,213 @@ def _download_records(auth, records, overwrite, logger, max_attempts, retry_dela
     return downloaded_count, skipped_count, failed_count
 
 
+def _invalid_pixel_mask(values: np.ndarray, nodata) -> np.ndarray:
+    invalid = ~np.isfinite(values)
+    if nodata is not None:
+        invalid |= values == nodata
+    invalid |= values < 0
+    return invalid
+
+
+def _fill_raster_band(
+    values: np.ndarray,
+    nodata,
+    *,
+    max_search_distance: float,
+    smoothing_iterations: int,
+):
+    invalid = _invalid_pixel_mask(values, nodata)
+    invalid_count = int(invalid.sum())
+    if invalid_count == 0:
+        return values, invalid_count
+
+    valid = ~invalid
+    if not valid.any():
+        raise ValueError("raster band has no valid pixels to fill from")
+
+    working = values.astype("float32", copy=True)
+    working[invalid] = 0.0
+    mask = valid.astype("uint8")
+    filled = fillnodata(
+        working,
+        mask=mask,
+        max_search_distance=max_search_distance,
+        smoothing_iterations=smoothing_iterations,
+    )
+    return filled, invalid_count
+
+
+def _patch_fill_raster(
+    input_path: Path,
+    output_path: Path,
+    *,
+    overwrite: bool,
+    max_search_distance: float | None,
+    smoothing_iterations: int,
+):
+    if output_path.exists() and output_path.stat().st_size > 0 and not overwrite:
+        return "skipped", 0, None
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_name(
+        f"{output_path.stem}.{int(time.time() * 1000)}.tmp{output_path.suffix}"
+    )
+    try:
+        with rasterio.open(input_path) as src:
+            profile = src.profile.copy()
+            nodata = src.nodata
+            data = src.read()
+            search_distance = (
+                float(max(src.width, src.height))
+                if max_search_distance is None
+                else max_search_distance
+            )
+
+        filled = np.empty((data.shape[0], data.shape[1], data.shape[2]), dtype="float32")
+        invalid_pixels = 0
+        for band_index in range(data.shape[0]):
+            filled_band, band_invalid = _fill_raster_band(
+                data[band_index].astype("float32", copy=False),
+                nodata,
+                max_search_distance=search_distance,
+                smoothing_iterations=smoothing_iterations,
+            )
+            filled[band_index] = filled_band
+            invalid_pixels += band_invalid
+
+        profile.update(
+            dtype="float32",
+            count=data.shape[0],
+            compress=profile.get("compress") or "deflate",
+            tiled=profile.get("tiled", True),
+        )
+        with rasterio.open(temporary_path, "w", **profile) as dst:
+            dst.write(filled)
+        temporary_path.replace(output_path)
+        return "patch_filled", invalid_pixels, search_distance
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def _patch_fill_record(
+    record,
+    output_root,
+    overwrite,
+    max_search_distance,
+    smoothing_iterations,
+):
+    input_path = Path(record["path"])
+    output_path = Path(output_root) / input_path.name
+    patch_record = {
+        key: value for key, value in record.items() if key in {"date", "month", "url"}
+    }
+    patch_record.update(
+        {
+            "source_path": str(input_path),
+            "path": str(output_path),
+        }
+    )
+
+    if not input_path.exists():
+        patch_record["status"] = "failed"
+        patch_record["error"] = f"source raster not found: {input_path}"
+        return "failed", patch_record
+
+    try:
+        status, invalid_pixels, search_distance = _patch_fill_raster(
+            input_path,
+            output_path,
+            overwrite=overwrite,
+            max_search_distance=max_search_distance,
+            smoothing_iterations=smoothing_iterations,
+        )
+        patch_record["status"] = status
+        patch_record["invalid_pixels_filled"] = invalid_pixels
+        patch_record["max_search_distance"] = search_distance
+        patch_record.pop("error", None)
+        return status, patch_record
+    except Exception as exc:
+        patch_record["status"] = "failed"
+        patch_record["error"] = str(exc)
+        return "failed", patch_record
+
+
+def _patch_fill_records(
+    source_name,
+    records,
+    output_root,
+    *,
+    overwrite,
+    logger,
+    max_workers,
+    max_search_distance=None,
+    smoothing_iterations=0,
+):
+    patched_count = 0
+    skipped_count = 0
+    failed_count = 0
+    invalid_pixels = 0
+    patch_records = []
+    if not records:
+        return patch_records, patched_count, skipped_count, failed_count, invalid_pixels
+
+    output_root = Path(output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+    worker_count = min(max_workers, len(records))
+    logger.info(
+        "Patch-filling %s ET rasters into %s with %s workers",
+        source_name,
+        output_root,
+        worker_count,
+    )
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(
+                _patch_fill_record,
+                record,
+                output_root,
+                overwrite,
+                max_search_distance,
+                smoothing_iterations,
+            )
+            for record in records
+        ]
+        for future in as_completed(futures):
+            status, patch_record = future.result()
+            patch_records.append(patch_record)
+            if status == "patch_filled":
+                patched_count += 1
+                invalid_pixels += int(patch_record.get("invalid_pixels_filled") or 0)
+            elif status == "skipped":
+                skipped_count += 1
+            elif status == "failed":
+                failed_count += 1
+                logger.error(
+                    "Patch-fill failed for %s: %s",
+                    patch_record.get("source_path"),
+                    patch_record.get("error"),
+                )
+
+    patch_records.sort(key=lambda item: item.get("date") or item.get("month") or "")
+    return patch_records, patched_count, skipped_count, failed_count, invalid_pixels
+
+
 def download_pan_india_et_assets(
     output_root,
     start_date,
     end_date,
     *,
+    et_root=None,
     overwrite=False,
     fldas_ca_daily_bbox=FLDAS_CA_DAILY_BBOX,
     fldas_global_monthly_bbox=PAN_INDIA_BBOX,
     max_attempts=5,
     retry_delay_seconds=5,
     max_workers=DEFAULT_MAX_WORKERS,
+    patch_fill=True,
+    patch_fill_max_search_distance=None,
+    patch_fill_smoothing_iterations=0,
     logger=None,
 ):
     """
@@ -280,11 +489,20 @@ def download_pan_india_et_assets(
         raise ValueError("max_attempts must be at least 1")
     if max_workers < 1:
         raise ValueError("max_workers must be at least 1")
+    if patch_fill_smoothing_iterations < 0:
+        raise ValueError("patch_fill_smoothing_iterations must be >= 0")
+    if (
+        patch_fill_max_search_distance is not None
+        and patch_fill_max_search_distance < 0
+    ):
+        raise ValueError("patch_fill_max_search_distance must be >= 0")
 
     output_root = Path(output_root)
-    et_root = output_root / "et"
-    daily_root = et_root / "fldas_ca_daily" / "daily"
-    monthly_root = et_root / "fldas_global_monthly" / "monthly"
+    et_root = Path(et_root) if et_root is not None else output_root / "et"
+    daily_root = et_root / FLDAS_CA_DAILY_SOURCE / "daily"
+    monthly_root = et_root / FLDAS_GLOBAL_MONTHLY_SOURCE / "monthly"
+    daily_patch_filled_root = et_root / FLDAS_CA_DAILY_PATCH_FILLED_SOURCE
+    monthly_patch_filled_root = et_root / FLDAS_GLOBAL_MONTHLY_PATCH_FILLED_SOURCE
 
     daily_records = []
     for day in _iter_days(start_date, end_date):
@@ -336,9 +554,48 @@ def download_pan_india_et_assets(
         max_workers,
     )
 
+    daily_patch_records = []
+    monthly_patch_records = []
+    daily_patch_count = daily_patch_skipped = daily_patch_failed = 0
+    monthly_patch_count = monthly_patch_skipped = monthly_patch_failed = 0
+    daily_patch_invalid_pixels = monthly_patch_invalid_pixels = 0
+    if patch_fill:
+        (
+            daily_patch_records,
+            daily_patch_count,
+            daily_patch_skipped,
+            daily_patch_failed,
+            daily_patch_invalid_pixels,
+        ) = _patch_fill_records(
+            FLDAS_CA_DAILY_SOURCE,
+            daily_records,
+            daily_patch_filled_root,
+            overwrite=overwrite,
+            logger=logger,
+            max_workers=max_workers,
+            max_search_distance=patch_fill_max_search_distance,
+            smoothing_iterations=patch_fill_smoothing_iterations,
+        )
+        (
+            monthly_patch_records,
+            monthly_patch_count,
+            monthly_patch_skipped,
+            monthly_patch_failed,
+            monthly_patch_invalid_pixels,
+        ) = _patch_fill_records(
+            FLDAS_GLOBAL_MONTHLY_SOURCE,
+            monthly_records,
+            monthly_patch_filled_root,
+            overwrite=overwrite,
+            logger=logger,
+            max_workers=max_workers,
+            max_search_distance=patch_fill_max_search_distance,
+            smoothing_iterations=patch_fill_smoothing_iterations,
+        )
+
     sources = [
         SourceManifest(
-            source="fldas_ca_daily",
+            source=FLDAS_CA_DAILY_SOURCE,
             shortname=FLDAS_CA_DAILY_SHORTNAME,
             product=FLDAS_CA_DAILY_PRODUCT,
             variable=EVAP_VARIABLE,
@@ -349,9 +606,19 @@ def download_pan_india_et_assets(
             downloaded_count=daily_downloaded,
             skipped_count=daily_skipped,
             failed_count=daily_failed,
+            patch_filled_source=(
+                FLDAS_CA_DAILY_PATCH_FILLED_SOURCE if patch_fill else None
+            ),
+            patch_filled_folder=(
+                str(daily_patch_filled_root) if patch_fill else None
+            ),
+            patch_filled_count=daily_patch_count,
+            patch_fill_skipped_count=daily_patch_skipped,
+            patch_fill_failed_count=daily_patch_failed,
+            patch_fill_invalid_pixels=daily_patch_invalid_pixels,
         ),
         SourceManifest(
-            source="fldas_global_monthly",
+            source=FLDAS_GLOBAL_MONTHLY_SOURCE,
             shortname=FLDAS_GLOBAL_MONTHLY_SHORTNAME,
             product=FLDAS_GLOBAL_MONTHLY_PRODUCT,
             variable=EVAP_VARIABLE,
@@ -362,6 +629,16 @@ def download_pan_india_et_assets(
             downloaded_count=monthly_downloaded,
             skipped_count=monthly_skipped,
             failed_count=monthly_failed,
+            patch_filled_source=(
+                FLDAS_GLOBAL_MONTHLY_PATCH_FILLED_SOURCE if patch_fill else None
+            ),
+            patch_filled_folder=(
+                str(monthly_patch_filled_root) if patch_fill else None
+            ),
+            patch_filled_count=monthly_patch_count,
+            patch_fill_skipped_count=monthly_patch_skipped,
+            patch_fill_failed_count=monthly_patch_failed,
+            patch_fill_invalid_pixels=monthly_patch_invalid_pixels,
         ),
     ]
 
@@ -386,26 +663,38 @@ def download_pan_india_et_assets(
         "download_policy": {
             "max_workers": max_workers,
         },
+        "patch_fill_policy": {
+            "enabled": bool(patch_fill),
+            "method": "rasterio.fill.fillnodata",
+            "invalid_pixels": ["nodata", "nan", "inf", "negative"],
+            "max_search_distance": (
+                "max(width, height) per raster"
+                if patch_fill_max_search_distance is None
+                else patch_fill_max_search_distance
+            ),
+            "smoothing_iterations": patch_fill_smoothing_iterations,
+        },
         "sources": [asdict(source) for source in sources],
         "records": {
-            "fldas_ca_daily": daily_records,
-            "fldas_global_monthly": monthly_records,
+            FLDAS_CA_DAILY_SOURCE: daily_records,
+            FLDAS_GLOBAL_MONTHLY_SOURCE: monthly_records,
+            FLDAS_CA_DAILY_PATCH_FILLED_SOURCE: daily_patch_records,
+            FLDAS_GLOBAL_MONTHLY_PATCH_FILLED_SOURCE: monthly_patch_records,
         },
     }
     _write_json(et_root / "manifest.json", manifest)
     _write_json(
-        et_root / "fldas_ca_daily" / "metadata.json",
+        et_root / FLDAS_CA_DAILY_SOURCE / "metadata.json",
         {
             "source": asdict(sources[0]),
             "records": daily_records,
         },
     )
     _write_json(
-        et_root / "fldas_global_monthly" / "metadata.json",
+        et_root / FLDAS_GLOBAL_MONTHLY_SOURCE / "metadata.json",
         {
             "source": asdict(sources[1]),
             "records": monthly_records,
         },
     )
-
     return manifest

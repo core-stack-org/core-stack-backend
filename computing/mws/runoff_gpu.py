@@ -18,6 +18,9 @@ from utilities.gee_utils import valid_gee_text
 
 DATA_ROOT = PROJECT_ROOT / "data"
 HYDROLOGY_OUTPUT_ROOT = DATA_ROOT / "hydrology_gpu"
+PAN_INDIA_RUNOFF_OUTPUT_ROOT = DATA_ROOT / "base_layers" / "hydrology" / "runoff"
+PAN_INDIA_RUNOFF_COMMONS_ROOT = PAN_INDIA_RUNOFF_OUTPUT_ROOT / "commons"
+PAN_INDIA_RUNOFF_TIMESERIES_DIR_NAME = "runoff_timeseries"
 DEFAULT_LOCAL_DEM_PATH = TERRAIN_RASTER_PATH
 DEFAULT_LOCAL_SOIL_PATH = SOIL_RASTER_PATH
 PAN_INDIA_DEFAULT_TILE_SIZE = 11264
@@ -62,11 +65,10 @@ def _resolve_dates(start_date, end_date, start_year=None, end_year=None):
 
     start_year = int(start_year)
     end_year = int(end_year)
-    if end_year < start_year:
-        raise ValueError("end_year must be greater than or equal to start_year")
+    if end_year <= start_year:
+        raise ValueError("end_year must be greater than start_year")
 
-    annual_end_year = end_year + 1
-    return f"{start_year}-07-01", f"{annual_end_year}-07-01", start_year, annual_end_year
+    return f"{start_year}-07-01", f"{end_year}-07-01", start_year, end_year
 
 
 def _resolve_lulc_path(lulc_start_year, lulc_end_year):
@@ -129,8 +131,18 @@ def _build_runner_args(
 ):
     scope, state, district, tehsil = _validate_scope(pan_india, state, district, tehsil)
     slug_path = _scope_slug(scope, state, district, tehsil)
-    output_root = HYDROLOGY_OUTPUT_ROOT / slug_path / annual_key
-    boundary_output = output_root / "boundaries" / f"{slug_path.replace('/', '_')}.geojson"
+    if scope == "pan_india":
+        output_root = PAN_INDIA_RUNOFF_OUTPUT_ROOT / annual_key
+        boundary_output = PAN_INDIA_RUNOFF_COMMONS_ROOT / "pan_india.geojson"
+        timeseries_output = (
+            output_root
+            / PAN_INDIA_RUNOFF_TIMESERIES_DIR_NAME
+            / "pan_india_timeseries.geojson"
+        )
+    else:
+        output_root = HYDROLOGY_OUTPUT_ROOT / slug_path / annual_key
+        boundary_output = output_root / "boundaries" / f"{slug_path.replace('/', '_')}.geojson"
+        timeseries_output = None
 
     return SimpleNamespace(
         pre_req=True,
@@ -147,6 +159,7 @@ def _build_runner_args(
         tehsil=tehsil,
         watershed_root=str(PRECOMPUTED_TEHSIL_WATERSHED_DIR),
         watershed_boundary_output=str(boundary_output),
+        timeseries_vector=str(timeseries_output) if timeseries_output else None,
         reuse_watershed_boundary=True,
         local_dem=str(DEFAULT_LOCAL_DEM_PATH),
         local_lulc=str(local_lulc_path),

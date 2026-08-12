@@ -5,7 +5,10 @@ from nrm_app.celery import app
 from computing.config_loader import PROJECT_ROOT
 from computing.hydrology_gpu.et_download import download_pan_india_et_assets
 
-from .runoff_gpu import HYDROLOGY_OUTPUT_ROOT, _parse_bool, _resolve_dates
+from .runoff_gpu import _parse_bool, _resolve_dates
+
+
+PAN_INDIA_ET_OUTPUT_ROOT = PROJECT_ROOT / "data" / "base_layers" / "hydrology" / "et"
 
 
 def _make_logger():
@@ -44,6 +47,7 @@ def run_et_download_local(
     start_year=None,
     end_year=None,
     overwrite=False,
+    patch_fill=True,
 ):
     pan_india = _parse_bool(pan_india)
     if not pan_india:
@@ -56,15 +60,17 @@ def run_et_download_local(
         end_year=end_year,
     )
     annual_key = f"{annual_start_year}_{annual_end_year}"
-    output_root = HYDROLOGY_OUTPUT_ROOT / "pan_india" / annual_key
+    output_root = PAN_INDIA_ET_OUTPUT_ROOT / annual_key
     output_root.mkdir(parents=True, exist_ok=True)
 
     logger = _make_logger()
     manifest = download_pan_india_et_assets(
         output_root=output_root,
+        et_root=output_root,
         start_date=start_date,
         end_date=end_date,
         overwrite=_parse_bool(overwrite),
+        patch_fill=_parse_bool(patch_fill),
         logger=logger,
     )
 
@@ -76,7 +82,8 @@ def run_et_download_local(
         "output_root": str(output_root),
         "et_root": manifest["et_root"],
         "sources": manifest["sources"],
-        "manifest": str(output_root / "et" / "manifest.json"),
+        "patch_fill_policy": manifest.get("patch_fill_policy"),
+        "manifest": str(output_root / "manifest.json"),
     }
 
 
@@ -89,6 +96,7 @@ def et_download(
     start_year=None,
     end_year=None,
     overwrite=False,
+    patch_fill=True,
 ):
     _ = self
     return run_et_download_local(
@@ -98,4 +106,5 @@ def et_download(
         start_year=start_year,
         end_year=end_year,
         overwrite=overwrite,
+        patch_fill=patch_fill,
     )

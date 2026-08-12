@@ -171,9 +171,13 @@ def modify_cfg(args):
     cfg.RAINFALL_FOLDER = _required_arg(args, "rainfall_folder")
     cfg.RUNOFFS_FOLDER = _required_arg(args, "runoffs_folder")
     if args.t:
-        path_obj = Path(cfg.MICROWATERSHEDS_PATH)
-        new_path = path_obj.with_name(f"{path_obj.stem}_timeseries{path_obj.suffix}")
-        cfg.TIMESERIES_VECTOR = new_path
+        configured_timeseries = getattr(args, "timeseries_vector", None)
+        if configured_timeseries:
+            cfg.TIMESERIES_VECTOR = Path(configured_timeseries)
+        else:
+            path_obj = Path(cfg.MICROWATERSHEDS_PATH)
+            new_path = path_obj.with_name(f"{path_obj.stem}_timeseries{path_obj.suffix}")
+            cfg.TIMESERIES_VECTOR = new_path
     cfg.ARG_START_DATE = args.start
     cfg.ARG_END_DATE = args.end
     cfg.TILE_SIZE = args.tile_size
