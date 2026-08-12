@@ -445,14 +445,20 @@ def gdf_to_ee_fc(gdf):
 
 
 def create_gee_folder(folder_path, gee_project_path):
-    full_path = gee_project_path + folder_path
+    full_path = (gee_project_path + folder_path).strip("/")
     parts = full_path.split("/")
-    for i in range(1, len(parts) + 1):
+    # Do not try to create GEE roots like "projects" or "projects/<id>/assets".
+    start = 1
+    if len(parts) >= 3 and parts[0] == "projects" and parts[2] == "assets":
+        start = 4  # projects/<project>/assets/<...>
+    if start > len(parts):
+        return
+    for i in range(start, len(parts) + 1):
         sub_path = "/".join(parts[:i])
         try:
             ee.data.getAsset(sub_path)
             print(f"Exists: {sub_path}")
-        except:
+        except Exception:
             try:
                 ee.data.createAsset({"type": "Folder"}, sub_path)
                 print(f"Created: {sub_path}")
@@ -979,39 +985,106 @@ def extract_task_id(command_output):
     return None
 
 
+def _resolve_earthengine_cli():
+    """Locate the earthengine binary when available (optional CLI fallback)."""
+    path = shutil.which("earthengine")
+    if path:
+        return path
+    candidates = []
+    conda_prefix = os.environ.get("CONDA_PREFIX")
+    if conda_prefix:
+        candidates.append(os.path.join(conda_prefix, "bin", "earthengine"))
+    candidates.extend(
+        [
+            "/home/ubuntu/miniconda3/envs/corestack-backend/bin/earthengine",
+            "/home/ubuntu/miniconda3/envs/corestackenv/bin/earthengine",
+            os.path.expanduser("~/miniconda3/envs/corestack-backend/bin/earthengine"),
+            os.path.expanduser("~/miniconda3/bin/earthengine"),
+        ]
+    )
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def gcs_to_gee_asset_api(gcs_uri, asset_id, gee_account_id):
+    """Upload a GCS table/shapefile to a GEE asset via the Earth Engine Python API."""
+    ee_initialize(gee_account_id)
+    if is_gee_asset_exists(asset_id):
+        print(f"Deleting existing asset before re-upload: {asset_id}")
+        ee.data.deleteAsset(asset_id)
+
+    task_ids = ee.data.newTaskId(1)
+    task_id = task_ids[0] if isinstance(task_ids, (list, tuple)) else task_ids
+    manifest = {
+        "name": asset_id,
+        "sources": [{"uris": [gcs_uri]}],
+    }
+    response = ee.data.startTableIngestion(task_id, manifest)
+    print(f"Started GEE table ingestion via API: task_id={task_id} response={response}")
+    return task_id
+
+
 def gcs_to_gee_asset_cli(gcs_uri, asset_id, gee_account_id):
+    """
+    Upload from GCS to a GEE asset.
+
+    Prefers the Earth Engine Python API (works under Apache/WSGI). Falls back to
+    the ``earthengine`` CLI when available on PATH.
+    """
+    try:
+        return gcs_to_gee_asset_api(gcs_uri, asset_id, gee_account_id)
+    except Exception as api_exc:
+        print(
+            f"GEE Python API table ingestion failed ({api_exc}); "
+            "falling back to earthengine CLI if available."
+        )
+
+    earthengine_bin = _resolve_earthengine_cli()
+    if not earthengine_bin:
+        raise FileNotFoundError(
+            "Earth Engine table upload failed: Python API ingestion failed and "
+            "the 'earthengine' CLI was not found on PATH for this process. "
+            f"API error: {api_exc}"
+        ) from api_exc
+
     account = GEEAccount.objects.get(pk=gee_account_id)
     key_dict = json.loads(account.get_credentials().decode("utf-8"))
 
-    # Write credentials to a temp JSON file
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False) as f:
-        json.dump(key_dict, f)
-        service_account_file = f.name
-
-    """Use earthengine CLI to upload from GCS to GEE asset"""
-    command = [
-        "earthengine",
-        f"--service_account_file={service_account_file}",
-        "upload",
-        "table",
-        f"--asset_id={asset_id}",
-        gcs_uri,
-    ]
-
+    service_account_file = None
     try:
+        with tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False) as f:
+            json.dump(key_dict, f)
+            service_account_file = f.name
+
+        command = [
+            earthengine_bin,
+            f"--service_account_file={service_account_file}",
+            "upload",
+            "table",
+            f"--asset_id={asset_id}",
+            gcs_uri,
+        ]
         result = subprocess.run(command, check=True, capture_output=True, text=True)
-        print("Upload initiated successfully.")
+        print("Upload initiated successfully via earthengine CLI.")
         print("Output:", result.stdout)
         if result.returncode == 0:
             return extract_task_id(result.stdout)
         return None
     except subprocess.CalledProcessError as e:
-        print("An error occurred during the upload.")
+        print("An error occurred during the CLI upload.")
         print("Command:", " ".join(command))
         print("Return Code:", e.returncode)
         print("STDOUT:", e.stdout)
         print("STDERR:", e.stderr)
-        return None
+        raise
+    finally:
+        if service_account_file and os.path.exists(service_account_file):
+            try:
+                os.unlink(service_account_file)
+            except OSError:
+                pass
 
 
 def upload_shp_to_gee(
