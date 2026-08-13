@@ -156,8 +156,6 @@ def run_lulc_vector_local(
                 "start_year": start_year,
                 "end_year": end_year,
                 "is_generated_locally": True,
-                "geoserver_available": geoserver_ok,
-                "geoserver_sync_response": geoserver_response,
             },
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,
