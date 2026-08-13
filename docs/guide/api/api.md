@@ -2,6 +2,9 @@
 
 This document provides a comprehensive overview of the Core Stack Backend API endpoints, their functionality, and usage.
 
+For local layer-generation endpoints, payloads, and curl examples, see
+[Local Compute Pipeline APIs](local_compute_pipeline.md).
+
 ## Authentication Endpoints
 
 ### Authentication Flow

@@ -235,39 +235,36 @@ def sync_lulc_to_geoserver(
     asset_suffix=None,
 ):
     print("Syncing lulc to geoserver")
-    lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
+    # lulc_workspaces = ["LULC_level_1", "LULC_level_2", "LULC_level_3"]
     layer_at_geoserver = False
     for i in range(0, len(final_output_filename_array_new)):
-        name_arr = final_output_filename_array_new[i].split(
-            "_20"
-        )  # TODO: better logic than this
+        name_arr = final_output_filename_array_new[i].split("_20")
         s_year = name_arr[1][:2]
         e_year = name_arr[2][:2]
         gcs_file_name = "LULC_" + s_year + "_" + e_year + "_" + name_arr[0]
         print("Syncing " + gcs_file_name + " to geoserver")
-        for workspace in lulc_workspaces:
-            suff = workspace.replace("LULC", "")
-            style = workspace.lower() + "_style"
-            if block_name:
-                layer_name = (
-                    "LULC_"
-                    + s_year
-                    + "_"
-                    + e_year
-                    + "_"
-                    + valid_gee_text(district_name.lower())
-                    + "_"
-                    + valid_gee_text(block_name.lower())
-                    + suff
-                )
-            else:
-                layer_name = f"LULC_{s_year}_{e_year}_{asset_suffix}_{suff}"
-
-            res = sync_raster_gcs_to_geoserver(
-                workspace, gcs_file_name, layer_name, style
+        # for workspace in lulc_workspaces:
+        workspace = "LULC_level_3"
+        suff = workspace.replace("LULC", "")
+        style = workspace.lower() + "_style"
+        if block_name:
+            layer_name = (
+                "LULC_"
+                + s_year
+                + "_"
+                + e_year
+                + "_"
+                + valid_gee_text(district_name.lower())
+                + "_"
+                + valid_gee_text(block_name.lower())
+                + suff
             )
-            if res and layer_ids:
-                update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
-                print("geoserver flag is updated")
-                layer_at_geoserver = True
+        else:
+            layer_name = f"LULC_{s_year}_{e_year}_{asset_suffix}_{suff}"
+
+        res = sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style)
+        if res and layer_ids:
+            update_layer_sync_status(layer_id=layer_ids[i], sync_to_geoserver=True)
+            print("geoserver flag is updated")
+            layer_at_geoserver = True
     return layer_at_geoserver

@@ -1,0 +1,158 @@
+{
+    "dynamic_layers": [
+        {
+            "name": "generate_nrega_layer"
+        },
+        {
+            "name": "lulc_v3",
+            "use_global_args": true
+        },
+        {
+            "name": "lulc_vector",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "change_detection",
+            "use_global_args": true
+        },
+        {
+            "name": "change_detection_vector",
+            "depends_on": ["change_detection"],
+            "use_global_args": true
+        },
+        {
+            "name": "generate_terrain_raster"
+        },
+        {
+            "name": "generate_terrain_descriptor",
+            "depends_on": ["generate_terrain_raster"]
+        },
+        {
+            "name": "terrain_lulc_plain_cluster",
+            "depends_on": ["generate_terrain_raster", "lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "terrain_lulc_slope_cluster",
+            "depends_on": ["generate_terrain_raster", "lulc_v3"],
+            "use_global_args": true
+        },
+        {
+            "name": "generate_ci_layer",
+            "use_global_args": true
+        },
+        {
+            "name": "generate_swb",
+            "use_global_args": true,
+            "pass_gee_account_id": true
+        },
+        {
+            "name": "tree_health_ch_raster",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_ch_vector",
+                    "use_global_args": true
+                }
+            ]
+        },
+        {
+            "name": "tree_health_ccd_raster",
+            "depends_on": ["lulc_v3"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_ccd_vector",
+                    "use_global_args": true
+                }
+            ]
+        },
+        {
+            "name": "tree_health_overall_change_raster",
+            "depends_on": ["change_detection"],
+            "use_global_args": true,
+            "children": [
+                {
+                    "name": "tree_health_overall_change_vector",
+		    "use_global_args": false
+                }
+            ]
+        },
+        {
+            "name": "soil_health"
+        }
+    ],
+    "static_layers": [
+        {
+            "name": "aquifer_vector"
+        },
+        {
+            "name": "generate_livestocks"
+        },
+        {
+            "name": "generate_antyodaya"
+        },
+        {
+            "name": "generate_density_vector"
+        },
+        {
+            "name": "generate_river_data"
+        },
+        {
+            "name": "generate_canal_vector"
+        },
+        {
+            "name": "generate_dem_raster_vector"
+        },
+        {
+            "name": "generate_facilities_proximity"
+        },
+        {
+            "name": "generate_drainage_layer"
+        },
+        {
+            "name": "restoration_opportunity"
+        },
+        {
+            "name": "soge_vector"
+        },
+        {
+            "name": "generate_lcw"
+        },
+        {
+            "name": "generate_agroecological"
+        },
+        {
+            "name": "generate_factory_csr"
+        },
+        {
+            "name": "generate_green_credit"
+        },
+        {
+            "name": "generate_mining"
+        },
+        {
+            "name": "generate_natural_depression"
+        },
+        {
+            "name": "generate_distance_nearest_DL"
+        },
+        {
+            "name": "generate_catchment_area_singleflow"
+        },
+        {
+            "name": "generate_slope_percentage"
+        },
+        {
+            "name": "generate_mws_connectivity_data"
+        },
+        {
+            "name": "generate_mws_centroid"
+        },
+        {
+            "name": "soil_type"
+        }
+    ]
+}

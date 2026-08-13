@@ -33,8 +33,8 @@ def load_fire_collections(start_year, end_year):
     Returns:
         ee.ImageCollection – merged, date-filtered MaxFRP collection.
     """
-    start_date = f"{start_year}-07-01"
-    end_date = f"{end_year + 1}-07-01"
+    start_date = f"{start_year}-01-01"
+    end_date = f"{end_year}-12-31"
 
     terra = ee.ImageCollection(TERRA_FIRE_PATH)
     aqua = ee.ImageCollection(AQUA_FIRE_PATH)
@@ -71,7 +71,6 @@ def prepare_frp_images(frp_collection, n_years):
     return {
         "sum": frp_masked.sum().divide(n_years),  # yearly-normalised total FRP
         "mean": frp_masked.mean(),  # temporal mean FRP
-        # "max": frp_masked.max(),                           # peak FRP
         "max": frp_masked.max(),
         "count": fire_binary_collection.sum().divide(n_years),  # yearly fire frequency
     }

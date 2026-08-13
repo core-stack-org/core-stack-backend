@@ -7,6 +7,8 @@ using LULC raster data from Google Earth Engine.
 
 import ee
 
+from utilities.constants import PAN_INDIA_LULC_V3_DATASET
+
 # ----------------------------------------
 # PARAMETERS / CONSTANTS
 # ----------------------------------------
@@ -37,8 +39,6 @@ LULC_CLASSES = {
 NEIGHBOR_CLASSES = [k for k in LULC_CLASSES.keys() if k != TREE_CLASS]
 THRESHOLD = 0.5  # strictly > 50%
 
-PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin"
-
 
 def load_pan_india_lulc(year):
     """
@@ -54,7 +54,7 @@ def load_pan_india_lulc(year):
         ee.Image with the 'predicted_label' band, unmasked and cast to Int.
     """
     return (
-        ee.Image(f"{PAN_INDIA_LULC_PATH}/pan_india_lulc_v3_{year}_{year + 1}")
+        ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}_{year + 1}")
         .select("predicted_label")
         .unmask(0)
         .toInt()

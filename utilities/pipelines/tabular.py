@@ -135,7 +135,12 @@ class CSVSQLiteSidecar:
 
         values = [value for value in values if value is not None and value == value]
         if not values:
-            return pd.DataFrame(columns=list(columns or []))
+            empty_columns = (
+                columns
+                if columns is not None
+                else (*self.key_columns, *(self.source_columns or ()))
+            )
+            return pd.DataFrame(columns=list(dict.fromkeys(empty_columns)))
         if not self.is_fresh():
             self.materialize()
         select_columns = "*" if columns is None else ", ".join(quote_identifier(col) for col in columns)
