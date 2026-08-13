@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 @app.task(bind=True, max_retries=3, default_retry_delay=60)
-def build_farm_boundary_map(self, state: str, district: str, block: str, api_key: str, year: int = None):
+def build_farm_boundary_map(self, state: str, district: str, block: str, api_key: str, year: int = None, overwrite = False):
     """
     Celery task: runs Phase 1, Phase 2, and optionally Phase 3.
 
