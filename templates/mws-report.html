@@ -2210,6 +2210,19 @@
                 cropping, double cropping and triple cropping using pixels which are classified as single kharif, single
                 non-kharif, double and triple classes of LULC classifier to determine cropping intensity. The data used
                 is from {{year_range_text}}.</p>
+
+            {% if ndvi_labels %}
+            <div class="chart-container">
+                <canvas id="lineChart-ndvi"></canvas>
+            </div>
+            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over cropped areas
+                in this microwatershed at ~14-day intervals using satellite imagery, and reflects the vigour of
+                vegetation/crop growth over time. Green dots are the raw NDVI values; the blue line is a
+                Whittaker-smoothed trend fitted through them. Whittaker smoothing balances two goals at once —
+                staying close to the raw values while penalizing sharp changes in the curve's slope (its second
+                derivative) — solved as a single linear system rather than a moving average, so it smooths out
+                cloud/noise-driven spikes while preserving the underlying seasonal growth pattern.</p>
+            {% endif %}
         </section>
 
         {% if land_degrad or tree_degrad %}
@@ -2261,7 +2274,6 @@
                 <div id="treeReduceMap" class="map"></div>
                 <div id="compMap4" class="map"></div>
             </div>
-
             <div class="legend">
                 <div class="legend-item">
                     <div class="legend-color" style="background-color: #73bb53;"></div>
@@ -2284,6 +2296,18 @@
                     <span>Trees - Shrubs and Scrubs</span>
                 </div>
             </div>
+
+
+            {% if ndvi_tree_labels %}
+            <div class="chart-container">
+                <canvas id="lineChart-ndvi-tree"></canvas>
+            </div>
+            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over tree-covered
+                areas in this microwatershed at ~14-day intervals using satellite imagery, and reflects the vigour of
+                tree/forest growth over time. Green dots are the raw NDVI values; the blue line is a
+                Whittaker-smoothed trend fitted through them (see the Cropping Intensity section for how the
+                smoothing is computed).</p>
+            {% endif %}
 
             {% if tree_reduction_sankey %}
             <div id="treeReductionSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
@@ -2542,13 +2566,13 @@
             <h3>Water availability in this microwatershed</h3>
 
             <div class="map-group">
-                <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
                 <div id="swbMap" class="map" style="flex: 1 1 48%;"></div>
+                <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
             </div>
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
                 <div style="width: 48%; text-align: center;">Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color)</div>
-                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
             </div>
 
             <p>{{swb_intro_desc}}</p>
@@ -3268,9 +3292,9 @@
 
         const landscapeLulcRasterLayer = new ol.layer.Image({
             source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wms',
+                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wms',
                 params: {
-                    'LAYERS': "LULC_level_1:LULC_24_25_{{district}}_{{block}}_level_1"
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3"
                 },
                 ratio: 1,
                 serverType: 'geoserver',
@@ -3610,7 +3634,7 @@
                 const idx = parseInt(lulcYearSlider.value, 10);
                 lulcYearLabel.textContent = lulcYearLabels[idx];
                 landscapeLulcRasterLayer.getSource().updateParams({
-                    'LAYERS': `LULC_level_1:LULC_${lulcYears[idx]}_{{district}}_{{block}}_level_1`
+                    'LAYERS': `LULC_level_3:LULC_${lulcYears[idx]}_{{district}}_{{block}}_level_3`
                 });
             });
         }
@@ -4526,6 +4550,187 @@
                 },
             }
         });
+
+        // NDVI Timeseries (Crops)
+        //
+        // Whittaker smoother (Eilers, 2003 "A Perfect Smoother"): fits a curve z to the raw
+        // series y by minimizing sum((y - z)^2) + lambda * sum((D^order z)^2), i.e. it trades
+        // off closeness to the raw points against a penalty on the curve's order-th order
+        // discrete derivative (order=2 penalizes curvature, giving a smooth trend). This is
+        // solved as the linear system (I + lambda * D'D) z = y, where D is the order-th
+        // difference matrix. We build that matrix densely and solve it via Gaussian
+        // elimination with partial pivoting — the series here (~150-200 points) is small
+        // enough that an O(n^3) dense solve runs in a few milliseconds in-browser.
+        function buildDifferenceMatrix(n, order) {
+            let D = Array.from({ length: n }, (_, i) => {
+                const row = new Array(n).fill(0);
+                row[i] = 1;
+                return row;
+            });
+            for (let k = 0; k < order; k++) {
+                const next = [];
+                for (let i = 0; i < D.length - 1; i++) {
+                    next.push(D[i + 1].map((v, j) => v - D[i][j]));
+                }
+                D = next;
+            }
+            return D; // (n - order) x n
+        }
+
+        function solveLinearSystem(A, b) {
+            const n = b.length;
+            const M = A.map(row => row.slice());
+            const x = b.slice();
+
+            for (let k = 0; k < n; k++) {
+                let maxRow = k;
+                let maxVal = Math.abs(M[k][k]);
+                for (let i = k + 1; i < n; i++) {
+                    if (Math.abs(M[i][k]) > maxVal) {
+                        maxVal = Math.abs(M[i][k]);
+                        maxRow = i;
+                    }
+                }
+                if (maxRow !== k) {
+                    [M[k], M[maxRow]] = [M[maxRow], M[k]];
+                    [x[k], x[maxRow]] = [x[maxRow], x[k]];
+                }
+                const pivot = M[k][k];
+                if (Math.abs(pivot) < 1e-12) continue;
+                for (let i = k + 1; i < n; i++) {
+                    const factor = M[i][k] / pivot;
+                    if (factor === 0) continue;
+                    for (let j = k; j < n; j++) M[i][j] -= factor * M[k][j];
+                    x[i] -= factor * x[k];
+                }
+            }
+
+            const z = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                let sum = x[i];
+                for (let j = i + 1; j < n; j++) sum -= M[i][j] * z[j];
+                z[i] = sum / M[i][i];
+            }
+            return z;
+        }
+
+        function whittakerSmooth(y, lambda = 10, order = 2) {
+            const n = y.length;
+            if (n < order + 2) return y.slice();
+
+            const D = buildDifferenceMatrix(n, order);
+            const A = Array.from({ length: n }, () => new Array(n).fill(0));
+            for (let i = 0; i < n; i++) A[i][i] = 1;
+
+            for (let r = 0; r < D.length; r++) {
+                const drow = D[r];
+                for (let i = 0; i < n; i++) {
+                    if (drow[i] === 0) continue;
+                    for (let j = 0; j < n; j++) {
+                        if (drow[j] === 0) continue;
+                        A[i][j] += lambda * drow[i] * drow[j];
+                    }
+                }
+            }
+
+            return solveLinearSystem(A, y);
+        }
+
+        // For labels formatted 'YYYY-MM-DD', finds the index of the first July date-point of each
+        // start of the series (e.g. 07/2018) and the last June date-point of each subsequent
+        // year (agricultural-year end), so the x-axis reads like 07/2018, 06/2019, 06/2020,
+        // 06/2021, ... — matching how the cropping-intensity bar chart bins a "year" as Jul-Jun.
+        const getAgYearBoundaryIndices = labels => {
+            const boundaryIndices = new Set();
+            if (labels.length > 0) boundaryIndices.add(0);
+
+            const lastJuneIndexByYear = {};
+            labels.forEach((dateStr, idx) => {
+                const [year, month] = dateStr.split('-');
+                if (month === '06') {
+                    lastJuneIndexByYear[year] = idx; // last occurrence wins
+                }
+            });
+            Object.values(lastJuneIndexByYear).forEach(idx => boundaryIndices.add(idx));
+
+            return boundaryIndices;
+        };
+
+        // Renders an NDVI chart (raw dots + Whittaker-smoothed line) into the given canvas.
+        // agYearTicks: when true, x-axis ticks only show agricultural-year (Jul-Jun) boundaries
+        // instead of a generic evenly-spaced date axis.
+        const renderNdviChart = (canvasId, labels, data, chartTitle, agYearTicks = false) => {
+            const canvas = document.getElementById(canvasId);
+            if (!labels || labels.length === 0 || !canvas) return;
+
+            const smoothed = whittakerSmooth(data, 10, 2);
+
+            let xTicks = { maxTicksLimit: 12 };
+            if (agYearTicks) {
+                const boundaryIndices = getAgYearBoundaryIndices(labels);
+                xTicks = {
+                    autoSkip: false,
+                    maxRotation: 60,
+                    minRotation: 60,
+                    callback: function (value, index) {
+                        if (!boundaryIndices.has(index)) return null;
+                        const [year, month] = labels[index].split('-');
+                        return `${month}/${year}`;
+                    }
+                };
+            }
+
+            new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'NDVI Raw',
+                            data: data,
+                            showLine: false,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#57ad2b',
+                            pointBorderColor: '#57ad2b',
+                        },
+                        {
+                            label: 'Whittaker Smoothed',
+                            data: smoothed,
+                            borderColor: '#2952e3',
+                            backgroundColor: 'rgba(41, 82, 227, 0.08)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'NDVI' }
+                        },
+                        x: {
+                            title: { display: true, text: agYearTicks ? 'Agricultural Year (Jul - Jun)' : 'Date' },
+                            ticks: xTicks
+                        }
+                    },
+                    animation: { duration: 0 },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: chartTitle
+                        },
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+        };
+
+        renderNdviChart('lineChart-ndvi', JSON.parse('{{ndvi_labels|safe}}'), JSON.parse('{{ndvi_data|safe}}'), 'NDVI Time Series (Cropped Area)', true);
+        renderNdviChart('lineChart-ndvi-tree', JSON.parse('{{ndvi_tree_labels|safe}}'), JSON.parse('{{ndvi_tree_data|safe}}'), 'NDVI Time Series (Tree Cover)');
 
         // WaterBalance Graphs and descriptions
         const dgData = JSON.parse('{{dg_data|safe}}')
