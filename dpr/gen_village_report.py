@@ -217,12 +217,12 @@ SECTION_RAW_PARAMS = {
         {"col": "availability_of_milk_routes",                       "label": "Availability of Milk Collection Centre/Milk routes/Chilling Centres",                             "repr": "binary"},
     ],
     "agriculture_land_cultivation": [
-        {"col": "area_irrigated_in_ha",                             "label": "Total area irrigated (ha)",                              "repr": "numeric"},
-        {"col": "net_sown_area_in_ha",                              "label": "Net sown Area (ha)",                               "repr": "numeric"},
-        {"col": "net_sown_area_kharif_in_ha",                       "label": "Net sown Area during Kharif season (ha)",                      "repr": "numeric"},
-        {"col": "net_sown_area_other_in_ha",                        "label": "Net sown Area during other seasons (ha)",                       "repr": "numeric"},
-        {"col": "net_sown_area_rabi_in_ha",                         "label": "Net sown Area during Rabi season (ha)",                        "repr": "numeric"},
-        {"col": "total_cultivable_area_in_ha",                      "label": "Total Cultivable Area (ha)",                       "repr": "numeric"},
+        {"col": "area_irrigated_in_hac",                             "label": "Total area irrigated (ha)",                              "repr": "numeric"},
+        {"col": "net_sown_area_in_hac",                              "label": "Net sown Area (ha)",                               "repr": "numeric"},
+        {"col": "net_sown_area_kharif_in_hac",                       "label": "Net sown Area during Kharif season (ha)",                      "repr": "numeric"},
+        {"col": "net_sown_area_other_in_hac",                        "label": "Net sown Area during other seasons (ha)",                       "repr": "numeric"},
+        {"col": "net_sown_area_rabi_in_hac",                         "label": "Net sown Area during Rabi season (ha)",                        "repr": "numeric"},
+        {"col": "total_cultivable_area_in_hac",                      "label": "Total Cultivable Area (ha)",                       "repr": "numeric"},
     ],
     "agriculture_irrigation_watershed": [
         {"col": "availability_of_major_source_of_irrigation",        "label": "Main Source of irrigation",              "repr": "string"},
@@ -525,36 +525,40 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
 
         edu = get_education_institutions(state, district, block, village_id, df_facilities=df_facilities)
 
-        return [
+        scores = [
             get_basic_infrastructure(state, district, block, village_id, df=df)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_health_and_wash(state, district, block, village_id, df=df, df_facilities=df_facilities)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             edu[3] if len(edu) >= 4 else 0.33,  # education returns a list; index 3 = composite_score
 
             get_financial_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_welfare_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_community_institutes(state, district, block, village_id, df=df)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_livelihood_diversification(state, district, block, village_id, df=df)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_livestock_management(state, district, block, village_id, df=df, df_facilities=df_facilities)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_agri_support_service(state, district, block, village_id, df=df, df_facilities=df_facilities)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
 
             get_ecological_climate_resiliance(state, district, block, village_id, df=df, df_nrega=df_nrega)
-                .get("composite_score", 0.33),
+                .get("composite_score", 0),
         ]
+
+        # Pad exact zeros to 0.1 so the village line doesn't collapse to the
+        # centre of the spider chart; Tehsil average is left untouched.
+        return [0.1 if s == 0 else s for s in scores]
 
     except Exception as e:
         logger.info(
@@ -593,33 +597,33 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
 
             per_village = [
                 get_basic_infrastructure(state, district, block, vid, df=df)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_health_and_wash(state, district, block, vid, df=df, df_facilities=df_facilities)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 edu[3] if len(edu) >= 4 else 0.33,
 
                 get_financial_inclusion(state, district, block, vid, df=df, df_facilities=df_facilities)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_welfare_inclusion(state, district, block, vid, df=df, df_facilities=df_facilities)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_community_institutes(state, district, block, vid, df=df)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_livelihood_diversification(state, district, block, vid, df=df)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_livestock_management(state, district, block, vid, df=df, df_facilities=df_facilities)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_agri_support_service(state, district, block, vid, df=df, df_facilities=df_facilities)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
 
                 get_ecological_climate_resiliance(state, district, block, vid, df=df, df_nrega=df_nrega)
-                    .get("composite_score", 0.33),
+                    .get("composite_score", 0),
             ]
 
             for i, score in enumerate(per_village):
@@ -829,6 +833,9 @@ def get_health_and_wash(state, district, block, village_id, df=None, df_faciliti
         water_sanitation_score = safe_float(
             row.get("water_sanitation_cat_value", 0)
         )
+
+        essential_distance = None
+        advanced_distance  = None
 
         if facility_row is not None:
 
