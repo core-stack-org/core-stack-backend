@@ -160,7 +160,13 @@ from .misc.soge_vector_local_compute import (
     generate_soge_vector_local as generate_soge_vector_local_task,
 )
 from .misc.stream_order import generate_stream_order
-from .mws.generate_hydrology import generate_hydrology
+from .mws.generate_hydrology import generate_hydrology as generate_hydrology_gee_task
+from .mws.generate_hydrology_local import (
+    generate_hydrology_base_layer as generate_hydrology_base_layer_task,
+    generate_hydrology as generate_hydrology_local_task,
+)
+from .mws.et_download import et_download as et_download_task
+from .mws.runoff_gpu import generate_runoff_gpu as generate_runoff_gpu_task
 from .mws.mws import mws_layer
 from .mws.mws_centroid import generate_mws_centroid_data
 from .mws.mws_centroid_local_compute import (
@@ -239,6 +245,27 @@ from .views import (
 from .zoi_layers.zoi import generate_zoi
 
 logger = logging.getLogger(__name__)
+
+
+def _get_pan_india_flag(request):
+    value = request.data.get(
+        "pan_india",
+        request.data.get(
+            "pan-india",
+            request.data.get("panIndia", False),
+        ),
+    )
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _has_any_payload_field(request, fields):
+    return any(field in request.data for field in fields)
+
+
+PAN_INDIA_PAYLOAD_FIELDS = ("pan_india", "pan-india", "panIndia")
+PAN_INDIA_LOCATION_FIELDS = ("state", "district", "block", "tehsil", "year")
 
 
 @api_security_check(allowed_methods="POST")
@@ -404,35 +431,22 @@ def generate_mws_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 @api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_fortnightly_hydrology(request):
     print("Inside generate_fortnightly_hydrology")
     try:
-        state = request.data.get("state")
-        district = request.data.get("district")
-        block = request.data.get("block")
-        start_year = int(request.data.get("start_year"))
-        end_year = int(request.data.get("end_year"))
-        gee_account_id = request.data.get("gee_account_id")
-        generate_hydrology.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-                "is_annual": False,
-            },
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
-        )
+        return _generate_tehsil_hydrology(request, is_annual=False)
+    except ValueError as e:
+        print("Invalid request in generate_fortnightly_hydrology api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         print("Exception in generate_fortnightly_hydrology api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(["POST"])
@@ -440,30 +454,267 @@ def generate_fortnightly_hydrology(request):
 def generate_annual_hydrology(request):
     print("Inside generate_annual_hydrology")
     try:
-        state = request.data.get("state")
-        district = request.data.get("district")
-        block = request.data.get("block")
-        start_year = int(request.data.get("start_year"))
-        end_year = int(request.data.get("end_year"))
-        gee_account_id = request.data.get("gee_account_id")
-        generate_hydrology.apply_async(
+        return _generate_tehsil_hydrology(request, is_annual=True)
+    except ValueError as e:
+        print("Invalid request in generate_annual_hydrology api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_annual_hydrology api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+def _generate_tehsil_hydrology(request, is_annual):
+    compute = _get_compute_mode(request)
+    if _has_any_payload_field(request, PAN_INDIA_PAYLOAD_FIELDS):
+        raise ValueError(
+            "Do not pass pan_india to the tehsil hydrology API. "
+            "Use /api/v1/pan-india/hydrology_fortnightly/ or "
+            "/api/v1/pan-india/hydrology_annual/ for Pan-India generation."
+        )
+
+    state = request.data.get("state")
+    district = request.data.get("district")
+    block = request.data.get("block")
+    if not all([state, district, block]):
+        raise ValueError("state, district, and block are required")
+
+    if request.data.get("start_year") is None or request.data.get("end_year") is None:
+        raise ValueError("start_year and end_year are required")
+    start_year = int(request.data.get("start_year"))
+    end_year = int(request.data.get("end_year"))
+    if end_year < start_year:
+        raise ValueError("end_year must be greater than or equal to start_year")
+
+    if compute == "gee":
+        task = generate_hydrology_gee_task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
                 "start_year": start_year,
                 "end_year": end_year,
-                "is_annual": True,
-                "gee_account_id": gee_account_id,
+                "gee_account_id": request.data.get("gee_account_id"),
+                "is_annual": is_annual,
+            },
+            queue="nrm",
+        )
+        source = "gee"
+        success = "hydrology GEE task initiated"
+    else:
+        if start_year != 2017:
+            raise ValueError(
+                "Local hydrology clipping must start from start_year=2017 because "
+                "the fortnightly cadence and cumulative G are anchored at 2017-07-01"
+            )
+        task = generate_hydrology_local_task.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_annual": is_annual,
+                "pan_india": False,
+                "overwrite": request.data.get("overwrite", False),
+            },
+            queue="nrm",
+        )
+        source = "base_layer_clip"
+        success = "hydrology clipping task initiated"
+
+    return Response(
+        {
+            "Success": success,
+            "task_id": task.id,
+            "compute": compute,
+            "scope": "tehsil",
+            "source": source,
+            "start_year": start_year,
+            "end_year": end_year,
+            "is_annual": bool(is_annual),
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+def _generate_pan_india_hydrology_base_layer(request, is_annual):
+    compute = _get_compute_mode(request)
+    if compute != "local":
+        raise ValueError(
+            "Pan-India hydrology generation supports compute='local' only"
+        )
+    if _has_any_payload_field(request, PAN_INDIA_PAYLOAD_FIELDS):
+        raise ValueError(
+            "Do not pass pan_india to the Pan-India hydrology API; "
+            "the /api/v1/pan-india/ route already defines the scope."
+        )
+    forbidden_fields = [
+        field for field in PAN_INDIA_LOCATION_FIELDS if field in request.data
+    ]
+    if forbidden_fields:
+        raise ValueError(
+            "Pan-India hydrology API accepts only compute, start_year, "
+            "end_year, and overwrite; do not pass "
+            f"{', '.join(forbidden_fields)}"
+        )
+
+    if request.data.get("start_year") is None or request.data.get("end_year") is None:
+        raise ValueError("start_year and end_year are required")
+    start_year = int(request.data.get("start_year"))
+    end_year = int(request.data.get("end_year"))
+    if end_year <= start_year:
+        raise ValueError("end_year must be greater than start_year")
+    if end_year != start_year + 1:
+        raise ValueError(
+            "Hydrology base-layer generation supports one hydrological year "
+            "at a time; use end_year=start_year+1"
+        )
+    task = generate_hydrology_base_layer_task.apply_async(
+        kwargs={
+            "start_year": start_year,
+            "end_year": end_year,
+            "is_annual": is_annual,
+            "overwrite": request.data.get("overwrite", False),
+        },
+        queue="nrm",
+    )
+    return Response(
+        {
+            "Success": "Pan-India hydrology task initiated",
+            "task_id": task.id,
+            "compute": compute,
+            "scope": "pan_india",
+            "start_year": start_year,
+            "end_year": end_year,
+            "year_key": f"{start_year}_{end_year}",
+            "is_annual": bool(is_annual),
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_fortnightly_hydrology(request):
+    print("Inside generate_pan_india_fortnightly_hydrology")
+    try:
+        return _generate_pan_india_hydrology_base_layer(request, is_annual=False)
+    except ValueError as e:
+        print(
+            "Invalid request in generate_pan_india_fortnightly_hydrology api :: ",
+            e,
+        )
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print(
+            "Exception in generate_pan_india_fortnightly_hydrology api :: ",
+            e,
+        )
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_annual_hydrology(request):
+    print("Inside generate_pan_india_annual_hydrology")
+    try:
+        return _generate_pan_india_hydrology_base_layer(request, is_annual=True)
+    except ValueError as e:
+        print("Invalid request in generate_pan_india_annual_hydrology api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in generate_pan_india_annual_hydrology api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_runoff_gpu(request):
+    print("Inside generate_runoff_gpu")
+    try:
+        compute = _get_compute_mode(request)
+        if compute != "local":
+            raise ValueError("runoff_gpu currently supports compute='local' only")
+
+        tehsil = request.data.get("tehsil") or request.data.get("block")
+        pan_india = _get_pan_india_flag(request)
+        task = generate_runoff_gpu_task.apply_async(
+            kwargs={
+                "state": request.data.get("state"),
+                "district": request.data.get("district"),
+                "tehsil": tehsil,
+                "pan_india": pan_india,
+                "start_date": request.data.get("start_date"),
+                "end_date": request.data.get("end_date"),
+                "start_year": request.data.get("start_year"),
+                "end_year": request.data.get("end_year"),
             },
             queue="nrm",
         )
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "Success": "runoff_gpu task initiated",
+                "task_id": task.id,
+            },
+            status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        print("Invalid request in generate_runoff_gpu api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_annual_hydrology api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        print("Exception in generate_runoff_gpu api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["POST"])
+@schema(None)
+def et_download(request):
+    print("Inside et_download")
+    try:
+        compute = _get_compute_mode(request)
+        if compute != "local":
+            raise ValueError("et_download currently supports compute='local' only")
+
+        pan_india = _get_pan_india_flag(request)
+        task = et_download_task.apply_async(
+            kwargs={
+                "pan_india": pan_india,
+                "start_date": request.data.get("start_date"),
+                "end_date": request.data.get("end_date"),
+                "start_year": request.data.get("start_year"),
+                "end_year": request.data.get("end_year"),
+                "overwrite": request.data.get("overwrite", False),
+                "patch_fill": request.data.get("patch_fill", True),
+            },
+            queue="nrm",
+        )
+        return Response(
+            {
+                "Success": "et_download task initiated",
+                "task_id": task.id,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except ValueError as e:
+        print("Invalid request in et_download api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        print("Exception in et_download api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 
 @api_view(["POST"])

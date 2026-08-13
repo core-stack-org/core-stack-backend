@@ -148,6 +148,11 @@ LULC_BASE_DIR: Path = _abs(
 
 TERRAIN_RASTER_PATH: Path = _base_layer_path("terrain")
 
+SOIL_RASTER_PATH: Path = _base_layer_path(
+    "hydrological soil group",
+    allowed_suffixes=(".tif", ".tiff"),
+)
+
 AEZ_VECTOR_PATH: Path = _base_layer_path("aez")
 
 PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_watersheds"
@@ -219,7 +224,7 @@ LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
 SWB_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("generate_swb")
 SOIL_TYPE_OUTPUT_DIR: Path = _derived_output_dir("soil type")
-
+HYDROLOGY_LOCAL_OUTPUT_DIR: Path = _derived_output_dir("hydrology_fortnightly")
 
 PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
     DATA_DIR / "base_layers/drainage_lines_pan_india.gpkg"
