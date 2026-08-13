@@ -69,6 +69,8 @@ from .gen_mws_report import (
     get_village_data,
     get_water_balance_data,
     get_fortnightly_water_balance_data,
+    get_ndvi_timeseries_data,
+    get_ndvi_timeseries_tree_data,
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
@@ -377,6 +379,12 @@ def generate_mws_report(request):
             get_cropping_intensity(state, district, block, uid)
         )
 
+        # ? NDVI Timeseries (Crops)
+        ndvi_labels, ndvi_data = get_ndvi_timeseries_data(state, district, block, uid)
+
+        # ? NDVI Timeseries (Trees)
+        ndvi_tree_labels, ndvi_tree_data = get_ndvi_timeseries_tree_data(state, district, block, uid)
+
         # ? LCW and Industrial Data Description
         lcw_desc = get_land_conflict_industrial_data(state, district, block, uid)
         factory_desc = get_factory_data(state, district, block, uid)
@@ -472,6 +480,10 @@ def generate_mws_report(request):
             "triple": json.dumps(triple),
             "uncrop": json.dumps(uncrop),
             "crop_years": json.dumps(crop_years),
+            "ndvi_labels": json.dumps(ndvi_labels),
+            "ndvi_data": json.dumps(ndvi_data),
+            "ndvi_tree_labels": json.dumps(ndvi_tree_labels),
+            "ndvi_tree_data": json.dumps(ndvi_tree_data),
             "water_years": json.dumps(water_years),
             "wb_years": json.dumps(wb_years),
             "drysp_all": json.dumps(drysp_all),

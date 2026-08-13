@@ -2128,6 +2128,48 @@ def get_fortnightly_water_balance_data(state, district, block, uid):
     return labels, precip_data, et_data, runoff_data
 
 
+def _fetch_ndvi_timeseries(state, district, block, uid, land_cover):
+    """Shared fetch for the geoserver ndvi_timeseries layer, keyed by land_cover ('crop' or 'tree')."""
+    labels = []
+    ndvi_data = []
+    try:
+        url = (
+            f"https://geoserver.core-stack.org:8443/geoserver/ndvi_timeseries/ows?service=WFS&version=1.0.0"
+            f"&request=GetFeature&typeName=ndvi_timeseries:ndvi_timeseries_{district.lower()}_{block.lower()}_{land_cover}"
+            f"&outputFormat=application/json&CQL_FILTER=uid='{uid}'"
+        )
+        res = requests.get(url, verify=False, timeout=60)
+        if res.status_code == 200:
+            features = res.json().get("features", [])
+            if features:
+                props = features[0]["properties"]
+                date_keys = sorted([k for k in props.keys() if re.match(r"^\d{4}-\d{2}-\d{2}$", k)])
+
+                for date_key in date_keys:
+                    try:
+                        val = props[date_key]
+                        if val is None:
+                            continue
+                        labels.append(date_key)
+                        ndvi_data.append(round(float(val), 4))
+                    except (ValueError, TypeError):
+                        continue
+    except Exception as e:
+        logger.info(f"Failed to fetch NDVI ({land_cover}) timeseries data for {uid}: {e}")
+
+    return labels, ndvi_data
+
+
+def get_ndvi_timeseries_data(state, district, block, uid):
+    """NDVI time series (cropped area) for the MWS, fetched live from the geoserver ndvi_timeseries layer."""
+    return _fetch_ndvi_timeseries(state, district, block, uid, "crop")
+
+
+def get_ndvi_timeseries_tree_data(state, district, block, uid):
+    """NDVI time series (tree cover) for the MWS, fetched live from the geoserver ndvi_timeseries layer."""
+    return _fetch_ndvi_timeseries(state, district, block, uid, "tree")
+
+
 def get_water_balance_data(state, district, block, uid):
     try:
         df = read_excel_sheet(
