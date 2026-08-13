@@ -94,6 +94,7 @@ def generate_mws_data_for_kyl_filters(
                 "river": -1,
                 "lulc_vector": -1,
                 "drainage_density": -1,
+                "overall_tree_change": -1,
             }
 
             try:
@@ -263,8 +264,7 @@ def generate_mws_data_for_kyl_filters(
                     avg_triply_cropped = -9999
                     print(f"Error occurred: {e}")
 
-            
-            ##################### SWB #####################
+                ##################### SWB #####################
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -369,7 +369,7 @@ def generate_mws_data_for_kyl_filters(
                     if not df_swb_annual_mws_data.empty:
                         total_swb_area = df_swb_annual_mws_data.iloc[0][
                             "total_swb_area_in_ha"
-                    ]
+                        ]
 
                     if total_swb_area != 0:  # Check if total_swb_area is not zero
                         swb_area_kharif_columns = df_swb_annual_mws_data.filter(
@@ -423,7 +423,7 @@ def generate_mws_data_for_kyl_filters(
                         avg_perc_kharif_surface_water_mws = (
                             avg_perc_rabi_surface_water_mws
                         ) = avg_perc_zaid_surface_water_mws = 0
-                    
+
                 except:
                     avg_perc_kharif_surface_water_mws = (
                         avg_perc_rabi_surface_water_mws
@@ -454,7 +454,9 @@ def generate_mws_data_for_kyl_filters(
                 try:
                     G_Trend = (
                         hydro_annual_mws_data.filter(like="G")
-                        .drop(columns=hydro_annual_mws_data.filter(like="DeltaG").columns)
+                        .drop(
+                            columns=hydro_annual_mws_data.filter(like="DeltaG").columns
+                        )
                         .dropna()
                     )
                     G_Trend = G_Trend.squeeze().tolist()
@@ -980,17 +982,34 @@ def generate_mws_data_for_kyl_filters(
                         ]
                         if not mws_drainage_density_data.empty:
                             row = mws_drainage_density_data.iloc[0]
-                            drainage_density = round(row["drainage_density_std_in_km_per_km2"], 2)
+                            drainage_density = round(
+                                row["drainage_density_std_in_km_per_km2"], 2
+                            )
                         else:
                             drainage_density = 0
 
                     else:
                         drainage_density = -9999
 
-
                 except Exception as e:
                     print(f"Error in getting drainage_density data: {e}")
                     drainage_density = -9999
+
+                ############ overall_tree_change #################
+                try:
+                    overall_tree_change_data = sheets["overall_tree_change"][
+                        sheets["overall_tree_change"]["UID"] == specific_mws_id
+                    ]
+                    reduction_canopy_density_height = overall_tree_change_data.get(
+                        "degradation_in_percent", -9999
+                    ).iloc[0]
+                    increase_canopy_density_height = overall_tree_change_data.get(
+                        "improvement_in_percent", -9999
+                    ).iloc[0]
+                except Exception as e:
+                    print(f"Error in getting overall_tree_change data: {e}")
+                    reduction_canopy_density_height = -9999
+                    increase_canopy_density_height = -9999
 
                 results.append(
                     {
@@ -1042,10 +1061,13 @@ def generate_mws_data_for_kyl_filters(
                         "lulc_forest_percent": lulc_forest_percent,
                         "lulc_crop_percent": lulc_crop_percent,
                         "drainage_density": drainage_density,
+                        "reduction_canopy_density_height": reduction_canopy_density_height,
+                        "increase_canopy_density_height": increase_canopy_density_height,
                     }
                 )
 
             results_df = pd.DataFrame(results)
+            results_df = results_df.fillna(-9999)
             if file_type == "xlsx":
                 results_df.to_excel(file_xl_path + "_KYL_filter_data.xlsx", index=False)
             elif file_type == "json":
