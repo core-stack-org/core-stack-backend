@@ -1867,9 +1867,8 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
             "single_non_kharif_area_percent": properties.get(
                 "sing_non_k", properties.get("sing_non_kharif_crop")
             ),
-            "single_kharif_area_percent": properties.get(
-                "double_cro", properties.get("double_crop")
-            ),
+            "single_kharif_area_percent": properties["sing_crop"],
+            "double_cropping_area_percent": properties["double_crop"],
             "triple_cropping_area_percent": properties.get(
                 "triple_cro", properties.get("triple_crop")
             ),
