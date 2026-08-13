@@ -2274,18 +2274,6 @@
                 <div id="treeReduceMap" class="map"></div>
                 <div id="compMap4" class="map"></div>
             </div>
-
-            {% if ndvi_tree_labels %}
-            <div class="chart-container">
-                <canvas id="lineChart-ndvi-tree"></canvas>
-            </div>
-            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over tree-covered
-                areas in this microwatershed at ~14-day intervals using satellite imagery, and reflects the vigour of
-                tree/forest growth over time. Green dots are the raw NDVI values; the blue line is a
-                Whittaker-smoothed trend fitted through them (see the Cropping Intensity section for how the
-                smoothing is computed).</p>
-            {% endif %}
-
             <div class="legend">
                 <div class="legend-item">
                     <div class="legend-color" style="background-color: #73bb53;"></div>
@@ -2308,6 +2296,18 @@
                     <span>Trees - Shrubs and Scrubs</span>
                 </div>
             </div>
+
+
+            {% if ndvi_tree_labels %}
+            <div class="chart-container">
+                <canvas id="lineChart-ndvi-tree"></canvas>
+            </div>
+            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over tree-covered
+                areas in this microwatershed at ~14-day intervals using satellite imagery, and reflects the vigour of
+                tree/forest growth over time. Green dots are the raw NDVI values; the blue line is a
+                Whittaker-smoothed trend fitted through them (see the Cropping Intensity section for how the
+                smoothing is computed).</p>
+            {% endif %}
 
             {% if tree_reduction_sankey %}
             <div id="treeReductionSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
@@ -2566,13 +2566,13 @@
             <h3>Water availability in this microwatershed</h3>
 
             <div class="map-group">
-                <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
                 <div id="swbMap" class="map" style="flex: 1 1 48%;"></div>
+                <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
             </div>
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
                 <div style="width: 48%; text-align: center;">Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color)</div>
-                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
             </div>
 
             <p>{{swb_intro_desc}}</p>
@@ -3292,9 +3292,9 @@
 
         const landscapeLulcRasterLayer = new ol.layer.Image({
             source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wms',
+                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wms',
                 params: {
-                    'LAYERS': "LULC_level_1:LULC_24_25_{{district}}_{{block}}_level_1"
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3"
                 },
                 ratio: 1,
                 serverType: 'geoserver',
@@ -3634,7 +3634,7 @@
                 const idx = parseInt(lulcYearSlider.value, 10);
                 lulcYearLabel.textContent = lulcYearLabels[idx];
                 landscapeLulcRasterLayer.getSource().updateParams({
-                    'LAYERS': `LULC_level_1:LULC_${lulcYears[idx]}_{{district}}_{{block}}_level_1`
+                    'LAYERS': `LULC_level_3:LULC_${lulcYears[idx]}_{{district}}_{{block}}_level_3`
                 });
             });
         }
@@ -4636,12 +4636,49 @@
             return solveLinearSystem(A, y);
         }
 
+        // For labels formatted 'YYYY-MM-DD', finds the index of the first July date-point of each
+        // start of the series (e.g. 07/2018) and the last June date-point of each subsequent
+        // year (agricultural-year end), so the x-axis reads like 07/2018, 06/2019, 06/2020,
+        // 06/2021, ... — matching how the cropping-intensity bar chart bins a "year" as Jul-Jun.
+        const getAgYearBoundaryIndices = labels => {
+            const boundaryIndices = new Set();
+            if (labels.length > 0) boundaryIndices.add(0);
+
+            const lastJuneIndexByYear = {};
+            labels.forEach((dateStr, idx) => {
+                const [year, month] = dateStr.split('-');
+                if (month === '06') {
+                    lastJuneIndexByYear[year] = idx; // last occurrence wins
+                }
+            });
+            Object.values(lastJuneIndexByYear).forEach(idx => boundaryIndices.add(idx));
+
+            return boundaryIndices;
+        };
+
         // Renders an NDVI chart (raw dots + Whittaker-smoothed line) into the given canvas.
-        const renderNdviChart = (canvasId, labels, data, chartTitle) => {
+        // agYearTicks: when true, x-axis ticks only show agricultural-year (Jul-Jun) boundaries
+        // instead of a generic evenly-spaced date axis.
+        const renderNdviChart = (canvasId, labels, data, chartTitle, agYearTicks = false) => {
             const canvas = document.getElementById(canvasId);
             if (!labels || labels.length === 0 || !canvas) return;
 
             const smoothed = whittakerSmooth(data, 10, 2);
+
+            let xTicks = { maxTicksLimit: 12 };
+            if (agYearTicks) {
+                const boundaryIndices = getAgYearBoundaryIndices(labels);
+                xTicks = {
+                    autoSkip: false,
+                    maxRotation: 60,
+                    minRotation: 60,
+                    callback: function (value, index) {
+                        if (!boundaryIndices.has(index)) return null;
+                        const [year, month] = labels[index].split('-');
+                        return `${month}/${year}`;
+                    }
+                };
+            }
 
             new Chart(canvas, {
                 type: 'line',
@@ -4676,8 +4713,8 @@
                             title: { display: true, text: 'NDVI' }
                         },
                         x: {
-                            title: { display: true, text: 'Date' },
-                            ticks: { maxTicksLimit: 12 }
+                            title: { display: true, text: agYearTicks ? 'Agricultural Year (Jul - Jun)' : 'Date' },
+                            ticks: xTicks
                         }
                     },
                     animation: { duration: 0 },
@@ -4692,7 +4729,7 @@
             });
         };
 
-        renderNdviChart('lineChart-ndvi', JSON.parse('{{ndvi_labels|safe}}'), JSON.parse('{{ndvi_data|safe}}'), 'NDVI Time Series (Cropped Area)');
+        renderNdviChart('lineChart-ndvi', JSON.parse('{{ndvi_labels|safe}}'), JSON.parse('{{ndvi_data|safe}}'), 'NDVI Time Series (Cropped Area)', true);
         renderNdviChart('lineChart-ndvi-tree', JSON.parse('{{ndvi_tree_labels|safe}}'), JSON.parse('{{ndvi_tree_data|safe}}'), 'NDVI Time Series (Tree Cover)');
 
         // WaterBalance Graphs and descriptions
