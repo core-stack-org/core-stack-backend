@@ -407,10 +407,16 @@ def materialize_pan_india_boundary(
     if destination.exists() and not overwrite:
         download_destination = download_boundary_path(destination)
         download_boundary_source = Path(download_boundary_source)
-        if not download_destination.exists() and download_boundary_source.exists():
-            download_destination.parent.mkdir(parents=True, exist_ok=True)
-            download_destination.write_text(download_boundary_source.read_text())
-        gdf_existing = gpd.read_file(destination)
+        gdf_existing = None
+        if not download_destination.exists():
+            if download_boundary_source.exists():
+                download_destination.parent.mkdir(parents=True, exist_ok=True)
+                download_destination.write_text(download_boundary_source.read_text())
+            else:
+                gdf_existing = gpd.read_file(destination)
+                write_download_boundary(gdf_existing, download_destination, PAN_INDIA_SLUG)
+        if gdf_existing is None:
+            gdf_existing = gpd.read_file(destination)
         return destination, [path for path, _ in matches], len(gdf_existing)
 
     frames = []
