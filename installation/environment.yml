@@ -1,4 +1,4 @@
-name: corestack-backend
+name: corestack-backend-test
 
 channels:
   - conda-forge
@@ -87,6 +87,7 @@ dependencies:
       - orjson
       - ijson
       - polars
+      - numpy==1.26.4
       - weasyprint
       - cupy-cuda12x[ctk]>=13.6.0
       - cucim-cu12>=26.2.0
