@@ -1,4 +1,5 @@
 import json
+import inspect
 import logging
 import os
 
@@ -47,6 +48,12 @@ from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
 from utilities.gee_utils import check_gee_task_status, download_gee_layer
 from utilities.pipelines import api_request_payload
+from utilities.layer_generation_mode import (
+    sync_layer_generation_if_enabled,
+)
+from utilities.layer_generation_logging import (
+    layer_generation_api_logging,
+)
 from .STAC_specs.stac_collection import generate_stac_collection_task
 from .clart.clart import generate_clart_layer
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
@@ -2947,3 +2954,39 @@ def generate_ltp_stp_change(request):
     except Exception as e:
         print("Exception in generate_ltp_stp api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _auto_discover_computing_api_views(namespace):
+    """Auto-wrap request handlers for sync layer generation + STAC enrichment."""
+    discovered = []
+    for name, fn in namespace.items():
+        if name.startswith("_") or not callable(fn):
+            continue
+        if getattr(fn, "__module__", None) != __name__:
+            continue
+        if getattr(fn, "__layer_generation_sync_wrapped__", False):
+            continue
+        try:
+            target = inspect.unwrap(fn)
+            sig = inspect.signature(target)
+        except (OSError, TypeError, ValueError):
+            continue
+
+        params = list(sig.parameters.values())
+        if len(params) == 0:
+            continue
+        first_param = params[0]
+        if first_param.kind in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        ) and first_param.name == "request":
+            discovered.append(name)
+    return discovered
+
+
+for _view_name in _auto_discover_computing_api_views(globals()):
+    wrapped = sync_layer_generation_if_enabled(
+        layer_generation_api_logging(globals()[_view_name])
+    )
+    wrapped.__layer_generation_sync_wrapped__ = True
+    globals()[_view_name] = wrapped

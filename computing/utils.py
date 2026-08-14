@@ -1043,6 +1043,13 @@ def update_layer_sync_status(
             sync_to_geoserver=sync_to_geoserver,
             is_stac_specs_generated=is_stac_specs_generated,
         )
+        if sync_to_geoserver:
+            try:
+                from utilities.layer_generation_mode import record_sync_layer_id
+
+                record_sync_layer_id(layer_id)
+            except Exception:
+                pass
         return layer_id
 
     try:
@@ -1066,6 +1073,13 @@ def update_layer_sync_status(
                 f"Updated {update_fields} for layer ID: {layer_id} "
                 f"(sync={sync_to_geoserver}, stac={is_stac_specs_generated})"
             )
+            if sync_to_geoserver:
+                try:
+                    from utilities.layer_generation_mode import record_sync_layer_id
+
+                    record_sync_layer_id(layer_id)
+                except Exception:
+                    pass
             return layer_id
 
     except Exception as e:

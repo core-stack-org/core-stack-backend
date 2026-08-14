@@ -282,6 +282,10 @@ USE_TZ = True
 # Celery
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
+SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
+STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
+STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=True)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -340,6 +344,11 @@ LOGGING = {
         "geoadmin": {
             "handlers": ["console"],
             "level": "DEBUG",
+            "propagate": False,
+        },
+        "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },
