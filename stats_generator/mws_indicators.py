@@ -903,7 +903,6 @@ def generate_mws_data_for_kyl_filters(
                 try:
                     lulc_shrub_percent = -9999
                     lulc_forest_percent = -9999
-                    lulc_crop_percent = -9999
 
                     lulc_df = sheets["lulc_vector"]
 
@@ -922,7 +921,7 @@ def generate_mws_data_for_kyl_filters(
                             shrub_cols = [
                                 col
                                 for col in lulc_df.columns
-                                if col.startswith("shrub_scrub_in_ha_")
+                                if col.startswith("shrub_scrub_area_in_ha_")
                             ]
 
                             lulc_shrub_area = round(
@@ -933,7 +932,7 @@ def generate_mws_data_for_kyl_filters(
                             forest_cols = [
                                 col
                                 for col in lulc_df.columns
-                                if col.startswith("tree_forest_in_ha_")
+                                if col.startswith("tree_forest_area_in_ha_")
                             ]
 
                             lulc_forest_area = round(
@@ -949,29 +948,34 @@ def generate_mws_data_for_kyl_filters(
                                 lulc_forest_percent = round(
                                     (lulc_forest_area / area_in_ha) * 100, 2
                                 )
-
-                        df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
-                            sheets["croppingIntensity_annual"]["UID"] == specific_mws_id
-                        ]
-
-                        crp_row = df_crp_intensity_mws_data.iloc[0]
-                        area_in_ha = float(crp_row.get("area_in_ha", 0))
-                        cropped_area_in_ha = float(crp_row.get("sum_area_in_ha", 0))
-
-                        lulc_crop_percent = round(
-                            (cropped_area_in_ha / area_in_ha) * 100, 2
-                        )
-
                     else:
                         lulc_shrub_percent = -9999
                         lulc_forest_percent = -9999
-                        lulc_crop_percent = -9999
                 except Exception as e:
                     print(f"Error in LULC vector: {e}")
 
                     lulc_shrub_percent = -9999
                     lulc_forest_percent = -9999
-                    lulc_crop_percent = -9999
+
+                ################### cropping intensity ###############
+                try:
+                    crop_df = sheets["croppingIntensity_annual"]
+                    if crop_df is not -1 and not crop_df.empty:
+                        df_crp_intensity_mws_data = crop_df[
+                            crop_df["UID"] == specific_mws_id
+                        ]
+                        if not df_crp_intensity_mws_data.empty:
+                            row = df_crp_intensity_mws_data.iloc[0]
+                            area_in_ha = float(row.get("area_in_ha", 0))
+                            cropped_area_in_ha = float(row.get("sum_area_in_ha", 0))
+
+                            lulc_crop_percent = round(
+                                (cropped_area_in_ha / area_in_ha) * 100, 2
+                            )
+                        else:
+                            lulc_crop_percent = -9999
+                except Exception as e:
+                    print(f"error in croppingIntensity_annual{e}")
 
                 ############ Canal ########################
                 try:
@@ -997,15 +1001,22 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ overall_tree_change #################
                 try:
-                    overall_tree_change_data = sheets["overall_tree_change"][
-                        sheets["overall_tree_change"]["UID"] == specific_mws_id
-                    ]
-                    reduction_canopy_density_height = overall_tree_change_data.get(
-                        "degradation_in_percent", -9999
-                    ).iloc[0]
-                    increase_canopy_density_height = overall_tree_change_data.get(
-                        "improvement_in_percent", -9999
-                    ).iloc[0]
+                    overall_tree_change_df = sheets["overall_tree_change"]
+                    if (
+                        overall_tree_change_df is not -1
+                        and not overall_tree_change_df.empty
+                    ):
+                        overall_tree_change_data = overall_tree_change_df[
+                            overall_tree_change_df["UID"] == specific_mws_id
+                        ]
+                        if not overall_tree_change_data.empty:
+                            row = overall_tree_change_data.iloc[0]
+                            reduction_canopy_density_height = row.get(
+                                "degradation_in_percent", -9999
+                            )
+                            increase_canopy_density_height = row.get(
+                                "improvement_in_percent", -9999
+                            )
                 except Exception as e:
                     print(f"Error in getting overall_tree_change data: {e}")
                     reduction_canopy_density_height = -9999
