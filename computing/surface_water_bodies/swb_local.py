@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 
 import ee
@@ -50,6 +51,7 @@ DATASET_NAME = "Surface Water Bodies"
 GEOSERVER_WORKSPACE = "swb"
 logger = logging.getLogger(__name__)
 GEE_EXPORT_CHUNK_SIZE = 1000
+ANNUAL_COLUMN_PATTERN = re.compile(r"^(area|k|kr|krz)_(\d{4})$")
 
 
 def _slug(value, fallback):
@@ -190,6 +192,28 @@ def _convert_area_columns_to_hectares(gdf):
     return converted, converted_columns
 
 
+def _restore_legacy_columns(gdf):
+    renamed_columns = {}
+    for column in gdf.columns:
+        match = ANNUAL_COLUMN_PATTERN.fullmatch(column)
+        if not match:
+            continue
+
+        prefix, end_year = match.groups()
+        end_year = int(end_year)
+        target_column = f"{prefix}_{(end_year - 1) % 100:02d}-{end_year % 100:02d}"
+        if target_column in gdf.columns:
+            raise ValueError(
+                f"Cannot rename SWB column {column} to existing column {target_column}."
+            )
+        renamed_columns[column] = target_column
+
+    result = gdf.rename(columns=renamed_columns)
+    if "wb_id" in result.columns:
+        result["uid"] = result["wb_id"]
+    return result
+
+
 def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
@@ -198,6 +222,7 @@ def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
     clipped_gdf, converted_area_columns = _convert_area_columns_to_hectares(
         clipped_gdf
     )
+    clipped_gdf = _restore_legacy_columns(clipped_gdf)
     logger.info(
         "Clipped SWB features: count=%s columns=%s",
         len(clipped_gdf),

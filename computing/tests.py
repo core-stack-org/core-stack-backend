@@ -29,6 +29,7 @@ from computing.surface_water_bodies.swb_local import (
     _convert_area_columns_to_hectares,
     _final_layer_name,
     _layer_name,
+    _restore_legacy_columns,
     run_swb_local,
 )
 from computing.surface_water_bodies.swb3 import (
@@ -159,6 +160,34 @@ class LocalSwbContinuationTests(SimpleTestCase):
         converted, _ = _convert_area_columns_to_hectares(source)
 
         self.assertEqual(converted.loc[0, "area_ored"], 0.25)
+
+    def test_restores_legacy_annual_columns_and_uid(self):
+        source = pd.DataFrame(
+            {
+                "wb_id": ["waterbody-1"],
+                "area_2018": [0.14],
+                "k_2019": [20],
+                "kr_2020": [30],
+                "krz_2021": [40],
+                "area_ored": [0.25],
+            }
+        )
+
+        result = _restore_legacy_columns(source)
+
+        self.assertEqual(
+            list(result.columns),
+            [
+                "wb_id",
+                "area_17-18",
+                "k_18-19",
+                "kr_19-20",
+                "krz_20-21",
+                "area_ored",
+                "uid",
+            ],
+        )
+        self.assertEqual(result.loc[0, "uid"], "waterbody-1")
 
     def test_swb_enrichment_defaults_to_pan_india_assets(self):
         raster_parameters = signature(
