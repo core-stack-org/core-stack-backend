@@ -695,9 +695,7 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
                     {
                         "UID": mws_uid,
                         "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
-                        "Waterbodies_name": swb_props.get(
-                            "water_body_name", swb_props.get("waterbody_type_name")
-                        ),
+                        "Waterbodies_name": swb_props.get("water_body_name"),
                         "Latitude": lat,
                         "Longitude": lon,
                     }
