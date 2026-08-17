@@ -153,6 +153,30 @@ def _resolve_gee_asset_id(state, district, block, asset_suffix, app_type):
     return description, asset_id, asset_folder_list
 
 
+def _delete_existing_swb_outputs(
+    output_path,
+    swb2_asset_id,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
+):
+    asset_dir = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    asset_ids = (
+        asset_dir + f"swb4_{asset_suffix}",
+        asset_dir + f"swb3_{asset_suffix}",
+        swb2_asset_id,
+    )
+    for asset_id in asset_ids:
+        if is_gee_asset_exists(asset_id):
+            ee.data.deleteAsset(asset_id)
+            logger.info("Deleted existing SWB GEE asset: %s", asset_id)
+
+    output_path.unlink(missing_ok=True)
+    logger.info("Deleted existing local SWB output: %s", output_path)
+
+
 def _prepare_gdf_for_gee(gdf):
     prepared = gdf.copy()
     if prepared.crs is None:
@@ -376,7 +400,7 @@ def _continue_swb_in_gee(
 
     make_asset_public(swb3_asset_id)
     make_asset_public(swb4_asset_id)
-    return asset_suffix, swb3_asset_id
+    return asset_suffix, swb4_asset_id
 
 
 def _sync_final_swb(
@@ -395,7 +419,7 @@ def _sync_final_swb(
     if sync_layer_metadata:
         misc = {
             "is_generated_locally": True,
-            "source_stage": "swb3_gee_from_swb2_local",
+            "source_stage": "swb4_gee_from_swb2_local",
         }
         if start_year is not None:
             misc["start_year"] = start_year
@@ -480,6 +504,7 @@ def run_swb_local(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    overwrite=False,
 ):
     state = str(state).strip().lower() if state else None
     district = str(district).strip().lower() if district else None
@@ -534,6 +559,14 @@ def run_swb_local(
     logger.info("Local SWB output path: %s", output_path)
 
     ee_initialize(gee_account_id)
+    if overwrite:
+        _delete_existing_swb_outputs(
+            output_path=output_path,
+            swb2_asset_id=gee_asset_id,
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+        )
     gee_roi = gdf_to_ee_fc(_prepare_gdf_for_gee(roi_gdf[["geometry"]]))
 
     if is_gee_asset_exists(gee_asset_id):
@@ -718,6 +751,7 @@ def _generate_swb_local_task(
     end_year=None,
     gee_account_id=None,
     app_type="MWS",
+    overwrite=False,
 ):
     return run_swb_local(
         state=state,
@@ -732,6 +766,7 @@ def _generate_swb_local_task(
         app_type=app_type,
         start_year=start_year,
         end_year=end_year,
+        overwrite=overwrite,
     )
 
 
@@ -748,6 +783,7 @@ def generate_swb_layer(
     end_year=None,
     gee_account_id=None,
     app_type="MWS",
+    overwrite=False,
 ):
     _ = self
     return _generate_swb_local_task(
@@ -761,4 +797,5 @@ def generate_swb_layer(
         end_year=end_year,
         gee_account_id=gee_account_id,
         app_type=app_type,
+        overwrite=overwrite,
     )

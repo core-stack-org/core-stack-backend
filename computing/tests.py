@@ -27,9 +27,11 @@ from computing.models import Dataset, Layer
 from computing.surface_water_bodies.swb_local import (
     _continue_swb_in_gee,
     _convert_area_columns_to_hectares,
+    _delete_existing_swb_outputs,
     _final_layer_name,
     _layer_name,
     _restore_legacy_columns,
+    generate_swb_layer as generate_swb_layer_local,
     run_swb_local,
 )
 from computing.surface_water_bodies.swb3 import (
@@ -69,6 +71,53 @@ class LocalNregaTests(SimpleTestCase):
 
 
 class LocalSwbContinuationTests(SimpleTestCase):
+    @patch("computing.surface_water_bodies.swb_local.get_gee_dir_path")
+    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
+    @patch("computing.surface_water_bodies.swb_local.ee.data.deleteAsset")
+    def test_overwrite_deletes_local_and_gee_outputs(
+        self,
+        delete_asset,
+        asset_exists,
+        get_gee_dir_path,
+    ):
+        get_gee_dir_path.return_value = "projects/example/state/district/block/"
+        asset_exists.return_value = True
+
+        with TemporaryDirectory() as output_dir:
+            output_path = Path(output_dir) / "swb.gpkg"
+            output_path.touch()
+
+            _delete_existing_swb_outputs(
+                output_path=output_path,
+                swb2_asset_id=(
+                    "projects/example/state/district/block/"
+                    "swb2_district_block_local"
+                ),
+                asset_suffix="district_block",
+                asset_folder_list=["state", "district", "block"],
+                app_type="MWS",
+            )
+
+            self.assertFalse(output_path.exists())
+
+        self.assertEqual(
+            delete_asset.call_args_list,
+            [
+                call(
+                    "projects/example/state/district/block/"
+                    "swb4_district_block"
+                ),
+                call(
+                    "projects/example/state/district/block/"
+                    "swb3_district_block"
+                ),
+                call(
+                    "projects/example/state/district/block/"
+                    "swb2_district_block_local"
+                ),
+            ],
+        )
+
     @patch("computing.surface_water_bodies.swb_local._complete_swb_pipeline")
     @patch("computing.surface_water_bodies.swb_local._push_local_swb_to_geoserver")
     @patch("computing.surface_water_bodies.swb_local.make_asset_public")
@@ -242,6 +291,9 @@ class LocalSwbContinuationTests(SimpleTestCase):
             },
         )
 
+    def test_local_swb_task_accepts_overwrite(self):
+        self.assertIn("overwrite", signature(generate_swb_layer_local.run).parameters)
+
     def test_local_map_runs_swb_without_generated_gee_dependencies(self):
         swb_node = next(
             node
@@ -303,7 +355,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
             make_asset_public.call_args_list,
             [call("swb3-asset"), call("swb4-asset")],
         )
-        self.assertEqual(result, ("district_block", "swb3-asset"))
+        self.assertEqual(result, ("district_block", "swb4-asset"))
 
 
 class BulkPipelineRegistryTests(SimpleTestCase):
