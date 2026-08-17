@@ -134,6 +134,10 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
             is_processing_required = request.data.get("is_processing_required", True)
             start_date = request.data.get("start_date") or request.data.get("startDate")
             end_date = request.data.get("end_date") or request.data.get("endDate")
+            if isinstance(start_date, (list, tuple)):
+                start_date = start_date[0] if start_date else None
+            if isinstance(end_date, (list, tuple)):
+                end_date = end_date[0] if end_date else None
 
             def _as_bool(val, default=False):
                 if val is None:
@@ -188,8 +192,6 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                         project=project,
                         uploaded_by=request.user,
                         excel_hash=excel_hash,
-                        start_date=start_date,
-                        end_date=end_date,
                     )
 
                     # # Convert KML to GeoJSON
