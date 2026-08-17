@@ -56,12 +56,29 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get project and check if it's a plantation project and enabled
+        # Resolve the waterbody project (do not reuse plantation error copy).
         try:
-            project = Project.objects.get(id=project_id, app_type=AppType.WATERBODY_REJ)
+            project = Project.objects.get(id=project_id)
         except Project.DoesNotExist:
             return Response(
-                {"detail": "Plantation project not found or not enabled."},
+                {"detail": f"Project {project_id} was not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if project.app_type != AppType.WATERBODY_REJ:
+            return Response(
+                {
+                    "detail": (
+                        f"Project {project_id} is app_type={project.app_type!r}, "
+                        f"expected {AppType.WATERBODY_REJ!r} (Waterbody Rejuvenation)."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not project.enabled:
+            return Response(
+                {"detail": f"Project {project_id} is not enabled."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
