@@ -95,6 +95,9 @@ def generate_mws_data_for_kyl_filters(
                 "lulc_vector": -1,
                 "drainage_density": -1,
                 "overall_tree_change": -1,
+                "soil_health": -1,
+                "soil_type": -1,
+                "change_detection_shrubchange": -1,
             }
 
             try:
@@ -1001,6 +1004,8 @@ def generate_mws_data_for_kyl_filters(
 
                 ############ overall_tree_change #################
                 try:
+                    reduction_canopy_density_height = -9999
+                    increase_canopy_density_height = -9999
                     overall_tree_change_df = sheets["overall_tree_change"]
                     if (
                         overall_tree_change_df is not -1
@@ -1019,8 +1024,108 @@ def generate_mws_data_for_kyl_filters(
                             )
                 except Exception as e:
                     print(f"Error in getting overall_tree_change data: {e}")
-                    reduction_canopy_density_height = -9999
-                    increase_canopy_density_height = -9999
+
+
+                ########## soil health ###########
+                try:
+                    nitrogen_levels = -9999
+                    phosphoros_levels = -9999
+                    potassium_levels = -9999
+                    organic_carbon = -9999
+                    organic_carbon_tree_cover = -9999
+
+                    soil_health_df = sheets["soil_health"]
+                    if soil_health_df is not -1 and not soil_health_df.empty:
+                        soil_health_data = soil_health_df[
+                            soil_health_df["UID"] == specific_mws_id
+                        ]
+                        if not soil_health_data.empty:
+                            row = soil_health_data.iloc[0]
+                            nitrogen_levels = row.get("N_p50_in_kg_per_ha", -9999)
+                            phosphoros_levels = row.get("P_p50_in_kg_per_ha", -9999)
+                            potassium_levels = row.get("K_p50_in_kg_per_ha", -9999)
+                            organic_carbon = row.get("OC_p50_in_percent", -9999)
+                            organic_carbon_tree_cover = row.get(
+                                "OC_OLM_p50_in_percent", -9999
+                            )
+                except Exception as e:
+                    print(f"Error while fetching data for soil health {e}")
+
+                ###### soil type ###########
+                soil_type_drainage_class = {
+                    "Excessively drained": 0,
+                    "Somewhat excessively drained": 1,
+                    "Well drained": 2,
+                    "Moderately well drained": 3,
+                    "Imperfectly drained": 4,
+                    "Poorly drained": 5,
+                    "Very poorly drained": 6,
+                }
+                soil_type_texture_class = {
+                    "Clay (heavy)": 0,
+                    "Silty clay": 1,
+                    "Clay": 2,
+                    "Silty clay loam": 3,
+                    "Clay loam": 4,
+                    "Silt": 5,
+                    "Silt loam": 6,
+                    "Sandy clay": 7,
+                    "Loam": 8,
+                    "Sandy clay loam": 9,
+                    "sandy loam": 10,
+                    "Loamy sand": 11,
+                    "sand": 12,
+                }
+
+                try:
+                    soil_drainage = -9999
+                    soil_texture = -9999
+                    soil_ph = -9999
+
+                    soil_type_df = sheets["soil_type"]
+                    if soil_type_df is not -1 and not soil_type_df.empty:
+                        soil_type_data = soil_type_df[
+                            soil_type_df["UID"] == specific_mws_id
+                        ]
+                        if not soil_type_data.empty:
+                            row = soil_type_data.iloc[0]
+                            soil_drainage = soil_type_drainage_class.get(
+                                row.get("soil_drainage_classes", -9999), -9999
+                            )
+                            soil_texture = soil_type_texture_class.get(
+                                row.get("subsoil_texture", -9999), -9999
+                            )
+                            soil_ph = row.get("topsoil_ph", -9999)
+
+                except Exception as e:
+                    print(f"Error occured while fetching data for soil type {e}")
+
+                ####### change vector Shrubchange ##########
+                try:
+                    reduction_in_shrubland_cover = -9999
+
+                    change_detection_shrubchange_df = sheets[
+                        "change_detection_shrubchange"
+                    ]
+                    if (
+                        change_detection_shrubchange_df is not -1
+                        and not change_detection_shrubchange_df.empty
+                    ):
+                        change_detection_shrubchange_data = (
+                            change_detection_shrubchange_df[
+                                change_detection_shrubchange_df["UID"]
+                                == specific_mws_id
+                            ]
+                        )
+                        if not change_detection_shrubchange_data.empty:
+                            row = change_detection_shrubchange_data.iloc[0]
+                            reduction_in_shrubland_cover = row.get(
+                                "total_change_area_in_ha", -9999
+                            )
+                except Exception as e:
+                    print(
+                        f"error occured while fetching data for change_detection_shrubchange {e}"
+                    )
 
                 results.append(
                     {
@@ -1074,6 +1179,15 @@ def generate_mws_data_for_kyl_filters(
                         "drainage_density": drainage_density,
                         "reduction_canopy_density_height": reduction_canopy_density_height,
                         "increase_canopy_density_height": increase_canopy_density_height,
+                        "nitrogen_levels": nitrogen_levels,
+                        "phosphoros_levels": phosphoros_levels,
+                        "potassium_levels": potassium_levels,
+                        "organic_carbon": organic_carbon,
+                        "soil_drainage": soil_drainage,
+                        "soil_texture": soil_texture,
+                        "soil_ph": soil_ph,
+                        "organic_carbon_tree_cover": organic_carbon_tree_cover,
+                        "reduction_in_shrubland_cover": reduction_in_shrubland_cover,
                     }
                 )
 
