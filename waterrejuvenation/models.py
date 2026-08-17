@@ -1,4 +1,5 @@
 import logging
+import hashlib
 from email.policy import default
 
 from django.db import models
@@ -56,15 +57,14 @@ class WaterbodiesFileUploadLog(models.Model):
     is_lulc_required = models.BooleanField(default=True)
     is_closest_wp = models.BooleanField(default=True)
     is_compute = models.BooleanField(default=False)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return self.name
 
     def save(self, *args, **kwargs):
         """Override save to calculate file hash before saving"""
-        start_date = kwargs.pop("start_date", None)
-        end_date = kwargs.pop("end_date", None)
-
         if not self.excel_hash and self.file:
             # Calculate hash for new file
             self.file.seek(0)
@@ -77,7 +77,7 @@ class WaterbodiesFileUploadLog(models.Model):
         print(f"is processing required: {self.is_processing_required}")
         print(f"is lullc required: {self.is_lulc_required}")
         if self.is_compute:
-            if self.is_processing_required and (not start_date or not end_date):
+            if self.is_processing_required and (not self.start_date or not self.end_date):
                 raise ValueError(
                     "start_date and end_date are required when is_compute and "
                     "is_processing_required are true (YYYY-MM-DD)."
@@ -89,8 +89,16 @@ class WaterbodiesFileUploadLog(models.Model):
                     "is_lulc_required": self.is_lulc_required,
                     "is_processing_required": self.is_processing_required,
                     "is_closest_wp": self.is_closest_wp,
-                    "start_date": start_date,
-                    "end_date": end_date,
+                    "start_date": (
+                        self.start_date.isoformat()
+                        if hasattr(self.start_date, "isoformat")
+                        else self.start_date
+                    ),
+                    "end_date": (
+                        self.end_date.isoformat()
+                        if hasattr(self.end_date, "isoformat")
+                        else self.end_date
+                    ),
                 },
                 queue="waterbody1",
             )

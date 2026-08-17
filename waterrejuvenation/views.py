@@ -143,6 +143,8 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 "is_processing_required": is_processing_required,
                 "is_closest_wp": request.data.get("is_closest_wp", True),
                 "is_compute": is_compute,
+                "start_date": start_date or None,
+                "end_date": end_date or None,
             }
             print(data)
             serializer = self.get_serializer(data=data)
