@@ -945,29 +945,20 @@
             </div>
         </section>
 
-        <!-- ===== SECTION 12: AGRICULTURAL LAND CULTIVATION PATTERNS ===== -->
-        <section id="section-land-cultivation" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
-            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Agricultural Land Cultivation Patterns</h2>
+        <!-- ===== SECTION 12: AGRICULTURAL PRODUCTIVITY ===== -->
+        <section id="section-agri-productivity" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
+            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Agricultural Productivity</h2>
 
-            <!-- Tab Buttons — full width -->
-            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <button id="landUtilizationBtn" onclick="switchLandCultivationMap('utilization')"
-                    style="padding: 0.75rem 1.5rem; background-color: var(--primary-accent); color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                    Land Utilization
-                </button>
-                <button id="seasonalCultivationBtn" onclick="switchLandCultivationMap('seasonal')"
-                    style="padding: 0.75rem 1.5rem; background-color: #bbb; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                    Seasonal Cultivation
-                </button>
-            </div>
+            <!-- Agricultural Land Cultivation Patterns -->
+            <div class="mb-10 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
+                <h3 class="text-2xl font-bold mb-4" style="color: var(--primary-dark);">Agricultural Land Cultivation Patterns</h3>
 
-            <!-- Side by side: Map (left) + Raw Params (right) -->
-            <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
-                <div style="flex: 1; min-width: 0;">
-                    <div id="landCultivationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
-                </div>
-                <div id="landRawParamsBox" style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
-                    <div id="rawParams-land_utilization">
+                <!-- Side by side: Map (left) + Raw Params (right) -->
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div id="landCultivationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
+                    </div>
+                    <div style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
                         <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Land Utilization</h4>
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
                             {% for param in land_raw_params.agriculture_land_cultivation %}
@@ -978,117 +969,90 @@
                             {% endfor %}
                         </table>
                     </div>
-                    <div id="rawParams-land_seasonal" style="display: none;">
-                        <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Seasonal Cultivation</h4>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
-                            {% for param in land_raw_params.agriculture_land_cultivation %}
-                            <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
-                                <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
-                                <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
                 </div>
-            </div>
 
-            <div class="mb-8">
-                <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Agricultural Land Cultivation Patterns</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="landCultivationText"></div>
             </div>
 
-            <div class="text-sm p-4 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
-                <p><strong>Note:</strong> Source of these indicators is the publicly available data from Mission Antyodaya, 2020.</p>
-            </div>
-        </section>
+            <!-- Irrigation Infrastructure and Farming Techniques -->
+            <div class="mb-10 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
+                <h3 class="text-2xl font-bold mb-4" style="color: var(--primary-dark);">Irrigation Infrastructure and Farming Techniques</h3>
 
-        <!-- ===== SECTION 13: IRRIGATION INFRASTRUCTURE AND FARMING TECHNIQUES ===== -->
-        <section id="section-irrigation" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
-            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Irrigation Infrastructure and Farming Techniques</h2>
-
-            <!-- Side by side: Map (left) + Raw Params (right) -->
-            <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
-                <div style="flex: 1; min-width: 0;">
-                    <div id="irrigationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
+                <!-- Side by side: Map (left) + Raw Params (right) -->
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div id="irrigationMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
+                    </div>
+                    <div style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
+                        <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Irrigation &amp; Watershed Parameters</h4>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                            {% for param in irrigation_raw_params.agriculture_irrigation_watershed %}
+                            <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
+                                <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
+                                <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
                 </div>
-                <div style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
-                    <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Irrigation &amp; Watershed Parameters</h4>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
-                        {% for param in irrigation_raw_params.agriculture_irrigation_watershed %}
-                        <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
-                            <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
-                            <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
-                        </tr>
-                        {% endfor %}
-                    </table>
-                </div>
-            </div>
 
-            <div class="mb-8">
-                <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Irrigation Watershed Access</h3>
                 <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="irrigationWatershedText"></div>
             </div>
 
-            <div class="text-sm p-4 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
-                <p><strong>Note:</strong> Source of these indicators is the publicly available data from Mission Antyodaya, 2020.</p>
-            </div>
-        </section>
-
-        <!-- ===== SECTION 13: AGRICULTURAL SUPPORT SERVICES AND MARKET ACCESS ===== -->
-        <section id="section-agri-support" class="px-20 py-16" style="page-break-inside: avoid; page-break-before: always;">
-            <h2 class="text-4xl font-bold mb-8 pb-4" style="color: var(--primary-dark); border-bottom: 4px solid var(--primary-accent);">Agricultural Support Services and Market Access</h2>
-
-            <!-- Tab Buttons — full width -->
-            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-                <button id="agriSupportBtn" onclick="switchAgriSupportMap('support')"
-                    style="padding: 0.75rem 1.5rem; background-color: var(--primary-accent); color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                    Support Services
-                </button>
-                <button id="agriMarketBtn" onclick="switchAgriSupportMap('market')"
-                    style="padding: 0.75rem 1.5rem; background-color: #bbb; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
-                    Market Access
-                </button>
-            </div>
-
-            <!-- Side by side: Map (left) + Raw Params (right) -->
-            <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
-                <div style="flex: 1; min-width: 0;">
-                    <div id="agriSupportMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
-                </div>
-                <div style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
-                    <div id="rawParams-agriculture_support_services">
-                        <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Support Services</h4>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
-                            {% for param in agri_support_raw_params.agriculture_support_services %}
-                            <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
-                                <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
-                                <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
-                    <div id="rawParams-agricultural_markets" style="display: none;">
-                        <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Market Access</h4>
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
-                            {% for param in agri_support_raw_params.agricultural_markets %}
-                            <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
-                                <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
-                                <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="mb-8 pb-6 border-b-2" style="border-color: var(--supporting-beige);">
-                <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Agricultural Support Services</h3>
-                <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="agriSupportText"></div>
-            </div>
-
+            <!-- Agricultural Support Services and Market Access -->
             <div class="mb-8">
-                <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-dark);">Agricultural Market Access</h3>
-                <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="agriMarketText"></div>
+                <h3 class="text-2xl font-bold mb-4" style="color: var(--primary-dark);">Agricultural Support Services and Market Access</h3>
+
+                <!-- Tab Buttons -->
+                <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                    <button id="agriSupportBtn" onclick="switchAgriSupportMap('support')"
+                        style="padding: 0.75rem 1.5rem; background-color: var(--primary-accent); color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
+                        Support Services
+                    </button>
+                    <button id="agriMarketBtn" onclick="switchAgriSupportMap('market')"
+                        style="padding: 0.75rem 1.5rem; background-color: #bbb; color: white; border: none; border-radius: 0.375rem; font-weight: 600; cursor: pointer;">
+                        Market Access
+                    </button>
+                </div>
+
+                <!-- Side by side: Map (left) + Raw Params (right) -->
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start; margin-bottom: 1.5rem;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div id="agriSupportMapContainer" class="map-container" style="height: 380px; margin-bottom: 0; border-radius: 0.5rem; overflow: hidden;"></div>
+                    </div>
+                    <div style="flex: 1; min-width: 0; height: 380px; overflow-y: auto; border: 1px solid rgba(212,196,168,0.5); border-radius: 0.5rem; padding: 1rem; background: rgba(232,220,200,0.08);">
+                        <div id="rawParams-agriculture_support_services">
+                            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Support Services</h4>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                                {% for param in agri_support_raw_params.agriculture_support_services %}
+                                <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
+                                    <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
+                                    <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </div>
+                        <div id="rawParams-agricultural_markets" style="display: none;">
+                            <h4 style="font-size: 0.9rem; font-weight: 600; color: var(--primary-dark); margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em;">Market Access</h4>
+                            <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                                {% for param in agri_support_raw_params.agricultural_markets %}
+                                <tr style="border-bottom: 1px solid rgba(212,196,168,0.25);">
+                                    <td style="padding: 0.3rem 0.5rem 0.3rem 0; color: var(--primary-dark); width: 70%;">{{ param.label }}</td>
+                                    <td style="padding: 0.3rem 0; color: var(--primary-dark); font-weight: 600; text-align: right;">{{ param.value }}</td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6 pb-4 border-b" style="border-color: var(--supporting-beige);">
+                    <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="agriSupportText"></div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="text-base leading-relaxed" style="color: var(--primary-dark); line-height: 1.8;" id="agriMarketText"></div>
+                </div>
             </div>
 
             <div class="text-sm p-4 rounded" style="background-color: rgba(232, 220, 200, 0.3); border-left: 3px solid var(--supporting-gray); color: var(--supporting-gray);">
@@ -1332,8 +1296,8 @@
             },
             {
                 label: '🌱 Agricultural Productivity',
-                anchor: 'section-agri-support',
-                subindicators: ['Watershed Access', 'Support Services', 'Market Access']
+                anchor: 'section-agri-productivity',
+                subindicators: ['Land Cultivation Patterns', 'Irrigation & Watershed', 'Support Services', 'Market Access']
             },
             {
                 label: '🍃 Ecological Resilience',
@@ -2273,26 +2237,21 @@
 
         // ===== INITIALIZE LAND CULTIVATION DATA =====
         const landCultivationLabels = [
-            'Land Utilization Pattern',
-            'Seasonal Cultivation (Kharif)'
+            'Land Utilization Pattern'
         ];
 
         let landCultivationData = [];
         let landUtilizationScore = '--';
-        let seasonalCultivationScore = '--';
         let landUtilizationColor = 'red';
-        let seasonalCultivationColor = 'red';
         let landCultivationCluster = 'Low';
 
         try {
             landCultivationData = JSON.parse('{{ land_cultivation_data|escapejs }}');
 
-            if (landCultivationData && Array.isArray(landCultivationData) && landCultivationData.length >= 4) {
+            if (landCultivationData && Array.isArray(landCultivationData) && landCultivationData.length >= 3) {
                 landUtilizationScore = landCultivationData[0];
-                seasonalCultivationScore = landCultivationData[1];
-                landUtilizationColor = landCultivationData[2];
-                landCultivationCluster = landCultivationData[3];
-                seasonalCultivationColor = landCultivationData[4];
+                landUtilizationColor = landCultivationData[1];
+                landCultivationCluster = landCultivationData[2];
             }
         } catch (error) {
             console.warn('Land cultivation data not available:', error);
@@ -2324,18 +2283,9 @@
                     name: 'Land Utilization Pattern',
                     desc: 'Land utilization level relative to total cultivable land, derived from Mission Antyodaya data.',
                     legend: '<span style="color: #22c55e;">● Green:</span> High | <span style="color: #eab308;">● Yellow:</span> Medium | <span style="color: #ef4444;">● Red:</span> Low'
-                },
-                seasonal: {
-                    colorKey: 'seasonal_cultivation_color',
-                    name: 'Seasonal Cultivation (Kharif)',
-                    desc: 'Share of cultivable land sown during the kharif season.',
-                    legend: '<span style="color: #22c55e;">● Green:</span> High | <span style="color: #eab308;">● Yellow:</span> Medium | <span style="color: #ef4444;">● Red:</span> Low'
                 }
             },
-            buttonIds: {
-                utilization: 'landUtilizationBtn',
-                seasonal: 'seasonalCultivationBtn'
-            },
+            buttonIds: {},
             infoIds: {
                 title: 'landCultivationTitle',
                 desc: 'landCultivationDesc',
@@ -2344,20 +2294,6 @@
             mwsesJson: MWSES_JSON,
             villageJson: VILLAGE_JSON
         });
-
-        const LAND_RAW_TABS = ['land_utilization', 'land_seasonal'];
-        const LAND_TAB_MAP  = { utilization: 'land_utilization', seasonal: 'land_seasonal' };
-        function switchLandCultivationMap(type) {
-            if (landCultivationResult) landCultivationResult.switchTab(type);
-            var key = LAND_TAB_MAP[type] || type;
-            // Hide the entire raw-params box for Seasonal Cultivation (no data to show)
-            var box = document.getElementById('landRawParamsBox');
-            if (box) box.style.display = (type === 'seasonal') ? 'none' : '';
-            LAND_RAW_TABS.forEach(function(k) {
-                var el = document.getElementById('rawParams-' + k);
-                if (el) el.style.display = (k === key) ? 'block' : 'none';
-            });
-        }
 
         // ===== INITIALIZE IRRIGATION DATA =====
         const irrigationLabels = [

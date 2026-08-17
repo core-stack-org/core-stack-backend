@@ -339,7 +339,7 @@ def populate_maintenance_from_waterbody(plan):
 
             if not existing:
                 maintenance_data = common_data.copy()
-                maintenance_data["select_one_water_structure"] = structure_type
+                maintenance_data["select_one_recharge_structure"] = structure_type
 
                 GW_maintenance.objects.create(
                     uuid=waterbody.uuid,

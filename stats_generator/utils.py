@@ -544,26 +544,20 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
     features = data["features"]
     years = list(range(start_year, end_year + 1))
 
-    classes = {
-        "barrenland": ("barrenland", "barrenla"),
-        "built_up_area": ("built-up_a", "built-up"),
-        "cropland": ("cropland_a", "cropland"),
-        "double_crop": ("doubly_cro", "doubly_c"),
-        "triple_crop": ("triply_cro", "triply_c"),
-        "tree_forest": ("tree_fores", "tree_for"),
-        "shrub_scrub": ("shrub_scru", "shrub_sc"),
-        "single_kharif": ("single_kha", "single_k"),
-        "single_non_kharif": ("single_non", "single_n"),
-        "k_water": ("k_water_ar", "k_water_"),
-        "kr_water": ("kr_water_a", "kr_water"),
-        "krz_water": ("krz_water_", "krz_wate"),
-    }
-
-    def get_key(base_key, trunc_prefix, idx):
-        """Derive the property key for a given year index."""
-        if idx == 0:
-            return base_key
-        return f"{trunc_prefix}_{idx}"
+    columns = [
+        "barrenlands_area_",
+        "built-up_area_",
+        "cropland_area_",
+        "doubly_cropped_area_",
+        "triply_cropped_area_",
+        "tree_forest_area_",
+        "shrub_scrub_area_",
+        "single_kharif_cropped_area_",
+        "single_non_kharif_cropped_area_",
+        "k_water_area_",
+        "kr_water_area_",
+        "krz_water_area_",
+    ]
 
     for feature in features:
         properties = feature["properties"]
@@ -571,13 +565,10 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "sum_in_ha": (properties.get("sum") or 0) / 10000,
         }
-
-        for idx, year in enumerate(years):
-            for class_name, (base_key, trunc_prefix) in classes.items():
-                key = get_key(base_key, trunc_prefix, idx)
-                row[f"{class_name}_in_ha_{year}"] = properties.get(key, 0)
+        for year in years:
+            for column in columns:
+                row[f"{column}in_ha_{year}"] = properties.get(f"{column}{year}")
 
         df_data.append(row)
 
@@ -703,7 +694,7 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
                 rows.append(
                     {
                         "UID": mws_uid,
-                        "SWB_UID": swb_props.get("UID"),
+                        "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
                         "Waterbodies_name": swb_props.get("water_body_name"),
                         "Latitude": lat,
                         "Longitude": lon,
@@ -1233,7 +1224,7 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
 
             years = range(2017, 2020)
 
-            tree_forest_cols = [f"tree_forest_in_ha_{y}" for y in years]
+            tree_forest_cols = [f"tree_forest_area_in_ha_{y}" for y in years]
 
             tree_forest_idxs = [
                 header_idx[c] for c in tree_forest_cols if c in header_idx
@@ -1867,7 +1858,8 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
             "single_non_kharif_area_percent": properties.get(
                 "sing_non_k", properties.get("sing_non_kharif_crop")
             ),
-            "single_kharif_area_percent": properties.get(
+            "single_kharif_area_percent": properties["sing_crop"],
+            "double_cropping_area_percent": properties.get(
                 "double_cro", properties.get("double_crop")
             ),
             "triple_cropping_area_percent": properties.get(
@@ -1893,19 +1885,22 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
     for feature in features:
         properties = feature.get("properties", {})
-        uid = properties.get("MWS_UID", "Unknown")
+        uid = properties.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = properties.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
 
         def calculate_area(base_area, percentage):
             if base_area == 0 or percentage == 0:
                 return 0
             return base_area * (percentage / 100)
-
-        parts = uid.split("_")
-        num_uid_parts_is = [
-            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
-        ]
-        if len(parts) % 2 == 1:  # Check for an unpaired last part
-            num_uid_parts_is.append(parts[-1])
 
         # Generate years dynamically based on start_year and end_year
         years = range(start_year, end_year)
@@ -2006,8 +2001,8 @@ def create_excel_for_nrega_assets(
     ]
 
     for _, row in joined.iterrows():
-        creation_t = row["creation_t"]
-        work_category = row["WorkCatego"]
+        creation_t = row.get("creation_t", row.get("creation_time"))
+        work_category = row.get("WorkCatego", row.get("WorkCategory"))
         mws_id = row["uid"]
 
         if isinstance(creation_t, pd.Timestamp):
@@ -2106,7 +2101,9 @@ def create_excel_village_nrega_assets(
         if year not in year_range:
             continue
 
-        category = workCategoryMapping.get(row["WorkCatego"])
+        category = workCategoryMapping.get(
+            row.get("WorkCatego", row.get("WorkCategory"))
+        )
         if not category:
             continue
 
