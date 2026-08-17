@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 import sys
 import time
 from celery import shared_task
@@ -399,6 +400,45 @@ def run_upload_desilting_points(wb_obj, *, sync=True):
     return Upload_Desilting_Points.run(**kwargs)
 
 
+_NUMERIC_RE = re.compile(r"[+-]?\d+(?:\.\d+)?")
+
+
+def normalize_number(val):
+    """Coerce Excel lat/lon (and similar) cells to float, ignoring encoding junk."""
+    if val is None:
+        return None
+    try:
+        import pandas as pd
+
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    if isinstance(val, bool):
+        return None
+    if isinstance(val, (int, float)):
+        return float(val)
+
+    text = str(val)
+    text = "".join(ch for ch in text if ch.isprintable())
+    text = (
+        text.replace("\u00a0", " ")
+        .replace("\u200b", "")
+        .replace("°", " ")
+        .replace(",", "")
+        .strip()
+    )
+    if not text:
+        return None
+    match = _NUMERIC_RE.search(text)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
 @shared_task
 def Upload_Desilting_Points(
     file_obj_id=None,
@@ -415,8 +455,9 @@ def Upload_Desilting_Points(
     def normalize(val):
         if pd.isna(val):
             return None
-        if isinstance(val, str) and val.strip() == "":
-            return None
+        if isinstance(val, str):
+            cleaned = "".join(ch for ch in val if ch.isprintable()).strip()
+            return cleaned or None
         return val
 
     if (is_processing_required or is_closest_wp) and (not start_date or not end_date):
@@ -446,6 +487,19 @@ def Upload_Desilting_Points(
         # -----------------------------
         # Create DB row FIRST (lossless)
         # -----------------------------
+        lat = normalize_number(row.get("Latitude"))
+        lon = normalize_number(row.get("Longitude"))
+        lat_raw = row.get("Latitude")
+        lon_raw = row.get("Longitude")
+        coord_format_error = None
+        if lat is None and not (pd.isna(lat_raw) or lat_raw in (None, "")):
+            coord_format_error = f"Latitude has invalid format: {lat_raw!r}"
+        if lon is None and not (pd.isna(lon_raw) or lon_raw in (None, "")):
+            msg = f"Longitude has invalid format: {lon_raw!r}"
+            coord_format_error = (
+                f"{coord_format_error}; {msg}" if coord_format_error else msg
+            )
+
         dsilting_obj_log = WaterbodiesDesiltingLog.objects.create(
             name_of_ngo=normalize(row.get("Name of NGO")),
             State=normalize(row.get("State")),
@@ -453,8 +507,8 @@ def Upload_Desilting_Points(
             Taluka=normalize(row.get("Taluka")),
             Village=normalize(row.get("Village")),
             waterbody_name=normalize(row.get("Name of the waterbody ")),
-            lat=normalize(row.get("Latitude")),
-            lon=normalize(row.get("Longitude")),
+            lat=lat,
+            lon=lon,
             slit_excavated=normalize(row.get("Silt Excavated as per App")),
             intervention_year=normalize(row.get("Intervention_year")),
             excel_hash=wb_obj.excel_hash,
@@ -467,7 +521,9 @@ def Upload_Desilting_Points(
         # -----------------------------
         if dsilting_obj_log.lat is None or dsilting_obj_log.lon is None:
             print("inside none conditom")
-            dsilting_obj_log.failure_reason = "Latitude or Longitude missing"
+            dsilting_obj_log.failure_reason = (
+                coord_format_error or "Latitude or Longitude missing"
+            )
             dsilting_obj_log.save(update_fields=["failure_reason"])
             continue
 
