@@ -836,7 +836,11 @@ def get_maintenance_data(plan_id, maintenance_type):
     if maintenance_type == "gw":
         for m in GW_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
             d = m.data_gw_maintenance or {}
-            structure_type = d.get("select_one_recharge_structure") or None
+            structure_type = (
+                d.get("select_one_recharge_structure")
+                or d.get("select_one_water_structure")
+                or None
+            )
             repair = _resolve_repair_activity(
                 d,
                 structure_type,

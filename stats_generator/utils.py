@@ -694,7 +694,7 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
                 rows.append(
                     {
                         "UID": mws_uid,
-                        "SWB_UID": swb_props.get("UID"),
+                        "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
                         "Waterbodies_name": swb_props.get("water_body_name"),
                         "Latitude": lat,
                         "Longitude": lon,
@@ -1885,19 +1885,22 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
     for feature in features:
         properties = feature.get("properties", {})
-        uid = properties.get("MWS_UID", "Unknown")
+        uid = properties.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = properties.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
 
         def calculate_area(base_area, percentage):
             if base_area == 0 or percentage == 0:
                 return 0
             return base_area * (percentage / 100)
-
-        parts = uid.split("_")
-        num_uid_parts_is = [
-            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
-        ]
-        if len(parts) % 2 == 1:  # Check for an unpaired last part
-            num_uid_parts_is.append(parts[-1])
 
         # Generate years dynamically based on start_year and end_year
         years = range(start_year, end_year)
