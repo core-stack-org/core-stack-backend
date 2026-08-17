@@ -14,7 +14,6 @@ import os
 from .email_texts import UPLOAD_MESSAGE_TEMPLATE
 from users.models import User
 from utilities.constants import SITE_DATA_PATH
-from .tasks import Upload_Desilting_Points
 
 logger = logging.getLogger(__name__)
 
@@ -82,64 +81,45 @@ class WaterbodiesFileUploadLog(models.Model):
                     "start_date and end_date are required when is_compute and "
                     "is_processing_required are true (YYYY-MM-DD)."
                 )
-            Upload_Desilting_Points.apply_async(
-                kwargs={
-                    "file_obj_id": self.id,
-                    "gee_account_id": self.gee_account_id,
-                    "is_lulc_required": self.is_lulc_required,
-                    "is_processing_required": self.is_processing_required,
-                    "is_closest_wp": self.is_closest_wp,
-                    "start_date": (
-                        self.start_date.isoformat()
-                        if hasattr(self.start_date, "isoformat")
-                        else self.start_date
+            return
+
+        logger.info(
+            f"File uploaded by user {self.uploaded_by.username}. Triggering email to superadmins and support"
+        )
+        attachments = [self.file.path]
+        subject = f"File uploaded on waterbody project for {self.project.name} with id {self.project.id}"
+        user_name = self.uploaded_by.username
+        proj_name = self.project.name
+        proj_id = self.project.id
+
+        upload_message = UPLOAD_MESSAGE_TEMPLATE.format(
+            username=user_name, proj_name=proj_name, proj_id=proj_id
+        )
+        body = upload_message
+        to_emails = ["kapil.dadheech@gramvaani.org"]
+        attachments = []
+
+        if self.file:
+            file_field = self.file
+
+            attachments.append(
+                {
+                    "filename": file_field.name.split("/")[-1],
+                    "content": file_field.read(),  # bytes
+                    "mimetype": (
+                        file_field.file.content_type
+                        if hasattr(file_field.file, "content_type")
+                        else "application/octet-stream"
                     ),
-                    "end_date": (
-                        self.end_date.isoformat()
-                        if hasattr(self.end_date, "isoformat")
-                        else self.end_date
-                    ),
-                },
-                queue="waterbody1",
+                }
             )
-        else:
-            logger.info(
-                f"File uploaded by user {self.uploaded_by.username}. Triggering email to superadmins and support"
-            )
-            attachments = [self.file.path]
-            subject = f"File uploaded on waterbody project for {self.project.name} with id {self.project.id}"
-            user_name = self.uploaded_by.username
-            proj_name = self.project.name
-            proj_id = self.project.id
-
-            upload_message = UPLOAD_MESSAGE_TEMPLATE.format(
-                username=user_name, proj_name=proj_name, proj_id=proj_id
-            )
-            body = upload_message
-            to_emails = ["kapil.dadheech@gramvaani.org"]
-            attachments = []
-
-            if self.file:
-                file_field = self.file
-
-                attachments.append(
-                    {
-                        "filename": file_field.name.split("/")[-1],
-                        "content": file_field.read(),  # bytes
-                        "mimetype": (
-                            file_field.file.content_type
-                            if hasattr(file_field.file, "content_type")
-                            else "application/octet-stream"
-                        ),
-                    }
-                )
-            send_email_notification(
-                subject=subject,
-                text_body="",
-                html_body=body,
-                to_emails=to_emails,
-                attachments=attachments,
-            )
+        send_email_notification(
+            subject=subject,
+            text_body="",
+            html_body=body,
+            to_emails=to_emails,
+            attachments=attachments,
+        )
 
     class Meta:
         ordering = ["-created_at"]

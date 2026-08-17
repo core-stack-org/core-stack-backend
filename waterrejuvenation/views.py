@@ -14,10 +14,19 @@ from users.permissions import IsOrganizationMember, HasProjectPermission
 from utilities.gee_utils import valid_gee_text
 from .models import WaterbodiesFileUploadLog
 from .serializers import ExcelFileSerializer
+from .tasks import run_upload_desilting_points
 from rest_framework.views import APIView
 from .utils import get_merged_waterbodies_with_zoi
 import pandas as pd
 from .utils import validate_excel_headers, EXPECTED_EXCEL_HEADERS
+
+
+def _as_bool(val, default=False):
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return val
+    return str(val).lower() in ("true", "1", "yes")
 
 
 class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
@@ -107,6 +116,12 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         created_files = []
         errors = []
 
+        sync_raw = request.data.get("sync")
+        if isinstance(sync_raw, (list, tuple)):
+            sync_raw = sync_raw[0] if sync_raw else None
+        # sync=true or omitted: Celery. sync=false: blocking in-process.
+        use_celery = True if sync_raw is None else _as_bool(sync_raw, True)
+
         for uploaded_file in files:
             # Validate file extension
             if not uploaded_file.name.lower().endswith(".xlsx"):
@@ -138,13 +153,6 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 start_date = start_date[0] if start_date else None
             if isinstance(end_date, (list, tuple)):
                 end_date = end_date[0] if end_date else None
-
-            def _as_bool(val, default=False):
-                if val is None:
-                    return default
-                if isinstance(val, bool):
-                    return val
-                return str(val).lower() in ("true", "1", "yes")
 
             compute_enabled = _as_bool(is_compute, False)
             processing_enabled = _as_bool(is_processing_required, True)
@@ -193,17 +201,25 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                         uploaded_by=request.user,
                         excel_hash=excel_hash,
                     )
+                    file_payload = serializer.data
+                    if compute_enabled:
+                        try:
+                            run_upload_desilting_points(
+                                excel_file, sync=use_celery
+                            )
+                            file_payload["compute_mode"] = (
+                                "celery" if use_celery else "blocking"
+                            )
+                        except Exception as compute_exc:
+                            errors.append(
+                                f"Compute failed for '{uploaded_file.name}': {compute_exc}"
+                            )
+                            file_payload["compute_mode"] = (
+                                "celery" if use_celery else "blocking"
+                            )
+                            file_payload["compute_error"] = str(compute_exc)
 
-                    # # Convert KML to GeoJSON
-                    # file_path = kml_file.file.path
-                    # geojson_data = convert_kml_to_geojson(file_path)
-                    #
-                    # if geojson_data:
-                    #     # Update GeoJSON data in the model
-                    #     kml_file.geojson_data = geojson_data
-                    #     kml_file.save(update_fields=["geojson_data"])
-
-                    created_files.append(serializer.data)
+                    created_files.append(file_payload)
                     print(created_files)
                 else:
                     errors.append(
@@ -218,7 +234,12 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         #     self.update_project_geojson(project)
 
         # Prepare response
-        response_data = {"files_created": len(created_files), "files": created_files}
+        response_data = {
+            "files_created": len(created_files),
+            "files": created_files,
+            "sync": use_celery,
+            "compute_mode": "celery" if use_celery else "blocking",
+        }
 
         if errors:
             response_data["errors"] = errors

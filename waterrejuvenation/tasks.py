@@ -369,6 +369,36 @@ def _match_desilting_points_to_waterbodies(desilt_gdf, wb_gdf, max_distance_m=10
     return matched_gdf, unmatched_gdf
 
 
+def _upload_desilting_kwargs(wb_obj):
+    start_date = wb_obj.start_date
+    end_date = wb_obj.end_date
+    return {
+        "file_obj_id": wb_obj.id,
+        "gee_account_id": wb_obj.gee_account_id,
+        "is_lulc_required": wb_obj.is_lulc_required,
+        "is_processing_required": wb_obj.is_processing_required,
+        "is_closest_wp": wb_obj.is_closest_wp,
+        "start_date": (
+            start_date.isoformat() if hasattr(start_date, "isoformat") else start_date
+        ),
+        "end_date": (
+            end_date.isoformat() if hasattr(end_date, "isoformat") else end_date
+        ),
+    }
+
+
+def run_upload_desilting_points(wb_obj, *, sync=True):
+    """Queue or run desilting compute.
+
+    sync=True  -> Celery apply_async (API returns immediately)
+    sync=False -> run the task function in-process (blocking API)
+    """
+    kwargs = _upload_desilting_kwargs(wb_obj)
+    if sync:
+        return Upload_Desilting_Points.apply_async(kwargs=kwargs, queue="waterbody1")
+    return Upload_Desilting_Points.run(**kwargs)
+
+
 @shared_task
 def Upload_Desilting_Points(
     file_obj_id=None,
