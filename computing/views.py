@@ -1,8 +1,8 @@
 import requests
+from typing import Optional
 from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
 from utilities.gee_utils import valid_gee_text
 import xml.etree.ElementTree as ET
-from lxml import etree as LET
 from nrm_app.celery import app
 from computing.models import *
 from utilities.geoserver_utils import Geoserver
@@ -13,7 +13,6 @@ from utilities.constants import (
     GEOSERVER_BASE,
 )
 from utilities.logger import setup_logger
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from rest_framework.response import Response
@@ -118,24 +117,9 @@ def layer_status(self, state, district, block):
                     status_code = 400
         else:
             if workspace not in capabilities_cache:
-                capabilities_url = f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
-                try:
-                    response = requests.get(capabilities_url, timeout=30)
-                    if response.status_code == 200:
-                        parser = LET.XMLParser(recover=True, encoding="utf-8")
-                        root = LET.fromstring(response.content, parser=parser)
-                        ns = {"wms": root.tag.split("}")[0].strip("{")}
-                        layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
-                        capabilities_cache[workspace] = {
-                            layer.text for layer in layers if layer.text
-                        }
-                    else:
-                        capabilities_cache[workspace] = set()
-                except Exception as e:
-                    print(
-                        f"Failed to fetch capabilities for workspace {workspace}: {e}"
-                    )
-                    capabilities_cache[workspace] = set()
+                capabilities_cache[workspace] = (
+                    valid_layers_for_workspace_rest(workspace) or set()
+                )
 
             if layer_name in capabilities_cache.get(workspace, set()):
                 status_code = 200
@@ -218,79 +202,63 @@ def get_layers_of_workspace(self, workspace):
         return []
 
 
-_raster_cache = {}
-_vector_cache = {}
+_rest_layer_cache = {}
+
+
+def valid_layers_for_workspace_rest(workspace: str) -> Optional[set]:
+    """
+    Fetches all published layers (raster + vector) for a given workspace using GeoServer REST API.
+    Returns a set of layer names on success, or None on network error/timeout.
+    """
+    if _is_cache_valid(_rest_layer_cache, workspace):
+        logger.info(f"Cache hit for REST layers: {workspace}")
+        return _rest_layer_cache[workspace]["data"]
+
+    geo = Geoserver()
+    try:
+        data = geo.get_layers(workspace)
+        layer_list = data.get("layers", {}).get("layer", [])
+        if isinstance(layer_list, list):
+            result = {
+                layer["name"]
+                for layer in layer_list
+                if isinstance(layer, dict) and "name" in layer
+            }
+        elif isinstance(layer_list, dict) and "name" in layer_list:
+            result = {layer_list["name"]}
+        else:
+            result = set()
+
+        _set_cache(_rest_layer_cache, workspace, result)
+        logger.info(f"Cached REST layers for {workspace}: {len(result)} layers")
+        return result
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch REST layers for workspace '{workspace}': {e} — returning None"
+        )
+        return None
 
 
 def valid_raster_layers_for_workspace(workspace: str) -> set:
-    if _is_cache_valid(_raster_cache, workspace):
-        logger.info(f"Cache hit for raster: {workspace}")
-        return _raster_cache[workspace]["data"]
-
-    session = get_session_with_retry()
-    capabilities_url = (
-        f"{GEOSERVER_BASE}{workspace}/wms?service=WMS&request=GetCapabilities"
-    )
-    try:
-        response = session.get(capabilities_url, timeout=(5, 15))
-        response.raise_for_status()
-    except requests.exceptions.Timeout:
-        logger.warning(
-            f"Timeout fetching raster capabilities for {workspace} — not caching"
-        )
-        return set()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed raster capabilities for {workspace}: {e} — not caching")
-        return set()
-
-    root = ET.fromstring(response.content)
-    ns = {"wms": root.tag.split("}")[0].strip("{")}
-    layers = root.findall(".//wms:Layer/wms:Name", namespaces=ns)
-    result = {layer.text for layer in layers}
-
-    _set_cache(_raster_cache, workspace, result)  # cache with timestamp
-    logger.info(f"Cached raster layers for {workspace}: {len(result)} layers")
-    return result
+    rest_layers = valid_layers_for_workspace_rest(workspace)
+    if rest_layers is not None:
+        return rest_layers
+    return set()
 
 
 def valid_vector_layers_for_workspace(workspace: str) -> set:
-    if _is_cache_valid(_vector_cache, workspace):
-        logger.info(f"Cache hit for vector: {workspace}")
-        return _vector_cache[workspace]["data"]
-
-    session = get_session_with_retry()
-    capabilities_url = (
-        f"{GEOSERVER_BASE}{workspace}/wfs"
-        f"?service=WFS&version=2.0.0&request=GetCapabilities"
-    )
-    try:
-        response = session.get(capabilities_url, timeout=(5, 15))
-        response.raise_for_status()
-    except requests.exceptions.Timeout:
-        logger.warning(
-            f"Timeout fetching vector capabilities for {workspace} — not caching"
-        )
-        return set()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed vector capabilities for {workspace}: {e} — not caching")
-        return set()
-
-    root = ET.fromstring(response.content)
-    ns = {"wfs": "http://www.opengis.net/wfs/2.0"}
-    names = root.findall(".//wfs:FeatureType/wfs:Name", namespaces=ns)
-    result = {name.text.split(":")[-1] for name in names}
-
-    _set_cache(_vector_cache, workspace, result)  # cache with timestamp
-    logger.info(f"Cached vector layers for {workspace}: {len(result)} layers")
-    return result
+    rest_layers = valid_layers_for_workspace_rest(workspace)
+    if rest_layers is not None:
+        return rest_layers
+    return set()
 
 
 def is_valid_vector_layer(workspace: str, layer_name: str) -> bool:
-    """Used in parallel fallback only."""
+    """Used in legacy individual check fallback."""
     session = get_session_with_retry()
     try:
         layer_url = get_url(GEOSERVER_URL, workspace, layer_name)
-        res = session.get(layer_url, timeout=(5, 10))  # shorter timeout per layer
+        res = session.get(layer_url, timeout=(5, 10))
         if res.status_code == 200:
             root = ET.fromstring(res.text)
             return int(root.attrib.get("numberOfFeatures", 0)) > 0
@@ -299,31 +267,6 @@ def is_valid_vector_layer(workspace: str, layer_name: str) -> bool:
     except Exception as e:
         logger.warning(f"Vector check failed for {layer_name}: {e}")
     return False
-
-
-def bulk_check_vector_layers(
-    workspace: str,
-    layer_names: list[str],
-    max_workers: int = 20,
-) -> dict[str, bool]:
-    """
-    Checks multiple vector layers concurrently using a thread pool.
-    Returns {layer_name: is_valid} mapping.
-    """
-    results = {}
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_layer = {
-            executor.submit(is_valid_vector_layer, workspace, name): name
-            for name in layer_names
-        }
-        for future in as_completed(future_to_layer):
-            layer_name = future_to_layer[future]
-            try:
-                results[layer_name] = future.result()
-            except Exception as e:
-                logger.warning(f"Failed check for {layer_name}: {e}")
-                results[layer_name] = False
-    return results
 
 
 @app.task(bind=True)
@@ -362,15 +305,21 @@ def check_missing_layers(workspace: str) -> dict:
         workspace_config, workspace, workspace_types
     )
 
-    # ── Fetch all available layers ONCE (bulk, cached) ──────────────────────
-    available_raster_layers = valid_raster_layers_for_workspace(workspace)
-    available_vector_layers = valid_vector_layers_for_workspace(workspace)  # bulk WFS`
-    use_bulk_vector = bool(available_vector_layers)  # fallback if WFS unavailable
+    # ── Fetch all available layers ONCE via GeoServer REST API ──────────────
+    available_layers = valid_layers_for_workspace_rest(workspace)
+    if available_layers is None:
+        logger.error(
+            f"GeoServer REST API unreachable or timed out for workspace: {workspace}"
+        )
+        return {
+            "error": f"GeoServer REST API connection timed out or unreachable for {workspace}",
+            "missing_layers": [],
+        }
 
     # ── Pre-build all (tehsil, layer_type, layer_name, state) combos ────────
-    active_tehsils = TehsilSOI.objects.select_related(
-        "district__state"  # eliminates N+1 DB queries
-    ).filter(active_status=True)
+    active_tehsils = TehsilSOI.objects.select_related("district__state").filter(
+        active_status=True
+    )
 
     tasks = []  # (state, layer_type, layer_name)
     for tehsil_obj in active_tehsils:
@@ -389,41 +338,14 @@ def check_missing_layers(workspace: str) -> dict:
                     (state, district_name, tehsil_name, layer_type, layer_name)
                 )
 
-    # ── Check raster layers (pure set lookup, no HTTP) ───────────────────────
+    # ── Check layer existence (pure O(1) set lookup, no HTTP) ───────────────
     missing_layers = []
-    vector_tasks = []  # collect for batch/parallel processing
 
     for state, district_name, tehsil_name, layer_type, layer_name in tasks:
-        if layer_type == "raster":
-            if layer_name not in available_raster_layers:
-                missing_layers.append(
-                    f"{state}, {district_name}, {tehsil_name}, {layer_name}"
-                )
-
-        elif layer_type == "vector":
-            if use_bulk_vector:
-                # O(1) set lookup — no HTTP call needed
-                if layer_name not in available_vector_layers:
-                    missing_layers.append(
-                        f"{state}, {district_name}, {tehsil_name}, {layer_name}"
-                    )
-            else:
-                vector_tasks.append(
-                    (state, district_name, tehsil_name, layer_name)
-                )  # queue for parallel check
-
-    # ── Parallel fallback for vector layers (if WFS bulk fetch failed) ───────
-    if vector_tasks:
-        layer_names = [ln for _, _, _, ln in vector_tasks]
-        info_by_name = {ln: (st, dn, tn) for st, dn, tn, ln in vector_tasks}
-        validity = bulk_check_vector_layers(workspace, layer_names)
-
-        for layer_name, is_valid in validity.items():
-            if not is_valid:
-                state, district_name, tehsil_name = info_by_name[layer_name]
-                missing_layers.append(
-                    f"{state}, {district_name}, {tehsil_name}, {layer_name}"
-                )
+        if layer_name not in available_layers:
+            missing_layers.append(
+                f"{state}, {district_name}, {tehsil_name}, {layer_name}"
+            )
 
     return {"missing_layers": missing_layers}
 
@@ -487,12 +409,10 @@ def get_session_with_retry():
 
 def clear_layer_cache(workspace: str = None):
     if workspace:
-        _raster_cache.pop(workspace, None)
-        _vector_cache.pop(workspace, None)
+        _rest_layer_cache.pop(workspace, None)
         logger.info(f"Cleared cache for {workspace}")
     else:
-        _raster_cache.clear()
-        _vector_cache.clear()
+        _rest_layer_cache.clear()
         logger.info("Cleared all layer caches")
 
 
