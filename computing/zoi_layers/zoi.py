@@ -55,7 +55,6 @@ def generate_zoi(
     )
 
     if proj_id:
-
         get_ndvi_for_zoi(
             state=state,
             district=district,
@@ -66,3 +65,5 @@ def generate_zoi(
             gee_account_id=gee_account_id,
             proj_id=proj_id,
         )
+
+    return True

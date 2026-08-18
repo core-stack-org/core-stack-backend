@@ -20,6 +20,10 @@ from computing.bulk_layer_generation import (
     pipeline_names,
     run_pipeline,
 )
+from computing.cropping_intensity.cropping_intensity import (
+    generate_gee_asset,
+    _pan_india_lulc_asset_id,
+)
 from computing.layer_dependency.layer_generation_in_order import get_args, load_map_config
 from computing.local_compute_helper import write_vector_output
 from computing.misc.nrega_local_compute import _compute_nrega_for_watersheds
@@ -40,6 +44,8 @@ from computing.surface_water_bodies.swb3 import (
 )
 from computing.utils import generate_swb_layer_with_max_so_catchment
 from computing.tasks import bulk_generate_layer
+from computing.zoi_layers.zoi1 import create_ring
+from computing.zoi_layers.zoi2 import generate_zoi_ci
 from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
 from utilities.constants import (
     CATCHMENT_AREA,
@@ -462,7 +468,118 @@ class LocalSwbContinuationTests(SimpleTestCase):
         self.assertTrue(result)
 
 
+class ZoiPipelineTests(SimpleTestCase):
+    @patch("computing.zoi_layers.zoi1.calculate_zoi_area", return_value=123)
+    @patch("computing.zoi_layers.zoi1.ee")
+    def test_create_ring_preserves_local_waterbody_id(self, ee, calculate_area):
+        feature = MagicMock()
+        feature.get.side_effect = {
+            "UID": None,
+            "wb_id": "waterbody-1",
+            "zoi_wb": 500,
+        }.get
+        ee.Number.side_effect = lambda value: value
+        ee.Algorithms.IsEqual.side_effect = lambda left, right: left == right
+        ee.Algorithms.If.side_effect = (
+            lambda condition, true_value, false_value: (
+                true_value if condition else false_value
+            )
+        )
+
+        create_ring(feature)
+
+        properties = ee.Feature.return_value.set.call_args.args[0]
+        self.assertEqual(properties["UID"], "waterbody-1")
+        self.assertEqual(properties["wb_id"], "waterbody-1")
+
+    @patch(
+        "computing.cropping_intensity.cropping_intensity."
+        "generate_cropping_intensity"
+    )
+    @patch("computing.zoi_layers.zoi2.sync_asset_to_db_and_geoserver")
+    @patch("computing.zoi_layers.zoi2.delete_asset_on_GEE")
+    @patch(
+        "computing.zoi_layers.zoi2.get_gee_dir_path",
+        return_value="projects/example/state/district/block/",
+    )
+    def test_rerun_deletes_final_zoi_cropping_intensity_asset(
+        self, get_dir, delete_asset, sync_asset, generate_ci
+    ):
+        generate_zoi_ci(
+            state="Rajasthan",
+            district="Raj Samand",
+            block="Bhim",
+            gee_account_id="22",
+        )
+
+        output_asset_id = (
+            "projects/example/state/district/block/"
+            "cropping_intensity_zoi_raj_samand_bhim"
+        )
+        delete_asset.assert_called_once_with(output_asset_id)
+        self.assertEqual(
+            generate_ci.call_args.kwargs["zoi_ci_asset"],
+            output_asset_id,
+        )
+
+
 class BulkPipelineRegistryTests(SimpleTestCase):
+    @patch(
+        "computing.cropping_intensity.cropping_intensity."
+        "export_vector_asset_to_gee",
+        return_value="task-id",
+    )
+    @patch(
+        "computing.cropping_intensity.cropping_intensity.is_gee_asset_exists",
+        return_value=False,
+    )
+    @patch("computing.cropping_intensity.cropping_intensity.ee")
+    def test_zoi_lulc_does_not_replace_output_asset_id(
+        self, ee, asset_exists, export_vector
+    ):
+        output_asset_id = "projects/example/cropping_intensity_zoi_location"
+
+        task_id, returned_asset_id = generate_gee_asset(
+            roi=MagicMock(),
+            asset_id=output_asset_id,
+            description="cropping_intensity_zoi_location",
+            asset_suffix="location",
+            asset_folder_list=["state", "district", "block"],
+            app_type="MWS",
+            start_year=2017,
+            end_year=2017,
+            zoi="projects/example/zoi_location",
+        )
+
+        ee.Image.assert_any_call(_pan_india_lulc_asset_id(2017))
+        export_vector.assert_called_once()
+        self.assertEqual(export_vector.call_args.args[2], output_asset_id)
+        self.assertEqual((task_id, returned_asset_id), ("task-id", output_asset_id))
+
+    def test_pan_india_lulc_asset_id_uses_agricultural_year(self):
+        self.assertEqual(
+            _pan_india_lulc_asset_id(2017),
+            "projects/corestack-datasets/assets/datasets/"
+            "LULC_v3_river_basin/pan_india_lulc_v3_2017_2018",
+        )
+
+    def test_zoi_is_registered_for_local_bulk_generation(self):
+        self.assertIn("generate_zoi", pipeline_names("local"))
+        self.assertEqual(
+            get_regeneration_dataset_names("generate_zoi"),
+            ("Surface Water Bodies",),
+        )
+
+    def test_local_zoi_map_runs_after_swb_with_gee_account(self):
+        zoi_node = next(
+            node
+            for node in load_map_config("dynamic_layers", compute="local")
+            if node["name"] == "generate_zoi"
+        )
+
+        self.assertEqual(zoi_node["depends_on"], ["generate_swb"])
+        self.assertTrue(zoi_node["pass_gee_account_id"])
+
     def test_all_local_pipelines_define_regeneration_datasets(self):
         for pipeline in pipeline_names("local"):
             self.assertTrue(

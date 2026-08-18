@@ -48,6 +48,11 @@
             "pass_gee_account_id": true
         },
         {
+            "name": "generate_zoi",
+            "depends_on": ["generate_swb"],
+            "pass_gee_account_id": true
+        },
+        {
             "name": "tree_health_ch_raster",
             "depends_on": ["lulc_v3"],
             "use_global_args": true,
