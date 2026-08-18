@@ -170,7 +170,7 @@ def waterbody_wbc_intersection(
     def merge_props(feature):
         matches = ee.List(feature.get("matches"))
         census_feature = ee.Feature(matches.get(0))
-        return feature.copyProperties(census_feature)
+        return feature.copyProperties(census_feature, exclude=["uid"])
 
     merged = joined.map(merge_props)
     merged = merged.map(lambda feat: remove_property(feat, "matches"))
