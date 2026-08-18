@@ -25,6 +25,7 @@ from computing.local_compute_helper import write_vector_output
 from computing.misc.nrega_local_compute import _compute_nrega_for_watersheds
 from computing.models import Dataset, Layer
 from computing.surface_water_bodies.swb_local import (
+    _complete_swb_pipeline,
     _continue_swb_in_gee,
     _convert_area_columns_to_hectares,
     _delete_existing_swb_outputs,
@@ -322,6 +323,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
         generate_swb4.return_value = ("swb4-task", "swb4-asset")
         is_gee_asset_exists.return_value = True
         roi = object()
+        completed_stages = []
 
         result = _continue_swb_in_gee(
             state="odisha",
@@ -330,6 +332,9 @@ class LocalSwbContinuationTests(SimpleTestCase):
             app_type="MWS",
             gee_account_id="account",
             roi=roi,
+            stage_completed=lambda stage, asset_id: completed_stages.append(
+                (stage, asset_id)
+            ),
         )
 
         generate_swb3.assert_called_once_with(
@@ -355,7 +360,108 @@ class LocalSwbContinuationTests(SimpleTestCase):
             make_asset_public.call_args_list,
             [call("swb3-asset"), call("swb4-asset")],
         )
+        self.assertEqual(
+            completed_stages,
+            [("swb3", "swb3-asset"), ("swb4", "swb4-asset")],
+        )
         self.assertEqual(result, ("district_block", "swb4-asset"))
+
+    @patch("computing.surface_water_bodies.swb_local.make_asset_public")
+    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
+    @patch("computing.surface_water_bodies.swb_local.check_task_status")
+    @patch("computing.surface_water_bodies.swb_local.waterbody_wbc_intersection")
+    @patch(
+        "computing.surface_water_bodies.swb_local.waterbody_catchment_streamorder_properties"
+    )
+    def test_retains_swb3_when_swb4_fails(
+        self,
+        generate_swb3,
+        generate_swb4,
+        check_task_status,
+        is_gee_asset_exists,
+        make_asset_public,
+    ):
+        generate_swb3.return_value = ("swb3-task", "swb3-asset")
+        generate_swb4.side_effect = RuntimeError("SWB4 failed")
+        is_gee_asset_exists.return_value = True
+        completed_stages = []
+
+        result = _continue_swb_in_gee(
+            state="odisha",
+            asset_suffix="district_block",
+            asset_folder_list=["odisha", "district", "block"],
+            app_type="MWS",
+            gee_account_id="account",
+            roi=object(),
+            stage_completed=lambda stage, asset_id: completed_stages.append(
+                (stage, asset_id)
+            ),
+        )
+
+        self.assertEqual(completed_stages, [("swb3", "swb3-asset")])
+        make_asset_public.assert_called_once_with("swb3-asset")
+        self.assertEqual(result, ("district_block", "swb3-asset"))
+
+    @patch("computing.surface_water_bodies.swb_local._sync_swb_stage")
+    @patch("computing.surface_water_bodies.swb_local._continue_swb_in_gee")
+    def test_syncs_geoserver_after_each_successful_gee_stage(
+        self,
+        continue_swb,
+        sync_stage,
+    ):
+        def complete_stages(**kwargs):
+            kwargs["stage_completed"]("swb3", "swb3-asset")
+            kwargs["stage_completed"]("swb4", "swb4-asset")
+
+        continue_swb.side_effect = complete_stages
+
+        result = _complete_swb_pipeline(
+            state="odisha",
+            district="district",
+            block="block",
+            asset_suffix="district_block",
+            asset_folder_list=["odisha", "district", "block"],
+            app_type="MWS",
+            gee_account_id="account",
+            roi=object(),
+            start_year=2017,
+            end_year=2024,
+            push_to_geoserver=True,
+            sync_layer_metadata=True,
+        )
+
+        self.assertEqual(
+            sync_stage.call_args_list,
+            [
+                call(
+                    state="odisha",
+                    district="district",
+                    block="block",
+                    layer_name="surface_waterbodies_district_block",
+                    asset_suffix="district_block",
+                    asset_id="swb3-asset",
+                    source_stage="swb3",
+                    start_year=2017,
+                    end_year=2024,
+                    push_to_geoserver=True,
+                    sync_layer_metadata=True,
+                ),
+                call(
+                    state="odisha",
+                    district="district",
+                    block="block",
+                    layer_name="surface_waterbodies_district_block",
+                    asset_suffix="district_block",
+                    asset_id="swb4-asset",
+                    source_stage="swb4",
+                    start_year=2017,
+                    end_year=2024,
+                    push_to_geoserver=True,
+                    sync_layer_metadata=True,
+                ),
+            ],
+        )
+        self.assertTrue(result)
 
 
 class BulkPipelineRegistryTests(SimpleTestCase):
