@@ -1,7 +1,8 @@
 import ee
 from computing.et_downscale.helper import (
     build_classifier,
-    build_common_pixel_mask,
+    crop_year_start_date,
+    crop_year_start_month,
     ee_annual_total_band,
     finalize_export_image,
     MONTH_ABBR,
@@ -12,7 +13,6 @@ from computing.et_downscale.helper import (
     empty_monthly_band,
     cast_monthly_band,
     ensure_monthly_band,
-    monthly_valid_mask,
 )
 
 
@@ -47,6 +47,10 @@ FEATURE_BANDS = [
     "SWdown_f_tavg",
     "Tair_f_inst",
 ]
+GLDAS_FEATURE_BANDS = FEATURE_BANDS[9:]
+LANDSAT_COLLECTION = "LANDSAT/LC08/C02/T1_L2"
+GLDAS_COLLECTION = "NASA/GLDAS/V021/NOAH/G025/T3H"
+MODEL_OUTPUT_SCALE = 0.1
 # =============================================================================
 # CORE LAYER 1 - AET
 # =============================================================================
@@ -57,21 +61,19 @@ def generate_aet(cfg, region):
     Monthly mean daily AET for every 30 m pixel.
     Output  : aet_<asset_suffix>_<year> GEE asset (13 bands)
     """
-    year = cfg["year"]
+    year = int(cfg["year"])
+    start_month = crop_year_start_month(cfg)
     asset_suffix = cfg["asset_suffix"]
 
     classifier = build_classifier(cfg["model_aez"])
-    aet_stack = build_aet_stack(region, classifier, year)
+    aet_stack = build_aet_stack(region, classifier, year, start_month=start_month)
 
     grid_proj = aet_stack.select("ET_01").projection()
-    common_mask = build_common_pixel_mask(region, grid_proj)
-    aet_monthly = aet_stack.multiply(0.1)
-
-    footprint = monthly_valid_mask(aet_monthly, "ET")
+    aet_monthly = aet_stack.multiply(MODEL_OUTPUT_SCALE)
 
     aet_annual = ee_annual_total_band(
-        aet_monthly, "ET", year, band_name="ET_annual"
-    ).updateMask(footprint)
+        aet_monthly, "ET", year, band_name="ET_annual", start_month=start_month
+    )
     aet_image = finalize_export_image(
         aet_monthly,
         aet_annual,
@@ -81,17 +83,17 @@ def generate_aet(cfg, region):
             "units": "bands 1-12: mm/day; band 13: mm/yr",
             "year": str(year),
             "asset_suffix": asset_suffix,
-            # "roi_path": cfg["roi_path"],
             "model_aez": cfg["model_aez"],
+            "model_output_scale": MODEL_OUTPUT_SCALE,
+            "interpolation": "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only",
             "description": "Bands 1-12: mean daily AET per month at 30 m; band 13: annual total AET",
         },
         band_descriptions=[f"ET_{abbr}_daily_mm" for abbr in MONTH_ABBR]
         + ["ET_annual_mm"],
         default_proj=grid_proj,
-        common_mask=common_mask,
     )
     spec = export_product_asset("aet", "AET", aet_image, cfg)
-    return aet_stack, common_mask, footprint, grid_proj, spec
+    return spec
 
 
 def build_aet_stack(
@@ -99,19 +101,18 @@ def build_aet_stack(
     classifier: ee.Classifier,
     year: int,
     proj: ee.Projection = None,
+    start_month: int = 7,
 ) -> ee.Image:
     """12-band ET_01...ET_12 stack (0.1 mm/day, mean daily)."""
+    start_date = crop_year_start_date(year, start_month)
     ls_col = (
-        ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+        ee.ImageCollection(LANDSAT_COLLECTION)
         .filterBounds(region)
-        .filterDate(ee.Date.fromYMD(year, 7, 1), ee.Date.fromYMD(year + 1, 7, 1))
+        .filterDate(start_date, start_date.advance(12, "month"))
     )
 
     if proj is None:
-        proj = get_proj_30m(region, year)
-
-    # months = ee.List.sequence(1, 12)
-    start_date = ee.Date.fromYMD(year, 7, 1)
+        proj = get_proj_30m(region, year, start_month=start_month)
 
     months = ee.List.sequence(0, 11)
     raw_monthly = ee.ImageCollection.fromImages(
@@ -122,7 +123,6 @@ def build_aet_stack(
                 ls_col,
                 region,
                 classifier,
-                year,
                 proj,
             )
         )
@@ -163,27 +163,49 @@ def calc_landsat_indices(img: ee.Image) -> ee.Image:
 def predict_daily_et(
     ls_img: ee.Image, region: ee.Geometry, classifier: ee.Classifier
 ) -> ee.Image:
+    """Predict ET for one Landsat observation, or return an empty ET band."""
     idx = calc_landsat_indices(ls_img)
-    clim = (
-        ee.ImageCollection("NASA/GLDAS/V021/NOAH/G025/T3H")
+    gldas = (
+        ee.ImageCollection(GLDAS_COLLECTION)
         .filterBounds(region)
         .filterDate(
             ls_img.date().advance(-12, "hour"), ls_img.date().advance(12, "hour")
         )
-        .mean()
-        .resample("bilinear")
-        .reproject(crs=ls_img.select("SR_B5").projection(), scale=30)
     )
-    return (
+    proj = ls_img.select("SR_B5").projection()
+    has_gldas = gldas.size().gt(0)
+    empty_clim = (
+        ee.Image.constant([0] * len(GLDAS_FEATURE_BANDS))
+        .rename(GLDAS_FEATURE_BANDS)
+        .updateMask(ee.Image.constant(0))
+        .setDefaultProjection(proj)
+    )
+    clim = (
+        ee.Image(
+            ee.Algorithms.If(
+                has_gldas,
+                gldas.mean().select(GLDAS_FEATURE_BANDS),
+                empty_clim,
+            )
+        )
+        .resample("bilinear")
+        .reproject(crs=proj, scale=30)
+    )
+    prediction = (
         idx.addBands(clim)
         .select(FEATURE_BANDS)
         .classify(classifier)
         .rename("ET_daily")
+    )
+    has_source = ee.Number(ee.Algorithms.If(has_gldas, 1, 0))
+    return (
+        cast_monthly_band(prediction, "ET_daily")
         .set("system:time_start", ls_img.date().millis())
+        .set("has_source", has_source)
     )
 
 
-def make_raw_monthly(date, agri_month, ls_col, region, classifier, year, proj=None):
+def make_raw_monthly(date, agri_month, ls_col, region, classifier, proj=None):
     start = ee.Date(date)
     end = start.advance(1, "month")
     mid = start.advance(15, "day").millis()
@@ -192,7 +214,7 @@ def make_raw_monthly(date, agri_month, ls_col, region, classifier, year, proj=No
 
     monthly_collection = ls_col.filterDate(start, end)
 
-    source_count = monthly_collection.size()
+    landsat_count = monthly_collection.size()
     et_collection = monthly_collection.map(
         lambda img: cast_monthly_band(
             predict_daily_et(img, region, classifier),
@@ -203,11 +225,19 @@ def make_raw_monthly(date, agri_month, ls_col, region, classifier, year, proj=No
         ee.ImageCollection.fromImages([empty_monthly_band("ET_daily", proj)])
     )
     et = safe_collection.mean().rename("ET_daily")
+    source_count = ee.Number(
+        ee.Algorithms.If(
+            landsat_count.gt(0),
+            et_collection.aggregate_sum("has_source"),
+            0,
+        )
+    )
     return (
         ensure_monthly_band(et, "ET_daily", proj)
         .set("month", agri_month)
         .set("calendar_month", month)
         .set("system:time_start", mid)
         .set("source_count", source_count)
+        .set("landsat_count", landsat_count)
         .set("is_placeholder", source_count.eq(0))
     )
