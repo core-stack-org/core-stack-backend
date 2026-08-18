@@ -232,10 +232,7 @@ def _restore_legacy_columns(gdf):
             )
         renamed_columns[column] = target_column
 
-    result = gdf.rename(columns=renamed_columns)
-    if "wb_id" in result.columns:
-        result["uid"] = result["wb_id"]
-    return result
+    return gdf.rename(columns=renamed_columns)
 
 
 def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):

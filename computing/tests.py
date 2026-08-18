@@ -211,7 +211,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
 
         self.assertEqual(converted.loc[0, "area_ored"], 0.25)
 
-    def test_restores_legacy_annual_columns_and_uid(self):
+    def test_restores_legacy_annual_columns(self):
         source = pd.DataFrame(
             {
                 "wb_id": ["waterbody-1"],
@@ -234,10 +234,8 @@ class LocalSwbContinuationTests(SimpleTestCase):
                 "kr_19-20",
                 "krz_20-21",
                 "area_ored",
-                "uid",
             ],
         )
-        self.assertEqual(result.loc[0, "uid"], "waterbody-1")
 
     def test_swb_enrichment_defaults_to_pan_india_assets(self):
         raster_parameters = signature(
