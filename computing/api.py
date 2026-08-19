@@ -164,6 +164,7 @@ from .mws.generate_hydrology import generate_hydrology as generate_hydrology_gee
 from .mws.generate_hydrology_local import (
     generate_hydrology_base_layer as generate_hydrology_base_layer_task,
     generate_hydrology as generate_hydrology_local_task,
+    missing_hydrology_base_layers,
 )
 from .mws.et_download import et_download as et_download_task
 from .mws.runoff_gpu import generate_runoff_gpu as generate_runoff_gpu_task
@@ -509,6 +510,7 @@ def _generate_tehsil_hydrology(request, is_annual):
                 "Local hydrology clipping must start from start_year=2017 because "
                 "the fortnightly cadence and cumulative G are anchored at 2017-07-01"
             )
+        _ensure_local_hydrology_base_layers(start_year, end_year, is_annual)
         task = generate_hydrology_local_task.apply_async(
             kwargs={
                 "state": state,
@@ -537,6 +539,29 @@ def _generate_tehsil_hydrology(request, is_annual):
             "is_annual": bool(is_annual),
         },
         status=status.HTTP_200_OK,
+    )
+
+
+def _ensure_local_hydrology_base_layers(start_year, end_year, is_annual):
+    missing_layers = missing_hydrology_base_layers(
+        start_year=start_year,
+        end_year=end_year,
+        is_annual=is_annual,
+    )
+    if not missing_layers:
+        return
+
+    period = "annual" if is_annual else "fortnightly"
+    endpoint = (
+        "/api/v1/pan-india/hydrology_annual/"
+        if is_annual
+        else "/api/v1/pan-india/hydrology_fortnightly/"
+    )
+    missing_summary = ", ".join(layer["year_key"] for layer in missing_layers)
+    raise ValueError(
+        f"Missing Pan-India hydrology {period} base layer(s) for requested "
+        f"year(s): {missing_summary}. Generate the missing base layer(s) first "
+        f"using {endpoint}; Celery task was not queued."
     )
 
 

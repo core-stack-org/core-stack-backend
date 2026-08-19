@@ -101,7 +101,7 @@ base_layers:
           type: file
 
         - name: admin boundaries
-          local_path: "{DATA_DIR}/admin-boundary/input/soi_tehsil.geojson"
+          local_path: "{DATA_DIR}/base_layers/admin_boundary/soi_tehsil.geojson"
           source: ""
           # Full admin-boundary archive (~8 GB, 7z) containing this file; extracted in place.
           gdrive_id: 1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d

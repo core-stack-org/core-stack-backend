@@ -150,6 +150,32 @@ def _base_layer_path(base_layer_root, year, is_annual):
     )
 
 
+def missing_hydrology_base_layers(
+    *,
+    start_year,
+    end_year,
+    is_annual,
+    base_layer_root=HYDROLOGY_BASE_LAYER_ROOT,
+):
+    start_year = int(start_year)
+    end_year = int(end_year)
+    if end_year < start_year:
+        raise ValueError("end_year must be greater than or equal to start_year")
+
+    missing_layers = []
+    for year in range(start_year, end_year + 1):
+        path = _base_layer_path(base_layer_root, year, is_annual)
+        if not path.is_file():
+            missing_layers.append(
+                {
+                    "year": year,
+                    "year_key": _year_key(year),
+                    "path": str(path),
+                }
+            )
+    return missing_layers
+
+
 def _write_parquet_atomic(frame, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
