@@ -1,4 +1,5 @@
 import ee
+from datetime import date
 
 from utilities.constants import AEZ
 from utilities.gee_utils import (
@@ -9,11 +10,17 @@ from utilities.gee_utils import (
 
 
 def generate_drought_resistance(
-    aez, start_year=2004, end_year=None, gee_account_id=None
+        aez, start_year=2004, end_year=None, gee_account_id=None
 ):
     """
     * Forest Sensitivity Analysis Pipeline — Script 2
     * Drought Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
+    *
+    * AGRICULTURAL YEAR CONVENTION:
+    * Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching the rest of the
+    * pipeline. SPEI-12 bands are named "{y}_{y+1}" (e.g. "2004_2005") by
+    * compute_spei.R — selected directly by that name here, not by a
+    * positional rename.
     *
     * For each forest pixel, computes mean resistance and resilience
     * across all drought years (SPEI-12 < threshold).
@@ -29,12 +36,18 @@ def generate_drought_resistance(
     *
     * Requires:
     * - Forest mask asset from Script 1
-    * - SPEI-12 assets from spei-drought-analysis-pipeline
+    * - SPEI-12 asset from the SPEI pipeline (compute_spei.R)
     """
 
     ee_initialize(gee_account_id)
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2003)}_{str(end_year)}"
+    if end_year is None:
+        raise ValueError(
+            "end_year must be specified explicitly — agricultural-year pipelines "
+            "cannot infer a safe default."
+        )
+
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
     OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
@@ -51,6 +64,41 @@ def generate_drought_resistance(
     BASELINE_START_YEAR = 2004  # SPEI has no data before 2004
     BASELINE_END_YEAR = 2024
 
+    speiMinYear = min(start_year, BASELINE_START_YEAR)
+    speiMaxYear = max(end_year, BASELINE_END_YEAR)
+
+    kndviMinYear = min(start_year, BASELINE_START_YEAR)
+    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+
+    # kndviMaxYear is the furthest single ag-year fetched anywhere in this
+    # script; that ag-year isn't complete until Jun 30 of kndviMaxYear+1.
+    required_complete_by = date(kndviMaxYear + 1, 6, 30)
+    if required_complete_by > date.today():
+        raise ValueError(
+            f"Agricultural year {kndviMaxYear} (Jul {kndviMaxYear} -> "
+            f"Jun {kndviMaxYear + 1}) is not yet complete as of "
+            f"{date.today().isoformat()}. Reduce end_year."
+        )
+
+    SPEI12_ASSET = "projects/corestack-datasets-alpha/assets/datasets/SPEI/SPEI12"
+
+    if not is_gee_asset_exists(TREE_COVER_ASSET):
+        raise ValueError(
+            f"Tree cover asset not found: {TREE_COVER_ASSET}. Run "
+            f"generate_hybrid_tree_mask with end_year={end_year} first."
+        )
+    if not is_gee_asset_exists(SPEI12_ASSET):
+        raise ValueError(f"SPEI-12 asset not found: {SPEI12_ASSET}.")
+
+    requiredSpeiBands = {f"{y}_{y + 1}" for y in range(speiMinYear, speiMaxYear + 1)}
+    availableSpeiBands = set(ee.Image(SPEI12_ASSET).bandNames().getInfo())
+    missingSpeiBands = sorted(requiredSpeiBands - availableSpeiBands)
+    if missingSpeiBands:
+        raise ValueError(
+            f"{SPEI12_ASSET} is missing bands: {missingSpeiBands}. Re-run the "
+            f"SPEI pipeline with start_year<=2004 and end_year>={speiMaxYear}."
+        )
+
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
     # aoi = (
     #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
@@ -64,23 +112,15 @@ def generate_drought_resistance(
     startYear = treeMeta.select("start_year")
     endYear = treeMeta.select("end_year")
 
-    # Load SPEI-12 collection from single multiband asset
-    SPEI12_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/SPEI12"
+    # Load SPEI-12 collection from single multiband asset. Bands are named
+    # "{y}_{y+1}" by compute_spei.R (e.g. "2004_2005" for ag-year 2004) —
+    # select directly by that name rather than assuming band order.
     spei12_raw = ee.Image(SPEI12_ASSET)
-    spei12_bandnames = []
-
-    for yn in range(2004, end_year + 1):
-        spei12_bandnames.append("y" + str(yn))
-    spei12_named = spei12_raw.rename(spei12_bandnames)
-
-    # Building the per-year SPEI collection here.
-    speiMinYear = min(start_year, BASELINE_START_YEAR)
-    speiMaxYear = max(end_year, BASELINE_END_YEAR)
 
     speiImages = []
     for y in range(speiMinYear, speiMaxYear + 1):
         speiImages.append(
-            spei12_named.select("y" + str(y)).rename("spei").set("year", y)
+            spei12_raw.select(f"{y}_{y + 1}").rename("spei").set("year", y)
         )
     speiCol = ee.ImageCollection(speiImages)
 
@@ -131,10 +171,11 @@ def generate_drought_resistance(
 
         return harmonized.copyProperties(image, ["system:time_start"])
 
-    # Calculate annual median kNDVI
+    # Calculate ag-year median kNDVI (Jul 1(year) -> Jun 30(year+1))
     def getAnnualKNDVI(year):
-        start = ee.Date.fromYMD(year, 1, 1)
-        end = ee.Date.fromYMD(year, 12, 31)
+        start = ee.Date.fromYMD(year, 7, 1)
+        # end-exclusive filterDate, so advance 1 day past Jun 30 to include it
+        end = ee.Date.fromYMD(ee.Number(year).add(1), 6, 30).advance(1, "day")
 
         l89 = (
             ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
@@ -166,18 +207,13 @@ def generate_drought_resistance(
 
         return l89.merge(l57).median().set("year", year).rename("kndvi")
 
-    # Load kNDVI for START_YEAR to END_YEAR+1 (need next year for resilience)
-    # kndviYears = ee.List.sequence(start_year, end_year + 1)
-    kndviMinYear = min(start_year, BASELINE_START_YEAR)
-    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
-
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 
     # BASELINE kNDVI (Yn_bar) :=
-    # Mean kNDVI across non-drought years only
+    # Mean kNDVI across non-drought ag-years only
 
-    # The analysis years will still remain the same , so if some internal year width is given like 2010-2018 for example
+    # The analysis years will still remain the same, so if some internal year width is given like 2010-2018 for example
     # then too the baseline yn_bar would be same of the bigger normalization. But the analysis will be resulting only of the analysis years.
     analysisYears = ee.List.sequence(start_year, end_year)
 
@@ -212,7 +248,7 @@ def generate_drought_resistance(
             .reproject(crs=kndviYe.projection(), scale=30)
         )
 
-        # Only compute on forest pixels during drought years
+        # Only compute on forest pixels during drought ag-years
         isForest = startYear.lte(year).And(endYear.gte(year))
         isDrought = speiYe.lt(DROUGHT_THRESHOLD)
         eventMask = isForest.And(isDrought)

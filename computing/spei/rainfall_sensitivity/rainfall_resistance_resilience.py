@@ -1,4 +1,5 @@
 import ee
+from datetime import date
 
 from utilities.constants import AEZ
 from utilities.gee_utils import (
@@ -9,11 +10,20 @@ from utilities.gee_utils import (
 
 
 def generate_rainfall_resilience(
-    aez, start_year=2004, end_year=None, gee_account_id=None
+        aez, start_year=2004, end_year=None, gee_account_id=None
 ):
     """
     * Forest Sensitivity Analysis Pipeline — Script 3b
     * Heavy Rainfall Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
+    *
+    * AGRICULTURAL YEAR CONVENTION:
+    * Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching Script 3a.
+    * kNDVI compositing windows, zScore band lookups, and the baseline
+    * (Yn_bar) window are all on this convention.
+    *
+    * Tree-cover / forest mask asset (Script 1) is also ag-year now, so
+    * startYearTree/endYearTree comparisons below against `year` are on
+    * the same convention with no fuzz.
     *
     * Signed resistance (both +ve and -ve events):
     * Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
@@ -26,11 +36,13 @@ def generate_rainfall_resilience(
     *
     * Requires:
     * - Forest mask asset (Script 1)
-    * - Rainfall index asset (Script 3a)
+    * - Rainfall index asset (Script 3a) — must have been exported with an
+    *   end_year >= this script's zMaxYear, or the zScore_{y} band lookup
+    *   below will fail.
     """
 
     ee_initialize(gee_account_id)
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2003)}_{str(end_year)}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
     RAIN_INDEX_ASSET = (
         f"projects/corestack-datasets-alpha/assets/datasets/SPEI/rain_index_AEZ_{aez}"
     )
@@ -43,51 +55,53 @@ def generate_rainfall_resilience(
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
 
+    if end_year is None:
+        raise ValueError(
+            "end_year must be specified explicitly — agricultural-year pipelines "
+            "cannot infer a safe default."
+        )
+
     Z_THRESHOLD = 1.0
 
-    # This is the same fix I did for the drought script (Script 2). Yn_bar is
-    # my baseline — "what kNDVI should normally look like on a healthy,
-    # non-anomalous year." If I let Yn_bar be computed only from
-    # START_YEAR..END_YEAR, then every time I extend my analysis window in
-    # the future, Yn_bar shifts a little, and that quietly changes ALL my
-    # past resistance/resilience numbers too — even for years I already
-    # published. That's the exact problem I don't want.
+    # Same frozen-baseline reasoning as Script 3a and Script 2 — Yn_bar (the
+    # "normal" kNDVI reference) must not shift every time the analysis
+    # window is extended, or already-published resistance/resilience
+    # numbers would silently drift.
     #
-    # So I'm freezing the baseline window here, separately from my analysis
-    # window. Once I publish results, I'm never touching these two numbers
-    # again — if I do, my old outputs will drift.
-    #
-    # I picked 2004-2024 to match what I already locked in for the drought
-    # baseline (Script 2) and for the rain z-score baseline (Script 3a) —
-    # keeping all three consistent. 2004 is my floor because that's as far
-    # back as my source data goes; 2024 is what I've already confirmed is
-    # available and exported (3a's END_YEAR is now 2024, so the zScore bands
-    # I need actually exist in the rain index asset).
+    # BASELINE_START_YEAR=2004 / BASELINE_END_YEAR=2024 mean the same
+    # ag-years here as in Script 3a: Jul 2004 -> Jun 2025 as the frozen
+    # normalization period. Kept identical on purpose so 3a's zScore
+    # baseline and 3b's kNDVI baseline stay aligned on the same years.
     BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
+
+    # zScoreCol needs bands up through zMaxYear from the 3a asset, and
+    # kndviCol needs data one year further out than that for resilience on
+    # the final analysis year (see completeness guard below).
+    zMinYear = min(start_year, BASELINE_START_YEAR)
+    zMaxYear = max(end_year, BASELINE_END_YEAR)
+
+    kndviMinYear = min(start_year, BASELINE_START_YEAR)
+    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+
+    # kndviMaxYear is the furthest single ag-year fetched anywhere in this
+    # script; that ag-year isn't complete until Jun 30 of kndviMaxYear+1.
+    # Refuse to silently compute on a partial year.
+    required_complete_by = date(kndviMaxYear + 1, 6, 30)
+    if required_complete_by > date.today():
+        raise ValueError(
+            f"Agricultural year {kndviMaxYear} (Jul {kndviMaxYear} -> "
+            f"Jun {kndviMaxYear + 1}) is not yet complete as of "
+            f"{date.today().isoformat()}. Reduce end_year."
+        )
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
     startYearTree = treeMeta.select("start_year")
     endYearTree = treeMeta.select("end_year")
 
     rainIndex = ee.Image(RAIN_INDEX_ASSET)
-
-    # I need zScore bands for every year covering BOTH my baseline window
-    # and my analysis window — whichever stretches further in each
-    # direction. Before, this loop only went START_YEAR..END_YEAR, which
-    # meant if I ever widened my baseline beyond my analysis window, I'd be
-    # trying to .select() a band like zScore_2024 that this loop never even
-    # asked for. So I'm building the year range from the min/max of both
-    # windows, to be safe.
-    zMinYear = min(start_year, BASELINE_START_YEAR)
-    zMaxYear = max(end_year, BASELINE_END_YEAR)
 
     zScoreCol_list = []
     for y in range(zMinYear, zMaxYear + 1):
@@ -140,10 +154,11 @@ def generate_rainfall_resilience(
 
         return harmonized.copyProperties(image, ["system:time_start"])
 
-    # Calculate annual median kNDVI
+    # Calculate ag-year median kNDVI (Jul 1(year) -> Jun 30(year+1))
     def getAnnualKNDVI(year):
-        start = ee.Date.fromYMD(year, 1, 1)
-        end = ee.Date.fromYMD(year, 12, 31)
+        start = ee.Date.fromYMD(year, 7, 1)
+        # end-exclusive filterDate, so advance 1 day past Jun 30 to include it
+        end = ee.Date.fromYMD(ee.Number(year).add(1), 6, 30).advance(1, "day")
 
         l89 = (
             ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
@@ -175,29 +190,18 @@ def generate_rainfall_resilience(
 
         return l89.merge(l57).median().set("year", year).rename("kndvi")
 
-    # Same idea as zScoreCol above — I need kNDVI images covering whichever
-    # is bigger: my baseline window, or my analysis window (+1 year, because
-    # resilience for my LAST analysis year needs next-year kNDVI to compare
-    # against). So I'm taking the min of the two start years and the max of
-    # (END_YEAR + 1) vs BASELINE_END_YEAR.
-    kndviMinYear = min(start_year, BASELINE_START_YEAR)
-    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
-
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 
     # BASELINE kNDVI (Yn_bar) :=
-    # Mean kNDVI across non-anomalous years only
+    # Mean kNDVI across non-anomalous ag-years only
 
-    # This is my actual analysis window — the years I want resistance and
-    # resilience results FOR. This stays exactly as before, untouched.
-
+    # Actual analysis window — the ag-years to compute resistance/resilience FOR.
     analysisYears = ee.List.sequence(start_year, end_year)
 
-    # This is my frozen baseline window — the years I use to WORK OUT what
-    # Yn_bar (my "normal" kNDVI reference) is. This is separate from
-    # analysisYears on purpose, so extending my analysis later doesn't shift
-    # Yn_bar and quietly rewrite results I've already published.
+    # Frozen baseline window — the ag-years used to work out Yn_bar. Kept
+    # separate from analysisYears so extending the analysis later doesn't
+    # shift Yn_bar and quietly rewrite already-published results.
     baselineYears = ee.List.sequence(BASELINE_START_YEAR, BASELINE_END_YEAR)
 
     def calc_Yn_bar(y):
@@ -221,11 +225,8 @@ def generate_rainfall_resilience(
     )
 
     # SIGNED RESISTANCE & RESILIENCE :=
-
-    # This part is completely unchanged from before — it still only runs
-    # over analysisYears (my actual START_YEAR..END_YEAR), it just now uses
-    # the frozen Yn_bar computed above instead of a Yn_bar that would've
-    # silently moved every time I touch START_YEAR/END_YEAR.
+    # Unchanged logic — runs only over analysisYears, using the frozen
+    # Yn_bar computed above.
 
     def calc_metrics_cols(y):
         year = ee.Number(y)
@@ -237,7 +238,7 @@ def generate_rainfall_resilience(
             .reproject(crs=kndviYe.projection(), scale=30)
         )
 
-        # Only compute on forest pixels during anomalous rainfall years
+        # Only compute on forest pixels during anomalous rainfall ag-years
         isAnomalous = zScore.select("zScore").gt(Z_THRESHOLD)
         isForest = startYearTree.lte(year).And(endYearTree.gte(year))
         eventMask = isAnomalous.And(isForest)

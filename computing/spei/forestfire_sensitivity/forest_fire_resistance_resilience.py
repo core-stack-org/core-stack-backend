@@ -1,11 +1,23 @@
 import ee
+from datetime import date
 
 from utilities.constants import AEZ
-from utilities.gee_utils import export_raster_asset_to_gee, is_gee_asset_exists
+from utilities.gee_utils import (
+    export_raster_asset_to_gee,
+    is_gee_asset_exists,
+    ee_initialize,
+)
 
 """
  * Forest Sensitivity Analysis Pipeline — Fire Resistance & Resilience
  * Fire Shock Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
+ *
+ * AGRICULTURAL YEAR CONVENTION:
+ * Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching Scripts 1/3a/3b/fire_index.
+ * kNDVI compositing windows, zScore band lookups, and the baseline (Yn_bar)
+ * window are all on this convention. Tree-cover asset (Script 1) is also
+ * ag-year now, so startYearTree/endYearTree comparisons against `year`
+ * carry no fuzz.
  *
  * Signed resistance (both +ve and -ve events):
  * Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
@@ -18,12 +30,17 @@ from utilities.gee_utils import export_raster_asset_to_gee, is_gee_asset_exists
  *
  * Requires:
  * - Forest mask asset (Script 1)
- * - Fire index asset (FRP > 30)
+ * - Fire index asset (FRP > 30) — must have been exported with an
+ *   end_year >= this script's zMaxYear (fire_index now enforces its
+ *   start/end_year fully covers the baseline window, so this holds as
+ *   long as fire_index's own defaults/args aren't narrowed).
 """
 
 
-def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=None):
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2003)}_{str(end_year)}"
+def forest_fire_sensitivity(aez, start_year=2004, end_year=2024, gee_account_id=None):
+    ee_initialize(gee_account_id)
+
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
 
     FIRE_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/fire_index_FRP30_AEZ_{aez}"
 
@@ -35,14 +52,40 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
 
+    if end_year is None:
+        raise ValueError(
+            "end_year must be specified explicitly — agricultural-year pipelines "
+            "cannot infer a safe default."
+        )
+
     Z_THRESHOLD = 1.0
 
     # I'm using 2004-2024 to match the same baseline window I already locked
     # in for drought (Script 2), rain (Script 3b), and the fire z-score
     # itself (fire index script) — keeping all my baselines consistent with
-    # each other.
+    # each other. These are ag-year labels now, same as everywhere else.
     BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
+
+    # zScoreCol needs bands through zMaxYear from the fire_index asset, and
+    # kndviCol needs data one year further out than that for resilience on
+    # the final analysis year — same completeness reasoning as Script 3b.
+    zMinYear = min(start_year, BASELINE_START_YEAR)
+    zMaxYear = max(end_year, BASELINE_END_YEAR)
+
+    kndviMinYear = min(start_year, BASELINE_START_YEAR)
+    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+
+    # kndviMaxYear is the furthest single ag-year fetched anywhere in this
+    # script; that ag-year isn't complete until Jun 30 of kndviMaxYear+1.
+    # Refuse to silently compute on a partial year.
+    required_complete_by = date(kndviMaxYear + 1, 6, 30)
+    if required_complete_by > date.today():
+        raise ValueError(
+            f"Agricultural year {kndviMaxYear} (Jul {kndviMaxYear} -> "
+            f"Jun {kndviMaxYear + 1}) is not yet complete as of "
+            f"{date.today().isoformat()}. Reduce end_year."
+        )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
     # aoi = (
@@ -50,6 +93,31 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=
     #     .filter(ee.Filter.eq("Name", "Odisha"))
     #     .geometry()
     # )
+    # Tree-mask asset names embed end_year and auto-version; fire-index
+    # asset names don't, and silently no-op on re-run unless deleted first
+    # (see is_gee_asset_exists guard in fire_index). That mismatch means
+    # it's easy to expand end_year, regenerate the tree mask, forget to
+    # regenerate fire_index, and end up reading a stale fire-index asset
+    # against a fresh tree-mask one. Fail loudly instead.
+    if not is_gee_asset_exists(TREE_COVER_ASSET):
+        raise ValueError(
+            f"Tree cover asset not found: {TREE_COVER_ASSET}. Run "
+            f"generate_hybrid_tree_mask with end_year={end_year} first."
+        )
+    if not is_gee_asset_exists(FIRE_INDEX_ASSET):
+        raise ValueError(f"Fire index asset not found: {FIRE_INDEX_ASSET}.")
+
+    requiredZBands = {f"zScore_{y}" for y in range(zMinYear, zMaxYear + 1)}
+    availableZBands = set(ee.Image(FIRE_INDEX_ASSET).bandNames().getInfo())
+    missingZBands = sorted(requiredZBands - availableZBands)
+    if missingZBands:
+        raise ValueError(
+            f"{FIRE_INDEX_ASSET} is missing bands: {missingZBands}. It was "
+            f"likely exported with a smaller end_year — re-run fire_index "
+            f"with end_year >= {zMaxYear} (delete the existing asset first, "
+            "its name doesn't auto-version)."
+        )
+
     # Loading the assets :=
     treeMeta = ee.Image(TREE_COVER_ASSET)
     startYearTree = treeMeta.select("start_year")
@@ -62,9 +130,6 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=
     # they're the same range (2004-2024), so this doesn't change anything
     # today, but it protects me for later when I extend END_YEAR and the two
     # windows stop lining up.
-    zMinYear = min(start_year, BASELINE_START_YEAR)
-    zMaxYear = max(end_year, BASELINE_END_YEAR)
-
     zScoreCol_list = []
 
     for y in range(zMinYear, zMaxYear + 1):
@@ -115,10 +180,11 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=
         harmonized = scaled.multiply(oliETMSlopes).add(oliETMIntercepts)
         return harmonized.copyProperties(image, ["system:time_start"])
 
-    # Calculate annual median kNDVI
+    # Calculate ag-year median kNDVI (Jul 1(year) -> Jun 30(year+1))
     def getAnnualKNDVI(year):
-        start = ee.Date.fromYMD(year, 1, 1)
-        end = ee.Date.fromYMD(year, 12, 31)
+        start = ee.Date.fromYMD(year, 7, 1)
+        # end-exclusive filterDate, so advance 1 day past Jun 30 to include it
+        end = ee.Date.fromYMD(ee.Number(year).add(1), 6, 30).advance(1, "day")
 
         l89 = (
             ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
@@ -150,23 +216,18 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=
 
         return l89.merge(l57).median().set("year", year).rename("kndvi")
 
-    # Same idea as zScoreCol above — I need kNDVI images covering whichever
-    # is bigger: my baseline window, or my analysis window PLUS ONE year
-    # (because resilience for my very last analysis year needs next-year
-    # kNDVI to compare against).
-    kndviMinYear = min(start_year, BASELINE_START_YEAR)
-    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 
     # BASELINE kNDVI (Yn_bar):=
-    # Mean kNDVI across non-anomalous years only
+    # Mean kNDVI across non-anomalous ag-years only
 
     analysisYears = ee.List.sequence(start_year, end_year)
 
-    # This is my frozen baseline window — the years I use to WORK OUT what
-    # Yn_bar (my "normal" kNDVI reference) is. On purpose, kept separate from
-    # analysisYears so extending my results later never shifts this.
+    # This is my frozen baseline window — the ag-years I use to WORK OUT
+    # what Yn_bar (my "normal" kNDVI reference) is. On purpose, kept
+    # separate from analysisYears so extending my results later never
+    # shifts this.
     baselineYears = ee.List.sequence(BASELINE_START_YEAR, BASELINE_END_YEAR)
 
     def calc_kndvi(y):
@@ -201,7 +262,7 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2022, gee_account_id=
             .reproject(crs=kndviYe.projection(), scale=30)
         )
 
-        # Only compute on forest pixels during anomalous fire years
+        # Only compute on forest pixels during anomalous fire ag-years
         isAnomalous = zScore.select("zScore").gt(Z_THRESHOLD)
         isForest = startYearTree.lte(year).And(endYearTree.gte(year))
         eventMask = isAnomalous.And(isForest)

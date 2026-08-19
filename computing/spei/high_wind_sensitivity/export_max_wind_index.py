@@ -1,4 +1,5 @@
 import ee
+from datetime import date
 
 from utilities.constants import AEZ
 from utilities.gee_utils import (
@@ -8,22 +9,29 @@ from utilities.gee_utils import (
 )
 
 
-def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
+def max_wind_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
     """
     * Forest Sensitivity Analysis Pipeline — Script 5a
     * High Windspeed Index Export (Annual Max Hourly Windspeed, Hours > Threshold, Mean > Threshold)
     *
-    * Computes three quantities per pixel per year and exports as a single
+    * AGRICULTURAL YEAR CONVENTION:
+    * Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching the rest of the pipeline.
+    * No baseline/z-score concept lives in this script (unlike rain/fire) — it
+    * just exports raw per-ag-year stats. The "must cover 2004-2024" constraint
+    * only exists on Script 5b's side, which needs baseline-year WSmax bands;
+    * that check lives there, not here.
+    *
+    * Computes three quantities per pixel per ag-year and exports as a single
     * multiband asset — three bands per year:
     *
-    * WSmax_{year}     = maximum hourly windspeed within the year (ERA5-Land)
+    * WSmax_{year}     = maximum hourly windspeed within the ag-year (ERA5-Land)
     * WShoursGT_{year} = total hours where windspeed > WIND_THRESHOLD
     * WSmeanGT_{year}  = mean windspeed during the hours it exceeded WIND_THRESHOLD
     *
     * Windspeed computed from ERA5-Land hourly u/v 10m wind components:
     * windspeed = sqrt(u_component_of_wind_10m^2 + v_component_of_wind_10m^2)
     *
-    * Output asset bands (e.g., for 2004-2022 = 19 years * 3 = 57 bands):
+    * Output asset bands (e.g., for 2004-2024 = 21 ag-years * 3 = 63 bands):
     * WSmax_2004, WShoursGT_2004, WSmeanGT_2004, ...
     *
     * Requires: nothing — only public datasets (ERA5-Land Hourly)
@@ -37,6 +45,30 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
+
+    if end_year is None:
+        raise ValueError(
+            "end_year must be specified explicitly — agricultural-year pipelines "
+            "cannot infer a safe default."
+        )
+
+    # ERA5-Land's own catalog description states data is published up to
+    # ~3 months behind real time (unlike CHIRPS/MODIS/Dynamic World, which
+    # are current to within a day or so). Reusing the other scripts' plain
+    # "today >= Jun 30(end_year+1)" check would silently compute on hours
+    # that aren't published yet, so this adds that 3-month buffer.
+    ERA5_LAND_LAG_MONTHS = 3
+    ag_year_end = date(end_year + 1, 6, 30)
+    lag_month = ag_year_end.month + ERA5_LAND_LAG_MONTHS
+    lag_year = ag_year_end.year + (lag_month - 1) // 12
+    lag_month = (lag_month - 1) % 12 + 1
+    required_complete_by = date(lag_year, lag_month, 30)
+    if required_complete_by > date.today():
+        raise ValueError(
+            f"Agricultural year {end_year} (Jul {end_year} -> Jun {end_year + 1}) "
+            f"isn't reliably published in ERA5-Land yet (data runs ~3 months "
+            f"behind real time) as of {date.today().isoformat()}. Reduce end_year."
+        )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
     # aoi = (
@@ -55,7 +87,7 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     era5Hourly = (
         ee.ImageCollection("ECMWF/ERA5_LAND/HOURLY")
         .filterBounds(aoi)
-        .filterDate("2000-01-01", ee.Date.fromYMD(end_year, 12, 31))
+        .filterDate("2000-01-01", ee.Date.fromYMD(end_year + 1, 7, 1))
         .select(["u_component_of_wind_10m", "v_component_of_wind_10m"])
     )
 
@@ -80,9 +112,10 @@ def max_wind_index(aez, start_year=2004, end_year=2022, gee_account_id=None):
     years = ee.List.sequence(start_year, end_year)
 
     def annual_metrics(y):
-        start = ee.Date.fromYMD(y, 1, 1)
-        # Note: filterDate is exclusive on the end date. Using y+1 ensures Dec 31 is included.
-        end = ee.Date.fromYMD(ee.Number(y).add(1), 1, 1)
+        start = ee.Date.fromYMD(y, 7, 1)
+        # filterDate is exclusive on the end date. Using (y+1, 7, 1) ensures
+        # Jun 30 of the ag-year's second calendar year is included.
+        end = ee.Date.fromYMD(ee.Number(y).add(1), 7, 1)
 
         yearCol = windSpeedCol.filterDate(start, end)
 
