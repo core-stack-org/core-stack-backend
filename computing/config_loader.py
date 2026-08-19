@@ -9,9 +9,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # Root directory for all downloaded/generated local compute data. Defaults to
 # `<repo>/data` for local development, but should be set to a directory
 # mounted from the host (e.g. a Docker volume) in containerized deployments.
-DATA_DIR: Path = Path(
-    os.environ.get("DATA_DIR", str(PROJECT_ROOT / "data"))
-).expanduser().resolve()
+DATA_DIR: Path = (
+    Path(os.environ.get("DATA_DIR", str(PROJECT_ROOT / "data"))).expanduser().resolve()
+)
 
 
 def _load(path: Path) -> dict:
@@ -130,7 +130,9 @@ def _derived_layer(name: str) -> dict | None:
 def _derived_output_dir(name: str) -> Path:
     layer = _derived_layer(name)
     if not layer:
-        raise KeyError(f"No derived layer found in {_CONFIG_PATH.name} for name: {name}")
+        raise KeyError(
+            f"No derived layer found in {_CONFIG_PATH.name} for name: {name}"
+        )
     return _abs(layer["local_path"])
 
 
@@ -172,14 +174,12 @@ SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
     "available_water_capacity": SOIL_TYPE_BASE_DIR / "available_water_capacity.tif",
     "soil_drainage_classes": SOIL_TYPE_BASE_DIR / "soil_drainage_classes.tif",
     "subsoil_bulk_density": SOIL_TYPE_BASE_DIR / "subsoil_bulk_density.tif",
-    "subsoil_exchange_capacity": SOIL_TYPE_BASE_DIR
-    / "subsoil_exchange_capacity.tif",
+    "subsoil_exchange_capacity": SOIL_TYPE_BASE_DIR / "subsoil_exchange_capacity.tif",
     "subsoil_organic_carbon": SOIL_TYPE_BASE_DIR / "subsoil_organic_carbon.tif",
     "subsoil_ph": SOIL_TYPE_BASE_DIR / "subsoil_pH.tif",
     "subsoil_texture": SOIL_TYPE_BASE_DIR / "subsoil_texture.tif",
     "topsoil_bulk_density": SOIL_TYPE_BASE_DIR / "topsoil_bulk_density.tif",
-    "topsoil_exchange_capacity": SOIL_TYPE_BASE_DIR
-    / "topsoil_exchange_capacity.tif",
+    "topsoil_exchange_capacity": SOIL_TYPE_BASE_DIR / "topsoil_exchange_capacity.tif",
     "topsoil_organic_carbon": SOIL_TYPE_BASE_DIR / "topsoil_organic_carbon.tif",
     "topsoil_ph": SOIL_TYPE_BASE_DIR / "topsoil_pH.tif",
     "topsoil_texture": SOIL_TYPE_BASE_DIR / "topsoil_texture.tif",
@@ -193,7 +193,9 @@ VILLAGE_BOUNDARIES_DIR: Path = DATA_DIR / "base_layers/village_boundaries"
 # Google Drive IDs
 # ---------------------------------------------------------------------------
 
-GDRIVE_ADMIN_BOUNDARY_FILE_ID: str = _base_layer("admin boundaries").get("gdrive_id", "")
+GDRIVE_ADMIN_BOUNDARY_FILE_ID: str = _base_layer("admin boundaries").get(
+    "gdrive_id", ""
+)
 
 # MWS boundaries are now sourced from S3 (see config.yaml); no Google Drive
 # file ID is configured for it anymore.
@@ -225,7 +227,9 @@ PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
     DATA_DIR / "base_layers/drainage_lines_pan_india.gpkg"
 )
 
-PAN_INDIA_DRAINAGE_LINES_PATH = DATA_DIR / "layers/drainage_lines/Pan_India_drainage_lines.gpkg"
+PAN_INDIA_DRAINAGE_LINES_PATH = (
+    DATA_DIR / "layers/drainage_lines/Pan_India_drainage_lines.gpkg"
+)
 LOCAL_DRAINAGE_LINES_OUTPUT = DATA_DIR / "layers/drainage_lines/drainage_lines_local"
 
 LOCAL_DRAINAGE_DENSITY_OUTPUT = DATA_DIR / "drainage_density"
@@ -264,11 +268,17 @@ PAN_INDIA_MINING_PATH = _base_layer_path(
 )
 LOCAL_MINING_OUTPUT = DATA_DIR / "layers/mining"
 
-PAN_INDIA_NATURALDEPRESSION_PATH = DATA_DIR / "base_layers/Pan_India_natural_depression.tif"
+PAN_INDIA_NATURALDEPRESSION_PATH = (
+    DATA_DIR / "base_layers/Pan_India_natural_depression.tif"
+)
 LOCAL_NATURALDEPRESSION_OUTPUT = DATA_DIR / "layers/natural_depression"
 
-PAN_INDIA_DISTANCETONEARESTDRAINAGE_PATH = DATA_DIR / "base_layers/Pan_India_distance_to_nearest_drainage.tif"
-LOCAL_DISTANCETONEARESTDRAINAGE_OUTPUT = DATA_DIR / "layers/distance_nearest_upstream_DL"
+PAN_INDIA_DISTANCETONEARESTDRAINAGE_PATH = (
+    DATA_DIR / "base_layers/Pan_India_distance_to_nearest_drainage.tif"
+)
+LOCAL_DISTANCETONEARESTDRAINAGE_OUTPUT = (
+    DATA_DIR / "layers/distance_nearest_upstream_DL"
+)
 
 PAN_INDIA_FACILITIES_PATH = _base_layer_path(
     "facilities", fallback="{DATA_DIR}/base_layers/Pan_India_facilities_polygon.geojson"
@@ -282,8 +292,12 @@ PAN_INDIA_SLOPE_PERCENTAGE_PATH = _base_layer_path(
 )
 LOCAL_SLOPE_PERCENTAGE_OUTPUT = DATA_DIR / "layers/slope_percentage"
 
-PAN_INDIA_MWS_CONNECTIVITY_PATH = DATA_DIR / "layers/mws_connectivity/Pan_India_mws_connectivity.geojson"
-LOCAL_MWS_CONNECTIVITY_OUTPUT = DATA_DIR / "layers/mws_connectivity/mws_connectivity_local"
+PAN_INDIA_MWS_CONNECTIVITY_PATH = (
+    DATA_DIR / "layers/mws_connectivity/Pan_India_mws_connectivity.geojson"
+)
+LOCAL_MWS_CONNECTIVITY_OUTPUT = (
+    DATA_DIR / "layers/mws_connectivity/mws_connectivity_local"
+)
 
 LOCAL_MWS_CENTROID_OUTPUT = DATA_DIR / "layers/mws_centroid"
 
@@ -299,7 +313,9 @@ PAN_INDIA_RIVER_PATH = _base_layer_path(
 )
 LOCAL_RIVER_OUTPUT = DATA_DIR / "river/river_local"
 
-PAN_INDIA_FABDEM_PATH = _base_layer_path("dem", fallback="{DATA_DIR}/fabdem/fabdem_pan_india.tif")
+PAN_INDIA_FABDEM_PATH = _base_layer_path(
+    "dem", fallback="{DATA_DIR}/fabdem/fabdem_pan_india.tif"
+)
 LOCAL_FABDEM_OUTPUT = DATA_DIR / "fabdem/fabdem_local"
 
 PAN_INDIA_ANTYODAYA_2020 = DATA_DIR / "base_layers/pan_india_antyodaya_2020.gpkg"
@@ -307,3 +323,13 @@ LOCAL_ANTYODAYA_2020_OUTPUT = DATA_DIR / "antyodaya/output/antyodaya_local"
 
 PAN_INDIA_LIVESTOCKS = DATA_DIR / "base_layers/pan_india_livestock.gpkg"
 LOCAL_LIVESTOCKS_OUTPUT = DATA_DIR / "livestock/output/livestock_local"
+
+
+PAN_INDIA_FOREST_FRINGE = (
+    DATA_DIR / "forest_fringe/input/forest_fringe_degradation.geojson"
+)
+LOCAL_FOREST_FRINGE_OUTPUT = DATA_DIR / "forest_fringe/output"
+PAN_INDIA_TREE_IN_GRASSLAND = (
+    DATA_DIR / "tree_in_grassland/input/tree_in_grassland.geojson"
+)
+LOCAL_TREE_IN_GRASSLAND_OUTPUT = DATA_DIR / "tree_in_grassland/output"

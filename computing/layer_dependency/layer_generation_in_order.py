@@ -133,6 +133,12 @@ from computing.terrain_descriptor.terrain_compute_all_local import (
 from computing.terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as terrain_raster_local,
 )
+from computing.forest_fringe.forest_fringe_local_compute import (
+    generate_forest_fringe_local,
+)
+from computing.tree_in_grassland.tree_in_grassland_local_compute import (
+    generate_tree_in_grassland_local,
+)
 from stats_generator.utils import generate_stats_excel_file
 from utilities.gee_utils import valid_gee_text
 import os
@@ -312,6 +318,8 @@ LOCAL_TASK_REGISTRY = {
     "soil_type": generate_soil_type_local,
     "generate_zoi": generate_zoi,
     "generate_zoi_data": generate_zoi,
+    "forest_fringe": generate_forest_fringe_local,
+    "tree_in_grassland": generate_tree_in_grassland_local,
 }
 
 TASK_REGISTRIES = {
