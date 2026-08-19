@@ -1,6 +1,7 @@
 name: corestack-backend-test
 
 channels:
+  - rapidsai
   - conda-forge
   - defaults
 
@@ -47,6 +48,9 @@ dependencies:
   - cairo
   - gdk-pixbuf
   - libffi
+  - cuda-version=12.9
+  - cupy=13.6.*
+  - cucim>=26.2.0
 
   - pip:
       - django==5.2.9
@@ -89,8 +93,6 @@ dependencies:
       - polars
       - numpy==1.26.4
       - weasyprint
-      - cupy-cuda12x[ctk]>=13.6.0
-      - cucim-cu12>=26.2.0
       - geedim==1.9.1
       - natsort>=8.4.0
       - pydrive2>=1.21.3

@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
+from celery.utils.log import get_task_logger
+
 from nrm_app.celery import app
 
 from computing.config_loader import (
@@ -25,6 +27,7 @@ DEFAULT_LOCAL_DEM_PATH = TERRAIN_RASTER_PATH
 DEFAULT_LOCAL_SOIL_PATH = SOIL_RASTER_PATH
 PAN_INDIA_DEFAULT_TILE_SIZE = 11264
 STATE_DEFAULT_TILE_SIZE = 4096
+logger = get_task_logger(__name__)
 
 
 def _is_blank(value):
@@ -289,7 +292,19 @@ def generate_runoff_gpu(
     start_year=None,
     end_year=None,
 ):
-    _ = self
+    logger.info(
+        "Starting runoff_gpu task_id=%s state=%s district=%s tehsil=%s pan_india=%s "
+        "start_date=%s end_date=%s start_year=%s end_year=%s",
+        self.request.id,
+        state,
+        district,
+        tehsil,
+        pan_india,
+        start_date,
+        end_date,
+        start_year,
+        end_year,
+    )
     return run_runoff_gpu_local(
         state=state,
         district=district,

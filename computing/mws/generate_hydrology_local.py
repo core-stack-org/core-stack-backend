@@ -610,6 +610,13 @@ def _read_complete_uid_cache(path, required_uids, value_columns):
     return frame
 
 
+def _geometry_union(geometries):
+    union_all = getattr(geometries, "union_all", None)
+    if callable(union_all):
+        return union_all()
+    return geometries.unary_union
+
+
 def _iter_unique_watershed_partitions(
     matches,
     *,
@@ -1024,7 +1031,7 @@ def _uses_daily_et(watersheds_gdf, daily_roots_by_year):
     with rasterio.open(reference_path) as src:
         raster_bounds = box(*src.bounds)
         watersheds = watersheds_gdf.to_crs(src.crs)
-        return raster_bounds.covers(watersheds.geometry.union_all())
+        return raster_bounds.covers(_geometry_union(watersheds.geometry))
 
 
 def _calculate_period_et(watersheds_gdf, periods, et_roots_by_year):
@@ -1219,7 +1226,7 @@ def _raster_covers_watersheds(watersheds_gdf, raster_path):
     with rasterio.open(raster_path) as src:
         raster_bounds = box(*src.bounds)
         watersheds = watersheds_gdf.to_crs(src.crs)
-        return raster_bounds.covers(watersheds.geometry.union_all())
+        return raster_bounds.covers(_geometry_union(watersheds.geometry))
 
 
 def _calculate_period_et_from_aggregates(

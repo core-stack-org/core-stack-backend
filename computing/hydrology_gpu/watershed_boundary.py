@@ -73,6 +73,17 @@ def load_manifest(root: Path) -> list[dict]:
         return list(csv.DictReader(f))
 
 
+def row_feature_count(row: dict) -> int:
+    try:
+        return int(row.get("feature_count") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def rows_feature_count(rows: list[dict]) -> int:
+    return sum(row_feature_count(row) for row in rows)
+
+
 def manifest_relative_output(root: Path, output_path: str) -> Path | None:
     if not output_path:
         return None
@@ -286,6 +297,20 @@ def write_download_boundary(gdf, destination: str | Path, state: str, district: 
     return destination
 
 
+def copy_pan_india_download_boundary(source: str | Path, destination: str | Path) -> Path:
+    source = Path(source)
+    if not source.exists():
+        raise FileNotFoundError(
+            "Pan-India download boundary source not found: "
+            f"{source}. Add the canonical boundary file instead of using a fallback."
+        )
+
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(source.read_text())
+    return destination
+
+
 def materialize_tehsil_boundary(
     state: str,
     district: str,
@@ -295,12 +320,11 @@ def materialize_tehsil_boundary(
     overwrite: bool = True,
 ) -> tuple[Path, Path, int]:
     root = Path(watershed_root)
-    source_path, _ = find_tehsil_watershed(root, state, district, tehsil)
+    source_path, row = find_tehsil_watershed(root, state, district, tehsil)
     destination = Path(output_path) if output_path else default_output_path(state, district, tehsil)
 
     if destination.exists() and not overwrite:
-        gdf_existing = gpd.read_file(destination)
-        return destination, source_path, len(gdf_existing)
+        return destination, source_path, row_feature_count(row)
 
     gdf = prepare_boundary_gdf(gpd.read_file(source_path), state, district, tehsil, source_path)
     gdf["id"] = range(1, len(gdf) + 1)
@@ -323,8 +347,8 @@ def materialize_district_boundary(
     destination = Path(output_path) if output_path else default_district_output_path(state, district)
 
     if destination.exists() and not overwrite:
-        gdf_existing = gpd.read_file(destination)
-        return destination, [path for path, _ in matches], len(gdf_existing)
+        feature_count = rows_feature_count([row for _, row in matches])
+        return destination, [path for path, _ in matches], feature_count
 
     frames = []
     source_paths = []
@@ -363,8 +387,8 @@ def materialize_state_boundary(
     destination = Path(output_path) if output_path else default_state_output_path(state)
 
     if destination.exists() and not overwrite:
-        gdf_existing = gpd.read_file(destination)
-        return destination, [path for path, _ in matches], len(gdf_existing)
+        feature_count = rows_feature_count([row for _, row in matches])
+        return destination, [path for path, _ in matches], feature_count
 
     frames = []
     source_paths = []
@@ -406,18 +430,9 @@ def materialize_pan_india_boundary(
 
     if destination.exists() and not overwrite:
         download_destination = download_boundary_path(destination)
-        download_boundary_source = Path(download_boundary_source)
-        gdf_existing = None
-        if not download_destination.exists():
-            if download_boundary_source.exists():
-                download_destination.parent.mkdir(parents=True, exist_ok=True)
-                download_destination.write_text(download_boundary_source.read_text())
-            else:
-                gdf_existing = gpd.read_file(destination)
-                write_download_boundary(gdf_existing, download_destination, PAN_INDIA_SLUG)
-        if gdf_existing is None:
-            gdf_existing = gpd.read_file(destination)
-        return destination, [path for path, _ in matches], len(gdf_existing)
+        copy_pan_india_download_boundary(download_boundary_source, download_destination)
+        feature_count = rows_feature_count([row for _, row in matches])
+        return destination, [path for path, _ in matches], feature_count
 
     frames = []
     source_paths = []
@@ -445,10 +460,6 @@ def materialize_pan_india_boundary(
     destination.write_text(combined.to_json())
 
     download_destination = download_boundary_path(destination)
-    download_boundary_source = Path(download_boundary_source)
-    if download_boundary_source.exists():
-        download_destination.write_text(download_boundary_source.read_text())
-    else:
-        write_download_boundary(combined, download_destination, PAN_INDIA_SLUG)
+    copy_pan_india_download_boundary(download_boundary_source, download_destination)
 
     return destination, source_paths, len(combined)
