@@ -88,7 +88,6 @@ def generate_gpp(cfg, region):
             "landsat_qa_mask": "QA_PIXEL bits 0-5 clear; QA_RADSAT red/NIR/terrain clear",
             "tmin_source": "GLDAS Tair_f_inst monthly minimum (K-273.15)",
             "vpd_source": "GLDAS Tair+Qair+Psurf Magnus formula",
-            "interpolation": "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only",
             "year": str(year),
             "asset_suffix": asset_suffix,
             "roi_path": cfg["roi_path"],
@@ -158,9 +157,9 @@ def build_gpp_stack(
     ls_col = (
         ee.ImageCollection(LANDSAT_COLLECTION)
         .filterBounds(region)
-        .filterDate(start_date, start_date.advance(12, "month"))
+        .filterDate(start_date.advance(-1, "month"), start_date.advance(13, "month"))
     )
-    months = ee.List.sequence(0, 11)
+    months = ee.List.sequence(-1, 12)
     raw_ndvi_monthly = ee.ImageCollection.fromImages(
         months.map(
             lambda agri_month_idx: make_raw_monthly_ndvi(
@@ -176,16 +175,16 @@ def build_gpp_stack(
         month: ee.Image(
             ndvi_monthly.filter(ee.Filter.eq("month", month)).first()
         ).select("NDVI")
-        for month in range(1, 13)
+        for month in range(0, 14)
     }
 
     gldas_col = (
         ee.ImageCollection(GLDAS_COLLECTION)
         .filterBounds(region)
-        .filterDate(start_date, start_date.advance(12, "month"))
+        .filterDate(start_date.advance(-1, "month"), start_date.advance(13, "month"))
     )
     monthly_images = []
-    for agri_month_idx in range(12):
+    for agri_month_idx in range(-1, 13):
         agri_month = agri_month_idx + 1
         monthly_images.append(
             make_raw_monthly_gpp(
