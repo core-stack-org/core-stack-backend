@@ -28,16 +28,18 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 @with_base_layers("soi_tehsil", "admin_boundary")
-def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
+def generate_tehsil_shape_file_data(
+        self, state, district, block, gee_account_id, sync_to_geoserver=True
+):
     """
     It will generate Admin boundary of given location as tehsil levels
     """
     ee_initialize(gee_account_id)
     description = (
-        "admin_boundary_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
+            "admin_boundary_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
     )
     asset_id = get_gee_asset_path(state, district, block) + description
 
@@ -50,10 +52,10 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
 
     if not is_gee_asset_exists(asset_id):
         layer_name = (
-            "admin_boundary_"
-            + valid_gee_text(district.lower())
-            + "_"
-            + valid_gee_text(block.lower())
+                "admin_boundary_"
+                + valid_gee_text(district.lower())
+                + "_"
+                + valid_gee_text(block.lower())
         )
         layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
         upload_shp_to_gee(layer_path, layer_name, asset_id)
@@ -69,12 +71,14 @@ def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id
             dataset_name="Admin Boundary",
         )
 
-    res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
     layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag updated")
-        layer_at_geoserver = True
+    if sync_to_geoserver:
+        res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
+
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("sync to geoserver flag updated")
+            layer_at_geoserver = True
     return layer_at_geoserver
 
 
