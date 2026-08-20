@@ -2176,8 +2176,12 @@ def fetch_village_asset_count(
                 {
                     "geometry": point,
                     "Asset ID": properties.get("Asset ID", "MISSING"),
-                    "creation_t": properties.get("creation_t", ""),
-                    "WorkCatego": properties.get("WorkCatego", ""),
+                    "creation_t": properties.get(
+                        "creation_t", properties.get("creation_time")
+                    ),
+                    "WorkCatego": properties.get(
+                        "WorkCatego", properties.get("WorkCategory")
+                    ),
                 }
             )
         except:
