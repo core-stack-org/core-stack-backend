@@ -11,7 +11,7 @@ from computing.utils import (
     sync_fc_to_geoserver,
     update_layer_sync_status,
 )
-from forest_fire_utils import (
+from .forest_fire_utils import (
     SCALE,
     MAXPIX,
     load_fire_image,
