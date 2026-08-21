@@ -10,9 +10,10 @@ from nrm_app.celery import app
 
 from computing.config_loader import (
     LULC_BASE_DIR,
-    PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    MICROWATERSHED_PATH,
     PROJECT_ROOT,
     SOIL_RASTER_PATH,
+    SOI_TEHSIL_PATH,
     TERRAIN_RASTER_PATH,
 )
 from utilities.gee_utils import valid_gee_text
@@ -22,6 +23,7 @@ DATA_ROOT = PROJECT_ROOT / "data"
 HYDROLOGY_OUTPUT_ROOT = DATA_ROOT / "hydrology_gpu"
 PAN_INDIA_RUNOFF_OUTPUT_ROOT = DATA_ROOT / "base_layers" / "hydrology" / "runoff"
 PAN_INDIA_RUNOFF_COMMONS_ROOT = PAN_INDIA_RUNOFF_OUTPUT_ROOT / "commons"
+PAN_INDIA_RUNOFF_WATERSHED_ROOT = PAN_INDIA_RUNOFF_COMMONS_ROOT / "tehsil_watersheds"
 PAN_INDIA_RUNOFF_TIMESERIES_DIR_NAME = "runoff_timeseries"
 DEFAULT_LOCAL_DEM_PATH = TERRAIN_RASTER_PATH
 DEFAULT_LOCAL_SOIL_PATH = SOIL_RASTER_PATH
@@ -121,6 +123,69 @@ def _ensure_default_inputs_exist():
             raise FileNotFoundError(f"{label} not found: {path}")
 
 
+def ensure_runoff_tehsil_watersheds(force=False):
+    manifest_path = PAN_INDIA_RUNOFF_WATERSHED_ROOT / "tehsil_watershed_manifest.csv"
+    if (
+        manifest_path.exists()
+        and any(PAN_INDIA_RUNOFF_WATERSHED_ROOT.glob("*/*/*.gpkg"))
+        and not force
+    ):
+        return PAN_INDIA_RUNOFF_WATERSHED_ROOT
+
+    resolved_inputs = []
+    for label, path in (
+        ("Canonical microwatershed file", MICROWATERSHED_PATH),
+        ("SOI tehsil boundary file", SOI_TEHSIL_PATH),
+    ):
+        if not path.exists():
+            raise FileNotFoundError(
+                f"{label} not found: {path}. "
+                "It is required to generate runoff helper tehsil watersheds."
+            )
+        resolved_inputs.append(path)
+
+    microwatershed_path, tehsil_path = resolved_inputs
+
+    from computing.terrain_descriptor.store_watersheds_for_tehsils import (
+        generate_tehsil_watershed_copies,
+    )
+
+    PAN_INDIA_RUNOFF_WATERSHED_ROOT.mkdir(parents=True, exist_ok=True)
+    generate_tehsil_watershed_copies(
+        microwatershed_path=str(microwatershed_path),
+        tehsil_path=str(tehsil_path),
+        output_dir=str(PAN_INDIA_RUNOFF_WATERSHED_ROOT),
+        output_format="gpkg",
+        overwrite=force,
+        include_empty=False,
+        fix_invalid_mws=False,
+        clip_to_tehsil=False,
+    )
+    if not manifest_path.exists():
+        raise FileNotFoundError(
+            "Runoff helper tehsil watershed generation did not create "
+            f"the manifest: {manifest_path}"
+        )
+    return PAN_INDIA_RUNOFF_WATERSHED_ROOT
+
+
+def _boundary_source_marker_path(boundary_path):
+    return Path(boundary_path).with_suffix(f"{Path(boundary_path).suffix}.source_root")
+
+
+def _boundary_uses_watershed_root(boundary_path, watershed_root):
+    marker_path = _boundary_source_marker_path(boundary_path)
+    if not marker_path.exists():
+        return False
+    return marker_path.read_text().strip() == str(Path(watershed_root).resolve())
+
+
+def _write_boundary_source_marker(boundary_path, watershed_root):
+    marker_path = _boundary_source_marker_path(boundary_path)
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text(str(Path(watershed_root).resolve()))
+
+
 def _build_runner_args(
     *,
     state,
@@ -160,7 +225,7 @@ def _build_runner_args(
         state=state,
         district=district,
         tehsil=tehsil,
-        watershed_root=str(PRECOMPUTED_TEHSIL_WATERSHED_DIR),
+        watershed_root=str(PAN_INDIA_RUNOFF_WATERSHED_ROOT),
         watershed_boundary_output=str(boundary_output),
         timeseries_vector=str(timeseries_output) if timeseries_output else None,
         reuse_watershed_boundary=True,
@@ -220,7 +285,18 @@ def run_runoff_gpu_local(
 
         hydro_runoff.validate_local_raster(args.local_lulc, "--local-lulc")
         hydro_runoff.validate_local_raster(args.local_soil, "--local-soil")
+        watershed_root = ensure_runoff_tehsil_watersheds()
+        if args.pan_india and not _boundary_uses_watershed_root(
+            args.watershed_boundary_output,
+            watershed_root,
+        ):
+            args.reuse_watershed_boundary = False
         hydro_runoff.resolve_boundary(args)
+        if args.pan_india:
+            _write_boundary_source_marker(
+                args.watershed_boundary_output,
+                watershed_root,
+            )
         if args.tile_size is None:
             if args.pan_india:
                 args.tile_size = PAN_INDIA_DEFAULT_TILE_SIZE

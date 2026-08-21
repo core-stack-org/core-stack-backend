@@ -46,6 +46,8 @@ from computing.mws.runoff_gpu import (
     HYDROLOGY_OUTPUT_ROOT,
     PAN_INDIA_RUNOFF_OUTPUT_ROOT,
     PAN_INDIA_RUNOFF_TIMESERIES_DIR_NAME,
+    PAN_INDIA_RUNOFF_WATERSHED_ROOT,
+    ensure_runoff_tehsil_watersheds,
 )
 from computing.mws.et_download import PAN_INDIA_ET_OUTPUT_ROOT
 from computing.utils import (
@@ -568,7 +570,7 @@ def _available_pan_india_series_ids(series_dirs):
 
 def _build_pan_india_uid_index(
     series_dirs,
-    watershed_root=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    watershed_root=PAN_INDIA_RUNOFF_WATERSHED_ROOT,
 ):
     available_ids = _available_pan_india_series_ids(series_dirs)
     if not available_ids:
@@ -1854,8 +1856,10 @@ def _run_generate_hydrology_pan_india_local(
         }
     series_dirs = list(dict.fromkeys(series_dirs))
 
+    watershed_root = ensure_runoff_tehsil_watersheds()
     matches, uid_to_watershed_id = _build_pan_india_uid_index(
         series_dirs=series_dirs,
+        watershed_root=watershed_root,
     )
     required_uids = set(uid_to_watershed_id)
     aquifer_cache = None
@@ -2090,8 +2094,10 @@ def _run_generate_hydrology_base_layer_local(
         source_year: source_inputs[source_year][1]
         for source_year in source_years
     }
+    watershed_root = ensure_runoff_tehsil_watersheds()
     matches, uid_to_watershed_id = _build_pan_india_uid_index(
         series_dirs=series_dirs,
+        watershed_root=watershed_root,
     )
     required_uids = set(uid_to_watershed_id)
     aquifer_cache = None
@@ -2194,6 +2200,13 @@ def _run_generate_hydrology_base_layer_local(
         combined,
         geometry="geometry",
         crs=records[0].crs,
+    )
+    result_gdf = result_gdf.drop(
+        columns=[
+            column
+            for column in ("id", "STATE", "District", "TEHSIL")
+            if column in result_gdf.columns
+        ]
     )
     if output_path.exists():
         output_path.unlink()
