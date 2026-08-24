@@ -31,7 +31,7 @@ STATE = os.environ.get("PUBLIC_API_STATE", "Rajasthan")
 DISTRICT = os.environ.get("PUBLIC_API_DISTRICT", "Bhilwara")
 TEHSIL = os.environ.get("PUBLIC_API_TEHSIL", "Mandalgarh")
 MWS_ID = os.environ.get("PUBLIC_API_MWS_ID", "12_100174")
-UID = os.environ.get("PUBLIC_API_UID", "12_100174_101")
+UID = os.environ.get("PUBLIC_API_UID", "12_100174_104")
 LAT = os.environ.get("PUBLIC_API_LAT", "25.20231618101583")
 LON = os.environ.get("PUBLIC_API_LON", "75.0868641493802")
 
@@ -119,11 +119,11 @@ def assert_success_envelope(endpoint: str, body: Any, failures: Failures) -> dic
         return None
     if body.get("error_message") is not None:
         failures.add(endpoint, f"error_message should be null, got {body.get('error_message')!r}")
-    # Strict JSON re-encode (NaN/Infinity would fail here if present as non-JSON).
+    # Strict JSON: reject NaN/Infinity which are not valid JSON.
     try:
-        json.loads(json.dumps(body))
+        json.loads(json.dumps(body, allow_nan=False))
     except (TypeError, ValueError) as exc:
-        failures.add(endpoint, f"body is not JSON-serializable: {exc}")
+        failures.add(endpoint, f"body is not valid JSON: {exc}")
     return body.get("data")
 
 
@@ -167,6 +167,8 @@ def assert_aligned_numeric_series(
             failures.add(endpoint, f"missing unit for metric '{metric}'")
         for value in series:
             if value is None:
+                continue
+            if isinstance(value, (dict, list, str)):
                 continue
             if not isinstance(value, (int, float)):
                 failures.add(endpoint, f"{metric} has non-numeric value {value!r}")
@@ -239,9 +241,24 @@ def validate_hints_or_units(
     if not isinstance(unit_map, dict) or not unit_map:
         failures.add(endpoint, f"{map_key} must be a non-empty object")
         return
+    _assert_leaf_string_units(endpoint, map_key, unit_map, failures)
+
+
+def _assert_leaf_string_units(
+    endpoint: str, map_key: str, unit_map: dict, failures: Failures
+) -> None:
     for key, value in unit_map.items():
-        if not isinstance(key, str) or not isinstance(value, str):
-            failures.add(endpoint, f"{map_key} entries must be string->string")
+        if not isinstance(key, str):
+            failures.add(endpoint, f"{map_key} keys must be strings")
+            continue
+        if isinstance(value, dict):
+            if not value:
+                failures.add(endpoint, f"{map_key}.{key} must be a non-empty object")
+                continue
+            _assert_leaf_string_units(endpoint, f"{map_key}.{key}", value, failures)
+            continue
+        if not isinstance(value, str) or not value.strip():
+            failures.add(endpoint, f"{map_key}[{key}] must be a non-empty string")
 
 
 def main() -> int:

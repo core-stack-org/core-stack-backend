@@ -35,17 +35,25 @@ UNIT_KEYWORDS = [
 ]
 
 # Strip from annual / tehsil metric keys; unit moves to *_units maps.
+# Longer suffixes must come first so they are not truncated by a shorter match.
 METRIC_UNIT_SUFFIXES = (
+    ("_in_km_per_km2", "km/km2"),
+    ("_in_percent", "%"),
+    ("_in_weeks", "weeks"),
     ("_in_mm", "mm"),
     ("_in_ha", "ha"),
     ("_in_km", "km"),
     ("_in_m", "m"),
-    ("_in_percent", "%"),
-    ("_in_weeks", "weeks"),
     ("_sqkm", "sqkm"),
     ("_count", "count"),
     ("_percent", "%"),
 )
+
+# Keys that still embed a unit token after suffix stripping.
+METRIC_KEY_RENAMES = {
+    "drysp_unit_4_weeks": "dry_spell",
+    "cropping_intensity_unit_less": "cropping_intensity",
+}
 
 METADATA_FIELD_UNITS = {
     "uid": "id",
@@ -55,7 +63,6 @@ METADATA_FIELD_UNITS = {
     "vill_name": "name",
     "village_name": "name",
     "area": "ha",
-    "area_in_ha": "ha",
     "sum": "ha",
     "sum_area": "ha",
     "total_swb_area": "ha",
@@ -76,11 +83,11 @@ ANNUAL_METRIC_UNIT_OVERRIDES = {
     "mild": "weeks",
     "moderate": "weeks",
     "severe": "weeks",
+    "dry_spell": "weeks",
     "drysp_unit_4_weeks": "weeks",
     "total_weeks": "weeks",
     "monsoon_onset": "iso8601",
     "kharif_cropped": "sqkm",
-    "cropping_intensity_unit_less": "ratio",
     "cropping_intensity": "ratio",
     "severe_moderate_drought_causality": "category",
     "mild_drought_causality": "category",
@@ -123,12 +130,38 @@ def _infer_unit(metric_name):
 
 
 def _split_metric_unit_suffix(metric):
-    """Return (metric_without_unit_suffix, unit)."""
+    """Return (metric_without_unit_suffix, unit). Always lowercase."""
     m = str(metric).strip().lower()
-    for suffix, unit in METRIC_UNIT_SUFFIXES:
+    unit = None
+    for suffix, suffix_unit in METRIC_UNIT_SUFFIXES:
         if m.endswith(suffix):
-            return m[: -len(suffix)], unit
+            m = m[: -len(suffix)]
+            unit = suffix_unit
+            break
+    m = METRIC_KEY_RENAMES.get(m, m)
+    if m in ANNUAL_METRIC_UNIT_OVERRIDES:
+        return m, ANNUAL_METRIC_UNIT_OVERRIDES[m]
+    if unit is not None:
+        return m, unit
     return m, _infer_unit(m)
+
+
+def _metadata_key_without_unit(key):
+    """Strip unit suffixes from metadata keys without lowercasing identifiers like UID.
+
+    Returns ``(key, unit, renamed)``. ``renamed`` is True when the key changed so
+    the caller can keep the suffix-derived unit instead of re-inferring from the
+    shortened name (e.g. ``drainage_density_weighted_in_km_per_km2`` → km/km2).
+    """
+    original = str(key)
+    lower = original.strip().lower()
+    stripped, unit = _split_metric_unit_suffix(lower)
+    if stripped != lower:
+        return stripped, unit, True
+    renamed = METRIC_KEY_RENAMES.get(lower)
+    if renamed:
+        return renamed, unit, True
+    return original, unit, False
 
 
 # Exact column names from KYL JSON (lowercase); anything else falls back to _infer_unit().
@@ -177,7 +210,29 @@ def indicator_unit_for_key(key):
     k = str(key).strip().lower()
     if k in KYL_INDICATOR_UNIT_OVERRIDES:
         return KYL_INDICATOR_UNIT_OVERRIDES[k]
-    return _infer_unit(k)
+    name, unit = _split_metric_unit_suffix(k)
+    if name in KYL_INDICATOR_UNIT_OVERRIDES:
+        return KYL_INDICATOR_UNIT_OVERRIDES[name]
+    return unit
+
+
+def _canonicalize_indicator_row(row):
+    """Rename keys that embed units (``lulc_crop_percent`` → ``lulc_crop``)."""
+    if not isinstance(row, dict):
+        return {}, {}
+    out = {}
+    units = {}
+    for key, value in row.items():
+        lower = str(key).strip().lower()
+        if lower in KYL_INDICATOR_UNIT_OVERRIDES:
+            new_key, unit = lower, KYL_INDICATOR_UNIT_OVERRIDES[lower]
+        else:
+            new_key, unit = _split_metric_unit_suffix(lower)
+            if new_key in KYL_INDICATOR_UNIT_OVERRIDES:
+                unit = KYL_INDICATOR_UNIT_OVERRIDES[new_key]
+        out[new_key] = value
+        units[new_key] = unit
+    return out, units
 
 
 def flat_kyl_indicator_payload(rows):
@@ -191,22 +246,27 @@ def flat_kyl_indicator_payload(rows):
     if len(rows) == 0:
         return {"indicators": [], "indicator_units": {}}
 
-    all_keys = set()
-    for r in rows:
-        if isinstance(r, dict):
-            all_keys.update(r.keys())
-    indicator_units = {k: indicator_unit_for_key(k) for k in sorted(all_keys)}
+    normalized_rows = []
+    indicator_units = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        canonical_row, units = _canonicalize_indicator_row(row)
+        normalized_rows.append(canonical_row)
+        indicator_units.update(units)
 
-    if len(rows) == 1:
+    if len(normalized_rows) == 0:
+        return {"indicators": [], "indicator_units": {}}
+    if len(normalized_rows) == 1:
         return round_floats(
             {
-                "indicators": rows[0],
+                "indicators": normalized_rows[0],
                 "indicator_units": indicator_units,
             },
             precision=2,
         )
     return round_floats(
-        {"indicators": rows, "indicator_units": indicator_units},
+        {"indicators": normalized_rows, "indicator_units": indicator_units},
         precision=2,
     )
 
@@ -583,7 +643,12 @@ def annual_structure_from_dict(item):
 
         match = YEAR_SUFFIX_RE.match(key)
         if not match:
-            metadata[key] = _coerce_metadata_entry(key, value)
+            meta_key, suffix_unit, renamed = _metadata_key_without_unit(key)
+            metadata[meta_key] = _coerce_metadata_entry(meta_key, value)
+            if renamed:
+                metadata_units_extra[meta_key] = METADATA_FIELD_UNITS.get(
+                    meta_key, suffix_unit
+                )
             continue
 
         metric_raw = _normalize_key_name(match.group("metric"))
@@ -594,11 +659,10 @@ def annual_structure_from_dict(item):
         grouped.setdefault(period_label, {})[metric] = normalized_value
         if value_units:
             _merge_sheet_units(metric_units, value_units)
-        else:
-            metric_units.setdefault(metric, unit)
+        metric_units.setdefault(metric, unit)
 
     metadata_units = _metadata_units_map(metadata)
-    _merge_sheet_units(metadata_units, metadata_units_extra)
+    metadata_units.update(metadata_units_extra)
 
     if not grouped:
         return _finalize_openmeteo_block(
@@ -841,6 +905,7 @@ def _normalize_tehsil_row(sheet_name, row):
         if map_units:
             out[key] = value
             _merge_sheet_units(units, map_units)
+            units.setdefault(key, unit)
             continue
 
         if sheet_name == "mws_intersect_swb" and key in {"latitude", "longitude"}:
