@@ -308,7 +308,7 @@ def flat_mws_by_latlon_payload(data):
     if not isinstance(data, dict):
         data = {}
     mws_details = {
-        "uid": data.get("uid"),
+        "uid": data.get("uid") or data.get("mws_id"),
         "State": data.get("State"),
         "District": data.get("District"),
         "Tehsil": data.get("Tehsil"),

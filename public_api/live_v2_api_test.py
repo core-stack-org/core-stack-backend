@@ -32,8 +32,8 @@ DISTRICT = os.environ.get("PUBLIC_API_DISTRICT", "Bhilwara")
 TEHSIL = os.environ.get("PUBLIC_API_TEHSIL", "Mandalgarh")
 MWS_ID = os.environ.get("PUBLIC_API_MWS_ID", "12_100174")
 UID = os.environ.get("PUBLIC_API_UID", "12_100174_101")
-LAT = os.environ.get("PUBLIC_API_LAT", "25.45")
-LON = os.environ.get("PUBLIC_API_LON", "75.05")
+LAT = os.environ.get("PUBLIC_API_LAT", "25.20231618101583")
+LON = os.environ.get("PUBLIC_API_LON", "75.0868641493802")
 
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
