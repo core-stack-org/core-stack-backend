@@ -223,6 +223,10 @@ from .tree_health.local.overall_change_vector_local import (
     tree_health_overall_change_vector_local,
 )
 from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .tree_in_grassland.tree_in_grassland_local_compute import (
+    generate_tree_in_grassland_local,
+)
+from .forest_fringe.forest_fringe_local_compute import generate_forest_fringe_local
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -2831,8 +2835,7 @@ def generate_soil_health(request):
 def generate_soil_type(request):
     try:
         location = {
-            field: request.data.get(field)
-            for field in ("state", "district", "block")
+            field: request.data.get(field) for field in ("state", "district", "block")
         }
         compute = request.data.get("compute")
         missing_fields = [field for field, value in location.items() if not value]
@@ -2900,4 +2903,46 @@ def generate_ltp_stp_change(request):
         )
     except Exception as e:
         print("Exception in generate_ltp_stp api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fringe(request):
+    print("Inside generate_forest_fringe API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        generate_forest_fringe_local.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": f"Successfully initiated generate_forest_fringe task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_forest_fringe api :: ", e)
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_tree_in_grassland(request):
+    print("Inside generate_tree_in_grassland API.")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+
+        generate_tree_in_grassland_local.apply_async(
+            args=[state, district, block], queue="nrm"
+        )
+        return Response(
+            {"Success": f"Successfully initiated generate_tree_in_grassland task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        print("Exception in generate_tree_in_grassland api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
