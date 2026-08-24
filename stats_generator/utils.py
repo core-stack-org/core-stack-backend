@@ -1903,7 +1903,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             return base_area * (percentage / 100)
 
         # Generate years dynamically based on start_year and end_year
-        years = range(start_year, end_year)
+        years = range(start_year, end_year + 1)
 
         for num_uid_part in num_uid_parts_is:
             row = {"UID": num_uid_part}
@@ -2298,7 +2298,7 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
                 triply_c_key, 0
             )
 
-        croppable_area_key = (f"total_cropable_area_ever_hydroyear_2017_{end_year}")
+        croppable_area_key = f"total_cropable_area_ever_hydroyear_2017_{end_year}"
         croppable_area = properties.get(croppable_area_key)
         row["sum_area_in_ha"] = croppable_area
         df_data.append(row)
