@@ -1,0 +1,17 @@
+{% if ceew_climate.drought.available %}
+<div class="district-climate-context" id="district-drought-context" data-district-name="{{ ceew_climate.district_name }}">
+    <p><strong>District Level Drought Context:</strong> {{ block }} lies in <em>{{ ceew_climate.district_name }}</em> district. Following figure shows available Observed IMD series (1981–2024), followed by corresponding RCP4.5 and RCP8.5 modelled-scenario series (2025–2099) for the normalised 6-month drought severity index and longest dry spell (continuous days in the district with less than 1mm rainfall) showing serious watrer scarcity.</p>
+
+    <div class="ceew-small-multiples ceew-drought-plots">
+        <div class="ceew-chart-card">
+            <canvas id="ceewDroughtSeverityChart" aria-label="Normalised 6-month drought severity for {{ ceew_climate.district_name }} district"></canvas>
+        </div>
+        <div class="ceew-chart-card">
+            <canvas id="ceewLongestDrySpellChart" aria-label="Longest dry spell for {{ ceew_climate.district_name }} district"></canvas>
+        </div>
+    </div>
+
+    <p class="legend-note">District-level climate context used in this tehsil report.</p>
+    <p>The observed normalized drought-severity value averaged {{ ceew_climate.drought.baseline_mean }} during 1981–2016 and {{ ceew_climate.drought.recent_mean }} during 2017–2024. The modelled segment is shown together, while a separation line shows clear demarcation between them. {{ ceew_climate.drought.projected_text }}</p>
+</div>
+{% endif %}

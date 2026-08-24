@@ -1,0 +1,52 @@
+{% if ceew_climate.climate_available %}
+<section class="section district-climate-context" id="district-climate-section" data-district-name="{{ ceew_climate.district_name }}">
+    <h2>District Climate Context</h2>
+
+    <p>{{ block }} lies in <em>{{ ceew_climate.district_name }}</em> district. While we recognise lack of tehsil level data regarding Climate Change, however we realise its immense importance for Water Resources management needs, therefore this section is added to show publicly available District Level Climate, how it has been changing, how based on best estimations it is projected to change in the future as well, allowing us to plan for mitigation and/or adaption regarding water resources, agriculture, people, livelihoods, governance.</p>
+
+    <p>RCP4.5 is an intermediate greenhouse-gas concentration pathway reaching approximately 4.5 W/m² of radiative forcing, while RCP8.5 is a high pathway reaching approximately 8.5 W/m² by 2100. They are shown together to examine climate change under intermediate and high pathways. These are modelled projections rather than predictions, and actual future observations may differ.</p>
+
+    {% if ceew_climate.temperature.available %}
+    <div class="ceew-chart-card ceew-chart-card-large">
+        <canvas id="ceewTemperatureRangeChart" aria-label="Annual maximum, average and minimum temperature for {{ ceew_climate.district_name }} district"></canvas>
+    </div>
+    <p class="legend-note">Annual district maximum, average and minimum temperature. The shaded band connects the minimum and maximum temperature series, while the central line shows average temperature. Observed IMD values continue through 2024, followed by RCP4.5 and RCP8.5 modelled values from 2025 onwards.</p>
+
+    <p>The observed IMD averages during 2017–2024 were {{ ceew_climate.temperature.maximum.observed_reference }}°C for maximum temperature, {{ ceew_climate.temperature.average.observed_reference }}°C for average temperature and {{ ceew_climate.temperature.minimum.observed_reference }}°C for minimum temperature. Under RCP8.5, {{ ceew_climate.temperature.projected_phrase }}. Compared with the modelled 2017–2024 averages, the modelled changes during 2025–2049 are {{ ceew_climate.temperature.maximum.near_change }}°C, {{ ceew_climate.temperature.average.near_change }}°C and {{ ceew_climate.temperature.minimum.near_change }}°C for maximum, average and minimum temperature; during 2075–2099 they are {{ ceew_climate.temperature.maximum.late_change }}°C, {{ ceew_climate.temperature.average.late_change }}°C and {{ ceew_climate.temperature.minimum.late_change }}°C.</p>
+    {% endif %}
+
+    {% if ceew_climate.unusual_temperature.available %}
+    <div class="ceew-small-multiples ceew-temperature-extremes-plots">
+        <div class="ceew-chart-card"><canvas id="ceewHotDaysChart" aria-label="Unusually hot days for {{ ceew_climate.district_name }} district"></canvas></div>
+        <div class="ceew-chart-card"><canvas id="ceewWarmNightsChart" aria-label="Unusually warm nights for {{ ceew_climate.district_name }} district"></canvas></div>
+        <div class="ceew-chart-card"><canvas id="ceewColdDaysChart" aria-label="Unusually cold days for {{ ceew_climate.district_name }} district"></canvas></div>
+        <div class="ceew-chart-card"><canvas id="ceewColdNightsChart" aria-label="Unusually cold nights for {{ ceew_climate.district_name }} district"></canvas></div>
+    </div>
+    <p class="legend-note">Annual counts of unusually hot days, unusually warm nights, unusually cold days and unusually cold nights. The observed series continues through 2024, followed by the RCP4.5 and RCP8.5 modelled series from 2025 onwards.</p>
+
+    <p>Compared with 1981–2016, the observed averages during 2017–2024 show {{ ceew_climate.unusual_temperature.metrics.hot.observed_word }} unusually hot days ({{ ceew_climate.unusual_temperature.metrics.hot.recent_mean }} from {{ ceew_climate.unusual_temperature.metrics.hot.baseline_mean }}), {{ ceew_climate.unusual_temperature.metrics.warm.observed_word }} unusually warm nights ({{ ceew_climate.unusual_temperature.metrics.warm.recent_mean }} from {{ ceew_climate.unusual_temperature.metrics.warm.baseline_mean }}), {{ ceew_climate.unusual_temperature.metrics.cold_day.observed_word }} unusually cold days ({{ ceew_climate.unusual_temperature.metrics.cold_day.recent_mean }} from {{ ceew_climate.unusual_temperature.metrics.cold_day.baseline_mean }}), and {{ ceew_climate.unusual_temperature.metrics.cold_night.observed_word }} unusually cold nights ({{ ceew_climate.unusual_temperature.metrics.cold_night.recent_mean }} from {{ ceew_climate.unusual_temperature.metrics.cold_night.baseline_mean }}).</p>
+
+    <p>As we can see, the district's climate is moving towards {{ ceew_climate.unusual_temperature.overall_phrase }}, with {{ ceew_climate.unusual_temperature.metrics.hot.projected_phrase }} unusually hot days and {{ ceew_climate.unusual_temperature.metrics.warm.projected_phrase }} unusually warm nights. It is also projected to have {{ ceew_climate.unusual_temperature.metrics.cold_day.projected_phrase }} unusually cold days and {{ ceew_climate.unusual_temperature.metrics.cold_night.projected_phrase }} unusually cold nights. Among these temperature extremes, the two largest modelled changes between 2025–2049 and 2075–2099 are {{ ceew_climate.unusual_temperature.priorities.0.label }}, from {{ ceew_climate.unusual_temperature.priorities.0.near_mean }} to {{ ceew_climate.unusual_temperature.priorities.0.late_mean }} a year, and {{ ceew_climate.unusual_temperature.priorities.1.label }}, from {{ ceew_climate.unusual_temperature.priorities.1.near_mean }} to {{ ceew_climate.unusual_temperature.priorities.1.late_mean }} a year.</p>
+    {% endif %}
+
+    {% if ceew_climate.rainfall.available %}
+    <div class="ceew-chart-card ceew-chart-card-large">
+        <canvas id="ceewAnnualRainfallChart" aria-label="Annual rainfall for {{ ceew_climate.district_name }} district"></canvas>
+    </div>
+    <p class="legend-note">Annual district rainfall from 1981–2099. The observed IMD series continues through 2024, followed by the RCP4.5 and RCP8.5 modelled series from 2025 onwards.</p>
+
+    <p>Annual district rainfall averaged {{ ceew_climate.rainfall.baseline_mean }} mm during 1981–2016 and {{ ceew_climate.rainfall.recent_mean }} mm during 2017–2024. Under RCP8.5, annual rainfall {{ ceew_climate.rainfall.projected_phrase }}, with the modelled average changing from {{ ceew_climate.rainfall.near_mean }} mm during 2025–2049 to {{ ceew_climate.rainfall.late_mean }} mm during 2075–2099.</p>
+    {% endif %}
+
+    {% if ceew_climate.unusual_rainfall.available %}
+    <div class="ceew-chart-card ceew-chart-card-large">
+        <canvas id="ceewUnusualRainfallChart" aria-label="Unusually heavy rainy days for {{ ceew_climate.district_name }} district"></canvas>
+    </div>
+    <p class="legend-note">Annual count of unusually heavy rainy days. The observed series continues through 2024, followed by the RCP4.5 and RCP8.5 modelled series from 2025 onwards.</p>
+
+    <p>Compared with 1981–2016, the observed average during 2017–2024 shows {{ ceew_climate.unusual_rainfall.observed_word }} unusually heavy rainy days ({{ ceew_climate.unusual_rainfall.recent_mean }} from {{ ceew_climate.unusual_rainfall.baseline_mean }}). Under RCP8.5, the district is projected to have {{ ceew_climate.unusual_rainfall.projected_phrase }} unusually heavy rainy days, with the modelled annual average changing from {{ ceew_climate.unusual_rainfall.near_mean }} during 2025–2049 to {{ ceew_climate.unusual_rainfall.late_mean }} during 2075–2099.</p>
+    {% endif %}
+
+    <p class="ceew-source"><em>CoRE Stack. Data presented through Climate Resilience Analytics and Visualisation Intelligence System (CRAVIS.ai). 2026. New Delhi: Council on Energy, Environment and Water (CEEW). Available at: <a href="https://cravis.ai" target="_blank">https://cravis.ai</a>.</em></p>
+</section>
+{% endif %}

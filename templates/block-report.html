@@ -445,6 +445,57 @@
             font-weight: bold;
         }
 
+        .district-climate-context {
+            margin: 24px 0;
+            padding: 22px;
+            background: #f7f9fb;
+            border-radius: 4px;
+        }
+
+        .district-climate-context h2 {
+            color: #2c3e50;
+        }
+
+        .ceew-chart-card {
+            position: relative;
+            width: 100%;
+            height: 260px;
+            margin: 18px 0;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid #dfe4ea;
+            border-radius: 4px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .ceew-chart-card-large {
+            height: 380px;
+        }
+
+        .ceew-small-multiples {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin: 18px 0;
+        }
+
+        .ceew-small-multiples .ceew-chart-card {
+            margin: 0;
+            height: 245px;
+        }
+
+        .ceew-drought-plots,
+        .ceew-temperature-extremes-plots {
+            grid-template-columns: 1fr;
+        }
+
+        .ceew-source {
+            margin-top: 24px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
         /* Responsive - stack on smaller screens */
         @media screen and (max-width: 768px) {
             .map-chart-container {
@@ -458,6 +509,10 @@
 
             .pattern-info-container {
                 flex-direction: column;
+            }
+
+            .ceew-small-multiples {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -741,6 +796,31 @@
                 print-color-adjust: exact !important;
             }
 
+            .district-climate-context {
+                background: #f7f9fb !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .ceew-chart-card {
+                height: 220px !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            .ceew-chart-card-large {
+                height: 340px !important;
+            }
+
+            .ceew-small-multiples {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .ceew-drought-plots,
+            .ceew-temperature-extremes-plots {
+                grid-template-columns: 1fr;
+            }
+
             /* Page setup for better printing */
             @page {
                 size: A4 portrait;
@@ -965,6 +1045,7 @@
                     spell is defined across four consecutive weeks with each week of these four weeks incurring a
                     rainfall deviation of more than 50% from the historical average.
                 </p>
+                {% include "dpr/ceew_drought_context.html" %}
                 <br>
                 <br>
             </div>
@@ -1238,6 +1319,8 @@
             <br>
             <br>
         </section>
+
+        {% include "dpr/ceew_climate_context.html" %}
 
         {% comment %} <section class="section" id="agroforestry-section">
             <h2>Agroforestry</h2>
@@ -3194,6 +3277,12 @@
         }
 
     </script>
+    {% if ceew_climate.available %}
+    {{ ceew_climate.charts|json_script:"ceew-climate-data" }}
+    <script>
+        {% include "js/ceew_tehsil_report.js" %}
+    </script>
+    {% endif %}
 </body>
 
 </html>

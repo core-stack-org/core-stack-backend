@@ -89,6 +89,7 @@ from .gen_tehsil_report import (
     get_fishery_water_potential_data,
     get_agroforestry_transition_data,
 )
+from .ceew_tehsil_report import get_ceew_tehsil_context
 from .gen_village_report import (
     load_block_sheets,
     get_village_polygon_and_info,
@@ -639,6 +640,9 @@ def generate_tehsil_report(request):
         agroforestry_transition, agroforestry_sankey = get_agroforestry_transition_data(
             result["state"], result["district"], result["block"]
         )
+        ceew_climate = get_ceew_tehsil_context(
+            result["state"], result["district"]
+        )
 
         # print("Active Patterns", active_pattern)
         active_pattern = mws_pattern_intensity_with_active_pattern.get(
@@ -680,6 +684,7 @@ def generate_tehsil_report(request):
             "fishery_timeline_json": json.dumps(fishery_timeline),
             "agroforestry_transition_json": json.dumps(agroforestry_transition),
             "agroforestry_sankey_json": json.dumps(agroforestry_sankey),
+            "ceew_climate": ceew_climate,
         }
 
         return render(request, "block-report.html", context)

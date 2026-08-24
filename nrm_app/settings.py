@@ -288,6 +288,10 @@ EXCEL_DIR = resolve_env_path(
     default="$BACKEND_DIR/data/excel_files",
     trailing_sep=True,
 )
+CEEW_DISTRICT_DATA_DIR = resolve_env_path(
+    "CEEW_DISTRICT_DATA_DIR",
+    default="$BACKEND_DIR/data/ceew/district_data",
+)
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
