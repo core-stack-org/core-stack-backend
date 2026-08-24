@@ -257,12 +257,80 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_type(geojson_data, writer)
             elif workspace == "soil_health_vector":
                 create_excel_for_soil_health(geojson_data, writer)
+            elif workspace == "ndvi_timeseries":
+                create_excel_for_ndvi_shrub(geojson_data, writer)
+                processed_ndvi_data = [
+                    process_feature_ndvi(feature)
+                    for feature in geojson_data["features"]
+                ]
+                create_excel_for_ndvi_shrub_seasonally(
+                    processed_ndvi_data, writer, start_year, end_year
+                )
 
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_ndvi_shrub_seasonally(
+    processed_data, writer, start_year, end_year
+):
+    seasons = ["kharif", "rabi", "zaid"]
+
+    data = {"UID": []}
+
+    for year in range(start_year, end_year + 1):
+        for season in seasons:
+            end_to_year = year + 1
+            column_name = f"ndvi_{season}_{year}-{end_to_year}"
+            data[column_name] = []
+
+    for feature_data in processed_data:
+        data["UID"].append(feature_data["UID"])
+
+        for year in range(start_year, end_year + 1):
+            for season in seasons:
+                end_to_year = year + 1
+                column_name = f"ndvi_{season}_{year}-{end_to_year}"
+
+                value = feature_data.get(season, {}).get(year, 0.0)
+
+                data[column_name].append(value)
+
+    df = pd.DataFrame(data)
+
+    df = df.sort_values("UID")
+
+    # Round all numeric values to 2 decimal places
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+
+    df[numeric_cols] = df[numeric_cols].round(2)
+
+    df.to_excel(writer, sheet_name="ndvi_seasonal", index=False)
+
+    print("Excel file created ndvi_seasonal")
+
+
+def create_excel_for_ndvi_shrub(data, writer):
+    print("Inside ndvi shrub excel generation")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        df.rename(columns={"uid": "UID"}, inplace=True)
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="ndvi_shrub", index=False)
+        print("Excel file created for ndvi_shrub")
+    except Exception as e:
+        print(f"Error occurred while generating excel for ndvi shrub {e} ")
 
 
 def create_excel_for_soil_health(data, writer):
@@ -2298,7 +2366,7 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
                 triply_c_key, 0
             )
 
-        croppable_area_key = (f"total_cropable_area_ever_hydroyear_2017_{end_year}")
+        croppable_area_key = f"total_cropable_area_ever_hydroyear_2017_{end_year}"
         croppable_area = properties.get(croppable_area_key)
         row["sum_area_in_ha"] = croppable_area
         df_data.append(row)
@@ -2430,6 +2498,47 @@ def get_season(month):
         return "kharif"
     elif month in (11, 12, 1, 2):
         return "rabi"
+
+
+def process_feature_ndvi(feature):
+    uid = feature["properties"]["uid"]
+    results = {
+        "UID": uid,
+        "kharif": {},
+        "rabi": {},
+        "zaid": {},
+    }
+    for key, value in feature["properties"].items():
+        if not key.startswith("20"):
+            continue
+        try:
+            date = datetime.strptime(key, "%Y-%m-%d")
+            year = date.year
+            month = date.month
+            season = get_season(month)
+            if season == "rabi":
+                current_year = year - 1 if month in (1, 2) else year
+            elif season == "zaid":
+                current_year = year - 1
+            else:
+                current_year = year
+            ndvi_value = float(value)
+            if current_year not in results[season]:
+                results[season][current_year] = []
+            results[season][current_year].append(ndvi_value)
+
+        except (ValueError, TypeError) as e:
+            print(f"Error processing NDVI data for date {key}: {e}")
+            continue
+    for season in ("kharif", "rabi", "zaid"):
+        for year in results[season]:
+            values = results[season][year]
+            if values:
+                results[season][year] = sum(values) / len(values)
+            else:
+                results[season][year] = 0.0
+
+    return results
 
 
 def process_feature(feature):
