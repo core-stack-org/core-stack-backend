@@ -569,14 +569,17 @@ def run_change_detection_local(
 
         published_layer_name = _published_layer_name(district, block, param_name)
         if push_to_geoserver:
-            upload_res, style_res = push_local_raster_to_geoserver(
+            geoserver_response = push_local_raster_to_geoserver(
                 file_path=raster_path,
                 layer_name=published_layer_name,
                 workspace=GEOSERVER_WORKSPACE,
                 style_name=param_name.lower(),
             )
-            print(f"GeoServer upload response for {param_name}: {upload_res}")
-            print(f"GeoServer style response for {param_name}: {style_res}")
+            print(f"GeoServer response for {param_name}: {geoserver_response}")
+            if geoserver_response.get("status_code") not in (200, 201):
+                raise RuntimeError(
+                    f"Failed to sync change raster: {geoserver_response}"
+                )
             geoserver_statuses.append(True)
 
         if sync_layer_metadata:

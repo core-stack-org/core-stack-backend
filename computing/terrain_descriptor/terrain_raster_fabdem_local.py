@@ -67,14 +67,15 @@ def run_terrain_raster_fabdem_local(
 
     if push_to_geoserver:
         try:
-            upload_res, style_res = push_local_raster_to_geoserver(
+            geoserver_response = push_local_raster_to_geoserver(
                 file_path=clipped_raster_path,
                 layer_name=layer_name,
                 workspace=GEOSERVER_WORKSPACE,
                 style_name=GEOSERVER_STYLE,
             )
-            print(f"GeoServer upload response: {upload_res}")
-            print(f"GeoServer style response: {style_res}")
+            print(f"GeoServer response: {geoserver_response}")
+            if geoserver_response.get("status_code") not in (200, 201):
+                raise RuntimeError(str(geoserver_response))
         except Exception as error:
             print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
             return False

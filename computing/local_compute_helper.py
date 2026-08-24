@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import ExitStack
 from pathlib import Path
@@ -11,8 +12,8 @@ from shapely.geometry import mapping
 from utilities.gee_utils import valid_gee_text
 
 from computing.utils import convert_to_zip
-import logging
 
+logger = logging.getLogger(__name__)
 
 from computing.config_loader import (
     AEZ_VECTOR_PATH,
@@ -353,41 +354,55 @@ RASTER_DECLARED_SRS = "EPSG:4326"
 VECTOR_DECLARED_SRS = "EPSG:4326"
 
 
-def _push_raster_to_geoserver_instance(geo, file_path, layer_name, workspace, style_name):
-
-    _log = logging.getLogger(__name__)
-
+def _push_raster_to_geoserver_instance(
+    geo,
+    file_path,
+    layer_name,
+    workspace,
+    style_name,
+    verify=False,
+):
     geo.ensure_workspace(workspace)
-    geo.delete_raster_store(workspace=workspace, store=layer_name)
     upload_response = geo.create_coveragestore(
         path=file_path,
         workspace=workspace,
         layer_name=layer_name,
     )
-    try:
-        geo.configure_coverage(
-            workspace=workspace,
-            store=layer_name,
-            coverage=layer_name,
-            srs=RASTER_DECLARED_SRS,
-            projection_policy="REPROJECT_TO_DECLARED",
-            enabled=True,
-        )
-    except Exception as e:
-        _log.warning(
-            "Failed to force SRS on coverage %s:%s: %s",
-            workspace,
-            layer_name,
-            e,
-        )
+    configure_response = None
     style_response = None
-    if style_name:
-        style_response = geo.publish_style(
-            layer_name=layer_name,
-            style_name=style_name,
-            workspace=workspace,
-        )
-    return upload_response, style_response
+    if upload_response.get("status_code") == 201:
+        try:
+            configure_response = geo.configure_coverage(
+                workspace=workspace,
+                store=layer_name,
+                coverage=layer_name,
+                srs=RASTER_DECLARED_SRS,
+                projection_policy="REPROJECT_TO_DECLARED",
+                enabled=True,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to force SRS on coverage %s:%s: %s",
+                workspace,
+                layer_name,
+                e,
+            )
+        if style_name:
+            style_response = geo.publish_style(
+                layer_name=layer_name,
+                style_name=style_name,
+                workspace=workspace,
+            )
+
+    return {
+        "status_code": upload_response.get("status_code"),
+        "upload_response": upload_response,
+        "configure_response": configure_response,
+        "style_response": style_response,
+        "layer_exists": (
+            _verify_raster_layer(geo, workspace, layer_name) if verify else None
+        ),
+    }
 
 
 def _verify_raster_layer(geo, workspace, layer_name):
@@ -403,16 +418,19 @@ def _verify_raster_layer(geo, workspace, layer_name):
         return False
 
 
-def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_type="gpkg"):
-    _log = logging.getLogger(__name__)
-
+def _push_vector_to_geoserver_instance(
+    geo,
+    zip_path,
+    layer_name,
+    workspace,
+    file_type="gpkg",
+):
     geo.ensure_workspace(workspace)
     try:
         geo.delete_vector_store(workspace=workspace, store=layer_name)
     except Exception:
         pass
 
-    zip_path = convert_to_zip(path, file_type)
     response = geo.create_shp_datastore(
         path=zip_path,
         store_name=layer_name,
@@ -428,7 +446,7 @@ def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_ty
             projection_policy="FORCE_DECLARED",
         )
     except Exception as e:
-        _log.warning(
+        logger.warning(
             "Failed to force SRS on featuretype %s:%s: %s",
             workspace,
             layer_name,
@@ -437,117 +455,112 @@ def _push_vector_to_geoserver_instance(geo, path, layer_name, workspace, file_ty
     return response
 
 
-def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"):
-    import logging
+def _geoserver_targets():
     from django.conf import settings
     from utilities.geoserver_utils import Geoserver
 
-    _log = logging.getLogger(__name__)
-
-    local_geo = Geoserver()
-    local_response = _push_vector_to_geoserver_instance(
-        local_geo, path, layer_name, workspace, file_type
-    )
-    local_ok = isinstance(local_response, dict) and local_response.get("status_code") in (
-        200,
-        201,
-    )
-    _log.info(
-        "Pushed vector %s to local GeoServer (ok=%s).", layer_name, local_ok
-    )
+    yield "local", Geoserver()
 
     prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
-    prod_response = None
-    prod_ok = None
     if prod_url:
-        try:
-            prod_geo = Geoserver(
+        yield (
+            "prod",
+            Geoserver(
                 service_url=prod_url,
                 username=settings.PROD_GEOSERVER_USERNAME,
                 password=settings.PROD_GEOSERVER_PASSWORD,
-            )
-            prod_response = _push_vector_to_geoserver_instance(
-                prod_geo, path, layer_name, workspace, file_type
-            )
-            prod_ok = isinstance(prod_response, dict) and prod_response.get(
-                "status_code"
-            ) in (200, 201)
-            _log.info(
-                "Pushed vector %s to prod GeoServer (%s) (ok=%s).",
-                layer_name,
-                prod_url,
-                prod_ok,
+            ),
+        )
+
+
+def _push_to_geoserver_targets(publish, layer_name, layer_type):
+    responses = {"local": None, "prod": None}
+    statuses = {"local": False, "prod": None}
+
+    for target, geo in _geoserver_targets():
+        try:
+            response = publish(geo)
+            ok = isinstance(response, dict) and response.get("status_code") in (
+                200,
+                201,
+                202,
             )
         except Exception as e:
-            prod_ok = False
-            prod_response = {"error": str(e)}
-            _log.error("Failed to push vector %s to prod GeoServer: %s", layer_name, e)
+            response = {"error": str(e)}
+            ok = False
+            logger.error(
+                "Failed to push %s %s to %s GeoServer: %s",
+                layer_type,
+                layer_name,
+                target,
+                e,
+            )
+        else:
+            logger.info(
+                "Pushed %s %s to %s GeoServer (ok=%s).",
+                layer_type,
+                layer_name,
+                target,
+                ok,
+            )
 
-    overall_ok = local_ok and (prod_ok if prod_ok is not None else True)
+        responses[target] = response
+        statuses[target] = ok
+
+    overall_ok = statuses["local"] and (
+        statuses["prod"] if statuses["prod"] is not None else True
+    )
     failure_status = None
-    if isinstance(prod_response, dict):
-        failure_status = prod_response.get("status_code")
-    if failure_status is None and isinstance(local_response, dict):
-        failure_status = local_response.get("status_code")
+    for target in ("local", "prod"):
+        response = responses[target]
+        if statuses[target] is False and isinstance(response, dict):
+            failure_status = response.get("status_code")
+            if failure_status is not None:
+                break
 
     return {
         "status_code": 201 if overall_ok else (failure_status or 500),
-        "local_ok": local_ok,
-        "prod_ok": prod_ok,
-        "local_response": local_response,
-        "prod_response": prod_response,
+        "local_ok": statuses["local"],
+        "prod_ok": statuses["prod"],
+        "local_response": responses["local"],
+        "prod_response": responses["prod"],
     }
 
 
-def push_local_raster_to_geoserver(file_path, layer_name, workspace, style_name=None):
-    import logging
-    from django.conf import settings
-    from utilities.geoserver_utils import Geoserver
-
-    _log = logging.getLogger(__name__)
-
-    local_geo = Geoserver()
-    upload_response, style_response = _push_raster_to_geoserver_instance(
-        local_geo, file_path, layer_name, workspace, style_name
-    )
-    local_layer_ok = _verify_raster_layer(local_geo, workspace, layer_name)
-    _log.info(
-        "Pushed raster %s to local GeoServer (layer_exists=%s).",
+def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"):
+    zip_path = convert_to_zip(path, file_type)
+    return _push_to_geoserver_targets(
+        lambda geo: _push_vector_to_geoserver_instance(
+            geo,
+            zip_path,
+            layer_name,
+            workspace,
+            file_type,
+        ),
         layer_name,
-        local_layer_ok,
+        "vector",
     )
 
-    prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
-    if prod_url:
-        try:
-            prod_geo = Geoserver(
-                service_url=prod_url,
-                username=settings.PROD_GEOSERVER_USERNAME,
-                password=settings.PROD_GEOSERVER_PASSWORD,
-            )
-            prod_upload, prod_style = _push_raster_to_geoserver_instance(
-                prod_geo, file_path, layer_name, workspace, style_name
-            )
-            prod_layer_ok = _verify_raster_layer(prod_geo, workspace, layer_name)
-            _log.info(
-                "Pushed raster %s to prod GeoServer (%s) "
-                "(layer_exists=%s, upload=%s, style=%s).",
-                layer_name,
-                prod_url,
-                prod_layer_ok,
-                prod_upload,
-                prod_style,
-            )
-            if not prod_layer_ok:
-                _log.error(
-                    "Prod raster push for %s created store but NO layer. "
-                    "Coverage auto-config likely failed on prod GeoServer.",
-                    layer_name,
-                )
-        except Exception as e:
-            _log.error("Failed to push raster %s to prod GeoServer: %s", layer_name, e)
 
-    return upload_response, style_response
+def push_local_raster_to_geoserver(
+    file_path,
+    layer_name,
+    workspace,
+    style_name=None,
+    verify=False,
+):
+    return _push_to_geoserver_targets(
+        lambda geo: _push_raster_to_geoserver_instance(
+            geo,
+            file_path,
+            layer_name,
+            workspace,
+            style_name,
+            verify,
+        ),
+        layer_name,
+        "raster",
+    )
 
 
 

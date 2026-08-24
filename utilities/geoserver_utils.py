@@ -2,9 +2,12 @@
 import io
 import logging
 import os
+from threading import Lock
 from typing import List, Optional, Set
 
 logger = logging.getLogger(__name__)
+_ensured_workspaces = set()
+_workspace_cache_lock = Lock()
 
 # third-party libraries
 import requests
@@ -256,14 +259,25 @@ class Geoserver:
         attempt that follows will surface the real error if the workspace is
         truly missing.
         """
-        try:
-            url = "{}/rest/workspaces/{}.json".format(self.service_url, workspace)
-            r = self._requests("get", url)
-            if r.status_code == 200:
+        cache_key = (self.service_url, workspace)
+        if cache_key in _ensured_workspaces:
+            return
+
+        with _workspace_cache_lock:
+            if cache_key in _ensured_workspaces:
                 return
-            self.create_workspace(workspace)
-        except Exception as e:
-            logger.warning("ensure_workspace(%s) failed (proceeding anyway): %s", workspace, e)
+            try:
+                url = "{}/rest/workspaces/{}.json".format(self.service_url, workspace)
+                r = self._requests("get", url)
+                if r.status_code != 200:
+                    self.create_workspace(workspace)
+                _ensured_workspaces.add(cache_key)
+            except Exception as e:
+                logger.warning(
+                    "ensure_workspace(%s) failed (proceeding anyway): %s",
+                    workspace,
+                    e,
+                )
 
     def delete_workspace(self, workspace: str):
         """
@@ -439,7 +453,14 @@ class Geoserver:
             r = self._requests(method="put", url=url, data=f, headers=headers)
 
         if r.status_code in (200, 201):
-            return r.json()
+            try:
+                response = r.json()
+            except ValueError:
+                response = r.text
+            return {
+                "status_code": r.status_code,
+                "response": response,
+            }
         else:
             raise GeoserverException(r.status_code, r.content)
 

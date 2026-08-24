@@ -259,14 +259,15 @@ def tree_health_ch_raster_local(
             continue
 
         try:
-            upload_res, style_res = push_local_raster_to_geoserver(
+            geoserver_response = push_local_raster_to_geoserver(
                 file_path=raster_path,
                 layer_name=layer_name,
                 workspace=GEOSERVER_WORKSPACE,
                 style_name=GEOSERVER_STYLE,
             )
-            print(f"GeoServer upload response for {layer_name}: {upload_res}")
-            print(f"GeoServer style response for {layer_name}: {style_res}")
+            print(f"GeoServer response for {layer_name}: {geoserver_response}")
+            if geoserver_response.get("status_code") not in (200, 201):
+                raise RuntimeError(str(geoserver_response))
         except Exception as error:
             print(f"Failed to sync local CH raster {layer_name}: {error}")
             layer_at_geoserver = False

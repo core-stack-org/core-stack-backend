@@ -292,12 +292,16 @@ def clip_soil_health_raster(
         )
 
         if push_to_geoserver:
-            upload_res, style_res = push_local_raster_to_geoserver(
+            geoserver_response = push_local_raster_to_geoserver(
                 file_path=output_raster_path,
                 layer_name=f"{layer_name}_{nutrient}",
                 workspace=GEOSERVER_RASTER_WORKSPACE,
             )
-            print(f"GeoServer upload response for {nutrient}: {upload_res}")
+            print(f"GeoServer response for {nutrient}: {geoserver_response}")
+            if geoserver_response.get("status_code") not in (200, 201):
+                raise RuntimeError(
+                    f"Failed to sync soil health raster: {geoserver_response}"
+                )
             geoserver_statuses.append(True)
 
         if sync_layer_metadata:
