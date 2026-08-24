@@ -156,9 +156,10 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
             {"metadata", "metadata_units", "annual", "annual_units"},
         )
         self.assertEqual(payload["metadata"]["uid"], "12_100174")
-        self.assertEqual(payload["metadata"]["area_in_ha"], 10.56)
+        self.assertEqual(payload["metadata"]["area"], 10.55)
+        self.assertNotIn("area_in_ha", payload["metadata"])
         self.assertEqual(payload["metadata_units"]["uid"], "id")
-        self.assertEqual(payload["metadata_units"]["area_in_ha"], "ha")
+        self.assertEqual(payload["metadata_units"]["area"], "ha")
         self.assertEqual(payload["annual"]["time"], ["2017", "2018"])
         self.assertEqual(payload["annual"]["precipitation"], [100.13, 110.1])
         self.assertEqual(payload["annual"]["g"], [5.02, 6.0])
@@ -203,10 +204,51 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
         self.assertIn("annual", drought_row)
         self.assertIn("annual_units", drought_row)
         self.assertEqual(drought_row["annual_units"]["no_drought"], "weeks")
+        self.assertEqual(drought_row["metadata"]["area"], 12.35)
+        self.assertNotIn("area_in_ha", drought_row["metadata"])
+        self.assertEqual(drought_row["metadata_units"]["area"], "ha")
+        self.assertEqual(payload["tehsil_units"]["drought"]["area"], "ha")
         stream = payload["tehsil_data"]["stream_order"][0]
         self.assertEqual(stream["order"], ["1", "2"])
         self.assertEqual(payload["tehsil_units"]["stream_order"]["order"], "order")
         self.assertEqual(payload["tehsil_units"]["stream_order"]["value"], "%")
+        json.dumps(payload, allow_nan=False)
+
+    def test_metadata_and_annual_keys_do_not_embed_units(self):
+        payload = annual_structure_from_dict(
+            {
+                "UID": "12_100174_101",
+                "area_in_ha": 10.5,
+                "sum_area_in_ha": 20.25,
+                "total_swb_area_in_ha": 1.2,
+                "drainage_density_weighted_in_km_per_km2": 0.51,
+                "drysp_unit_4_weeks_2017": 2,
+                "drysp_unit_4_weeks_2018": 3,
+                "cropping_intensity_unit_less_2017": 1.16,
+                "cropping_intensity_unit_less_2018": 1.2,
+                "mild_drought_causality_2017": {"deficit": "mild", "other": "none"},
+                "mild_drought_causality_2018": {"deficit": "none", "other": "mild"},
+            }
+        )
+        self.assertEqual(payload["metadata"]["UID"], "12_100174_101")
+        self.assertEqual(payload["metadata"]["area"], 10.5)
+        self.assertEqual(payload["metadata"]["sum_area"], 20.25)
+        self.assertEqual(payload["metadata"]["total_swb_area"], 1.2)
+        self.assertEqual(payload["metadata"]["drainage_density_weighted"], 0.51)
+        self.assertNotIn("area_in_ha", payload["metadata"])
+        self.assertEqual(payload["metadata_units"]["area"], "ha")
+        self.assertEqual(payload["metadata_units"]["sum_area"], "ha")
+        self.assertEqual(payload["metadata_units"]["total_swb_area"], "ha")
+        self.assertEqual(payload["metadata_units"]["drainage_density_weighted"], "km/km2")
+        self.assertEqual(payload["annual"]["dry_spell"], [2, 3])
+        self.assertNotIn("drysp_unit_4_weeks", payload["annual"])
+        self.assertEqual(payload["annual_units"]["dry_spell"], "weeks")
+        self.assertEqual(payload["annual"]["cropping_intensity"], [1.16, 1.2])
+        self.assertNotIn("cropping_intensity_unit_less", payload["annual"])
+        self.assertEqual(payload["annual_units"]["cropping_intensity"], "ratio")
+        self.assertEqual(payload["annual_units"]["mild_drought_causality"], "category")
+        self.assertEqual(payload["annual_units"]["mild_drought_causality.keys"], "label")
+        assert_aligned_series(self, payload["annual"], payload["annual_units"])
         json.dumps(payload, allow_nan=False)
 
     def test_flat_admin_detail_payload(self):
@@ -248,15 +290,19 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
                     "mws_id": "12_100174",
                     "avg_precipitation": 800.129,
                     "cropping_intensity_avg": 1.5,
+                    "lulc_crop_percent": 40.12,
                 }
             ]
         )
         self.assertEqual(set(payload.keys()), {"indicators", "indicator_units"})
         self.assertIsInstance(payload["indicators"], dict)
         self.assertEqual(payload["indicators"]["avg_precipitation"], 800.13)
+        self.assertEqual(payload["indicators"]["lulc_crop"], 40.12)
+        self.assertNotIn("lulc_crop_percent", payload["indicators"])
         self.assertEqual(payload["indicator_units"]["mws_id"], "id")
         self.assertEqual(payload["indicator_units"]["avg_precipitation"], "mm")
         self.assertEqual(payload["indicator_units"]["cropping_intensity_avg"], "ratio")
+        self.assertEqual(payload["indicator_units"]["lulc_crop"], "%")
 
     def test_flat_generated_layers_payload(self):
         payload = flat_generated_layers_payload(
@@ -453,6 +499,8 @@ class TehsilDataV2Tests(V2ApiTestCase):
         drought_row = data["tehsil_data"]["drought"][0]
         self.assertIn("annual", drought_row)
         self.assertIn("annual_units", drought_row)
+        self.assertEqual(drought_row["metadata"]["area"], 12.35)
+        self.assertNotIn("area_in_ha", drought_row["metadata"])
         assert_aligned_series(
             self, drought_row["annual"], drought_row["annual_units"]
         )
