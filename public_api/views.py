@@ -69,14 +69,40 @@ def raster_tiff_download_url(workspace, layer_name):
     return geotiff_url
 
 
+def _soi_name_candidates(name):
+    """Match both GEE-normalized (uttar_pradesh) and SOI (Uttar Pradesh) names."""
+    raw = str(name or "").strip()
+    if not raw:
+        return []
+    candidates = []
+    for value in (raw, raw.replace("_", " "), raw.replace(" ", "_")):
+        if value and value not in candidates:
+            candidates.append(value)
+    return candidates
+
+
+def _get_soi_by_name(model, field_name, name, **filters):
+    for candidate in _soi_name_candidates(name):
+        match = model.objects.filter(**{f"{field_name}__iexact": candidate}, **filters).first()
+        if match is not None:
+            return match
+    raise model.DoesNotExist(
+        f"{model.__name__} matching query does not exist for {field_name}={name!r}."
+    )
+
+
 def fetch_generated_layer_urls(state_name, district_name, block_name):
     """
     Fetch all vector and raster layers for given state, district, and block,
     and return their metadata as JSON.
     """
-    state = StateSOI.objects.get(state_name__iexact=state_name)
-    district = DistrictSOI.objects.get(district_name__iexact=district_name, state=state)
-    tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
+    state = _get_soi_by_name(StateSOI, "state_name", state_name)
+    district = _get_soi_by_name(
+        DistrictSOI, "district_name", district_name, state=state
+    )
+    tehsil = _get_soi_by_name(
+        TehsilSOI, "tehsil_name", block_name, district=district
+    )
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
 
@@ -226,9 +252,10 @@ def get_mws_id_by_lat_lon(lon, lat):
             )
 
         properties = features[0].get("properties", {})
-        uid = properties.get("uid")
+        uid = properties.get("uid") or properties.get("UID") or properties.get("mws_id")
 
         data_dict["mws_id"] = uid
+        data_dict["uid"] = uid
         return data_dict
 
     except Exception as e:

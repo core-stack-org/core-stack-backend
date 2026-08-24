@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.response import Response
 from rest_framework import status
 from utilities.gee_utils import (
@@ -596,6 +597,13 @@ def get_generated_layer_urls(request):
         payload = flat_generated_layers_payload(layers_details_json)
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
 
+    except ObjectDoesNotExist as e:
+        print(f"Error in get_generated_layer_urls: {str(e)}")
+        return _error_response(
+            "State, district, or tehsil not found.",
+            status.HTTP_404_NOT_FOUND,
+            details=str(e),
+        )
     except Exception as e:
         print(f"Error in get_generated_layer_urls: {str(e)}")
         return _error_response(
