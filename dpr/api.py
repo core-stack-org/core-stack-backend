@@ -833,6 +833,19 @@ def generate_village_report(request):
         state, district, block
     )
 
+    # antyodaya sheet is mandatory — if it's missing the report cannot be built
+    if df is None:
+        return render(
+            request,
+            "village-report-unavailable.html",
+            {
+                "state": state,
+                "district": district,
+                "block": block,
+                "village_id": village_id,
+            },
+        )
+
     # Get village polygon and info from GeoServer
     village_data = get_village_polygon_and_info(state, district, block, village_id)
 

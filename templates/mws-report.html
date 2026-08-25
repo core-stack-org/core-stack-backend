@@ -3411,7 +3411,8 @@
                 serverType: 'geoserver',
             }),
             visible: true,
-            name: 'water_raster'
+            name: 'water_raster',
+            zIndex: 6
         })
 
         const urbanRaster = new ol.layer.Image({
@@ -4119,6 +4120,7 @@
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
+                        addVillageBoundariesToMap(swbMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature);
                         addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
                         addDemographicBoundariesToMap(feature);
@@ -4226,7 +4228,7 @@
                     features: new ol.format.GeoJSON().readFeatures(data),
                 });
 
-                swbVillageMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
+                swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
             })
             .catch(error => {
                 // Silently handle fetch errors

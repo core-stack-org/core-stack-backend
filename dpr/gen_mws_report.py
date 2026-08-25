@@ -40,6 +40,14 @@ def read_excel_sheet(path, sheet_name):
     return _get_excel_file(path).parse(sheet_name).copy()
 
 
+def display_name(name):
+    """Convert an underscore/lowercase transformed name (e.g. 'west_bengal', from
+    utils.transform_name) back to a human-readable display form (e.g. 'West Bengal')."""
+    if not name:
+        return name
+    return name.replace("_", " ").title()
+
+
 # ? MARK: HELPER FUNCTIONS
 def get_geojson(workspace, layer_name):
     """Construct the GeoServer WFS request URL for fetching GeoJSON data."""
@@ -888,15 +896,19 @@ def get_osm_data(state, district, block, uid):
                 f" as a crucial water source for agriculture and daily needs"
             )
         
+        block_display = display_name(block)
+        district_display = display_name(district)
+        state_display = display_name(state)
+
         if parameter_block == "":
-            parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
+            parameter_block = f"The Tehsil {block_display} lies in district {district_display} in {state_display}."
         else :
-            parameter_block = f"The Tehsil {block} having total area {total_area:,} hectares" + parameter_block + "."
+            parameter_block = f"The Tehsil {block_display} having total area {total_area:,} hectares" + parameter_block + "."
 
         if parameter_mws == "":
-            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block}</strong> which lies in district <strong>{district.capitalize()}</strong> in <strong>{state.capitalize()}</strong>."
+            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong> which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>."
         else :
-            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block}</strong>" + parameter_mws + "."
+            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong>, which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>" + parameter_mws + "."
 
         return parameter_block, parameter_mws
 
