@@ -42,6 +42,19 @@ PARAM_BOUNDS = (
     [150, 200, 5, 400, 5, 400],  # upper
 )
 
+# Caps how many attempts curve_fit gets before giving up on a stubborn
+# pixel. Timed on 300 real AEZ 5/2000 pixels at the old maxfev=2000: mean
+# 17.24ms/fit (vs. 1.96ms on clean synthetic data), with a heavy tail -
+# 4.3% of pixels over 50ms, worst case 437.88ms - clearly a handful of
+# noisy/ambiguous pixels burning through most of their iteration budget
+# without converging. Lowering the cap makes those pixels fail faster
+# instead of dragging out the whole run; the tradeoff is that a pixel
+# that would have eventually converged on attempt #600 now gives up
+# early and is marked NaN instead. 500 is a first guess, not tuned -
+# worth re-timing after this change to see how much it actually helps
+# and whether the NaN rate rises enough to matter.
+MAXFEV = 500
+
 
 def double_logistic(t, c1, c2, c3, c4, c5, c6):
     """The Elmore et al. 2012 double-logistic seasonal curve model.
@@ -102,7 +115,7 @@ def fit_phenology(vci_series, doy_array):
         return np.nan, np.nan, np.nan
 
     try:
-        popt, _ = curve_fit(double_logistic, t, y, p0=p0, bounds=PARAM_BOUNDS, maxfev=2000)
+        popt, _ = curve_fit(double_logistic, t, y, p0=p0, bounds=PARAM_BOUNDS, maxfev=MAXFEV)
     except Exception:
         return np.nan, np.nan, np.nan
 
