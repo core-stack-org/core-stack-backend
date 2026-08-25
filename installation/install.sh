@@ -923,7 +923,7 @@ function install_postgres() {
     else
         echo "Installing PostgreSQL..."
         sudo apt-get update
-        sudo apt-get install -y postgresql postgresql-contrib postgis libpq-dev
+        sudo apt-get install -y postgresql postgresql-contrib postgresql-client-common postgis libpq-dev
     fi
 
     sudo service postgresql start || sudo pg_ctlcluster 14 main start
