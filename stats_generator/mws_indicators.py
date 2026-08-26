@@ -1056,7 +1056,7 @@ def generate_mws_data_for_kyl_filters(
                     "Somewhat excessively drained": 0,
                     "Well drained": 1,
                     "Moderately well drained": 1,
-                    "Imperfectly drained": 2,
+                    "Imperfectly drained": 3,
                     "Poorly drained": 2,
                     "Very poorly drained": 2,
                 }
