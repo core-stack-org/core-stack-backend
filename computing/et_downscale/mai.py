@@ -44,7 +44,6 @@ def generate_mai(cfg, region):
             "aet_asset": product_asset_id(cfg, "aet"),
             "pet_asset": product_asset_id(cfg, "pet"),
             "valid_data_rule": "Calculated where AET and PET are valid and PET > 0",
-            "interpolation": "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only",
             "year": str(year),
             "asset_suffix": cfg["asset_suffix"],
             "roi_path": cfg["roi_path"],
