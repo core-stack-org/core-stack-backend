@@ -263,23 +263,41 @@ def _build_file_path(state, district, block):
 
 
 def load_block_sheets(state, district, block):
-    """Load all Excel sheets for a block once. Returns (df, df_facilities, df_nrega, df_livestock)."""
+    """Load all Excel sheets for a block once. Returns (df, df_facilities, df_nrega, df_livestock).
+    Only antyodaya is mandatory — returns (None, None, None, None) when it is absent.
+    Other sheets fall back to empty DataFrames so individual section functions degrade gracefully."""
     try:
         excel_file = pd.ExcelFile(_build_file_path(state, district, block))
-        df = pd.read_excel(excel_file, sheet_name="antyodaya")
-        df["village_id"] = df["village_id"].astype(str).str.strip()
+    except Exception as e:
+        logger.error("Excel file not found for %s/%s/%s: %s", state, district, block, str(e))
+        return None, None, None, None
+
+    if "antyodaya" not in excel_file.sheet_names:
+        logger.error("antyodaya sheet missing for %s/%s/%s", state, district, block)
+        return None, None, None, None
+
+    df = pd.read_excel(excel_file, sheet_name="antyodaya")
+    df["village_id"] = df["village_id"].astype(str).str.strip()
+
+    try:
         df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
         df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
+    except Exception:
+        df_facilities = pd.DataFrame(columns=["village_id"])
+
+    try:
         df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
         df_nrega["vill_id"] = df_nrega["vill_id"].astype(str).str.strip()
+    except Exception:
+        df_nrega = pd.DataFrame(columns=["vill_id"])
+
+    try:
         df_livestock = pd.read_excel(excel_file, sheet_name="livestock")
         df_livestock["village_id"] = df_livestock["village_id"].astype(str).str.strip()
-        return df, df_facilities, df_nrega, df_livestock
-    except Exception as e:
-        logger.error(
-            "Failed to load block sheets for %s/%s/%s: %s", state, district, block, str(e)
-        )
-        return None, None, None, None
+    except Exception:
+        df_livestock = pd.DataFrame(columns=["village_id"])
+
+    return df, df_facilities, df_nrega, df_livestock
 
 
 # ? MARK: HELPER FUNCTIONS
@@ -510,7 +528,11 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
             if df_facilities is None:
                 df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
             if df_nrega is None:
-                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                try:
+                    df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                except Exception:
+                    logger.info("nrega_assets_village sheet missing for %s %s — NREGA scores will be 0.33", district, block)
+                    df_nrega = pd.DataFrame(columns=["vill_id"])
 
         df["village_id"]            = df["village_id"].astype(str).str.strip()
         df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
@@ -556,6 +578,8 @@ def get_development_data(state, district, block, village_id, df=None, df_facilit
                 .get("composite_score", 0),
         ]
 
+        print(scores)
+
         # Pad exact zeros to 0.1 so the village line doesn't collapse to the
         # centre of the spider chart; Tehsil average is left untouched.
         return [0.1 if s == 0 else s for s in scores]
@@ -581,7 +605,11 @@ def get_block_development_data(state, district, block, df=None, df_facilities=No
             if df_facilities is None:
                 df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
             if df_nrega is None:
-                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                try:
+                    df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                except Exception:
+                    logger.info("nrega_assets_village sheet missing for %s %s — NREGA scores will be 0.33", district, block)
+                    df_nrega = pd.DataFrame(columns=["vill_id"])
 
         df["village_id"]            = df["village_id"].astype(str).str.strip()
         df_facilities["village_id"] = df_facilities["village_id"].astype(str).str.strip()
@@ -722,6 +750,7 @@ def get_basic_infrastructure(state, district, block, village_id, df=None):
             cluster_label(energy_cluster),
             cluster_label(housing_cluster),
         ]
+
 
         raw_params = {
             cat_key: [
@@ -2167,10 +2196,11 @@ def get_ecological_climate_resiliance(state, district, block, village_id, df=Non
                 )
 
             if df_nrega is None:
-                df_nrega = pd.read_excel(
-                    excel_file,
-                    sheet_name="nrega_assets_village"
-                )
+                try:
+                    df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                except Exception:
+                    logger.info("nrega_assets_village sheet missing for %s %s — NREGA scores will be 0.33", district, block)
+                    df_nrega = pd.DataFrame(columns=["vill_id"])
 
         df["village_id"] = (
             df["village_id"]
@@ -2330,12 +2360,9 @@ def get_ecological_climate_resiliance(state, district, block, village_id, df=Non
 #? Get Tehsil Map Data
 def get_all_villages_basic_infrastructure(state, district, block, df=None, df_nrega=None):
     try:
-        if df is None or df_nrega is None:
+        if df is None:
             excel_file = pd.ExcelFile(_build_file_path(state, district, block))
-            if df is None:
-                df = pd.read_excel(excel_file, sheet_name="antyodaya")
-            if df_nrega is None:
-                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+            df = pd.read_excel(excel_file, sheet_name="antyodaya")
 
         df["village_id"] = (
             df["village_id"]
@@ -2343,17 +2370,10 @@ def get_all_villages_basic_infrastructure(state, district, block, df=None, df_nr
             .str.strip()
         )
 
-        village_ids = (
-            df_nrega["vill_id"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-        )
-
         village_ids = [
-            vid
-            for vid in village_ids.unique()
-            if vid and vid != "0"
+            str(v).strip()
+            for v in df["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
         ]
 
         result = {}
@@ -2456,13 +2476,9 @@ def get_all_villages_health_and_wash(state, district, block, df=None):
 
 def get_all_villages_education_institutions(state, district, block, df_facilities=None, df_nrega=None):
     try:
-
-        if df_facilities is None or df_nrega is None:
+        if df_facilities is None:
             excel_file = pd.ExcelFile(_build_file_path(state, district, block))
-            if df_nrega is None:
-                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
-            if df_facilities is None:
-                df_facilities = pd.read_excel(excel_file, sheet_name="facilities_proximity")
+            df_facilities = pd.read_excel(excel_file, sheet_name="antyodaya")
 
         df_facilities["village_id"] = (
             df_facilities["village_id"]
@@ -2470,17 +2486,10 @@ def get_all_villages_education_institutions(state, district, block, df_facilitie
             .str.strip()
         )
 
-        village_ids = (
-            df_nrega["vill_id"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-        )
-
         village_ids = [
-            vid
-            for vid in village_ids.unique()
-            if vid and vid != "0"
+            str(v).strip()
+            for v in df_facilities["village_id"].dropna().unique()
+            if str(v).strip() not in ("", "0")
         ]
 
         result = {}
@@ -2517,12 +2526,10 @@ def get_all_villages_financial_inclusion(state, district, block, df=None, df_fac
 
     try:
 
-        if df is None or df_nrega is None:
+        if df is None:
             excel_file = pd.ExcelFile(_build_file_path(state, district, block))
             if df is None:
                 df = pd.read_excel(excel_file, sheet_name="antyodaya")
-            if df_nrega is None:
-                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
 
         df["village_id"] = df["village_id"].astype(str).str.strip()
 
@@ -2745,7 +2752,11 @@ def get_all_villages_ecological_climate_resiliance(state, district, block, df=No
             if df is None:
                 df = pd.read_excel(excel_file, sheet_name="antyodaya")
             if df_nrega is None:
-                df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                try:
+                    df_nrega = pd.read_excel(excel_file, sheet_name="nrega_assets_village")
+                except Exception:
+                    logger.info("nrega_assets_village sheet missing for %s %s — all villages will show red NREGA", district, block)
+                    df_nrega = pd.DataFrame(columns=["vill_id"])
 
         df["village_id"]    = df["village_id"].astype(str).str.strip()
         df_nrega["vill_id"] = df_nrega["vill_id"].astype(str).str.strip()

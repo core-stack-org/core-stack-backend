@@ -380,7 +380,7 @@ def fill_monthly_collection(
     value_band: str,
     proj: ee.Projection = None,
 ) -> ee.ImageCollection:
-    """Fill masked monthly pixels without crossing the crop-year boundary."""
+    """Fill masked monthly pixels from +/-45-day neighbours."""
 
     def normalize(img):
         img = ee.Image(img)
@@ -397,7 +397,6 @@ def fill_monthly_collection(
 
     def interpolate(img):
         img = ee.Image(img)
-        agri_month = ee.Number(img.get("month"))
         time_start = img.get("system:time_start")
         start_window = (
             ee.Date(time_start)
@@ -414,23 +413,7 @@ def fill_monthly_collection(
             .filter(ee.Filter.gte("system:time_start", start_window))
             .filter(ee.Filter.lt("system:time_start", end_window))
         )
-        july_neighbour = safe_monthly.select(value_band).filter(
-            ee.Filter.eq("month", 2)
-        )
-        june_neighbour = safe_monthly.select(value_band).filter(
-            ee.Filter.eq("month", 11)
-        )
-        neighbours = ee.ImageCollection(
-            ee.Algorithms.If(
-                agri_month.eq(1),
-                july_neighbour,
-                ee.Algorithms.If(
-                    agri_month.eq(12),
-                    june_neighbour,
-                    window_neighbours,
-                ),
-            )
-        )
+        neighbours = window_neighbours
         filled = neighbours.mean()
         out = img.select(value_band).unmask(filled)
         return (
@@ -440,7 +423,6 @@ def fill_monthly_collection(
             .set("system:time_start", time_start)
             .set("source_count", img.get("source_count"))
             .set("is_placeholder", img.get("is_placeholder"))
-            .set("interpolation_window_days", MONTHLY_INTERPOLATION_WINDOW_DAYS)
         )
 
     return safe_monthly.map(interpolate)
@@ -462,7 +444,7 @@ def monthly_collection_to_stack(
             .float()
         )
 
-    named = monthly_col.map(rename_month)
+    named = monthly_col.filter(ee.Filter.gte("month", 1)).filter(ee.Filter.lte("month", 12)).sort("month").map(rename_month)
     stack = named.toBands().clip(region)
     current_names = stack.bandNames()
     new_names = current_names.map(lambda n: ee.String(n).split("_").slice(1).join("_"))
