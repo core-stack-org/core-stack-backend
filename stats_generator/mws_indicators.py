@@ -1025,7 +1025,6 @@ def generate_mws_data_for_kyl_filters(
                 except Exception as e:
                     print(f"Error in getting overall_tree_change data: {e}")
 
-
                 ########## soil health ###########
                 try:
                     nitrogen_levels = -9999
@@ -1054,27 +1053,27 @@ def generate_mws_data_for_kyl_filters(
                 ###### soil type ###########
                 soil_type_drainage_class = {
                     "Excessively drained": 0,
-                    "Somewhat excessively drained": 1,
-                    "Well drained": 2,
-                    "Moderately well drained": 3,
-                    "Imperfectly drained": 4,
-                    "Poorly drained": 5,
-                    "Very poorly drained": 6,
+                    "Somewhat excessively drained": 0,
+                    "Well drained": 1,
+                    "Moderately well drained": 1,
+                    "Imperfectly drained": 2,
+                    "Poorly drained": 2,
+                    "Very poorly drained": 2,
                 }
                 soil_type_texture_class = {
-                    "Clay (heavy)": 0,
-                    "Silty clay": 1,
-                    "Clay": 2,
-                    "Silty clay loam": 3,
-                    "Clay loam": 4,
-                    "Silt": 5,
-                    "Silt loam": 6,
-                    "Sandy clay": 7,
-                    "Loam": 8,
-                    "Sandy clay loam": 9,
-                    "sandy loam": 10,
-                    "Loamy sand": 11,
-                    "sand": 12,
+                    "Clay (heavy)": 3,
+                    "Silty clay": 3,
+                    "Clay": 3,
+                    "Sandy clay": 3,
+                    "Sandy clay loam": 2,
+                    "Silty clay loam": 2,
+                    "Clay loam": 2,
+                    "Silt": 1,
+                    "Silt loam": 1,
+                    "Loam": 1,
+                    "sandy loam": 0,
+                    "Loamy sand": 0,
+                    "sand": 0,
                 }
 
                 try:
