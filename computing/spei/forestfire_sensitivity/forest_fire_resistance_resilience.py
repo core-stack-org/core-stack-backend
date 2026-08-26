@@ -40,13 +40,13 @@ from utilities.gee_utils import (
 def forest_fire_sensitivity(aez, start_year=2004, end_year=2024, gee_account_id=None):
     ee_initialize(gee_account_id)
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
 
-    FIRE_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/fire_index_FRP30_AEZ_{aez}"
+    FIRE_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/fire_index_FRP30_AEZ_{aez}"
 
     OUTPUT_DESC = f"fire_metrics_harmonized_kNDVI_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):

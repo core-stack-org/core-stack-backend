@@ -42,14 +42,12 @@ def generate_rainfall_resilience(
     """
 
     ee_initialize(gee_account_id)
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
-    RAIN_INDEX_ASSET = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/rain_index_AEZ_{aez}"
-    )
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    RAIN_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/rain_index_AEZ_{aez}"
 
     OUTPUT_DESC = f"Rain_Metrics_{aez}"  # f"Rain_Metrics_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
@@ -76,6 +74,11 @@ def generate_rainfall_resilience(
     BASELINE_END_YEAR = 2024
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
 
     # zScoreCol needs bands up through zMaxYear from the 3a asset, and
     # kndviCol needs data one year further out than that for resilience on

@@ -41,7 +41,7 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
     ee_initialize(gee_account_id)
     OUTPUT_DESC = f"rain_index_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
@@ -71,7 +71,11 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
 
     # 1. AOI
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
     # 2. FULL CHIRPS COLLECTION
     # Deliberately unbounded on the end date. This collection feeds BOTH the
     # baseline percentile calc (bounded separately below) AND the per-year

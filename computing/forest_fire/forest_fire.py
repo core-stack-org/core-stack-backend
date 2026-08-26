@@ -35,11 +35,12 @@ def forest_fringes_on_AEZ(aez_no, gee_account_id=7):
     aez = ee.FeatureCollection(AEZ)
     mwses = ee.FeatureCollection(MWS_DATASET)
 
-    filter_aez = aez.filter(ee.Filter.eq("ae_regcode", aez_no))
-    roi = mwses.filterBounds(filter_aez.geometry())
+    filter_aez = aez.filter(ee.Filter.eq("ae_regcode", aez_no)).geometry()
+
+    roi = mwses.filterBounds(filter_aez)
 
     asset_suffix = f"AEZ_{aez_no}"
-    asset_folder_list = ["forest_fringes"]
+    asset_folder_list = ["forest_fire"]
     generate_forest_fire_layer(
         roi=roi,
         asset_suffix=asset_suffix,

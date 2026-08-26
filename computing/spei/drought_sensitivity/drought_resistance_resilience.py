@@ -47,10 +47,10 @@ def generate_drought_resistance(
             "cannot infer a safe default."
         )
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
     OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
@@ -80,7 +80,9 @@ def generate_drought_resistance(
             f"{date.today().isoformat()}. Reduce end_year."
         )
 
-    SPEI12_ASSET = "projects/corestack-datasets-alpha/assets/datasets/SPEI/SPEI12"
+    SPEI12_ASSET = (
+        "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/SPEI12"
+    )
 
     if not is_gee_asset_exists(TREE_COVER_ASSET):
         raise ValueError(
@@ -90,7 +92,7 @@ def generate_drought_resistance(
     if not is_gee_asset_exists(SPEI12_ASSET):
         raise ValueError(f"SPEI-12 asset not found: {SPEI12_ASSET}.")
 
-    requiredSpeiBands = {f"{y}_{y + 1}" for y in range(speiMinYear, speiMaxYear + 1)}
+    requiredSpeiBands = {f"y{y}_{y + 1}" for y in range(speiMinYear, speiMaxYear + 1)}
     availableSpeiBands = set(ee.Image(SPEI12_ASSET).bandNames().getInfo())
     missingSpeiBands = sorted(requiredSpeiBands - availableSpeiBands)
     if missingSpeiBands:
@@ -105,7 +107,6 @@ def generate_drought_resistance(
     #     .filter(ee.Filter.eq("Name", "Odisha"))
     #     .geometry()
     # )
-    # Loading the assets :=
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
 
@@ -120,7 +121,7 @@ def generate_drought_resistance(
     speiImages = []
     for y in range(speiMinYear, speiMaxYear + 1):
         speiImages.append(
-            spei12_raw.select(f"{y}_{y + 1}").rename("spei").set("year", y)
+            spei12_raw.select(f"y{y}_{y + 1}").rename("spei").set("year", y)
         )
     speiCol = ee.ImageCollection(speiImages)
 

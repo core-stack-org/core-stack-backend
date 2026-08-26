@@ -15,9 +15,7 @@ SCALE = 1000
 MAXPIX = 1e13
 
 # MODIS Active Fire products (Terra + Aqua)
-FIRE_INDEX_PATH = (
-    "projects/valiant-complex-468922-j7/assets/Orissa_SEF_Fire_Index_FRP30"
-)
+FIRE_INDEX_PATH = "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/fire_index_FRP30_AEZ_Odisha"
 
 
 def load_fire_image():

@@ -47,7 +47,7 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
     ee_initialize(gee_account_id)
     OUTPUT_DESC = f"fire_index_FRP30_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
