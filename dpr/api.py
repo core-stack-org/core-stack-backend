@@ -846,6 +846,20 @@ def generate_village_report(request):
             },
         )
 
+    # Check data availability for this specific village
+    village_row = df[df["village_id"] == str(village_id).strip()]
+    if village_row.empty or str(village_row.iloc[0].get("data_availability_status", "")).strip().lower() != "matched":
+        return render(
+            request,
+            "village-report-unavailable.html",
+            {
+                "state": state,
+                "district": district,
+                "block": block,
+                "village_id": village_id,
+            },
+        )
+
     # Get village polygon and info from GeoServer
     village_data = get_village_polygon_and_info(state, district, block, village_id)
 
