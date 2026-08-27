@@ -13,7 +13,7 @@ from computing.soil_health.soil_health_helper import (
     nutrient_stats_for_geometries,
     lulc_area_stats_for_geometries,
 )
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
     PROJECT_ROOT,
@@ -24,8 +24,8 @@ from computing.local_compute_helper import (
     read_validated_vector_file,
     validate_geometry,
     write_vector_output,
-    push_local_vector_to_geoserver,
-    push_local_raster_to_geoserver,
+    queue_local_vector_for_geoserver,
+    queue_local_raster_for_geoserver,
     load_precomputed_roi,
 )
 
@@ -291,19 +291,7 @@ def clip_soil_health_raster(
             allowed_mask_classes=allowed_mask_classes,
         )
 
-        if push_to_geoserver:
-            geoserver_response = push_local_raster_to_geoserver(
-                file_path=output_raster_path,
-                layer_name=f"{layer_name}_{nutrient}",
-                workspace=GEOSERVER_RASTER_WORKSPACE,
-            )
-            print(f"GeoServer response for {nutrient}: {geoserver_response}")
-            if geoserver_response.get("status_code") not in (200, 201):
-                raise RuntimeError(
-                    f"Failed to sync soil health raster: {geoserver_response}"
-                )
-            geoserver_statuses.append(True)
-
+        layer_id = None
         if sync_layer_metadata:
             layer_id = save_layer_info_to_db(
                 state=state,
@@ -317,9 +305,20 @@ def clip_soil_health_raster(
                 algorithm_version=LOCAL_ALGORITHM_VERSION,
             )
             logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-            if layer_id:
-                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-                print("Sync to GeoServer flag updated for Soil health raster")
+
+        if push_to_geoserver:
+            geoserver_response = queue_local_raster_for_geoserver(
+                file_path=output_raster_path,
+                layer_name=f"{layer_name}_{nutrient}",
+                workspace=GEOSERVER_RASTER_WORKSPACE,
+                layer_id=layer_id,
+            )
+            print(f"GeoServer response for {nutrient}: {geoserver_response}")
+            if geoserver_response.get("status_code") != 202:
+                raise RuntimeError(
+                    f"Failed to queue soil health raster: {geoserver_response}"
+                )
+            geoserver_statuses.append(True)
 
     return (
         all(geoserver_statuses) if push_to_geoserver else True,
@@ -423,21 +422,7 @@ def vectorize_soil_health(
     print(f"Saved soil health vector: {output_path}")
 
     geoserver_status = False
-    if push_to_geoserver:
-        geoserver_response = push_local_vector_to_geoserver(
-            path=os.path.splitext(output_path)[0],
-            layer_name=output_layer_name,
-            workspace=GEOSERVER_VECTOR_WORKSPACE,
-            file_type="gpkg",
-        )
-        print(f"GeoServer response: {geoserver_response}")
-
-        if not isinstance(geoserver_response, dict) or geoserver_response.get(
-            "status_code"
-        ) not in (200, 201):
-            return False
-        geoserver_status = True
-
+    layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -451,9 +436,19 @@ def vectorize_soil_health(
             algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
         logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-        if layer_id and push_to_geoserver:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("Sync to GeoServer flag updated for Soil health vector")
+
+    if push_to_geoserver:
+        geoserver_response = queue_local_vector_for_geoserver(
+            path=os.path.splitext(output_path)[0],
+            layer_name=output_layer_name,
+            workspace=GEOSERVER_VECTOR_WORKSPACE,
+            file_type="gpkg",
+            layer_id=layer_id,
+        )
+        print(f"GeoServer response: {geoserver_response}")
+        geoserver_status = geoserver_response.get("status_code") == 202
+        if not geoserver_status:
+            return False
 
     return geoserver_status if push_to_geoserver else True
 

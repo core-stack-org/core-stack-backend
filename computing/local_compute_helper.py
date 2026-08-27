@@ -563,6 +563,74 @@ def push_local_raster_to_geoserver(
     )
 
 
+def queue_local_layer_for_geoserver(
+    layer_type,
+    path,
+    layer_name,
+    workspace,
+    style_name=None,
+    file_type="gpkg",
+    layer_id=None,
+    verify=False,
+):
+    from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
+
+    result = publish_local_layer.apply_async(
+        kwargs={
+            "layer_type": layer_type,
+            "path": str(path),
+            "layer_name": layer_name,
+            "workspace": workspace,
+            "style_name": style_name,
+            "file_type": file_type,
+            "layer_id": layer_id,
+            "verify": verify,
+        },
+        queue=GEOSERVER_QUEUE,
+    )
+    return {
+        "status_code": 202,
+        "queued": True,
+        "task_id": result.id,
+    }
+
+
+def queue_local_raster_for_geoserver(
+    file_path,
+    layer_name,
+    workspace,
+    style_name=None,
+    layer_id=None,
+    verify=False,
+):
+    return queue_local_layer_for_geoserver(
+        layer_type="raster",
+        path=file_path,
+        layer_name=layer_name,
+        workspace=workspace,
+        style_name=style_name,
+        layer_id=layer_id,
+        verify=verify,
+    )
+
+
+def queue_local_vector_for_geoserver(
+    path,
+    layer_name,
+    workspace,
+    file_type="gpkg",
+    layer_id=None,
+):
+    return queue_local_layer_for_geoserver(
+        layer_type="vector",
+        path=path,
+        layer_name=layer_name,
+        workspace=workspace,
+        file_type=file_type,
+        layer_id=layer_id,
+    )
+
+
 
 def compute_pixel_area_grid(transform, height, width, crs):
     if crs is None:

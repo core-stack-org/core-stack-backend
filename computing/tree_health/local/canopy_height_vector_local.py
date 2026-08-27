@@ -6,11 +6,11 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     load_precomputed_watersheds,
-    push_local_vector_to_geoserver,
+    queue_local_vector_for_geoserver,
     read_validated_vector_file,
     write_vector_output,
 )
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -141,17 +141,7 @@ def tree_health_ch_vector_local(
     )
     print(f"Saved local canopy height vector: {asset_id}")
 
-    if push_to_geoserver:
-        res = push_local_vector_to_geoserver(
-            path=asset_id,
-            layer_name=layer_name,
-            workspace=GEOSERVER_WORKSPACE,
-            file_type="gpkg",
-        )
-        print(f"GeoServer response for {layer_name}: {res}")
-        if not isinstance(res, dict) or res.get("status_code") not in (200, 201):
-            return False
-
+    layer_id = None
     if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -168,7 +158,17 @@ def tree_health_ch_vector_local(
             algorithm="local_ch_vector",
             algorithm_version="local-1.0",
         )
-        if layer_id and push_to_geoserver:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+
+    if push_to_geoserver:
+        res = queue_local_vector_for_geoserver(
+            path=asset_id,
+            layer_name=layer_name,
+            workspace=GEOSERVER_WORKSPACE,
+            file_type="gpkg",
+            layer_id=layer_id,
+        )
+        print(f"GeoServer response for {layer_name}: {res}")
+        if res.get("status_code") != 202:
+            return False
 
     return True

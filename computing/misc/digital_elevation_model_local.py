@@ -15,7 +15,7 @@ from computing.local_compute_helper import (
     get_union_geometry,
     load_precomputed_roi,
     load_precomputed_watersheds,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
     read_validated_vector_file,
     write_vector_output,
 )
@@ -117,24 +117,9 @@ def run_raster_fabdem_local(
         output_path=str(output_raster_path),
     )
 
-    if push_to_geoserver:
-        try:
-            geoserver_response = push_local_raster_to_geoserver(
-                file_path=clipped_raster_path,
-                layer_name=layer_name,
-                workspace=GEOSERVER_WORKSPACE,
-                style_name=GEOSERVER_STYLE,
-            )
-            print(f"GeoServer response: {geoserver_response}")
-            if geoserver_response.get("status_code") not in (200, 201):
-                raise RuntimeError(str(geoserver_response))
-        except Exception as error:
-            print(f"Failed to sync local FABDEM raster to GeoServer: {error}")
-            return False, None
-
+    layer_id = None
     if sync_layer_metadata and state and district and block:
-        from computing.STAC_specs import generate_STAC_layerwise
-        from computing.utils import save_layer_info_to_db, update_layer_sync_status
+        from computing.utils import save_layer_info_to_db
 
         layer_id = save_layer_info_to_db(
             state=state,
@@ -147,9 +132,22 @@ def run_raster_fabdem_local(
             algorithm_version="1.0",
             misc={"is_generated_locally": True},
         )
-        if layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("Sync to GeoServer flag updated")
+
+    if push_to_geoserver:
+        try:
+            geoserver_response = queue_local_raster_for_geoserver(
+                file_path=clipped_raster_path,
+                layer_name=layer_name,
+                workspace=GEOSERVER_WORKSPACE,
+                style_name=GEOSERVER_STYLE,
+                layer_id=layer_id,
+            )
+            print(f"GeoServer response: {geoserver_response}")
+            if geoserver_response.get("status_code") != 202:
+                raise RuntimeError(str(geoserver_response))
+        except Exception as error:
+            print(f"Failed to queue local FABDEM raster for GeoServer: {error}")
+            return False, None
 
     return True, clipped_raster_path
 
