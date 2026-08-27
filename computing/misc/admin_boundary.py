@@ -7,6 +7,7 @@ from shapely.geometry import mapping
 from computing.utils import (
     generate_shape_files,
     push_shape_to_geoserver,
+    sync_fc_to_geoserver,
 )
 from computing.base_layer_setup import with_base_layers
 from utilities.gee_utils import (
@@ -28,53 +29,72 @@ from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
 @app.task(bind=True)
 @with_base_layers("soi_tehsil", "admin_boundary")
-def generate_tehsil_shape_file_data(self, state, district, block, gee_account_id):
+def generate_tehsil_shape_file_data(
+        self, state, district, block, gee_account_id=None, sync_to_geoserver=True
+):
     """
     It will generate Admin boundary of given location as tehsil levels
     """
     ee_initialize(gee_account_id)
     description = (
-        "admin_boundary_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-    )
-    asset_id = get_gee_asset_path(state, district, block) + description
-
-    collection, state_dir = clip_block_from_admin_boundary(state, district, block)
-
-    layer_id = None
-    # Generate shape files and sync to geoserver
-    shp_path = create_shp_files(collection, state_dir, district, block, layer_id)
-    create_gee_directory(state, district, block)
-
-    if not is_gee_asset_exists(asset_id):
-        layer_name = (
             "admin_boundary_"
             + valid_gee_text(district.lower())
             + "_"
             + valid_gee_text(block.lower())
-        )
-        layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
-        upload_shp_to_gee(layer_path, layer_name, asset_id)
+    )
+    asset_id = get_gee_asset_path(state, district, block) + description
+    shp_path = None
+    if not is_gee_asset_exists(asset_id):
+        collection, state_dir = clip_block_from_admin_boundary(state, district, block)
 
+        layer_id = None
+        if collection:
+            # Generate shape files and sync to geoserver
+            shp_path = create_shp_files(
+                collection, state_dir, district, block, layer_id
+            )
+            create_gee_directory(state, district, block)
+
+            layer_name = (
+                    "admin_boundary_"
+                    + valid_gee_text(district.lower())
+                    + "_"
+                    + valid_gee_text(block.lower())
+            )
+            layer_path = os.path.splitext(shp_path)[0] + "/" + shp_path.split("/")[-1]
+            upload_shp_to_gee(layer_path, layer_name, asset_id)
+
+    layer_at_geoserver = False
+    layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
     if is_gee_asset_exists(asset_id):
         make_asset_public(asset_id)
         layer_id = save_layer_info_to_db(
             state,
             district,
             block,
-            layer_name=f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}",
+            layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Admin Boundary",
         )
 
-    res = push_shape_to_geoserver(shp_path, workspace="panchayat_boundaries")
-    layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("sync to geoserver flag updated")
-        layer_at_geoserver = True
+        if sync_to_geoserver:
+            if not shp_path:
+                fc = ee.FeatureCollection(asset_id)
+                res = sync_fc_to_geoserver(
+                    fc,
+                    state,
+                    layer_name,
+                    "panchayat_boundaries",
+                )
+            else:
+                res = push_shape_to_geoserver(
+                    shp_path, workspace="panchayat_boundaries"
+                )
+
+            if res["status_code"] == 201 and layer_id:
+                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+                print("sync to geoserver flag updated")
+                layer_at_geoserver = True
     return layer_at_geoserver
 
 
@@ -106,8 +126,6 @@ def clip_block_from_admin_boundary(state, district, block):
             + district.replace(" ", "_")
             + ".geojson"
         )
-        print("census_2011", census_2011)
-
     except Exception as e:
         print(f"Error occurred: Census data not available: {e}")
 
@@ -116,18 +134,21 @@ def clip_block_from_admin_boundary(state, district, block):
 
     if census_2011 is not None and "TEHSIL" in list(census_2011.columns):
         admin_boundary_data = census_2011[(census_2011["TEHSIL"].str.lower() == block)]
-    else:
-        soi = gpd.read_file(SOI_TEHSIL)
 
+    if admin_boundary_data is None or admin_boundary_data.shape[0] < 1:
+        print(
+            "Admin boundary data not available for the specified block. Attempting to use SOI data."
+        )
+
+        soi = gpd.read_file(SOI_TEHSIL)
         soi = soi[(soi["STATE"].str.lower() == state)]
         soi = soi[(soi["District"].str.lower() == district)]
         soi = soi[(soi["TEHSIL"].str.lower() == block)]
         soi.rename(
             columns={"STATE": "state_name", "District": "district_name"}, inplace=True
         )
-        print("soi", soi)
 
-        if census_2011 is not None:
+        if census_2011 is not None and "TEHSIL" not in list(census_2011.columns):
             census_2011["area"] = census_2011.geometry.area
             # Ensure both GeoDataFrames are in the same coordinate reference system (CRS)
             if soi.crs != census_2011.crs:
@@ -135,6 +156,7 @@ def clip_block_from_admin_boundary(state, district, block):
 
             # Perform the intersection
             admin_boundary_data = gpd.overlay(soi, census_2011, how="intersection")
+            print("admin_boundary_data after intersection", admin_boundary_data)
         else:
             tehsil_boundary = soi.iloc[0]
             features.append(

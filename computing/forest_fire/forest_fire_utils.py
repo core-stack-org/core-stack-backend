@@ -15,62 +15,33 @@ SCALE = 1000
 MAXPIX = 1e13
 
 # MODIS Active Fire products (Terra + Aqua)
-TERRA_FIRE_PATH = "MODIS/061/MOD14A1"
-AQUA_FIRE_PATH = "MODIS/061/MYD14A1"
+FIRE_INDEX_PATH = "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/fire_index_FRP30_AEZ_Odisha"
 
 
-def load_fire_collections(start_year, end_year):
+def load_fire_image():
     """
-    Load and merge MODIS Terra + Aqua active fire collections.
-
-    Filters the merged collection to the date range
-    [start_year-01-01, end_year-12-31] and selects the MaxFRP band.
-
-    Args:
-        start_year: int – first year of the analysis window.
-        end_year:   int – last year of the analysis window.
-
-    Returns:
-        ee.ImageCollection – merged, date-filtered MaxFRP collection.
+    Load yearly fire-index image.
     """
-    start_date = f"{start_year}-01-01"
-    end_date = f"{end_year}-12-31"
-
-    terra = ee.ImageCollection(TERRA_FIRE_PATH)
-    aqua = ee.ImageCollection(AQUA_FIRE_PATH)
-
-    fires = terra.merge(aqua).filterDate(start_date, end_date)
-    return fires.select("MaxFRP")
+    return ee.Image(FIRE_INDEX_PATH)
 
 
-def prepare_frp_images(frp_collection, n_years):
+def prepare_frp_images(fire_image, start_year, end_year):
     """
-    Pre-compute the four temporally aggregated fire images.
-
-    Args:
-        frp_collection: ee.ImageCollection – MaxFRP collection.
-        n_years:        int – number of years in the analysis window.
-
-    Returns:
-        dict with keys 'sum', 'mean', 'max', 'count', each mapping to
-        an ee.Image ready for spatial reduction.
+    Build aggregated images from yearly FRP and fireDays bands.
     """
 
-    # Mask zeros for FRP statistics
-    def mask_fire(img):
-        return img.updateMask(img.gt(0))
+    years = list(range(start_year, end_year + 1))
+    n_years = len(years)
 
-    frp_masked = frp_collection.map(mask_fire)
+    frp_bands = [f"FRP_{y}" for y in years]
+    fireday_bands = [f"fireDays_{y}" for y in years]
 
-    # Binary fire occurrence for count
-    def fire_binary(img):
-        return img.gt(0).unmask(0).rename("fire")
-
-    fire_binary_collection = frp_collection.map(fire_binary)
+    frp = fire_image.select(frp_bands)
+    firedays = fire_image.select(fireday_bands)
 
     return {
-        "sum": frp_masked.sum().divide(n_years),  # yearly-normalised total FRP
-        "mean": frp_masked.mean(),  # temporal mean FRP
-        "max": frp_masked.max(),
-        "count": fire_binary_collection.sum().divide(n_years),  # yearly fire frequency
+        "sum": frp.reduce(ee.Reducer.sum()).divide(n_years),
+        "mean": frp.reduce(ee.Reducer.mean()),
+        "max": frp.reduce(ee.Reducer.max()),
+        "count": firedays.reduce(ee.Reducer.sum()).divide(n_years),
     }

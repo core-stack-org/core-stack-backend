@@ -1,4 +1,5 @@
 import ee
+from datetime import date
 
 from utilities.constants import AEZ
 from utilities.gee_utils import (
@@ -13,8 +14,15 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     * Forest Sensitivity Analysis Pipeline — Script 5b
     * High Windspeed Resistance & Resilience (Harmonized kNDVI + Signed Formulas)
     *
+    * AGRICULTURAL YEAR CONVENTION:
+    * Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching Scripts 1/3a/3b/
+    * fire_index/forest_fire_sensitivity/5a. kNDVI compositing windows and
+    * the baseline (Yn_bar) window are all on this convention. Tree-cover
+    * asset (Script 1) is also ag-year, so startYear/endYear comparisons
+    * against `year` carry no fuzz.
+    *
     * For each forest pixel, computes mean resistance and resilience
-    * across all high-windspeed years (WSmax > threshold).
+    * across all high-windspeed ag-years (WSmax > threshold).
     *
     * Harmonization: Transforms Landsat 8/9 (OLI) to Landsat 5/7 (ETM+)
     * equivalent before computing kNDVI to eliminate sensor-shift bias.
@@ -27,18 +35,25 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     *
     * Requires:
     * - Forest mask asset from Script 1
-    * - Windspeed index asset from Script 5a
+    * - Windspeed index asset from Script 5a — must have been exported with
+    *   an end_year >= this script's wsMaxYear, or the WSmax_{y} band lookup
+    *   below will fail (checked explicitly below rather than left to fail
+    *   deep inside the pipeline).
     """
     ee_initialize(gee_account_id)
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI/Hybrid_Tree_AEZ_{aez}_{str(2003)}_{str(end_year)}"
-    WIND_INDEX_ASSET = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/wind_index_AEZ_{aez}"
-    )
+    if end_year is None:
+        raise ValueError(
+            "end_year must be specified explicitly — agricultural-year pipelines "
+            "cannot infer a safe default."
+        )
+
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    WIND_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/wind_index_AEZ_{aez}"
 
     OUTPUT_DESC = f"wind_metrics_harmonized_kNDVI_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
@@ -48,6 +63,54 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
     BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
+
+    # wind_index (5a) has no baseline concept of its own — it just exports
+    # whatever start_year..end_year it was called with. So this script,
+    # which does need baseline-year WSmax bands, has to verify the asset
+    # actually contains them rather than assume it does.
+    wsMinYear = min(start_year, BASELINE_START_YEAR)
+    wsMaxYear = max(end_year, BASELINE_END_YEAR)
+
+    kndviMinYear = min(start_year, BASELINE_START_YEAR)
+    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+
+    # kndviMaxYear is the furthest single ag-year fetched anywhere in this
+    # script; that ag-year isn't complete until Jun 30 of kndviMaxYear+1.
+    # Refuse to silently compute on a partial year. (Landsat, unlike
+    # ERA5-Land, is current to near-real-time, so no extra lag buffer
+    # needed here — that's handled inside 5a already, for its own data.)
+    required_complete_by = date(kndviMaxYear + 1, 6, 30)
+    if required_complete_by > date.today():
+        raise ValueError(
+            f"Agricultural year {kndviMaxYear} (Jul {kndviMaxYear} -> "
+            f"Jun {kndviMaxYear + 1}) is not yet complete as of "
+            f"{date.today().isoformat()}. Reduce end_year."
+        )
+
+    # Tree-mask asset names embed end_year and auto-version; wind-index
+    # asset names don't, and silently no-op on re-run unless deleted first
+    # (see is_gee_asset_exists guard in max_wind_index). That mismatch
+    # means it's easy to expand end_year, regenerate the tree mask, forget
+    # to regenerate wind_index, and end up reading a stale wind-index asset
+    # against a fresh tree-mask one. Fail loudly instead.
+    if not is_gee_asset_exists(TREE_COVER_ASSET):
+        raise ValueError(
+            f"Tree cover asset not found: {TREE_COVER_ASSET}. Run "
+            f"generate_hybrid_tree_mask with end_year={end_year} first."
+        )
+    if not is_gee_asset_exists(WIND_INDEX_ASSET):
+        raise ValueError(f"Wind index asset not found: {WIND_INDEX_ASSET}.")
+
+    requiredWsBands = {f"WSmax_{y}" for y in range(wsMinYear, wsMaxYear + 1)}
+    availableWsBands = set(ee.Image(WIND_INDEX_ASSET).bandNames().getInfo())
+    missingWsBands = sorted(requiredWsBands - availableWsBands)
+    if missingWsBands:
+        raise ValueError(
+            f"{WIND_INDEX_ASSET} is missing bands: {missingWsBands}. It was "
+            f"likely exported with a smaller end_year — re-run max_wind_index "
+            f"with end_year >= {wsMaxYear} (delete the existing asset first, "
+            "its name doesn't auto-version)."
+        )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
     # aoi = (
@@ -63,13 +126,6 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
     # Load windspeed index from single multiband asset (Script 5a output)
     windIndex_raw = ee.Image(WIND_INDEX_ASSET)
-
-    # I need WSmax bands covering BOTH my analysis window and my baseline
-    # window — whichever stretches further. Right now they're the same range
-    # (2004-2022), so this doesn't change anything today, but it protects me
-    # once the two windows stop lining up in the future.
-    wsMinYear = min(start_year, BASELINE_START_YEAR)
-    wsMaxYear = max(end_year, BASELINE_END_YEAR)
 
     wsImages = []
     for y in range(wsMinYear, wsMaxYear + 1):
@@ -125,10 +181,11 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
         return harmonized.copyProperties(image, ["system:time_start"])
 
-    # Calculate annual median kNDVI
+    # Calculate ag-year median kNDVI (Jul 1(year) -> Jun 30(year+1))
     def getAnnualKNDVI(year):
-        start = ee.Date.fromYMD(year, 1, 1)
-        end = ee.Date.fromYMD(year, 12, 31)
+        start = ee.Date.fromYMD(year, 7, 1)
+        # end-exclusive filterDate, so advance 1 day past Jun 30 to include it
+        end = ee.Date.fromYMD(ee.Number(year).add(1), 6, 30).advance(1, "day")
 
         l89 = (
             ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
@@ -160,24 +217,17 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
         return l89.merge(l57).median().set("year", year).rename("kndvi")
 
-    # Load kNDVI for START_YEAR to END_YEAR+1 (need next year for resilience)
-    # I need kNDVI images covering whichever is bigger: my baseline window, or
-    # my analysis window PLUS ONE year (since resilience for my last analysis
-    # year needs next-year kNDVI to compare against).
-
-    kndviMinYear = min(start_year, BASELINE_START_YEAR)
-    kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
-
+    # Load kNDVI for kndviMinYear to kndviMaxYear (need next year for resilience)
     kndviYears = ee.List.sequence(kndviMinYear, kndviMaxYear)
     kndviCol = ee.ImageCollection(kndviYears.map(getAnnualKNDVI))
 
     # BASELINE kNDVI (Yn_bar):=
-    # Mean kNDVI across non-high-wind years only
+    # Mean kNDVI across non-high-wind ag-years only
 
     analysisYears = ee.List.sequence(start_year, end_year)
 
-    # This is my frozen baseline window — the years I use to WORK OUT what
-    # Yn_bar (my "normal" kNDVI reference) is, kept separate from
+    # This is my frozen baseline window — the ag-years I use to WORK OUT
+    # what Yn_bar (my "normal" kNDVI reference) is, kept separate from
     # analysisYears on purpose.
     baselineYears = ee.List.sequence(BASELINE_START_YEAR, BASELINE_END_YEAR)
 
@@ -209,7 +259,7 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
             .reproject(crs=kndviYe.projection(), scale=30)
         )
 
-        # Only compute on forest pixels during high-windspeed years
+        # Only compute on forest pixels during high-windspeed ag-years
         # Flag ANY year where WSmax crosses the threshold, however briefly
         isForest = startYear.lte(year).And(endYear.gte(year))
         isHighWind = wsYe.gt(WIND_THRESHOLD)
