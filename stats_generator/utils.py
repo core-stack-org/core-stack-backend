@@ -259,58 +259,11 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_health(geojson_data, writer)
             elif workspace == "ndvi_timeseries":
                 create_excel_for_ndvi_shrub(geojson_data, writer)
-                processed_ndvi_data = [
-                    process_feature_ndvi(feature)
-                    for feature in geojson_data["features"]
-                ]
-                create_excel_for_ndvi_shrub_seasonally(
-                    processed_ndvi_data, writer, start_year, end_year
-                )
-
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
-
-
-def create_excel_for_ndvi_shrub_seasonally(
-    processed_data, writer, start_year, end_year
-):
-    seasons = ["kharif", "rabi", "zaid"]
-
-    data = {"UID": []}
-
-    for year in range(start_year, end_year + 1):
-        for season in seasons:
-            end_to_year = year + 1
-            column_name = f"ndvi_{season}_{year}-{end_to_year}"
-            data[column_name] = []
-
-    for feature_data in processed_data:
-        data["UID"].append(feature_data["UID"])
-
-        for year in range(start_year, end_year + 1):
-            for season in seasons:
-                end_to_year = year + 1
-                column_name = f"ndvi_{season}_{year}-{end_to_year}"
-
-                value = feature_data.get(season, {}).get(year, 0.0)
-
-                data[column_name].append(value)
-
-    df = pd.DataFrame(data)
-
-    df = df.sort_values("UID")
-
-    # Round all numeric values to 2 decimal places
-    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-
-    df[numeric_cols] = df[numeric_cols].round(2)
-
-    df.to_excel(writer, sheet_name="ndvi_seasonal", index=False)
-
-    print("Excel file created ndvi_seasonal")
 
 
 def create_excel_for_ndvi_shrub(data, writer):
@@ -325,6 +278,7 @@ def create_excel_for_ndvi_shrub(data, writer):
         other_cols = [c for c in df.columns if c not in priority_cols]
         new_order = priority_cols + other_cols
         df = df[new_order]
+        df = df.fillna(-9999)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
         df.to_excel(writer, sheet_name="ndvi_shrub", index=False)
