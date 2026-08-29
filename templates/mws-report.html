@@ -4208,14 +4208,13 @@
                 const data = await response.json();
 
                 const waterbodyStyleFunction = feature => {
-                    const isRiver = (feature.get('waterbody_type') || '').toLowerCase() === 'river';
                     return new ol.style.Style({
                         stroke: new ol.style.Stroke({
-                            color: isRiver ? 'rgb(255, 140, 0)' : 'rgb(0, 150, 255)',
+                            color: 'rgb(0, 150, 255)',
                             width: 2,
                         }),
                         fill: new ol.style.Fill({
-                            color: isRiver ? 'rgba(255, 140, 0, 0.4)' : 'rgba(137, 207, 240, 0.4)',
+                            color:'rgba(137, 207, 240, 0.4)',
                         }),
                     });
                 };
@@ -4226,7 +4225,6 @@
 
                 swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
                 swbMap.addLayer(waterRaster);
-                console.log(swbVillageSource)
             } catch (error) {
                 // Silently handle fetch errors
             }
