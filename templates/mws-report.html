@@ -3404,7 +3404,7 @@
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params: {
-                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3",
                     'STYLES': "lulc_water_pixels"
                 },
                 ratio: 1,
@@ -4198,19 +4198,15 @@
         // FETCH SURFACE WATERBODIES
         // ============================================================================
 
-        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
-            .then(response => response.json())
-            .then(data => {
-                swbMap.addLayer(waterRaster);
-            })
-            .catch(error => {
-                // Silently handle fetch errors
-            });
-
         // Waterbodies for this MWS, colored by type (river vs other), for the village maps
-        fetch(`https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=MWS_UID='{{mws_id}}'`)
-            .then(response => response.json())
-            .then(data => {
+        (async () => {
+            const typeName = `swb:surface_waterbodies_{{district}}_{{block}}`;
+            const url = `https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
                 const waterbodyStyleFunction = feature => {
                     const isRiver = (feature.get('waterbody_type') || '').toLowerCase() === 'river';
                     return new ol.style.Style({
@@ -4229,10 +4225,12 @@
                 });
 
                 swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
-            })
-            .catch(error => {
+                swbMap.addLayer(waterRaster);
+                console.log(swbVillageSource)
+            } catch (error) {
                 // Silently handle fetch errors
-            });
+            }
+        })();
 
         // ============================================================================
         // FETCH GROUNDWATER EXTRACTION STATUS
