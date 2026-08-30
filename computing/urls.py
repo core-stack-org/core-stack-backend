@@ -36,6 +36,11 @@ urlpatterns = [
         name="generate_drought_layer",
     ),
     path(
+        "generate_temperature_humidity_layer/",
+        api.generate_temperature_humidity_layer,
+        name="generate_temperature_humidity_layer",
+    ),
+    path(
         "generate_terrain_descriptor/",
         api.generate_terrain_descriptor,
         name="generate_terrain_descriptor",
