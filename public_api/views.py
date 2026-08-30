@@ -12,10 +12,22 @@ from utilities.gee_utils import (
     get_gee_asset_path,
     is_gee_asset_exists,
 )
+from rest_framework.response import Response
+from rest_framework import status
+from nrm_app.settings import EXCEL_PATH
+import json
+import requests
+import pandas as pd
+import numpy as np
+import geopandas as gpd
+from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
 from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL, GEE_HELPER_ACCOUNT_ID
 from geoadmin.models import StateSOI, DistrictSOI, TehsilSOI
 from computing.models import Layer, LayerType
 from stats_generator.utils import get_url
+from nrm_app.settings import GEOSERVER_URL
+from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
+from utilities.renderers import round_floats
 from django.db.models import Q
 
 # Create your views here.
@@ -57,14 +69,40 @@ def raster_tiff_download_url(workspace, layer_name):
     return geotiff_url
 
 
+def _soi_name_candidates(name):
+    """Match both GEE-normalized (uttar_pradesh) and SOI (Uttar Pradesh) names."""
+    raw = str(name or "").strip()
+    if not raw:
+        return []
+    candidates = []
+    for value in (raw, raw.replace("_", " "), raw.replace(" ", "_")):
+        if value and value not in candidates:
+            candidates.append(value)
+    return candidates
+
+
+def _get_soi_by_name(model, field_name, name, **filters):
+    for candidate in _soi_name_candidates(name):
+        match = model.objects.filter(**{f"{field_name}__iexact": candidate}, **filters).first()
+        if match is not None:
+            return match
+    raise model.DoesNotExist(
+        f"{model.__name__} matching query does not exist for {field_name}={name!r}."
+    )
+
+
 def fetch_generated_layer_urls(state_name, district_name, block_name):
     """
     Fetch all vector and raster layers for given state, district, and block,
     and return their metadata as JSON.
     """
-    state = StateSOI.objects.get(state_name__iexact=state_name)
-    district = DistrictSOI.objects.get(district_name__iexact=district_name, state=state)
-    tehsil = TehsilSOI.objects.get(tehsil_name__iexact=block_name, district=district)
+    state = _get_soi_by_name(StateSOI, "state_name", state_name)
+    district = _get_soi_by_name(
+        DistrictSOI, "district_name", district_name, state=state
+    )
+    tehsil = _get_soi_by_name(
+        TehsilSOI, "tehsil_name", block_name, district=district
+    )
 
     layers = Layer.objects.filter(state=state, district=district, block=tehsil)
 
@@ -214,9 +252,10 @@ def get_mws_id_by_lat_lon(lon, lat):
             )
 
         properties = features[0].get("properties", {})
-        uid = properties.get("uid")
+        uid = properties.get("uid") or properties.get("UID") or properties.get("mws_id")
 
         data_dict["mws_id"] = uid
+        data_dict["uid"] = uid
         return data_dict
 
     except Exception as e:
@@ -397,7 +436,7 @@ def get_tehsil_json(state, district, tehsil, regenerate):
 
     if not regenerate and os.path.exists(json_path):
         with open(json_path, "r") as f:
-            return json.load(f)
+            return round_floats(json.load(f))
 
     xls = pd.read_excel(file_path, sheet_name=None)
     json_data = {}
@@ -408,7 +447,7 @@ def get_tehsil_json(state, district, tehsil, regenerate):
         df = df.where(pd.notnull(df), None)
         json_data[sheet_name] = df.to_dict(orient="records")
 
-    # Save JSON file
+    json_data = round_floats(json_data)
     with open(json_path, "w") as f:
         json.dump(json_data, f)
     return json_data
@@ -446,6 +485,117 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
     report_url = f"{base_url}/api/v1/generate_mws_report/?state={state}&district={district}&block={tehsil}&uid={mws_id}"
 
     return {"Mws_report_url": report_url}, None
+
+
+def get_mws_geometry(state, district, tehsil, mws_id):
+    """
+    Fetch GeoJSON geometry for a single MWS uid from the generated MWS layer.
+    """
+    ee_initialize(GEE_HELPER_ACCOUNT_ID)
+    asset_path = get_gee_asset_path(state, district, tehsil)
+    mws_asset_id = asset_path + f"filtered_mws_{district}_{tehsil}_uid"
+
+    if not is_gee_asset_exists(mws_asset_id):
+        return None, Response(
+            {"error": "Mws Layer not found for the given location."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    try:
+        mws_fc = ee.FeatureCollection(mws_asset_id)
+        matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
+        feature_info = (
+            matching_feature.getInfo() if matching_feature is not None else None
+        )
+        if feature_info is None:
+            return None, Response(
+                {"error": "Data not found for the given mws_id"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return (
+            {
+                "uid": mws_id,
+                "state": state,
+                "district": district,
+                "tehsil": tehsil,
+                "geometry": feature_info.get("geometry"),
+            },
+            None,
+        )
+    except Exception as e:
+        return None, Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def get_village_geometries(state, district, tehsil, village_id=None):
+    """
+    Fetch village geometries from panchayat boundaries layer for a block.
+    """
+    try:
+        layer_name = f"{district}_{tehsil}"
+        village_gdf = gpd.read_file(get_url("panchayat_boundaries", layer_name))
+        if village_gdf.empty:
+            return None, Response(
+                {"error": "No village boundaries found for the given location."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        columns = list(village_gdf.columns)
+        col_lookup = {str(c).strip().lower(): c for c in columns}
+
+        id_candidates = [
+            "vill_id",
+            "villid",
+            "village_id",
+            "villageid",
+            "id",
+        ]
+        name_candidates = [
+            "vill_name",
+            "village_name",
+            "village",
+            "name",
+        ]
+
+        id_col = next((col_lookup[k] for k in id_candidates if k in col_lookup), None)
+        name_col = next(
+            (col_lookup[k] for k in name_candidates if k in col_lookup), None
+        )
+
+        if id_col is None or name_col is None or "geometry" not in village_gdf.columns:
+            return None, Response(
+                {"error": "Village boundary layer schema is missing required fields."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if village_id is not None:
+            village_gdf = village_gdf[
+                village_gdf[id_col].astype(str) == str(village_id)
+            ]
+            if village_gdf.empty:
+                return None, Response(
+                    {"error": "Village not found for the given village_id."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        rows = []
+        for _, row in village_gdf.iterrows():
+            rows.append(
+                {
+                    "village_id": str(row.get(id_col))
+                    if row.get(id_col) is not None
+                    else None,
+                    "village_name": row.get(name_col),
+                    "state": state,
+                    "district": district,
+                    "tehsil": tehsil,
+                    "geometry": row.get("geometry").__geo_interface__
+                    if row.get("geometry") is not None
+                    else None,
+                }
+            )
+        return rows, None
+    except Exception as e:
+        return None, Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def get_mws_geometries_data(state, district, tehsil):
