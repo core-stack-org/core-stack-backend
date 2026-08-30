@@ -13,6 +13,7 @@ from typing import Any, Mapping
 import pandas as pd
 from django.conf import settings
 
+from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from utilities.pipelines import AdminScope, CSAdminSource, StandardRequest, load_config
 from utilities.pipelines.admin import (
     ADMIN_COLUMN_DESCRIPTIONS,
@@ -24,11 +25,12 @@ from utilities.pipelines.outputs import (
     column_dictionary,
     frame_profile,
     input_signatures,
+    resolved_scope_output_identity,
     slug,
     stable_hash,
     utc_now_text,
 )
-from utilities.pipelines.publish import publish_gpkg_layer, register_layer
+from utilities.pipelines.publish import publish_gpkg_layer
 from utilities.pipelines.schema import (
     STATUS_MATCHED,
     STATUS_NO_DATA,
@@ -49,11 +51,11 @@ from utilities.constants import (
     ANTYODAYA_2020_CSV,
     ANTYODAYA_GEOSERVER_WORKSPACE,
 )
-
+from utilities.pipelines import api_request_payload
 
 CONFIG_PATH = Path(__file__).with_name("antyodaya_pipeline.yaml")
 ALGORITHM = "local-antyodaya-csv-admin-join"
-ALGORITHM_VERSION = "2.0"
+ALGORITHM_VERSION = "2.1"
 SOURCE_DEFAULTS = {
     "admin_gpkg": ADMIN_BOUNDARY_GPKG,
     "csv": ANTYODAYA_2020_CSV,
@@ -82,11 +84,9 @@ def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
     return resolved
 
 
-def _layer_name(prefix: str, district: str | None, tehsil: str | None) -> str:
-    return f"{prefix}_{slug(district)}_{slug(tehsil)}".strip("_")
-
-
-def _cli_request(state: str, district: str, tehsil: str, sync_to_geoserver: bool = True) -> StandardRequest:
+def _cli_request(
+    state: str, district: str, tehsil: str, sync_to_geoserver: bool = True
+) -> StandardRequest:
     return StandardRequest.from_mapping(
         {
             "scope": {
@@ -104,11 +104,19 @@ def _cli_request(state: str, district: str, tehsil: str, sync_to_geoserver: bool
 def _source_columns(config: Mapping[str, Any]) -> dict[str, list[str]]:
     header = csv_header(_repo_path(config["sources"]["csv"]))
     validation = config["validation"]
-    category_cluster = [col for col in header if col.endswith(validation["category_cluster_suffix"])]
-    category_value = [col for col in header if col.endswith(validation["category_value_suffix"])]
-    feature_value = [col for col in header if col.endswith(validation["feature_value_suffix"])]
+    category_cluster = [
+        col for col in header if col.endswith(validation["category_cluster_suffix"])
+    ]
+    category_value = [
+        col for col in header if col.endswith(validation["category_value_suffix"])
+    ]
+    feature_value = [
+        col for col in header if col.endswith(validation["feature_value_suffix"])
+    ]
     metric_columns = set(category_cluster + category_value + feature_value)
-    location_columns = [col for col in config["source_location_columns"] if col in header]
+    location_columns = [
+        col for col in config["source_location_columns"] if col in header
+    ]
     source_identity_columns = {
         config["keys"]["source_join_key"],
         config["keys"]["source_unique_key"],
@@ -125,7 +133,9 @@ def _source_columns(config: Mapping[str, Any]) -> dict[str, list[str]]:
     }
 
 
-def _sidecar(config: Mapping[str, Any], columns: Mapping[str, list[str]]) -> CSVSQLiteSidecar:
+def _sidecar(
+    config: Mapping[str, Any], columns: Mapping[str, list[str]]
+) -> CSVSQLiteSidecar:
     source_columns = [
         config["keys"]["source_join_key"],
         config["keys"]["source_unique_key"],
@@ -146,10 +156,14 @@ def _sidecar(config: Mapping[str, Any], columns: Mapping[str, list[str]]) -> CSV
 def _normalize_category_clusters(frame: pd.DataFrame, columns: list[str]) -> None:
     for column in columns:
         if column in frame.columns:
-            frame[column] = frame[column].where(frame[column].isna(), frame[column].astype(str).str.upper())
+            frame[column] = frame[column].where(
+                frame[column].isna(), frame[column].astype(str).str.upper()
+            )
 
 
-def _validate_antyodaya(frame: pd.DataFrame, config: Mapping[str, Any]) -> list[ValidationIssue]:
+def _validate_antyodaya(
+    frame: pd.DataFrame, config: Mapping[str, Any]
+) -> list[ValidationIssue]:
     validation = config["validation"]
     category_columns = columns_ending_with(frame, validation["category_cluster_suffix"])
     value_columns = columns_ending_with(frame, validation["category_value_suffix"])
@@ -175,7 +189,9 @@ def _validate_antyodaya(frame: pd.DataFrame, config: Mapping[str, Any]) -> list[
     return issues
 
 
-def _merge_admin_antyodaya(admin_rows, source_rows: pd.DataFrame, config: Mapping[str, Any]):
+def _merge_admin_antyodaya(
+    admin_rows, source_rows: pd.DataFrame, config: Mapping[str, Any]
+):
     admin_key = config["keys"]["admin_join_key"]
     source_key = config["keys"]["source_join_key"]
     admin = admin_rows.copy()
@@ -185,17 +201,36 @@ def _merge_admin_antyodaya(admin_rows, source_rows: pd.DataFrame, config: Mappin
         "district_name",
         "sub_district_name",
     }
-    attrs = attrs.drop(columns=[col for col in source_duplicate_columns if col in attrs.columns], errors="ignore")
-    return admin.merge(attrs, left_on=admin_key, right_on=source_key, how="left", suffixes=("", "_antyodaya"))
+    attrs = attrs.drop(
+        columns=[col for col in source_duplicate_columns if col in attrs.columns],
+        errors="ignore",
+    )
+    return admin.merge(
+        attrs,
+        left_on=admin_key,
+        right_on=source_key,
+        how="left",
+        suffixes=("", "_antyodaya"),
+    )
 
 
-def _ordered_tabular_columns(frame: pd.DataFrame, columns: Mapping[str, list[str]]) -> list[str]:
+def _ordered_tabular_columns(
+    frame: pd.DataFrame, columns: Mapping[str, list[str]]
+) -> list[str]:
     ordered = []
-    ordered.extend([col for col in columns["location"] if col not in ordered and col in frame.columns])
+    ordered.extend(
+        [
+            col
+            for col in columns["location"]
+            if col not in ordered and col in frame.columns
+        ]
+    )
     ordered.extend([col for col in columns["category_cluster"] if col in frame.columns])
     ordered.extend([col for col in columns["category_value"] if col in frame.columns])
     ordered.extend([col for col in columns["feature_value"] if col in frame.columns])
-    ordered.extend([col for col in columns["raw"] if col in frame.columns and col not in ordered])
+    ordered.extend(
+        [col for col in columns["raw"] if col in frame.columns and col not in ordered]
+    )
     return [col for col in ordered if col in frame.columns]
 
 
@@ -210,17 +245,27 @@ def _report_value_columns(columns: Mapping[str, list[str]]) -> list[str]:
     ]
 
 
-def _focused_frame(frame: pd.DataFrame, columns: Mapping[str, list[str]], status_name: str | None) -> pd.DataFrame:
-    focused = admin_presentation_frame(frame.drop(columns=["geometry"], errors="ignore"))
+def _focused_frame(
+    frame: pd.DataFrame, columns: Mapping[str, list[str]], status_name: str | None
+) -> pd.DataFrame:
+    focused = admin_presentation_frame(
+        frame.drop(columns=["geometry"], errors="ignore")
+    )
     source = frame.set_index("fid", drop=False) if "fid" in frame.columns else frame
     metric_columns = _report_value_columns(columns)
     output_rows: list[dict[str, Any]] = []
     for _, admin_row in focused.iterrows():
         row = admin_row.to_dict()
         admin_index = row.get("index")
-        values = source.loc[admin_index] if admin_index in source.index else pd.Series(dtype=object)
+        values = (
+            source.loc[admin_index]
+            if admin_index in source.index
+            else pd.Series(dtype=object)
+        )
         has_village_id = pd.notna(row.get("village_id"))
-        has_antyodaya = pd.notna(values.get("village_key")) if not values.empty else False
+        has_antyodaya = (
+            pd.notna(values.get("village_key")) if not values.empty else False
+        )
         status = STATUS_MATCHED
         if not has_village_id:
             status = STATUS_NO_VILLAGE_ID
@@ -237,7 +282,11 @@ def _focused_frame(frame: pd.DataFrame, columns: Mapping[str, list[str]], status
     ordered = list(focused.columns)
     if status_name:
         ordered.append(status_name)
-    ordered.extend(column for column in metric_columns if column in output.columns and column not in ordered)
+    ordered.extend(
+        column
+        for column in metric_columns
+        if column in output.columns and column not in ordered
+    )
     return output.reindex(columns=ordered)
 
 
@@ -314,7 +363,9 @@ def _column_describer(config: Mapping[str, Any], columns: Mapping[str, list[str]
     return describe
 
 
-def _overview(frame: pd.DataFrame, group_columns: list[str], columns: Mapping[str, list[str]]) -> pd.DataFrame:
+def _overview(
+    frame: pd.DataFrame, group_columns: list[str], columns: Mapping[str, list[str]]
+) -> pd.DataFrame:
     available_group_columns = [col for col in group_columns if col in frame.columns]
     if not available_group_columns:
         return pd.DataFrame()
@@ -324,14 +375,20 @@ def _overview(frame: pd.DataFrame, group_columns: list[str], columns: Mapping[st
             keys = (keys,)
         row = dict(zip(available_group_columns, keys))
         row["admin_village_rows"] = int(len(group))
-        row["matched_antyodaya_rows"] = int(group["village_key"].notna().sum()) if "village_key" in group else 0
+        row["matched_antyodaya_rows"] = (
+            int(group["village_key"].notna().sum()) if "village_key" in group else 0
+        )
         for column in columns["category_value"]:
             if column in group.columns:
-                row[f"{column}_mean"] = float(pd.to_numeric(group[column], errors="coerce").mean())
+                row[f"{column}_mean"] = float(
+                    pd.to_numeric(group[column], errors="coerce").mean()
+                )
         for column in columns["category_cluster"]:
             if column not in group.columns:
                 continue
-            counts = group[column].fillna("NO_DATA").astype(str).str.upper().value_counts()
+            counts = (
+                group[column].fillna("NO_DATA").astype(str).str.upper().value_counts()
+            )
             for label in ("HIGH", "MEDIUM", "LOW", "NO_DATA"):
                 row[f"{column}_{label.lower()}_count"] = int(counts.get(label, 0))
         rows.append(row)
@@ -346,8 +403,12 @@ def _column_reference_lines(column_entries: list[Mapping[str, Any]]) -> list[str
         "| --- | --- | --- |",
     ]
     for entry in column_entries:
-        description = str(entry.get("description") or "").replace("|", "\\|").replace("\n", " ")
-        lines.append(f"| `{entry['column']}` | {entry.get('datatype', '')} | {description} |")
+        description = (
+            str(entry.get("description") or "").replace("|", "\\|").replace("\n", " ")
+        )
+        lines.append(
+            f"| `{entry['column']}` | {entry.get('datatype', '')} | {description} |"
+        )
     lines.append("")
     return lines
 
@@ -420,7 +481,9 @@ def _readme_lines(
     return lines
 
 
-def _cache_input_signatures(config: Mapping[str, Any], config_path: str | Path) -> dict[str, dict[str, Any]]:
+def _cache_input_signatures(
+    config: Mapping[str, Any], config_path: str | Path
+) -> dict[str, dict[str, Any]]:
     sources = config.get("sources", {})
     paths: dict[str, str | Path] = {
         "pipeline_config": _repo_path(config_path),
@@ -448,7 +511,9 @@ def _cache_key(request: StandardRequest, outputs: OutputOptions) -> str:
     )
 
 
-def _required_result_paths(outputs: OutputOptions, request: StandardRequest) -> tuple[str, ...]:
+def _required_result_paths(
+    outputs: OutputOptions, request: StandardRequest
+) -> tuple[str, ...]:
     required: list[str] = ["mapping_yaml_path", "links_path"]
     if outputs.metadata:
         required.append("run_metadata_path")
@@ -472,9 +537,27 @@ def run_antyodaya_pipeline(
     outputs = resolve_output_options(request, config)
     columns = _source_columns(config)
     output_config = config["output"]
-    layer_name = _layer_name(output_config["layer_prefix"], request.scope.district_name, request.scope.tehsil_name)
-    result_name = layer_name or f"{output_config['layer_prefix']}_{slug(request.scope.level)}"
-    output_root = _repo_path(output_config["root"]) / slug(request.scope.state_name) / slug(request.scope.district_name) / slug(request.scope.tehsil_name)
+
+    t0 = time.perf_counter()
+    admin_source = CSAdminSource(
+        _repo_path(config["sources"]["admin_gpkg"]),
+        table_name=config["sources"]["admin_layer"],
+    )
+    include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
+    (
+        admin_selection,
+        registration_scope,
+        output_parts,
+        result_name,
+    ) = resolved_scope_output_identity(
+        admin_source,
+        output_config["layer_prefix"],
+        AdminScope.from_mapping(asdict(request.scope)),
+        include_geometry=include_geometry,
+    )
+    timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
+
+    output_root = _repo_path(output_config["root"]).joinpath(*output_parts)
     bundle = OutputBundle(
         output_root,
         result_name,
@@ -492,12 +575,6 @@ def run_antyodaya_pipeline(
         if cached:
             cached["cache_hit"] = True
             return cached
-
-    t0 = time.perf_counter()
-    admin_source = CSAdminSource(_repo_path(config["sources"]["admin_gpkg"]), table_name=config["sources"]["admin_layer"])
-    include_geometry = outputs.gpkg or request.publish.sync_to_geoserver
-    admin_selection = admin_source.read_scope(AdminScope.from_mapping(asdict(request.scope)), include_geometry=include_geometry)
-    timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
 
     t0 = time.perf_counter()
     sidecar = _sidecar(config, columns)
@@ -521,17 +598,24 @@ def run_antyodaya_pipeline(
     status_name, status_outputs = status_column_config(config)
     if status_name:
         joined[status_name] = [
-            STATUS_NO_VILLAGE_ID
-            if pd.isna(village_id)
-            else (STATUS_MATCHED if pd.notna(village_key) else STATUS_NO_DATA)
+            (
+                STATUS_NO_VILLAGE_ID
+                if pd.isna(village_id)
+                else (STATUS_MATCHED if pd.notna(village_key) else STATUS_NO_DATA)
+            )
             for village_id, village_key in zip(joined["village_id"], village_keys)
         ]
     ordered_columns = _ordered_tabular_columns(joined, columns)
-    villages_frame = admin_output_frame(joined.drop(columns=["geometry"], errors="ignore"), value_columns=ordered_columns)
+    villages_frame = admin_output_frame(
+        joined.drop(columns=["geometry"], errors="ignore"),
+        value_columns=ordered_columns,
+    )
     gpkg_value_columns = list(ordered_columns)
     if status_name and {"gpkg", "geoserver"} & status_outputs:
         gpkg_value_columns = [status_name, *gpkg_value_columns]
-    gpkg_frame = admin_output_frame(joined, value_columns=gpkg_value_columns, include_geometry=True)
+    gpkg_frame = admin_output_frame(
+        joined, value_columns=gpkg_value_columns, include_geometry=True
+    )
     gpkg_frame = normalize_unicode_frame(gpkg_frame)
     describe = _column_describer(config, columns)
     timings["build_outputs_seconds"] = round(time.perf_counter() - t0, 3)
@@ -556,7 +640,9 @@ def run_antyodaya_pipeline(
         "layer_name": result_name,
         "rows": int(len(villages_frame)),
         "matched_rows": matched_rows,
-        "join_coverage": round(matched_rows / len(villages_frame), 6) if len(villages_frame) else 0,
+        "join_coverage": (
+            round(matched_rows / len(villages_frame), 6) if len(villages_frame) else 0
+        ),
         "validation_issues": [asdict(issue) for issue in validation_issues],
         "sidecar": sidecar_status,
         "admin_created_indexes": admin_selection.created_indexes,
@@ -597,29 +683,6 @@ def run_antyodaya_pipeline(
                 geoserver = asdict(geoserver_result)
                 geoserver["ok"] = True
                 geoserver["status"] = "published"
-                if request.publish.register_layers:
-                    result["layer_registration"] = register_layer(
-                        dataset_name=output_config.get("dataset_name", "Antyodaya 2020"),
-                        layer_name=result_name,
-                        scope=request.scope,
-                        workspace=geoserver_workspace,
-                        geoserver_url=geoserver.get("wfs_url"),
-                        algorithm=ALGORITHM,
-                        algorithm_version=ALGORITHM_VERSION,
-                        misc={
-                            "source_csv": config["sources"]["csv"],
-                            "gpkg_path": result.get("gpkg_path"),
-                            "links_path": result.get("links_path"),
-                            "output_dir": bundle.path.as_posix(),
-                            "geoserver_layer_name": result_name,
-                            "geoserver_url": geoserver.get("wfs_url"),
-                            "rows": result.get("rows"),
-                            "matched_rows": result.get("matched_rows"),
-                            "join_coverage": result.get("join_coverage"),
-                        },
-                        overwrite=request.publish.overwrite,
-                    )
-                    result["layer_id"] = (result["layer_registration"] or {}).get("layer_id")
             except Exception as exc:
                 geoserver = {
                     "ok": False,
@@ -631,6 +694,38 @@ def run_antyodaya_pipeline(
                 }
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
+    if request.publish.register_layers and geoserver and geoserver.get("ok"):
+        state = registration_scope.state_name
+        district = registration_scope.district_name
+        block = registration_scope.tehsil_name
+        dataset_name = output_config.get("dataset_name", "Antyodaya 2020")
+        layer_id = save_layer_info_to_db(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=result_name,
+            asset_id="not applicable: local compute GeoServer layer",
+            dataset_name=dataset_name,
+            algorithm=ALGORITHM,
+            algorithm_version=ALGORITHM_VERSION,
+            misc={"is_generated_locally": True},
+            is_override=request.publish.overwrite,
+        )
+        if layer_id is None:
+            raise RuntimeError(
+                f"Database registration failed for layer {result_name!r}."
+            )
+        if update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True) is None:
+            raise RuntimeError(
+                f"GeoServer sync status update failed for layer ID {layer_id}."
+            )
+        result["layer_id"] = layer_id
+        result["layer_registration"] = {
+            "ok": True,
+            "status": "registered",
+            "dataset": dataset_name,
+            "layer_id": layer_id,
+        }
     if outputs.readme:
         result["readme_path"] = bundle.write_readme(
             _readme_lines(
@@ -642,7 +737,9 @@ def run_antyodaya_pipeline(
                 issues=validation_issues,
                 geoserver=geoserver,
                 column_entries=column_dictionary(
-                    pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")),
+                    pd.DataFrame(
+                        gpkg_frame.drop(columns=["geometry"], errors="ignore")
+                    ),
                     describe,
                 ),
             )
@@ -670,7 +767,9 @@ def run_antyodaya_pipeline(
                 "config_path": str(config_path),
                 "outputs": {
                     "villages": frame_profile(
-                        pd.DataFrame(gpkg_frame.drop(columns=["geometry"], errors="ignore")),
+                        pd.DataFrame(
+                            gpkg_frame.drop(columns=["geometry"], errors="ignore")
+                        ),
                         describe,
                     ),
                 },
@@ -694,14 +793,27 @@ def run_antyodaya_request(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 @app.task(bind=True)
-def generate_antyodaya_layer_task(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+def generate_antyodaya_layer_task(
+    self,
+    state: str | None = None,
+    district: str | None = None,
+    block: str | None = None,
+    payload: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Generate Mission Antyodaya outputs for a standard request payload."""
+    if payload is None:
+        payload = api_request_payload(
+            {"state": state, "district": district, "block": block},
+            overwrite=True,
+        )
 
     return run_antyodaya_request(payload)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the local Mission Antyodaya pipeline.")
+    parser = argparse.ArgumentParser(
+        description="Run the local Mission Antyodaya pipeline."
+    )
     parser.add_argument("--state")
     parser.add_argument("--district")
     parser.add_argument("--tehsil")

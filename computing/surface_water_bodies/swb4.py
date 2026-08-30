@@ -1,5 +1,6 @@
 import ee
 
+from computing.surface_water_bodies.area_utils import ensure_gee_area_ored
 from utilities.constants import GEE_PATHS, WBC
 from utilities.gee_utils import (
     get_gee_dir_path,
@@ -40,7 +41,18 @@ def waterbody_wbc_intersection(
         )
         + "swb3_"
         + asset_suffix
-    )
+    ).map(ensure_gee_area_ored)
+
+    def ensure_uid(feature):
+        feature = ee.Feature(feature)
+        uid = ee.Algorithms.If(
+            ee.Algorithms.IsEqual(feature.get("UID"), None),
+            feature.get("wb_id"),
+            feature.get("UID"),
+        )
+        return feature.set("UID", uid)
+
+    water_bodies = water_bodies.map(ensure_uid)
 
     # Filter points and polygons within the area of interest (aoi)
     points = census_state.filterBounds(roi)
@@ -92,7 +104,6 @@ def waterbody_wbc_intersection(
     def select_closest_polygon(feature):
         # Calculate the spread area of the water body
         spread = ee.Number(feature.get("water_spread_area_of_water_body"))
-        spread = spread.multiply(10000)
         intersections = ee.List(feature.get("intersections"))
 
         # Calculate the difference between intersection areas

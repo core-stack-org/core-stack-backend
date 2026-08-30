@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import site
 from datetime import timedelta
 from pathlib import Path
 
@@ -24,6 +25,18 @@ environ.Env.read_env(str(ENV_FILE))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 os.environ.setdefault("BACKEND_DIR", str(BASE_DIR))
+
+PYTHON_ENV_DIR = Path(site.__file__).resolve()
+if "lib" in PYTHON_ENV_DIR.parts:
+    PYTHON_ENV_DIR = Path(*PYTHON_ENV_DIR.parts[: PYTHON_ENV_DIR.parts.index("lib")])
+    GDAL_DATA_DIR = PYTHON_ENV_DIR / "share" / "gdal"
+    PROJ_DATA_DIR = PYTHON_ENV_DIR / "share" / "proj"
+
+    if GDAL_DATA_DIR.is_dir():
+        os.environ.setdefault("GDAL_DATA", str(GDAL_DATA_DIR))
+    if PROJ_DATA_DIR.is_dir():
+        os.environ.setdefault("PROJ_LIB", str(PROJ_DATA_DIR))
+        os.environ.setdefault("PROJ_DATA", str(PROJ_DATA_DIR))
 
 
 def resolve_env_path(name, default="", *, trailing_sep=False):
@@ -74,7 +87,7 @@ DB_PASSWORD = env("DB_PASSWORD")
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 
-STATIC_ROOT = "static/"
+STATIC_ROOT = BASE_DIR / "static"
 GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
 GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
 ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
@@ -269,13 +282,17 @@ USE_TZ = True
 # Celery
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
+SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
+STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
+STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=True)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
 
-STATIC_URL = "static/"
-STATIC_ROOT = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 
 # Media files (User uploaded content)
@@ -329,6 +346,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -351,6 +373,13 @@ PASSWORD_RESET_TIMEOUT = 259200  # 3 days in seconds
 GEOSERVER_URL = env("GEOSERVER_URL", default="")
 GEOSERVER_USERNAME = env("GEOSERVER_USERNAME", default="")
 GEOSERVER_PASSWORD = env("GEOSERVER_PASSWORD", default="")
+
+PROD_GEOSERVER_URL = env("PROD_GEOSERVER_URL", default="")
+PROD_GEOSERVER_USERNAME = env("PROD_GEOSERVER_USERNAME", default="")
+PROD_GEOSERVER_PASSWORD = env("PROD_GEOSERVER_PASSWORD", default="")
+
+PROD_BACKEND_URL = env("PROD_BACKEND_URL", default="")
+PROD_BACKEND_API_KEY = env("PROD_BACKEND_API_KEY", default="")
 
 PROD_GEOSERVER_URL = env("PROD_GEOSERVER_URL", default="")
 PROD_GEOSERVER_USERNAME = env("PROD_GEOSERVER_USERNAME", default="")
