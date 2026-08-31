@@ -6,59 +6,47 @@ from .models import (
     ODK_well,
 )
 
+# Maps a model to the (raw data field, modified-data field, {source_key: preserved_key})
+# it needs original values preserved for, before any mapping.py normalization
+# (e.g. classify_demand_type) can overwrite them downstream.
+_PRESERVED_FIELDS = {
+    ODK_waterbody: (
+        "data_waterbody",
+        "modified_data_waterbody",
+        {"select_one_owns": "demand_type"},
+    ),
+    ODK_well: (
+        "data_well",
+        "modified_data_well",
+        {"select_one_owns": "demand_type"},
+    ),
+}
 
-def preserve_unmodified_demand_type(
-    instance,
-    data_field,
-    unmodified_data_field,
-    source_field,
-):
-    """
-    Preserve only the original value of the field that is modified
-    by classify_demand_type().
-    """
 
+def _preserve_original_values(instance, data_field, modified_data_field, field_map):
+    """
+    Snapshot the original (pre-normalization) value of each source key in
+    field_map into modified_data_field, keyed by its preserved_key. Each
+    value is preserved only once and never overwritten on later saves.
+    """
     data = getattr(instance, data_field, None) or {}
-    unmodified_data = getattr(instance, unmodified_data_field, None) or {}
+    modified_data = getattr(instance, modified_data_field, None) or {}
 
-    # Original ODK value
-    original_value = data.get(source_field)
+    changed = False
+    for source_key, preserved_key in field_map.items():
+        if preserved_key in modified_data:
+            continue
+        original_value = data.get(source_key)
+        if original_value is not None:
+            modified_data[preserved_key] = original_value
+            changed = True
 
-    # Preserve it only once.
-    # Never overwrite the already preserved original value.
-    if original_value is not None and "demand_type" not in unmodified_data:
-        unmodified_data["demand_type"] = original_value
-
-        setattr(
-            instance,
-            unmodified_data_field,
-            unmodified_data,
-        )
+    if changed:
+        setattr(instance, modified_data_field, modified_data)
 
 
 @receiver(pre_save, sender=ODK_waterbody)
-def preserve_waterbody_unmodified_demand_type(
-    sender,
-    instance,
-    **kwargs,
-):
-    preserve_unmodified_demand_type(
-        instance=instance,
-        data_field="data_waterbody",
-        unmodified_data_field="unmodified_data_waterbody",
-        source_field="select_one_owns",
-    )
-
-
 @receiver(pre_save, sender=ODK_well)
-def preserve_well_unmodified_demand_type(
-    sender,
-    instance,
-    **kwargs,
-):
-    preserve_unmodified_demand_type(
-        instance=instance,
-        data_field="data_well",
-        unmodified_data_field="unmodified_data_well",
-        source_field="select_one_owns",
-    )
+def preserve_original_data(sender, instance, **kwargs):
+    data_field, modified_data_field, field_map = _PRESERVED_FIELDS[sender]
+    _preserve_original_values(instance, data_field, modified_data_field, field_map)
