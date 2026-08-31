@@ -29,6 +29,7 @@ from .serializers import (
     MaintenanceSerializer,
     NRMWorkSerializer,
     SettlementSerializer,
+    StatusTrackingByPlanSerializer,
     TeamDetailsSerializer,
     VillageBriefSerializer,
     WaterbodySerializer,
@@ -41,6 +42,7 @@ from .services import (
     get_dpr_summary,
     get_dpr_status_tracking,
     get_global_status_tracking,
+    get_status_tracking_by_plan,
     get_livestock_data,
     get_livelihood_data,
     get_maintenance_data,
@@ -1225,18 +1227,22 @@ def dpr_livelihood(request, plan_id):
     )
 
 
-# MARK: DPR Report Status Summary
-@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
-@schema(None)
-def dpr_report_status_summary(request):
+def _parse_geo_org_status_filters(request, include_status=False):
+    """
+    Parses the plan_id/state_id/district_id/block_id/organization_id query
+    params shared by the DPR status-tracking endpoints, and optionally the
+    `status` param. Returns (filters, error_response). filters is a dict;
+    error_response is a Response to return immediately if parsing failed,
+    else None.
+    """
     filters = {}
-    for key in ("state_id", "district_id", "block_id"):
+    for key in ("plan_id", "state_id", "district_id", "block_id"):
         val = request.query_params.get(key)
         if val:
             try:
                 filters[key] = int(val)
             except ValueError:
-                return Response(
+                return None, Response(
                     {"error": f"'{key}' must be an integer"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -1245,10 +1251,35 @@ def dpr_report_status_summary(request):
         try:
             filters["organization_id"] = str(uuid.UUID(org_id))
         except ValueError:
-            return Response(
+            return None, Response(
                 {"error": "'organization_id' must be a valid UUID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+    if include_status:
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            from .services import VALID_DEMAND_STATUSES
+
+            if status_filter not in VALID_DEMAND_STATUSES:
+                return None, Response(
+                    {
+                        "error": f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            filters["status"] = status_filter
+
+    return filters, None
+
+
+# MARK: DPR Report Status Summary
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_report_status_summary(request):
+    filters, err = _parse_geo_org_status_filters(request)
+    if err:
+        return err
     return Response(get_dpr_report_status_summary(filters))
 
 
@@ -1256,41 +1287,22 @@ def dpr_report_status_summary(request):
 @api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
 @schema(None)
 def dpr_global_status_tracking(request):
-    filters = {}
-    for key in ("state_id", "district_id", "block_id"):
-        val = request.query_params.get(key)
-        if val:
-            try:
-                filters[key] = int(val)
-            except ValueError:
-                return Response(
-                    {"error": f"'{key}' must be an integer"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-    org_id = request.query_params.get("organization_id")
-    if org_id:
-        try:
-            filters["organization_id"] = str(uuid.UUID(org_id))
-        except ValueError:
-            return Response(
-                {"error": "'organization_id' must be a valid UUID"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-    status_filter = request.query_params.get("status")
-    if status_filter:
-        from .services import VALID_DEMAND_STATUSES
-
-        if status_filter not in VALID_DEMAND_STATUSES:
-            return Response(
-                {
-                    "error": f"Invalid status. Choose from: {', '.join(sorted(VALID_DEMAND_STATUSES))}"
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        filters["status"] = status_filter
-
+    filters, err = _parse_geo_org_status_filters(request, include_status=True)
+    if err:
+        return err
     return Response(get_global_status_tracking(filters))
+
+
+# MARK: Status Tracking By Plan
+@api_security_check(auth_type="JWT_or_API_key", allowed_methods=["GET"])
+@schema(None)
+def dpr_status_tracking_by_plan(request):
+    filters, err = _parse_geo_org_status_filters(request, include_status=True)
+    if err:
+        return err
+    return _paginated_response(
+        request, get_status_tracking_by_plan(filters), StatusTrackingByPlanSerializer
+    )
 
 
 # MARK: DPR Status Tracking
