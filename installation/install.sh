@@ -1853,7 +1853,7 @@ staged_credentials = copy_gee_credentials_into_repo(
 
 account = upsert_gee_account_from_json(
     credentials_path=staged_credentials["absolute_path"],
-    project_name=os.environ["GEE_PROJECT_NAME"],
+    account_name=os.environ["GEE_PROJECT_NAME"],
 )
 
 print(
