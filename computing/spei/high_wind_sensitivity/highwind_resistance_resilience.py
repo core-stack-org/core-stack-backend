@@ -48,12 +48,12 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
             "cannot infer a safe default."
         )
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
-    WIND_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/wind_index_AEZ_{aez}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    WIND_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/wind_index_AEZ_{aez}"
 
     OUTPUT_DESC = f"wind_metrics_harmonized_kNDVI_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/hazards/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):

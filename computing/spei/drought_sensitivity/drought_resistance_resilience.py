@@ -47,10 +47,10 @@ def generate_drought_resistance(
             "cannot infer a safe default."
         )
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
     OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/hazards/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
