@@ -826,32 +826,51 @@ def _build_global_status_totals(type_map, plan_ids=None):
     return totals
 
 
+def _build_per_plan_status_totals(type_map, plan_ids):
+    """
+    Returns {plan_id (str): {status: count}} aggregated per plan for all models
+    in type_map. Runs one GROUP BY (plan_id, status) query per model —
+    O(models), not O(plans).
+    """
+    from django.db.models import Count
+
+    totals = defaultdict(lambda: defaultdict(int))
+    for model, pk_field, demand_field in type_map.values():
+        rows = (
+            model.objects.exclude(is_deleted=True)
+            .filter(plan_id__in=plan_ids)
+            .values("plan_id", demand_field)
+            .annotate(count=Count(pk_field))
+        )
+        for row in rows:
+            totals[row["plan_id"]][row[demand_field]] += row["count"]
+    return totals
+
+
 CFPT_ORG_ID = "2e4fed85-39d2-4691-a7dd-f5cf70a78ec6"
 
 
-def get_global_status_tracking(filters=None):
+def _filtered_plan_queryset(filters):
     """
-    Returns global totals of resource and demand counts by status, with optional
-    geo/org filtering. Does not return per-plan detail — use the per-plan
-    status-tracking endpoint for that.
+    Base PlanApp queryset scoped by optional geo/org filters, with test/demo
+    plans and the CFPT organisation always excluded.
 
-    filters (dict, optional):
-        state_id, district_id, block_id, organization_id  -- geo/org scoping
-        status -- filter the plan set to only plans that have at least one
-                  resource/demand in this status before computing totals
-
-    Test/demo plans and the CFPT organisation are always excluded.
+    filters (dict): plan_id, state_id, district_id, block_id, organization_id
+    plan_id is an explicit direct lookup, so it bypasses the test/demo/CFPT
+    exclusions and all other filters — if you ask for a specific plan, you
+    get it.
     """
     from django.db.models import Q
     from plans.models import PlanApp
 
-    filters = filters or {}
+    plan_qs = PlanApp.objects.filter(enabled=True)
 
-    plan_qs = (
-        PlanApp.objects.filter(enabled=True)
-        .exclude(Q(plan__icontains="test") | Q(plan__icontains="demo"))
-        .exclude(organization_id=CFPT_ORG_ID)
-    )
+    if filters.get("plan_id"):
+        return plan_qs.filter(id=filters["plan_id"])
+
+    plan_qs = plan_qs.exclude(
+        Q(plan__icontains="test") | Q(plan__icontains="demo")
+    ).exclude(organization_id=CFPT_ORG_ID)
     if filters.get("state_id"):
         plan_qs = plan_qs.filter(state_soi_id=filters["state_id"])
     if filters.get("district_id"):
@@ -860,36 +879,119 @@ def get_global_status_tracking(filters=None):
         plan_qs = plan_qs.filter(tehsil_soi_id=filters["block_id"])
     if filters.get("organization_id"):
         plan_qs = plan_qs.filter(organization_id=filters["organization_id"])
+    return plan_qs
 
-    plan_ids = list(plan_qs.values_list("id", flat=True))
+
+def _narrow_plan_ids_by_status(plan_ids, status_filter):
+    """Keeps only plan_ids that have >=1 resource/demand record in status_filter."""
+    matching_ids = set()
+    for model, pk_field, demand_field in ALL_TYPE_MAP.values():
+        ids = (
+            model.objects.exclude(is_deleted=True)
+            .filter(plan_id__in=plan_ids, **{demand_field: status_filter})
+            .values_list("plan_id", flat=True)
+            .distinct()
+        )
+        matching_ids.update(str(i) for i in ids)
+    return [pid for pid in plan_ids if str(pid) in matching_ids]
+
+
+def _status_totals(resource_counts, demand_counts):
+    """
+    Builds the {status: {resources, demands}} dict for all valid statuses.
+    An APPROVED item was necessarily SUBMITTED first, so APPROVED counts are
+    folded into SUBMITTED as well (SUBMITTED becomes a cumulative "at least
+    submitted" count, not an exclusive one).
+    """
+    totals = {
+        st: {
+            "resources": resource_counts.get(st, 0),
+            "demands": demand_counts.get(st, 0),
+        }
+        for st in VALID_DEMAND_STATUSES
+    }
+    totals["SUBMITTED"]["resources"] += totals["APPROVED"]["resources"]
+    totals["SUBMITTED"]["demands"] += totals["APPROVED"]["demands"]
+    return totals
+
+
+def get_global_status_tracking(filters=None):
+    """
+    Returns global totals of resource and demand counts by status, with optional
+    geo/org filtering. Does not return per-plan detail — use
+    get_status_tracking_by_plan for that. APPROVED counts are folded into
+    SUBMITTED (see _status_totals) since approval implies prior submission.
+
+    filters (dict, optional):
+        state_id, district_id, block_id, organization_id  -- geo/org scoping
+        status -- filter the plan set to only plans that have at least one
+                  resource/demand in this status before computing totals
+
+    Test/demo plans and the CFPT organisation are always excluded.
+    """
+    filters = filters or {}
+
+    plan_ids = list(_filtered_plan_queryset(filters).values_list("id", flat=True))
 
     status_filter = filters.get("status")
     if status_filter:
-        # Narrow plan_ids to only those with ≥1 record in the requested status
-        matching_ids = set()
-        for model, pk_field, demand_field in ALL_TYPE_MAP.values():
-            ids = (
-                model.objects.exclude(is_deleted=True)
-                .filter(plan_id__in=plan_ids, **{demand_field: status_filter})
-                .values_list("plan_id", flat=True)
-                .distinct()
-            )
-            matching_ids.update(str(i) for i in ids)
-        plan_ids = [pid for pid in plan_ids if str(pid) in matching_ids]
+        plan_ids = _narrow_plan_ids_by_status(plan_ids, status_filter)
 
     resource_totals = _build_global_status_totals(RESOURCE_TYPE_MAP, plan_ids)
     demand_totals = _build_global_status_totals(DEMAND_TYPE_MAP, plan_ids)
 
     return {
         "plan_count": len(plan_ids),
-        "totals": {
-            st: {
-                "resources": resource_totals.get(st, 0),
-                "demands": demand_totals.get(st, 0),
-            }
-            for st in VALID_DEMAND_STATUSES
-        },
+        "totals": _status_totals(resource_totals, demand_totals),
     }
+
+
+def get_status_tracking_by_plan(filters=None):
+    """
+    Same breakdown as get_global_status_tracking, but returns one row per plan
+    instead of a single aggregated total. APPROVED counts are folded into
+    SUBMITTED (see _status_totals) since approval implies prior submission.
+
+    filters (dict, optional):
+        plan_id -- return just this one plan (bypasses all other filters)
+        state_id, district_id, block_id, organization_id  -- geo/org scoping
+        status -- filter the plan set to only plans that have at least one
+                  resource/demand in this status before computing totals
+
+    Test/demo plans and the CFPT organisation are always excluded, unless
+    plan_id is given.
+    """
+    filters = filters or {}
+
+    plans = list(
+        _filtered_plan_queryset(filters).select_related(
+            "organization", "state_soi", "district_soi", "tehsil_soi"
+        )
+    )
+    plan_ids = [str(p.id) for p in plans]
+
+    status_filter = filters.get("status")
+    if status_filter:
+        plan_ids = _narrow_plan_ids_by_status(plan_ids, status_filter)
+        plans = [p for p in plans if str(p.id) in plan_ids]
+
+    resource_totals = _build_per_plan_status_totals(RESOURCE_TYPE_MAP, plan_ids)
+    demand_totals = _build_per_plan_status_totals(DEMAND_TYPE_MAP, plan_ids)
+
+    return [
+        {
+            "plan_id": p.id,
+            "plan_name": p.plan,
+            "organization": p.organization.name if p.organization else None,
+            "state": p.state_soi.state_name if p.state_soi else None,
+            "district": p.district_soi.district_name if p.district_soi else None,
+            "block": p.tehsil_soi.tehsil_name if p.tehsil_soi else None,
+            "totals": _status_totals(
+                resource_totals.get(str(p.id), {}), demand_totals.get(str(p.id), {})
+            ),
+        }
+        for p in plans
+    ]
 
 
 def get_dpr_status_tracking(plan_id):

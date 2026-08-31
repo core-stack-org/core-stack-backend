@@ -5,7 +5,7 @@ from dpr.models import (
     ODK_well,
     SWB_maintenance,
 )
-from dpr.utils import ensure_str, format_text
+from dpr.utils import ensure_str
 from utilities.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -183,16 +183,48 @@ _COMMUNITY_DEMAND_VALUES = {
 }
 _INDIVIDUAL_DEMAND_VALUES = {"private", "privately owned", "individual demand"}
 
+DEMAND_TYPE_LABELS = {
+    "community_demand": "Community Demand",
+    "individual_demand": "Individual Demand",
+}
 
-def classify_demand_type(raw_value):
+
+def classify_demand_type_code(raw_value):
+    """
+    Normalize a raw ODK ownership value into the machine-readable demand-type
+    code ("community_demand" / "individual_demand"), e.g. for form-label
+    translation lookups keyed by that code. Returns raw_value unchanged if
+    it isn't a recognized community/individual variant.
+    """
     if not raw_value:
         return raw_value
     normalized = raw_value.strip().lower().replace("_", " ")
     if normalized in _COMMUNITY_DEMAND_VALUES:
-        return "Community Demand"
+        return "community_demand"
     if normalized in _INDIVIDUAL_DEMAND_VALUES:
-        return "Individual Demand"
+        return "individual_demand"
     return raw_value
+
+
+def classify_demand_type(raw_value):
+    """Return the display-ready demand-type label (e.g. "Community Demand")."""
+    code = classify_demand_type_code(raw_value)
+    return DEMAND_TYPE_LABELS.get(code, code)
+
+
+def _extract_repair_value(section, key, other_key):
+    """
+    Read a repair-activity choice from an ODK data section, resolving the
+    "other" free-text follow-up when present. Returns None if the section
+    doesn't have a value for `key` at all.
+    """
+    value = ensure_str(section.get(key))
+    if not value:
+        return None
+    if value.lower() == "other":
+        other_value = section.get(other_key)
+        return other_value if other_value else value
+    return value
 
 
 def get_activity_type_from_waterbody(waterbody):
@@ -209,37 +241,21 @@ def get_activity_type_from_waterbody(waterbody):
     data = waterbody.data_waterbody
 
     expected_repair_key = STRUCTURE_TO_REPAIR_MAPPING.get(structure_type)
-    print(f"Expected repair key: {expected_repair_key}")
-
     if expected_repair_key:
-        repair_value = ensure_str(data.get(expected_repair_key))
-
-        if repair_value and repair_value.lower() == "other":
-            other_value = data.get(f"{expected_repair_key}_other")
-            if other_value:
-                print(
-                    f"Found repair activity '{expected_repair_key}' with value '{other_value}' for waterbody {waterbody.waterbody_id}"
-                )
-                return other_value
-            else:
-                print(
-                    f"Repair activity '{expected_repair_key}' is 'other' but no 'other' value specified for waterbody {waterbody.waterbody_id}"
-                )
-        elif repair_value:
-            print(
-                f"Found repair activity '{expected_repair_key}' with value '{repair_value}' for waterbody {waterbody.waterbody_id}"
-            )
+        repair_value = _extract_repair_value(
+            data, expected_repair_key, f"{expected_repair_key}_other"
+        )
+        if repair_value:
             return repair_value
-        else:
-            print(
-                f"Repair activity '{expected_repair_key}' is not 'other' but no value specified for waterbody {waterbody.waterbody_id}"
-            )
-            return "Maintenance"
+
+    return "Maintenance"
 
 
 def get_activity_type_from_well(well):
     """
     Extract the activity type VALUE from well based on data_well content.
+    Checks Well_usage.repairs_type first (the field the ODK form primarily
+    populates), then falls back to Well_condition.select_one_repairs_well.
 
     Args:
         well: ODK_well instance
@@ -249,35 +265,85 @@ def get_activity_type_from_well(well):
     """
     data = well.data_well
 
-    # Navigate to the Well_condition section
+    well_usage = data.get("Well_usage", {})
+    repair_value = _extract_repair_value(
+        well_usage, "repairs_type", "repairs_type_other"
+    )
+    if repair_value:
+        return repair_value
+
     well_condition = data.get("Well_condition", {})
+    repair_value = _extract_repair_value(
+        well_condition, "select_one_repairs_well", "select_one_repairs_well_other"
+    )
+    if repair_value:
+        return repair_value
 
-    repair_type = ensure_str(well_condition.get("select_one_repairs_well"))
-    print(f"Repair type well: {repair_type}")
-
-    if repair_type:
-        if repair_type.lower() == "other":
-            other_value = well_condition.get("select_one_repairs_well_other")
-            if other_value:
-                print(
-                    f"Found well repair type 'other' with value '{other_value}' for well {well.well_id}"
-                )
-                return other_value
-            else:
-                print(
-                    f"Well repair type is 'other' but no 'other' value specified for well {well.well_id}"
-                )
-                return repair_type
-        else:
-            print(f"Found well repair type '{repair_type}' for well {well.well_id}")
-            return repair_type
-
-    print(f"No repair type found for well {well.well_id}, using 'Maintenance'")
     return "Maintenance"
 
 
+def _build_modified_data(**raw_values):
+    """Keep only the raw (pre-transform) values that were actually present."""
+    return {k: v for k, v in raw_values.items() if v is not None}
+
+
+def _preserve_source_modified_data(instance, modified_data_field, raw_values):
+    """
+    Snapshot raw pre-transform values (e.g. the raw select_one_owns/repair-
+    activity choice) onto the ODK_waterbody/ODK_well record itself -- that's
+    where this data actually originates; the maintenance record is just a
+    derived copy of it. Only fills in keys not already preserved, and never
+    overwrites an existing snapshot.
+    """
+    modified_data = getattr(instance, modified_data_field) or {}
+    changed = False
+    for key, value in raw_values.items():
+        if key not in modified_data:
+            modified_data[key] = value
+            changed = True
+
+    if not changed:
+        return
+
+    setattr(instance, modified_data_field, modified_data)
+    instance.save(update_fields=[modified_data_field])
+
+
+def _sync_maintenance_activity(
+    existing, data_field, modified_data_field, common_data, common_modified_data
+):
+    """
+    Refresh the derived (demand_type, select_one_activities) values on an
+    already-created maintenance record, so mapping/classification fixes made
+    after the record was created (e.g. a corrected repair-activity lookup)
+    still reach it on the next regeneration. Records already moderated or
+    soft-deleted are left untouched.
+    """
+    if existing.is_moderated or existing.is_deleted:
+        return False
+
+    data = getattr(existing, data_field) or {}
+    changed = False
+    for key in ("demand_type", "select_one_activities"):
+        if data.get(key) != common_data[key]:
+            data[key] = common_data[key]
+            changed = True
+
+    if not changed:
+        return False
+
+    modified_data = getattr(existing, modified_data_field) or {}
+    modified_data.update(common_modified_data)
+
+    setattr(existing, data_field, data)
+    setattr(existing, modified_data_field, modified_data)
+    existing.save(update_fields=[data_field, modified_data_field])
+    print(f"Refreshed {data_field} for existing record {existing.pk}")
+    return True
+
+
 # MARK: Water Structures Data and Well Data
-def populate_maintenance_from_waterbody(plan):
+def populate_maintenance_from_waterbody(plan, create_missing=True):
     """
     Filter ODK_waterbody and ODK_well records by water structure type and populate the appropriate maintenance tables
     (GW_maintenance, Agri_maintenance, SWB_maintenance) based on the structure type.
@@ -286,7 +352,16 @@ def populate_maintenance_from_waterbody(plan):
 
     Args:
         plan: Plan object containing plan details
+        create_missing: when False, only refresh derived fields on maintenance
+            records that already exist -- never create new ones. Used by the
+            backfill_maintenance_activity management command to safely re-sync
+            historical data without generating Section E for plans that never
+            had it.
+
+    Returns:
+        dict with "created" and "refreshed" counts.
     """
+    stats = {"created": 0, "refreshed": 0}
     # Get all waterbody records for the plan
     waterbodies = ODK_waterbody.objects.filter(plan_id=plan.id).exclude(
         status_re="rejected"
@@ -304,16 +379,26 @@ def populate_maintenance_from_waterbody(plan):
 
         # Get the dynamic activity type VALUE based on structure type and data_waterbody
         activity_type = get_activity_type_from_waterbody(waterbody)
+        raw_owner = waterbody.data_waterbody.get("select_one_owns")
 
         common_data = {
-            "demand_type": classify_demand_type(
-                waterbody.data_waterbody.get("select_one_owns")
-            ),
+            "demand_type": classify_demand_type(raw_owner),
             "beneficiary_settlement": waterbody.beneficiary_settlement,
             "Beneficiary_Name": waterbody.data_waterbody.get("Beneficiary_name"),
             "ben_father": waterbody.data_waterbody.get("ben_father"),
-            "select_one_activities": format_text(activity_type),
+            # Keep the raw (underscore-code) activity value here -- translation
+            # lookups need the original ODK choice code. format_text() is only
+            # applied at display time, after translation has been attempted.
+            "select_one_activities": activity_type,
         }
+        # Preserve the raw values before classify_demand_type() normalizes them
+        common_modified_data = _build_modified_data(
+            demand_type=raw_owner,
+            select_one_activities=activity_type,
+        )
+        _preserve_source_modified_data(
+            waterbody, "modified_data_waterbody", common_modified_data
+        )
 
         work_id = waterbody.waterbody_id
         print("Work ID:", work_id)
@@ -338,21 +423,32 @@ def populate_maintenance_from_waterbody(plan):
             )
 
             if not existing:
-                maintenance_data = common_data.copy()
-                maintenance_data["select_one_recharge_structure"] = structure_type
+                if create_missing:
+                    maintenance_data = common_data.copy()
+                    maintenance_data["select_one_recharge_structure"] = structure_type
 
-                GW_maintenance.objects.create(
-                    uuid=waterbody.uuid,
-                    plan_id=plan.id,
-                    plan_name=plan.plan,
-                    latitude=waterbody.latitude,
-                    longitude=waterbody.longitude,
-                    status_re=waterbody.status_re,
-                    work_id=work_id,
-                    corresponding_work_id=waterbody.waterbody_id,
-                    data_gw_maintenance=maintenance_data,
-                )
-                print(f"GW Maintenance record created successfully for {work_id}")
+                    GW_maintenance.objects.create(
+                        uuid=waterbody.uuid,
+                        plan_id=plan.id,
+                        plan_name=plan.plan,
+                        latitude=waterbody.latitude,
+                        longitude=waterbody.longitude,
+                        status_re=waterbody.status_re,
+                        work_id=work_id,
+                        corresponding_work_id=waterbody.waterbody_id,
+                        data_gw_maintenance=maintenance_data,
+                        modified_data_gw_maintenance=common_modified_data,
+                    )
+                    stats["created"] += 1
+                    print(f"GW Maintenance record created successfully for {work_id}")
+            elif _sync_maintenance_activity(
+                existing,
+                "data_gw_maintenance",
+                "modified_data_gw_maintenance",
+                common_data,
+                common_modified_data,
+            ):
+                stats["refreshed"] += 1
 
         elif structure_type_lower in irrigation_structures_lower:
             existing = (
@@ -369,25 +465,36 @@ def populate_maintenance_from_waterbody(plan):
             )
 
             if not existing:
-                maintenance_data = common_data.copy()
-                maintenance_data["select_one_irrigation_structure"] = structure_type
+                if create_missing:
+                    maintenance_data = common_data.copy()
+                    maintenance_data["select_one_irrigation_structure"] = structure_type
 
-                print(f"Creating Agri Maintenance record for {work_id}")
-                print(f"Maintenance data: {maintenance_data}")
-                print(f"Plan name: {plan.plan}")
+                    print(f"Creating Agri Maintenance record for {work_id}")
+                    print(f"Maintenance data: {maintenance_data}")
+                    print(f"Plan name: {plan.plan}")
 
-                Agri_maintenance.objects.create(
-                    uuid=waterbody.uuid,
-                    plan_id=plan.id,
-                    plan_name=plan.plan,
-                    latitude=waterbody.latitude,
-                    longitude=waterbody.longitude,
-                    status_re=waterbody.status_re,
-                    work_id=work_id,
-                    corresponding_work_id=waterbody.waterbody_id,
-                    data_agri_maintenance=maintenance_data,
-                )
-                print(f"Agri Maintenance record created successfully for {work_id}")
+                    Agri_maintenance.objects.create(
+                        uuid=waterbody.uuid,
+                        plan_id=plan.id,
+                        plan_name=plan.plan,
+                        latitude=waterbody.latitude,
+                        longitude=waterbody.longitude,
+                        status_re=waterbody.status_re,
+                        work_id=work_id,
+                        corresponding_work_id=waterbody.waterbody_id,
+                        data_agri_maintenance=maintenance_data,
+                        modified_data_agri_maintenance=common_modified_data,
+                    )
+                    stats["created"] += 1
+                    print(f"Agri Maintenance record created successfully for {work_id}")
+            elif _sync_maintenance_activity(
+                existing,
+                "data_agri_maintenance",
+                "modified_data_agri_maintenance",
+                common_data,
+                common_modified_data,
+            ):
+                stats["refreshed"] += 1
 
         elif structure_type_lower in surface_waterbodies_lower:
             existing = SWB_maintenance.objects.filter(
@@ -400,24 +507,35 @@ def populate_maintenance_from_waterbody(plan):
             )
 
             if not existing:
-                maintenance_data = common_data.copy()
-                maintenance_data["TYPE_OF_WORK"] = structure_type
+                if create_missing:
+                    maintenance_data = common_data.copy()
+                    maintenance_data["TYPE_OF_WORK"] = structure_type
 
-                print(f"Creating SWB Maintenance record for {work_id}")
-                print(f"Maintenance data: {maintenance_data}")
+                    print(f"Creating SWB Maintenance record for {work_id}")
+                    print(f"Maintenance data: {maintenance_data}")
 
-                SWB_maintenance.objects.create(
-                    uuid=waterbody.uuid,
-                    plan_id=plan.id,
-                    plan_name=plan.plan,
-                    latitude=waterbody.latitude,
-                    longitude=waterbody.longitude,
-                    status_re=waterbody.status_re,
-                    work_id=work_id,
-                    corresponding_work_id=waterbody.waterbody_id,
-                    data_swb_maintenance=maintenance_data,
-                )
-                print(f"SWB Maintenance record created successfully for {work_id}")
+                    SWB_maintenance.objects.create(
+                        uuid=waterbody.uuid,
+                        plan_id=plan.id,
+                        plan_name=plan.plan,
+                        latitude=waterbody.latitude,
+                        longitude=waterbody.longitude,
+                        status_re=waterbody.status_re,
+                        work_id=work_id,
+                        corresponding_work_id=waterbody.waterbody_id,
+                        data_swb_maintenance=maintenance_data,
+                        modified_data_swb_maintenance=common_modified_data,
+                    )
+                    stats["created"] += 1
+                    print(f"SWB Maintenance record created successfully for {work_id}")
+            elif _sync_maintenance_activity(
+                existing,
+                "data_swb_maintenance",
+                "modified_data_swb_maintenance",
+                common_data,
+                common_modified_data,
+            ):
+                stats["refreshed"] += 1
 
     for well in wells:
         if well.need_maintenance.lower() != "yes":
@@ -425,14 +543,21 @@ def populate_maintenance_from_waterbody(plan):
 
         # Get the dynamic activity type VALUE from well data
         activity_type = get_activity_type_from_well(well)
+        raw_owner = well.data_well.get("select_one_owns")
 
         common_data = {
-            "demand_type": classify_demand_type(well.data_well.get("select_one_owns")),
+            "demand_type": classify_demand_type(raw_owner),
             "beneficiary_settlement": well.beneficiary_settlement,
             "Beneficiary_Name": well.data_well.get("Beneficiary_name"),
             "ben_father": well.data_well.get("ben_father"),
-            "select_one_activities": format_text(activity_type),
+            # Raw (underscore-code) value -- see comment in the waterbody loop above.
+            "select_one_activities": activity_type,
         }
+        common_modified_data = _build_modified_data(
+            demand_type=raw_owner,
+            select_one_activities=activity_type,
+        )
+        _preserve_source_modified_data(well, "modified_data_well", common_modified_data)
 
         well_id = well.well_id
 
@@ -446,25 +571,37 @@ def populate_maintenance_from_waterbody(plan):
         )
 
         if not existing_well:
-            maintenance_data = common_data.copy()
-            maintenance_data["select_one_irrigation_structure"] = "Well"
+            if create_missing:
+                maintenance_data = common_data.copy()
+                maintenance_data["select_one_irrigation_structure"] = "Well"
 
-            Agri_maintenance.objects.create(
-                uuid=well.uuid,
-                plan_id=plan.id,
-                plan_name=plan.plan,
-                latitude=well.latitude,
-                longitude=well.longitude,
-                status_re=well.status_re,
-                work_id=well_id,
-                corresponding_work_id=well.well_id,
-                data_agri_maintenance=maintenance_data,
-            )
-            print(f"Well maintenance record created successfully for {well_id}")
+                Agri_maintenance.objects.create(
+                    uuid=well.uuid,
+                    plan_id=plan.id,
+                    plan_name=plan.plan,
+                    latitude=well.latitude,
+                    longitude=well.longitude,
+                    status_re=well.status_re,
+                    work_id=well_id,
+                    corresponding_work_id=well.well_id,
+                    data_agri_maintenance=maintenance_data,
+                    modified_data_agri_maintenance=common_modified_data,
+                )
+                stats["created"] += 1
+                print(f"Well maintenance record created successfully for {well_id}")
         else:
             print(f"Well maintenance record already exists for {well_id}")
+            if _sync_maintenance_activity(
+                existing_well,
+                "data_agri_maintenance",
+                "modified_data_agri_maintenance",
+                common_data,
+                common_modified_data,
+            ):
+                stats["refreshed"] += 1
 
     print("Maintenance records created successfully")
+    return stats
 
 
 # yuktdhara kml icon mapping

@@ -149,6 +149,9 @@ def sync_edited_updated_well(well_submission):
         "data_well": well_submission,
     }
 
+    print("WELL ID:", well_id)
+    print("MAPPED:", mapped)
+
     ODK_well.objects.update_or_create(well_id=well_id, defaults=mapped)
 
 
