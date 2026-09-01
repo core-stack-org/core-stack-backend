@@ -30,7 +30,7 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 
 
-def forest_fringes_on_AEZ(aez_no, gee_account_id=7):
+def forest_fire_on_AEZ(aez_no, gee_account_id=7):
     ee_initialize(gee_account_id)
     aez = ee.FeatureCollection(AEZ)
     mwses = ee.FeatureCollection(MWS_DATASET)
@@ -103,21 +103,21 @@ def generate_forest_fire_layer(
 
     asset_id = get_gee_dir_path(asset_folder_list, asset_path=asset_path) + description
 
-    print("Total features:", roi.size().getInfo())
+    # print("Total features:", roi.size().getInfo())
 
-    def flag_bad_geom(f):
-        area = f.geometry().area(1)
-        return f.set("area_m2", area)
+    # def flag_bad_geom(f):
+    #     area = f.geometry().area(1)
+    #     return f.set("area_m2", area)
+    #
+    # debug_fc = roi.map(flag_bad_geom)
+    # bad = debug_fc.filter(ee.Filter.eq("area_m2", 0))
 
-    debug_fc = roi.map(flag_bad_geom)
-    bad = debug_fc.filter(ee.Filter.eq("area_m2", 0))
+    # print("Bad geometry count:", bad.size().getInfo())
+    # print("Bad UIDs:", bad.aggregate_array("uid").getInfo())
 
-    print("Bad geometry count:", bad.size().getInfo())
-    print("Bad UIDs:", bad.aggregate_array("uid").getInfo())
+    fire_image = load_fire_image(roi)
 
-    fire_image = load_fire_image()
-
-    print(fire_image.bandNames().getInfo())
+    # print(fire_image.bandNames().getInfo())
 
     fire_images = prepare_frp_images(
         fire_image,
@@ -165,7 +165,7 @@ def generate_forest_fire_layer(
                 ),
                 "fire_frp_max": reduce(
                     frp_max_img,
-                    ee.Reducer.mean(),
+                    ee.Reducer.max(),
                     "max",
                 ),
                 "fire_count_per_year": reduce(
@@ -225,7 +225,7 @@ def generate_forest_fire_layer(
     # --------------------------------------------------------------
     task_id = export_vector_asset_to_gee(fc, description, asset_id)
 
-    if task_id:
+    if sync_to_geoserver and task_id:
         check_task_status([task_id])
         print("Forest Fire layer exported to GEE.")
 
@@ -269,7 +269,7 @@ def _save_to_db_and_sync_to_geoserver(
             dataset_name="Forest Fire",
         )
 
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
     if sync_to_geoserver:
         fc = ee.FeatureCollection(asset_id)
         res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fire")
