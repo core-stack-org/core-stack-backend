@@ -72,13 +72,16 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/canal/canal.geojson
           type: file
 
-        - name: hydrological soil group
-          local_path: "{DATA_DIR}/base_layers/hydrological_soil_group/hydrological_soil_group.geojson"
-          source: s3://corestack-datasets/base_layers/static_layers/hydrological_soil_group/hydrological_soil_group.geojson
-          type: file
-
         - name: mission antyodaya
           local_path: "{DATA_DIR}/base_layers/mission_antyodaya/mission_antyodaya.gpkg"
+          source: ""
+          type: file
+
+        - name: hydrological soil group
+          aliases:
+              - soil raster
+              - hysogs
+          local_path: "{DATA_DIR}/base_layers/soil/hysogs_india_250m_4326.tif"
           source: ""
           type: file
 
@@ -98,7 +101,7 @@ base_layers:
           type: file
 
         - name: admin boundaries
-          local_path: "{DATA_DIR}/admin-boundary/input/soi_tehsil.geojson"
+          local_path: "{DATA_DIR}/base_layers/admin_boundary/soi_tehsil.geojson"
           source: ""
           # Full admin-boundary archive (~8 GB, 7z) containing this file; extracted in place.
           gdrive_id: 1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d
@@ -509,8 +512,16 @@ derived_layers:
     - name: stream_order
 
     - name: hydrology_fortnightly
+      filename: "deltaG_fortnight_{district}_{block}.gpkg"
+      local_path: "{DATA_DIR}/hydrology/hydrology_local/{state}/{district}/{block}/{filename}"
+      geoserver_workspace: mws_layers
+      layer_type: vector
 
     - name: hydrology_annual
+      filename: "deltaG_annual_{district}_{block}.gpkg"
+      local_path: "{DATA_DIR}/hydrology/hydrology_local/{state}/{district}/{block}/{filename}"
+      geoserver_workspace: mws_layers
+      layer_type: vector
 
     - name: generate_block_layer
 

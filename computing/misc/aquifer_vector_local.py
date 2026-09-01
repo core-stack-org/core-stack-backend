@@ -183,24 +183,12 @@ def _build_aquifer_properties(watershed_row, area_in_ha, intersections_df):
     )
     return properties
 
-
-def _compute_aquifer_properties_for_watersheds(watersheds_gdf, aquifers_gdf):
-    watersheds_gdf = validate_geometry(watersheds_gdf)
-    if watersheds_gdf.empty:
-        raise ValueError("No valid watershed geometries found for local processing.")
-    if watersheds_gdf.crs is None:
-        raise ValueError("Watershed CRS is missing; cannot compute aquifer overlaps.")
-
+def _prepare_aquifers_for_intersection(aquifers_gdf):
     aquifers_gdf = validate_geometry(aquifers_gdf)
     if aquifers_gdf.empty:
         raise ValueError("Aquifer source file has no valid geometries.")
     if aquifers_gdf.crs is None:
         raise ValueError("Aquifer source CRS is missing; cannot compute overlaps.")
-
-    watersheds_result = watersheds_gdf.copy()
-    watersheds_result["area_in_ha"] = get_watershed_areas_in_hectares(
-        watersheds_result
-    ).astype(float)
 
     aquifers_with_yield = aquifers_gdf.copy()
     aquifers_with_yield["y_value"] = aquifers_with_yield["yeild__"].apply(
@@ -212,8 +200,30 @@ def _compute_aquifer_properties_for_watersheds(watersheds_gdf, aquifers_gdf):
     if aquifers_with_yield.empty:
         raise ValueError("Aquifer source has no records with valid yield values.")
 
+    return aquifers_with_yield.to_crs("EPSG:6933")
+
+def _compute_aquifer_properties_for_watersheds(
+    watersheds_gdf,
+    aquifers_gdf=None,
+    aquifers_projected=None,
+):
+    watersheds_gdf = validate_geometry(watersheds_gdf)
+    if watersheds_gdf.empty:
+        raise ValueError("No valid watershed geometries found for local processing.")
+    if watersheds_gdf.crs is None:
+        raise ValueError("Watershed CRS is missing; cannot compute aquifer overlaps.")
+
+    if aquifers_projected is None:
+        if aquifers_gdf is None:
+            raise ValueError("Aquifer source is required for local processing.")
+        aquifers_projected = _prepare_aquifers_for_intersection(aquifers_gdf)
+
+    watersheds_result = watersheds_gdf.copy()
+    watersheds_result["area_in_ha"] = get_watershed_areas_in_hectares(
+        watersheds_result
+    ).astype(float)
     watersheds_projected = watersheds_result.to_crs("EPSG:6933")
-    aquifers_projected = aquifers_with_yield.to_crs("EPSG:6933")
+    aquifer_spatial_index = aquifers_projected.sindex
 
     computed_rows = []
     total = len(watersheds_projected)
@@ -236,9 +246,13 @@ def _compute_aquifer_properties_for_watersheds(watersheds_gdf, aquifers_gdf):
             )
             continue
 
-        intersecting_aquifers = aquifers_projected.loc[
-            aquifers_projected.intersects(watershed_geometry)
-        ]
+        candidate_positions = sorted(
+            aquifer_spatial_index.query(
+                watershed_geometry,
+                predicate="intersects",
+            )
+        )
+        intersecting_aquifers = aquifers_projected.iloc[candidate_positions]
 
         intersections = []
         for _, aquifer_row in intersecting_aquifers.iterrows():
@@ -294,7 +308,6 @@ def _compute_aquifer_properties_for_watersheds(watersheds_gdf, aquifers_gdf):
     for column in computed_df.columns:
         watersheds_result[column] = computed_df[column].values
     return watersheds_result
-
 
 def run_aquifer_vector_local(
     state,
