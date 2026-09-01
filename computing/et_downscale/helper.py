@@ -106,6 +106,7 @@ def ee_annual_total_band(
     start_month=7,
 ) -> ee.Image:
     annual = ee.Image.constant(0).float()
+    daily_sum = ee.Image.constant(0).float()
     valid_count = ee.Image.constant(0).float()
 
     for agri_month_idx in range(12):
@@ -113,10 +114,14 @@ def ee_annual_total_band(
         actual_month = ((start_month - 1 + agri_month_idx) % 12) + 1
         actual_year = year if actual_month >= start_month else year + 1
         days = calendar.monthrange(actual_year, actual_month)[1]
-        annual = annual.add(month_band.unmask(0).multiply(days))
-        valid_count = valid_count.add(month_band.mask().gt(0).unmask(0))
+        valid_mask = month_band.gte(0).unmask(0)
+        annual = annual.add(month_band.unmask(0).multiply(valid_mask).multiply(days))
+        daily_sum = daily_sum.add(month_band.unmask(0).multiply(valid_mask))
+        valid_count = valid_count.add(valid_mask)
 
-    return annual.updateMask(valid_count.eq(12)).rename(band_name).float()
+    full_annual = annual.updateMask(valid_count.eq(12))
+    estimated_annual = daily_sum.divide(valid_count).multiply(365)
+    return full_annual.unmask(estimated_annual).updateMask(valid_count.gt(0)).rename(band_name).float()
 
 
 def ee_annual_mean_band(
@@ -126,11 +131,13 @@ def ee_annual_mean_band(
         monthly_stack.select(f"{prefix}_{month:02d}").rename("annual_src").float()
         for month in range(1, 13)
     ]
-    collection = ee.ImageCollection.fromImages(images)
+    collection = ee.ImageCollection.fromImages(images).map(
+        lambda img: ee.Image(img).updateMask(ee.Image(img).gte(0))
+    )
     valid_count = collection.map(
         lambda img: ee.Image(img).mask().gt(0).unmask(0).rename("annual_src")
     ).sum()
-    return collection.mean().updateMask(valid_count.eq(12)).rename(band_name).float()
+    return collection.mean().updateMask(valid_count.gt(0)).rename(band_name).float()
 
 
 def _apply_image_properties(img: ee.Image, props: dict) -> ee.Image:
