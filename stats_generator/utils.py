@@ -2297,7 +2297,13 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
                 triply_c_key, 0
             )
 
-        row["sum_area_in_ha"] = properties.get("sum", 0) / 10000
+        croppable_area_key = (
+            f"total_cropable_area_ever_hydroyear_2017_{end_year}"
+        )
+        croppable_area = properties.get(croppable_area_key)
+        if croppable_area is None:
+            croppable_area = properties.get("sum", 0) / 10000
+        row["sum_area_in_ha"] = croppable_area
         df_data.append(row)
 
     # Create and format DataFrame

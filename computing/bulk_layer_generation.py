@@ -178,6 +178,7 @@ LOCAL_TASK_DATASETS = {
         "Soil Health Vector",
     ),
     "computing.soil_type.soil_type_local.generate_soil_type_local": ("Soil Type",),
+    "computing.zoi_layers.zoi.generate_zoi": ("Surface Water Bodies",),
 }
 
 

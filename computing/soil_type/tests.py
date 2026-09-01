@@ -59,15 +59,12 @@ class SoilTypePublicationTests(TestCase):
                 return_value="/tmp/soil_type_test.gpkg",
             ),
             patch(
-                "computing.soil_type.soil_type_local.push_local_vector_to_geoserver",
+                "computing.soil_type.soil_type_local.queue_local_vector_for_geoserver",
                 return_value={"status_code": geoserver_status},
             ),
             patch(
                 "computing.soil_type.soil_type_local.save_layer_info_to_db",
                 return_value=42,
-            ),
-            patch(
-                "computing.soil_type.soil_type_local.update_layer_sync_status"
             ),
         )
         mocks = [patcher.start() for patcher in patchers]
@@ -80,11 +77,10 @@ class SoilTypePublicationTests(TestCase):
         )
         return success, mocks
 
-    def test_success_creates_workspace_and_syncs_cloud_metadata(self):
-        success, mocks = self._run_with_mocks(201)
+    def test_success_queues_publication_with_layer_metadata(self):
+        success, mocks = self._run_with_mocks(202)
         geoserver_mock = mocks[4]
         save_layer_mock = mocks[5]
-        update_sync_mock = mocks[6]
 
         self.assertTrue(success)
         geoserver_mock.assert_called_once_with(
@@ -92,6 +88,7 @@ class SoilTypePublicationTests(TestCase):
             workspace="soil_type",
             layer_name="soil_type_puducherry_bahur",
             file_type="gpkg",
+            layer_id=42,
         )
         self.assertEqual(
             save_layer_mock.call_args.kwargs["dataset_name"],
@@ -101,17 +98,11 @@ class SoilTypePublicationTests(TestCase):
             save_layer_mock.call_args.kwargs["layer_name"],
             "soil_type_puducherry_bahur",
         )
-        update_sync_mock.assert_called_once_with(
-            layer_id=42,
-            sync_to_geoserver=True,
-        )
-
-    def test_failed_publication_does_not_update_cloud_metadata(self):
+    def test_failed_queueing_keeps_unsynced_metadata(self):
         success, mocks = self._run_with_mocks(500)
 
         self.assertFalse(success)
-        mocks[5].assert_not_called()
-        mocks[6].assert_not_called()
+        mocks[5].assert_called_once()
 
 
 class SoilTypeAPITests(APISimpleTestCase):

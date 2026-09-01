@@ -11,14 +11,11 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     load_precomputed_watersheds,
-    push_local_vector_to_geoserver,
+    queue_local_vector_for_geoserver,
     resolve_lulc_raster_paths,
     write_vector_output,
 )
-from computing.utils import (
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
+from computing.utils import save_layer_info_to_db
 
 logger = logging.getLogger(__name__)
 
@@ -124,25 +121,6 @@ def run_lulc_vector_local(
     logger.info("Saved local LULC vector: %s", asset_id)
 
     geoserver_ok = False
-    geoserver_response = None
-    if push_to_geoserver:
-        geoserver_response = push_local_vector_to_geoserver(
-            path=os.path.splitext(asset_id)[0],
-            workspace=GEOSERVER_WORKSPACE,
-            layer_name=layer_name,
-            file_type="gpkg",
-        )
-        geoserver_ok = (
-            isinstance(geoserver_response, dict)
-            and geoserver_response.get("status_code") in (200, 201)
-        )
-        if geoserver_ok:
-            logger.info("GeoServer upload succeeded for layer %s", layer_name)
-        else:
-            logger.error(
-                "GeoServer upload failed for layer %s: %s", layer_name, geoserver_response
-            )
-
     layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
@@ -161,8 +139,24 @@ def run_lulc_vector_local(
             algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
         logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-        if layer_id and geoserver_ok:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+
+    if push_to_geoserver:
+        geoserver_response = queue_local_vector_for_geoserver(
+            path=os.path.splitext(asset_id)[0],
+            workspace=GEOSERVER_WORKSPACE,
+            layer_name=layer_name,
+            file_type="gpkg",
+            layer_id=layer_id,
+        )
+        geoserver_ok = geoserver_response.get("status_code") == 202
+        if geoserver_ok:
+            logger.info("GeoServer upload queued for layer %s", layer_name)
+        else:
+            logger.error(
+                "GeoServer queueing failed for layer %s: %s",
+                layer_name,
+                geoserver_response,
+            )
 
     return geoserver_ok if push_to_geoserver else True
 

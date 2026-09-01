@@ -20,15 +20,23 @@ from computing.bulk_layer_generation import (
     pipeline_names,
     run_pipeline,
 )
+from computing.cropping_intensity.cropping_intensity import (
+    generate_gee_asset,
+    _pan_india_lulc_asset_id,
+)
 from computing.layer_dependency.layer_generation_in_order import get_args, load_map_config
 from computing.local_compute_helper import write_vector_output
 from computing.misc.nrega_local_compute import _compute_nrega_for_watersheds
 from computing.models import Dataset, Layer
 from computing.surface_water_bodies.swb_local import (
+    _complete_swb_pipeline,
     _continue_swb_in_gee,
     _convert_area_columns_to_hectares,
+    _delete_existing_swb_outputs,
     _final_layer_name,
     _layer_name,
+    _restore_legacy_columns,
+    generate_swb_layer as generate_swb_layer_local,
     run_swb_local,
 )
 from computing.surface_water_bodies.swb3 import (
@@ -36,6 +44,8 @@ from computing.surface_water_bodies.swb3 import (
 )
 from computing.utils import generate_swb_layer_with_max_so_catchment
 from computing.tasks import bulk_generate_layer
+from computing.zoi_layers.zoi1 import create_ring
+from computing.zoi_layers.zoi2 import generate_zoi_ci
 from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
 from utilities.constants import (
     CATCHMENT_AREA,
@@ -68,6 +78,53 @@ class LocalNregaTests(SimpleTestCase):
 
 
 class LocalSwbContinuationTests(SimpleTestCase):
+    @patch("computing.surface_water_bodies.swb_local.get_gee_dir_path")
+    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
+    @patch("computing.surface_water_bodies.swb_local.ee.data.deleteAsset")
+    def test_overwrite_deletes_local_and_gee_outputs(
+        self,
+        delete_asset,
+        asset_exists,
+        get_gee_dir_path,
+    ):
+        get_gee_dir_path.return_value = "projects/example/state/district/block/"
+        asset_exists.return_value = True
+
+        with TemporaryDirectory() as output_dir:
+            output_path = Path(output_dir) / "swb.gpkg"
+            output_path.touch()
+
+            _delete_existing_swb_outputs(
+                output_path=output_path,
+                swb2_asset_id=(
+                    "projects/example/state/district/block/"
+                    "swb2_district_block_local"
+                ),
+                asset_suffix="district_block",
+                asset_folder_list=["state", "district", "block"],
+                app_type="MWS",
+            )
+
+            self.assertFalse(output_path.exists())
+
+        self.assertEqual(
+            delete_asset.call_args_list,
+            [
+                call(
+                    "projects/example/state/district/block/"
+                    "swb4_district_block"
+                ),
+                call(
+                    "projects/example/state/district/block/"
+                    "swb3_district_block"
+                ),
+                call(
+                    "projects/example/state/district/block/"
+                    "swb2_district_block_local"
+                ),
+            ],
+        )
+
     @patch("computing.surface_water_bodies.swb_local._complete_swb_pipeline")
     @patch("computing.surface_water_bodies.swb_local._push_local_swb_to_geoserver")
     @patch("computing.surface_water_bodies.swb_local.make_asset_public")
@@ -160,6 +217,32 @@ class LocalSwbContinuationTests(SimpleTestCase):
 
         self.assertEqual(converted.loc[0, "area_ored"], 0.25)
 
+    def test_restores_legacy_annual_columns(self):
+        source = pd.DataFrame(
+            {
+                "wb_id": ["waterbody-1"],
+                "area_2018": [0.14],
+                "k_2019": [20],
+                "kr_2020": [30],
+                "krz_2021": [40],
+                "area_ored": [0.25],
+            }
+        )
+
+        result = _restore_legacy_columns(source)
+
+        self.assertEqual(
+            list(result.columns),
+            [
+                "wb_id",
+                "area_17-18",
+                "k_18-19",
+                "kr_19-20",
+                "krz_20-21",
+                "area_ored",
+            ],
+        )
+
     def test_swb_enrichment_defaults_to_pan_india_assets(self):
         raster_parameters = signature(
             generate_swb_layer_with_max_so_catchment
@@ -213,6 +296,9 @@ class LocalSwbContinuationTests(SimpleTestCase):
             },
         )
 
+    def test_local_swb_task_accepts_overwrite(self):
+        self.assertIn("overwrite", signature(generate_swb_layer_local.run).parameters)
+
     def test_local_map_runs_swb_without_generated_gee_dependencies(self):
         swb_node = next(
             node
@@ -241,6 +327,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
         generate_swb4.return_value = ("swb4-task", "swb4-asset")
         is_gee_asset_exists.return_value = True
         roi = object()
+        completed_stages = []
 
         result = _continue_swb_in_gee(
             state="odisha",
@@ -249,6 +336,9 @@ class LocalSwbContinuationTests(SimpleTestCase):
             app_type="MWS",
             gee_account_id="account",
             roi=roi,
+            stage_completed=lambda stage, asset_id: completed_stages.append(
+                (stage, asset_id)
+            ),
         )
 
         generate_swb3.assert_called_once_with(
@@ -274,10 +364,222 @@ class LocalSwbContinuationTests(SimpleTestCase):
             make_asset_public.call_args_list,
             [call("swb3-asset"), call("swb4-asset")],
         )
+        self.assertEqual(
+            completed_stages,
+            [("swb3", "swb3-asset"), ("swb4", "swb4-asset")],
+        )
+        self.assertEqual(result, ("district_block", "swb4-asset"))
+
+    @patch("computing.surface_water_bodies.swb_local.make_asset_public")
+    @patch("computing.surface_water_bodies.swb_local.is_gee_asset_exists")
+    @patch("computing.surface_water_bodies.swb_local.check_task_status")
+    @patch("computing.surface_water_bodies.swb_local.waterbody_wbc_intersection")
+    @patch(
+        "computing.surface_water_bodies.swb_local.waterbody_catchment_streamorder_properties"
+    )
+    def test_retains_swb3_when_swb4_fails(
+        self,
+        generate_swb3,
+        generate_swb4,
+        check_task_status,
+        is_gee_asset_exists,
+        make_asset_public,
+    ):
+        generate_swb3.return_value = ("swb3-task", "swb3-asset")
+        generate_swb4.side_effect = RuntimeError("SWB4 failed")
+        is_gee_asset_exists.return_value = True
+        completed_stages = []
+
+        result = _continue_swb_in_gee(
+            state="odisha",
+            asset_suffix="district_block",
+            asset_folder_list=["odisha", "district", "block"],
+            app_type="MWS",
+            gee_account_id="account",
+            roi=object(),
+            stage_completed=lambda stage, asset_id: completed_stages.append(
+                (stage, asset_id)
+            ),
+        )
+
+        self.assertEqual(completed_stages, [("swb3", "swb3-asset")])
+        make_asset_public.assert_called_once_with("swb3-asset")
         self.assertEqual(result, ("district_block", "swb3-asset"))
+
+    @patch("computing.surface_water_bodies.swb_local._sync_swb_stage")
+    @patch("computing.surface_water_bodies.swb_local._continue_swb_in_gee")
+    def test_syncs_geoserver_after_each_successful_gee_stage(
+        self,
+        continue_swb,
+        sync_stage,
+    ):
+        def complete_stages(**kwargs):
+            kwargs["stage_completed"]("swb3", "swb3-asset")
+            kwargs["stage_completed"]("swb4", "swb4-asset")
+
+        continue_swb.side_effect = complete_stages
+
+        result = _complete_swb_pipeline(
+            state="odisha",
+            district="district",
+            block="block",
+            asset_suffix="district_block",
+            asset_folder_list=["odisha", "district", "block"],
+            app_type="MWS",
+            gee_account_id="account",
+            roi=object(),
+            start_year=2017,
+            end_year=2024,
+            push_to_geoserver=True,
+            sync_layer_metadata=True,
+        )
+
+        self.assertEqual(
+            sync_stage.call_args_list,
+            [
+                call(
+                    state="odisha",
+                    district="district",
+                    block="block",
+                    layer_name="surface_waterbodies_district_block",
+                    asset_suffix="district_block",
+                    asset_id="swb3-asset",
+                    source_stage="swb3",
+                    start_year=2017,
+                    end_year=2024,
+                    push_to_geoserver=True,
+                    sync_layer_metadata=True,
+                ),
+                call(
+                    state="odisha",
+                    district="district",
+                    block="block",
+                    layer_name="surface_waterbodies_district_block",
+                    asset_suffix="district_block",
+                    asset_id="swb4-asset",
+                    source_stage="swb4",
+                    start_year=2017,
+                    end_year=2024,
+                    push_to_geoserver=True,
+                    sync_layer_metadata=True,
+                ),
+            ],
+        )
+        self.assertTrue(result)
+
+
+class ZoiPipelineTests(SimpleTestCase):
+    @patch("computing.zoi_layers.zoi1.calculate_zoi_area", return_value=123)
+    @patch("computing.zoi_layers.zoi1.ee")
+    def test_create_ring_preserves_local_waterbody_id(self, ee, calculate_area):
+        feature = MagicMock()
+        feature.get.side_effect = {
+            "UID": None,
+            "wb_id": "waterbody-1",
+            "zoi_wb": 500,
+        }.get
+        ee.Number.side_effect = lambda value: value
+        ee.Algorithms.IsEqual.side_effect = lambda left, right: left == right
+        ee.Algorithms.If.side_effect = (
+            lambda condition, true_value, false_value: (
+                true_value if condition else false_value
+            )
+        )
+
+        create_ring(feature)
+
+        properties = ee.Feature.return_value.set.call_args.args[0]
+        self.assertEqual(properties["UID"], "waterbody-1")
+        self.assertEqual(properties["wb_id"], "waterbody-1")
+
+    @patch(
+        "computing.cropping_intensity.cropping_intensity."
+        "generate_cropping_intensity"
+    )
+    @patch("computing.zoi_layers.zoi2.sync_asset_to_db_and_geoserver")
+    @patch("computing.zoi_layers.zoi2.delete_asset_on_GEE")
+    @patch(
+        "computing.zoi_layers.zoi2.get_gee_dir_path",
+        return_value="projects/example/state/district/block/",
+    )
+    def test_rerun_deletes_final_zoi_cropping_intensity_asset(
+        self, get_dir, delete_asset, sync_asset, generate_ci
+    ):
+        generate_zoi_ci(
+            state="Rajasthan",
+            district="Raj Samand",
+            block="Bhim",
+            gee_account_id="22",
+        )
+
+        output_asset_id = (
+            "projects/example/state/district/block/"
+            "cropping_intensity_zoi_raj_samand_bhim"
+        )
+        delete_asset.assert_called_once_with(output_asset_id)
+        self.assertEqual(
+            generate_ci.call_args.kwargs["zoi_ci_asset"],
+            output_asset_id,
+        )
 
 
 class BulkPipelineRegistryTests(SimpleTestCase):
+    @patch(
+        "computing.cropping_intensity.cropping_intensity."
+        "export_vector_asset_to_gee",
+        return_value="task-id",
+    )
+    @patch(
+        "computing.cropping_intensity.cropping_intensity.is_gee_asset_exists",
+        return_value=False,
+    )
+    @patch("computing.cropping_intensity.cropping_intensity.ee")
+    def test_zoi_lulc_does_not_replace_output_asset_id(
+        self, ee, asset_exists, export_vector
+    ):
+        output_asset_id = "projects/example/cropping_intensity_zoi_location"
+
+        task_id, returned_asset_id = generate_gee_asset(
+            roi=MagicMock(),
+            asset_id=output_asset_id,
+            description="cropping_intensity_zoi_location",
+            asset_suffix="location",
+            asset_folder_list=["state", "district", "block"],
+            app_type="MWS",
+            start_year=2017,
+            end_year=2017,
+            zoi="projects/example/zoi_location",
+        )
+
+        ee.Image.assert_any_call(_pan_india_lulc_asset_id(2017))
+        export_vector.assert_called_once()
+        self.assertEqual(export_vector.call_args.args[2], output_asset_id)
+        self.assertEqual((task_id, returned_asset_id), ("task-id", output_asset_id))
+
+    def test_pan_india_lulc_asset_id_uses_agricultural_year(self):
+        self.assertEqual(
+            _pan_india_lulc_asset_id(2017),
+            "projects/corestack-datasets/assets/datasets/"
+            "LULC_v3_river_basin/pan_india_lulc_v3_2017_2018",
+        )
+
+    def test_zoi_is_registered_for_local_bulk_generation(self):
+        self.assertIn("generate_zoi", pipeline_names("local"))
+        self.assertEqual(
+            get_regeneration_dataset_names("generate_zoi"),
+            ("Surface Water Bodies",),
+        )
+
+    def test_local_zoi_map_runs_after_swb_with_gee_account(self):
+        zoi_node = next(
+            node
+            for node in load_map_config("dynamic_layers", compute="local")
+            if node["name"] == "generate_zoi"
+        )
+
+        self.assertEqual(zoi_node["depends_on"], ["generate_swb"])
+        self.assertTrue(zoi_node["pass_gee_account_id"])
+
     def test_all_local_pipelines_define_regeneration_datasets(self):
         for pipeline in pipeline_names("local"):
             self.assertTrue(

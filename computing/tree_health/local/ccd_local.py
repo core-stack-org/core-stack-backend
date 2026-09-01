@@ -12,12 +12,12 @@ from computing.local_compute_helper import (
     build_output_raster_path,
     get_union_geometry,
     load_precomputed_roi,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
     read_validated_vector_file,
     resolve_lulc_raster_paths,
     validate_geometry,
 )
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -253,21 +253,20 @@ def tree_health_ccd_raster_local(
             continue
 
         try:
-            upload_res, style_res = push_local_raster_to_geoserver(
+            geoserver_response = queue_local_raster_for_geoserver(
                 file_path=raster_path,
                 layer_name=layer_name,
                 workspace=GEOSERVER_WORKSPACE,
                 style_name=GEOSERVER_STYLE,
+                layer_id=layer_id,
             )
-            print(f"GeoServer upload response for {layer_name}: {upload_res}")
-            print(f"GeoServer style response for {layer_name}: {style_res}")
+            print(f"GeoServer response for {layer_name}: {geoserver_response}")
+            if geoserver_response.get("status_code") != 202:
+                raise RuntimeError(str(geoserver_response))
             layer_at_geoserver = True
         except Exception as error:
             print(f"Failed to sync local CCD raster {layer_name}: {error}")
             layer_at_geoserver = False
             continue
-
-        if layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
 
     return layer_at_geoserver if push_to_geoserver else True

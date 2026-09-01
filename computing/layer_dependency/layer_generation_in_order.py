@@ -310,6 +310,8 @@ LOCAL_TASK_REGISTRY = {
     "soil_health": soil_health_local,
     "generate_soil_type": generate_soil_type_local,
     "soil_type": generate_soil_type_local,
+    "generate_zoi": generate_zoi,
+    "generate_zoi_data": generate_zoi,
 }
 
 TASK_REGISTRIES = {

@@ -196,7 +196,12 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
-        res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        res = push_shape_to_geoserver(
+            path,
+            workspace=workspace,
+            layer_name=layer_name,
+            file_type="gpkg",
+        )
         if style_name:
             style_res = geo.publish_style(
                 layer_name=layer_name, style_name=style_name, workspace=workspace
