@@ -1,16 +1,15 @@
 import ee
 
-from computing.et_downscale.aet import build_aet_stack
-from computing.et_downscale.gpp import build_gpp_stack
 from computing.et_downscale.helper import (
-    build_classifier,
-    get_proj_30m,
-    build_common_pixel_mask,
+    crop_year_start_month,
+    divide_where_valid,
     ee_annual_mean_band,
     finalize_export_image,
     MONTH_ABBR,
     export_product_asset,
-    monthly_valid_mask,
+    interpolate_monthly_stack,
+    load_product_monthly_stack,
+    product_asset_id,
 )
 
 
@@ -19,39 +18,30 @@ from computing.et_downscale.helper import (
 # =============================================================================
 
 
-def generate_wue(
-    cfg,
-    region,
-    footprint=None,
-    common_mask=None,
-    grid_proj=None,
-    aet_stack=None,
-    gpp_stack=None,
-):
+def generate_wue(cfg, region):
     """
     Water Use Efficiency = GPP / AET (g C / kg H2O)
     Output  : wue_<tehsil>_<year> GEE asset (13 bands)
     """
-    year = cfg["year"]
+    year = int(cfg["year"])
+    start_month = crop_year_start_month(cfg)
 
-    if gpp_stack is None:
-        print("  Building GPP stack (LUE: GLDAS + Landsat NDVI + MCD12Q1) ...")
-        proj = get_proj_30m(region, year)
-        gpp_stack = build_gpp_stack(region, year, proj)
+    gpp_stack = load_product_monthly_stack(cfg, "gpp", "GPP")
+    aet_stack = load_product_monthly_stack(cfg, "aet", "ET")
+    proj = aet_stack.select("ET_01").projection()
 
-    if aet_stack is None:
-        print("  Building AET stack (Landsat 8 + GLDAS -> RF model) ...")
-        classifier = build_classifier(cfg["model_aez"])
-        aet_stack = build_aet_stack(region, classifier, year)
-
-        grid_proj = aet_stack.select("ET_01").projection()
-        common_mask = build_common_pixel_mask(region, grid_proj)
-        footprint = monthly_valid_mask(aet_stack, "ET")
-
-    wue_monthly = build_wue_image(aet_stack, gpp_stack).updateMask(footprint)
+    wue_raw = build_wue_image(gpp_stack, aet_stack)
+    wue_monthly = interpolate_monthly_stack(
+        wue_raw,
+        "WUE",
+        region,
+        year,
+        proj=proj,
+        start_month=start_month,
+    )
     wue_annual = ee_annual_mean_band(
         wue_monthly, "WUE", band_name="WUE_annual"
-    ).updateMask(footprint)
+    )
     wue_image = finalize_export_image(
         wue_monthly,
         wue_annual,
@@ -59,10 +49,13 @@ def generate_wue(
         metadata={
             "application": "wue",
             "units": "g C / kg H2O",
-            "formula": "GPP (LUE) / AET (RF downscaled)",
+            "formula": "GPP / AET",
+            "gpp_asset": product_asset_id(cfg, "gpp"),
+            "aet_asset": product_asset_id(cfg, "aet"),
             "gpp_method": "PAR x fAPAR x eps_max x TMIN_scalar x VPD_scalar",
             "aet_method": "Landsat8 + GLDAS features -> Random Forest",
             "bplut_source": "MOD17 C6 BPLUT / MCD12Q1 IGBP LC_Type1",
+            "valid_data_rule": "Calculated where GPP and AET are valid and AET > 0",
             "year": str(year),
             "asset_suffix": cfg["asset_suffix"],
             "roi_path": cfg["roi_path"],
@@ -70,24 +63,18 @@ def generate_wue(
         },
         band_descriptions=[f"WUE_{abbr}_gC_per_kgH2O" for abbr in MONTH_ABBR]
         + ["WUE_annual_mean"],
-        default_proj=grid_proj,
-        common_mask=common_mask,
+        default_proj=proj,
     )
     spec = export_product_asset("wue", "WUE", wue_image, cfg)
     return spec
 
 
-def build_wue_image(aet_stack: ee.Image, gpp_stack: ee.Image) -> ee.Image:
-    """WUE_01...12 = GPP / AET_mm (g C / kg H2O)."""
+def build_wue_image(gpp_stack: ee.Image, aet_stack: ee.Image) -> ee.Image:
+    """WUE_01...12 = GPP / AET (g C / kg H2O)."""
     bands = []
     for month in range(1, 13):
-        aet_mm = aet_stack.select(f"ET_{month:02d}").multiply(0.1)
-        wue = (
-            gpp_stack.select(f"GPP_{month:02d}").divide(aet_mm).updateMask(aet_mm.gt(0))
-        )
-        wue = wue.updateMask(wue.gte(0)).updateMask(wue.lte(50))
+        aet = aet_stack.select(f"ET_{month:02d}")
+        gpp = gpp_stack.select(f"GPP_{month:02d}")
+        wue = divide_where_valid(gpp, aet)
         bands.append(wue.rename(f"WUE_{month:02d}").float())
-    stack = bands[0]
-    for band in bands[1:]:
-        stack = stack.addBands(band)
-    return stack
+    return ee.Image.cat(bands)

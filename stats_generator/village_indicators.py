@@ -5,7 +5,7 @@ import pandas as pd
 from nrm_app.settings import EXCEL_PATH
 from django.http import HttpResponse
 from rest_framework import status
-
+import math
 
 import pandas as pd
 
@@ -425,6 +425,16 @@ def extract_antyodaya(df_antyodaya, v_id):
     return {column: excel_value(row[column]) for column in required_columns}
 
 
+def clean_results(results):
+    return [
+        {
+            key: -9999 if isinstance(value, float) and math.isnan(value) else value
+            for key, value in row.items()
+        }
+        for row in results
+    ]
+
+
 def get_generate_filter_data_village(state, district, block, regenerate=0):
 
     print("Generation of village filter json")
@@ -586,6 +596,7 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
     # --------------------------------------------------
     # Save generated json
     # --------------------------------------------------
+    results = clean_results(results)
     with open(json_path, "w") as f:
         json.dump(results, f, indent=4, default=str)
 
