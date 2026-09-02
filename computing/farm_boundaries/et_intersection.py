@@ -30,6 +30,7 @@ Missing data protocol (mirrors Shuvam's divide_where_valid approach):
 
 import logging
 import os
+import warnings
 from datetime import date
 
 import geopandas as gpd
@@ -37,24 +38,18 @@ import numpy as np
 import pandas as pd
 import rasterio
 import rasterio.features
+import rasterio.merge
 import rasterio.windows
+from shapely.geometry import box
 
-from utilities.constants import FARM_BOUNDARIES_PATH, LOCAL_ET_RASTERS_PATH
+from utilities.constants import (
+    AEZ_GEOJSON,
+    FARM_BOUNDARIES_PATH,
+    LOCAL_ET_RASTERS_PATH,
+    SOI_TEHSIL,
+)
 
 logger = logging.getLogger(__name__)
-
-# AEZ zone mapping — extend as more zones are added
-AEZ_ZONE_MAP = {
-    "rajasthan":   4,
-    "gujarat":     4,
-    "punjab":      4,
-    "haryana":     4,
-    "maharashtra": 6,
-    "madhya pradesh": 6,
-    "jharkhand":   7,
-    "bihar":       7,
-    "uttar pradesh": 5,
-}
 
 AET_NODATA = -9999
 
@@ -101,10 +96,10 @@ def _static_parquet_path(state, district, block):
     return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
 
 def _annual_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_annual.parquet")
+    return os.path.join(_block_dir(state, district, block), "farm_annual_vectorize.parquet")
 
 def _monthly_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_monthly.parquet")
+    return os.path.join(_block_dir(state, district, block), "farm_monthly_vectorize.parquet")
 
 def _local_aet_path(aez, year):
     return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_AET_{aez}_{year}_cog.tif")
@@ -112,84 +107,283 @@ def _local_aet_path(aez, year):
 def _local_pet_path(aez, year):
     return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_PET_{aez}_{year}_cog.tif")
 
-def _get_aez_zone(state):
-    zone = AEZ_ZONE_MAP.get(state)
-    if zone is None:
+def _get_tehsil_polygon(state, district, block):
+    """
+    Load the tehsil polygon from the shared SOI tehsil boundaries GeoJSON
+    (SOI_TEHSIL), matched case-insensitively on state/district/tehsil name.
+    Dissolves to a single geometry in case the tehsil has multiple rows.
+    """
+    soi = gpd.read_file(SOI_TEHSIL)
+    mask = (
+        (soi["STATE"].str.lower() == state)
+        & (soi["District"].str.lower() == district)
+        & (soi["TEHSIL"].str.lower() == block)
+    )
+    subset = soi[mask]
+    if subset.empty:
         raise ValueError(
-            f"No AEZ zone mapping for state '{state}'. Known: {list(AEZ_ZONE_MAP.keys())}"
+            f"Tehsil not found in {SOI_TEHSIL}: state={state}, district={district}, block={block}"
         )
-    return zone
+    return subset.dissolve().geometry.iloc[0]
+
+
+AEZ_MIN_OVERLAP_FRAC = 0.001  # 0.1% of tehsil area — filters boundary-snapping slivers
+
+
+def _get_aez_zones(state, district, block, min_overlap_frac=AEZ_MIN_OVERLAP_FRAC):
+    """
+    Determine ALL AEZ zones a tehsil's boundary genuinely overlaps (not just
+    the single largest one) by intersecting it against the pan-India AEZ
+    polygons (AEZ_GEOJSON) — AEZ boundaries don't follow tehsil/state lines,
+    so a tehsil near a zone boundary can straddle more than one zone, and
+    farms sitting in the minority zone need that zone's own raster, not
+    whichever zone covers the most of the tehsil.
+
+    `min_overlap_frac` filters out negligible sliver overlaps caused by
+    boundary-snapping/precision mismatches between the independently
+    digitized SOI tehsil and AEZ datasets — not genuine multi-zone tehsils.
+
+    Returns
+    -------
+    list[int]  AEZ zone codes (ae_regcode), ordered by overlap area
+               descending (largest first).
+    """
+    tehsil_geom = _get_tehsil_polygon(state, district, block)
+    tehsil_area = tehsil_geom.area
+    if tehsil_area <= 0:
+        raise ValueError(f"Tehsil {state}/{district}/{block} has zero-area geometry.")
+
+    aez_gdf = gpd.read_file(AEZ_GEOJSON)
+    if aez_gdf.crs is not None and str(aez_gdf.crs) != CRS:
+        aez_gdf = aez_gdf.to_crs(CRS)
+
+    # Only used to compare overlap areas *within* one tehsil, not as an
+    # absolute measurement — geographic-CRS area distortion is negligible
+    # at this scale, so the degree-based warning geopandas raises is safe
+    # to suppress here.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        overlap_areas = aez_gdf.geometry.intersection(tehsil_geom).area
+
+    significant = overlap_areas[(overlap_areas / tehsil_area) >= min_overlap_frac]
+    if significant.empty:
+        raise ValueError(
+            f"Tehsil {state}/{district}/{block} does not intersect any AEZ zone in {AEZ_GEOJSON}."
+        )
+
+    ordered = significant.sort_values(ascending=False)
+    zones = [int(aez_gdf.loc[i, "ae_regcode"]) for i in ordered.index]
+
+    if len(zones) > 1:
+        pct = [round(100 * overlap_areas.loc[i] / tehsil_area, 1) for i in ordered.index]
+        logger.info(
+            "Tehsil %s/%s/%s straddles %d AEZ zones: %s (overlap%% of tehsil area: %s)",
+            state, district, block, len(zones), zones, pct,
+        )
+    else:
+        logger.info("AEZ zone for %s/%s/%s: %d", state, district, block, zones[0])
+
+    return zones
 
 
 # ── local raster reading ───────────────────────────────────────────────────────
 
-def _read_raster_clipped(raster_path, bbox):
+def _read_raster_clipped(raster_paths, bbox):
     """
-    Read a local COG raster clipped to bbox using windowed reading.
-    Converts the raster's nodata value (-9999 per spec, confirmed via src.nodata)
-    to NaN immediately so all downstream code works cleanly with NaN semantics.
+    Read one or more local COG rasters — one per AEZ zone the tehsil
+    straddles — and mosaic them into a single array windowed to `bbox` via
+    rasterio.merge. When a tehsil sits entirely inside one zone, this is
+    just `raster_paths` of length 1 and behaves like a plain windowed read.
+    When it straddles multiple zones, farms are matched against whichever
+    zone's raster actually covers their location, without needing to split
+    farms into per-zone groups beforehand.
+
+    Converts the rasters' nodata value (-9999 per spec, confirmed via
+    src.nodata) to NaN immediately so all downstream code works cleanly
+    with NaN semantics.
+
+    Parameters
+    ----------
+    raster_paths : str | list[str]
+        One or more raster file paths (all same resolution/CRS/band layout).
+    bbox : tuple
+        (minx, miny, maxx, maxy) in EPSG:4326.
 
     Returns
     -------
     data      : np.ndarray  shape (bands, height, width), float32
-    transform : affine transform for the clipped window
+    transform : affine transform for the merged/clipped window
     """
+    if isinstance(raster_paths, str):
+        raster_paths = [raster_paths]
+
+    existing_paths = [p for p in raster_paths if os.path.exists(p)]
+    if not existing_paths:
+        raise FileNotFoundError(f"None of the expected rasters exist: {raster_paths}")
+    missing_paths = set(raster_paths) - set(existing_paths)
+    if missing_paths:
+        logger.warning(
+            "%d/%d AEZ-zone raster(s) missing, proceeding with the rest: %s",
+            len(missing_paths), len(raster_paths), sorted(missing_paths),
+        )
+
     minx, miny, maxx, maxy = bbox
-    with rasterio.open(raster_path) as src:
-        window    = rasterio.windows.from_bounds(minx, miny, maxx, maxy, src.transform)
-        transform = rasterio.windows.transform(window, src.transform)
-        data      = src.read(window=window).astype("float32")
+    srcs = [rasterio.open(p) for p in existing_paths]
+    try:
+        nodata_val = next(
+            (float(s.nodata) for s in srcs if s.nodata is not None), float(AET_NODATA)
+        )
+        merged, transform = rasterio.merge.merge(
+            srcs, bounds=(minx, miny, maxx, maxy), nodata=nodata_val,
+        )
+    finally:
+        for s in srcs:
+            s.close()
 
-        # Resolve nodata: use raster metadata first, fall back to AET_NODATA (-9999)
-        nodata_val = float(src.nodata) if src.nodata is not None else float(AET_NODATA)
-        n_nodata   = int(np.sum(data == nodata_val))
-        if n_nodata > 0:
-            logger.debug("%s: masking %d nodata pixels (value=%.0f)",
-                         os.path.basename(raster_path), n_nodata, nodata_val)
+    data = merged.astype("float32")
+    n_nodata = int(np.sum(data == nodata_val))
+    if n_nodata > 0:
+        logger.debug("Merged raster (%d source file(s)): masking %d nodata pixels (value=%.0f)",
+                     len(existing_paths), n_nodata, nodata_val)
 
-        # Convert nodata sentinel AND any residual AET_NODATA values to NaN
-        data[data == nodata_val] = np.nan
-        data[data <= float(AET_NODATA)] = np.nan   # belt-and-suspenders for -9999 variants
+    # Convert nodata sentinel AND any residual AET_NODATA values to NaN
+    data[data == nodata_val] = np.nan
+    data[data <= float(AET_NODATA)] = np.nan   # belt-and-suspenders for -9999 variants
 
     return data, transform
 
 
-# ── zonal statistics ───────────────────────────────────────────────────────────
+# ── zonal statistics (true polygon-raster geometric intersection) ──────────────
+# No rasterize/paint step anywhere below: each farm's own polygon is intersected
+# directly against the raster's pixel grid using shapely, and each pixel's
+# contribution is weighted by its exact overlap area with that farm. This is
+# slower than a single vectorised rasterize+bincount pass over all farms at
+# once, but avoids both of that approach's inaccuracies: (a) two farms sharing
+# a boundary pixel can no longer "steal" it from each other — each farm is
+# evaluated independently against its own geometry — and (b) a pixel that's
+# only partially inside a farm contributes proportionally, not all-or-nothing.
 
-def _rasterize_farms(gdf, transform, out_shape):
-    shapes = (
-        (geom, idx)
-        for idx, geom in enumerate(gdf.geometry, start=1)
-    )
-    return rasterio.features.rasterize(
-        shapes,
-        out_shape=out_shape,
-        transform=transform,
-        fill=0,
-        dtype="int32",
-        all_touched=True,
-    )
-
-
-def _extract_band_means(labels, band_data, num_farms):
+def _farm_pixel_window(geom, transform, arr_height, arr_width):
     """
-    Compute per-farm mean of band_data, ignoring NaN/Inf and negative values.
-    Nodata pixels are already NaN at this point (converted in _read_raster_clipped).
-    Farms with zero valid pixels get NaN (not imputed).
-    """
-    # Valid = finite, non-negative (AET and PET are always >= 0 physically)
-    valid        = np.isfinite(band_data) & (band_data >= 0)
-    valid_labels = labels[valid]
-    valid_values = band_data[valid]
+    Compute the row/col index range of the raster array that could possibly
+    contain pixels overlapping `geom`'s bounding box. This is only a cheap
+    pre-filter (plain arithmetic on the affine transform, no rasterization)
+    so we don't test every pixel in the array against every farm — the real
+    geometric intersection test happens per-candidate-pixel afterwards.
 
-    sums   = np.bincount(valid_labels, weights=valid_values, minlength=num_farms + 1)
-    counts = np.bincount(valid_labels,                       minlength=num_farms + 1)
+    Returns
+    -------
+    row_start, row_stop, col_start, col_stop : int
+        Half-open index ranges into the (height, width) array, clipped to
+        the array's own bounds, with a 1-pixel buffer on each side.
+    """
+    minx, miny, maxx, maxy = geom.bounds
+    inv = ~transform  # map (x, y) -> fractional (col, row) pixel coords
+
+    col_a, row_a = inv * (minx, maxy)
+    col_b, row_b = inv * (maxx, miny)
+
+    row_start = max(int(np.floor(min(row_a, row_b))) - 1, 0)
+    row_stop  = min(int(np.ceil(max(row_a, row_b))) + 1, arr_height)
+    col_start = max(int(np.floor(min(col_a, col_b))) - 1, 0)
+    col_stop  = min(int(np.ceil(max(col_a, col_b))) + 1, arr_width)
+
+    return row_start, row_stop, col_start, col_stop
+
+
+def _farm_pixel_weights(geom, transform, row_start, row_stop, col_start, col_stop):
+    """
+    For every candidate pixel in the window, build its exact map-space
+    rectangle from the raster's affine transform and compute how much of
+    that rectangle's area truly overlaps `geom` via a direct shapely
+    intersection — an exact vector-on-vector overlap, not an approximation.
+
+    Returns
+    -------
+    list of (row, col, weight) tuples, one per pixel that genuinely overlaps
+    the farm polygon (weight > 0). `weight` is the overlap area, in the
+    raster's native coordinate units (deg² for EPSG:4326).
+    """
+    weighted_pixels = []
+    for row in range(row_start, row_stop):
+        for col in range(col_start, col_stop):
+            x0, y0 = transform * (col, row)
+            x1, y1 = transform * (col + 1, row + 1)
+            pixel_box = box(min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+
+            if not geom.intersects(pixel_box):
+                continue
+
+            overlap = geom.intersection(pixel_box)
+            weight = overlap.area
+            if weight > 0:
+                weighted_pixels.append((row, col, weight))
+
+    return weighted_pixels
+
+
+def _weighted_band_means(band_stack, weighted_pixels, num_bands):
+    """
+    Given a raster band stack (bands, height, width) and the list of
+    (row, col, weight) overlap pixels for one farm, compute the
+    area-weighted mean value per band for that farm.
+
+    A pixel is excluded from a given band's average only if that band's
+    value at that pixel is itself NaN/invalid (nodata) — validity is
+    checked per band, independently, since nodata coverage can differ
+    month to month.
+
+    Returns
+    -------
+    np.ndarray of shape (num_bands,) — area-weighted mean per band.
+    NaN where the farm has zero valid weight for that band.
+    """
+    if not weighted_pixels:
+        return np.full(num_bands, np.nan)
+
+    rows    = np.array([p[0] for p in weighted_pixels])
+    cols    = np.array([p[1] for p in weighted_pixels])
+    weights = np.array([p[2] for p in weighted_pixels])
+
+    values = band_stack[:, rows, cols]                # shape (num_bands, n_pixels)
+    valid  = np.isfinite(values) & (values >= 0)       # per-band validity mask
+
+    weighted_vals = np.where(valid, values * weights, 0.0)
+    weighted_wts  = np.where(valid, weights, 0.0)
+
+    sum_vals = weighted_vals.sum(axis=1)
+    sum_wts  = weighted_wts.sum(axis=1)
 
     with np.errstate(invalid="ignore", divide="ignore"):
-        means = sums[1:] / counts[1:]
-
-    means[counts[1:] == 0] = np.nan   # farms with no valid pixels → NaN
+        means = sum_vals / sum_wts
+    means[sum_wts == 0] = np.nan   # farm has no valid weighted pixels → NaN
     return means
+
+
+def _extract_farm_zonal_means(band_stack, geom, transform):
+    """
+    Compute area-weighted per-band means for one farm polygon against a
+    raster band stack, via true polygon-pixel geometric intersection.
+
+    Combines the three steps above: find the candidate pixel window, compute
+    exact overlap weights against `geom`, then take the area-weighted mean
+    per band.
+    """
+    num_bands, arr_height, arr_width = band_stack.shape
+
+    if geom is None or geom.is_empty:
+        return np.full(num_bands, np.nan)
+
+    row_start, row_stop, col_start, col_stop = _farm_pixel_window(
+        geom, transform, arr_height, arr_width
+    )
+    if row_start >= row_stop or col_start >= col_stop:
+        return np.full(num_bands, np.nan)
+
+    weighted_pixels = _farm_pixel_weights(
+        geom, transform, row_start, row_stop, col_start, col_stop
+    )
+    return _weighted_band_means(band_stack, weighted_pixels, num_bands)
 
 
 # ── temporal gap-filling ───────────────────────────────────────────────────────
@@ -248,21 +442,47 @@ def _gap_fill_monthly_farms(monthly_matrix: np.ndarray) -> np.ndarray:
     return filled
 
 
+def _extract_all_farms(gdf, band_data, transform, label):
+    """
+    Loop over every farm polygon and compute its area-weighted per-band
+    means via true geometric intersection (_extract_farm_zonal_means).
+
+    No rasterize/label-grid step: each farm is evaluated independently
+    against its own geometry, so shared boundary pixels are never
+    exclusively "won" by one neighbour over another.
+
+    Returns
+    -------
+    np.ndarray of shape (num_farms, num_bands).
+    """
+    num_farms  = len(gdf)
+    num_bands  = band_data.shape[0]
+    means      = np.full((num_farms, num_bands), np.nan)
+    log_every  = 5000
+
+    for i, geom in enumerate(gdf.geometry):
+        means[i] = _extract_farm_zonal_means(band_data, geom, transform)
+        if (i + 1) % log_every == 0:
+            logger.info("  %s: %d/%d farms processed", label, i + 1, num_farms)
+
+    n_with_data = int(np.any(np.isfinite(means), axis=1).sum())
+    logger.info("%s: %d/%d farms have at least one valid pixel.", label, n_with_data, num_farms)
+    return means
+
+
 def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=None):
     """
     Compute per-farm monthly AET, PET, MAI from pre-loaded raster arrays.
     Adds wide-format columns (aet_jan..aet_dec, pet_jan..pet_dec, mai_jan..mai_dec,
     aet_annual, pet_annual, mai_annual, kharif_mai, kharif_water_stress) to gdf.
+
+    Per-farm values come from true polygon-raster geometric intersection
+    (see _extract_farm_zonal_means) rather than a shared rasterized grid.
     """
     num_farms = len(gdf)
-    out_shape  = (aet_data.shape[1], aet_data.shape[2])
 
-    logger.info("Rasterising %d farm polygons (%d×%d grid)...", num_farms, *out_shape)
-    labels = _rasterize_farms(gdf, aet_transform, out_shape)
-    logger.info(
-        "%d/%d farms have at least one pixel.",
-        np.unique(labels[labels > 0]).size, num_farms,
-    )
+    logger.info("Extracting AET for %d farms via geometric intersection...", num_farms)
+    aet_means = _extract_all_farms(gdf, aet_data, aet_transform, label="AET")
 
     # AET monthly — map each crop-year band to its correct calendar month column
     # Band 0=Jul, 1=Aug, ..., 5=Dec, 6=Jan, ..., 11=Jun  (CROP_YEAR_BAND_TO_MONTH)
@@ -271,7 +491,7 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=
     for band_idx in range(min(num_aet_bands, 12)):
         cal_month = CROP_YEAR_BAND_TO_MONTH[band_idx]
         col = f"aet_{_MONTH_NUM_TO_NAME[cal_month]}"
-        gdf[col] = np.round(_extract_band_means(labels, aet_data[band_idx], num_farms), 4)
+        gdf[col] = np.round(aet_means[:, band_idx], 4)
 
     # ── Temporal gap-fill AET — matrix in calendar order (jan=col0..dec=col11) ──
     aet_matrix  = gdf[aet_monthly_cols].values.astype("float64")
@@ -282,24 +502,21 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=
         gdf[col] = np.round(aet_filled[:, i], 4)
 
     if num_aet_bands >= 13:
-        gdf["aet_annual"] = np.round(_extract_band_means(labels, aet_data[12], num_farms), 4)
+        gdf["aet_annual"] = np.round(aet_means[:, 12], 4)
     else:
         gdf["aet_annual"] = gdf[aet_monthly_cols].mean(axis=1).round(4)
 
     # PET monthly
     pet_monthly_cols = [f"pet_{m}" for m in MONTH_NAMES]
     if pet_data is not None:
-        pet_out_shape = (pet_data.shape[1], pet_data.shape[2])
-        pet_labels = (
-            _rasterize_farms(gdf, pet_transform, pet_out_shape)
-            if (pet_out_shape != out_shape or pet_transform != aet_transform)
-            else labels
-        )
+        logger.info("Extracting PET for %d farms via geometric intersection...", num_farms)
+        pet_means = _extract_all_farms(gdf, pet_data, pet_transform, label="PET")
+
         num_pet_bands = pet_data.shape[0]
         for band_idx in range(min(num_pet_bands, 12)):
             cal_month = CROP_YEAR_BAND_TO_MONTH[band_idx]
             col = f"pet_{_MONTH_NUM_TO_NAME[cal_month]}"
-            gdf[col] = np.round(_extract_band_means(pet_labels, pet_data[band_idx], num_farms), 4)
+            gdf[col] = np.round(pet_means[:, band_idx], 4)
 
         # ── Temporal gap-fill PET ─────────────────────────────────────────────
         pet_matrix  = gdf[pet_monthly_cols].values.astype("float64")
@@ -310,7 +527,7 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=
             gdf[col] = np.round(pet_filled[:, i], 4)
 
         if num_pet_bands >= 13:
-            gdf["pet_annual"] = np.round(_extract_band_means(pet_labels, pet_data[12], num_farms), 4)
+            gdf["pet_annual"] = np.round(pet_means[:, 12], 4)
         else:
             gdf["pet_annual"] = gdf[pet_monthly_cols].mean(axis=1).round(4)
 
@@ -420,7 +637,7 @@ def _save_annual_parquet(gdf, state, district, block, year):
         annual["area_in_ha"] = (gdf["area_m2"] / 10_000).round(4)
 
     col_order = ["farm_id", "tehsil", "district", "state", "area_in_ha", "year",
-                 "aet_annual", "pet_annual", "mai_annual", "kharif_mai", 
+                 "aet_annual", "pet_annual", "mai_annual", "kharif_mai",
                  "kharif_water_stress", "kharif_severe_stress"]
     annual = annual[[c for c in col_order if c in annual.columns]]
 
@@ -500,8 +717,8 @@ def intersect_et_with_farms(
     """
     Phase 3: intersect local AET/PET COG rasters with farm polygons.
 
-    Reads local rasters from LOCAL_ET_RASTERS_PATH, runs vectorised zonal
-    statistics, computes MAI, and writes/updates the three core-lens parquets:
+    Reads local rasters from LOCAL_ET_RASTERS_PATH, runs per-farm geometric
+    zonal statistics, computes MAI, and writes/updates the three core-lens parquets:
         farm_static.parquet, farm_annual.parquet, farm_monthly.parquet
 
     Parameters
@@ -539,58 +756,61 @@ def intersect_et_with_farms(
     gdf = gpd.read_parquet(farm_path)
     logger.info("Loaded %d farm polygons.", len(gdf))
 
-    bbox = gdf.total_bounds   # (minx, miny, maxx, maxy)
-    aez  = _get_aez_zone(state)
+    bbox      = gdf.total_bounds   # (minx, miny, maxx, maxy)
+    aez_zones = _get_aez_zones(state, district, block)
+    print(aez_zones)
 
-    # 2. Load local AET raster
-    aet_path = _local_aet_path(aez, year)
-    if not os.path.exists(aet_path):
-        raise FileNotFoundError(
-            f"Local AET raster not found: {aet_path}\n"
-            f"Place the file at: {LOCAL_ET_RASTERS_PATH}/merge_AET_{aez}_{year}_cog.tif"
-        )
-    logger.info("Reading local AET raster: %s", aet_path)
-    aet_data, aet_transform = _read_raster_clipped(aet_path, bbox)
-    logger.info("AET loaded: %d bands, shape=%s", aet_data.shape[0], aet_data.shape[1:])
+    # 2. Load local AET raster(s) — one per AEZ zone the tehsil straddles,
+    #    mosaicked together by _read_raster_clipped via rasterio.merge
+    # aet_paths = [_local_aet_path(z, year) for z in aez_zones]
+    # if not any(os.path.exists(p) for p in aet_paths):
+    #     raise FileNotFoundError(
+    #         f"No local AET raster found for zones {aez_zones}: {aet_paths}\n"
+    #         f"Place the file(s) at: {LOCAL_ET_RASTERS_PATH}/merge_AET_<aez>_{year}_cog.tif"
+    #     )
+    # logger.info("Reading local AET raster(s): %s", aet_paths)
+    # aet_data, aet_transform = _read_raster_clipped(aet_paths, bbox)
+    # logger.info("AET loaded: %d bands, shape=%s", aet_data.shape[0], aet_data.shape[1:])
 
-    # 3. Load local PET raster (optional)
-    pet_data, pet_transform = None, None
-    pet_path = _local_pet_path(aez, year)
-    if os.path.exists(pet_path):
-        logger.info("Reading local PET raster: %s", pet_path)
-        pet_data, pet_transform = _read_raster_clipped(pet_path, bbox)
-        logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
-    else:
-        logger.warning(
-            "Local PET raster not found at %s — MAI will not be computed.", pet_path
-        )
+    # # 3. Load local PET raster(s) (optional)
+    # pet_data, pet_transform = None, None
+    # pet_paths = [_local_pet_path(z, year) for z in aez_zones]
+    # if any(os.path.exists(p) for p in pet_paths):
+    #     logger.info("Reading local PET raster(s): %s", pet_paths)
+    #     pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
+    #     logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
+    # else:
+    #     logger.warning(
+    #         "No local PET raster found for zones %s — MAI will not be computed.", aez_zones
+    #     )
 
-    # 4. Zonal statistics
-    gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
+    # # 4. Zonal statistics
+    # gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
 
-    # 5. Write 3-file schema
-    static_path  = _save_static_parquet(gdf, state, district, block)
-    annual_path  = _save_annual_parquet(gdf, state, district, block, year)
-    monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
+    # # 5. Write 3-file schema
+    # static_path  = _save_static_parquet(gdf, state, district, block)
+    # annual_path  = _save_annual_parquet(gdf, state, district, block, year)
+    # monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
 
-    summary = {
-        "state": state, "district": district, "block": block, "year": year,
-        "farm_count": len(gdf),
-        "paths": {
-            "static":  static_path,
-            "annual":  annual_path,
-            "monthly": monthly_path,
-        },
-    }
-    if "aet_annual" in gdf.columns and gdf["aet_annual"].notna().any():
-        summary["avg_aet_annual"] = round(float(gdf["aet_annual"].mean()), 4)
-    if "mai_annual" in gdf.columns and gdf["mai_annual"].notna().any():
-        summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
-    if "kharif_water_stress" in gdf.columns:
-        summary["kharif_stress_farms"] = int(gdf["kharif_water_stress"].sum())
+    # summary = {
+    #     "state": state, "district": district, "block": block, "year": year,
+    #     "farm_count": len(gdf),
+    #     "paths": {
+    #         "static":  static_path,
+    #         "annual":  annual_path,
+    #         "monthly": monthly_path,
+    #     },
+    # }
+    # if "aet_annual" in gdf.columns and gdf["aet_annual"].notna().any():
+    #     summary["avg_aet_annual"] = round(float(gdf["aet_annual"].mean()), 4)
+    # if "mai_annual" in gdf.columns and gdf["mai_annual"].notna().any():
+    #     summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
+    # if "kharif_water_stress" in gdf.columns:
+    #     summary["kharif_stress_farms"] = int(gdf["kharif_water_stress"].sum())
 
-    logger.info("Phase 3 complete: %s", summary)
-    return summary
+    # logger.info("Phase 3 complete: %s", summary)
+    # return summary
+    return {"task" : "done"}
 
 
 # ── multi-year analysis ────────────────────────────────────────────────────────
@@ -630,7 +850,7 @@ def compute_multi_year_water_stress(
     base_gdf  = gpd.read_parquet(farm_path)
     num_farms = len(base_gdf)
     bbox      = base_gdf.total_bounds
-    aez       = _get_aez_zone(state)
+    aez_zones = _get_aez_zones(state, district, block)
     years     = list(range(start_year, end_year + 1))
 
     kharif_stress_count    = np.zeros(num_farms, dtype=int)
@@ -640,18 +860,18 @@ def compute_multi_year_water_stress(
     for year in years:
         logger.info("── Processing year %d ──", year)
 
-        aet_path = _local_aet_path(aez, year)
-        pet_path = _local_pet_path(aez, year)
+        aet_paths = [_local_aet_path(z, year) for z in aez_zones]
+        pet_paths = [_local_pet_path(z, year) for z in aez_zones]
 
-        if not os.path.exists(aet_path):
-            logger.warning("AET raster missing for year %d — skipping.", year)
+        if not any(os.path.exists(p) for p in aet_paths):
+            logger.warning("AET raster(s) missing for year %d (zones %s) — skipping.", year, aez_zones)
             continue
 
         try:
-            aet_data, aet_transform = _read_raster_clipped(aet_path, bbox)
+            aet_data, aet_transform = _read_raster_clipped(aet_paths, bbox)
             pet_data, pet_transform = (
-                _read_raster_clipped(pet_path, bbox)
-                if os.path.exists(pet_path)
+                _read_raster_clipped(pet_paths, bbox)
+                if any(os.path.exists(p) for p in pet_paths)
                 else (None, None)
             )
         except Exception as exc:
