@@ -242,6 +242,7 @@ def generate_tree_in_grassland_layer(
         fc = results_fc.select(
             [
                 "uid",
+                "area_in_ha",
                 "grassland_area_in_ha",
                 "tree_in_shrub_area_in_ha",
                 "isolated_shrub_area_in_ha",
