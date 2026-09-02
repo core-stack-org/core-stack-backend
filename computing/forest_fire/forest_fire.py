@@ -202,6 +202,7 @@ def generate_forest_fire_layer(
     fc = fc.select(
         [
             "uid",
+            "area_in_ha",
             "fire_frp_sum_per_year",
             "fire_frp_mean",
             "fire_frp_max",
