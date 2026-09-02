@@ -349,9 +349,4 @@ urlpatterns = [
         api.generate_forest_fringe,
         name="generate_forest_fringe",
     ),
-    path(
-        "generate_tree_in_grassland/",
-        api.generate_tree_in_grassland,
-        name="generate_tree_in_grassland",
-    ),
 ]

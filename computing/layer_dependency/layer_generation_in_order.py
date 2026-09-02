@@ -319,7 +319,9 @@ LOCAL_TASK_REGISTRY = {
     "generate_zoi": generate_zoi,
     "generate_zoi_data": generate_zoi,
     "forest_fringe": generate_forest_fringe_local,
+    "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
+    "generate_tree_in_grassland": generate_tree_in_grassland_local,
 }
 
 TASK_REGISTRIES = {

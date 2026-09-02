@@ -179,6 +179,12 @@ LOCAL_TASK_DATASETS = {
     ),
     "computing.soil_type.soil_type_local.generate_soil_type_local": ("Soil Type",),
     "computing.zoi_layers.zoi.generate_zoi": ("Surface Water Bodies",),
+    "computing.forest_fringe.forest_fringe_local_compute.generate_forest_fringe_local": (
+        "Forest Fringe",
+    ),
+    "computing.tree_in_grassland.tree_in_grassland_local_compute.generate_tree_in_grassland_local": (
+        "Tree in Grassland",
+    ),
 }
 
 

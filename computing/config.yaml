@@ -158,6 +158,22 @@ base_layers:
           source: ""
           type: file
 
+        - name: forest fringe
+          aliases:
+              - forest_fringe
+          local_path: "{DATA_DIR}/base_layers/forest_fringe/forest_fringe_degradation.geojson"
+          source: s3://corestack-datasets/base_layers/static_layers/forest_fringe/forest_fringe_degradation.geojson
+          type: file
+
+        - name: tree grassland
+          aliases:
+              - tree_grassland
+              - tree in grassland
+              - tree_in_grassland
+          local_path: "{DATA_DIR}/base_layers/tree_grassland/tree_in_grassland.geojson"
+          source: s3://corestack-datasets/base_layers/static_layers/tree_grassland/tree_in_grassland.geojson
+          type: file
+
         - name: Agroecological Natural Farming
           aliases:
               - aez
@@ -620,3 +636,13 @@ derived_layers:
       layer_type: vector
 
     - name: plantation_site_suitability
+
+    - name: forest fringe
+      local_path: "{DATA_DIR}/forest_fringe/output/"
+      geoserver_workspace: forest_fringes
+      layer_type: vector
+
+    - name: tree in grassland
+      local_path: "{DATA_DIR}/tree_in_grassland/output/"
+      geoserver_workspace: tree_in_grassland
+      layer_type: vector

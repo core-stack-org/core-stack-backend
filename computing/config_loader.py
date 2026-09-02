@@ -325,11 +325,13 @@ PAN_INDIA_LIVESTOCKS = DATA_DIR / "base_layers/pan_india_livestock.gpkg"
 LOCAL_LIVESTOCKS_OUTPUT = DATA_DIR / "livestock/output/livestock_local"
 
 
-PAN_INDIA_FOREST_FRINGE = (
-    DATA_DIR / "forest_fringe/input/forest_fringe_degradation.geojson"
+PAN_INDIA_FOREST_FRINGE = _base_layer_path(
+    "forest fringe",
+    allowed_suffixes=(".geojson", ".gpkg", ".shp"),
 )
-LOCAL_FOREST_FRINGE_OUTPUT = DATA_DIR / "forest_fringe/output"
-PAN_INDIA_TREE_IN_GRASSLAND = (
-    DATA_DIR / "tree_in_grassland/input/tree_in_grassland.geojson"
+LOCAL_FOREST_FRINGE_OUTPUT = _derived_output_dir("forest fringe")
+PAN_INDIA_TREE_IN_GRASSLAND = _base_layer_path(
+    "tree in grassland",
+    allowed_suffixes=(".geojson", ".gpkg", ".shp"),
 )
-LOCAL_TREE_IN_GRASSLAND_OUTPUT = DATA_DIR / "tree_in_grassland/output"
+LOCAL_TREE_IN_GRASSLAND_OUTPUT = _derived_output_dir("tree in grassland")

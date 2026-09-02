@@ -4,6 +4,7 @@ from nrm_app.celery import app
 
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
+    clip_vector_to_watersheds,
     load_precomputed_watersheds,
     read_validated_vector_file,
     validate_geometry,
@@ -20,34 +21,7 @@ from computing.config_loader import PAN_INDIA_FOREST_FRINGE, LOCAL_FOREST_FRINGE
 
 
 def _compute_forest_fringe_for_watersheds(watersheds_gdf, forest_fringe_gdf):
-    """
-    Spatially joins forest fringe features with watershed polygons.
-    Equivalent to the GEE Join.saveFirst() with spatial intersection.
-    """
-    if forest_fringe_gdf.empty:
-        return forest_fringe_gdf
-
-    if (
-        watersheds_gdf.crs
-        and forest_fringe_gdf.crs
-        and watersheds_gdf.crs != forest_fringe_gdf.crs
-    ):
-        forest_fringe_gdf = forest_fringe_gdf.to_crs(watersheds_gdf.crs)
-
-    # We only need the 'uid' from watersheds
-    target_watersheds = watersheds_gdf[["uid", "geometry"]].copy()
-
-    joined_gdf = gpd.sjoin(
-        forest_fringe_gdf, target_watersheds, how="inner", predicate="intersects"
-    )
-
-    # To mimic ee.Join.saveFirst(), drop duplicates based on the original feature index
-    joined_gdf = joined_gdf[~joined_gdf.index.duplicated(keep="first")]
-
-    if "index_right" in joined_gdf.columns:
-        joined_gdf = joined_gdf.drop(columns=["index_right"])
-
-    return joined_gdf
+    return clip_vector_to_watersheds(watersheds_gdf, forest_fringe_gdf)
 
 
 @app.task(bind=True)
@@ -99,7 +73,7 @@ def generate_forest_fringe_local(
         forest_fringe_gdf=forest_fringe_gdf,
     )
     print(
-        f"Final valid forest fringe features after spatial join: {len(forest_fringe_gdf)}"
+        f"Final valid forest fringe features after clipping: {len(result_gdf)}"
     )
 
     output_path = build_output_vector_path(
@@ -111,7 +85,7 @@ def generate_forest_fringe_local(
     )
 
     asset_id = write_vector_output(
-        gdf=forest_fringe_gdf,
+        gdf=result_gdf,
         output_path=output_path,
         layer_name=layer_name,
     )
@@ -140,8 +114,8 @@ def generate_forest_fringe_local(
             dataset_name="Forest Fringe",
             misc={"is_generated_locally": True},
         )
-        if layer_id:
+        if layer_id and layer_at_geoserver:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("Sync to GeoServer flag updated for Green Credit vector")
+            print("Sync to GeoServer flag updated for Forest Fringe vector")
 
-    return layer_at_geoserver
+    return layer_at_geoserver or not push_to_geoserver

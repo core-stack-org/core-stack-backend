@@ -4,6 +4,7 @@ from nrm_app.celery import app
 
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
+    clip_vector_to_watersheds,
     load_precomputed_watersheds,
     read_validated_vector_file,
     validate_geometry,
@@ -23,34 +24,7 @@ from computing.config_loader import (
 
 
 def _compute_tree_in_grassland_for_watersheds(watersheds_gdf, tree_in_grassland_gdf):
-    """
-    Spatially joins tree in grassland features with watershed polygons.
-    Equivalent to the GEE Join.saveFirst() with spatial intersection.
-    """
-    if tree_in_grassland_gdf.empty:
-        return tree_in_grassland_gdf
-
-    if (
-        watersheds_gdf.crs
-        and tree_in_grassland_gdf.crs
-        and watersheds_gdf.crs != tree_in_grassland_gdf.crs
-    ):
-        tree_in_grassland_gdf = tree_in_grassland_gdf.to_crs(watersheds_gdf.crs)
-
-    # We only need the 'uid' from watersheds
-    target_watersheds = watersheds_gdf[["uid", "geometry"]].copy()
-
-    joined_gdf = gpd.sjoin(
-        tree_in_grassland_gdf, target_watersheds, how="inner", predicate="intersects"
-    )
-
-    # To mimic ee.Join.saveFirst(), drop duplicates based on the original feature index
-    joined_gdf = joined_gdf[~joined_gdf.index.duplicated(keep="first")]
-
-    if "index_right" in joined_gdf.columns:
-        joined_gdf = joined_gdf.drop(columns=["index_right"])
-
-    return joined_gdf
+    return clip_vector_to_watersheds(watersheds_gdf, tree_in_grassland_gdf)
 
 
 @app.task(bind=True)
@@ -145,8 +119,8 @@ def generate_tree_in_grassland_local(
             dataset_name="Tree in Grassland",
             misc={"is_generated_locally": True},
         )
-        if layer_id:
+        if layer_id and layer_at_geoserver:
             update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
             print("Sync to GeoServer flag updated for Tree in Grassland vector")
 
-    return layer_at_geoserver
+    return layer_at_geoserver or not push_to_geoserver
