@@ -17,11 +17,11 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     ensure_file_exists,
     load_precomputed_watersheds,
-    push_local_vector_to_geoserver,
+    queue_local_vector_for_geoserver,
     read_validated_vector_file,
     write_vector_output,
 )
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -237,26 +237,7 @@ def run_soil_type_local(
     logger.info("Saved local soil type vector: %s", asset_id)
 
     geoserver_ok = False
-    geoserver_response = None
-    if push_to_geoserver:
-        geoserver_response = push_local_vector_to_geoserver(
-            path=os.path.splitext(asset_id)[0],
-            workspace=GEOSERVER_WORKSPACE,
-            layer_name=layer_name,
-            file_type="gpkg",
-        )
-        geoserver_ok = (
-            isinstance(geoserver_response, dict)
-            and geoserver_response.get("status_code") in (200, 201)
-        )
-        if not geoserver_ok:
-            logger.error(
-                "GeoServer upload failed for %s: %s",
-                layer_name,
-                geoserver_response,
-            )
-            return False
-
+    layer_id = None
     if sync_layer_metadata and is_tehsil_run:
         layer_id = save_layer_info_to_db(
             state=state,
@@ -271,11 +252,23 @@ def run_soil_type_local(
             algorithm=LOCAL_ALGORITHM,
             algorithm_version=LOCAL_ALGORITHM_VERSION,
         )
-        if layer_id and push_to_geoserver:
-            update_layer_sync_status(
-                layer_id=layer_id,
-                sync_to_geoserver=True,
+
+    if push_to_geoserver:
+        geoserver_response = queue_local_vector_for_geoserver(
+            path=os.path.splitext(asset_id)[0],
+            workspace=GEOSERVER_WORKSPACE,
+            layer_name=layer_name,
+            file_type="gpkg",
+            layer_id=layer_id,
+        )
+        geoserver_ok = geoserver_response.get("status_code") == 202
+        if not geoserver_ok:
+            logger.error(
+                "GeoServer queueing failed for %s: %s",
+                layer_name,
+                geoserver_response,
             )
+            return False
 
     return geoserver_ok if push_to_geoserver else True
 
