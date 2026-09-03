@@ -75,6 +75,22 @@ LOCAL_DIR_SPEI3_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries")
 # climatological median.
 LOCAL_DIR_MONSOON_ONSET = os.path.join(LOCAL_EXPORT_ROOT, "monsoon_onset")
 
+# SPEI-3 at 500m (revision of Script 01a/01b) - decided with the user:
+# GSMaP rainfall is only ~11km natively, so "500m SPEI" means the same
+# 11km rainfall field resampled (bilinear) onto a 500m grid - no new
+# rainfall information is created - fused with PET at its true native
+# 500m resolution, which is where the real spatial detail comes from.
+# SPI-1 stays at 11km (rainfall-only, so upsampling it gains nothing).
+# Full timeseries (not just params) is generated, per the user, matching
+# the original 11km SPEI-3's analog-year-lookup requirement.
+LOCAL_DIR_GSMAP_500M = os.path.join(LOCAL_EXPORT_ROOT, "gsmap_500m")
+LOCAL_DIR_MODIS_PET_500M = os.path.join(LOCAL_EXPORT_ROOT, "modis_pet_500m")
+LOCAL_DIR_WATER_BALANCE_500M = os.path.join(LOCAL_EXPORT_ROOT, "water_balance_500m")
+LOCAL_DIR_SPEI3_PARAMS_500M = os.path.join(LOCAL_EXPORT_ROOT, "spei3_params_500m")
+LOCAL_DIR_SPEI3_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries_500m")
+GCS_PATH_GSMAP_500M = "ksheetiz/farm_stress/gsmap_500m/"
+GCS_PATH_MODIS_PET_500M = "ksheetiz/farm_stress/modis_pet_500m/"
+
 # VCI (Script 03a) - the 26 yearly multi-band VCI COGs (one file per year,
 # up to 23 bands = 16-day periods) were exported to GEE, downloaded via
 # Drive, merged, and converted to COG manually (not via this repo's

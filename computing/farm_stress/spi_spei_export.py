@@ -31,11 +31,16 @@ from computing.farm_stress.config import (
     MODIS_PET_BAND,
     MODIS_PET_SCALE_FACTOR,
     SPI_SCALE_M,
+    EXPORT_SCALE_M,
     INDIA_BBOX_COORDS,
     LOCAL_DIR_GSMAP_MONTHLY,
     LOCAL_DIR_MODIS_PET_MONTHLY,
     LOCAL_DIR_GSMAP_DAILY,
     GCS_PATH_MODIS_PET_MONTHLY,
+    LOCAL_DIR_GSMAP_500M,
+    LOCAL_DIR_MODIS_PET_500M,
+    GCS_PATH_GSMAP_500M,
+    GCS_PATH_MODIS_PET_500M,
 )
 
 
@@ -192,6 +197,403 @@ def export_gsmap_daily_archive(
         f"skipped {len(skipped)} already on disk."
     )
     return {"downloaded": downloaded, "skipped": skipped}
+
+
+# ── 500m SPEI-3 revision ────────────────────────────────────────────────────
+# GSMaP is only ~11km natively, so there's no genuine 500m rainfall
+# information to export - export_gsmap_500m_archive resamples the same
+# 11km field onto a 500m grid via bilinear interpolation (smoother than
+# GEE's default nearest-neighbor, which would otherwise render as
+# visibly blocky 11km cells at 500m). export_modis_pet_500m_archive
+# reuses export_modis_pet_historical_archive's exact 28-day proration
+# logic, just stopping before its reduceResolution-to-11km step - PET is
+# already natively 500m, so no resampling choice applies to it.
+#
+# Both export yearly multi-band assets (one band per 28-day period that
+# falls in that calendar year, ~13 bands/year) rather than one task per
+# period - 340 periods as individual tasks would repeat the exact quota
+# problem VCI's per-composite export hit (~575 tasks) before being
+# restructured the same way. _split_yearly_bands_to_periods() below then
+# splits each downloaded yearly file back into the single-band
+# per-period files (precip_{label}.tif / pet_{label}.tif) the rest of
+# the pipeline (water_balance.py, spei_fit.py) already expects - a cheap
+# local step, no extra GEE cost. Band order isn't read back from any
+# stored metadata: generate_28day_periods() is a pure/deterministic
+# function, so both the export step and the split step independently
+# compute the identical sorted period list for a given year and agree on
+# which band is which without needing a sidecar file.
+
+
+def _periods_by_year(start_year, end_year):
+    """{year: [period, ...]} - periods grouped by the calendar year of
+    their period_start, sorted chronologically within each year. Pure
+    function of generate_28day_periods, safe to call independently at
+    export time and at split time and get the same grouping both times.
+    """
+    periods = generate_28day_periods(start_year, end_year)
+    by_year = {}
+    for period in periods:
+        year = int(period["period_start"][:4])
+        by_year.setdefault(year, []).append(period)
+    for year in by_year:
+        by_year[year].sort(key=lambda p: p["period_start"])
+    return by_year
+
+
+def export_gsmap_500m_archive(
+    gee_account_id,
+    start_year=2000,
+    end_year=2025,
+    output_dir=LOCAL_DIR_GSMAP_500M,
+    overwrite=False,
+    poll_seconds=30,
+):
+    """Download the historical GSMaP rainfall archive resampled to 500m
+    (bilinear), as yearly multi-band GCS exports later split into the
+    per-period files the rest of the pipeline expects (see module
+    comment above) - the 500m companion to export_gsmap_historical_archive.
+
+    gee_account_id: required, no default - see export_gsmap_period.
+
+    Safe to interrupt and re-run: years whose split-out period files are
+    all already on disk are skipped unless overwrite=True.
+    """
+    ee_initialize(gee_account_id)
+    region = ee.Geometry.Rectangle(INDIA_BBOX_COORDS)
+    hourly = ee.ImageCollection(GSMAP_COLLECTION).select(GSMAP_BAND).filterBounds(region)
+
+    by_year = _periods_by_year(start_year, end_year)
+    output_dir = output_dir.rstrip("/")
+    print(f"{len(by_year)} year(s) to process ({start_year}-{end_year})")
+
+    pending = []  # (year, periods, task_id, layer_name)
+    skipped = []
+    for year in sorted(by_year):
+        periods = by_year[year]
+        if not overwrite and all(
+            os.path.exists(f"{output_dir}/precip_{p['label']}.tif") for p in periods
+        ):
+            skipped.append(year)
+            continue
+
+        band_images = []
+        for period in periods:
+            window = hourly.filterDate(
+                period["period_start"], ee.Date(period["period_end"]).advance(1, "day")
+            )
+            window_hours = ee.Date(period["period_end"]).advance(1, "day").difference(
+                ee.Date(period["period_start"]), "hour"
+            )
+            # .resample('bilinear') changes how the image is interpolated at
+            # its next reprojection (the implicit one Export.image.toCloudStorage
+            # performs to reach scale=EXPORT_SCALE_M/500m below) - without it,
+            # GEE defaults to nearest-neighbor, which would just tile each
+            # ~11km GSMaP cell into a blocky grid of identical 500m pixels
+            # instead of a smooth interpolated surface.
+            band = (
+                window.mean()
+                .multiply(window_hours)
+                .resample("bilinear")
+                .rename(f"period_{period['label']}")
+            )
+            band_images.append(band)
+
+        combined = ee.Image.cat(band_images).clip(region)
+        layer_name = f"precip_500m_{year}"
+        task_id = sync_raster_to_gcs(combined, EXPORT_SCALE_M, layer_name, gcs_path=GCS_PATH_GSMAP_500M)
+        print(f"Submitted {year} ({len(periods)} bands) -> task {task_id}")
+        pending.append((year, periods, task_id, layer_name))
+
+    print(f"Submitted {len(pending)} year(s), waiting for the batch to finish...")
+    check_task_status([task_id for _, _, task_id, _ in pending], sleep_time=poll_seconds)
+
+    bucket = gcs_config(gee_account_id)
+    os.makedirs(output_dir, exist_ok=True)
+    downloaded = []
+    for year, periods, task_id, layer_name in pending:
+        yearly_path = f"{output_dir}/_yearly_{layer_name}.tif"
+        blob = bucket.blob(f"{GCS_PATH_GSMAP_500M.rstrip('/')}/{layer_name}.tif")
+        blob.download_to_filename(yearly_path)
+        print(f"Downloaded -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+        split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "precip")
+        os.remove(yearly_path)
+        downloaded.extend(split_paths)
+
+    print(
+        f"Done. Downloaded/split {len(downloaded)} period file(s) across "
+        f"{len(pending)} year(s), skipped {len(skipped)} year(s) already on disk."
+    )
+    return {"downloaded": downloaded, "skipped_years": skipped}
+
+
+def export_modis_pet_500m_archive(
+    gee_account_id,
+    start_year=2000,
+    end_year=2025,
+    output_dir=LOCAL_DIR_MODIS_PET_500M,
+    overwrite=False,
+    poll_seconds=30,
+):
+    """Download the historical MOD16A2GF PET archive at its true native
+    500m resolution, as yearly multi-band GCS exports later split into
+    per-period files (see module comment above) - the 500m companion to
+    export_modis_pet_historical_archive.
+
+    Identical 28-day proration logic (day-overlap weighted sum of 8-day
+    composites) as the 11km version - this is that one with the
+    reduceResolution/reproject-to-11km step removed, keeping pet_28d_500m
+    directly instead of aggregating it down first.
+
+    gee_account_id: required, no default - see export_gsmap_period.
+
+    Safe to interrupt and re-run: years whose split-out period files are
+    all already on disk are skipped unless overwrite=True.
+    """
+    ee_initialize(gee_account_id)
+    region = ee.Geometry.Rectangle(INDIA_BBOX_COORDS)
+
+    def scale_pet(img):
+        img = ee.Image(img)
+        return ee.Image(
+            img.multiply(MODIS_PET_SCALE_FACTOR).copyProperties(
+                img, ["system:time_start", "system:time_end"]
+            )
+        )
+
+    native_projection = ee.ImageCollection(MODIS_ET_COLLECTION).first().select(MODIS_PET_BAND).projection()
+
+    pet_col = (
+        ee.ImageCollection(MODIS_ET_COLLECTION)
+        .select(MODIS_PET_BAND)
+        .filterBounds(region)
+        .map(scale_pet)
+    )
+
+    by_year = _periods_by_year(start_year, end_year)
+    output_dir = output_dir.rstrip("/")
+    print(f"{len(by_year)} year(s) to process ({start_year}-{end_year})")
+
+    pending = []
+    skipped = []
+    for year in sorted(by_year):
+        periods = by_year[year]
+        if not overwrite and all(
+            os.path.exists(f"{output_dir}/pet_{p['label']}.tif") for p in periods
+        ):
+            skipped.append(year)
+            continue
+
+        band_images = []
+        for period in periods:
+            period_start_ms = ee.Date(period["period_start"]).millis()
+            period_end_ms = ee.Date(period["period_end"]).advance(1, "day").millis()
+
+            overlapping = pet_col.filterDate(
+                ee.Date(period["period_start"]).advance(-8, "day"),
+                ee.Date(period["period_end"]).advance(9, "day"),
+            )
+
+            def prorate(img, period_start_ms=period_start_ms, period_end_ms=period_end_ms):
+                img = ee.Image(img)
+                c_start = ee.Number(img.get("system:time_start"))
+                c_end = ee.Number(img.get("system:time_end"))
+                overlap_ms = c_end.min(period_end_ms).subtract(c_start.max(period_start_ms)).max(0)
+                composite_ms = c_end.subtract(c_start)
+                weight = overlap_ms.divide(composite_ms)
+                return img.multiply(weight).toFloat()
+
+            band = (
+                overlapping.map(prorate)
+                .sum()
+                .setDefaultProjection(native_projection)
+                .rename(f"period_{period['label']}")
+            )
+            band_images.append(band)
+
+        combined = ee.Image.cat(band_images).clip(region)
+        layer_name = f"pet_500m_{year}"
+        task_id = sync_raster_to_gcs(combined, EXPORT_SCALE_M, layer_name, gcs_path=GCS_PATH_MODIS_PET_500M)
+        print(f"Submitted {year} ({len(periods)} bands) -> task {task_id}")
+        pending.append((year, periods, task_id, layer_name))
+
+    print(f"Submitted {len(pending)} year(s), waiting for the batch to finish...")
+    check_task_status([task_id for _, _, task_id, _ in pending], sleep_time=poll_seconds)
+
+    bucket = gcs_config(gee_account_id)
+    os.makedirs(output_dir, exist_ok=True)
+    downloaded = []
+    for year, periods, task_id, layer_name in pending:
+        yearly_path = f"{output_dir}/_yearly_{layer_name}.tif"
+        blob = bucket.blob(f"{GCS_PATH_MODIS_PET_500M.rstrip('/')}/{layer_name}.tif")
+        blob.download_to_filename(yearly_path)
+        print(f"Downloaded -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+        split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "pet")
+        os.remove(yearly_path)
+        downloaded.extend(split_paths)
+
+    print(
+        f"Done. Downloaded/split {len(downloaded)} period file(s) across "
+        f"{len(pending)} year(s), skipped {len(skipped)} year(s) already on disk."
+    )
+    return {"downloaded": downloaded, "skipped_years": skipped}
+
+
+def _split_yearly_bands_to_periods(yearly_path, periods, output_dir, file_prefix):
+    """Split one yearly multi-band GeoTIFF (bands in the same order as
+    `periods`, sorted chronologically - see _periods_by_year) into
+    individual single-band {file_prefix}_{label}.tif files.
+
+    Band descriptions aren't relied on for this correspondence (GCS
+    exports don't reliably preserve them, confirmed with the VCI COGs
+    earlier in this project) - band index -> period is purely positional,
+    matching the exact order the bands were requested in at export time.
+    """
+    import rasterio
+
+    written = []
+    with rasterio.open(yearly_path) as src:
+        if src.count != len(periods):
+            raise ValueError(
+                f"{yearly_path}: expected {len(periods)} bands (one per period), got {src.count}"
+            )
+        profile = src.profile
+        profile.update(count=1)
+        for band_index, period in enumerate(periods, start=1):
+            out_path = f"{output_dir}/{file_prefix}_{period['label']}.tif"
+            with rasterio.open(out_path, "w", **profile) as dst:
+                dst.write(src.read(band_index), 1)
+            written.append(out_path)
+    return written
+
+
+def download_500m_archive_from_gcs(
+    gee_account_id,
+    dataset,
+    start_year=2000,
+    end_year=2025,
+    output_dir=None,
+    overwrite=False,
+):
+    """Download + split whatever yearly 500m files already exist in GCS,
+    WITHOUT submitting any new export tasks - a standalone recovery path
+    for when export_gsmap_500m_archive/export_modis_pet_500m_archive's
+    own download step didn't complete (e.g. the process was interrupted
+    right after the GCS export finished but before/during download).
+
+    Re-running the full export_* functions in that situation would be
+    wasteful and risky: since the split-out period files aren't on disk
+    yet, they'd conclude those years still need fitting and resubmit new
+    export tasks for work that's already sitting in the bucket, burning
+    quota for nothing. This function only ever reads from GCS - it never
+    calls Export.image.toCloudStorage.
+
+    A full-India 500m yearly image is large enough that GEE splits it
+    into multiple spatial shards per year rather than one file (same
+    behaviour hit with the VCI 2023 export earlier in this project) -
+    e.g. "precip_500m_20000000000000-0000000000.tif" (GEE's tile-offset
+    suffix appended directly to the "precip_500m_2000" fileNamePrefix,
+    no separator). So this can't just look for one exact filename per
+    year - it lists everything under the GCS prefix, groups blobs by
+    which year they belong to (prefix match), downloads every shard for
+    a year, and mosaics them with rasterio.merge before splitting into
+    periods.
+
+    dataset: "gsmap" or "pet" - which archive to pull.
+
+    Safe to interrupt and re-run: years already fully split locally are
+    skipped unless overwrite=True.
+    """
+    import rasterio
+    from rasterio.merge import merge as rasterio_merge
+
+    if dataset == "gsmap":
+        gcs_path, output_dir, layer_prefix, file_prefix = (
+            GCS_PATH_GSMAP_500M,
+            output_dir or LOCAL_DIR_GSMAP_500M,
+            "precip_500m",
+            "precip",
+        )
+    elif dataset == "pet":
+        gcs_path, output_dir, layer_prefix, file_prefix = (
+            GCS_PATH_MODIS_PET_500M,
+            output_dir or LOCAL_DIR_MODIS_PET_500M,
+            "pet_500m",
+            "pet",
+        )
+    else:
+        raise ValueError(f"dataset must be 'gsmap' or 'pet', got {dataset!r}")
+
+    output_dir = output_dir.rstrip("/")
+    os.makedirs(output_dir, exist_ok=True)
+    by_year = _periods_by_year(start_year, end_year)
+
+    bucket = gcs_config(gee_account_id)
+    all_blob_names = [
+        blob.name.rsplit("/", 1)[-1] for blob in bucket.list_blobs(prefix=gcs_path.rstrip("/") + "/")
+    ]
+    print(f"{len(all_blob_names)} blob(s) found under gs://.../{gcs_path.rstrip('/')}/")
+
+    # Group blobs by year via prefix match: every shard for year Y is
+    # named "{layer_prefix}_{Y}<shard-suffix>.tif" - the shard suffix
+    # itself varies (tile offsets) and isn't parsed, just matched as
+    # "starts with the year's prefix".
+    blobs_by_year = {}
+    for name in all_blob_names:
+        for year in by_year:
+            if name.startswith(f"{layer_prefix}_{year}"):
+                blobs_by_year.setdefault(year, []).append(name)
+                break
+
+    downloaded, skipped, missing_in_gcs = [], [], []
+    for year in sorted(by_year):
+        periods = by_year[year]
+        if not overwrite and all(
+            os.path.exists(f"{output_dir}/{file_prefix}_{p['label']}.tif") for p in periods
+        ):
+            skipped.append(year)
+            continue
+
+        shard_names = blobs_by_year.get(year)
+        if not shard_names:
+            print(f"{year}: no blobs matching {layer_prefix}_{year}* found in GCS yet, skipping")
+            missing_in_gcs.append(year)
+            continue
+
+        shard_paths = []
+        for shard_name in shard_names:
+            shard_path = f"{output_dir}/_shard_{shard_name}"
+            bucket.blob(f"{gcs_path.rstrip('/')}/{shard_name}").download_to_filename(shard_path)
+            shard_paths.append(shard_path)
+        print(f"{year}: downloaded {len(shard_paths)} shard(s), mosaicking ...")
+
+        yearly_path = f"{output_dir}/_yearly_{layer_prefix}_{year}.tif"
+        if len(shard_paths) == 1:
+            os.rename(shard_paths[0], yearly_path)
+        else:
+            srcs = [rasterio.open(p) for p in shard_paths]
+            mosaic, mosaic_transform = rasterio_merge(srcs)
+            profile = srcs[0].profile.copy()
+            profile.update(
+                height=mosaic.shape[1], width=mosaic.shape[2], transform=mosaic_transform, count=mosaic.shape[0]
+            )
+            for src in srcs:
+                src.close()
+            with rasterio.open(yearly_path, "w", **profile) as dst:
+                dst.write(mosaic)
+            for p in shard_paths:
+                os.remove(p)
+
+        print(f"  mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+        split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, file_prefix)
+        os.remove(yearly_path)
+        downloaded.extend(split_paths)
+
+    print(
+        f"Done. Downloaded/split {len(downloaded)} period file(s), "
+        f"skipped {len(skipped)} year(s) already on disk, "
+        f"{len(missing_in_gcs)} year(s) not yet in GCS."
+    )
+    return {"downloaded": downloaded, "skipped_years": skipped, "missing_in_gcs": missing_in_gcs}
 
 
 def export_modis_pet_historical_archive(

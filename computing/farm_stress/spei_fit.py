@@ -19,6 +19,7 @@ from datetime import datetime
 
 import numpy as np
 import rasterio
+from rasterio.windows import Window
 from scipy.special import gamma as gamma_func
 from scipy.special import ndtri
 
@@ -27,6 +28,9 @@ from computing.farm_stress.config import (
     LOCAL_DIR_WATER_BALANCE_MONTHLY,
     LOCAL_DIR_SPEI3_PARAMS,
     LOCAL_DIR_SPEI3_TIMESERIES,
+    LOCAL_DIR_WATER_BALANCE_500M,
+    LOCAL_DIR_SPEI3_PARAMS_500M,
+    LOCAL_DIR_SPEI3_TIMESERIES_500M,
 )
 
 
@@ -195,6 +199,132 @@ def fit_spei3_archive(
 
         if (i + 1) % 50 == 0 or i == len(periods) - 1:
             print(f"  [{i + 1}/{len(periods)}] {period['label']} done")
+
+    print("Done.")
+    return {"params_dir": params_dir, "timeseries_dir": timeseries_dir, "n_periods": n_periods}
+
+
+def fit_spei3_archive_tiled(
+    start_year=2000,
+    end_year=2025,
+    wb_dir=LOCAL_DIR_WATER_BALANCE_500M,
+    params_dir=LOCAL_DIR_SPEI3_PARAMS_500M,
+    timeseries_dir=LOCAL_DIR_SPEI3_TIMESERIES_500M,
+    row_chunk=150,
+):
+    """Row-tiled version of fit_spei3_archive, for grids too large to
+    hold in memory all at once - the 500m full-India grid is ~500x more
+    pixels than the 11km one fit_spei3_archive was written for
+    (~46.7M vs ~97K), and loading all 340 periods x that many pixels x
+    8 bytes would be >100GB, infeasible on this machine.
+
+    Produces IDENTICAL results to fit_spei3_archive (verified against it
+    on synthetic data before this was used on real 500m data) - each
+    pixel's fit depends only on its own time series, never on any other
+    pixel, so splitting the grid into horizontal row-strips and fitting
+    each strip independently doesn't change the math, only how much of
+    the archive is held in memory at once. row_chunk=150 keeps one
+    strip's full-history read (150 rows x full width x 340 periods x
+    8 bytes) to a few GB.
+
+    Every output file (12 monthly params + up to 340 timeseries rasters)
+    is opened once, up front, and written to window-by-window as each
+    strip is processed, rather than reopened per strip - keeps ~350+
+    file handles open for the duration of the run. If this hits an OS
+    "too many open files" error, raise the process's file descriptor
+    ulimit rather than reducing row_chunk (row_chunk controls memory per
+    strip, not file-handle count, which is fixed by n_periods regardless).
+
+    Unlike fit_spei3_archive, this doesn't support resuming a partial
+    run (every output file is truncated and rewritten from row 0) -
+    windowed writes into a partially-existing file of unknown state
+    would be unsafe to reason about; re-run the whole thing if
+    interrupted.
+    """
+    periods = generate_28day_periods(start_year, end_year)
+    for period in periods:
+        start = datetime.strptime(period["period_start"], "%Y-%m-%d")
+        end = datetime.strptime(period["period_end"], "%Y-%m-%d")
+        period["month"] = (start + (end - start) / 2).month
+    months = np.array([p["month"] for p in periods])
+    n_periods = len(periods)
+    has_history = np.arange(n_periods) >= 2
+
+    wb_dir = wb_dir.rstrip("/")
+    wb_paths = [f"{wb_dir}/wb_{p['label']}.tif" for p in periods]
+    missing = [p for p in wb_paths if not os.path.exists(p)]
+    if missing:
+        raise FileNotFoundError(
+            f"{len(missing)} water-balance file(s) missing (e.g. {missing[:3]}) - "
+            "run the 500m water balance step first"
+        )
+
+    with rasterio.open(wb_paths[0]) as src:
+        profile = src.profile
+        rows, cols = src.height, src.width
+
+    params_dir = params_dir.rstrip("/")
+    timeseries_dir = timeseries_dir.rstrip("/")
+    os.makedirs(params_dir, exist_ok=True)
+    os.makedirs(timeseries_dir, exist_ok=True)
+
+    param_profile = profile.copy()
+    param_profile.update(count=3, dtype="float64", nodata=np.nan)
+    ts_profile = profile.copy()
+    ts_profile.update(count=1, dtype="float64", nodata=np.nan)
+
+    param_paths = [f"{params_dir}/spei3_params_month{m:02d}.tif" for m in range(1, 13)]
+    ts_paths = [f"{timeseries_dir}/spei3_{p['label']}.tif" for p in periods]
+
+    param_dsts = [rasterio.open(p, "w", **param_profile) for p in param_paths]
+    ts_dsts = [rasterio.open(p, "w", **ts_profile) for p in ts_paths]
+
+    try:
+        n_strips = (rows + row_chunk - 1) // row_chunk
+        print(f"Fitting {rows}x{cols} grid in {n_strips} row-strip(s) of up to {row_chunk} rows each ...")
+
+        for s in range(n_strips):
+            row_off = s * row_chunk
+            strip_h = min(row_chunk, rows - row_off)
+            window = Window(0, row_off, cols, strip_h)
+
+            strip = np.empty((n_periods, strip_h, cols), dtype=np.float64)
+            for i, path in enumerate(wb_paths):
+                with rasterio.open(path) as src:
+                    strip[i] = src.read(1, window=window)
+
+            flat = strip.reshape(n_periods, strip_h * cols)
+            del strip
+            wb3 = np.full_like(flat, np.nan)
+            wb3[2:] = flat[2:] + flat[1:-1] + flat[:-2]
+            del flat
+
+            gamma_by_month = np.full((12, strip_h * cols), np.nan)
+            alpha_by_month = np.full((12, strip_h * cols), np.nan)
+            beta_by_month = np.full((12, strip_h * cols), np.nan)
+
+            for m in range(1, 13):
+                month_mask = (months == m) & has_history
+                gamma_loc, alpha, beta = fit_loglogistic_pwm(wb3[month_mask])
+                gamma_by_month[m - 1] = gamma_loc
+                alpha_by_month[m - 1] = alpha
+                beta_by_month[m - 1] = beta
+
+                param_dsts[m - 1].write(gamma_loc.reshape(strip_h, cols), 1, window=window)
+                param_dsts[m - 1].write(alpha.reshape(strip_h, cols), 2, window=window)
+                param_dsts[m - 1].write(beta.reshape(strip_h, cols), 3, window=window)
+
+            for i, period in enumerate(periods):
+                m = period["month"]
+                spei3 = loglogistic_to_spei(
+                    wb3[i], gamma_by_month[m - 1], alpha_by_month[m - 1], beta_by_month[m - 1]
+                ).reshape(strip_h, cols)
+                ts_dsts[i].write(spei3, 1, window=window)
+
+            print(f"  [{s + 1}/{n_strips}] rows {row_off}-{row_off + strip_h} done")
+    finally:
+        for dst in param_dsts + ts_dsts:
+            dst.close()
 
     print("Done.")
     return {"params_dir": params_dir, "timeseries_dir": timeseries_dir, "n_periods": n_periods}
