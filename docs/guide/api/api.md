@@ -906,7 +906,10 @@ Superadmins must specify the organization ID since they can create projects for 
       },
       "demand_overview": {
           "community_demands": 320,
-          "individual_demands": 215
+          "individual_demands": 215,
+          "unclassified_demands": 40,
+          "total_classified_demands": 535,
+          "total_demands": 575
       },
       "commons_connect_operational": {
           "active_tehsils": 25,
@@ -957,6 +960,9 @@ Superadmins must specify the organization ID since they can create projects for 
   ```
 - **Notes**:
     - `demand_overview`: counts Community Demands and Individual Demands across all NRM maintenance (Section E) and NRM works (Section F) records for the filtered plans
+        - `total_demands`: every demand record encountered, regardless of whether its ownership value could be classified
+        - `total_classified_demands`: `community_demands + individual_demands`
+        - `unclassified_demands`: `total_demands - total_classified_demands` — records whose raw ownership value didn't match a known community/individual keyword
     - `landscape_stewards.total_stewards`: only counts facilitators who are **App User** group members and do **not** belong to the CFPT organization
     - `landscape_stewards.gender_breakdown`: male/female/other counts from the User table for the active stewards; users without a gender set are excluded from all buckets
     - `by_organization` in `landscape_stewards` is omitted when `?organization` filter is applied

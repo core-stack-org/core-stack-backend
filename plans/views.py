@@ -211,6 +211,8 @@ def _count_demand_types(plan_id_strs):
     return {
         "community_demands": community,
         "individual_demands": individual,
+        "unclassified_demands": total - community - individual,
+        "total_classified_demands": community + individual,
         "total_demands": total,
     }
 

@@ -1627,7 +1627,7 @@ def get_change_detection_data(state, district, block, uid):
 
         if degradation >= 20:
             barren_percent = get_mws_barren_percent(state, district, block, uid)
-            parameter_land += f"{barren_percent}% of the area is barren in this microwatershed. There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2022. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
+            parameter_land += f"{barren_percent}% of the area is barren in this microwatershed. There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2024. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
 
         # ? Tree Reduction
         df_defo["total_deforestation_area_in_ha"] = df_defo[
@@ -1640,7 +1640,7 @@ def get_change_detection_data(state, district, block, uid):
         avg = df_defo["total_deforestation_area_in_ha"].mean()
 
         if reduction >= 50:
-            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2022, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares per micro watershed in the entire block."
+            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2024, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares per micro watershed in the entire block."
 
         # ? Urbanization
         df_urban["total_urbanization_area_in_ha"] = df_urban[
