@@ -54,6 +54,7 @@ class ODK_settlement(models.Model):
     nrega_issues = models.TextField()
     nrega_community = models.TextField()
     data_settlement = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_settlement = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -103,6 +104,7 @@ class ODK_well(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_well = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_well = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -158,6 +160,7 @@ class ODK_waterbody(models.Model):
     system = models.JSONField(default=dict)
     gps_point = models.JSONField(default=dict)
     data_waterbody = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_waterbody = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -204,6 +207,7 @@ class ODK_groundwater(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_groundwater = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_groundwater = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -256,6 +260,7 @@ class ODK_agri(models.Model):
     gps_point = models.JSONField()
     work_dimensions = models.JSONField(default=dict)
     data_agri = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_agri = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -311,6 +316,7 @@ class ODK_crop(models.Model):
     system = models.JSONField()
     gps_point = models.JSONField(default=dict, null=True, blank=True)
     data_crop = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_crop = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -359,6 +365,7 @@ class ODK_livelihood(models.Model):
     system = models.JSONField()
     gps_point = models.JSONField()
     data_livelihood = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_livelihood = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -410,6 +417,7 @@ class GW_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     submission_time = models.DateTimeField(null=True, blank=True)
     data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_gw_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -452,6 +460,7 @@ class SWB_RS_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     submission_time = models.DateTimeField(null=True, blank=True)
     data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_swb_rs_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -494,6 +503,7 @@ class SWB_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     submission_time = models.DateTimeField(null=True, blank=True)
     data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_swb_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -536,6 +546,7 @@ class Agri_maintenance(models.Model):
     corresponding_work_id = models.CharField(max_length=255)
     submission_time = models.DateTimeField(null=True, blank=True)
     data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_agri_maintenance = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(
@@ -575,6 +586,7 @@ class ODK_agrohorticulture(models.Model):
     longitude = models.FloatField()
     status_re = models.TextField()
     data_agohorticulture = models.JSONField(default=dict, null=True, blank=True)
+    modified_data_agohorticulture = models.JSONField(default=dict, null=True, blank=True)
     is_moderated = models.BooleanField(default=False, blank=True, null=True)
     moderated_at = models.DateTimeField(null=True, blank=True)
     moderated_by = models.ForeignKey(

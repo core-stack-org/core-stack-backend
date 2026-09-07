@@ -906,7 +906,10 @@ Superadmins must specify the organization ID since they can create projects for 
       },
       "demand_overview": {
           "community_demands": 320,
-          "individual_demands": 215
+          "individual_demands": 215,
+          "unclassified_demands": 40,
+          "total_classified_demands": 535,
+          "total_demands": 575
       },
       "commons_connect_operational": {
           "active_tehsils": 25,
@@ -957,6 +960,9 @@ Superadmins must specify the organization ID since they can create projects for 
   ```
 - **Notes**:
     - `demand_overview`: counts Community Demands and Individual Demands across all NRM maintenance (Section E) and NRM works (Section F) records for the filtered plans
+        - `total_demands`: every demand record encountered, regardless of whether its ownership value could be classified
+        - `total_classified_demands`: `community_demands + individual_demands`
+        - `unclassified_demands`: `total_demands - total_classified_demands` — records whose raw ownership value didn't match a known community/individual keyword
     - `landscape_stewards.total_stewards`: only counts facilitators who are **App User** group members and do **not** belong to the CFPT organization
     - `landscape_stewards.gender_breakdown`: male/female/other counts from the User table for the active stewards; users without a gender set are excluded from all buckets
     - `by_organization` in `landscape_stewards` is omitted when `?organization` filter is applied
@@ -1940,6 +1946,7 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 |---|---|---|
 | `GET dpr_data/report-status-summary/` | No | Count of `DPR_Report` records grouped by workflow status |
 | `GET dpr_data/status-tracking/` | No | Global totals by status across all plans (no per-plan detail) |
+| `GET dpr_data/status-tracking-by-plan/` | Yes | Same breakdown as above, one row per plan; also supports `?plan_id=` for a single plan |
 | `GET dpr_data/{id}/summary/` | No | All ODK models (counts only) |
 | `GET dpr_data/{id}/team-details/` | No | `PlanApp` |
 | `GET dpr_data/{id}/village-brief/` | No | `PlanApp` + `ODK_settlement` |
@@ -2016,7 +2023,7 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
     "plan_count": 120,
     "totals": {
       "PENDING":   { "resources": 30, "demands": 20 },
-      "SUBMITTED": { "resources": 20, "demands": 10 },
+      "SUBMITTED": { "resources": 35, "demands": 18 },
       "APPROVED":  { "resources": 15, "demands": 8 },
       "REJECTED":  { "resources": 2,  "demands": 1 },
       "REVERTED":  { "resources": 0,  "demands": 0 }
@@ -2026,8 +2033,9 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 - **Notes**:
   - `plan_count` is the number of plans included in the aggregation (after applying any filters).
   - `totals` are scoped to the filtered plan set, not all plans globally.
+  - `SUBMITTED` counts are cumulative — an `APPROVED` item was necessarily submitted first, so its count is folded into `SUBMITTED` as well as being shown under `APPROVED`. In the example above, `35 = 20` raw-submitted `+ 15` approved. `SUBMITTED` is not mutually exclusive with `APPROVED`.
   - When `?status=SUBMITTED` is passed, `plan_count` and `totals` are computed over only the plans that have at least one resource or demand in `SUBMITTED` state — useful for a review queue summary badge.
-  - For per-plan breakdown, use `GET /api/v1/dpr_data/{plan_id}/status-tracking/` per plan.
+  - For per-plan breakdown, use `GET /api/v1/dpr_data/status-tracking-by-plan/` (list, filterable) or `GET /api/v1/dpr_data/{plan_id}/status-tracking/` (single plan, legacy shape).
   - **Resources**: `ODK_settlement`, `ODK_well`, `ODK_waterbody`, `ODK_crop`
   - **Demands**: `ODK_groundwater`, `ODK_agri`, `ODK_livelihood`, `ODK_agrohorticulture`, `GW_maintenance`, `SWB_RS_maintenance`, `SWB_maintenance`, `Agri_maintenance`
   - Only `enabled=True` plans are included. Deleted records (`is_deleted=True`) are excluded from all counts.
@@ -2041,6 +2049,66 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
   ```
 - **Error Responses**:
   - `400 Bad Request` — non-integer value passed for `state_id`, `district_id`, `block_id`, or `organization_id`
+  - `400 Bad Request` — `status` value not in `DEMAND_STATUS_CHOICES`
+
+---
+
+### Status Tracking By Plan
+
+- **URL**: `/api/v1/dpr_data/status-tracking-by-plan/`
+- **Method**: GET
+- **Description**: Same breakdown as [Global Status Tracking](#global-status-tracking), but returns one row per plan instead of a single aggregated total. Supports the same geo/org filters as a list view, plus a `plan_id` filter for looking up a single plan directly.
+- **Authentication**: `Authorization: Bearer <token>` or `X-API-Key: <key>`
+- **Paginated**: Yes
+- **Query Parameters** (all optional):
+
+| Parameter | Type | Description |
+|---|---|---|
+| `plan_id` | integer | Return just this one plan. Bypasses all other filters below, and bypasses the test/demo-name and CFPT-organisation exclusions — if you ask for a specific plan, you get it (as long as it's `enabled=True`) |
+| `state_id` | integer | Filter to plans in this state |
+| `district_id` | integer | Filter to plans in this district |
+| `block_id` | integer | Filter to plans in this block |
+| `organization_id` | integer | Filter to plans belonging to this organization |
+| `status` | string | Only return plans that have ≥1 resource or demand in this status. One of `PENDING`, `SUBMITTED`, `APPROVED`, `REVERTED`, `REJECTED` |
+
+- **Response**:
+  ```json
+  {
+    "count": 42,
+    "next": "...?page=2",
+    "previous": null,
+    "results": [
+      {
+        "plan_id": 1163,
+        "plan_name": "Rampur Watershed Plan 2024",
+        "organization": "CoRE Stack Foundation",
+        "state": "Uttar Pradesh",
+        "district": "Jaunpur",
+        "block": "Badlapur",
+        "totals": {
+          "PENDING":   { "resources": 5,  "demands": 4 },
+          "SUBMITTED": { "resources": 15, "demands": 10 },
+          "APPROVED":  { "resources": 3,  "demands": 2 },
+          "REJECTED":  { "resources": 0,  "demands": 1 },
+          "REVERTED":  { "resources": 0,  "demands": 0 }
+        }
+      }
+    ]
+  }
+  ```
+- **Notes**:
+  - Same `SUBMITTED`-includes-`APPROVED` behavior as [Global Status Tracking](#global-status-tracking) — see that section's note for details.
+  - Same resource/demand model scope as [Global Status Tracking](#global-status-tracking).
+  - When `plan_id` is **not** given, the same test/demo-name and CFPT-organisation exclusions from Global Status Tracking apply.
+  - If `plan_id` doesn't exist or the plan is disabled, the response is `{"count": 0, "results": []}`, not a `404`.
+- **Examples**:
+  ```
+  GET /api/v1/dpr_data/status-tracking-by-plan/?plan_id=1163
+  GET /api/v1/dpr_data/status-tracking-by-plan/?state_id=3
+  GET /api/v1/dpr_data/status-tracking-by-plan/?district_id=12&status=SUBMITTED
+  ```
+- **Error Responses**:
+  - `400 Bad Request` — non-integer value passed for `plan_id`, `state_id`, `district_id`, `block_id`, or `organization_id`
   - `400 Bad Request` — `status` value not in `DEMAND_STATUS_CHOICES`
 
 ---

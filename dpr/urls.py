@@ -14,6 +14,11 @@ urlpatterns = [
         api.dpr_global_status_tracking,
         name="dpr_global_status_tracking",
     ),
+    path(
+        "dpr_data/status-tracking-by-plan/",
+        api.dpr_status_tracking_by_plan,
+        name="dpr_status_tracking_by_plan",
+    ),
     path("generate_dpr/", api.generate_dpr, name="generate_dpr"),
     path("generate_mws_report/", api.generate_mws_report, name="generate_mws_report"),
     path(

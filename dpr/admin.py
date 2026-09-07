@@ -49,6 +49,7 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "block_name",
         "submitted_by",
         "plan_name",
+        "plan_id",
     ]
     readonly_fields = [
         "uuid",
@@ -57,6 +58,7 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         "farmer_family",
         "livestock_census",
         "data_before_moderation",
+        "modified_data_settlement",
     ]
     ordering = ["-submission_time"]
 
@@ -146,7 +148,12 @@ class ODKSettlementAdmin(admin.ModelAdmin):
         (
             "Data",
             {
-                "fields": ("farmer_family", "livestock_census", "data_settlement"),
+                "fields": (
+                    "farmer_family",
+                    "livestock_census",
+                    "data_settlement",
+                    "modified_data_settlement",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -186,7 +193,13 @@ class ODKWellAdmin(admin.ModelAdmin):
         "block_name",
         "plan_name",
     ]
-    readonly_fields = ["uuid", "system", "gps_point", "data_before_moderation"]
+    readonly_fields = [
+        "uuid",
+        "system",
+        "gps_point",
+        "data_before_moderation",
+        "modified_data_well",
+    ]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -238,7 +251,13 @@ class ODKWellAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {
-                "fields": ("submission_time", "uuid", "system", "data_well"),
+                "fields": (
+                    "submission_time",
+                    "uuid",
+                    "system",
+                    "data_well",
+                    "modified_data_well",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -284,6 +303,7 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         "gps_point",
         "water_structure_dimension",
         "data_before_moderation",
+        "modified_data_waterbody",
     ]
     ordering = ["-submission_time"]
 
@@ -363,7 +383,13 @@ class ODKWaterbodyAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {
-                "fields": ("submission_time", "uuid", "system", "data_waterbody"),
+                "fields": (
+                    "submission_time",
+                    "uuid",
+                    "system",
+                    "data_waterbody",
+                    "modified_data_waterbody",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -404,6 +430,7 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         "gps_point",
         "work_dimensions",
         "data_before_moderation",
+        "modified_data_groundwater",
     ]
     ordering = ["-submission_time"]
 
@@ -453,7 +480,13 @@ class ODKGroundwaterAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {
-                "fields": ("submission_time", "uuid", "system", "data_groundwater"),
+                "fields": (
+                    "submission_time",
+                    "uuid",
+                    "system",
+                    "data_groundwater",
+                    "modified_data_groundwater",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -494,6 +527,7 @@ class ODKAgriAdmin(admin.ModelAdmin):
         "gps_point",
         "work_dimensions",
         "data_before_moderation",
+        "modified_data_agri",
     ]
     ordering = ["-submission_time"]
 
@@ -543,7 +577,13 @@ class ODKAgriAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {
-                "fields": ("submission_time", "uuid", "system", "data_agri"),
+                "fields": (
+                    "submission_time",
+                    "uuid",
+                    "system",
+                    "data_agri",
+                    "modified_data_agri",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -573,7 +613,12 @@ class ODKCropAdmin(admin.ModelAdmin):
         "is_deleted",
     ]
     search_fields = ["crop_grid_id", "beneficiary_settlement", "plan_name"]
-    readonly_fields = ["uuid", "system", "data_before_moderation"]
+    readonly_fields = [
+        "uuid",
+        "system",
+        "data_before_moderation",
+        "modified_data_crop",
+    ]
     ordering = ["-submission_time"]
 
     fieldsets = (
@@ -633,7 +678,13 @@ class ODKCropAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {
-                "fields": ("submission_time", "uuid", "system", "data_crop"),
+                "fields": (
+                    "submission_time",
+                    "uuid",
+                    "system",
+                    "data_crop",
+                    "modified_data_crop",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -677,6 +728,7 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         "system",
         "gps_point",
         "data_before_moderation",
+        "modified_data_livelihood",
     ]
     ordering = ["-submission_time"]
 
@@ -730,7 +782,13 @@ class ODKLivelihoodAdmin(admin.ModelAdmin):
         (
             "Metadata",
             {
-                "fields": ("submission_time", "uuid", "system", "data_livelihood"),
+                "fields": (
+                    "submission_time",
+                    "uuid",
+                    "system",
+                    "data_livelihood",
+                    "modified_data_livelihood",
+                ),
                 "classes": ("collapse",),
             },
         ),
@@ -750,7 +808,12 @@ class GWMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["gw_maintenance_id", "uuid", "data_before_moderation"]
+    readonly_fields = [
+        "gw_maintenance_id",
+        "uuid",
+        "data_before_moderation",
+        "modified_data_gw_maintenance",
+    ]
 
     fieldsets = (
         (
@@ -789,7 +852,14 @@ class GWMaintenanceAdmin(admin.ModelAdmin):
         ),
         (
             "Metadata",
-            {"fields": ("uuid", "data_gw_maintenance"), "classes": ("collapse",)},
+            {
+                "fields": (
+                    "uuid",
+                    "data_gw_maintenance",
+                    "modified_data_gw_maintenance",
+                ),
+                "classes": ("collapse",),
+            },
         ),
     )
 
@@ -807,7 +877,12 @@ class SWBRSMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["swb_rs_maintenance_id", "uuid", "data_before_moderation"]
+    readonly_fields = [
+        "swb_rs_maintenance_id",
+        "uuid",
+        "data_before_moderation",
+        "modified_data_swb_rs_maintenance",
+    ]
 
     fieldsets = (
         (
@@ -846,7 +921,14 @@ class SWBRSMaintenanceAdmin(admin.ModelAdmin):
         ),
         (
             "Metadata",
-            {"fields": ("uuid", "data_swb_rs_maintenance"), "classes": ("collapse",)},
+            {
+                "fields": (
+                    "uuid",
+                    "data_swb_rs_maintenance",
+                    "modified_data_swb_rs_maintenance",
+                ),
+                "classes": ("collapse",),
+            },
         ),
     )
 
@@ -864,7 +946,12 @@ class SWBMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["swb_maintenance_id", "uuid", "data_before_moderation"]
+    readonly_fields = [
+        "swb_maintenance_id",
+        "uuid",
+        "data_before_moderation",
+        "modified_data_swb_maintenance",
+    ]
 
     fieldsets = (
         (
@@ -903,7 +990,14 @@ class SWBMaintenanceAdmin(admin.ModelAdmin):
         ),
         (
             "Metadata",
-            {"fields": ("uuid", "data_swb_maintenance"), "classes": ("collapse",)},
+            {
+                "fields": (
+                    "uuid",
+                    "data_swb_maintenance",
+                    "modified_data_swb_maintenance",
+                ),
+                "classes": ("collapse",),
+            },
         ),
     )
 
@@ -921,7 +1015,12 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["work_id", "corresponding_work_id", "plan_name", "uuid"]
-    readonly_fields = ["agri_maintenance_id", "uuid", "data_before_moderation"]
+    readonly_fields = [
+        "agri_maintenance_id",
+        "uuid",
+        "data_before_moderation",
+        "modified_data_agri_maintenance",
+    ]
 
     fieldsets = (
         (
@@ -963,7 +1062,14 @@ class AgriMaintenanceAdmin(admin.ModelAdmin):
         ),
         (
             "Metadata",
-            {"fields": ("uuid", "data_agri_maintenance"), "classes": ("collapse",)},
+            {
+                "fields": (
+                    "uuid",
+                    "data_agri_maintenance",
+                    "modified_data_agri_maintenance",
+                ),
+                "classes": ("collapse",),
+            },
         ),
     )
 
@@ -979,7 +1085,12 @@ class ODKAgrohorticultureAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status_re", "plan_id", "plan_name", "is_moderated", "is_deleted"]
     search_fields = ["agrohorticulture_id", "plan_name", "uuid"]
-    readonly_fields = ["agrohorticulture_id", "uuid", "data_before_moderation"]
+    readonly_fields = [
+        "agrohorticulture_id",
+        "uuid",
+        "data_before_moderation",
+        "modified_data_agohorticulture",
+    ]
     ordering = ["-agrohorticulture_id"]
 
     fieldsets = (
@@ -1017,7 +1128,14 @@ class ODKAgrohorticultureAdmin(admin.ModelAdmin):
         ),
         (
             "Metadata",
-            {"fields": ("uuid", "data_agohorticulture"), "classes": ("collapse",)},
+            {
+                "fields": (
+                    "uuid",
+                    "data_agohorticulture",
+                    "modified_data_agohorticulture",
+                ),
+                "classes": ("collapse",),
+            },
         ),
     )
 
