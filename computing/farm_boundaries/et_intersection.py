@@ -762,54 +762,54 @@ def intersect_et_with_farms(
 
     # 2. Load local AET raster(s) — one per AEZ zone the tehsil straddles,
     #    mosaicked together by _read_raster_clipped via rasterio.merge
-    # aet_paths = [_local_aet_path(z, year) for z in aez_zones]
-    # if not any(os.path.exists(p) for p in aet_paths):
-    #     raise FileNotFoundError(
-    #         f"No local AET raster found for zones {aez_zones}: {aet_paths}\n"
-    #         f"Place the file(s) at: {LOCAL_ET_RASTERS_PATH}/merge_AET_<aez>_{year}_cog.tif"
-    #     )
-    # logger.info("Reading local AET raster(s): %s", aet_paths)
-    # aet_data, aet_transform = _read_raster_clipped(aet_paths, bbox)
-    # logger.info("AET loaded: %d bands, shape=%s", aet_data.shape[0], aet_data.shape[1:])
+    aet_paths = [_local_aet_path(z, year) for z in aez_zones]
+    if not any(os.path.exists(p) for p in aet_paths):
+        raise FileNotFoundError(
+            f"No local AET raster found for zones {aez_zones}: {aet_paths}\n"
+            f"Place the file(s) at: {LOCAL_ET_RASTERS_PATH}/merge_AET_<aez>_{year}_cog.tif"
+        )
+    logger.info("Reading local AET raster(s): %s", aet_paths)
+    aet_data, aet_transform = _read_raster_clipped(aet_paths, bbox)
+    logger.info("AET loaded: %d bands, shape=%s", aet_data.shape[0], aet_data.shape[1:])
 
-    # # 3. Load local PET raster(s) (optional)
-    # pet_data, pet_transform = None, None
-    # pet_paths = [_local_pet_path(z, year) for z in aez_zones]
-    # if any(os.path.exists(p) for p in pet_paths):
-    #     logger.info("Reading local PET raster(s): %s", pet_paths)
-    #     pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
-    #     logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
-    # else:
-    #     logger.warning(
-    #         "No local PET raster found for zones %s — MAI will not be computed.", aez_zones
-    #     )
+    # 3. Load local PET raster(s) (optional)
+    pet_data, pet_transform = None, None
+    pet_paths = [_local_pet_path(z, year) for z in aez_zones]
+    if any(os.path.exists(p) for p in pet_paths):
+        logger.info("Reading local PET raster(s): %s", pet_paths)
+        pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
+        logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
+    else:
+        logger.warning(
+            "No local PET raster found for zones %s — MAI will not be computed.", aez_zones
+        )
 
-    # # 4. Zonal statistics
-    # gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
+    # 4. Zonal statistics
+    gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
 
-    # # 5. Write 3-file schema
-    # static_path  = _save_static_parquet(gdf, state, district, block)
-    # annual_path  = _save_annual_parquet(gdf, state, district, block, year)
-    # monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
+    # 5. Write 3-file schema
+    static_path  = _save_static_parquet(gdf, state, district, block)
+    annual_path  = _save_annual_parquet(gdf, state, district, block, year)
+    monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
 
-    # summary = {
-    #     "state": state, "district": district, "block": block, "year": year,
-    #     "farm_count": len(gdf),
-    #     "paths": {
-    #         "static":  static_path,
-    #         "annual":  annual_path,
-    #         "monthly": monthly_path,
-    #     },
-    # }
-    # if "aet_annual" in gdf.columns and gdf["aet_annual"].notna().any():
-    #     summary["avg_aet_annual"] = round(float(gdf["aet_annual"].mean()), 4)
-    # if "mai_annual" in gdf.columns and gdf["mai_annual"].notna().any():
-    #     summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
-    # if "kharif_water_stress" in gdf.columns:
-    #     summary["kharif_stress_farms"] = int(gdf["kharif_water_stress"].sum())
+    summary = {
+        "state": state, "district": district, "block": block, "year": year,
+        "farm_count": len(gdf),
+        "paths": {
+            "static":  static_path,
+            "annual":  annual_path,
+            "monthly": monthly_path,
+        },
+    }
+    if "aet_annual" in gdf.columns and gdf["aet_annual"].notna().any():
+        summary["avg_aet_annual"] = round(float(gdf["aet_annual"].mean()), 4)
+    if "mai_annual" in gdf.columns and gdf["mai_annual"].notna().any():
+        summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
+    if "kharif_water_stress" in gdf.columns:
+        summary["kharif_stress_farms"] = int(gdf["kharif_water_stress"].sum())
 
-    # logger.info("Phase 3 complete: %s", summary)
-    # return summary
+    logger.info("Phase 3 complete: %s", summary)
+    return summary
     return {"task" : "done"}
 
 
