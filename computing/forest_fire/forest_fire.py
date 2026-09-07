@@ -115,7 +115,11 @@ def generate_forest_fire_layer(
     # print("Bad geometry count:", bad.size().getInfo())
     # print("Bad UIDs:", bad.aggregate_array("uid").getInfo())
 
-    fire_image = load_fire_image(roi)
+    fire_image = (
+        load_fire_image()
+        if state and district and block
+        else load_fire_image(asset_suffix)
+    )
 
     # print(fire_image.bandNames().getInfo())
 

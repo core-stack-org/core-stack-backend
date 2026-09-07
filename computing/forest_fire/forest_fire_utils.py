@@ -20,11 +20,14 @@ FIRE_INDEX_PATH = (
 )
 
 
-def load_fire_image(roi):
+def load_fire_image(aez_suffix=None):
     """
     Load yearly fire-index image.
     """
-    return ee.Image(FIRE_INDEX_PATH).clip(roi.geometry())
+    if aez_suffix:
+        return ee.Image(f"{FIRE_INDEX_PATH}_{aez_suffix}")
+
+    return ee.Image(FIRE_INDEX_PATH)
 
 
 def prepare_frp_images(fire_image, start_year, end_year):
