@@ -158,6 +158,12 @@
         },
         {
             "name": "soil_type"
+        },
+        {
+            "name": "forest_fringe"
+        },
+        {
+            "name": "tree_in_grassland"
         }
     ]
 }

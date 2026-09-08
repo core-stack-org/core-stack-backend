@@ -344,4 +344,9 @@ urlpatterns = [
         api.et_downscale,
         name="et_downscale",
     ),
+    path(
+        "generate_forest_fringe/",
+        api.generate_forest_fringe,
+        name="generate_forest_fringe",
+    ),
 ]

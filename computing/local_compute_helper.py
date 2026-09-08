@@ -76,6 +76,38 @@ def read_validated_vector_file(path, empty_message):
     return gdf
 
 
+def clip_vector_to_watersheds(watersheds_gdf, source_gdf):
+    watersheds_gdf = validate_geometry(watersheds_gdf)
+    source_gdf = validate_geometry(source_gdf)
+    if source_gdf.empty:
+        return source_gdf
+
+    if (
+        watersheds_gdf.crs
+        and source_gdf.crs
+        and watersheds_gdf.crs != source_gdf.crs
+    ):
+        source_gdf = source_gdf.to_crs(watersheds_gdf.crs)
+
+    outer_boundary = watersheds_gdf.geometry.unary_union
+    source_gdf = source_gdf[source_gdf.intersects(outer_boundary)].copy()
+    if source_gdf.empty:
+        return source_gdf
+
+    clipped_gdf = validate_geometry(gpd.clip(source_gdf, outer_boundary))
+    if clipped_gdf.empty:
+        return clipped_gdf
+
+    joined_gdf = gpd.sjoin(
+        clipped_gdf,
+        watersheds_gdf[["uid", "geometry"]],
+        how="inner",
+        predicate="intersects",
+    )
+    joined_gdf = joined_gdf[~joined_gdf.index.duplicated(keep="first")]
+    return joined_gdf.drop(columns=["index_right"], errors="ignore")
+
+
 def resolve_precomputed_vector_file(
     state,
     district,

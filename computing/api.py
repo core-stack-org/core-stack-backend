@@ -230,6 +230,10 @@ from .tree_health.local.overall_change_vector_local import (
     tree_health_overall_change_vector_local,
 )
 from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .tree_in_grassland.tree_in_grassland_local_compute import (
+    generate_tree_in_grassland_local,
+)
+from .forest_fringe.forest_fringe_local_compute import generate_forest_fringe_local
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -2765,30 +2769,43 @@ def generate_drainage_density_data(request):
 def generate_tree_in_grassland(request):
     print("Inside generate_tree_in_grassland API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_tree_in_grassland_layer.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        location = {
+            field: request.data.get(field) for field in ("state", "district", "block")
+        }
+        missing_fields = [field for field, value in location.items() if not value]
+        if missing_fields:
+            return Response(
+                {"Exception": f"Missing required fields: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        compute = _normalize_layer_order_compute(
+            request.data.get("compute") or "local"
         )
+        task = (
+            generate_tree_in_grassland_local
+            if compute == "local"
+            else generate_tree_in_grassland_layer
+        )
+        kwargs = {field: value.lower() for field, value in location.items()}
+        if compute == "gee":
+            kwargs.update(
+                start_year=request.data.get("start_year"),
+                end_year=request.data.get("end_year"),
+                gee_account_id=request.data.get("gee_account_id"),
+            )
+        task.apply_async(kwargs=kwargs, queue="nrm")
         return Response(
-            {"Success": "Tree in Grassland task initiated"},
+            {"Success": f"Tree in Grassland {compute} task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_tree_in_grassland api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.exception("Exception in generate_tree_in_grassland api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
@@ -2884,8 +2901,7 @@ def generate_soil_health(request):
 def generate_soil_type(request):
     try:
         location = {
-            field: request.data.get(field)
-            for field in ("state", "district", "block")
+            field: request.data.get(field) for field in ("state", "district", "block")
         }
         compute = request.data.get("compute")
         missing_fields = [field for field, value in location.items() if not value]
@@ -2956,37 +2972,30 @@ def generate_ltp_stp_change(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-def _auto_discover_computing_api_views(namespace):
-    """Auto-wrap request handlers for sync layer generation + STAC enrichment."""
-    discovered = []
-    for name, fn in namespace.items():
-        if name.startswith("_") or not callable(fn):
-            continue
-        if getattr(fn, "__module__", None) != __name__:
-            continue
-        if getattr(fn, "__layer_generation_sync_wrapped__", False):
-            continue
-        try:
-            target = inspect.unwrap(fn)
-            sig = inspect.signature(target)
-        except (OSError, TypeError, ValueError):
-            continue
-
-        params = list(sig.parameters.values())
-        if len(params) == 0:
-            continue
-        first_param = params[0]
-        if first_param.kind in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        ) and first_param.name == "request":
-            discovered.append(name)
-    return discovered
-
-
-for _view_name in _auto_discover_computing_api_views(globals()):
-    wrapped = sync_layer_generation_if_enabled(
-        layer_generation_api_logging(globals()[_view_name])
-    )
-    wrapped.__layer_generation_sync_wrapped__ = True
-    globals()[_view_name] = wrapped
+@api_view(["POST"])
+@schema(None)
+def generate_forest_fringe(request):
+    print("Inside generate_forest_fringe API.")
+    try:
+        location = {
+            field: request.data.get(field) for field in ("state", "district", "block")
+        }
+        missing_fields = [field for field, value in location.items() if not value]
+        if missing_fields:
+            return Response(
+                {"Exception": f"Missing required fields: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        generate_forest_fringe_local.apply_async(
+            kwargs={field: value.lower() for field, value in location.items()},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_forest_fringe task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        logger.exception("Exception in generate_forest_fringe api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

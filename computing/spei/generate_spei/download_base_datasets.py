@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import ee
@@ -31,7 +31,7 @@ DATASET_CHOICES = ("chirps", "modis_pet", "both")
 
 
 def date_range(
-    start_date: ee.Date, end_date_exclusive: ee.Date, unit: str
+        start_date: ee.Date, end_date_exclusive: ee.Date, unit: str
 ) -> list[ee.Date]:
     # Builds monthly/daily date anchors. end_date_exclusive is intentionally
     # advanced by one day in build_dataset_image so user input is inclusive.
@@ -40,7 +40,7 @@ def date_range(
 
 
 def collection_dates(
-    collection: ee.ImageCollection, start_date: ee.Date, end_date_exclusive: ee.Date
+        collection: ee.ImageCollection, start_date: ee.Date, end_date_exclusive: ee.Date
 ) -> list[ee.Date]:
     # Native cadence should use the source image timestamps. This is important
     # for MODIS PET, which is 8-day rather than daily.
@@ -62,10 +62,10 @@ def expand_datasets(selected: list[str]) -> list[str]:
 
 
 def make_chirps_image(
-    chirps: ee.ImageCollection,
-    aoi: ee.FeatureCollection,
-    start_date: ee.Date,
-    frequency: str,
+        chirps: ee.ImageCollection,
+        aoi: ee.FeatureCollection,
+        start_date: ee.Date,
+        frequency: str,
 ) -> tuple[ee.Image, str]:
     # CHIRPS is daily precipitation. Monthly mode sums daily precipitation
     # into one monthly image before local download.
@@ -89,11 +89,11 @@ def make_chirps_image(
 
 
 def make_modis_pet_image(
-    modis_pet: ee.ImageCollection,
-    aoi: ee.FeatureCollection,
-    start_date: ee.Date,
-    frequency: str,
-    target_projection: ee.Projection | None = None,
+        modis_pet: ee.ImageCollection,
+        aoi: ee.FeatureCollection,
+        start_date: ee.Date,
+        frequency: str,
+        target_projection: ee.Projection | None = None,
 ) -> tuple[ee.Image, str]:
     # MOD16A2GF PET is not daily. The PET band has a 0.1 scale factor, applied
     # here so downloaded rasters contain real PET values.
@@ -124,12 +124,12 @@ def make_modis_pet_image(
 
 
 def download_image(
-    image: ee.Image,
-    aoi: ee.FeatureCollection,
-    output_path: Path,
-    scale: int,
-    crs: str | None = "EPSG:4326",
-    retries: int = 3,
+        image: ee.Image,
+        aoi: ee.FeatureCollection,
+        output_path: Path,
+        scale: int,
+        crs: str | None = "EPSG:4326",
+        retries: int = 3,
 ) -> None:
     # Earth Engine's direct download endpoint has a request-size limit, so this
     # function downloads only one time step at a time.
@@ -164,7 +164,7 @@ def download_image(
 
 
 def get_last_downloaded_date(
-    output_dir: Path, aez: int, frequency: str, dataset: str
+        output_dir: Path, aez: int, frequency: str, dataset: str
 ) -> str | None:
     """
     Check the output directory and find the last downloaded date.
@@ -245,11 +245,11 @@ def dataset_label(dataset: str) -> str:
 
 
 def build_dataset_image(
-    aez: int,
-    dataset: str,
-    start_date: str,
-    end_date: str,
-    frequency: str,
+        aez: int,
+        dataset: str,
+        start_date: str,
+        end_date: str,
+        frequency: str,
 ) -> tuple[ee.ImageCollection, ee.FeatureCollection, str, list[tuple[ee.Date, str]]]:
     # Prepares the collection, AOI, and date labels for exactly one dataset.
     # CHIRPS and MODIS PET stay separate from this point through final output.
@@ -279,11 +279,11 @@ def build_dataset_image(
         name = dataset_label(dataset)
 
     labeled_dates = []
-    for date in dates:
+    for date_val in dates:
         # These labels become the downloaded GeoTIFF file names.
         date_format = "YYYYMMdd" if frequency in ("daily", "native") else "YYYYMM"
-        label = date.format(date_format).getInfo()
-        labeled_dates.append((date, label))
+        label = date_val.format(date_format).getInfo()
+        labeled_dates.append((date_val, label))
 
     print(
         f"Preparing {len(labeled_dates)} {frequency} {name} image(s) " f"for aez {aez}"
@@ -292,17 +292,17 @@ def build_dataset_image(
 
 
 def download_dataset_images(
-    aez: int,
-    dataset: str,
-    start_date: str,
-    end_date: str,
-    frequency: str,
-    output_dir: str,
-    scale: int,
-    crs: str | None,
-    sleep: float,
-    overwrite: bool,
-    max_workers: int,
+        aez: int,
+        dataset: str,
+        start_date: str,
+        end_date: str,
+        frequency: str,
+        output_dir: str,
+        scale: int,
+        crs: str | None,
+        sleep: float,
+        overwrite: bool,
+        max_workers: int,
 ) -> None:
     # End-to-end local workflow for one dataset:
     # download one small GeoTIFF per time step and keep those files on disk.
@@ -405,23 +405,51 @@ def download_dataset_images(
 
 
 def download_data_locally(
-    aez: int,
-    datasets: list[str] | str | None = None,
-    start_year: str = None,
-    end_year: str = None,
-    frequency: str = "monthly",
-    output_dir: str = "data/base_layers/spei/inputs",
-    sleep: float = 0.2,
-    max_workers: int = 4,
-    overwrite: bool = False,
+        aez: int,
+        datasets: list[str] | str | None = None,
+        start_year: int | None = None,
+        end_year: int | None = None,
+        frequency: str = "monthly",
+        output_dir: str = "data/base_layers/spei/inputs",
+        sleep: float = 0.2,
+        max_workers: int = 4,
+        overwrite: bool = False,
 ) -> None:
     # Public entry point for notebooks/scripts. datasets=["both"] downloads
     # separate CHIRPS and MODIS PET time-step GeoTIFFs.
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year must be specified explicitly — "
+            "agricultural-year pipelines cannot infer a safe default."
+        )
+
+    # MOD16A2GF is NOT updated incrementally like CHIRPS. NASA's MODIS
+    # Science Team has confirmed it: "users cannot get MOD16A2GF in near-
+    # real time because it will be generated only at the end of a given
+    # year" — a full calendar year is released as one batch, early in the
+    # following year. Ag-year `end_year` needs calendar years end_year AND
+    # end_year+1 (Jul-Dec + Jan-Jun), so the data isn't published until
+    # early calendar end_year+2. Using March 1 of that year as a
+    # conservative buffer past "early in the year".
+    modis_pet_selected = "both" in (datasets or ["both"]) or "modis_pet" in (
+            datasets or ["both"]
+    )
+    if modis_pet_selected:
+        required_complete_by = date(end_year + 2, 3, 1)
+        if required_complete_by > date.today():
+            raise ValueError(
+                f"Agricultural year {end_year} (Jul {end_year} -> Jun "
+                f"{end_year + 1}) needs calendar year {end_year + 1}'s "
+                f"MOD16A2GF data, which isn't published as an annual batch "
+                f"until early {end_year + 2} — not yet, as of "
+                f"{date.today().isoformat()}. Reduce end_year."
+            )
+
     selected_datasets = datasets or ["both"]
     # validate_inputs(aez, selected_datasets, frequency)
 
-    start_date = f"{str(start_year)}-07-01"
-    end_date = f"{str(end_year+1)}-06-30"
+    start_date = f"{str(start_year)}-01-01"
+    end_date = f"{str(end_year + 1)}-06-30"
 
     expanded_datasets = expand_datasets(selected_datasets)
     for dataset in expanded_datasets:

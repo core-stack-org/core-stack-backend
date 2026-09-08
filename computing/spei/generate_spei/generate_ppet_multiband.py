@@ -28,9 +28,9 @@ def read_masked_band(dataset: rasterio.DatasetReader) -> np.ma.MaskedArray:
 
 
 def reproject_modis_to_chirps_grid(
-    modis_path: Path,
-    chirps_dataset: rasterio.DatasetReader,
-    log_metadata: bool = False,
+        modis_path: Path,
+        chirps_dataset: rasterio.DatasetReader,
+        log_metadata: bool = False,
 ) -> np.ma.MaskedArray:
     OUTPUT_NODATA = -9999.0
     """Reproject/resample MODIS PET onto the CHIRPS projection and pixel grid."""
@@ -45,10 +45,10 @@ def reproject_modis_to_chirps_grid(
             )
 
         if (
-            modis_src.crs == chirps_dataset.crs
-            and modis_src.transform == chirps_dataset.transform
-            and modis_src.width == chirps_dataset.width
-            and modis_src.height == chirps_dataset.height
+                modis_src.crs == chirps_dataset.crs
+                and modis_src.transform == chirps_dataset.transform
+                and modis_src.width == chirps_dataset.width
+                and modis_src.height == chirps_dataset.height
         ):
             return read_masked_band(modis_src)
 
@@ -82,9 +82,9 @@ def reproject_modis_to_chirps_grid(
 
 
 def ppet_multiband(
-    aez=None,
-    start: int = 2004,
-    end: int = 2024,
+        aez=None,
+        start: int = 2004,
+        end: int = 2024,
 ) -> Path:
     """
     SPEI Pipeline - Step 1 (Local P-PET)
@@ -93,9 +93,18 @@ def ppet_multiband(
       ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
       ee.ImageCollection("MODIS/061/MOD16A2GF").select("PET")
 
-    Output: one local multiband GeoTIFF with one P-PET band per month.
-    Band names follow the original script: y{year}_m{month}, e.g. y2015_m06.
+    Output: one local multiband GeoTIFF with one P-PET band per month,
+    spanning Jan(start) -> Jun(end+1) in plain chronological order.
 
+    SPEI-1/SPEI-3 don't care about agricultural-year framing — they're
+    calendar-month indices — so this data window is a straightforward
+    calendar range starting Jan(start), not Jul(start). The trailing 6
+    months (Jan-Jun of end+1) exist only so compute_spei.R has a full
+    12-month history to compute the last requested ag-year's SPEI-12
+    (Jul(end)-Jun(end+1)); they aren't part of the reported SPEI-1/3 output.
+
+    Band names follow the original script: y{year}_m{month}, e.g. y2015_m06,
+    using the true calendar year/month of each band.
     """
     data_root = Path("data/base_layers/spei/inputs")
     chirps_dir = data_root / str(aez) / "monthly" / "chirps"
@@ -113,14 +122,19 @@ def ppet_multiband(
     )
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    agri_months = list(range(7, 13)) + list(range(1, 7))
-    months = [
-        (year if month >= 7 else year + 1, month)
-        for year in range(start, end + 1)
-        for month in agri_months
-    ]
+    # Plain chronological calendar enumeration: Jan(start) -> Jun(end+1).
+    # No ag-year reordering here — SPEI-1/3 are calendar-month indices, and
+    # SPEI-12's ag-year framing is applied later in compute_spei.R purely by
+    # which months get selected/labeled, not by reordering the input data.
+    months = []
+    year, month = start, 1
+    while (year, month) <= (end + 1, 6):
+        months.append((year, month))
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
 
-    # months = [(year, month) for year in range(start, end + 1) for month in range(1, 13)]
     first_chirps = find_monthly_file(chirps_dir, "CHIRPS", *months[0])
 
     with rasterio.open(first_chirps) as template:
@@ -156,7 +170,7 @@ def ppet_multiband(
                 )
                 with np.errstate(invalid="ignore", over="ignore"):
                     ppet_data[valid_mask] = (
-                        precipitation_data[valid_mask] - pet_data[valid_mask]
+                            precipitation_data[valid_mask] - pet_data[valid_mask]
                     )
 
                 ppet = np.ma.masked_where(
