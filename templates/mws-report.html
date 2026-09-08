@@ -1442,7 +1442,7 @@
     <div class="container">
 
         <section class="section">
-            <h2>Landscape Overview</h2>
+            <h2>Landscape Overview11</h2>
             <p>{{mws_osm|safe}}</p>
 
             <div id="mainMap" class="map" style="position: relative;">
@@ -2566,7 +2566,83 @@
             <h3>Water availability in this microwatershed</h3>
 
             <div class="map-group">
-                <div id="swbMap" class="map" style="flex: 1 1 48%;"></div>
+                <!-- <div id="swbMap" class="map" style="flex: 1 1 48%;"></div> -->
+                 <div id="swbMap" class="map" style="flex: 1 1 48%; position: relative;">
+
+    <div
+        style="position: absolute; bottom: 6px; left: 6px;
+               background: rgba(255, 255, 255, 0.9);
+               padding: 6px;
+               border-radius: 4px;
+               border: 1px solid #d1d5db;
+               z-index: 1000;
+               font-family: sans-serif;
+               pointer-events: none;
+               max-width: 65%;">
+
+        <div style="display: flex; flex-direction: column; gap: 3px;">
+
+            <!-- Waterbodies -->
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <div
+                    style="width: 10px;
+                           height: 10px;
+                           background-color: #00FFFF;
+                           border: 1px solid #0000FF;
+                           flex-shrink: 0;">
+                </div>
+
+                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">
+                    Waterbodies
+                </span>
+            </div>
+
+            <!-- Rivers -->
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <div
+                    style="width: 10px;
+                           height: 3px;
+                           background-color: #0000FF;
+                           flex-shrink: 0;">
+                </div>
+
+                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">
+                    Rivers
+                </span>
+            </div>
+
+            <!-- Canals -->
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <div
+                    style="width: 10px;
+                           height: 3px;
+                           background-color: #FF4500;
+                           flex-shrink: 0;">
+                </div>
+
+                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">
+                    Canals
+                </span>
+            </div>
+
+            <!-- MWS Boundary -->
+            <div style="display: flex; align-items: center; gap: 4px;">
+                <div
+                    style="width: 10px;
+                           height: 3px;
+                           background-color: #87CEEB;
+                           flex-shrink: 0;">
+                </div>
+
+                <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">
+                    MWS Boundary
+                </span>
+            </div>
+
+        </div>
+    </div>
+
+</div>
                 <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
             </div>
             <div
@@ -4120,7 +4196,7 @@
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
-                        addVillageBoundariesToMap(swbMap, feature);
+                        // addVillageBoundariesToMap(swbMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature);
                         addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
                         addDemographicBoundariesToMap(feature);
@@ -4225,6 +4301,8 @@
 
                 swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
                 swbMap.addLayer(waterRaster);
+                swbMap.addLayer(riverLayer);
+                swbMap.addLayer(canalLayer);
             } catch (error) {
                 // Silently handle fetch errors
             }
@@ -4330,36 +4408,119 @@
                 return;
             }
 
-            const legendHTML = `
-            <div class="google-maps-legend">
-                <div class="legend-header">
-                    <p class="legend-title">Legend</p>
-                    <button type="button" class="legend-close" aria-label="Toggle legend" aria-expanded="true">&#9660;</button>
+        //     const legendHTML = `
+        //     <div class="google-maps-legend">
+        //         <div class="legend-header">
+        //             <p class="legend-title">Legend</p>
+        //             <button type="button" class="legend-close" aria-label="Toggle legend" aria-expanded="true">&#9660;</button>
+        //         </div>
+
+        //         <div class="legend-section">
+        //             <div class="legend-section-title">Boundaries</div>
+
+        //             <div class="legend-item">
+        //                 <div class="legend-checkbox">
+        //                     <label for="village-${mapElement.id}">
+        //                         <span class="legend-line village-line"></span>
+        //                         <span class="legend-text">Village Boundary</span>
+        //                     </label>
+        //                 </div>
+        //             </div>
+
+        //             <div class="legend-item">
+        //                 <div class="legend-checkbox">
+        //                     <label for="mws-${mapElement.id}">
+        //                         <span class="legend-line mws-line"></span>
+        //                         <span class="legend-text">MWS Boundary</span>
+        //                     </label>
+        //                 </div>
+        //             </div>
+        //         </div>
+        //     </div>
+        // `;
+
+const legendHTML = `
+    <div class="google-maps-legend">
+        <div class="legend-header">
+            <p class="legend-title">Legend</p>
+            <button type="button" class="legend-close" aria-label="Toggle legend" aria-expanded="true">&#9660;</button>
+        </div>
+
+        <div class="legend-section">
+
+            ${mapElement.id === 'swbMap' ? `
+                <div class="legend-section-title">Water Features</div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line"
+                                  style="width: 18px; height: 8px; background-color: #00FFFF; border: 1px solid #0000FF;">
+                            </span>
+                            <span class="legend-text">Waterbodies</span>
+                        </label>
+                    </div>
                 </div>
 
-                <div class="legend-section">
-                    <div class="legend-section-title">Boundaries</div>
-
-                    <div class="legend-item">
-                        <div class="legend-checkbox">
-                            <label for="village-${mapElement.id}">
-                                <span class="legend-line village-line"></span>
-                                <span class="legend-text">Village Boundary</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="legend-item">
-                        <div class="legend-checkbox">
-                            <label for="mws-${mapElement.id}">
-                                <span class="legend-line mws-line"></span>
-                                <span class="legend-text">MWS Boundary</span>
-                            </label>
-                        </div>
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line"
+                                  style="width: 18px; height: 3px; background-color: #0000FF;">
+                            </span>
+                            <span class="legend-text">Rivers</span>
+                        </label>
                     </div>
                 </div>
-            </div>
-        `;
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line"
+                                  style="width: 18px; height: 3px; background-color: #FF4500;">
+                            </span>
+                            <span class="legend-text">Canals</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="legend-section-title">Boundaries</div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line mws-line"></span>
+                            <span class="legend-text">MWS Boundary</span>
+                        </label>
+                    </div>
+                </div>
+
+            ` : `
+
+                <div class="legend-section-title">Boundaries</div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label for="village-${mapElement.id}">
+                            <span class="legend-line village-line"></span>
+                            <span class="legend-text">Village Boundary</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label for="mws-${mapElement.id}">
+                            <span class="legend-line mws-line"></span>
+                            <span class="legend-text">MWS Boundary</span>
+                        </label>
+                    </div>
+                </div>
+
+            `}
+        </div>
+    </div>
+`;
 
             mapElement.insertAdjacentHTML('beforeend', legendHTML);
 
