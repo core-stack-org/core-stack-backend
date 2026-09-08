@@ -124,7 +124,7 @@ from .gen_village_report import (
     get_mwses_ids,
 )
 from .gen_report_download import render_pdf_with_firefox
-from .utils import validate_email, transform_name
+from .utils import validate_email
 from .tasks import generate_dpr_task
 import tempfile
 import os
@@ -132,6 +132,7 @@ from .generate_yuktdhara_format import csv_to_kml, fetch_data
 import zipfile
 from geoadmin.models import GramPanchayat
 from plans.models import PlanApp
+from utilities.gee_utils import valid_gee_text
 
 state_param = openapi.Parameter(
     "state",
@@ -254,9 +255,9 @@ def generate_mws_report(request):
             result[key] = value
 
         # Transform district, block, and state
-        district = transform_name(result["district"])
-        block = transform_name(result["block"])
-        state = transform_name(result["state"])
+        district = valid_gee_text(result["district"])
+        block = valid_gee_text(result["block"])
+        state = valid_gee_text(result["state"])
         uid = result["uid"]
 
         # print("Api Processing End 1", datetime.now())
@@ -518,8 +519,8 @@ def generate_resource_report(request):
             result[key] = value
 
         context = {
-            "district": transform_name(result["district"]),
-            "block": transform_name(result["block"]),
+            "district": valid_gee_text(result["district"]),
+            "block": valid_gee_text(result["block"]),
             "plan_id": result["plan_id"],
             "plan_name": result["plan_name"],
         }
