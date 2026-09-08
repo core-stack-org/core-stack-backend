@@ -900,12 +900,22 @@ function install_miniconda() {
     mark_step_complete "miniconda"
 }
 
+function ensure_pdf_and_gee_packages() {
+    activate_conda_env
+    echo "Ensuring PDF rendering and Earth Engine dependencies are up to date..."
+    conda install -y -c conda-forge pango cairo gdk-pixbuf libffi
+    python -m pip install --upgrade "earthengine-api==1.7.42"
+    python -m pip install --upgrade geetools
+    python -m pip install --upgrade weasyprint
+}
+
 function setup_conda_env() {
     local force="${1:-0}"
 
     ensure_conda
     if conda_env_exists && [ "$force" -ne 1 ]; then
         echo "Conda environment '$CONDA_ENV_NAME' already exists. Keeping it."
+        ensure_pdf_and_gee_packages
         mark_step_complete "conda_env"
         return
     fi
@@ -914,6 +924,7 @@ function setup_conda_env() {
     conda env remove -n "$CONDA_ENV_NAME" -y >/dev/null 2>&1 || true
     conda env create -f "$CONDA_ENV_YAML" -n "$CONDA_ENV_NAME"
     echo "Conda environment ready."
+    ensure_pdf_and_gee_packages
     mark_step_complete "conda_env"
 }
 
@@ -1512,6 +1523,18 @@ function generate_env_file() {
         sed -E 's/env\s*\(\s*"([^"]+)"/\1/' | sort -u)
     all_vars=$(printf '%s\n%s\n' "$env_vars" "$env_vars_simple" | sort -u | grep -v '^$' || true)
 
+    # env.int()/env.bool()/env.float() cast their value, so an empty placeholder
+    # ("") breaks them even when settings.py defines a default= for them (the
+    # default is only used when the key is absent, not when it's present-but-empty).
+    # Extract those defaults here so we can seed the .env with a real value instead.
+    local typed_default_entry=""
+    declare -A typed_defaults=()
+    while IFS= read -r typed_default_entry; do
+        [ -z "$typed_default_entry" ] && continue
+        typed_defaults["${typed_default_entry%%=*}"]="${typed_default_entry#*=}"
+    done < <(grep -oE 'env\.(int|bool|float)\(\s*"[A-Za-z_][A-Za-z0-9_]*"\s*,\s*default\s*=\s*[A-Za-z0-9_.]+' "$settings_file" 2>/dev/null | \
+        sed -E 's/env\.(int|bool|float)\(\s*"([^"]+)"\s*,\s*default\s*=\s*([A-Za-z0-9_.]+)/\2=\3/')
+
     if [ ! -f "$env_file" ] && [ -f "$LEGACY_ROOT_ENV_FILE" ]; then
         echo "Migrating existing root .env to $APP_ENV_FILE ..."
         mkdir -p "$(dirname "$env_file")"
@@ -1565,7 +1588,11 @@ function generate_env_file() {
                 echo "NREGA_BUCKET=$DEFAULT_NREGA_BUCKET" >> "$env_file"
                 ;;
             *)
-                echo "${var_name}=\"\"" >> "$env_file"
+                if [ -n "${typed_defaults[$var_name]+set}" ]; then
+                    echo "${var_name}=${typed_defaults[$var_name]}" >> "$env_file"
+                else
+                    echo "${var_name}=\"\"" >> "$env_file"
+                fi
                 ;;
         esac
     done <<< "$all_vars"
