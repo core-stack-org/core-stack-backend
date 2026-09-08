@@ -2727,7 +2727,7 @@ def get_ndvi_timeseries_tree_data(state, district, block, uid):
 def get_ndvi_trend(state, district, block, uid):
     try:
         df = read_excel_sheet(
-            "data/stats_excel_files/"
+            DATA_DIR_TEMP
             + state.upper()
             + "/"
             + district.upper()
@@ -2740,7 +2740,9 @@ def get_ndvi_trend(state, district, block, uid):
         )
         selected_column = [col for col in df.columns if col.startswith("20")]
         df[selected_column] = (
-            df[selected_column].apply(pd.to_numeric, errors="coerce").replace(-9999, np.nan)
+            df[selected_column]
+            .apply(pd.to_numeric, errors="coerce")
+            .replace(-9999, np.nan)
         )
         filtered_df_g = df.loc[df["UID"] == uid, selected_column].iloc[0]
         filtered_df_g = filtered_df_g.dropna().values

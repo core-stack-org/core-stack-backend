@@ -2453,48 +2453,6 @@ def get_season(month):
     elif month in (11, 12, 1, 2):
         return "rabi"
 
-
-def process_feature_ndvi(feature):
-    uid = feature["properties"]["uid"]
-    results = {
-        "UID": uid,
-        "kharif": {},
-        "rabi": {},
-        "zaid": {},
-    }
-    for key, value in feature["properties"].items():
-        if not key.startswith("20"):
-            continue
-        try:
-            date = datetime.strptime(key, "%Y-%m-%d")
-            year = date.year
-            month = date.month
-            season = get_season(month)
-            if season == "rabi":
-                current_year = year - 1 if month in (1, 2) else year
-            elif season == "zaid":
-                current_year = year - 1
-            else:
-                current_year = year
-            ndvi_value = float(value)
-            if current_year not in results[season]:
-                results[season][current_year] = []
-            results[season][current_year].append(ndvi_value)
-
-        except (ValueError, TypeError) as e:
-            print(f"Error processing NDVI data for date {key}: {e}")
-            continue
-    for season in ("kharif", "rabi", "zaid"):
-        for year in results[season]:
-            values = results[season][year]
-            if values:
-                results[season][year] = sum(values) / len(values)
-            else:
-                results[season][year] = 0.0
-
-    return results
-
-
 def process_feature(feature):
     uid = feature["properties"]["uid"]
     results = {
