@@ -13,6 +13,8 @@ from .models import LayerInfo
 from django.http import HttpResponse
 from rest_framework import status
 from pathlib import Path
+import time
+from shapely.strtree import STRtree
 
 
 def fetch_layers_for_excel_generation():
@@ -668,47 +670,77 @@ def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
 
     mws_geojson = mws_response.json()
 
-    def calculate_intersection_area(geom1, geom2):
-        if geom1.intersects(geom2):
-            return geom1.intersection(geom2).area
-        return 0
+    # Prepare feature lists
+
+    mws_features = mws_geojson["features"]
+    swb_features = swb_geojson["features"]
+
+    # Convert SWB GeoJSON -> Shapely ONLY ONCE
+    swb_geometries = []
+
+    for swb_feature in swb_features:
+        swb_geometries.append(shape(swb_feature["geometry"]))
+
+    # Build spatial index
+    swb_tree = STRtree(swb_geometries)
+
+    # Intersection processing
 
     rows = []
-
-    for mws_feature in mws_geojson["features"]:
+    for mws_index, mws_feature in enumerate(mws_features):
         mws_props = mws_feature["properties"]
         mws_uid = mws_props.get("uid")
+
+        # Convert MWS geometry only once
         mws_geom = shape(mws_feature["geometry"])
 
-        for swb_feature in swb_geojson["features"]:
+        # Get only SWBs that could intersect this MWS.
+        candidate_indices = swb_tree.query(mws_geom, predicate="intersects")
+
+        for swb_index in candidate_indices:
+
+            swb_feature = swb_features[swb_index]
             swb_props = swb_feature["properties"]
-            swb_geom = shape(swb_feature["geometry"])
 
-            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
+            swb_geom = swb_geometries[swb_index]
 
-            if intersection_area > 0:
-                # waterbodies centroid calculation
-                centroid = swb_geom.centroid
-                lon, lat = centroid.x, centroid.y
+            if mws_geom.intersects(swb_geom):
 
-                rows.append(
-                    {
-                        "UID": mws_uid,
-                        "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
-                        "Waterbodies_name": swb_props.get("water_body_name"),
-                        "Latitude": lat,
-                        "Longitude": lon,
-                    }
-                )
+                intersection_area = mws_geom.intersection(swb_geom).area
+
+                if intersection_area > 0:
+
+                    centroid = swb_geom.centroid
+
+                    lon = centroid.x
+                    lat = centroid.y
+
+                    rows.append(
+                        {
+                            "UID": mws_uid,
+                            "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
+                            "Waterbodies_name": swb_props.get("water_body_name"),
+                            "Latitude": lat,
+                            "Longitude": lon,
+                        }
+                    )
+
+    # =========================================================
+    # Create DataFrame
+    # =========================================================
 
     df = pd.DataFrame(rows)
 
     if not df.empty:
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+
         df[numeric_cols] = df[numeric_cols].round(2)
 
+    # =========================================================
+    # Write Excel
+    # =========================================================
     df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
-    print("Excel sheet 'mws_intersect_swb' created successfully")
+    print("Excel sheet " "'mws_intersect_swb' created successfully")
 
 
 def create_excel_for_facilities(data, writer):
