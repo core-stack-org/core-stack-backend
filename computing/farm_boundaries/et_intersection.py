@@ -96,10 +96,10 @@ def _static_parquet_path(state, district, block):
     return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
 
 def _annual_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_annual_vectorize.parquet")
+    return os.path.join(_block_dir(state, district, block), "farm_annual.parquet")
 
 def _monthly_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_monthly_vectorize.parquet")
+    return os.path.join(_block_dir(state, district, block), "farm_monthly.parquet")
 
 def _local_aet_path(aez, year):
     return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_AET_{aez}_{year}_cog.tif")
@@ -198,9 +198,12 @@ def _read_raster_clipped(raster_paths, bbox):
     zone's raster actually covers their location, without needing to split
     farms into per-zone groups beforehand.
 
-    Converts the rasters' nodata value (-9999 per spec, confirmed via
-    src.nodata) to NaN immediately so all downstream code works cleanly
-    with NaN semantics.
+    These rasters' invalid pixels are real NaN on disk regardless of what
+    their nodata metadata declares (if anything) — mosaicking is done with
+    NaN-aware masking so gaps in one zone's raster are correctly filled by
+    another zone's raster instead of the NaN sticking permanently. Any
+    residual numeric -9999 sentinel values are also folded into NaN, so all
+    downstream code works cleanly with NaN semantics either way.
 
     Parameters
     ----------
@@ -230,25 +233,31 @@ def _read_raster_clipped(raster_paths, bbox):
     minx, miny, maxx, maxy = bbox
     srcs = [rasterio.open(p) for p in existing_paths]
     try:
-        nodata_val = next(
-            (float(s.nodata) for s in srcs if s.nodata is not None), float(AET_NODATA)
-        )
+        # These rasters' outside-zone/invalid pixels are actually stored as
+        # real NaN on disk, regardless of what (if anything) their nodata
+        # metadata tag declares (-9999, or nothing at all). Telling merge()
+        # to treat -9999 as nodata doesn't recognize those NaN pixels as
+        # empty, so once the first (e.g. dominant-zone) source writes its
+        # NaNs into the mosaic, later sources can never fill the gap — the
+        # NaN sticks permanently. Passing nodata=np.nan instead makes merge()
+        # use its NaN-aware masking branch, so gaps left by one source's
+        # NaNs are correctly filled by the next source's real data.
         merged, transform = rasterio.merge.merge(
-            srcs, bounds=(minx, miny, maxx, maxy), nodata=nodata_val,
+            srcs, bounds=(minx, miny, maxx, maxy), nodata=np.nan,
         )
     finally:
         for s in srcs:
             s.close()
 
     data = merged.astype("float32")
-    n_nodata = int(np.sum(data == nodata_val))
+    n_nodata = int(np.sum(np.isnan(data)))
     if n_nodata > 0:
-        logger.debug("Merged raster (%d source file(s)): masking %d nodata pixels (value=%.0f)",
-                     len(existing_paths), n_nodata, nodata_val)
+        logger.debug("Merged raster (%d source file(s)): %d nodata (NaN) pixels",
+                     len(existing_paths), n_nodata)
 
-    # Convert nodata sentinel AND any residual AET_NODATA values to NaN
-    data[data == nodata_val] = np.nan
-    data[data <= float(AET_NODATA)] = np.nan   # belt-and-suspenders for -9999 variants
+    # Belt-and-suspenders: some rasters may still use the numeric -9999
+    # sentinel instead of/alongside NaN — fold those into NaN too.
+    data[data <= float(AET_NODATA)] = np.nan
 
     return data, transform
 
@@ -596,7 +605,7 @@ def _save_static_parquet(gdf, state, district, block):
         logger.info("farm_static.parquet already exists — skipping.")
         return out_path
 
-    keep = ["farm_id", "farm_uid", "cell_token", "alu_type",
+    keep = ["farm_id", "plus_code", "cell_token", "alu_type",
             "class_confidence", "capture_date", "geometry"]
     static = gdf[[c for c in keep if c in gdf.columns]].copy()
     static.insert(0, "state",    state)

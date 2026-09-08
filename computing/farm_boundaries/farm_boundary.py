@@ -13,6 +13,13 @@ Celery task that orchestrates the three-phase farm boundary pipeline:
       Downloads AET raster from Google Earth Engine, computes per-farm
       monthly ET via zonal statistics, and writes an enhanced parquet.
 
+  Phase 4 — pmtiles.convert_boundaries_to_pmtiles()
+      Converts farm_boundaries.parquet into a PMTiles vector tile archive
+      (via tippecanoe + the pmtiles CLI) for map rendering. Runs regardless
+      of Phase 3, since it only needs the farm boundary geometry. A failure
+      here is logged but does not fail the overall task — Phases 1-3's
+      output is still usable without the tileset.
+
 The task is wired to the "nrm" Celery queue (same as all other CoRE Stack
 pipelines) and supports automatic retries on transient failures.
 
@@ -103,10 +110,34 @@ def build_farm_boundary_map(self, state: str, district: str, block: str, api_key
         )
         raise self.retry(exc=exc)
 
+    # ── Phase 4: PMTiles conversion ───────────────────────────────────────────
+    # Not wrapped in the retry logic above: Phases 1-3 have already produced
+    # usable output by this point, so a Phase 4 failure (e.g. missing
+    # tippecanoe/pmtiles binaries) is logged and returned as an error field
+    # rather than discarding everything via a retry.
+    phase4_summary = None
+    try:
+        from .pmtiles import convert_boundaries_to_pmtiles
+
+        logger.info("Phase 4 — PMTiles conversion")
+        phase4_summary = convert_boundaries_to_pmtiles(
+            state=state,
+            district=district,
+            block=block,
+        )
+        logger.info("Phase 4 done: %s", phase4_summary)
+    except Exception as exc:
+        logger.exception(
+            "Phase 4 (PMTiles) failed for %s/%s/%s: %s",
+            state, district, block, exc,
+        )
+        phase4_summary = {"error": str(exc)}
+
     result = {
         "phase1": phase1_summary,
         "phase2": phase2_summary,
         "phase3": phase3_summary,
+        "phase4": phase4_summary,
     }
     logger.info("Farm boundary pipeline completed successfully: %s", result)
     return result
