@@ -1,0 +1,143 @@
+# User compose: pull the published backend image and run Postgres + GeoServer.
+# First start downloads admin-boundary data inside Docker onto the data volume.
+# Creates GeoServer workspaces/styles. Mount GEE JSON only.
+#
+#   mkdir -p gee_confs
+#   cp your-gee-service-account.json gee_confs/gee-service-account.json
+#   docker compose pull
+#   docker compose up -d
+#
+# Django:     http://localhost:8000
+# GeoServer:  http://localhost:8080/geoserver   (admin / geoserver)
+
+name: core-stack
+
+x-geoserver-amd64: &geoserver-amd64
+  platform: ${GEOSERVER_PLATFORM:-linux/amd64}
+
+x-backend-image: &backend-image
+  image: ${CORESTACK_IMAGE:-ghcr.io/core-stack-org/core-stack-backend:latest}
+  platform: ${COMPOSE_PLATFORM:-linux/amd64}
+
+x-backend-env: &backend-env
+  BACKEND_DIR: /app
+  DATA_DIR: /var/tmp/core-stack-data
+  DB_NAME: ${POSTGRES_DB:-corestack_db}
+  DB_USER: ${POSTGRES_USER:-corestack_admin}
+  DB_PASSWORD: ${POSTGRES_PASSWORD:-corestack@123}
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  SKIP_RABBITMQ: "1"
+  GEOSERVER_URL: http://geoserver:8080/geoserver/
+  GEOSERVER_USERNAME: ${GEOSERVER_USERNAME:-admin}
+  GEOSERVER_PASSWORD: ${GEOSERVER_PASSWORD:-geoserver}
+  GEE_CONFS_DIR: /app/data/gee_confs
+  GEE_SERVICE_ACCOUNT_KEY_PATH: /app/data/gee_confs/gee-service-account.json
+  ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
+  DEBUG: "True"
+  LAYER_GENERATION_SYNC_MODE: "True"
+  DOWNLOAD_ADMIN_BOUNDARY: "1"
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-corestack_db}
+      POSTGRES_USER: ${POSTGRES_USER:-corestack_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-corestack@123}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-corestack_admin} -d ${POSTGRES_DB:-corestack_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  geoserver:
+    <<: *geoserver-amd64
+    image: kartoza/geoserver:2.24.4
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_USERNAME:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_PASSWORD:-geoserver}
+      CONSOLE_HANDLER_LEVEL: WARNING
+    ports:
+      - "${GEOSERVER_PORT:-8080}:8080"
+    volumes:
+      - geoserver_data:/opt/geoserver/data_dir
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -u $$GEOSERVER_ADMIN_USER:$$GEOSERVER_ADMIN_PASSWORD http://localhost:8080/geoserver/web/ >/dev/null",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 120s
+
+  geoserver-init:
+    <<: *backend-image
+    depends_on:
+      geoserver:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+      FORCE_GEOSERVER_INIT: ${FORCE_GEOSERVER_INIT:-0}
+    volumes:
+      - core_stack_data:/var/tmp/core-stack-data
+      - ./installation/docker:/opt/corestack-scripts:ro
+    command: ["bash", "/opt/corestack-scripts/geoserver-init.sh"]
+    restart: "no"
+
+  data-download:
+    <<: *backend-image
+    environment:
+      <<: *backend-env
+      FORCE_DATA_DOWNLOAD: ${FORCE_DATA_DOWNLOAD:-0}
+    volumes:
+      - core_stack_data:/var/tmp/core-stack-data
+      - ./installation/docker:/opt/corestack-scripts:ro
+    command: ["bash", "/opt/corestack-scripts/download-data.sh"]
+    restart: "no"
+
+  gee-config:
+    <<: *backend-image
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+    volumes:
+      - ${GEE_CONFS_DIR:-./gee_confs}:/app/data/gee_confs
+      - core_stack_data:/var/tmp/core-stack-data
+      - ./installation/docker:/opt/corestack-scripts:ro
+    command: ["bash", "/opt/corestack-scripts/gee-config.sh"]
+    restart: "no"
+
+  backend:
+    <<: *backend-image
+    depends_on:
+      postgres:
+        condition: service_healthy
+      geoserver-init:
+        condition: service_completed_successfully
+      data-download:
+        condition: service_completed_successfully
+      gee-config:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-env
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ${GEE_CONFS_DIR:-./gee_confs}:/app/data/gee_confs
+      - core_stack_data:/var/tmp/core-stack-data
+      - ./installation/docker:/opt/corestack-scripts:ro
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh"]
+
+volumes:
+  postgres_data:
+  geoserver_data:
+  core_stack_data:

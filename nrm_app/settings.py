@@ -83,6 +83,8 @@ ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
 DB_NAME = env("DB_NAME")
 DB_USER = env("DB_USER")
 DB_PASSWORD = env("DB_PASSWORD")
+DB_HOST = env("DB_HOST", default="127.0.0.1")
+DB_PORT = env("DB_PORT", default="5432")
 
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
@@ -245,8 +247,8 @@ DATABASES = {
         "NAME": DB_NAME,
         "USER": DB_USER,
         "PASSWORD": DB_PASSWORD,
-        "HOST": "127.0.0.1",
-        "PORT": "",
+        "HOST": DB_HOST,
+        "PORT": DB_PORT,
     }
 }
 
@@ -280,6 +282,10 @@ USE_I18N = True
 USE_TZ = True
 
 # Celery
+CELERY_BROKER_URL = env(
+    "CELERY_BROKER_URL", default="amqp://guest:guest@127.0.0.1:5672//"
+)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="rpc://")
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
