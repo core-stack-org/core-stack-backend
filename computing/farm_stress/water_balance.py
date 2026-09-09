@@ -83,3 +83,98 @@ def compute_water_balance_archive(
     if missing_input:
         print(f"Periods missing rainfall/PET input: {missing_input}")
     return {"computed": computed, "skipped": skipped, "missing_input": missing_input}
+
+
+def compute_water_balance_archive_banded(
+    precip_paths_by_year,
+    pet_paths_by_year,
+    start_year=2000,
+    end_year=2025,
+    output_dir=None,
+    overwrite=False,
+):
+    """Yearly multi-band version of compute_water_balance_archive, for
+    the 500m SPEI-3 pipeline where rainfall/PET are stored as one
+    multi-band file per year (one band per 28-day period) rather than
+    one file per period - avoids ever materialising the ~340 tiny
+    per-period files the 11km pipeline uses, which matters at 500m scale
+    where disk space is a real constraint (this was built specifically
+    because of that - see conversation).
+
+    precip_paths_by_year / pet_paths_by_year: {year: file_path} - passed
+    in explicitly rather than assumed from a fixed naming pattern,
+    because the actual files on disk came from a manual terminal
+    workflow (gdalbuildvrt/gdal_translate merges) with naming that
+    doesn't perfectly follow one convention (e.g. 1999 is a single
+    un-sharded file with a different name than the merged years) -
+    baking a fragile path-guessing pattern into this function risks
+    yet another silent-mismatch bug like the last two.
+
+    Band order within each year's file must match
+    spi_spei_export._periods_by_year's chronological ordering for that
+    year - true for anything produced by this project's export/merge
+    path, since both sides derive from the same
+    generate_28day_periods() call.
+
+    Output: one wb_{year}.tif per year, same band layout as the inputs.
+
+    Safe to interrupt and re-run: years already on disk are skipped
+    unless overwrite=True.
+    """
+    from computing.farm_stress.config import LOCAL_DIR_WATER_BALANCE_500M
+    from computing.farm_stress.spi_spei_export import _periods_by_year
+
+    output_dir = (output_dir or LOCAL_DIR_WATER_BALANCE_500M).rstrip("/")
+    os.makedirs(output_dir, exist_ok=True)
+    by_year = _periods_by_year(start_year, end_year)
+    print(f"{len(by_year)} year(s) to process ({start_year}-{end_year})")
+
+    computed, skipped, missing_input = [], [], []
+    for year in sorted(by_year):
+        periods = by_year[year]
+        out_path = f"{output_dir}/wb_{year}.tif"
+        if os.path.exists(out_path) and not overwrite:
+            skipped.append(out_path)
+            continue
+
+        precip_path = precip_paths_by_year.get(year)
+        pet_path = pet_paths_by_year.get(year)
+        if not (precip_path and pet_path and os.path.exists(precip_path) and os.path.exists(pet_path)):
+            print(f"{year}: missing precip and/or pet file, skipping")
+            missing_input.append(year)
+            continue
+
+        with rasterio.open(precip_path) as precip_src, rasterio.open(pet_path) as pet_src:
+            if precip_src.count != len(periods) or pet_src.count != len(periods):
+                raise ValueError(
+                    f"{year}: expected {len(periods)} bands, got "
+                    f"{precip_src.count} (precip) / {pet_src.count} (pet)"
+                )
+            # float64, matching compute_water_balance_archive exactly -
+            # only one year (~13 bands) is ever held in memory at once
+            # here, not the full 340-period archive, so there's no real
+            # memory pressure to trade away precision for (float32 was
+            # tried here first and measurably diverged from the
+            # per-period reference pipeline - up to ~0.09 in the final
+            # SPEI-3 values on a synthetic test - not worth it for a
+            # saving that isn't needed at this scale).
+            precip = precip_src.read().astype(np.float64)
+            pet = pet_src.read().astype(np.float64)
+            profile = pet_src.profile
+
+        water_balance = precip - pet
+
+        profile.update(dtype="float64", count=len(periods), nodata=np.nan)
+        with rasterio.open(out_path, "w", **profile) as dst:
+            dst.write(water_balance)
+
+        print(f"{year}: wrote {out_path} ({len(periods)} bands)")
+        computed.append(out_path)
+
+    print(
+        f"Done. Computed {len(computed)}, skipped {len(skipped)}, "
+        f"missing input for {len(missing_input)} year(s)."
+    )
+    if missing_input:
+        print(f"Years missing rainfall/PET input: {missing_input}")
+    return {"computed": computed, "skipped": skipped, "missing_input": missing_input}
