@@ -204,6 +204,143 @@ def fit_spei3_archive(
     return {"params_dir": params_dir, "timeseries_dir": timeseries_dir, "n_periods": n_periods}
 
 
+def fit_spei3_archive_banded_tiled(
+    start_year=2000,
+    end_year=2025,
+    wb_dir=LOCAL_DIR_WATER_BALANCE_500M,
+    params_dir=LOCAL_DIR_SPEI3_PARAMS_500M,
+    timeseries_dir=LOCAL_DIR_SPEI3_TIMESERIES_500M,
+    row_chunk=150,
+):
+    """Row-tiled SPEI-3 fit reading yearly multi-band water balance
+    (wb_{year}.tif, from compute_water_balance_archive_banded) instead
+    of one file per period, and writing yearly multi-band SPEI-3 output
+    (spei3_{year}.tif) instead of one file per period - matches the
+    500m pipeline's space-saving layout end to end (26 output files
+    instead of 340).
+
+    Same row-strip memory strategy and same underlying math as
+    fit_spei3_archive_tiled (each pixel's fit depends only on its own
+    time series, so this is purely a different file layout, not a
+    different algorithm) - only fewer file opens per strip now (~26
+    yearly files instead of 340 period files).
+
+    Every output file (12 monthly params + one per year for the
+    timeseries) is opened once, up front, and written to window-by-
+    window as each strip is processed. Same ulimit caveat as
+    fit_spei3_archive_tiled if this errors with "too many open files",
+    though there are far fewer handles here (~26 vs ~340) so it's less
+    likely to matter.
+
+    Doesn't support resuming a partial run, same reason as
+    fit_spei3_archive_tiled - re-run from scratch if interrupted.
+    """
+    from computing.farm_stress.spi_spei_export import _periods_by_year
+
+    by_year = _periods_by_year(start_year, end_year)
+    periods = []
+    for year in sorted(by_year):
+        periods.extend(by_year[year])  # already chronologically sorted within each year
+
+    for period in periods:
+        start = datetime.strptime(period["period_start"], "%Y-%m-%d")
+        end = datetime.strptime(period["period_end"], "%Y-%m-%d")
+        period["month"] = (start + (end - start) / 2).month
+    months = np.array([p["month"] for p in periods])
+    n_periods = len(periods)
+    has_history = np.arange(n_periods) >= 2
+
+    wb_dir = wb_dir.rstrip("/")
+    wb_paths_by_year = {y: f"{wb_dir}/wb_{y}.tif" for y in by_year}
+    missing = [y for y, p in wb_paths_by_year.items() if not os.path.exists(p)]
+    if missing:
+        raise FileNotFoundError(
+            f"{len(missing)} year(s) missing water-balance file(s) (e.g. {missing[:3]}) - "
+            "run compute_water_balance_archive_banded first"
+        )
+
+    with rasterio.open(wb_paths_by_year[sorted(by_year)[0]]) as src:
+        profile = src.profile
+        rows, cols = src.height, src.width
+
+    params_dir = params_dir.rstrip("/")
+    timeseries_dir = timeseries_dir.rstrip("/")
+    os.makedirs(params_dir, exist_ok=True)
+    os.makedirs(timeseries_dir, exist_ok=True)
+
+    param_profile = profile.copy()
+    param_profile.update(count=3, dtype="float64", nodata=np.nan)
+    param_paths = [f"{params_dir}/spei3_params_month{m:02d}.tif" for m in range(1, 13)]
+    param_dsts = [rasterio.open(p, "w", **param_profile) for p in param_paths]
+
+    ts_dsts_by_year = {}
+    for year in by_year:
+        ts_profile = profile.copy()
+        ts_profile.update(count=len(by_year[year]), dtype="float64", nodata=np.nan)
+        ts_dsts_by_year[year] = rasterio.open(f"{timeseries_dir}/spei3_{year}.tif", "w", **ts_profile)
+
+    try:
+        n_strips = (rows + row_chunk - 1) // row_chunk
+        print(f"Fitting {rows}x{cols} grid in {n_strips} row-strip(s) of up to {row_chunk} rows each ...")
+
+        for s in range(n_strips):
+            row_off = s * row_chunk
+            strip_h = min(row_chunk, rows - row_off)
+            window = Window(0, row_off, cols, strip_h)
+
+            # Read this row-strip from every YEARLY file (not every
+            # period file) and reassemble into the same continuous
+            # (n_periods, strip_h, cols) order as `periods`.
+            strip = np.empty((n_periods, strip_h, cols), dtype=np.float64)
+            idx = 0
+            for year in sorted(by_year):
+                n_bands_year = len(by_year[year])
+                with rasterio.open(wb_paths_by_year[year]) as src:
+                    strip[idx : idx + n_bands_year] = src.read(window=window)
+                idx += n_bands_year
+
+            flat = strip.reshape(n_periods, strip_h * cols)
+            del strip
+            wb3 = np.full_like(flat, np.nan)
+            wb3[2:] = flat[2:] + flat[1:-1] + flat[:-2]
+            del flat
+
+            gamma_by_month = np.full((12, strip_h * cols), np.nan)
+            alpha_by_month = np.full((12, strip_h * cols), np.nan)
+            beta_by_month = np.full((12, strip_h * cols), np.nan)
+
+            for m in range(1, 13):
+                month_mask = (months == m) & has_history
+                gamma_loc, alpha, beta = fit_loglogistic_pwm(wb3[month_mask])
+                gamma_by_month[m - 1] = gamma_loc
+                alpha_by_month[m - 1] = alpha
+                beta_by_month[m - 1] = beta
+
+                param_dsts[m - 1].write(gamma_loc.reshape(strip_h, cols), 1, window=window)
+                param_dsts[m - 1].write(alpha.reshape(strip_h, cols), 2, window=window)
+                param_dsts[m - 1].write(beta.reshape(strip_h, cols), 3, window=window)
+
+            idx = 0
+            for year in sorted(by_year):
+                n_bands_year = len(by_year[year])
+                for local_band in range(n_bands_year):
+                    global_idx = idx + local_band
+                    m = periods[global_idx]["month"]
+                    spei3 = loglogistic_to_spei(
+                        wb3[global_idx], gamma_by_month[m - 1], alpha_by_month[m - 1], beta_by_month[m - 1]
+                    ).reshape(strip_h, cols)
+                    ts_dsts_by_year[year].write(spei3, local_band + 1, window=window)
+                idx += n_bands_year
+
+            print(f"  [{s + 1}/{n_strips}] rows {row_off}-{row_off + strip_h} done")
+    finally:
+        for dst in param_dsts + list(ts_dsts_by_year.values()):
+            dst.close()
+
+    print("Done.")
+    return {"params_dir": params_dir, "timeseries_dir": timeseries_dir, "n_periods": n_periods}
+
+
 def fit_spei3_archive_tiled(
     start_year=2000,
     end_year=2025,

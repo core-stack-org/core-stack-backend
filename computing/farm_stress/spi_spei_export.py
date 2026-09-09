@@ -240,6 +240,68 @@ def _periods_by_year(start_year, end_year):
     return by_year
 
 
+def _mosaic_shard_paths(shard_paths, yearly_path):
+    """Mosaic local shard files (already on disk, however they got
+    there - downloaded from GCS or placed manually) into one merged
+    multi-band file at yearly_path via rasterio.merge. A single shard is
+    just renamed, not passed through the merge machinery. Deletes the
+    input shard files on success - they're redundant once merged.
+    """
+    import rasterio
+    from rasterio.merge import merge as rasterio_merge
+
+    if len(shard_paths) == 1:
+        os.rename(shard_paths[0], yearly_path)
+        return yearly_path
+
+    print(f"  {len(shard_paths)} shards, mosaicking ...")
+    srcs = [rasterio.open(p) for p in shard_paths]
+    mosaic, mosaic_transform = rasterio_merge(srcs)
+    profile = srcs[0].profile.copy()
+    profile.update(
+        height=mosaic.shape[1], width=mosaic.shape[2], transform=mosaic_transform, count=mosaic.shape[0]
+    )
+    for src in srcs:
+        src.close()
+    with rasterio.open(yearly_path, "w", **profile) as dst:
+        dst.write(mosaic)
+    for p in shard_paths:
+        os.remove(p)
+    return yearly_path
+
+
+def _download_and_mosaic_year(bucket, gcs_path, layer_name, output_dir):
+    """Download every GCS blob whose name starts with `layer_name` (one
+    year's worth of shards - a full-India 500m multi-band image is large
+    enough that GEE splits it into multiple spatial shards rather than
+    one file, e.g. "precip_500m_20000000000000-0000000000.tif" for
+    layer_name="precip_500m_2000" - confirmed empirically, same behaviour
+    hit with the VCI 2023 export earlier in this project), then mosaics
+    them via _mosaic_shard_paths and returns the merged yearly file's
+    path. Used by both export_gsmap_500m_archive/export_modis_pet_500m_archive's
+    own download step and the standalone download_500m_archive_from_gcs
+    recovery path, so the shard-handling logic only exists in one place.
+
+    Raises if no matching blobs are found - callers should check for
+    this rather than let it surface as a confusing downstream error.
+    """
+    shard_names = [
+        blob.name.rsplit("/", 1)[-1]
+        for blob in bucket.list_blobs(prefix=f"{gcs_path.rstrip('/')}/{layer_name}")
+    ]
+    if not shard_names:
+        raise FileNotFoundError(f"No GCS blobs found matching {layer_name}* under {gcs_path}")
+
+    shard_paths = []
+    for shard_name in shard_names:
+        shard_path = f"{output_dir}/_shard_{shard_name}"
+        bucket.blob(f"{gcs_path.rstrip('/')}/{shard_name}").download_to_filename(shard_path)
+        shard_paths.append(shard_path)
+
+    yearly_path = f"{output_dir}/_yearly_{layer_name}.tif"
+    return _mosaic_shard_paths(shard_paths, yearly_path)
+
+
 def export_gsmap_500m_archive(
     gee_account_id,
     start_year=2000,
@@ -311,10 +373,8 @@ def export_gsmap_500m_archive(
     os.makedirs(output_dir, exist_ok=True)
     downloaded = []
     for year, periods, task_id, layer_name in pending:
-        yearly_path = f"{output_dir}/_yearly_{layer_name}.tif"
-        blob = bucket.blob(f"{GCS_PATH_GSMAP_500M.rstrip('/')}/{layer_name}.tif")
-        blob.download_to_filename(yearly_path)
-        print(f"Downloaded -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+        yearly_path = _download_and_mosaic_year(bucket, GCS_PATH_GSMAP_500M, layer_name, output_dir)
+        print(f"Downloaded/mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
         split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "precip")
         os.remove(yearly_path)
         downloaded.extend(split_paths)
@@ -333,21 +393,31 @@ def export_modis_pet_500m_archive(
     output_dir=LOCAL_DIR_MODIS_PET_500M,
     overwrite=False,
     poll_seconds=30,
+    keep_banded=True,
 ):
     """Download the historical MOD16A2GF PET archive at its true native
-    500m resolution, as yearly multi-band GCS exports later split into
-    per-period files (see module comment above) - the 500m companion to
-    export_modis_pet_historical_archive.
+    500m resolution, as yearly multi-band GCS exports - the 500m
+    companion to export_modis_pet_historical_archive.
 
     Identical 28-day proration logic (day-overlap weighted sum of 8-day
     composites) as the 11km version - this is that one with the
     reduceResolution/reproject-to-11km step removed, keeping pet_28d_500m
     directly instead of aggregating it down first.
 
+    keep_banded (default True): keep each year's mosaicked file as-is
+    (pet_500m_{year}.tif, one band per period) rather than splitting it
+    into per-period files. The 500m pipeline moved to yearly-banded
+    files throughout (water_balance.py's compute_water_balance_archive_banded,
+    spei_fit.py's fit_spei3_archive_banded_tiled) specifically to avoid
+    the disk footprint of ~340 small per-period files - keep_banded=False
+    is only for matching the older per-period convention if something
+    downstream still needs it.
+
     gee_account_id: required, no default - see export_gsmap_period.
 
-    Safe to interrupt and re-run: years whose split-out period files are
-    all already on disk are skipped unless overwrite=True.
+    Safe to interrupt and re-run: years already on disk (banded file or
+    all split-out period files, matching keep_banded) are skipped unless
+    overwrite=True.
     """
     ee_initialize(gee_account_id)
     region = ee.Geometry.Rectangle(INDIA_BBOX_COORDS)
@@ -377,9 +447,12 @@ def export_modis_pet_500m_archive(
     skipped = []
     for year in sorted(by_year):
         periods = by_year[year]
-        if not overwrite and all(
-            os.path.exists(f"{output_dir}/pet_{p['label']}.tif") for p in periods
-        ):
+        already_done = (
+            os.path.exists(f"{output_dir}/pet_500m_{year}.tif")
+            if keep_banded
+            else all(os.path.exists(f"{output_dir}/pet_{p['label']}.tif") for p in periods)
+        )
+        if not overwrite and already_done:
             skipped.append(year)
             continue
 
@@ -423,16 +496,20 @@ def export_modis_pet_500m_archive(
     os.makedirs(output_dir, exist_ok=True)
     downloaded = []
     for year, periods, task_id, layer_name in pending:
-        yearly_path = f"{output_dir}/_yearly_{layer_name}.tif"
-        blob = bucket.blob(f"{GCS_PATH_MODIS_PET_500M.rstrip('/')}/{layer_name}.tif")
-        blob.download_to_filename(yearly_path)
-        print(f"Downloaded -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
-        split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "pet")
-        os.remove(yearly_path)
-        downloaded.extend(split_paths)
+        yearly_path = _download_and_mosaic_year(bucket, GCS_PATH_MODIS_PET_500M, layer_name, output_dir)
+        if keep_banded:
+            final_path = f"{output_dir}/pet_500m_{year}.tif"
+            os.replace(yearly_path, final_path)
+            print(f"Downloaded/mosaicked -> {final_path} ({len(periods)} bands, kept banded)")
+            downloaded.append(final_path)
+        else:
+            print(f"Downloaded/mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+            split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "pet")
+            os.remove(yearly_path)
+            downloaded.extend(split_paths)
 
     print(
-        f"Done. Downloaded/split {len(downloaded)} period file(s) across "
+        f"Done. Downloaded {len(downloaded)} file(s) across "
         f"{len(pending)} year(s), skipped {len(skipped)} year(s) already on disk."
     )
     return {"downloaded": downloaded, "skipped_years": skipped}
@@ -503,9 +580,6 @@ def download_500m_archive_from_gcs(
     Safe to interrupt and re-run: years already fully split locally are
     skipped unless overwrite=True.
     """
-    import rasterio
-    from rasterio.merge import merge as rasterio_merge
-
     if dataset == "gsmap":
         gcs_path, output_dir, layer_prefix, file_prefix = (
             GCS_PATH_GSMAP_500M,
@@ -526,23 +600,7 @@ def download_500m_archive_from_gcs(
     output_dir = output_dir.rstrip("/")
     os.makedirs(output_dir, exist_ok=True)
     by_year = _periods_by_year(start_year, end_year)
-
     bucket = gcs_config(gee_account_id)
-    all_blob_names = [
-        blob.name.rsplit("/", 1)[-1] for blob in bucket.list_blobs(prefix=gcs_path.rstrip("/") + "/")
-    ]
-    print(f"{len(all_blob_names)} blob(s) found under gs://.../{gcs_path.rstrip('/')}/")
-
-    # Group blobs by year via prefix match: every shard for year Y is
-    # named "{layer_prefix}_{Y}<shard-suffix>.tif" - the shard suffix
-    # itself varies (tile offsets) and isn't parsed, just matched as
-    # "starts with the year's prefix".
-    blobs_by_year = {}
-    for name in all_blob_names:
-        for year in by_year:
-            if name.startswith(f"{layer_prefix}_{year}"):
-                blobs_by_year.setdefault(year, []).append(name)
-                break
 
     downloaded, skipped, missing_in_gcs = [], [], []
     for year in sorted(by_year):
@@ -553,37 +611,15 @@ def download_500m_archive_from_gcs(
             skipped.append(year)
             continue
 
-        shard_names = blobs_by_year.get(year)
-        if not shard_names:
-            print(f"{year}: no blobs matching {layer_prefix}_{year}* found in GCS yet, skipping")
+        layer_name = f"{layer_prefix}_{year}"
+        try:
+            yearly_path = _download_and_mosaic_year(bucket, gcs_path, layer_name, output_dir)
+        except FileNotFoundError:
+            print(f"{year}: no blobs matching {layer_name}* found in GCS yet, skipping")
             missing_in_gcs.append(year)
             continue
 
-        shard_paths = []
-        for shard_name in shard_names:
-            shard_path = f"{output_dir}/_shard_{shard_name}"
-            bucket.blob(f"{gcs_path.rstrip('/')}/{shard_name}").download_to_filename(shard_path)
-            shard_paths.append(shard_path)
-        print(f"{year}: downloaded {len(shard_paths)} shard(s), mosaicking ...")
-
-        yearly_path = f"{output_dir}/_yearly_{layer_prefix}_{year}.tif"
-        if len(shard_paths) == 1:
-            os.rename(shard_paths[0], yearly_path)
-        else:
-            srcs = [rasterio.open(p) for p in shard_paths]
-            mosaic, mosaic_transform = rasterio_merge(srcs)
-            profile = srcs[0].profile.copy()
-            profile.update(
-                height=mosaic.shape[1], width=mosaic.shape[2], transform=mosaic_transform, count=mosaic.shape[0]
-            )
-            for src in srcs:
-                src.close()
-            with rasterio.open(yearly_path, "w", **profile) as dst:
-                dst.write(mosaic)
-            for p in shard_paths:
-                os.remove(p)
-
-        print(f"  mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+        print(f"{year}: downloaded/mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
         split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, file_prefix)
         os.remove(yearly_path)
         downloaded.extend(split_paths)
@@ -594,6 +630,77 @@ def download_500m_archive_from_gcs(
         f"{len(missing_in_gcs)} year(s) not yet in GCS."
     )
     return {"downloaded": downloaded, "skipped_years": skipped, "missing_in_gcs": missing_in_gcs}
+
+
+def merge_local_500m_shards(dataset, start_year=2000, end_year=2025, local_dir=None, overwrite=False):
+    """Mosaic + split shard files that are ALREADY ON DISK (downloaded by
+    some means other than download_500m_archive_from_gcs - e.g. manually
+    via the GCS console/gsutil, as happened here) into the per-period
+    files the rest of the pipeline expects. Purely local - no GCS, no
+    GEE, no network calls at all.
+
+    Looks for files matching "{layer_prefix}_{year}*.tif" in local_dir
+    (e.g. "precip_500m_20000000000000-0000000000.tif") - the same
+    GEE tile-shard naming as download_500m_archive_from_gcs handles, just
+    sourced from disk instead of a bucket listing. Handles any number of
+    shards per year (confirmed one year needed 3, not the usual 2).
+
+    dataset: "gsmap" or "pet".
+
+    Safe to interrupt and re-run: years already fully split are skipped
+    unless overwrite=True. Consumed shard files are deleted as each year
+    is successfully merged and split (via _mosaic_shard_paths).
+    """
+    if dataset == "gsmap":
+        local_dir, layer_prefix, file_prefix = (
+            local_dir or LOCAL_DIR_GSMAP_500M,
+            "precip_500m",
+            "precip",
+        )
+    elif dataset == "pet":
+        local_dir, layer_prefix, file_prefix = (
+            local_dir or LOCAL_DIR_MODIS_PET_500M,
+            "pet_500m",
+            "pet",
+        )
+    else:
+        raise ValueError(f"dataset must be 'gsmap' or 'pet', got {dataset!r}")
+
+    local_dir = local_dir.rstrip("/")
+    by_year = _periods_by_year(start_year, end_year)
+    all_files = sorted(os.listdir(local_dir))
+
+    merged, skipped, missing_locally = [], [], []
+    for year in sorted(by_year):
+        periods = by_year[year]
+        if not overwrite and all(
+            os.path.exists(f"{local_dir}/{file_prefix}_{p['label']}.tif") for p in periods
+        ):
+            skipped.append(year)
+            continue
+
+        shard_names = [f for f in all_files if f.startswith(f"{layer_prefix}_{year}")]
+        if not shard_names:
+            print(f"{year}: no local files matching {layer_prefix}_{year}* found, skipping")
+            missing_locally.append(year)
+            continue
+
+        print(f"{year}: found {len(shard_names)} shard file(s) on disk")
+        shard_paths = [f"{local_dir}/{name}" for name in shard_names]
+        yearly_path = f"{local_dir}/_yearly_{layer_prefix}_{year}.tif"
+        yearly_path = _mosaic_shard_paths(shard_paths, yearly_path)
+
+        print(f"  mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+        split_paths = _split_yearly_bands_to_periods(yearly_path, periods, local_dir, file_prefix)
+        os.remove(yearly_path)
+        merged.extend(split_paths)
+
+    print(
+        f"Done. Merged/split {len(merged)} period file(s), "
+        f"skipped {len(skipped)} year(s) already on disk, "
+        f"{len(missing_locally)} year(s) with no local shard files found."
+    )
+    return {"merged": merged, "skipped_years": skipped, "missing_locally": missing_locally}
 
 
 def export_modis_pet_historical_archive(
