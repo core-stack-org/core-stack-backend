@@ -101,9 +101,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_swb(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-                create_excel_for_mws_intersect_swb(
-                    geojson_data, writer, district, block
-                )
+                create_excel_for_mws_intersect_swb(geojson_data, writer)
             elif workspace == "nrega_assets":
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                 mws_file_url = get_url("mws_layers", mws_lay_name)
@@ -257,12 +255,34 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_type(geojson_data, writer)
             elif workspace == "soil_health_vector":
                 create_excel_for_soil_health(geojson_data, writer)
-
+            elif workspace == "ndvi_timeseries":
+                create_excel_for_ndvi_shrub(geojson_data, writer)
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_ndvi_shrub(data, writer):
+    print("Inside ndvi shrub excel generation")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        df.rename(columns={"uid": "UID"}, inplace=True)
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="ndvi_shrub", index=False)
+        print("Excel file created for ndvi_shrub")
+    except Exception as e:
+        print(f"Error occurred while generating excel for ndvi shrub {e} ")
 
 
 def create_excel_for_soil_health(data, writer):
@@ -654,59 +674,38 @@ def create_excel_for_dem(data, writer):
     print("Excel file created for dem")
 
 
-def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
+def create_excel_for_mws_intersect_swb(swb_geojson, writer):
     print("Inside create_excel_for_mws_intersect_swb")
-
-    # --- Fetch MWS layer ---
-    mws_layer_name = f"mws_{district}_{block}"
-    mws_data_url = get_url("mws", mws_layer_name)
-
-    mws_response = requests.get(mws_data_url)
-    if mws_response.status_code != 200:
-        print(f"Error fetching MWS data: {mws_response.status_code}")
-        return
-
-    mws_geojson = mws_response.json()
-
-    def calculate_intersection_area(geom1, geom2):
-        if geom1.intersects(geom2):
-            return geom1.intersection(geom2).area
-        return 0
-
     rows = []
 
-    for mws_feature in mws_geojson["features"]:
-        mws_props = mws_feature["properties"]
-        mws_uid = mws_props.get("uid")
-        mws_geom = shape(mws_feature["geometry"])
-
-        for swb_feature in swb_geojson["features"]:
-            swb_props = swb_feature["properties"]
-            swb_geom = shape(swb_feature["geometry"])
-
-            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
-
-            if intersection_area > 0:
-                # waterbodies centroid calculation
-                centroid = swb_geom.centroid
-                lon, lat = centroid.x, centroid.y
-
-                rows.append(
-                    {
-                        "UID": mws_uid,
-                        "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
-                        "Waterbodies_name": swb_props.get("water_body_name"),
-                        "Latitude": lat,
-                        "Longitude": lon,
-                    }
-                )
+    for swb_feature in swb_geojson["features"]:
+        swb_props = swb_feature["properties"]
+        swb_geom = shape(swb_feature["geometry"])
+        centroid = swb_geom.centroid
+        lon, lat = centroid.x, centroid.y
+        uid = swb_props.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = swb_props.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
+        for num_uid_part in num_uid_parts_is:
+            rows.append(
+                {
+                    "UID": num_uid_part,
+                    "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
+                    "Waterbodies_name": swb_props.get("water_body_name"),
+                    "Latitude": lat,
+                    "Longitude": lon,
+                }
+            )
 
     df = pd.DataFrame(rows)
-
-    if not df.empty:
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-        df[numeric_cols] = df[numeric_cols].round(2)
-
     df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
     print("Excel sheet 'mws_intersect_swb' created successfully")
 
@@ -2430,7 +2429,6 @@ def get_season(month):
         return "kharif"
     elif month in (11, 12, 1, 2):
         return "rabi"
-
 
 def process_feature(feature):
     uid = feature["properties"]["uid"]

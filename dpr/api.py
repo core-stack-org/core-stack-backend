@@ -76,6 +76,7 @@ from .gen_mws_report import (
     get_factory_data,
     get_mining_data,
     get_green_credit_data,
+    get_ndvi_trend,
 )
 from .gen_tehsil_report import (
     get_tehsil_data,
@@ -386,7 +387,9 @@ def generate_mws_report(request):
         ndvi_labels, ndvi_data = get_ndvi_timeseries_data(state, district, block, uid)
 
         # ? NDVI Timeseries (Trees)
-        ndvi_tree_labels, ndvi_tree_data = get_ndvi_timeseries_tree_data(state, district, block, uid)
+        ndvi_tree_labels, ndvi_tree_data = get_ndvi_timeseries_tree_data(
+            state, district, block, uid
+        )
 
         # ? LCW and Industrial Data Description
         lcw_desc = get_land_conflict_industrial_data(state, district, block, uid)
@@ -394,6 +397,8 @@ def generate_mws_report(request):
         mining_desc = get_mining_data(state, district, block, uid)
 
         green_credits = get_green_credit_data(state, district, block, uid)
+
+        ndvi_trend = get_ndvi_trend(state, district, block, uid)
 
         context = {
             "state": state,
@@ -495,6 +500,7 @@ def generate_mws_report(request):
             "factory_desc": factory_desc,
             "mining_desc": mining_desc,
             "green_credit_desc": green_credits,
+            "ndvi_trend": ndvi_trend,
         }
 
         # print("Api Processing End 1", datetime.now())
@@ -892,15 +898,30 @@ def generate_village_report(request):
     basic_infra_performance = _basic_infra_result.get("performance", [])
 
     # Calculate Health and Wash
-    _health_wash_result   = get_health_and_wash(state, district, block, village_id, df=df, df_facilities=df_facilities)
-    health_wash_data      = _health_wash_result.get("data", [])
+    _health_wash_result = get_health_and_wash(
+        state, district, block, village_id, df=df, df_facilities=df_facilities
+    )
+    health_wash_data = _health_wash_result.get("data", [])
     health_wash_raw_params = _health_wash_result.get("raw_params", {})
-    health_wash_performance = _health_wash_result.get("performance", [
-        "High" if (health_wash_data[0] if health_wash_data else 0) > 0.66 else "Low",
-        "Low" if (health_wash_data[1] if len(health_wash_data) > 1 else 0) <= 0.33 else (
-            "High" if (health_wash_data[1] if len(health_wash_data) > 1 else 0) > 0.66 else "Medium"
-        ),
-    ])
+    health_wash_performance = _health_wash_result.get(
+        "performance",
+        [
+            (
+                "High"
+                if (health_wash_data[0] if health_wash_data else 0) > 0.66
+                else "Low"
+            ),
+            (
+                "Low"
+                if (health_wash_data[1] if len(health_wash_data) > 1 else 0) <= 0.33
+                else (
+                    "High"
+                    if (health_wash_data[1] if len(health_wash_data) > 1 else 0) > 0.66
+                    else "Medium"
+                )
+            ),
+        ],
+    )
     health_wash_colors = _health_wash_result.get("colors", [])
 
     # Calculate Education Institutions
@@ -909,67 +930,81 @@ def generate_village_report(request):
     )
 
     # Calculate Financial Inclusion
-    _finance_result      = get_financial_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
-    finance_data         = _finance_result.get("data", [])
-    finance_raw_params   = _finance_result.get("raw_params", {})
-    finance_performance  = _finance_result.get("performance", [])
-    finance_colors       = _finance_result.get("colors", [])
+    _finance_result = get_financial_inclusion(
+        state, district, block, village_id, df=df, df_facilities=df_facilities
+    )
+    finance_data = _finance_result.get("data", [])
+    finance_raw_params = _finance_result.get("raw_params", {})
+    finance_performance = _finance_result.get("performance", [])
+    finance_colors = _finance_result.get("colors", [])
 
     # Calculate Welfare
-    _welfare_result      = get_welfare_inclusion(state, district, block, village_id, df=df, df_facilities=df_facilities)
-    welfare_data         = _welfare_result.get("data", [])
-    welfare_raw_params   = _welfare_result.get("raw_params", {})
-    welfare_performance  = _welfare_result.get("performance", [])
-    welfare_colors       = _welfare_result.get("colors", [])
+    _welfare_result = get_welfare_inclusion(
+        state, district, block, village_id, df=df, df_facilities=df_facilities
+    )
+    welfare_data = _welfare_result.get("data", [])
+    welfare_raw_params = _welfare_result.get("raw_params", {})
+    welfare_performance = _welfare_result.get("performance", [])
+    welfare_colors = _welfare_result.get("colors", [])
 
     # Calculate Community Institutions
-    _community_result    = get_community_institutes(state, district, block, village_id, df=df)
-    community_data       = _community_result.get("data", [])
+    _community_result = get_community_institutes(
+        state, district, block, village_id, df=df
+    )
+    community_data = _community_result.get("data", [])
     community_raw_params = _community_result.get("raw_params", {})
     community_performance = _community_result.get("performance", [])
-    community_colors     = _community_result.get("colors", [])
+    community_colors = _community_result.get("colors", [])
 
     # Livelihood Diversification
-    _livelihood_result      = get_livelihood_diversification(state, district, block, village_id, df=df)
-    livelihood_data         = _livelihood_result.get("data", [])
-    livelihood_raw_params   = _livelihood_result.get("raw_params", {})
-    livelihood_performance  = _livelihood_result.get("performance", [])
-    livelihood_colors       = _livelihood_result.get("colors", [])
+    _livelihood_result = get_livelihood_diversification(
+        state, district, block, village_id, df=df
+    )
+    livelihood_data = _livelihood_result.get("data", [])
+    livelihood_raw_params = _livelihood_result.get("raw_params", {})
+    livelihood_performance = _livelihood_result.get("performance", [])
+    livelihood_colors = _livelihood_result.get("colors", [])
 
     # Livestock Management
-    _livestock_mgmt_result   = get_livestock_management(state, district, block, village_id, df=df, df_facilities=df_facilities)
-    livestock_data           = _livestock_mgmt_result.get("data", [])
-    livestock_raw_params     = _livestock_mgmt_result.get("raw_params", {})
-    livestock_performance    = _livestock_mgmt_result.get("performance", [])
-    livestock_colors         = _livestock_mgmt_result.get("colors", [])
+    _livestock_mgmt_result = get_livestock_management(
+        state, district, block, village_id, df=df, df_facilities=df_facilities
+    )
+    livestock_data = _livestock_mgmt_result.get("data", [])
+    livestock_raw_params = _livestock_mgmt_result.get("raw_params", {})
+    livestock_performance = _livestock_mgmt_result.get("performance", [])
+    livestock_colors = _livestock_mgmt_result.get("colors", [])
 
     livestock_count_data = get_livestock_count(
         state, district, block, village_id, df_livestock=df_livestock
     )
 
     # Land Cultivation
-    _land_result             = get_land_cultivation(state, district, block, village_id, df=df)
-    land_cultivation_data    = _land_result.get("data", [])
-    land_raw_params          = _land_result.get("raw_params", {})
-    land_performance         = _land_result.get("performance", [])
-    land_colors              = _land_result.get("colors", [])
+    _land_result = get_land_cultivation(state, district, block, village_id, df=df)
+    land_cultivation_data = _land_result.get("data", [])
+    land_raw_params = _land_result.get("raw_params", {})
+    land_performance = _land_result.get("performance", [])
+    land_colors = _land_result.get("colors", [])
 
     # Irrigation data
-    _irrigation_result       = get_irrigation_Infra(state, district, block, village_id, df=df)
-    irrigation_data          = _irrigation_result.get("data", [])
-    irrigation_raw_params    = _irrigation_result.get("raw_params", {})
+    _irrigation_result = get_irrigation_Infra(state, district, block, village_id, df=df)
+    irrigation_data = _irrigation_result.get("data", [])
+    irrigation_raw_params = _irrigation_result.get("raw_params", {})
 
     # Agriculture Support
-    _agri_result             = get_agri_support_service(state, district, block, village_id, df=df, df_facilities=df_facilities)
-    agri_support_data        = _agri_result.get("data", [])
-    agri_support_raw_params  = _agri_result.get("raw_params", {})
+    _agri_result = get_agri_support_service(
+        state, district, block, village_id, df=df, df_facilities=df_facilities
+    )
+    agri_support_data = _agri_result.get("data", [])
+    agri_support_raw_params = _agri_result.get("raw_params", {})
     agri_support_performance = _agri_result.get("performance", [])
-    agri_support_colors      = _agri_result.get("colors", [])
+    agri_support_colors = _agri_result.get("colors", [])
 
     # Climate Resiliance
-    _climate_result          = get_ecological_climate_resiliance(state, district, block, village_id, df=df, df_nrega=df_nrega)
-    climate_resiliance_data  = _climate_result.get("data", [])
-    climate_raw_params       = _climate_result.get("raw_params", {})
+    _climate_result = get_ecological_climate_resiliance(
+        state, district, block, village_id, df=df, df_nrega=df_nrega
+    )
+    climate_resiliance_data = _climate_result.get("data", [])
+    climate_raw_params = _climate_result.get("raw_params", {})
 
     # Map Data
     basic_infra_map = get_all_villages_basic_infrastructure(
