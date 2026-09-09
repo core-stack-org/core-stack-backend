@@ -2313,7 +2313,7 @@
         </section>
         {% endif %}
 
-        {% if land_degrad or tree_degrad %}
+        {% if land_degrad or tree_degrad or tree_gain %}
         <section class="section">
             {% if land_degrad %}
             <h3>Cropping degradation</h3>
@@ -2346,7 +2346,7 @@
             {% if crop_intensity_sankey %}
             <div id="cropIntensitySankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
             <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Cropping Intensity Change (Single / Double / Triple)
+                Cropland Degradation (Crops &rarr; Built up / Barren / Shrubs and Scrubs)
             </div>
             {% endif %}
 
@@ -2355,7 +2355,7 @@
             {% endif %}
 
             {% if tree_degrad %}
-            <h3>Reduction in tree cover</h3>
+            <h3>Reduction and degradation of tree cover</h3>
             <p>{{tree_degrad}}</p>
 
             <div class="map-group">
@@ -2410,6 +2410,94 @@
 
             <p>{{restore_desc}}</p>
             {% endif %}
+
+            {% if tree_gain %}
+            <h3>Increase in Tree Cover</h3>
+            <p>{{tree_gain}}</p>
+
+            <div class="map-group">
+                <div id="afforestMap" class="map"></div>
+                <div id="compMap6" class="map"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <span>Built Up - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eee05d;"></div>
+                    <span>Crops - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Barren - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                    <span>Shrubs and Scrubs - Trees</span>
+                </div>
+            </div>
+
+            {% if afforestation_sankey %}
+            <div id="afforestationSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Afforestation (Barren / Built up / Farm / Shrubs and Scrubs &rarr; Forest)
+            </div>
+            {% endif %}
+
+            <p class="legend-note">Note: The increase in tree cover is computed using the IndiaSAT Land Use Land
+                Cover outputs. Transitions from barren land, human settlements (built-up), farmland or shrubs to
+                tree cover are computed.</p>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        {% if shrub_degrad %}
+        <section class="section">
+            <h3>Shrubland Diversion</h3>
+            <p>{{shrub_degrad}}</p>
+
+            <div class="map-group">
+                <div id="shrubMap" class="map"></div>
+                <div id="compMap7" class="map"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                    <span>Shrubs - Shrubs</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #BAD93E;"></div>
+                    <span>Shrubs - Crops</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #73bb53;"></div>
+                    <span>Shrubs - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <span>Shrubs - Built Up</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #1ca3ec;"></div>
+                    <span>Shrubs - Water</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Shrubs - Barren</span>
+                </div>
+            </div>
+
+            {% if shrub_change_sankey %}
+            <div id="shrubChangeSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Shrubland Diversion (Shrub &rarr; Farm / Tree / Built up / Water / Barren)
+            </div>
+            {% endif %}
+
+            <p class="legend-note">Note: The diversion of shrubland is computed using the IndiaSAT Land Use Land
+                Cover outputs. Transitions from shrubland to farmland, tree cover, human settlements (built-up),
+                water or barren land are computed.</p>
         </section>
         {% endif %}
 
@@ -3593,6 +3681,34 @@
             name: 'tree_raster'
         })
 
+        const afforestRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Afforestation",
+                    'STYLES': "afforestation"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'afforest_raster'
+        })
+
+        const shrubRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_ShrubChange",
+                    'STYLES': "shrubchange"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'shrub_raster'
+        })
+
         // ============================================================================
         // MAP INITIALIZATION (with village boundaries)
         // ============================================================================
@@ -4114,6 +4230,96 @@
             ])
         })
 
+        const AfforestMap = new ol.Map({
+            target: 'afforestMap',
+            layers: [getBaseLayer(), afforestRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ComparisonMap6 = new ol.Map({
+            target: 'compMap6',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ShrubMap = new ol.Map({
+            target: 'shrubMap',
+            layers: [getBaseLayer(), shrubRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ComparisonMap7 = new ol.Map({
+            target: 'compMap7',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
         const swbMap = new ol.Map({
             target: 'swbMap',
             layers: [
@@ -4313,12 +4519,17 @@
                         soilKRaster.addFilter(crop);
                         soilOCRaster.addFilter(crop);
 
+                        afforestRaster.addFilter(crop);
+                        shrubRaster.addFilter(crop);
+
 
                         // Add village boundaries to all comparison maps with spatial filter
                         addVillageBoundariesToMap(ComparisonMap1, feature);
                         addVillageBoundariesToMap(ComparisonMap3, feature);
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
+                        addVillageBoundariesToMap(ComparisonMap6, feature);
+                        addVillageBoundariesToMap(ComparisonMap7, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
                         addVillageBoundariesToMap(soilHealthBoundaryMap, feature);
                         // addVillageBoundariesToMap(swbMap, feature);
@@ -4352,6 +4563,8 @@
                     addMwsBoundaryToMap(ComparisonMap3);
                     addMwsBoundaryToMap(ComparisonMap4);
                     addMwsBoundaryToMap(ComparisonMap5);
+                    addMwsBoundaryToMap(ComparisonMap6);
+                    addMwsBoundaryToMap(ComparisonMap7);
                     addMwsBoundaryToMap(soilHealthBoundaryMap);
                     addMwsBoundaryToMap(swbMap);
                     addMwsBoundaryToMap(swbVillageMap);
@@ -4376,10 +4589,14 @@
                     hydroVectorMap.getView().fit(arr, fitOptions);
                     DegradMap.getView().fit(arr, fitOptions);
                     treeReduceMap.getView().fit(arr, fitOptions);
+                    AfforestMap.getView().fit(arr, fitOptions);
+                    ShrubMap.getView().fit(arr, fitOptions);
                     ComparisonMap1.getView().fit(arr, fitOptions);
                     ComparisonMap3.getView().fit(arr, fitOptions);
                     ComparisonMap4.getView().fit(arr, fitOptions);
                     ComparisonMap5.getView().fit(arr, fitOptions);
+                    ComparisonMap6.getView().fit(arr, fitOptions);
+                    ComparisonMap7.getView().fit(arr, fitOptions);
                     soilHealthMap.getView().fit(arr, fitOptions);
                     soilHealthBoundaryMap.getView().fit(arr, fitOptions);
                     urbanMap.getView().fit(arr, fitOptions);
@@ -4706,6 +4923,8 @@ const legendHTML = `
             if (typeof hydroVectorMap !== 'undefined') addVisualScaleBar(hydroVectorMap);
             if (typeof DegradMap !== 'undefined') addVisualScaleBar(DegradMap);
             if (typeof treeReduceMap !== 'undefined') addVisualScaleBar(treeReduceMap);
+            if (typeof AfforestMap !== 'undefined') addVisualScaleBar(AfforestMap);
+            if (typeof ShrubMap !== 'undefined') addVisualScaleBar(ShrubMap);
             if (typeof soilHealthMap !== 'undefined') addVisualScaleBar(soilHealthMap);
             if (typeof soilHealthBoundaryMap !== 'undefined') addVisualScaleBar(soilHealthBoundaryMap);
 
@@ -4713,6 +4932,8 @@ const legendHTML = `
             if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
             if (typeof ComparisonMap4 !== 'undefined') addVisualScaleBar(ComparisonMap4);
             if (typeof ComparisonMap5 !== 'undefined') addVisualScaleBar(ComparisonMap5);
+            if (typeof ComparisonMap6 !== 'undefined') addVisualScaleBar(ComparisonMap6);
+            if (typeof ComparisonMap7 !== 'undefined') addVisualScaleBar(ComparisonMap7);
 
 
             if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
@@ -4722,7 +4943,7 @@ const legendHTML = `
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['compMap1', 'compMap3', 'compMap4', 'compMap5', 'soilHealthBoundaryMap', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
+            const boundaryMaps = ['compMap1', 'compMap3', 'compMap4', 'compMap5', 'compMap6', 'compMap7', 'soilHealthBoundaryMap', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
@@ -5320,11 +5541,12 @@ const legendHTML = `
             window.addEventListener('resize', () => chart.resize());
         };
 
-        // Cropping Intensity Change Sankey
+        // Cropland Degradation Sankey
         renderSankeyChart('cropIntensitySankey', JSON.parse('{{crop_intensity_sankey|safe}}'), {
-            'Single': '#F0F4A3',
-            'Double': '#B7D43A',
-            'Triple': '#7FAF2E',
+            'Crops': '#F0F4A3',
+            'Built up': '#ff0000',
+            'Barren': '#a9a9a9',
+            'Shrubs and Scrubs': '#8C7A4F',
         });
 
         // Tree Cover Change Sankey
@@ -5334,6 +5556,25 @@ const legendHTML = `
             'Farm': '#eee05d',
             'Barren': '#a9a9a9',
             'Scrub Land': '#eaa4f0',
+        });
+
+        // Afforestation Sankey
+        renderSankeyChart('afforestationSankey', JSON.parse('{{afforestation_sankey|safe}}'), {
+            'Barren': '#a9a9a9',
+            'Built up': '#ff0000',
+            'Farm': '#eee05d',
+            'Scrub Land': '#eaa4f0',
+            'Forest': '#73bb53',
+        });
+
+        // Shrubland Diversion Sankey
+        renderSankeyChart('shrubChangeSankey', JSON.parse('{{shrub_change_sankey|safe}}'), {
+            'Farm': '#eee05d',
+            'Tree': '#73bb53',
+            'Built up': '#ff0000',
+            'Water': '#1ca3ec',
+            'Barren': '#a9a9a9',
+            'Shrub': '#eaa4f0',
         });
 
         // Urbanization Change Sankey
@@ -5441,9 +5682,9 @@ const legendHTML = `
 
         // Beforeprint event handler
         window.addEventListener('beforeprint', function () {
-            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, AfforestMap, ShrubMap, soilHealthMap, soilHealthBoundaryMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, villageIntersectMap, sogeMap];
+                ComparisonMap4, ComparisonMap5, ComparisonMap6, ComparisonMap7, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, villageIntersectMap, sogeMap];
 
             allMaps.forEach(function (map) {
                 if (map) {
@@ -5459,9 +5700,9 @@ const legendHTML = `
                 item.classList.remove('print-visible');
             });
 
-            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, AfforestMap, ShrubMap, soilHealthMap, soilHealthBoundaryMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, villageIntersectMap, sogeMap, demMapTerrain];
+                ComparisonMap4, ComparisonMap5, ComparisonMap6, ComparisonMap7, swbMap, swbVillageMap, villageIntersectMap, sogeMap, demMapTerrain];
 
             setTimeout(function () {
                 allMaps.forEach(function (map) {
