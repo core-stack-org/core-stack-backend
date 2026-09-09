@@ -41,6 +41,41 @@ PY
     return 1
 }
 
+upsert_env() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+    [ -n "$value" ] || return 0
+    mkdir -p "$(dirname "$file")"
+    if [ -f "$file" ] && grep -q "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
+apply_geoserver_and_gee_env() {
+    local runtime="${DATA_DIR}/.gee_runtime.env"
+    if [ -f "$runtime" ]; then
+        set -a
+        # shellcheck disable=SC1090
+        . "$runtime"
+        set +a
+    fi
+    upsert_env "$APP_ENV_FILE" "GEOSERVER_URL" "${GEOSERVER_URL:-}"
+    upsert_env "$APP_ENV_FILE" "GEOSERVER_USERNAME" "${GEOSERVER_USERNAME:-}"
+    upsert_env "$APP_ENV_FILE" "GEOSERVER_PASSWORD" "${GEOSERVER_PASSWORD:-}"
+    upsert_env "$APP_ENV_FILE" "GEE_STORAGE_PROJECT" "${GEE_STORAGE_PROJECT:-}"
+    upsert_env "$APP_ENV_FILE" "GEE_STORAGE_PROJECT_HELPER" "${GEE_STORAGE_PROJECT_HELPER:-}"
+    upsert_env "$APP_ENV_FILE" "GCS_BUCKET_NAME" "${GCS_BUCKET_NAME:-}"
+    upsert_env "$APP_ENV_FILE" "GEE_SERVICE_ACCOUNT_KEY_PATH" "${GEE_SERVICE_ACCOUNT_KEY_PATH:-}"
+    upsert_env "$APP_ENV_FILE" "GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH" "${GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH:-}"
+    export GEOSERVER_URL="${GEOSERVER_URL:-}"
+    export GEE_STORAGE_PROJECT="${GEE_STORAGE_PROJECT:-}"
+    export GEE_STORAGE_PROJECT_HELPER="${GEE_STORAGE_PROJECT_HELPER:-}"
+    export GCS_BUCKET_NAME="${GCS_BUCKET_NAME:-}"
+}
+
 ensure_env_file() {
     if [ -f "$APP_ENV_FILE" ]; then
         echo "Using existing ${APP_ENV_FILE}"
@@ -145,6 +180,7 @@ if [ -n "${RABBITMQ_HOST:-}" ] && [ "${SKIP_RABBITMQ:-1}" != "1" ]; then
     wait_for_tcp "$RABBITMQ_HOST" "5672" "RabbitMQ"
 fi
 ensure_env_file
+apply_geoserver_and_gee_env
 ensure_dirs
 
 if [ "${SKIP_DB_SETUP:-0}" != "1" ]; then

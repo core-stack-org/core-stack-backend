@@ -32,11 +32,20 @@ You only need the repo for `docker-compose.yml` and `installation/docker/`. You 
 
 ## 2. Optional: Google Earth Engine credentials
 
-The stack starts without GEE. Layer jobs that call Earth Engine need a service-account JSON.
+The stack starts without GEE. Layer jobs that call Earth Engine need a service-account JSON. Compose reads `project_id` from that JSON and sets `GEE_STORAGE_PROJECT` (and helper) so asset paths in `utilities/constants.py` resolve. Raster publish also needs a GCS bucket.
 
 ```bash
 mkdir -p gee_confs
 cp /path/to/your-gee-service-account.json gee_confs/gee-service-account.json
+```
+
+Put the bucket (and optional project override) in a `.env` next to `docker-compose.yml`:
+
+```bash
+GCS_BUCKET_NAME=your-gcs-bucket
+# Optional; defaults to project_id inside the JSON
+# GEE_STORAGE_PROJECT=ee-your-project
+# GEE_STORAGE_PROJECT_HELPER=ee-your-helper-project
 ```
 
 After Django is up, add the account in admin: [http://localhost:8000/admin/gee_computing/geeaccount/add/](http://localhost:8000/admin/gee_computing/geeaccount/add/). Use the service-account email from the JSON. Full GEE project steps are in [INSTALLATION.md](INSTALLATION.md#32-gee-account-setup).
@@ -118,7 +127,7 @@ docker compose down -v
 
 ## Optional settings
 
-Create a `.env` next to `docker-compose.yml` if you need to change ports or passwords:
+Create a `.env` next to `docker-compose.yml` if you need to change ports, passwords, or GCP settings:
 
 ```bash
 BACKEND_PORT=8000
@@ -129,7 +138,13 @@ POSTGRES_USER=corestack_admin
 POSTGRES_PASSWORD=corestack@123
 GEOSERVER_USERNAME=admin
 GEOSERVER_PASSWORD=geoserver
+GEOSERVER_URL=http://geoserver:8080/geoserver/
+GCS_BUCKET_NAME=your-gcs-bucket
+GEE_STORAGE_PROJECT=ee-your-project
+GEE_STORAGE_PROJECT_HELPER=ee-your-helper-project
 ```
+
+`GEOSERVER_URL` defaults to the Compose GeoServer service. Django `settings.GEOSERVER_URL` and `utilities.constants.GEOSERVER_BASE` both use that value. `GEE_STORAGE_PROJECT` defaults to `project_id` in `gee_confs/gee-service-account.json` when unset.
 
 Force a fresh admin-boundary download:
 

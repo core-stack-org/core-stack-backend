@@ -31,11 +31,15 @@ x-backend-env: &backend-env
   CELERY_TASK_ALWAYS_EAGER: "True"
   CELERY_BROKER_URL: memory://
   CELERY_RESULT_BACKEND: cache+memory://
-  GEOSERVER_URL: http://geoserver:8080/geoserver/
+  GEOSERVER_URL: ${GEOSERVER_URL:-http://geoserver:8080/geoserver/}
   GEOSERVER_USERNAME: ${GEOSERVER_USERNAME:-admin}
   GEOSERVER_PASSWORD: ${GEOSERVER_PASSWORD:-geoserver}
   GEE_CONFS_DIR: /app/data/gee_confs
   GEE_SERVICE_ACCOUNT_KEY_PATH: /app/data/gee_confs/gee-service-account.json
+  GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH: /app/data/gee_confs/gee-helper-account.json
+  GEE_STORAGE_PROJECT: ${GEE_STORAGE_PROJECT:-}
+  GEE_STORAGE_PROJECT_HELPER: ${GEE_STORAGE_PROJECT_HELPER:-}
+  GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-}
   ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
   DEBUG: "True"
   LAYER_GENERATION_SYNC_MODE: "True"
