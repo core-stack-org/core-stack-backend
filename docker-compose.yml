@@ -28,6 +28,9 @@ x-backend-env: &backend-env
   DB_HOST: postgres
   DB_PORT: "5432"
   SKIP_RABBITMQ: "1"
+  CELERY_TASK_ALWAYS_EAGER: "True"
+  CELERY_BROKER_URL: memory://
+  CELERY_RESULT_BACKEND: cache+memory://
   GEOSERVER_URL: http://geoserver:8080/geoserver/
   GEOSERVER_USERNAME: ${GEOSERVER_USERNAME:-admin}
   GEOSERVER_PASSWORD: ${GEOSERVER_PASSWORD:-geoserver}
