@@ -85,7 +85,6 @@ def generate_aet(cfg, region):
             "asset_suffix": asset_suffix,
             "model_aez": cfg["model_aez"],
             "model_output_scale": MODEL_OUTPUT_SCALE,
-            "interpolation": "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only",
             "description": "Bands 1-12: mean daily AET per month at 30 m; band 13: annual total AET",
         },
         band_descriptions=[f"ET_{abbr}_daily_mm" for abbr in MONTH_ABBR]
@@ -108,13 +107,13 @@ def build_aet_stack(
     ls_col = (
         ee.ImageCollection(LANDSAT_COLLECTION)
         .filterBounds(region)
-        .filterDate(start_date, start_date.advance(12, "month"))
+        .filterDate(start_date.advance(-1, "month"), start_date.advance(13, "month"))
     )
 
     if proj is None:
         proj = get_proj_30m(region, year, start_month=start_month)
 
-    months = ee.List.sequence(0, 11)
+    months = ee.List.sequence(-1, 12)
     raw_monthly = ee.ImageCollection.fromImages(
         months.map(
             lambda agri_month_idx: make_raw_monthly(

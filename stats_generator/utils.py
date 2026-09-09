@@ -1925,7 +1925,7 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             return base_area * (percentage / 100)
 
         # Generate years dynamically based on start_year and end_year
-        years = range(start_year, end_year)
+        years = range(start_year, end_year + 1)
 
         for num_uid_part in num_uid_parts_is:
             row = {"UID": num_uid_part}

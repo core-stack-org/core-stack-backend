@@ -45,7 +45,6 @@ def generate_pet(cfg, region):
             "modis_collection": modis_col_id,
             "source_scale_factor": MODIS_SCALE_FACTOR,
             "source_composite_days": MODIS_COMPOSITE_DAYS,
-            "interpolation": "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only",
             "year": str(year),
             "asset_suffix": cfg["asset_suffix"],
             "roi_path": cfg["roi_path"],
@@ -116,7 +115,7 @@ def build_pet_stack(
     """
     modis_col = ee.ImageCollection(modis_col_id).filterBounds(region)
     start_date = crop_year_start_date(year, start_month)
-    months = ee.List.sequence(0, 11)
+    months = ee.List.sequence(-1, 12)
     raw_monthly = ee.ImageCollection.fromImages(
         months.map(
             lambda agri_month_idx: _make_raw_monthly_pet(

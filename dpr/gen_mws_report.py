@@ -5,7 +5,7 @@ import geopandas as gpd
 import pandas as pd
 import numpy as np
 import pymannkendall as mk
-
+import os
 import json
 
 from datetime import datetime
@@ -24,13 +24,21 @@ DATA_DIR_TEMP = EXCEL_DIR
 
 
 @functools.lru_cache(maxsize=8)
+def _get_excel_file_cached(path, mtime):
+    """Cached ExcelFile handle, keyed on (path, mtime) so an updated file
+    is transparently re-read instead of silently serving a stale/broken
+    cached workbook."""
+    return pd.ExcelFile(path)
+
+
 def _get_excel_file(path):
     """Cached ExcelFile handle. Every get_* function in this module used to call
     pd.read_excel()/pd.ExcelFile() independently for the same report's workbook,
     re-opening and re-parsing the whole .xlsx from disk on every call (dozens of
     times per report). This opens/parses each workbook once per path and reuses
     the in-memory handle for every sheet read after that."""
-    return pd.ExcelFile(path)
+    mtime = os.path.getmtime(path)
+    return _get_excel_file_cached(path, mtime)
 
 
 def read_excel_sheet(path, sheet_name):
@@ -38,6 +46,14 @@ def read_excel_sheet(path, sheet_name):
     copy so callers can mutate the DataFrame freely without affecting other
     callers sharing the same cached workbook."""
     return _get_excel_file(path).parse(sheet_name).copy()
+
+
+def display_name(name):
+    """Convert an underscore/lowercase transformed name (e.g. 'west_bengal', from
+    utils.transform_name) back to a human-readable display form (e.g. 'West Bengal')."""
+    if not name:
+        return name
+    return name.replace("_", " ").title()
 
 
 # ? MARK: HELPER FUNCTIONS
@@ -941,20 +957,24 @@ def get_osm_data(state, district, block, uid):
                 f" as a crucial water source for agriculture and daily needs"
             )
 
+        block_display = display_name(block)
+        district_display = display_name(district)
+        state_display = display_name(state)
+
         if parameter_block == "":
-            parameter_block = f"The Tehsil {block.capitalize()} lies in district {district.capitalize()} in {state.capitalize()}."
+            parameter_block = f"The Tehsil {block_display} lies in district {district_display} in {state_display}."
         else:
             parameter_block = (
-                f"The Tehsil {block} having total area {total_area:,} hectares"
+                f"The Tehsil {block_display} having total area {total_area:,} hectares"
                 + parameter_block
                 + "."
             )
 
         if parameter_mws == "":
-            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block}</strong> which lies in district <strong>{district.capitalize()}</strong> in <strong>{state.capitalize()}</strong>."
+            parameter_mws = f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong> which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>."
         else:
             parameter_mws = (
-                f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block}</strong>"
+                f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong>, which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>"
                 + parameter_mws
                 + "."
             )
@@ -1607,7 +1627,7 @@ def get_change_detection_data(state, district, block, uid):
 
         if degradation >= 20:
             barren_percent = get_mws_barren_percent(state, district, block, uid)
-            parameter_land += f"{barren_percent}% of the area is barren in this microwatershed. There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2022. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
+            parameter_land += f"{barren_percent}% of the area is barren in this microwatershed. There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2024. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
 
         # ? Tree Reduction
         df_defo["total_deforestation_area_in_ha"] = df_defo[
@@ -1620,7 +1640,7 @@ def get_change_detection_data(state, district, block, uid):
         avg = df_defo["total_deforestation_area_in_ha"].mean()
 
         if reduction >= 50:
-            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2022, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares per micro watershed in the entire block."
+            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2024, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares per micro watershed in the entire block."
 
         # ? Urbanization
         df_urban["total_urbanization_area_in_ha"] = df_urban[

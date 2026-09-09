@@ -56,7 +56,6 @@ def generate_wue(cfg, region):
             "aet_method": "Landsat8 + GLDAS features -> Random Forest",
             "bplut_source": "MOD17 C6 BPLUT / MCD12Q1 IGBP LC_Type1",
             "valid_data_rule": "Calculated where GPP and AET are valid and AET > 0",
-            "interpolation": "+/-45 days for Aug-May; Jul uses Aug only; Jun uses May only",
             "year": str(year),
             "asset_suffix": cfg["asset_suffix"],
             "roi_path": cfg["roi_path"],

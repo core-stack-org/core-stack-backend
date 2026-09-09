@@ -3404,14 +3404,15 @@
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params: {
-                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3",
                     'STYLES': "lulc_water_pixels"
                 },
                 ratio: 1,
                 serverType: 'geoserver',
             }),
             visible: true,
-            name: 'water_raster'
+            name: 'water_raster',
+            zIndex: 6
         })
 
         const urbanRaster = new ol.layer.Image({
@@ -4119,6 +4120,7 @@
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
+                        addVillageBoundariesToMap(swbMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature);
                         addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
                         addDemographicBoundariesToMap(feature);
@@ -4196,28 +4198,23 @@
         // FETCH SURFACE WATERBODIES
         // ============================================================================
 
-        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
-            .then(response => response.json())
-            .then(data => {
-                swbMap.addLayer(waterRaster);
-            })
-            .catch(error => {
-                // Silently handle fetch errors
-            });
-
         // Waterbodies for this MWS, colored by type (river vs other), for the village maps
-        fetch(`https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=MWS_UID='{{mws_id}}'`)
-            .then(response => response.json())
-            .then(data => {
+        (async () => {
+            const typeName = `swb:surface_waterbodies_{{district}}_{{block}}`;
+            const url = `https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
                 const waterbodyStyleFunction = feature => {
-                    const isRiver = (feature.get('waterbody_type') || '').toLowerCase() === 'river';
                     return new ol.style.Style({
                         stroke: new ol.style.Stroke({
-                            color: isRiver ? 'rgb(255, 140, 0)' : 'rgb(0, 150, 255)',
+                            color: 'rgb(0, 150, 255)',
                             width: 2,
                         }),
                         fill: new ol.style.Fill({
-                            color: isRiver ? 'rgba(255, 140, 0, 0.4)' : 'rgba(137, 207, 240, 0.4)',
+                            color:'rgba(137, 207, 240, 0.4)',
                         }),
                     });
                 };
@@ -4226,11 +4223,12 @@
                     features: new ol.format.GeoJSON().readFeatures(data),
                 });
 
-                swbVillageMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
-            })
-            .catch(error => {
+                swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
+                swbMap.addLayer(waterRaster);
+            } catch (error) {
                 // Silently handle fetch errors
-            });
+            }
+        })();
 
         // ============================================================================
         // FETCH GROUNDWATER EXTRACTION STATUS
