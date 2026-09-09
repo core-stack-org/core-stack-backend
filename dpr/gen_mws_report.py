@@ -2744,6 +2744,37 @@ def get_ndvi_timeseries_tree_data(state, district, block, uid):
     return _fetch_ndvi_timeseries(state, district, block, uid, "tree")
 
 
+def get_ndvi_trend(state, district, block, uid):
+    try:
+        df = read_excel_sheet(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            "ndvi_shrub",
+        )
+        selected_column = [col for col in df.columns if col.startswith("20")]
+        df[selected_column] = (
+            df[selected_column]
+            .apply(pd.to_numeric, errors="coerce")
+            .replace(-9999, np.nan)
+        )
+        filtered_df_g = df.loc[df["UID"] == uid, selected_column].iloc[0]
+        filtered_df_g = filtered_df_g.dropna().values
+        if len(filtered_df_g) < 2:
+            return "Insufficient data"
+        result = mk.original_test(filtered_df_g)
+        trend = result.trend.capitalize()
+        return trend
+    except Exception as e:
+        print(f"error occurred while calculating trend {e}")
+
+
 def get_water_balance_data(state, district, block, uid):
     try:
         df = read_excel_sheet(
