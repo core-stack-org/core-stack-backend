@@ -129,7 +129,6 @@ def generate_forest_fire_layer(
         end_year,
     )
 
-    frp_sum_img = fire_images["sum"]
     frp_mean_img = fire_images["mean"]
     frp_max_img = fire_images["max"]
     fire_count_img = fire_images["count"]
@@ -157,11 +156,6 @@ def generate_forest_fire_layer(
         return ee.Feature(f.geometry()).set(
             {
                 "uid": f.get("uid"),
-                "fire_frp_sum_per_year": reduce(
-                    frp_sum_img,
-                    ee.Reducer.sum(),
-                    "sum",
-                ),
                 "fire_frp_mean": reduce(
                     frp_mean_img,
                     ee.Reducer.mean(),
