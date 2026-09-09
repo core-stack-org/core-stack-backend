@@ -19,7 +19,7 @@ def forest_additionality(start_year, mid_pt, end_year, state_name):
         base_file_path, working_directory, start_year, mid_pt, end_year, state_name
     )
 
-    ee_initialize(4)
+    ee_initialize(3)
 
     engine.perform_gee_operations()
 

@@ -817,8 +817,8 @@ class GEEManager:
         with rasterio.open(output_path, "w", **profile) as dst:
             dst.write(deforestation_map, 1)
 
-        with rasterio.open(output_path, "w", **profile) as dst:
-            dst.write(deforestation_map, 1)
+        # with rasterio.open(output_path, "w", **profile) as dst:
+        #     dst.write(deforestation_map, 1)
 
         print(f"Deforestation map saved to: {output_path}")
 
