@@ -1,6 +1,7 @@
-# User compose: pull the published backend image and run Postgres + GeoServer.
+# User compose: pull the published runtime image and run Postgres + GeoServer.
+# App code is bind-mounted from this checkout onto /app (not baked into the image).
 # First start downloads admin-boundary data inside Docker onto the data volume.
-# Creates GeoServer workspaces/styles. Mount GEE JSON only.
+# Creates GeoServer workspaces/styles.
 #
 #   mkdir -p gee_confs
 #   cp your-gee-service-account.json gee_confs/gee-service-account.json
@@ -93,6 +94,7 @@ services:
       <<: *backend-env
       FORCE_GEOSERVER_INIT: ${FORCE_GEOSERVER_INIT:-0}
     volumes:
+      - ${BACKEND_CODE_DIR:-.}:/app
       - core_stack_data:/var/tmp/core-stack-data
       - ./installation/docker:/opt/corestack-scripts:ro
     command: ["bash", "/opt/corestack-scripts/geoserver-init.sh"]
@@ -117,6 +119,7 @@ services:
     environment:
       <<: *backend-env
     volumes:
+      - ${BACKEND_CODE_DIR:-.}:/app
       - ${GEE_CONFS_DIR:-./gee_confs}:/app/data/gee_confs
       - core_stack_data:/var/tmp/core-stack-data
       - ./installation/docker:/opt/corestack-scripts:ro
@@ -139,6 +142,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
+      - ${BACKEND_CODE_DIR:-.}:/app
       - ${GEE_CONFS_DIR:-./gee_confs}:/app/data/gee_confs
       - core_stack_data:/var/tmp/core-stack-data
       - ./installation/docker:/opt/corestack-scripts:ro
