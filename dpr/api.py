@@ -60,6 +60,7 @@ from .gen_mws_report import (
     get_land_conflict_industrial_data,
     get_cropping_intensity,
     get_cropping_year_range,
+    get_soil_health_data,
     get_drought_data,
     get_osm_data,
     get_soge_data,
@@ -286,10 +287,14 @@ def generate_mws_report(request):
         (
             land_degrad,
             tree_degrad,
+            tree_gain,
+            shrub_degrad,
             urbanization,
             restore_desc,
             crop_intensity_sankey,
             tree_reduction_sankey,
+            afforestation_sankey,
+            shrub_change_sankey,
             urbanization_sankey,
         ) = get_change_detection_data(state, district, block, uid)
 
@@ -383,6 +388,9 @@ def generate_mws_report(request):
             get_cropping_intensity(state, district, block, uid)
         )
 
+        # ? Soil Health Description
+        soil_health_desc = get_soil_health_data(state, district, block, uid)
+
         # ? NDVI Timeseries (Crops)
         ndvi_labels, ndvi_data = get_ndvi_timeseries_data(state, district, block, uid)
 
@@ -416,10 +424,14 @@ def generate_mws_report(request):
             "terrain_slope_pct": terrain_slope_pct,
             "land_degrad": land_degrad,
             "tree_degrad": tree_degrad,
+            "tree_gain": tree_gain,
+            "shrub_degrad": shrub_degrad,
             "urbanization": urbanization,
             "restore_desc": restore_desc,
             "crop_intensity_sankey": json.dumps(crop_intensity_sankey),
             "tree_reduction_sankey": json.dumps(tree_reduction_sankey),
+            "afforestation_sankey": json.dumps(afforestation_sankey),
+            "shrub_change_sankey": json.dumps(shrub_change_sankey),
             "urbanization_sankey": json.dumps(urbanization_sankey),
             "year_range_text": year_range_text,
             "swb_intro_desc": swb_intro_desc,
@@ -435,6 +447,7 @@ def generate_mws_report(request):
             "drought_desc": drought_desc,
             "inten_desc1": inten_desc1,
             "inten_desc2": inten_desc2,
+            "soil_health_desc": soil_health_desc,
             "soge_desc": soge_desc,
             "min_elev": min_elev,
             "max_elev": max_elev,

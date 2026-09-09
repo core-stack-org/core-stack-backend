@@ -1423,10 +1423,10 @@ def get_mws_barren_percent(state, district, block, uid):
 
 
 def get_crop_intensity_sankey_data(state, district, block, uid):
-    """Cropping-intensity class transitions (single/double/triple) for the MWS, as sankey source-target-value links."""
+    """Cropland degradation transitions (to built-up/barren/scrub) for the MWS, as sankey source-target-value links."""
     sankey_data = []
     try:
-        df_cc = read_excel_sheet(
+        df_degrad = read_excel_sheet(
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1436,33 +1436,31 @@ def get_crop_intensity_sankey_data(state, district, block, uid):
             + "_"
             + block.lower()
             + ".xlsx",
-            "change_detection_cropintensity",
+            "change_detection_degradation",
         )
-        row_cc = df_cc.loc[df_cc["UID"] == uid]
-        if not row_cc.empty:
-            # Only degradation flows: Triple/Double (left) -> Double/Single (right)
+        row_degrad = df_degrad.loc[df_degrad["UID"] == uid]
+        if not row_degrad.empty:
             transitions = [
-                ("double_to_single_area_in_ha", "Double", "Single"),
-                ("double_to_double_area_in_ha", "Double", "Double"),
-                ("triple_to_single_area_in_ha", "Triple", "Single"),
-                ("triple_to_double_area_in_ha", "Triple", "Double"),
+                ("farm_to_built_up_area_in_ha", "Built up"),
+                ("farm_to_barren_area_in_ha", "Barren"),
+                ("farm_to_scrub_land_area_in_ha", "Shrubs and Scrubs"),
             ]
-            for col, source, target in transitions:
-                if col not in row_cc.columns:
+            for col, target in transitions:
+                if col not in row_degrad.columns:
                     continue
-                value = row_cc[col].values[0]
+                value = row_degrad[col].values[0]
                 value = float(value) if not pd.isna(value) else 0
                 if value > 0:
                     sankey_data.append(
                         {
-                            "source": f"{source} Cropping (Before)",
-                            "target": f"{target} Cropping (After)",
+                            "source": "Crops (Before)",
+                            "target": f"{target} (After)",
                             "value": round(value, 2),
                         }
                     )
     except Exception as e:
         logger.info(
-            f"Failed to read change_detection_cropintensity sheet for {uid}: {e}"
+            f"Failed to read change_detection_degradation sheet for {uid}: {e}"
         )
 
     return sankey_data
@@ -1509,6 +1507,97 @@ def get_tree_reduction_sankey_data(state, district, block, uid):
     except Exception as e:
         logger.info(
             f"Failed to read change_detection_deforestation sheet for {uid}: {e}"
+        )
+
+    return sankey_data
+
+
+def get_afforestation_sankey_data(state, district, block, uid):
+    """Land cover transitions into forest (afforestation) for the MWS, as sankey source-target-value links."""
+    sankey_data = []
+    try:
+        df_affor = read_excel_sheet(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            "change_detection_afforestation",
+        )
+        row_affor = df_affor.loc[df_affor["UID"] == uid]
+        if not row_affor.empty:
+            transitions = [
+                ("barren_to_forest_area_in_ha", "Barren"),
+                ("built_up_to_forest_area_in_ha", "Built up"),
+                ("farm_to_forest_area_in_ha", "Farm"),
+                ("scrub_land_to_forest_area_in_ha", "Scrub Land"),
+            ]
+            for col, source in transitions:
+                if col not in row_affor.columns:
+                    continue
+                value = row_affor[col].values[0]
+                value = float(value) if not pd.isna(value) else 0
+                if value > 0:
+                    sankey_data.append(
+                        {
+                            "source": f"{source} (Before)",
+                            "target": "Forest (After)",
+                            "value": round(value, 2),
+                        }
+                    )
+    except Exception as e:
+        logger.info(
+            f"Failed to read change_detection_afforestation sheet for {uid}: {e}"
+        )
+
+    return sankey_data
+
+
+def get_shrub_change_sankey_data(state, district, block, uid):
+    """Shrubland transitions (to farm/tree/built-up/water/barren) for the MWS, as sankey source-target-value links."""
+    sankey_data = []
+    try:
+        df_shrub = read_excel_sheet(
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx",
+            "change_detection_shrubchange",
+        )
+        row_shrub = df_shrub.loc[df_shrub["UID"] == uid]
+        if not row_shrub.empty:
+            transitions = [
+                ("shrub_to_farm_area_in_ha", "Farm"),
+                ("shrub_to_tree_area_in_ha", "Tree"),
+                ("shrub_to_built_up_area_in_ha", "Built up"),
+                ("shrub_to_water_area_in_ha", "Water"),
+                ("shrub_to_barren_area_in_ha", "Barren"),
+            ]
+            for col, target in transitions:
+                if col not in row_shrub.columns:
+                    continue
+                value = row_shrub[col].values[0]
+                value = float(value) if not pd.isna(value) else 0
+                if value > 0:
+                    sankey_data.append(
+                        {
+                            "source": "Shrub (Before)",
+                            "target": f"{target} (After)",
+                            "value": round(value, 2),
+                        }
+                    )
+    except Exception as e:
+        logger.info(
+            f"Failed to read change_detection_shrubchange sheet for {uid}: {e}"
         )
 
     return sankey_data
@@ -1561,7 +1650,7 @@ def get_urbanization_sankey_data(state, district, block, uid):
 
 def get_change_detection_data(state, district, block, uid):
     try:
-        df_degrad = read_excel_sheet(
+        excel_path = (
             DATA_DIR_TEMP
             + state.upper()
             + "/"
@@ -1570,48 +1659,20 @@ def get_change_detection_data(state, district, block, uid):
             + district.lower()
             + "_"
             + block.lower()
-            + ".xlsx",
-            "change_detection_degradation",
+            + ".xlsx"
         )
-        df_defo = read_excel_sheet(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            "change_detection_deforestation",
-        )
-        df_urban = read_excel_sheet(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            "change_detection_urbanization",
-        )
-        df_restore = read_excel_sheet(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            "restoration_vector",
-        )
+
+        df_degrad = read_excel_sheet(excel_path, "change_detection_degradation")
+        df_defo = read_excel_sheet(excel_path, "change_detection_deforestation")
+        df_affor = read_excel_sheet(excel_path, "change_detection_afforestation")
+        df_shrub = read_excel_sheet(excel_path, "change_detection_shrubchange")
+        df_urban = read_excel_sheet(excel_path, "change_detection_urbanization")
+        df_restore = read_excel_sheet(excel_path, "restoration_vector")
 
         parameter_land = f""
         parameter_tree = f""
+        parameter_afforest = f""
+        parameter_shrub = f""
         parameter_urban = f""
         parameter_restore = f""
 
@@ -1639,8 +1700,61 @@ def get_change_detection_data(state, district, block, uid):
         reduction = filtered_df.iloc[0]
         avg = df_defo["total_deforestation_area_in_ha"].mean()
 
-        if reduction >= 50:
-            parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2024, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares per micro watershed in the entire block."
+        if reduction >= 20:
+            degradation_area = 0
+            try:
+                df_tree_change = read_excel_sheet(excel_path, "overall_tree_change")
+                df_tree_change["degradation_area_in_ha"] = df_tree_change[
+                    "degradation_area_in_ha"
+                ].apply(pd.to_numeric, errors="coerce")
+                degradation_area = df_tree_change.loc[
+                    df_tree_change["UID"] == uid, "degradation_area_in_ha"
+                ].iloc[0]
+            except Exception:
+                degradation_area = 0
+
+            if not degradation_area:
+                degradation_clause = "but the reduction in Canopy density has been zero during 2017-24."
+            else:
+                degradation_clause = f"while reduction in canopy density and/or height of tree cover has been noted at about {round(degradation_area, 2)} hectares during 2017-24."
+
+            parameter_tree += f"In about {round(reduction, 2)} hectares of area, there has been a total loss of tree cover, {degradation_clause}"
+
+            try:
+                df_soil_health = read_excel_sheet(excel_path, "soil_health")
+                df_soil_health["OC_OLM_p50_in_percent"] = df_soil_health[
+                    "OC_OLM_p50_in_percent"
+                ].apply(pd.to_numeric, errors="coerce")
+                oc_percent = df_soil_health.loc[
+                    df_soil_health["UID"] == uid, "OC_OLM_p50_in_percent"
+                ].iloc[0]
+                parameter_tree += f" The organic carbon concentration across tree cover in this microwatershed is {round(oc_percent, 2)}%."
+            except Exception:
+                pass
+
+        # ? Increase in Tree Cover (Afforestation)
+        df_affor["total_afforestation_area_in_ha"] = df_affor[
+            "total_afforestation_area_in_ha"
+        ].apply(pd.to_numeric, errors="coerce")
+        filtered_df = df_affor.loc[
+            df_affor["UID"] == uid, "total_afforestation_area_in_ha"
+        ]
+        afforestation = filtered_df.iloc[0]
+        avg = df_affor["total_afforestation_area_in_ha"].mean()
+
+        if afforestation >= 20:
+            parameter_afforest += f"There has been a considerate increase in tree cover in this micro watershed over the years 2017-2024, with about {round(afforestation, 2)} hectares of new tree cover gained, as compared to {round(avg, 2)} hectares per micro watershed in the entire block."
+
+        # ? Shrubland Diversion
+        df_shrub["total_change_area_in_ha"] = df_shrub[
+            "total_change_area_in_ha"
+        ].apply(pd.to_numeric, errors="coerce")
+        filtered_df = df_shrub.loc[df_shrub["UID"] == uid, "total_change_area_in_ha"]
+        shrub_change = filtered_df.iloc[0]
+        avg = df_shrub["total_change_area_in_ha"].mean()
+
+        if shrub_change >= 20:
+            parameter_shrub += f"There has been a considerate level of degradation of shrubland cover in this microwatershed over the years 2017-24, about {round(shrub_change, 2)} hectares, as compared to {round(avg, 2)} hectares per microwatershed in the entire block."
 
         # ? Urbanization
         df_urban["total_urbanization_area_in_ha"] = df_urban[
@@ -1651,7 +1765,7 @@ def get_change_detection_data(state, district, block, uid):
         ]
         built_up_area = filtered_df.iloc[0]
 
-        if built_up_area >= 40:
+        if built_up_area >= 20:
             parameter_urban += f"There has been a considerate level of urbanization in this micro watershed with about {round(built_up_area, 2)} hectares of land covered with settlements."
 
         # ? Wide Scale Restoration
@@ -1678,15 +1792,25 @@ def get_change_detection_data(state, district, block, uid):
         tree_reduction_sankey = get_tree_reduction_sankey_data(
             state, district, block, uid
         )
+        afforestation_sankey = get_afforestation_sankey_data(
+            state, district, block, uid
+        )
+        shrub_change_sankey = get_shrub_change_sankey_data(
+            state, district, block, uid
+        )
         urbanization_sankey = get_urbanization_sankey_data(state, district, block, uid)
 
         return (
             parameter_land,
             parameter_tree,
+            parameter_afforest,
+            parameter_shrub,
             parameter_urban,
             parameter_restore,
             crop_intensity_sankey,
             tree_reduction_sankey,
+            afforestation_sankey,
+            shrub_change_sankey,
             urbanization_sankey,
         )
 
@@ -1696,7 +1820,7 @@ def get_change_detection_data(state, district, block, uid):
             district,
             block,
         )
-        return "", "", "", "", [], [], []
+        return "", "", "", "", "", "", [], [], [], [], []
 
 
 def get_land_conflict_industrial_data(state, district, block, uid):
@@ -2117,6 +2241,73 @@ def get_cropping_intensity(state, district, block, uid):
             block,
         )
         return "", "", [], [], [], [], []
+
+
+def get_soil_health_data(state, district, block, uid):
+    try:
+        excel_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        df_health = read_excel_sheet(excel_path, "soil_health")
+        df_type = read_excel_sheet(excel_path, "soil_type")
+
+        nutrient_columns = [
+            "N_p50_in_kg_per_ha",
+            "P_p50_in_kg_per_ha",
+            "K_p50_in_kg_per_ha",
+            "OC_p50_in_percent",
+        ]
+        df_health[nutrient_columns] = df_health[nutrient_columns].apply(
+            pd.to_numeric, errors="coerce"
+        )
+
+        filtered_health = df_health.loc[df_health["UID"] == uid]
+        filtered_type = df_type.loc[df_type["UID"] == uid]
+
+        if filtered_health.empty or filtered_type.empty:
+            return ""
+
+        nitrogen = round(filtered_health["N_p50_in_kg_per_ha"].values[0], 2)
+        phosphorus = round(filtered_health["P_p50_in_kg_per_ha"].values[0], 2)
+        potassium = round(filtered_health["K_p50_in_kg_per_ha"].values[0], 2)
+        organic_carbon = round(filtered_health["OC_p50_in_percent"].values[0], 2)
+
+        soil_drainage = filtered_type["soil_drainage_classes"].values[0]
+        soil_texture = filtered_type["subsoil_texture"].values[0]
+        soil_ph = filtered_type["topsoil_ph"].values[0]
+
+        soil_health_desc = (
+            "Soil health is a foundational indicator for agricultural resilience, land degradation assessment, "
+            "and precision farming interventions. Nitrogen, phosphorus, and potassium (NPK) concentrations in a "
+            "microwatershed indicate soil fertility, guide targeted fertilizer use, and help prevent water "
+            "pollution. Nitrogen concentration in this microwatershed is "
+            f"<strong>{nitrogen} kg/ha</strong>, Phosphorus concentration is "
+            f"<strong>{phosphorus} kg/ha</strong> and Potassium concentration is "
+            f"<strong>{potassium} kg/ha</strong>. Organic carbon, which is an indicator of soil's capacity to "
+            "hold other nitrogen, phosphorus, and potassium, helps retain soil moisture and reduce soil erosion, "
+            f"and drives nutrient cycling, has a concentration of <strong>{organic_carbon}%</strong> in this "
+            f"microwatershed. The soil is <strong>{soil_drainage}</strong>, has a <strong>{soil_texture}</strong> "
+            f"texture and has a pH of <strong>{soil_ph}</strong>."
+        )
+
+        return soil_health_desc
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Soil Health",
+            district,
+            block,
+        )
+        return ""
 
 
 def get_cropping_year_range(state, district, block, uid):
