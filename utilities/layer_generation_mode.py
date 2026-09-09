@@ -527,13 +527,29 @@ def sync_layer_generation_if_enabled(view_func):
                     if _SYNC_LAYER_GENERATED.get() is False:
                         payload.pop("asset_id", None)
                         payload.pop("asset_ids", None)
+                        payload.pop("stac_items", None)
                         payload["layer_generated"] = False
-                    if "stac" not in payload:
+                    else:
                         stac_spec = _collect_stac_for_request(request)
-                        payload["stac"] = format_stac_for_api_response(stac_spec)
+                        if "stac" not in payload:
+                            payload["stac"] = format_stac_for_api_response(stac_spec)
                         if stac_spec is not None and stac_spec.get("stac_errors"):
                             payload["stac_errors"] = stac_spec["stac_errors"]
                         payload.pop("stac_spec", None)
+                        # Populate the fields Airflow's generated STACD DAGs
+                        # read from the API response (asset_id(s)/stac_items)
+                        # to register a dataset instance + STAC item for
+                        # this run. Without these, the DAG's dataset
+                        # registration task raises AirflowSkipException and
+                        # nothing shows up in the STACD lineage browser.
+                        stac_items = (stac_spec or {}).get("items") or []
+                        payload["stac_items"] = stac_items
+                        asset_ids = [
+                            item.get("id") for item in stac_items if item.get("id")
+                        ]
+                        if asset_ids:
+                            payload["asset_ids"] = asset_ids
+                            payload["asset_id"] = asset_ids[0]
                     if payload.get("status") == "initiated":
                         payload["status"] = "completed"
                         payload["Success"] = "Layer generation completed"
