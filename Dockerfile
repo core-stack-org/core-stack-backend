@@ -36,7 +36,9 @@ COPY installation/docker/entrypoint.sh \
      installation/docker/download-data.sh \
      /usr/local/bin/
 RUN micromamba run -n corestackenv python -m pip install --no-cache-dir gdown \
-    && micromamba install -y -n corestackenv -c conda-forge geetools=1.15.0 \
+    && micromamba run -n corestackenv python -m pip uninstall -y geetools || true \
+    && micromamba install -y -n corestackenv -c conda-forge --force-reinstall geetools=1.15.0 \
+    && micromamba run -n corestackenv python -c "import geetools; from geetools.ee_asset import Asset; print('geetools', geetools.__version__)" \
     && micromamba clean --all --yes \
     && chmod +x /usr/local/bin/entrypoint.sh \
         /usr/local/bin/geoserver-init.sh \

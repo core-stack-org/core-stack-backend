@@ -80,7 +80,7 @@ dependencies:
       - speechrecognition==3.14.3
       - pystac
       - tqdm
-      - geemap
+      - geemap==0.34.5
       - geetools==1.15.0
       - unidecode
       - drf-nested-routers
