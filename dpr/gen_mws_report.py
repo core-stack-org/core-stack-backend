@@ -1639,7 +1639,7 @@ def get_change_detection_data(state, district, block, uid):
         reduction = filtered_df.iloc[0]
         avg = df_defo["total_deforestation_area_in_ha"].mean()
 
-        if reduction >= 50:
+        if reduction >= 20:
             parameter_tree += f"There has been a considerate level of reduction in tree cover in this micro watershed over the years 2017-2024, about {round(reduction, 1)} hectares, as compared to {round(avg, 1)} hectares per micro watershed in the entire block."
 
         # ? Urbanization
@@ -1651,7 +1651,7 @@ def get_change_detection_data(state, district, block, uid):
         ]
         built_up_area = filtered_df.iloc[0]
 
-        if built_up_area >= 40:
+        if built_up_area >= 20:
             parameter_urban += f"There has been a considerate level of urbanization in this micro watershed with about {round(built_up_area, 2)} hectares of land covered with settlements."
 
         # ? Wide Scale Restoration
@@ -2117,6 +2117,73 @@ def get_cropping_intensity(state, district, block, uid):
             block,
         )
         return "", "", [], [], [], [], []
+
+
+def get_soil_health_data(state, district, block, uid):
+    try:
+        excel_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        df_health = read_excel_sheet(excel_path, "soil_health")
+        df_type = read_excel_sheet(excel_path, "soil_type")
+
+        nutrient_columns = [
+            "N_p50_in_kg_per_ha",
+            "P_p50_in_kg_per_ha",
+            "K_p50_in_kg_per_ha",
+            "OC_p50_in_percent",
+        ]
+        df_health[nutrient_columns] = df_health[nutrient_columns].apply(
+            pd.to_numeric, errors="coerce"
+        )
+
+        filtered_health = df_health.loc[df_health["UID"] == uid]
+        filtered_type = df_type.loc[df_type["UID"] == uid]
+
+        if filtered_health.empty or filtered_type.empty:
+            return ""
+
+        nitrogen = round(filtered_health["N_p50_in_kg_per_ha"].values[0], 2)
+        phosphorus = round(filtered_health["P_p50_in_kg_per_ha"].values[0], 2)
+        potassium = round(filtered_health["K_p50_in_kg_per_ha"].values[0], 2)
+        organic_carbon = round(filtered_health["OC_p50_in_percent"].values[0], 2)
+
+        soil_drainage = filtered_type["soil_drainage_classes"].values[0]
+        soil_texture = filtered_type["subsoil_texture"].values[0]
+        soil_ph = filtered_type["topsoil_ph"].values[0]
+
+        soil_health_desc = (
+            "Soil health is a foundational indicator for agricultural resilience, land degradation assessment, "
+            "and precision farming interventions. Nitrogen, phosphorus, and potassium (NPK) concentrations in a "
+            "microwatershed indicate soil fertility, guide targeted fertilizer use, and help prevent water "
+            "pollution. Nitrogen concentration in this microwatershed is "
+            f"<strong>{nitrogen} kg/ha</strong>, Phosphorus concentration is "
+            f"<strong>{phosphorus} kg/ha</strong> and Potassium concentration is "
+            f"<strong>{potassium} kg/ha</strong>. Organic carbon, which is an indicator of soil's capacity to "
+            "hold other nitrogen, phosphorus, and potassium, helps retain soil moisture and reduce soil erosion, "
+            f"and drives nutrient cycling, has a concentration of <strong>{organic_carbon}%</strong> in this "
+            f"microwatershed. The soil is <strong>{soil_drainage}</strong>, has a <strong>{soil_texture}</strong> "
+            f"texture and has a pH of <strong>{soil_ph}</strong>."
+        )
+
+        return soil_health_desc
+
+    except Exception as e:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Soil Health",
+            district,
+            block,
+        )
+        return ""
 
 
 def get_cropping_year_range(state, district, block, uid):

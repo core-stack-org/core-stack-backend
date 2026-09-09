@@ -2225,6 +2225,94 @@
             {% endif %}
         </section>
 
+        {% if soil_health_desc %}
+        <section class="section">
+            <h3>Soil Health</h3>
+            <p>{{soil_health_desc|safe}}</p>
+
+            <div class="map-group">
+                <div id="soilHealthMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <div class="raster-legend"
+                        style="position: absolute; top: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Soil Parameter</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="N" checked onchange="toggleSoilHealthLayer(this)">
+                                    Nitrogen (N)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="P" onchange="toggleSoilHealthLayer(this)">
+                                    Phosphorus (P)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="K" onchange="toggleSoilHealthLayer(this)">
+                                    Potassium (K)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="OC" onchange="toggleSoilHealthLayer(this)">
+                                    Organic Carbon (OC)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; transform: scale(0.85); transform-origin: bottom left;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 id="soilLegendTitle" style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Nitrogen (kg/ha)</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
+                            <div id="soilLegend-N" class="soil-legend-panel" style="display: flex; gap: 8px;">
+                                <div
+                                    style="width: 16px; height: 140px; background: linear-gradient(to top, #8B0000 0%, #D73027 10%, #F46D43 20%, #FDAE61 30%, #FEE08B 40%, #FFFFBF 50%, #D9EF8B 60%, #A6D96A 70%, #66BD63 80%, #1A9850 90%, #006837 100%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;">
+                                </div>
+                                <div style="position: relative; height: 140px; flex: 1; min-width: 30px;">
+                                    <div style="position: absolute; bottom: 0%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">0</span></div>
+                                    <div style="position: absolute; bottom: 20%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">100</span></div>
+                                    <div style="position: absolute; bottom: 40%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">200</span></div>
+                                    <div style="position: absolute; bottom: 60%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">300</span></div>
+                                    <div style="position: absolute; bottom: 80%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">400</span></div>
+                                    <div style="position: absolute; bottom: 100%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">500</span></div>
+                                </div>
+                            </div>
+                            <div id="soilLegend-P" class="soil-legend-panel" style="display: none; flex-direction: column; gap: 3px;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #D73027; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Low (&lt;10)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #FEE08B; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Medium (10-25)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #1A9850; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">High (&gt;25)</span></div>
+                            </div>
+                            <div id="soilLegend-K" class="soil-legend-panel" style="display: none; flex-direction: column; gap: 3px;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #FF0000; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Low (&lt;120 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #EEE05D; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Medium (120-280 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #73BB53; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">High (&gt;280 kg/ha)</span></div>
+                            </div>
+                            <div id="soilLegend-OC" class="soil-legend-panel" style="display: none; flex-direction: column; gap: 3px;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #C8E6C9; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Low (0-120 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #66BB6A; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Medium (120-280 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #2E7D32; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">High (&gt;280 kg/ha)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="soilHealthBoundaryMap" class="map" style="flex: 1 1 48%;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Soil Nutrient Raster - use checkboxes to toggle between Nitrogen, Phosphorus, Potassium and Organic Carbon</div>
+                <div style="width: 48%; text-align: center;">MWS and Village Boundaries</div>
+            </div>
+
+            <p class="legend-note">Note: Ground truth sampling data from Government of India&rsquo;s Soil Health Card
+                portal was integrated with satellite derived features to compute all parameters. A cropland LULC mask
+                was applied prior to prediction to restrict outputs to active agricultural land. Final rasters are
+                generated at 30 m spatial resolution.</p>
+        </section>
+        {% endif %}
+
         {% if land_degrad or tree_degrad %}
         <section class="section">
             {% if land_degrad %}
@@ -3434,6 +3522,63 @@
             name: 'tree_raster'
         })
 
+        // Soil Health rasters (Nitrogen / Phosphorus / Potassium / Organic Carbon) - toggled via checkboxes, one visible at a time
+        const soilNRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_N",
+                    'STYLES': 'Soil_Health_Nitrogen',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'soil_n_raster'
+        })
+
+        const soilPRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_P",
+                    'STYLES': 'Soil_Health_Phosphorus',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: false,
+            name: 'soil_p_raster'
+        })
+
+        const soilKRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_K",
+                    'STYLES': 'Soil_Health_Potassium',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: false,
+            name: 'soil_k_raster'
+        })
+
+        const soilOCRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_OC",
+                    'STYLES': 'Soil_Health_Organic_carbon',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: false,
+            name: 'soil_oc_raster'
+        })
+
         const treeReduceRaster = new ol.layer.Image({
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
@@ -3913,6 +4058,51 @@
             ])
         })
 
+        const soilHealthMap = new ol.Map({
+            target: 'soilHealthMap',
+            layers: [getBaseLayer(), soilNRaster, soilPRaster, soilKRaster, soilOCRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const soilHealthBoundaryMap = new ol.Map({
+            target: 'soilHealthBoundaryMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [getBaseLayer(), treeReduceRaster],
@@ -4118,6 +4308,11 @@
                         farmLossRasterMapLayer.addFilter(crop);
                         treeLossRasterMapLayer.addFilter(crop);
 
+                        soilNRaster.addFilter(crop);
+                        soilPRaster.addFilter(crop);
+                        soilKRaster.addFilter(crop);
+                        soilOCRaster.addFilter(crop);
+
 
                         // Add village boundaries to all comparison maps with spatial filter
                         addVillageBoundariesToMap(ComparisonMap1, feature);
@@ -4125,6 +4320,7 @@
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
+                        addVillageBoundariesToMap(soilHealthBoundaryMap, feature);
                         // addVillageBoundariesToMap(swbMap, feature);
                         addVillageBoundariesToMap(swbVillageMap, feature);
                         addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
@@ -4156,6 +4352,7 @@
                     addMwsBoundaryToMap(ComparisonMap3);
                     addMwsBoundaryToMap(ComparisonMap4);
                     addMwsBoundaryToMap(ComparisonMap5);
+                    addMwsBoundaryToMap(soilHealthBoundaryMap);
                     addMwsBoundaryToMap(swbMap);
                     addMwsBoundaryToMap(swbVillageMap);
                     addMwsBoundaryToMap(villageIntersectMap);
@@ -4183,6 +4380,8 @@
                     ComparisonMap3.getView().fit(arr, fitOptions);
                     ComparisonMap4.getView().fit(arr, fitOptions);
                     ComparisonMap5.getView().fit(arr, fitOptions);
+                    soilHealthMap.getView().fit(arr, fitOptions);
+                    soilHealthBoundaryMap.getView().fit(arr, fitOptions);
                     urbanMap.getView().fit(arr, fitOptions);
                     farmLossMap.getView().fit(arr, fitOptions);
                     treeLossMap.getView().fit(arr, fitOptions);
@@ -4325,6 +4524,35 @@
             if (!isShown) tooltip.classList.add('show');
         }
         window.toggleMapInfo = toggleMapInfo;
+
+        // Toggle between the N/P/K/OC soil health rasters on the Soil Health map (single layer visible at a time)
+        function toggleSoilHealthLayer(checkbox) {
+            const layerMap = { N: soilNRaster, P: soilPRaster, K: soilKRaster, OC: soilOCRaster };
+            const titleMap = { N: 'Nitrogen (kg/ha)', P: 'Phosphorus', K: 'Potassium', OC: 'Organic Carbon' };
+            if (!checkbox.checked) {
+                // Always keep exactly one parameter visible
+                checkbox.checked = true;
+                return;
+            }
+            document.querySelectorAll('.soil-health-toggle').forEach(cb => {
+                const layer = layerMap[cb.dataset.layer];
+                if (!layer) return;
+                if (cb === checkbox) {
+                    layer.setVisible(true);
+                } else {
+                    cb.checked = false;
+                    layer.setVisible(false);
+                }
+            });
+
+            const activeParam = checkbox.dataset.layer;
+            document.querySelectorAll('.soil-legend-panel').forEach(panel => {
+                panel.style.display = panel.id === 'soilLegend-' + activeParam ? 'flex' : 'none';
+            });
+            const legendTitle = document.getElementById('soilLegendTitle');
+            if (legendTitle) legendTitle.textContent = titleMap[activeParam] || 'Soil Parameter';
+        }
+        window.toggleSoilHealthLayer = toggleSoilHealthLayer;
 
         document.addEventListener('click', evt => {
             if (!evt.target.closest('.map-info-btn')) {
@@ -4478,6 +4706,8 @@ const legendHTML = `
             if (typeof hydroVectorMap !== 'undefined') addVisualScaleBar(hydroVectorMap);
             if (typeof DegradMap !== 'undefined') addVisualScaleBar(DegradMap);
             if (typeof treeReduceMap !== 'undefined') addVisualScaleBar(treeReduceMap);
+            if (typeof soilHealthMap !== 'undefined') addVisualScaleBar(soilHealthMap);
+            if (typeof soilHealthBoundaryMap !== 'undefined') addVisualScaleBar(soilHealthBoundaryMap);
 
             if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
             if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
@@ -4492,7 +4722,7 @@ const legendHTML = `
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
+            const boundaryMaps = ['compMap1', 'compMap3', 'compMap4', 'compMap5', 'soilHealthBoundaryMap', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
