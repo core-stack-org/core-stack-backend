@@ -92,6 +92,7 @@ def compute_water_balance_archive_banded(
     end_year=2025,
     output_dir=None,
     overwrite=False,
+    row_chunk=500,
 ):
     """Yearly multi-band version of compute_water_balance_archive, for
     the 500m SPEI-3 pipeline where rainfall/PET are stored as one
@@ -101,14 +102,25 @@ def compute_water_balance_archive_banded(
     where disk space is a real constraint (this was built specifically
     because of that - see conversation).
 
+    Row-tiled (read/subtract/write a horizontal strip at a time, not the
+    whole year at once) - subtraction has no cross-pixel dependency, so
+    this is a zero-cost way to bound memory, unlike the float32 downcast
+    tried first here: reading a full year (13 bands, 6569x7110) of
+    precip AND pet AND the output simultaneously actually OOM-killed the
+    process in practice (~19.7GB RSS, confirmed via dmesg) - the earlier
+    assumption that one year was "small enough" to hold whole was wrong
+    on a machine already under memory pressure from other things. Row
+    tiling fixes that at the root without trading away precision the way
+    float32 did (measured ~0.09 divergence in final SPEI-3 values on a
+    synthetic test - not an acceptable tradeoff when tiling is free).
+
     precip_paths_by_year / pet_paths_by_year: {year: file_path} - passed
     in explicitly rather than assumed from a fixed naming pattern,
     because the actual files on disk came from a manual terminal
     workflow (gdalbuildvrt/gdal_translate merges) with naming that
-    doesn't perfectly follow one convention (e.g. 1999 is a single
-    un-sharded file with a different name than the merged years) -
-    baking a fragile path-guessing pattern into this function risks
-    yet another silent-mismatch bug like the last two.
+    doesn't perfectly follow one convention - baking a fragile
+    path-guessing pattern into this function risks yet another
+    silent-mismatch bug like the last two.
 
     Band order within each year's file must match
     spi_spei_export._periods_by_year's chronological ordering for that
@@ -119,8 +131,11 @@ def compute_water_balance_archive_banded(
     Output: one wb_{year}.tif per year, same band layout as the inputs.
 
     Safe to interrupt and re-run: years already on disk are skipped
-    unless overwrite=True.
+    unless overwrite=True. Doesn't resume a partially-written year if
+    interrupted mid-strip - re-run that year with overwrite=True.
     """
+    from rasterio.windows import Window
+
     from computing.farm_stress.config import LOCAL_DIR_WATER_BALANCE_500M
     from computing.farm_stress.spi_spei_export import _periods_by_year
 
@@ -150,25 +165,22 @@ def compute_water_balance_archive_banded(
                     f"{year}: expected {len(periods)} bands, got "
                     f"{precip_src.count} (precip) / {pet_src.count} (pet)"
                 )
-            # float64, matching compute_water_balance_archive exactly -
-            # only one year (~13 bands) is ever held in memory at once
-            # here, not the full 340-period archive, so there's no real
-            # memory pressure to trade away precision for (float32 was
-            # tried here first and measurably diverged from the
-            # per-period reference pipeline - up to ~0.09 in the final
-            # SPEI-3 values on a synthetic test - not worth it for a
-            # saving that isn't needed at this scale).
-            precip = precip_src.read().astype(np.float64)
-            pet = pet_src.read().astype(np.float64)
-            profile = pet_src.profile
+            rows, cols = precip_src.height, precip_src.width
+            profile = precip_src.profile.copy()
+            profile.update(dtype="float64", count=len(periods), nodata=np.nan)
 
-        water_balance = precip - pet
+            n_strips = (rows + row_chunk - 1) // row_chunk
+            with rasterio.open(out_path, "w", **profile) as dst:
+                for s in range(n_strips):
+                    row_off = s * row_chunk
+                    strip_h = min(row_chunk, rows - row_off)
+                    window = Window(0, row_off, cols, strip_h)
 
-        profile.update(dtype="float64", count=len(periods), nodata=np.nan)
-        with rasterio.open(out_path, "w", **profile) as dst:
-            dst.write(water_balance)
+                    precip_strip = precip_src.read(window=window).astype(np.float64)
+                    pet_strip = pet_src.read(window=window).astype(np.float64)
+                    dst.write(precip_strip - pet_strip, window=window)
 
-        print(f"{year}: wrote {out_path} ({len(periods)} bands)")
+        print(f"{year}: wrote {out_path} ({len(periods)} bands, {n_strips} strip(s))")
         computed.append(out_path)
 
     print(
