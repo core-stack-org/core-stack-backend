@@ -45,14 +45,14 @@ class GEEManager:
         except Exception as e:
             print(f"Error initializing GEE: {e}")
             print("Please authenticate your Google Earth Engine account.")
-        if False:
-            try:
-                drive.mount("/content/drive")
-                print("Google Drive mounted successfully.")
-            except Exception as e:
-                print(
-                    "Google Drive is not available. Please run this code in Google Colab."
-                )
+        # if False:
+        #     try:
+        #         drive.mount("/content/drive")
+        #         print("Google Drive mounted successfully.")
+        #     except Exception as e:
+        #         print(
+        #             "Google Drive is not available. Please run this code in Google Colab."
+        #         )
 
     def get_state_image(self, state_name: str):
         """
@@ -198,7 +198,7 @@ class GEEManager:
         return stateForest
 
     def export_forest_cover_to_drive(
-        self, forest_non_forest_cover_maps, years, state_name
+        self, forest_non_forest_cover_maps, years, state_name, file_path
     ) -> None:
         """
         Export the forest/non-forest cover map to Google Drive.
@@ -263,7 +263,7 @@ class GEEManager:
         for year in years:
             download_tif_from_gcs(
                 source_blob_name=f"nrm_raster/{state_name}_{year}.tif",
-                destination_file_name=f"data/forest_additionality/{state_name}/{state_name}_{year}.tif",
+                destination_file_name=f"{file_path}/{state_name}_{year}.tif",
             )
         return None
 
@@ -300,7 +300,9 @@ class GEEManager:
 
         return None
 
-    def create_forest_maps_and_export(self, state_name: str, years: List[int]) -> None:
+    def create_forest_maps_and_export(
+        self, state_name: str, years: List[int], drive_file_path
+    ) -> None:
         """
         Create and export forest/non-forest cover maps for a given state and years.
 
@@ -327,12 +329,13 @@ class GEEManager:
             forest_non_forest_cover_maps=forest_non_forest_cover_maps,
             years=years,
             state_name=state_name,
+            file_path=drive_file_path,
         )
 
         return None
 
     # Functions to export administrative divisions
-    def export_districts(self, state_name: str):
+    def export_districts(self, state_name: str, file_path):
         """
         We are treating the districts as the administrative divisions, here.
         This function needs to be changed according to the requirements.
@@ -385,7 +388,7 @@ class GEEManager:
 
         download_tif_from_gcs(
             source_blob_name=f"nrm_raster/{state_name}_districts.tif",
-            destination_file_name=f"data/forest_additionality/{state_name}/{state_name}_districts.tif",
+            destination_file_name=f"{file_path}/{state_name}_districts.tif",
         )
 
         return None
@@ -448,7 +451,7 @@ class GEEManager:
         # display(map_folium)  # This function works only in Jupyter nootebook environment
 
     def export_jurisdiction_mask(
-        self, jurisdiction_mask: ee.image.Image, state_name: str
+        self, jurisdiction_mask: ee.image.Image, state_name: str, file_path
     ):
         """
         Exports the created jusisdiction mask to the drive.
@@ -490,12 +493,12 @@ class GEEManager:
 
         download_tif_from_gcs(
             source_blob_name=f"nrm_raster/{state_name}_jurisidiction_mask.tif",
-            destination_file_name=f"data/forest_additionality/{state_name}/{state_name}_jurisidiction_mask.tif",
+            destination_file_name=f"{file_path}/{state_name}_jurisidiction_mask.tif",
         )
 
         return None
 
-    def create_and_export_jurisdiction_mask(self, state_name: str):
+    def create_and_export_jurisdiction_mask(self, state_name: str, drive_file_path):
         """
         This function will create and export the jurisdiction mask for the required state.
 
@@ -507,7 +510,9 @@ class GEEManager:
 
         # Export the jurisdiction mask
         self.export_jurisdiction_mask(
-            jurisdiction_mask=jurisdiction_mask, state_name=state_name
+            jurisdiction_mask=jurisdiction_mask,
+            state_name=state_name,
+            file_path=drive_file_path,
         )
 
         return None

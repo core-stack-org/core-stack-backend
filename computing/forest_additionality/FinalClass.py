@@ -182,9 +182,13 @@ class RiskMaps:
 
         Note: This function is time-intensive (~30-45 minutes).
         """
-        self.gee_manager.create_forest_maps_and_export(self.state_name, self.years)
-        self.gee_manager.create_and_export_jurisdiction_mask(self.state_name)
-        self.gee_manager.export_districts(self.state_name)
+        self.gee_manager.create_forest_maps_and_export(
+            self.state_name, self.years, self.drive_folder_path
+        )
+        self.gee_manager.create_and_export_jurisdiction_mask(
+            self.state_name, self.drive_folder_path
+        )
+        self.gee_manager.export_districts(self.state_name, self.drive_folder_path)
 
     def prepare_data(self):
         """

@@ -13,7 +13,9 @@ from dataclasses import dataclass
 from rasterio.warp import reproject, Resampling
 
 
-def get_area_estimation(state_name, start_year, mid_pt, end_year, DATA_DIR):
+def get_deforestation_area_estimation(
+    state_name, start_year, mid_pt, end_year, DATA_DIR
+):
     # Directory that contains the generated prediction and mask rasters.
     PRED_DIR = f"{DATA_DIR}/outputs"  # BASE_DIR / "outputs" / "predictions"
     LABEL_BAND = "remapped"  # "9_deforestation"
@@ -200,7 +202,7 @@ def get_area_estimation(state_name, start_year, mid_pt, end_year, DATA_DIR):
     df = pd.DataFrame(results)
 
     # Save the summary metrics to disk for downstream analysis or reporting.
-    out_csv = DATA_DIR + "/deforestation_area_estimates_625_new.csv"
+    out_csv = DATA_DIR + "/deforestation_area_estimates.csv"
 
     df.to_csv(out_csv, index=False)
 

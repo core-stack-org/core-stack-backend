@@ -56,8 +56,8 @@ def generate_afforestation_mask(state_name, start_year, mid_pt, end_year, dir_pa
             meta.update(dtype=rasterio.int8)
 
             # Create separate masks for deforestation and afforestation
-            deforestation_mask = np.zeros_like(change, dtype=np.int8)
-            deforestation_mask[change == 1] = -1
+            # deforestation_mask = np.zeros_like(change, dtype=np.int8)
+            # deforestation_mask[change == -1] = 1
             afforestation_mask = np.zeros_like(change, dtype=np.int8)
             afforestation_mask[change == 1] = 1
             print(change.shape)
