@@ -111,10 +111,6 @@ def build_farm_boundary_map(self, state: str, district: str, block: str, api_key
         raise self.retry(exc=exc)
 
     # ── Phase 4: PMTiles conversion ───────────────────────────────────────────
-    # Not wrapped in the retry logic above: Phases 1-3 have already produced
-    # usable output by this point, so a Phase 4 failure (e.g. missing
-    # tippecanoe/pmtiles binaries) is logged and returned as an error field
-    # rather than discarding everything via a retry.
     phase4_summary = None
     try:
         from .pmtiles import convert_boundaries_to_pmtiles

@@ -1,19 +1,26 @@
 """
-Phase 4 — Convert farm_boundaries.parquet into a PMTiles vector tile archive.
+Phase 4 — Convert farm_boundaries.parquet into a PMTiles vector tile archive
+and upload it to S3.
 
 Pipeline:
     farm_boundaries.parquet
         -> newline-delimited GeoJSON (GeoJSONSeq), via GeoPandas/Fiona
         -> tippecanoe                                  -> intermediate .mbtiles
         -> `pmtiles convert` (go-pmtiles CLI)           -> farm_boundaries.pmtiles
+        -> boto3 upload                                -> S3
+
+Everything is built inside a temp directory — no .pmtiles (or intermediate
+.geojsonl/.mbtiles) file is kept on local disk; the only persistent copy
+lives in S3.
 
 Both `tippecanoe` and the `pmtiles` CLI are external binaries, not Python
 packages. `tippecanoe` is installed into the project's conda env
 (corestackenv); `pmtiles` is a standalone system binary. Both must be
 reachable on PATH wherever this runs.
 
-Output:
-    data/farm_boundaries/<state>/<district>/<block>/farm_boundaries.pmtiles
+S3 destination (same credentials/region as dpr/utils.py's upload_dpr_to_s3,
+different bucket):
+    corestack-farm-data/<state>/<district>/<block>.pmtiles
 
 Usage (standalone / debug):
     from computing.farm_boundaries.pmtiles import convert_boundaries_to_pmtiles
@@ -27,8 +34,10 @@ import shutil
 import subprocess
 import tempfile
 
+import boto3
 import geopandas as gpd
 
+from nrm_app.settings import DPR_S3_ACCESS_KEY, DPR_S3_REGION, DPR_S3_SECRET_KEY
 from utilities.constants import FARM_BOUNDARIES_PATH
 
 logger = logging.getLogger(__name__)
@@ -49,6 +58,10 @@ DEFAULT_MAX_ZOOM = 16
 
 REQUIRED_BINARIES = ["tippecanoe", "pmtiles"]
 
+# Same AWS account/credentials as DPR's S3 upload (dpr/utils.py), separate
+# bucket dedicated to farm boundary tilesets.
+FARM_DATA_S3_BUCKET = "corestack-farm-data"
+
 
 # ── path helpers ───────────────────────────────────────────────────────────────
 
@@ -58,8 +71,11 @@ def _output_dir(state, district, block):
 def _farm_parquet_path(state, district, block):
     return os.path.join(_output_dir(state, district, block), "farm_boundaries.parquet")
 
-def _pmtiles_path(state, district, block):
-    return os.path.join(_output_dir(state, district, block), "farm_boundaries.pmtiles")
+def _s3_key(state, district, block):
+    return f"{state}/{district}/{block}.pmtiles"
+
+def _s3_url(state, district, block):
+    return f"https://{FARM_DATA_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{_s3_key(state, district, block)}"
 
 
 # ── environment check ────────────────────────────────────────────────────────
@@ -72,6 +88,15 @@ def _check_binaries_available():
             "Install tippecanoe (conda install -c conda-forge tippecanoe) "
             "and the go-pmtiles CLI before running Phase 4."
         )
+
+
+def _s3_client():
+    return boto3.client(
+        "s3",
+        aws_access_key_id=DPR_S3_ACCESS_KEY,
+        aws_secret_access_key=DPR_S3_SECRET_KEY,
+        region_name=DPR_S3_REGION,
+    )
 
 
 # ── pipeline steps ───────────────────────────────────────────────────────────
@@ -129,38 +154,54 @@ def _convert_mbtiles_to_pmtiles(mbtiles_path, pmtiles_path):
     logger.debug("pmtiles convert stderr:\n%s", result.stderr)
 
 
+def _upload_pmtiles_to_s3(local_path, state, district, block):
+    """
+    Upload a local .pmtiles file to corestack-farm-data/<state>/<district>/<block>.pmtiles.
+    Mirrors dpr/utils.py's upload_dpr_to_s3 (same credentials/region, different bucket).
+    """
+    s3_key = _s3_key(state, district, block)
+
+    with open(local_path, "rb") as f:
+        _s3_client().upload_fileobj(
+            f,
+            FARM_DATA_S3_BUCKET,
+            s3_key,
+            ExtraArgs={"ContentType": "application/octet-stream"},
+        )
+
+    s3_url = _s3_url(state, district, block)
+    logger.info("PMTiles uploaded to S3: %s", s3_url)
+    return s3_url
+
+
 # ── public entry point ───────────────────────────────────────────────────────
 
 def convert_boundaries_to_pmtiles(
     state: str,
     district: str,
     block: str,
-    overwrite: bool = False,
     min_zoom: int = DEFAULT_MIN_ZOOM,
     max_zoom: int = DEFAULT_MAX_ZOOM,
 ) -> dict:
     """
-    Phase 4: convert farm_boundaries.parquet into a PMTiles vector tile archive.
+    Phase 4: convert farm_boundaries.parquet into a PMTiles vector tile
+    archive and upload it to S3, always overwriting whatever is already at
+    that S3 key. No .pmtiles (or intermediate) file is kept on local disk —
+    everything is built in a temp directory and discarded once uploaded.
 
     Parameters
     ----------
     state, district, block : str
         Lower-cased administrative names.
-    overwrite : bool
-        If False (default) and farm_boundaries.pmtiles already exists, skip.
     min_zoom, max_zoom : int
         Zoom range to generate tiles for.
 
     Returns
     -------
     dict
-        Summary with output path, farm count, and file size (or skipped flag).
+        Summary with S3 url, farm count, and file size (or skipped flag if
+        there were no farms to tile).
     """
-    out_path = _pmtiles_path(state, district, block)
-    if not overwrite and os.path.exists(out_path):
-        logger.info("farm_boundaries.pmtiles already exists — skipping Phase 4.")
-        return {"path": out_path, "skipped": True}
-
     _check_binaries_available()
 
     farm_path = _farm_parquet_path(state, district, block)
@@ -177,7 +218,7 @@ def convert_boundaries_to_pmtiles(
 
     if gdf.empty:
         logger.warning("No farm polygons to tile — skipping Phase 4.")
-        return {"path": None, "farm_count": 0, "skipped": True}
+        return {"s3_url": None, "farm_count": 0, "skipped": True}
 
     # Thin down to just the join key + area — everything else (alu_type,
     # plus_code, cell_token, class_confidence, capture_date, ...) is looked
@@ -189,20 +230,23 @@ def convert_boundaries_to_pmtiles(
     with tempfile.TemporaryDirectory() as tmp_dir:
         geojsonseq_path = os.path.join(tmp_dir, "farm_boundaries.geojsonl")
         mbtiles_path = os.path.join(tmp_dir, "farm_boundaries.mbtiles")
+        pmtiles_path = os.path.join(tmp_dir, "farm_boundaries.pmtiles")
 
         logger.info("Exporting %d farms to GeoJSONSeq...", len(gdf))
         _export_geojsonseq(gdf, geojsonseq_path)
 
         _run_tippecanoe(geojsonseq_path, mbtiles_path, LAYER_NAME, min_zoom, max_zoom)
+        _convert_mbtiles_to_pmtiles(mbtiles_path, pmtiles_path)
 
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        _convert_mbtiles_to_pmtiles(mbtiles_path, out_path)
+        size_bytes = os.path.getsize(pmtiles_path)
+        s3_url = _upload_pmtiles_to_s3(pmtiles_path, state, district, block)
+        # tmp_dir (geojsonseq + mbtiles + pmtiles) is removed on context exit —
+        # the S3 copy is the only one that persists.
 
-    size_bytes = os.path.getsize(out_path)
     summary = {
         "state": state, "district": district, "block": block,
         "farm_count": len(gdf),
-        "path": out_path,
+        "s3_url": s3_url,
         "size_bytes": size_bytes,
         "min_zoom": min_zoom,
         "max_zoom": max_zoom,
