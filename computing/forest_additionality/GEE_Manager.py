@@ -442,11 +442,11 @@ class GEEManager:
         if jurisdiction_mask == None:
             return
 
-        if not gcs_file_exists(f"nrm_raster/{district_name}_jurisidiction_mask"):
+        if not gcs_file_exists(f"nrm_raster/{district_name}_jurisdiction_mask"):
             task_id = sync_raster_to_gcs(
                 jurisdiction_mask,
                 30,
-                f"{district_name}_jurisidiction_mask",
+                f"{district_name}_jurisdiction_mask",
                 district.geometry(),
             )
 
@@ -454,8 +454,8 @@ class GEEManager:
         print("Jurisdiction Mask Export completed")
 
         download_tif_from_gcs(
-            source_blob_name=f"nrm_raster/{district_name}_jurisidiction_mask.tif",
-            destination_file_name=f"{file_path}/{district_name}_jurisidiction_mask.tif",
+            source_blob_name=f"nrm_raster/{district_name}_jurisdiction_mask.tif",
+            destination_file_name=f"{file_path}/{district_name}_jurisdiction_mask.tif",
         )
 
         return None
@@ -471,7 +471,7 @@ class GEEManager:
             district_name (str): The name of the district we intend to create a jurisdiction mask for.
         """
         if not os.path.exists(
-            f"{drive_file_path}/{district_name}_jurisidiction_mask.tif"
+            f"{drive_file_path}/{district_name}_jurisdiction_mask.tif"
         ):
             # Create the jurisdiction mask
             jurisdiction_mask = self.create_jurisdiction_mask(

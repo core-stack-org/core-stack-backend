@@ -21,7 +21,7 @@ def get_afforestation_area_estimation(
     """
     gt_tif = DATA_DIR + f"/afforestation_{start_year}_{end_year}.tif"
     forest_start_tif = DATA_DIR + f"/{district_name}_{start_year}.tif"
-    jurisdiction_tif = DATA_DIR + f"/{district_name}_jurisidiction_mask.tif"
+    jurisdiction_tif = DATA_DIR + f"/{district_name}_jurisdiction_mask.tif"
 
     with (
         rasterio.open(gt_tif) as gt_src,

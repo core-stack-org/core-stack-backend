@@ -92,7 +92,7 @@ class RiskMaps:
             self.working_directory, f"Vulnerability_Map_HRP.tif"
         )
         self.jurisdiction_mask = os.path.join(
-            self.working_directory, f"{self.district_name}_jurisidiction_mask.tif"
+            self.working_directory, f"{self.district_name}_jurisdiction_mask.tif"
         )
         self.administrative_divisions = os.path.join(
             self.working_directory, f"{self.district_name}_districts.tif"
@@ -214,7 +214,7 @@ class RiskMaps:
         # Resample jurisdiction mask
         self.gee_manager.resample_raster(
             os.path.join(
-                self.drive_folder_path, f"{self.district_name}_jurisidiction_mask.tif"
+                self.drive_folder_path, f"{self.district_name}_jurisdiction_mask.tif"
             ),
             self.jurisdiction_mask,
         )
