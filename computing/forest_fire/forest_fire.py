@@ -201,23 +201,11 @@ def generate_forest_fire_layer(
         [
             "uid",
             "area_in_ha",
-            "fire_frp_sum_per_year",
             "fire_frp_mean",
             "fire_frp_max",
             "fire_count_per_year",
         ]
     )
-
-    # print("Exporting locally...")
-    #
-    # geemap.ee_export_vector(
-    #     fc,
-    #     filename="forest_fire.geojson",
-    # )
-    #
-    # print("Done.")
-    #
-    # return fc
 
     # --------------------------------------------------------------
     # Export to GEE

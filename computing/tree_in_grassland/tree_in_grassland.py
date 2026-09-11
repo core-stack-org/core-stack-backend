@@ -222,12 +222,12 @@ def generate_tree_in_grassland_layer(
                     ),
                     "shrubland_area_in_ha": area(lulc_start.eq(12)),
                     "tree_loss_area_in_ha": tree_loss_area,
-                    "tree_loss_to_grassland_ratio": ee.Number(tree_loss_area).divide(
-                        grassland_area
-                    ),
-                    "tree_loss_to_tree_in_shrub_ratio": ee.Number(
-                        tree_loss_area
-                    ).divide(tree_in_shrub_area),
+                    # "tree_loss_to_grassland_ratio": ee.Number(tree_loss_area).divide(
+                    #     grassland_area
+                    # ),
+                    # "tree_loss_to_tree_in_shrub_ratio": ee.Number(
+                    #     tree_loss_area
+                    # ).divide(tree_in_shrub_area),
                     "tree_shrub_to_barren_area_in_ha": area(tree_to_barren),
                     "tree_shrub_to_built_area_in_ha": area(to_built),
                     "tree_shrub_to_kharif_water_area_in_ha": area(to_kharif),
@@ -248,8 +248,6 @@ def generate_tree_in_grassland_layer(
                 "isolated_shrub_area_in_ha",
                 "shrubland_area_in_ha",
                 "tree_loss_area_in_ha",
-                "tree_loss_to_grassland_ratio",
-                "tree_loss_to_tree_in_shrub_ratio",
                 "tree_shrub_to_barren_area_in_ha",
                 "tree_shrub_to_built_area_in_ha",
                 "tree_shrub_to_kharif_water_area_in_ha",
