@@ -257,11 +257,72 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_health(geojson_data, writer)
             elif workspace == "ndvi_timeseries":
                 create_excel_for_ndvi_shrub(geojson_data, writer)
+            elif workspace == "forest_fringes":
+                create_excel_for_forest_fringe(geojson_data, writer)
+            elif workspace == "tree_in_grassland":
+                create_excel_for_tree_in_grassland(geojson_data, writer)
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_tree_in_grassland(geojson_data, writer):
+    print("inside tree in grassland excel generation")
+    try:
+        features = geojson_data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = [
+            "uid_right",
+            "id",
+            "tree_loss_to_grassland_ratio",
+            "tree_loss_to_tree_in_shrub_ratio",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(columns={"uid_left": "UID"}, inplace=True)
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="tree_in_grassland", index=False)
+        print("Excel file created for tree in grassland")
+    except Exception as e:
+        print(f"Error occurred while generating excel for tree in grassland {e} ")
+
+
+def create_excel_for_forest_fringe(geojson_data, writer):
+    print("inside forest fringe excel generation")
+    try:
+        features = geojson_data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = [
+            "uid_right",
+            "id",
+            "forest_fringe_ratio",
+            "tree_deforestation_fringe_ratio",
+            "tree_degradation_fringe_ratio",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(columns={"uid_left": "UID"}, inplace=True)
+        priority_cols = ["UID", "mws_area_in_ha"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="forest_fringes", index=False)
+        print("Excel file created for forest fringes")
+    except Exception as e:
+        print(f"Error occurred while generating excel for forest fringes {e} ")
 
 
 def create_excel_for_ndvi_shrub(data, writer):
@@ -2429,6 +2490,7 @@ def get_season(month):
         return "kharif"
     elif month in (11, 12, 1, 2):
         return "rabi"
+
 
 def process_feature(feature):
     uid = feature["properties"]["uid"]
