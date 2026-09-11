@@ -19,24 +19,6 @@ SHRUB_THRESHOLD = 0.5
 RADIUS_M = 100
 SCALE = 30
 MAXPIX = 1e12
-
-LULC_CLASSES = {
-    0: "Background",
-    1: "Built_up",
-    2: "Kharif_water",
-    3: "Kharif_Rabi_water",
-    4: "Kharif_Rabi_Zaid_water",
-    5: "Crops",
-    6: "Trees",
-    7: "Barren_land",
-    8: "Single_Kharif",
-    9: "Single_Non_Kharif",
-    10: "Double_Cropping",
-    11: "Triple_Annual_Perennial",
-    12: "Shrubs_Scrubs",
-}
-
-NEIGHBOR_CLASSES = [k for k in LULC_CLASSES.keys() if k != TREE_CLASS]
 THRESHOLD = 0.5  # strictly > 50%
 
 
