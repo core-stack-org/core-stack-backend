@@ -221,7 +221,9 @@ class GEEManager:
         # print(state.getInfo())  # or just print(state) if debugging in GEE Python API
 
         for year in years:
-            if not gcs_file_exists(f"nrm_raster/{state_name}_{year}"):
+            if year in forest_non_forest_cover_maps and not gcs_file_exists(
+                f"nrm_raster/{state_name}_{year}"
+            ):
                 image = forest_non_forest_cover_maps[year]
 
                 task_id = sync_raster_to_gcs(
@@ -231,40 +233,12 @@ class GEEManager:
 
         check_task_status(tasks)
 
-        #     # Export the final deforestation image as a GeoTIFF file to Google Drive
-        #     task = ee.batch.Export.image.toDrive(
-        #         image=image,
-        #         description='GLC_FSC30D',
-        #         folder=f'GEE_exports_{state_name}',
-        #         fileNamePrefix=f'{state_name}_{year}',
-        #         region=state_geometry,
-        #         scale=30,
-        #         crs='EPSG:4326',
-        #         fileFormat='GeoTIFF',
-        #         # formatOptions={'cloudOptimized': True},
-        #         maxPixels=1e13
-        #     )
-        #     task.start()
-        #     tasks.append(task)
-        #     print(f"Export task for year {year} started")
-        #
-        # # Wait for all tasks to complete
-        # all_completed = False
-        # while not all_completed:
-        #     all_completed = True
-        #     for task in tasks:
-        #         if task.active():
-        #             all_completed = False
-        #             print("Export tasks still running...")
-        #             time.sleep(30)
-        #             break
-        #     if all_completed:
-        #         print("All export tasks completed.")
         for year in years:
-            download_tif_from_gcs(
-                source_blob_name=f"nrm_raster/{state_name}_{year}.tif",
-                destination_file_name=f"{file_path}/{state_name}_{year}.tif",
-            )
+            if year in forest_non_forest_cover_maps:
+                download_tif_from_gcs(
+                    source_blob_name=f"nrm_raster/{state_name}_{year}.tif",
+                    destination_file_name=f"{file_path}/{state_name}_{year}.tif",
+                )
         return None
 
     # Function to visualize forest cover map
@@ -318,11 +292,14 @@ class GEEManager:
 
         # Loop through the years and create the forest/non-forest cover map for each year
         for year in years:
-            print(f"Creating forest/non-forest cover map for {state_name} in {year}...")
-            forest_non_forest_cover_map = self.create_forest_cover_map(
-                state_name=state_name, year_of_interest=year
-            )
-            forest_non_forest_cover_maps[year] = forest_non_forest_cover_map
+            if not os.path.exists(f"{drive_file_path}/{state_name}_{year}.tif"):
+                print(
+                    f"Creating forest/non-forest cover map for {state_name} in {year}..."
+                )
+                forest_non_forest_cover_map = self.create_forest_cover_map(
+                    state_name=state_name, year_of_interest=year
+                )
+                forest_non_forest_cover_maps[year] = forest_non_forest_cover_map
 
         # Export the forest/non-forest cover maps to Google Drive
         self.export_forest_cover_to_drive(
@@ -346,52 +323,34 @@ class GEEManager:
         Returns:
             None
         """
-        # Load FAO/GAUL level-2 boundaries (districts)
-        districts = ee.FeatureCollection("FAO/GAUL/2015/level2")
+        if not os.path.exists(f"{file_path}/{state_name}_districts.tif"):
+            # Load FAO/GAUL level-2 boundaries (districts)
+            districts = ee.FeatureCollection("FAO/GAUL/2015/level2")
 
-        # Filter to Tripura state
-        state_districts = districts.filter(ee.Filter.eq("ADM2_NAME", state_name))
+            # Filter to Tripura state
+            state_districts = districts.filter(ee.Filter.eq("ADM2_NAME", state_name))
 
-        # Rasterize the feature collection
-        rasterized_districts = state_districts.reduceToImage(
-            properties=["ADM2_CODE"], reducer=ee.Reducer.first()
-        ).rename("district_codes")
+            # Rasterize the feature collection
+            rasterized_districts = state_districts.reduceToImage(
+                properties=["ADM2_CODE"], reducer=ee.Reducer.first()
+            ).rename("district_codes")
 
-        # # Export the rasterized districts as a GeoTIFF to Google Drive
-        # task = ee.batch.Export.image.toDrive(
-        #     image=rasterized_districts,
-        #     description=f"{state_name}Districts_GeoTIFF",
-        #     folder=f"GEE_exports_{state_name}",
-        #     fileNamePrefix=f"{state_name}_districts",
-        #     region=state_districts.geometry(),
-        #     scale=30,
-        #     crs="EPSG:4326",
-        #     fileFormat="GeoTIFF",
-        #     maxPixels=1e13,
-        # )
-        # task.start()
-        #
-        # while task.active():
-        #     print("Task is running....")
-        #     time.sleep(60)
-        if not gcs_file_exists(f"nrm_raster/{state_name}_districts"):
-            task_id = sync_raster_to_gcs(
-                rasterized_districts,
-                30,
-                f"{state_name}_districts",
-                state_districts.geometry(),
+            if not gcs_file_exists(f"nrm_raster/{state_name}_districts"):
+                task_id = sync_raster_to_gcs(
+                    rasterized_districts,
+                    30,
+                    f"{state_name}_districts",
+                    state_districts.geometry(),
+                )
+
+                check_task_status([task_id])
+
+            print("Task completed")
+
+            download_tif_from_gcs(
+                source_blob_name=f"nrm_raster/{state_name}_districts.tif",
+                destination_file_name=f"{file_path}/{state_name}_districts.tif",
             )
-
-            check_task_status([task_id])
-
-        print("Task completed")
-
-        download_tif_from_gcs(
-            source_blob_name=f"nrm_raster/{state_name}_districts.tif",
-            destination_file_name=f"{file_path}/{state_name}_districts.tif",
-        )
-
-        return None
 
     # Jurisdiction mask creation
     def create_jurisdiction_mask(self, state_name: str):
@@ -463,23 +422,6 @@ class GEEManager:
         if jurisdiction_mask == None:
             return
 
-        # # Export the mask as a GeoTIFF to Google Drive
-        # task = ee.batch.Export.image.toDrive(
-        #     image=jurisdiction_mask,
-        #     description=f"{state_name}JurisdictionMask_GeoTIFF",
-        #     folder=f"GEE_exports_{state_name}",
-        #     fileNamePrefix=f"{state_name}_jurisidiction_mask",
-        #     region=state.geometry(),
-        #     scale=30,
-        #     crs="EPSG:4326",
-        #     fileFormat="GeoTIFF",
-        #     maxPixels=1e13,
-        # )
-        # task.start()
-        #
-        # while task.active():
-        #     print("Task is running....")
-        #     time.sleep(60)
         if not gcs_file_exists(f"nrm_raster/{state_name}_jurisidiction_mask"):
             task_id = sync_raster_to_gcs(
                 jurisdiction_mask,
@@ -505,111 +447,110 @@ class GEEManager:
         Args:
             state_name (str): The name of the state we intend to create a jurisdiction mask for.
         """
-        # Create the jurisdiction mask
-        jurisdiction_mask = self.create_jurisdiction_mask(state_name=state_name)
+        if not os.path.exists(f"{drive_file_path}/{state_name}_jurisidiction_mask.tif"):
+            # Create the jurisdiction mask
+            jurisdiction_mask = self.create_jurisdiction_mask(state_name=state_name)
 
-        # Export the jurisdiction mask
-        self.export_jurisdiction_mask(
-            jurisdiction_mask=jurisdiction_mask,
-            state_name=state_name,
-            file_path=drive_file_path,
-        )
+            # Export the jurisdiction mask
+            self.export_jurisdiction_mask(
+                jurisdiction_mask=jurisdiction_mask,
+                state_name=state_name,
+                file_path=drive_file_path,
+            )
 
-        return None
+    # def export_settlement_map(
+    #     self,
+    #     state_name: str,
+    #     settlement_id="projects/ee-mtpictd-dev/assets/settlement_tripura",
+    # ):
+    #     """
+    #     Creates a binary raster map for settlements in Tripura where:
+    #     - 0 = Settlement
+    #     - 1 = Non-settlement
+    #
+    #     The function exports this binary raster to Google Drive using 30m Land
+    #     """
+    #     print(
+    #         "Note:\nHere I have used settlement_id as 'projects/ee-mtpictd-dev/assets/settlement_tipura'\nIn order to do this for some other state you need to download the shapefiles from this website and add it to gee assets\nhttps://indiawris.gov.in/wris/#/geoSpatialData"
+    #     )
+    #     # 1. Load FAO GAUL and Get Tripura Boundary
+    #     countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
+    #     tripura = countries.filter(ee.Filter.eq("ADM2_NAME", "Tripura"))
+    #
+    #     # 2. Load Settlement Vector (replace asset path if needed)
+    #     settlements = ee.FeatureCollection(settlement_id)
+    #
+    #     # 3. Create Reference Image (30m constant image over Tripura)
+    #     reference_image = (
+    #         ee.Image.constant(1).clip(tripura).reproject(crs="EPSG:4326", scale=30)
+    #     )
+    #
+    #     # 4. Create Binary Raster: 0 = Settlement 1 = Non-settlement
+    #     base = ee.Image.constant(1).clip(tripura).rename("settlement")
+    #     settlement_raster = base.paint(featureCollection=settlements, color=0).rename(
+    #         "settlement"
+    #     )
+    #
+    #     # Match projection
+    #     settlement_raster = settlement_raster.reproject(
+    #         crs=reference_image.projection()
+    #     )
+    #
+    #     # 5. Export to Google Drive
+    #     task = ee.batch.Export.image.toDrive(
+    #         image=settlement_raster,
+    #         description="Tripura_NonSettlement_Binary_30m",
+    #         folder=f"GEE_exports_{state_name}",
+    #         fileNamePrefix=f"settlement_binary_{state_name}",
+    #         region=tripura.geometry(),
+    #         scale=30,
+    #         crs="EPSG:4326",
+    #         maxPixels=1e13,
+    #     )
+    #
+    #     task.start()
+    #
+    #     import time
+    #
+    #     while task.active():
+    #         print("Waiting for export to finish")
+    #         time.sleep(30)
 
-    def export_settlement_map(
-        self,
-        state_name: str,
-        settlement_id="projects/ee-mtpictd-dev/assets/settlement_tripura",
-    ):
-        """
-        Creates a binary raster map for settlements in Tripura where:
-        - 0 = Settlement
-        - 1 = Non-settlement
-
-        The function exports this binary raster to Google Drive using 30m Land
-        """
-        print(
-            "Note:\nHere I have used settlement_id as 'projects/ee-mtpictd-dev/assets/settlement_tipura'\nIn order to do this for some other state you need to download the shapefiles from this website and add it to gee assets\nhttps://indiawris.gov.in/wris/#/geoSpatialData"
-        )
-        # 1. Load FAO GAUL and Get Tripura Boundary
-        countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
-        tripura = countries.filter(ee.Filter.eq("ADM2_NAME", "Tripura"))
-
-        # 2. Load Settlement Vector (replace asset path if needed)
-        settlements = ee.FeatureCollection(settlement_id)
-
-        # 3. Create Reference Image (30m constant image over Tripura)
-        reference_image = (
-            ee.Image.constant(1).clip(tripura).reproject(crs="EPSG:4326", scale=30)
-        )
-
-        # 4. Create Binary Raster: 0 = Settlement 1 = Non-settlement
-        base = ee.Image.constant(1).clip(tripura).rename("settlement")
-        settlement_raster = base.paint(featureCollection=settlements, color=0).rename(
-            "settlement"
-        )
-
-        # Match projection
-        settlement_raster = settlement_raster.reproject(
-            crs=reference_image.projection()
-        )
-
-        # 5. Export to Google Drive
-        task = ee.batch.Export.image.toDrive(
-            image=settlement_raster,
-            description="Tripura_NonSettlement_Binary_30m",
-            folder=f"GEE_exports_{state_name}",
-            fileNamePrefix=f"settlement_binary_{state_name}",
-            region=tripura.geometry(),
-            scale=30,
-            crs="EPSG:4326",
-            maxPixels=1e13,
-        )
-
-        task.start()
-
-        import time
-
-        while task.active():
-            print("Waiting for export to finish")
-            time.sleep(30)
-
-    def extract_dem(self, state_name: str):
-        """
-        Extracts the DEM for the specified state and exports it to Google Drive.
-
-        Args:
-            state_name (str): The name of the state to extract the DEM for.
-            export_folder (str): The folder in Google Drive to export the DEM to.
-        """
-        # Load SRTM DEM
-        dem = ee.Image("USGS/SRTMGL1_003")
-
-        # Get state boundary
-        countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
-        state_boundary = countries.filter(ee.Filter.eq("ADM2_NAME", state_name))
-
-        # Clip DEM to state boundary
-        dem_clipped = dem.clip(state_boundary)
-
-        # Export DEM to Google Drive
-        task = ee.batch.Export.image.toDrive(
-            image=dem_clipped,
-            description="SRTM_DEM",
-            folder=f"GEE_exports_{state_name}",
-            fileNamePrefix=f"{state_name}_DEM",
-            region=state_boundary.geometry(),
-            scale=30,
-            crs="EPSG:4326",
-            maxPixels=1e13,
-        )
-
-        task.start()
-
-        while task.active():
-            print("Waiting for export to finish")
-            time.sleep(30)
+    # def extract_dem(self, state_name: str):
+    #     """
+    #     Extracts the DEM for the specified state and exports it to Google Drive.
+    #
+    #     Args:
+    #         state_name (str): The name of the state to extract the DEM for.
+    #         export_folder (str): The folder in Google Drive to export the DEM to.
+    #     """
+    #     # Load SRTM DEM
+    #     dem = ee.Image("USGS/SRTMGL1_003")
+    #
+    #     # Get state boundary
+    #     countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
+    #     state_boundary = countries.filter(ee.Filter.eq("ADM2_NAME", state_name))
+    #
+    #     # Clip DEM to state boundary
+    #     dem_clipped = dem.clip(state_boundary)
+    #
+    #     # Export DEM to Google Drive
+    #     task = ee.batch.Export.image.toDrive(
+    #         image=dem_clipped,
+    #         description="SRTM_DEM",
+    #         folder=f"GEE_exports_{state_name}",
+    #         fileNamePrefix=f"{state_name}_DEM",
+    #         region=state_boundary.geometry(),
+    #         scale=30,
+    #         crs="EPSG:4326",
+    #         maxPixels=1e13,
+    #     )
+    #
+    #     task.start()
+    #
+    #     while task.active():
+    #         print("Waiting for export to finish")
+    #         time.sleep(30)
 
     def resample_raster(self, input_tif, output_tif, target_resolution=(25, 25)):
         """

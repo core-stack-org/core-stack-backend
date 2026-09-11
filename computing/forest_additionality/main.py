@@ -10,8 +10,10 @@ from .deforestation_area_estimation import get_deforestation_area_estimation
 
 def forest_additionality(start_year, mid_pt, end_year, state_name):
     # Initialize the RiskMaps engine
-    base_file_path = f"{BASE_DIR}/data/forest_additionality/{state_name}/{start_year}_{mid_pt}_{end_year}"
-    working_directory = os.path.join(base_file_path, "outputs")
+    base_file_path = f"{BASE_DIR}/data/forest_additionality/{state_name}"
+    working_directory = os.path.join(
+        base_file_path, f"{start_year}_{mid_pt}_{end_year}"
+    )
 
     if not os.path.exists(working_directory):
         os.makedirs(working_directory)
@@ -31,9 +33,9 @@ def forest_additionality(start_year, mid_pt, end_year, state_name):
     )
 
     get_deforestation_area_estimation(
-        state_name, start_year, mid_pt, end_year, base_file_path
+        state_name, start_year, mid_pt, end_year, working_directory
     )
 
     get_afforestation_area_estimation(
-        state_name, start_year, mid_pt, end_year, base_file_path
+        state_name, start_year, mid_pt, end_year, working_directory
     )

@@ -17,8 +17,7 @@ def get_deforestation_area_estimation(
     state_name, start_year, mid_pt, end_year, DATA_DIR
 ):
     # Directory that contains the generated prediction and mask rasters.
-    PRED_DIR = f"{DATA_DIR}/outputs"  # BASE_DIR / "outputs" / "predictions"
-    LABEL_BAND = "remapped"  # "9_deforestation"
+    # LABEL_BAND = "remapped"  # "9_deforestation"
 
     @dataclass
     class RunConfig:
@@ -48,14 +47,14 @@ def get_deforestation_area_estimation(
             suffix = "ex_post"
 
         if cfg.udef_arp:
-            pred_tif = PRED_DIR + "/Acre_Adjucted_Density_Map_VP.tif"
+            pred_tif = DATA_DIR + "/Acre_Adjucted_Density_Map_VP.tif"
 
         # elif cfg.counterfactual:
         #     pred_tif = PRED_DIR + f"counterfactual_prediction_FULL_{predict_year}_ex_{'ante' if cfg.ex_ante else 'post'}.tif"
 
         else:
             pred_tif = (
-                PRED_DIR + f"/deforestation_prob_{predict_year}_full_{suffix}.tif"
+                DATA_DIR + f"/deforestation_prob_{predict_year}_full_{suffix}.tif"
             )
 
         # gt_tif = (
@@ -63,12 +62,12 @@ def get_deforestation_area_estimation(
         # )  # f"training_data_x_{predict_year[:4]}_y_{predict_year}.tif"
 
         # Ground-truth deforestation layer for the evaluation period.
-        gt_tif = PRED_DIR + f"/deforestation_map_{mid_pt}_{end_year}.tif"
+        gt_tif = DATA_DIR + f"/deforestation_map_{mid_pt}_{end_year}.tif"
 
         # A pixel can only be evaluated if it was forest at the start of the
         # evaluation period (T2) and is within the jurisdiction.
-        forest_start_tif = PRED_DIR + f"/{state_name}_{mid_pt}.tif"
-        jurisdiction_tif = PRED_DIR + f"/{state_name}_jurisidiction_mask.tif"
+        forest_start_tif = DATA_DIR + f"/{state_name}_{mid_pt}.tif"
+        jurisdiction_tif = DATA_DIR + f"/{state_name}_jurisidiction_mask.tif"
 
         with rasterio.open(gt_tif) as gt_src, rasterio.open(pred_tif) as pred_src:
 

@@ -169,7 +169,7 @@ class RiskMaps:
         ]
 
         # Drive export path
-        self.drive_folder_path = base_file_path  # f'/mnt/d/workspaces/BECC/data/GEE_exports_{self.state_name}'
+        self.drive_folder_path = base_file_path
 
         # NRT (Normalized Risk Threshold) placeholder
         self.nrt = None

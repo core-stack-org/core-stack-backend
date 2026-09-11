@@ -19,12 +19,9 @@ def get_afforestation_area_estimation(
     restricts the assessment to pixels that were non-forest at the start of the period and
     fall within the valid jurisdiction mask.
     """
-
-    PRED_DIR = f"{DATA_DIR}/outputs"
-
-    gt_tif = PRED_DIR + f"/afforestation_{start_year}_{end_year}.tif"
-    forest_start_tif = PRED_DIR + f"/{state_name}_{start_year}.tif"
-    jurisdiction_tif = PRED_DIR + f"/{state_name}_jurisidiction_mask.tif"
+    gt_tif = DATA_DIR + f"/afforestation_{start_year}_{end_year}.tif"
+    forest_start_tif = DATA_DIR + f"/{state_name}_{start_year}.tif"
+    jurisdiction_tif = DATA_DIR + f"/{state_name}_jurisidiction_mask.tif"
 
     with (
         rasterio.open(gt_tif) as gt_src,
