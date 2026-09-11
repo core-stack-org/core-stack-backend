@@ -54,33 +54,37 @@ class GEEManager:
         #             "Google Drive is not available. Please run this code in Google Colab."
         #         )
 
-    def get_state_image(self, state_name: str):
+    def get_district_roi(self, state_name: str, district_name: str):
         """
-        Get the image of a state from the FAO/GAUL dataset.
+        Get the image of a district from the FAO/GAUL dataset.
 
         Args:
-            state_name (str): The name of the state to get the image for.
-
-        Returns:
-            ee.Image: The image of the state.
+            district_name (str): The name of the district to get the image for.
         """
-        return ee.FeatureCollection("FAO/GAUL/2015/level2").filter(
-            ee.Filter.eq("ADM2_NAME", state_name)
+        if state_name == "Odisha":
+            state_name = "Orissa"
+        return (
+            ee.FeatureCollection("FAO/GAUL/2015/level2")
+            .filter(ee.Filter.eq("ADM0_NAME", "India"))
+            .filter(ee.Filter.eq("ADM1_NAME", state_name))
+            .filter(ee.Filter.eq("ADM2_NAME", district_name))
         )
 
     def get_aoi_from_kmz(self, asset_name):
         return
 
-    def create_forest_cover_map(self, state_name: str, year_of_interest: int):
+    def create_forest_cover_map(
+        self, state_name: str, district_name: str, year_of_interest: int
+    ):
         """
-        Create a forest/non-forest cover map for a given state and year.
+        Create a forest/non-forest cover map for a given district and year.
 
         Args:
-            state_name (str): The name of the state to create the map for.
+            district_name (str): The name of the district to create the map for.
             year_of_interest (int): The year of interest for the map.
 
         Returns:
-            ee.Image: The forest/non-forest cover map for the state and year.
+            ee.Image: The forest/non-forest cover map for the district and year.
 
         Note:
             This function currently uses the data provided by the GLC_FCS30D dataset.
@@ -187,18 +191,19 @@ class GEEManager:
         ).rename("forest_binary")
 
         # -----------------------------------------------------------------------------
-        # Load FAO/GAUL Level-1 boundaries to get Indian state boundaries.
+        # Load FAO/GAUL Level-1 boundaries to get Indian district boundaries.
         # (FAO/GAUL Level-1 provides sub-national admin boundaries.)
-        countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
-        state = countries.filter(ee.Filter.eq("ADM2_NAME", state_name))
+        # countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
+        # district = countries.filter(ee.Filter.eq("ADM2_NAME", district_name))
+        district = self.get_district_roi(state_name, district_name)
 
-        # Clip the binary forest image to the selected state.
-        stateForest = forestNonForest.clip(state)
+        # Clip the binary forest image to the selected district.
+        districtForest = forestNonForest.clip(district)
 
-        return stateForest
+        return districtForest
 
     def export_forest_cover_to_drive(
-        self, forest_non_forest_cover_maps, years, state_name, file_path
+        self, forest_non_forest_cover_maps, years, state_name, district_name, file_path
     ) -> None:
         """
         Export the forest/non-forest cover map to Google Drive.
@@ -210,24 +215,26 @@ class GEEManager:
         Args:
             forest_non_forest_cover_maps : The forest/non-forest cover maps to export.
             years (List[int]): The years of the maps.
-            state_name (str): The name of the state to export the maps for.
+            district_name (str): The name of the district to export the maps for.
         """
-        # Load FAO/GAUL Level-1 boundaries to get Indian state boundaries.
-        state = self.get_state_image(state_name=state_name)
-        state_geometry = state.geometry()
+        # Load FAO/GAUL Level-1 boundaries to get Indian district boundaries.
+        district = self.get_district_roi(
+            state_name=state_name, district_name=district_name
+        )
+        district_geometry = district.geometry()
 
         tasks = []
 
-        # print(state.getInfo())  # or just print(state) if debugging in GEE Python API
+        # print(district.getInfo())  # or just print(district) if debugging in GEE Python API
 
         for year in years:
             if year in forest_non_forest_cover_maps and not gcs_file_exists(
-                f"nrm_raster/{state_name}_{year}"
+                f"nrm_raster/{district_name}_{year}"
             ):
                 image = forest_non_forest_cover_maps[year]
 
                 task_id = sync_raster_to_gcs(
-                    image, 30, f"{state_name}_{year}", state_geometry
+                    image, 30, f"{district_name}_{year}", district_geometry
                 )
                 tasks.append(task_id)
 
@@ -236,8 +243,8 @@ class GEEManager:
         for year in years:
             if year in forest_non_forest_cover_maps:
                 download_tif_from_gcs(
-                    source_blob_name=f"nrm_raster/{state_name}_{year}.tif",
-                    destination_file_name=f"{file_path}/{state_name}_{year}.tif",
+                    source_blob_name=f"nrm_raster/{district_name}_{year}.tif",
+                    destination_file_name=f"{file_path}/{district_name}_{year}.tif",
                 )
         return None
 
@@ -275,13 +282,14 @@ class GEEManager:
         return None
 
     def create_forest_maps_and_export(
-        self, state_name: str, years: List[int], drive_file_path
+        self, state_name: str, district_name: str, years: List[int], drive_file_path
     ) -> None:
         """
-        Create and export forest/non-forest cover maps for a given state and years.
+        Create and export forest/non-forest cover maps for a given district and years.
 
         Args:
-            state_name (str): The name of the state to create the maps for.
+            state_name (str): The name of the state to export the maps for.
+            district_name (str): The name of the district to create the maps for.
             years (List[int]): The years of interest for the maps.
 
         Returns:
@@ -292,12 +300,14 @@ class GEEManager:
 
         # Loop through the years and create the forest/non-forest cover map for each year
         for year in years:
-            if not os.path.exists(f"{drive_file_path}/{state_name}_{year}.tif"):
+            if not os.path.exists(f"{drive_file_path}/{district_name}_{year}.tif"):
                 print(
-                    f"Creating forest/non-forest cover map for {state_name} in {year}..."
+                    f"Creating forest/non-forest cover map for {district_name} in {year}..."
                 )
                 forest_non_forest_cover_map = self.create_forest_cover_map(
-                    state_name=state_name, year_of_interest=year
+                    state_name=state_name,
+                    district_name=district_name,
+                    year_of_interest=year,
                 )
                 forest_non_forest_cover_maps[year] = forest_non_forest_cover_map
 
@@ -306,41 +316,43 @@ class GEEManager:
             forest_non_forest_cover_maps=forest_non_forest_cover_maps,
             years=years,
             state_name=state_name,
+            district_name=district_name,
             file_path=drive_file_path,
         )
 
         return None
 
     # Functions to export administrative divisions
-    def export_districts(self, state_name: str, file_path):
+    def export_districts(self, state_name: str, district_name: str, file_path):
         """
         We are treating the districts as the administrative divisions, here.
         This function needs to be changed according to the requirements.
 
         Args:
-            state_name (str): The name of the state to export the districts for.
+            state_name (str): The name of the state to export the maps for.
+            district_name (str): The name of the district to export the districts for.
 
         Returns:
             None
         """
-        if not os.path.exists(f"{file_path}/{state_name}_districts.tif"):
+        if not os.path.exists(f"{file_path}/{district_name}_districts.tif"):
             # Load FAO/GAUL level-2 boundaries (districts)
-            districts = ee.FeatureCollection("FAO/GAUL/2015/level2")
-
-            # Filter to Tripura state
-            state_districts = districts.filter(ee.Filter.eq("ADM2_NAME", state_name))
+            # districts = ee.FeatureCollection("FAO/GAUL/2015/level2").filter(
+            #     ee.Filter.eq("ADM2_NAME", district_name)
+            # )
+            districts = self.get_district_roi(state_name, district_name)
 
             # Rasterize the feature collection
-            rasterized_districts = state_districts.reduceToImage(
+            rasterized_districts = districts.reduceToImage(
                 properties=["ADM2_CODE"], reducer=ee.Reducer.first()
             ).rename("district_codes")
 
-            if not gcs_file_exists(f"nrm_raster/{state_name}_districts"):
+            if not gcs_file_exists(f"nrm_raster/{district_name}_districts"):
                 task_id = sync_raster_to_gcs(
                     rasterized_districts,
                     30,
-                    f"{state_name}_districts",
-                    state_districts.geometry(),
+                    f"{district_name}_districts",
+                    districts.geometry(),
                 )
 
                 check_task_status([task_id])
@@ -348,28 +360,30 @@ class GEEManager:
             print("Task completed")
 
             download_tif_from_gcs(
-                source_blob_name=f"nrm_raster/{state_name}_districts.tif",
-                destination_file_name=f"{file_path}/{state_name}_districts.tif",
+                source_blob_name=f"nrm_raster/{district_name}_districts.tif",
+                destination_file_name=f"{file_path}/{district_name}_districts.tif",
             )
 
     # Jurisdiction mask creation
-    def create_jurisdiction_mask(self, state_name: str):
+    def create_jurisdiction_mask(self, state_name: str, district_name: str):
         """
         Creates a binary mask for the jurisdiction, where 1 indicates areas within the jurisdiction
 
         Args:
-            state_name (str): The name of the state to create the mask for.
+            district_name (str): The name of the district to create the mask for.
 
         Returns:
             ee.Image: A binary mask image where 1 indicates areas within the jurisdiction and 0 indicates areas outside the jurisdiction.
         """
-        state = ee.FeatureCollection("FAO/GAUL/2015/level2").filter(
-            ee.Filter.eq("ADM2_NAME", state_name)
-        )
+        # district = ee.FeatureCollection("FAO/GAUL/2015/level2").filter(
+        #     ee.Filter.eq("ADM2_NAME", district_name)
+        # )
 
-        # Rasterize the state boundary to create a mask
+        district = self.get_district_roi(state_name, district_name)
+
+        # Rasterize the district boundary to create a mask
         mask = (
-            state.reduceToImage(
+            district.reduceToImage(
                 properties=["ADM2_CODE"],  # Use any property to rasterize
                 reducer=ee.Reducer.first(),
             )
@@ -410,57 +424,71 @@ class GEEManager:
         # display(map_folium)  # This function works only in Jupyter nootebook environment
 
     def export_jurisdiction_mask(
-        self, jurisdiction_mask: ee.image.Image, state_name: str, file_path
+        self,
+        jurisdiction_mask: ee.image.Image,
+        state_name: str,
+        district_name: str,
+        file_path,
     ):
         """
         Exports the created jusisdiction mask to the drive.
         """
-        state = ee.FeatureCollection("FAO/GAUL/2015/level2").filter(
-            ee.Filter.eq("ADM2_NAME", state_name)
-        )
+        # district = ee.FeatureCollection("FAO/GAUL/2015/level2").filter(
+        #     ee.Filter.eq("ADM2_NAME", district_name)
+        # )
+
+        district = self.get_district_roi(state_name, district_name)
 
         if jurisdiction_mask == None:
             return
 
-        if not gcs_file_exists(f"nrm_raster/{state_name}_jurisidiction_mask"):
+        if not gcs_file_exists(f"nrm_raster/{district_name}_jurisidiction_mask"):
             task_id = sync_raster_to_gcs(
                 jurisdiction_mask,
                 30,
-                f"{state_name}_jurisidiction_mask",
-                state.geometry(),
+                f"{district_name}_jurisidiction_mask",
+                district.geometry(),
             )
 
             check_task_status([task_id])
         print("Jurisdiction Mask Export completed")
 
         download_tif_from_gcs(
-            source_blob_name=f"nrm_raster/{state_name}_jurisidiction_mask.tif",
-            destination_file_name=f"{file_path}/{state_name}_jurisidiction_mask.tif",
+            source_blob_name=f"nrm_raster/{district_name}_jurisidiction_mask.tif",
+            destination_file_name=f"{file_path}/{district_name}_jurisidiction_mask.tif",
         )
 
         return None
 
-    def create_and_export_jurisdiction_mask(self, state_name: str, drive_file_path):
+    def create_and_export_jurisdiction_mask(
+        self, state_name: str, district_name: str, drive_file_path
+    ):
         """
-        This function will create and export the jurisdiction mask for the required state.
+        This function will create and export the jurisdiction mask for the required district.
 
         Args:
-            state_name (str): The name of the state we intend to create a jurisdiction mask for.
+            state_name (str): The name of the state to create the mask for.
+            district_name (str): The name of the district we intend to create a jurisdiction mask for.
         """
-        if not os.path.exists(f"{drive_file_path}/{state_name}_jurisidiction_mask.tif"):
+        if not os.path.exists(
+            f"{drive_file_path}/{district_name}_jurisidiction_mask.tif"
+        ):
             # Create the jurisdiction mask
-            jurisdiction_mask = self.create_jurisdiction_mask(state_name=state_name)
+            jurisdiction_mask = self.create_jurisdiction_mask(
+                state_name=state_name, district_name=district_name
+            )
 
             # Export the jurisdiction mask
             self.export_jurisdiction_mask(
                 jurisdiction_mask=jurisdiction_mask,
                 state_name=state_name,
+                district_name=district_name,
                 file_path=drive_file_path,
             )
 
     # def export_settlement_map(
     #     self,
-    #     state_name: str,
+    #     district_name: str,
     #     settlement_id="projects/ee-mtpictd-dev/assets/settlement_tripura",
     # ):
     #     """
@@ -471,7 +499,7 @@ class GEEManager:
     #     The function exports this binary raster to Google Drive using 30m Land
     #     """
     #     print(
-    #         "Note:\nHere I have used settlement_id as 'projects/ee-mtpictd-dev/assets/settlement_tipura'\nIn order to do this for some other state you need to download the shapefiles from this website and add it to gee assets\nhttps://indiawris.gov.in/wris/#/geoSpatialData"
+    #         "Note:\nHere I have used settlement_id as 'projects/ee-mtpictd-dev/assets/settlement_tipura'\nIn order to do this for some other district you need to download the shapefiles from this website and add it to gee assets\nhttps://indiawris.gov.in/wris/#/geoSpatialData"
     #     )
     #     # 1. Load FAO GAUL and Get Tripura Boundary
     #     countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
@@ -500,8 +528,8 @@ class GEEManager:
     #     task = ee.batch.Export.image.toDrive(
     #         image=settlement_raster,
     #         description="Tripura_NonSettlement_Binary_30m",
-    #         folder=f"GEE_exports_{state_name}",
-    #         fileNamePrefix=f"settlement_binary_{state_name}",
+    #         folder=f"GEE_exports_{district_name}",
+    #         fileNamePrefix=f"settlement_binary_{district_name}",
     #         region=tripura.geometry(),
     #         scale=30,
     #         crs="EPSG:4326",
@@ -516,31 +544,31 @@ class GEEManager:
     #         print("Waiting for export to finish")
     #         time.sleep(30)
 
-    # def extract_dem(self, state_name: str):
+    # def extract_dem(self, district_name: str):
     #     """
-    #     Extracts the DEM for the specified state and exports it to Google Drive.
+    #     Extracts the DEM for the specified district and exports it to Google Drive.
     #
     #     Args:
-    #         state_name (str): The name of the state to extract the DEM for.
+    #         district_name (str): The name of the district to extract the DEM for.
     #         export_folder (str): The folder in Google Drive to export the DEM to.
     #     """
     #     # Load SRTM DEM
     #     dem = ee.Image("USGS/SRTMGL1_003")
     #
-    #     # Get state boundary
+    #     # Get district boundary
     #     countries = ee.FeatureCollection("FAO/GAUL/2015/level2")
-    #     state_boundary = countries.filter(ee.Filter.eq("ADM2_NAME", state_name))
+    #     district_boundary = countries.filter(ee.Filter.eq("ADM2_NAME", district_name))
     #
-    #     # Clip DEM to state boundary
-    #     dem_clipped = dem.clip(state_boundary)
+    #     # Clip DEM to district boundary
+    #     dem_clipped = dem.clip(district_boundary)
     #
     #     # Export DEM to Google Drive
     #     task = ee.batch.Export.image.toDrive(
     #         image=dem_clipped,
     #         description="SRTM_DEM",
-    #         folder=f"GEE_exports_{state_name}",
-    #         fileNamePrefix=f"{state_name}_DEM",
-    #         region=state_boundary.geometry(),
+    #         folder=f"GEE_exports_{district_name}",
+    #         fileNamePrefix=f"{district_name}_DEM",
+    #         region=district_boundary.geometry(),
     #         scale=30,
     #         crs="EPSG:4326",
     #         maxPixels=1e13,
@@ -768,19 +796,19 @@ class GEEManager:
 
         print(f"Deforestation map saved to: {output_path}")
 
-    def generate_forest_change_maps(self, folder_pth, out_dir, state_name, years):
+    def generate_forest_change_maps(self, folder_pth, out_dir, district_name, years):
         """
         Generate forest change maps (deforestation as well as afforestation) for each pair of consecutive years.
 
         Args:
             folder_path (str): The path to the folder wher all the forest-nonforest cover maps are present.
-            state_name (str): Area of interest
+            district_name (str): Area of interest
             years (List[int]): Years for which we want to create forest change maps.
         """
         for year1, year2 in zip(years[:-1], years[1:]):
             # Check if forest cover files exists
-            file1 = os.path.join(folder_pth, f"{state_name}_{year1}.tif")
-            file2 = os.path.join(folder_pth, f"{state_name}_{year2}.tif")
+            file1 = os.path.join(folder_pth, f"{district_name}_{year1}.tif")
+            file2 = os.path.join(folder_pth, f"{district_name}_{year2}.tif")
 
             if not os.path.exists(file1) or not os.path.exists(file2):
                 raise FileNotFoundError(

@@ -35,6 +35,7 @@ class RiskMaps:
         mid_year,
         end_year,
         state_name,
+        district_name,
     ):
         """
         Initialize the RiskMaps class for generating final risk maps.
@@ -44,13 +45,14 @@ class RiskMaps:
             start_year (int): Beginning year of the historical reference period.
             mid_year (int): Middle year, used for calibration period.
             end_year (int): Ending year of the historical reference period.
-            state_name (str): Name of the state/region for analysis.
+            district_name (str): Name of the state/region for analysis.
         """
         self.working_directory = working_directory
         self.start_year = start_year
         self.mid_year = mid_year
         self.end_year = end_year
         self.state_name = state_name
+        self.district_name = district_name
 
         # Initialize Google Earth Engine (GEE) and Drive manager
         self.gee_manager = GEEManager()
@@ -90,13 +92,13 @@ class RiskMaps:
             self.working_directory, f"Vulnerability_Map_HRP.tif"
         )
         self.jurisdiction_mask = os.path.join(
-            self.working_directory, f"{self.state_name}_jurisidiction_mask.tif"
+            self.working_directory, f"{self.district_name}_jurisidiction_mask.tif"
         )
         self.administrative_divisions = os.path.join(
-            self.working_directory, f"{self.state_name}_districts.tif"
+            self.working_directory, f"{self.district_name}_districts.tif"
         )
         self.forest_nonforest_cal = os.path.join(
-            self.working_directory, f"{self.state_name}_{self.start_year}.tif"
+            self.working_directory, f"{self.district_name}_{self.start_year}.tif"
         )
 
         # List of files to validate for consistency
@@ -183,12 +185,14 @@ class RiskMaps:
         Note: This function is time-intensive (~30-45 minutes).
         """
         self.gee_manager.create_forest_maps_and_export(
-            self.state_name, self.years, self.drive_folder_path
+            self.state_name, self.district_name, self.years, self.drive_folder_path
         )
         self.gee_manager.create_and_export_jurisdiction_mask(
-            self.state_name, self.drive_folder_path
+            self.state_name, self.district_name, self.drive_folder_path
         )
-        self.gee_manager.export_districts(self.state_name, self.drive_folder_path)
+        self.gee_manager.export_districts(
+            self.state_name, self.district_name, self.drive_folder_path
+        )
 
     def prepare_data(self):
         """
@@ -200,31 +204,31 @@ class RiskMaps:
         print("================= Preparing Data ===================")
         for year in self.years:
             file_pth = os.path.join(
-                self.drive_folder_path, f"{self.state_name}_{year}.tif"
+                self.drive_folder_path, f"{self.district_name}_{year}.tif"
             )
             output_pth = os.path.join(
-                self.working_directory, f"{self.state_name}_{year}.tif"
+                self.working_directory, f"{self.district_name}_{year}.tif"
             )
             self.gee_manager.resample_raster(file_pth, output_pth)
 
         # Resample jurisdiction mask
         self.gee_manager.resample_raster(
             os.path.join(
-                self.drive_folder_path, f"{self.state_name}_jurisidiction_mask.tif"
+                self.drive_folder_path, f"{self.district_name}_jurisidiction_mask.tif"
             ),
             self.jurisdiction_mask,
         )
 
         # Resample administrative divisions
         self.gee_manager.resample_raster(
-            os.path.join(self.drive_folder_path, f"{self.state_name}_districts.tif"),
+            os.path.join(self.drive_folder_path, f"{self.district_name}_districts.tif"),
             self.administrative_divisions,
         )
 
         # Calculate Euclidean distance from forest edge at the start of the calibration period
         self.gee_manager.euclidean_dist_calc(
             os.path.join(
-                self.working_directory, f"{self.state_name}_{self.start_year}.tif"
+                self.working_directory, f"{self.district_name}_{self.start_year}.tif"
             ),
             self.forest_edge_distance_start,
         )
@@ -232,7 +236,7 @@ class RiskMaps:
         # Calcuate Euclidean distance from forest edge at the start of the confirmation period
         self.gee_manager.euclidean_dist_calc(
             os.path.join(
-                self.working_directory, f"{self.state_name}_{self.mid_year}.tif"
+                self.working_directory, f"{self.district_name}_{self.mid_year}.tif"
             ),
             self.forest_edge_distance_cnf,
         )
@@ -240,20 +244,20 @@ class RiskMaps:
         # Calculate Euclidean distance from forest edge at the start of the validity period
         self.gee_manager.euclidean_dist_calc(
             os.path.join(
-                self.working_directory, f"{self.state_name}_{self.end_year}.tif"
+                self.working_directory, f"{self.district_name}_{self.end_year}.tif"
             ),
             self.forest_edge_distance_vp,
         )
 
         # Generate deforestation maps
         file1 = os.path.join(
-            self.working_directory, f"{self.state_name}_{self.start_year}.tif"
+            self.working_directory, f"{self.district_name}_{self.start_year}.tif"
         )
         file2 = os.path.join(
-            self.working_directory, f"{self.state_name}_{self.mid_year}.tif"
+            self.working_directory, f"{self.district_name}_{self.mid_year}.tif"
         )
         file3 = os.path.join(
-            self.working_directory, f"{self.state_name}_{self.end_year}.tif"
+            self.working_directory, f"{self.district_name}_{self.end_year}.tif"
         )
 
         self.gee_manager.generate_deforestation_map(

@@ -15,7 +15,7 @@ import numpy as np
 import os
 
 
-def generate_afforestation_mask(state_name, start_year, mid_pt, end_year, dir_path):
+def generate_afforestation_mask(district_name, start_year, mid_pt, end_year, dir_path):
     """
     File Locations/Paths
     --------------------
@@ -25,9 +25,9 @@ def generate_afforestation_mask(state_name, start_year, mid_pt, end_year, dir_pa
     """
 
     if os.path.exists(dir_path):
-        forest_cover1 = f"{dir_path}/{state_name}_{start_year}.tif"
-        forest_cover2 = f"{dir_path}/{state_name}_{mid_pt}.tif"
-        forest_cover3 = f"{dir_path}/{state_name}_{end_year}.tif"
+        forest_cover1 = f"{dir_path}/{district_name}_{start_year}.tif"
+        forest_cover2 = f"{dir_path}/{district_name}_{mid_pt}.tif"
+        forest_cover3 = f"{dir_path}/{district_name}_{end_year}.tif"
         # Calculate deforestation and afforestation
         for i in range(2):
             with rasterio.open(forest_cover1) as src:

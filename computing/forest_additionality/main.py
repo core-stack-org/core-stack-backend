@@ -8,9 +8,13 @@ from .afforestation_area_estimation import get_afforestation_area_estimation
 from .deforestation_area_estimation import get_deforestation_area_estimation
 
 
-def forest_additionality(start_year, mid_pt, end_year, state_name):
+def forest_additionality(
+    start_year, mid_pt, end_year, state_name, district_name, gee_account_id=None
+):
     # Initialize the RiskMaps engine
-    base_file_path = f"{BASE_DIR}/data/forest_additionality/{state_name}"
+    base_file_path = (
+        f"{BASE_DIR}/data/forest_additionality/{state_name}/{district_name}"
+    )
     working_directory = os.path.join(
         base_file_path, f"{start_year}_{mid_pt}_{end_year}"
     )
@@ -19,23 +23,29 @@ def forest_additionality(start_year, mid_pt, end_year, state_name):
         os.makedirs(working_directory)
 
     engine = RiskMaps(
-        base_file_path, working_directory, start_year, mid_pt, end_year, state_name
+        base_file_path,
+        working_directory,
+        start_year,
+        mid_pt,
+        end_year,
+        state_name,
+        district_name,
     )
 
-    ee_initialize(3)
+    ee_initialize(gee_account_id)
 
     engine.perform_gee_operations()
 
     engine.run_wo_gee()
 
     generate_afforestation_mask(
-        state_name, start_year, mid_pt, end_year, working_directory
+        district_name, start_year, mid_pt, end_year, working_directory
     )
 
     get_deforestation_area_estimation(
-        state_name, start_year, mid_pt, end_year, working_directory
+        district_name, start_year, mid_pt, end_year, working_directory
     )
 
     get_afforestation_area_estimation(
-        state_name, start_year, mid_pt, end_year, working_directory
+        district_name, start_year, mid_pt, end_year, working_directory
     )

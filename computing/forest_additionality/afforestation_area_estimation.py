@@ -10,7 +10,7 @@ import rasterio
 
 
 def get_afforestation_area_estimation(
-    state_name, start_year, mid_pt, end_year, DATA_DIR
+    district_name, start_year, mid_pt, end_year, DATA_DIR
 ):
     """Return observed afforestation area in hectares for the selected period.
 
@@ -20,8 +20,8 @@ def get_afforestation_area_estimation(
     fall within the valid jurisdiction mask.
     """
     gt_tif = DATA_DIR + f"/afforestation_{start_year}_{end_year}.tif"
-    forest_start_tif = DATA_DIR + f"/{state_name}_{start_year}.tif"
-    jurisdiction_tif = DATA_DIR + f"/{state_name}_jurisidiction_mask.tif"
+    forest_start_tif = DATA_DIR + f"/{district_name}_{start_year}.tif"
+    jurisdiction_tif = DATA_DIR + f"/{district_name}_jurisidiction_mask.tif"
 
     with (
         rasterio.open(gt_tif) as gt_src,
@@ -67,7 +67,7 @@ def get_afforestation_area_estimation(
     )
 
     result = {
-        "state_name": state_name,
+        "district_name": district_name,
         "start_year": start_year,
         "mid_pt": mid_pt,
         "end_year": end_year,

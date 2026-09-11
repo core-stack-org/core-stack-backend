@@ -14,7 +14,7 @@ from rasterio.warp import reproject, Resampling
 
 
 def get_deforestation_area_estimation(
-    state_name, start_year, mid_pt, end_year, DATA_DIR
+    district_name, start_year, mid_pt, end_year, DATA_DIR
 ):
     # Directory that contains the generated prediction and mask rasters.
     # LABEL_BAND = "remapped"  # "9_deforestation"
@@ -66,8 +66,8 @@ def get_deforestation_area_estimation(
 
         # A pixel can only be evaluated if it was forest at the start of the
         # evaluation period (T2) and is within the jurisdiction.
-        forest_start_tif = DATA_DIR + f"/{state_name}_{mid_pt}.tif"
-        jurisdiction_tif = DATA_DIR + f"/{state_name}_jurisidiction_mask.tif"
+        forest_start_tif = DATA_DIR + f"/{district_name}_{mid_pt}.tif"
+        jurisdiction_tif = DATA_DIR + f"/{district_name}_jurisidiction_mask.tif"
 
         with rasterio.open(gt_tif) as gt_src, rasterio.open(pred_tif) as pred_src:
 
