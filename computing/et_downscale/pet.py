@@ -1,11 +1,10 @@
 import ee
 
-from computing.et_downscale.aet import build_aet_stack
 from computing.et_downscale.helper import (
-    build_classifier,
+    crop_year_start_date,
+    crop_year_start_month,
     get_proj_30m,
     MODIS_COL,
-    build_common_pixel_mask,
     ee_annual_total_band,
     finalize_export_image,
     export_product_asset,
@@ -15,35 +14,26 @@ from computing.et_downscale.helper import (
     cast_monthly_band,
     empty_monthly_band,
     ensure_monthly_band,
-    monthly_valid_mask,
 )
 
 
-def generate_pet(
-    cfg,
-    region,
-    common_mask=None,
-    footprint=None,
-    grid_proj=None,
-):
-    year = cfg["year"]
+MODIS_SCALE_FACTOR = 0.1
+MODIS_COMPOSITE_DAYS = 8
+MODIS_VALID_MAX = 32700
 
-    if footprint is None:
-        print("  Building AET stack (pixel-grid carrier) ...")
-        classifier = build_classifier(cfg["model_aez"])
-        aet_stack = build_aet_stack(region, classifier, year)
 
-        grid_proj = aet_stack.select("ET_01").projection()
-        common_mask = build_common_pixel_mask(region, grid_proj)
-        footprint = monthly_valid_mask(aet_stack, "ET")
+def generate_pet(cfg, region):
+    year = int(cfg["year"])
+    start_month = crop_year_start_month(cfg)
+    modis_col_id = cfg.get("modis_collection", MODIS_COL)
 
-    proj = get_proj_30m(region, year)
-    pet_stack = build_pet_stack(region, year, MODIS_COL, proj)
+    proj = get_proj_30m(region, year, start_month=start_month)
+    pet_stack = build_pet_stack(region, year, modis_col_id, proj, start_month)
 
-    pet_monthly = pet_stack.multiply(0.1).updateMask(footprint)
+    pet_monthly = pet_stack.multiply(MODIS_SCALE_FACTOR)
     pet_annual = ee_annual_total_band(
-        pet_monthly, "PET", year, band_name="PET_annual"
-    ).updateMask(footprint)
+        pet_monthly, "PET", year, band_name="PET_annual", start_month=start_month
+    )
     pet_image = finalize_export_image(
         pet_monthly,
         pet_annual,
@@ -52,7 +42,9 @@ def generate_pet(
             "application": "pet",
             "units": "bands 1-12: mm/day; band 13: mm/yr",
             "source": "MODIS MOD16A2",
-            "modis_collection": MODIS_COL,
+            "modis_collection": modis_col_id,
+            "source_scale_factor": MODIS_SCALE_FACTOR,
+            "source_composite_days": MODIS_COMPOSITE_DAYS,
             "year": str(year),
             "asset_suffix": cfg["asset_suffix"],
             "roi_path": cfg["roi_path"],
@@ -60,14 +52,25 @@ def generate_pet(
         },
         band_descriptions=[f"PET_{abbr}_daily_mm" for abbr in MONTH_ABBR]
         + ["PET_annual_mm"],
-        default_proj=grid_proj,
-        common_mask=common_mask,
+        default_proj=proj,
     )
     spec = export_product_asset("pet", "PET", pet_image, cfg)
-    return pet_stack, proj, spec
+    return spec
 
 
-def _make_raw_monthly_pet(date, agri_month, modis_col, year, proj):
+def _prepare_pet_image(img: ee.Image, proj: ee.Projection) -> ee.Image:
+    """Convert one 8-day PET composite to a 30 m daily-rate image."""
+    pet = ee.Image(img).select("PET").float()
+    pet = pet.updateMask(pet.gte(0)).updateMask(pet.lte(MODIS_VALID_MAX))
+    return (
+        pet.divide(MODIS_COMPOSITE_DAYS)
+        .resample("bilinear")
+        .reproject(crs=proj, scale=30)
+        .rename("PET_daily")
+    )
+
+
+def _make_raw_monthly_pet(date, agri_month, modis_col, proj):
     start = ee.Date(date)
     end = start.advance(1, "month")
     mid = start.advance(15, "day").millis()
@@ -78,12 +81,7 @@ def _make_raw_monthly_pet(date, agri_month, modis_col, year, proj):
     source_count = monthly_collection.size()
     pet_collection = (
         monthly_collection.select("PET")
-        .map(
-            lambda img: img.divide(8)
-            .resample("bilinear")
-            .reproject(crs=proj, scale=30)
-            .rename("PET_daily")
-        )
+        .map(lambda img: _prepare_pet_image(img, proj))
         .map(lambda img: cast_monthly_band(img, "PET_daily"))
     )
     safe_collection = pet_collection.merge(
@@ -103,25 +101,27 @@ def _make_raw_monthly_pet(date, agri_month, modis_col, year, proj):
 
 
 def build_pet_stack(
-    region: ee.Geometry, year: int, modis_col_id: str, proj: ee.Projection
+    region: ee.Geometry,
+    year: int,
+    modis_col_id: str,
+    proj: ee.Projection,
+    start_month: int = 7,
 ) -> ee.Image:
     """
     12-band PET stack PET_01...PET_12 (0.1 mm/day) at 30 m.
     MOD16A2 is 8-day composite; divide by 8 for daily rate.
     500 m MODIS pixel bilinearly resampled to the 30 m Landsat grid.
-    Months with no MODIS composites are filled using a +/-30 day window.
+    Months with no MODIS composites are filled by the shared helper.
     """
     modis_col = ee.ImageCollection(modis_col_id).filterBounds(region)
-    # months = ee.List.sequence(1, 12)
-    start_date = ee.Date.fromYMD(year, 7, 1)
-    months = ee.List.sequence(0, 11)
+    start_date = crop_year_start_date(year, start_month)
+    months = ee.List.sequence(-1, 12)
     raw_monthly = ee.ImageCollection.fromImages(
         months.map(
             lambda agri_month_idx: _make_raw_monthly_pet(
                 start_date.advance(agri_month_idx, "month"),
                 ee.Number(agri_month_idx).add(1),
                 modis_col,
-                year,
                 proj,
             )
         )

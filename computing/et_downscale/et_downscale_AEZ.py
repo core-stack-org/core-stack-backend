@@ -2,7 +2,6 @@ from computing.et_downscale.et_downscale import generate_et_downscale
 import ee
 
 from utilities.constants import AEZ
-from utilities.gee_utils import ee_initialize
 
 
 def generate_et_aez(

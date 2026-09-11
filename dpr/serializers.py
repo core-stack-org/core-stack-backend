@@ -130,6 +130,16 @@ class NRMWorkSerializer(serializers.Serializer):
     status = serializers.CharField()
 
 
+class StatusTrackingByPlanSerializer(serializers.Serializer):
+    plan_id = serializers.IntegerField()
+    plan_name = serializers.CharField()
+    organization = serializers.CharField(allow_null=True)
+    state = serializers.CharField(allow_null=True)
+    district = serializers.CharField(allow_null=True)
+    block = serializers.CharField(allow_null=True)
+    totals = serializers.DictField()
+
+
 class LivelihoodSerializer(serializers.Serializer):
     id = serializers.CharField()
     livelihood_work = serializers.CharField()

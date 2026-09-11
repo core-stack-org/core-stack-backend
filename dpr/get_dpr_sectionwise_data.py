@@ -11,11 +11,31 @@ from .gen_dpr import (
 )
 from .utils import to_utf8
 from collections import defaultdict
-from dpr.utils import ensure_str, get_waterbody_repair_activities
-from .mapping import populate_maintenance_from_waterbody
+from dpr.utils import ensure_str, format_text, get_waterbody_repair_activities
+from .mapping import (
+    populate_maintenance_from_waterbody,
+    classify_demand_type_code,
+    RECHARGE_STRUCTURE_REVERSE_MAPPING,
+    IRRIGATION_STRUCTURE_REVERSE_MAPPING,
+    WATER_STRUCTURE_REVERSE_MAPPING,
+    RS_WATER_STRUCTIRE_REVERSE_MAPPING,
+)
 from .services import (
     get_nrm_works_data,
 )
+
+
+def _lower_keys(mapping):
+    return {str(k).lower(): v for k, v in mapping.items()}
+
+
+# Structure-type -> repair-activity-key lookups used by _resolve_repair_activity,
+# which normalizes structure_type to lowercase before matching. Derived from the
+# canonical mappings in dpr.mapping so both stay in sync.
+_RECHARGE_STRUCTURE_LOOKUP = _lower_keys(RECHARGE_STRUCTURE_REVERSE_MAPPING)
+_IRRIGATION_STRUCTURE_LOOKUP = _lower_keys(IRRIGATION_STRUCTURE_REVERSE_MAPPING)
+_WATER_STRUCTURE_LOOKUP = _lower_keys(WATER_STRUCTURE_REVERSE_MAPPING)
+_RS_WATER_STRUCTURE_LOOKUP = _lower_keys(RS_WATER_STRUCTIRE_REVERSE_MAPPING)
 from .service.form_download_service import (
     load_form_labels,
     translate_choice,
@@ -468,7 +488,7 @@ def get_detailed_waterbody_data(
             str(waterbody.water_structure_type).strip().lower()
         )
         wb_owner = waterbody.owner
-        wb_owner = classify_demand_type(wb_owner.lower())
+        wb_owner = classify_demand_type_code(wb_owner.lower())
         rows.append(
             {
                 "mws_id": mws_id,
@@ -517,6 +537,26 @@ def get_detailed_waterbody_data(
     return rows
 
 
+def _translate_repair_activity(labels, lookup, structure_type, repair_value, language):
+    """
+    Translate a repair-activity choice using the structure-specific choice list
+    for `structure_type` (falls back to the raw value if there's no matching
+    key/translation), then run it through format_text() so an untranslated
+    value still reads as clean text instead of a raw underscore_case ODK code.
+    Must be called with the *original* (untranslated) structure_type, since
+    lookup keys are the raw lowercase structure names.
+    """
+    if not repair_value:
+        return repair_value
+
+    repair_key = lookup.get(str(structure_type).strip().lower())
+    if repair_key:
+        repair_value = translate_choice(
+            labels, repair_key, clean_odk_value(repair_value), language
+        )
+    return format_text(repair_value)
+
+
 def get_section_e_data(plan, language):
     populate_maintenance_from_waterbody(plan)
     gw_data = get_maintenance_data(plan.id, "gw")
@@ -533,7 +573,13 @@ def get_section_e_data(plan, language):
     swb_label = load_form_labels("NRM_form_NRM_form_Waterbody_Screen_V1.0.0")
 
     for row in gw_data:
-
+        row["repair_activities"] = _translate_repair_activity(
+            gw_label,
+            _RECHARGE_STRUCTURE_LOOKUP,
+            row["structure_type"],
+            row.get("repair_activities"),
+            language,
+        )
         row["demand_type"] = translate_choice(
             gw_label,
             "demand_type",
@@ -548,7 +594,14 @@ def get_section_e_data(plan, language):
             language,
         )
     for row in agri_data:
-        demand_type = classify_demand_type((row.get("demand_type") or "").lower())
+        row["repair_activities"] = _translate_repair_activity(
+            agri_label,
+            _IRRIGATION_STRUCTURE_LOOKUP,
+            row["structure_type"],
+            row.get("repair_activities"),
+            language,
+        )
+        demand_type = classify_demand_type_code((row.get("demand_type") or "").lower())
         row["demand_type"] = translate_choice(
             agri_label,
             "demand_type".lower().replace(" ", "_"),
@@ -562,6 +615,13 @@ def get_section_e_data(plan, language):
             language,
         )
     for row in swb_data:
+        row["repair_activities"] = _translate_repair_activity(
+            swb_rs_label,
+            _WATER_STRUCTURE_LOOKUP,
+            row["structure_type"],
+            row.get("repair_activities"),
+            language,
+        )
         row["demand_type"] = translate_choice(
             swb_label,
             "demand_type",
@@ -575,23 +635,19 @@ def get_section_e_data(plan, language):
             language,
         )
     for row in swb_rs_data:
+        row["repair_activities"] = _translate_repair_activity(
+            swb_rs_label,
+            _RS_WATER_STRUCTURE_LOOKUP,
+            row["structure_type"],
+            row.get("repair_activities"),
+            language,
+        )
         row["demand_type"] = translate_choice(
             swb_rs_label,
             "demand_type",
             row["demand_type"],
             language,
         )
-
-        original_structure = row["structure_type"]
-        original_structure = str(original_structure).strip().lower()
-        repair_key = RS_WATER_STRUCTIRE_REVERSE_MAPPING.get(original_structure)
-        if repair_key and row.get("repair_activities"):
-            row["repair_activities"] = translate_choice(
-                swb_rs_label,
-                repair_key,
-                clean_odk_value(row["repair_activities"]),
-                language,
-            )
         row["structure_type"] = translate_choice(
             swb_rs_label,
             "TYPE_OF_WORK",
@@ -836,11 +892,15 @@ def get_maintenance_data(plan_id, maintenance_type):
     if maintenance_type == "gw":
         for m in GW_maintenance.objects.filter(plan_id=pid).exclude(is_deleted=True):
             d = m.data_gw_maintenance or {}
-            structure_type = d.get("select_one_recharge_structure") or None
+            structure_type = (
+                d.get("select_one_recharge_structure")
+                or d.get("select_one_water_structure")
+                or None
+            )
             repair = _resolve_repair_activity(
                 d,
                 structure_type,
-                RECHARGE_STRUCTURE_MAPPING,
+                _RECHARGE_STRUCTURE_LOOKUP,
             )
             result.append(
                 {
@@ -866,7 +926,7 @@ def get_maintenance_data(plan_id, maintenance_type):
                 or "NA"
             )
             repair = _resolve_repair_activity(
-                d, structure_type, IRRIGATION_STRUCTURE_REVERSE_MAPPING
+                d, structure_type, _IRRIGATION_STRUCTURE_LOOKUP
             )
             result.append(
                 {
@@ -889,7 +949,7 @@ def get_maintenance_data(plan_id, maintenance_type):
                 d.get("TYPE_OF_WORK") or d.get("select_one_water_structure") or "NA"
             )
             repair = _resolve_repair_activity(
-                d, structure_type, WATER_STRUCTURE_REVERSE_MAPPING
+                d, structure_type, _WATER_STRUCTURE_LOOKUP
             )
             result.append(
                 {
@@ -913,7 +973,7 @@ def get_maintenance_data(plan_id, maintenance_type):
             d = m.data_swb_rs_maintenance or {}
             structure_type = d.get("TYPE_OF_WORK") or "NA"
             repair = _resolve_repair_activity(
-                d, structure_type, RS_WATER_STRUCTIRE_REVERSE_MAPPING
+                d, structure_type, _RS_WATER_STRUCTURE_LOOKUP
             )
 
             result.append(
@@ -955,25 +1015,6 @@ def _resolve_repair_activity(
     return repair_activities
 
 
-RECHARGE_STRUCTURE_MAPPING = {
-    "Check dam": "select_one_check_dam",
-    "Percolation tank": "select_one_percolation_tank",
-    "Earthen gully plug": "select_one_earthen_gully_plug",
-    "Drainage/soakage channels": "select_one_drainage_soakage_channels",
-    "Recharge pits": "select_one_recharge_pits",
-    "Sokage pits": "select_one_sokage_pits",
-    "Trench cum bund network": "select_one_trench_cum_bund_network",
-    "Continuous contour trenches (CCT)": "select_one_continuous_contour_trenches",
-    "Staggered Contour trenches(SCT)": "select_one_staggered_contour_trenches",
-    "Water absorption trenches(WAT)": "select_one_water_absorption_trenches",
-    "Loose boulder structure": "select_one_loose_boulder_structure",
-    "Rock fill dam": "select_one_rock_fill_dam",
-    "Stone bunding": "select_one_stone_bunding",
-    "Diversion drains": "select_one_diversion_drains",
-    "Bunding:Contour bunds/ graded bunds": "select_one_bunding",
-    "5% model structure": "select_one_model5_structure",
-    "30-40 model structure": "select_one_model30_40_structure",
-}
 def flatten_odk_multiselect(value):
     parts = []
 
@@ -1235,71 +1276,3 @@ def translate_work_category(value, language):
     return translations.get(language, {}).get(value, value)
 
 
-_COMMUNITY_DEMAND_VALUES = {
-    "community",
-    "community well",
-    "community demand",
-    "public",
-    "public well",
-    "shared among families",
-}
-_INDIVIDUAL_DEMAND_VALUES = {"private", "privately owned", "individual demand"}
-
-
-def classify_demand_type(raw_value):
-    if not raw_value:
-        return raw_value
-    normalized = raw_value.strip().lower().replace("_", " ")
-    if normalized in _COMMUNITY_DEMAND_VALUES:
-        return "community_demand"
-    if normalized in _INDIVIDUAL_DEMAND_VALUES:
-        return "individual_demand"
-    return raw_value
-
-
-IRRIGATION_STRUCTURE_MAPPING = {
-    "select_one_farm_pond": "Farm pond",
-    "select_one_community_pond": "Community Pond",
-    "select_one_well": "Well",
-    "select_one_canal": "Canal",
-    "select_one_farm_bund": "Farm bund",
-}
-
-IRRIGATION_STRUCTURE_REVERSE_MAPPING = {
-    v.lower(): k for k, v in IRRIGATION_STRUCTURE_MAPPING.items()
-}
-
-RS_WATER_STRUCTURE_MAPPING = {
-    "select_one_farm_pond": "Farm pond",
-    "select_one_community_pond": "Community Pond",
-    "select_one_repair_large_water_body": "Large water body",
-    "select_one_repair_canal": "Canal",
-    "select_one_check_dam": "Check dam",
-    "select_one_percolation_tank": "Percolation tank",
-    "select_one_rock_fill_dam": "Rock fill dam",
-    "select_one_loose_boulder_structure": "Loose boulder structure",
-    "select_one_model5_structure": "5% Model structure",
-    "select_one_Model30_40_structure": "30-40 Model structure",
-}
-
-RS_WATER_STRUCTIRE_REVERSE_MAPPING = {
-    v.lower(): k for k, v in RS_WATER_STRUCTURE_MAPPING.items()
-}
-
-
-WATER_STRUCTURE_MAPPING = {
-    "select_one_farm_pond": "Farm pond",
-    "select_one_community_pond": "Community Pond",
-    "select_one_repair_large_water_body": "Large water body",
-    "select_one_repair_canal": "Canal",
-    "select_one_check_dam": "Check dam",
-    "select_one_percolation_tank": "Percolation tank",
-    "select_one_rock_fill_dam": "Rock fill dam",
-    "select_one_loose_boulder_structure": "Loose boulder structure",
-    "select_one_model5_structure": "5% Model structure",
-    "select_one_Model30_40_structure": "30-40 Model structure",
-}
-
-WATER_STRUCTURE_REVERSE_MAPPING = {
-    v.lower(): k for k, v in WATER_STRUCTURE_MAPPING.items()
-}

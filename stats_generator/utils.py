@@ -101,9 +101,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_swb(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-                create_excel_for_mws_intersect_swb(
-                    geojson_data, writer, district, block
-                )
+                create_excel_for_mws_intersect_swb(geojson_data, writer)
             elif workspace == "nrega_assets":
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                 mws_file_url = get_url("mws_layers", mws_lay_name)
@@ -257,12 +255,34 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_type(geojson_data, writer)
             elif workspace == "soil_health_vector":
                 create_excel_for_soil_health(geojson_data, writer)
-
+            elif workspace == "ndvi_timeseries":
+                create_excel_for_ndvi_shrub(geojson_data, writer)
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_ndvi_shrub(data, writer):
+    print("Inside ndvi shrub excel generation")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        df.rename(columns={"uid": "UID"}, inplace=True)
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="ndvi_shrub", index=False)
+        print("Excel file created for ndvi_shrub")
+    except Exception as e:
+        print(f"Error occurred while generating excel for ndvi shrub {e} ")
 
 
 def create_excel_for_soil_health(data, writer):
@@ -544,26 +564,20 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
     features = data["features"]
     years = list(range(start_year, end_year + 1))
 
-    classes = {
-        "barrenland": ("barrenland", "barrenla"),
-        "built_up_area": ("built-up_a", "built-up"),
-        "cropland": ("cropland_a", "cropland"),
-        "double_crop": ("doubly_cro", "doubly_c"),
-        "triple_crop": ("triply_cro", "triply_c"),
-        "tree_forest": ("tree_fores", "tree_for"),
-        "shrub_scrub": ("shrub_scru", "shrub_sc"),
-        "single_kharif": ("single_kha", "single_k"),
-        "single_non_kharif": ("single_non", "single_n"),
-        "k_water": ("k_water_ar", "k_water_"),
-        "kr_water": ("kr_water_a", "kr_water"),
-        "krz_water": ("krz_water_", "krz_wate"),
-    }
-
-    def get_key(base_key, trunc_prefix, idx):
-        """Derive the property key for a given year index."""
-        if idx == 0:
-            return base_key
-        return f"{trunc_prefix}_{idx}"
+    columns = [
+        "barrenlands_area_",
+        "built-up_area_",
+        "cropland_area_",
+        "doubly_cropped_area_",
+        "triply_cropped_area_",
+        "tree_forest_area_",
+        "shrub_scrub_area_",
+        "single_kharif_cropped_area_",
+        "single_non_kharif_cropped_area_",
+        "k_water_area_",
+        "kr_water_area_",
+        "krz_water_area_",
+    ]
 
     for feature in features:
         properties = feature["properties"]
@@ -571,13 +585,10 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "sum_in_ha": (properties.get("sum") or 0) / 10000,
         }
-
-        for idx, year in enumerate(years):
-            for class_name, (base_key, trunc_prefix) in classes.items():
-                key = get_key(base_key, trunc_prefix, idx)
-                row[f"{class_name}_in_ha_{year}"] = properties.get(key, 0)
+        for year in years:
+            for column in columns:
+                row[f"{column}in_ha_{year}"] = properties.get(f"{column}{year}")
 
         df_data.append(row)
 
@@ -663,59 +674,38 @@ def create_excel_for_dem(data, writer):
     print("Excel file created for dem")
 
 
-def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
+def create_excel_for_mws_intersect_swb(swb_geojson, writer):
     print("Inside create_excel_for_mws_intersect_swb")
-
-    # --- Fetch MWS layer ---
-    mws_layer_name = f"mws_{district}_{block}"
-    mws_data_url = get_url("mws", mws_layer_name)
-
-    mws_response = requests.get(mws_data_url)
-    if mws_response.status_code != 200:
-        print(f"Error fetching MWS data: {mws_response.status_code}")
-        return
-
-    mws_geojson = mws_response.json()
-
-    def calculate_intersection_area(geom1, geom2):
-        if geom1.intersects(geom2):
-            return geom1.intersection(geom2).area
-        return 0
-
     rows = []
 
-    for mws_feature in mws_geojson["features"]:
-        mws_props = mws_feature["properties"]
-        mws_uid = mws_props.get("uid")
-        mws_geom = shape(mws_feature["geometry"])
-
-        for swb_feature in swb_geojson["features"]:
-            swb_props = swb_feature["properties"]
-            swb_geom = shape(swb_feature["geometry"])
-
-            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
-
-            if intersection_area > 0:
-                # waterbodies centroid calculation
-                centroid = swb_geom.centroid
-                lon, lat = centroid.x, centroid.y
-
-                rows.append(
-                    {
-                        "UID": mws_uid,
-                        "SWB_UID": swb_props.get("UID"),
-                        "Waterbodies_name": swb_props.get("water_body_name"),
-                        "Latitude": lat,
-                        "Longitude": lon,
-                    }
-                )
+    for swb_feature in swb_geojson["features"]:
+        swb_props = swb_feature["properties"]
+        swb_geom = shape(swb_feature["geometry"])
+        centroid = swb_geom.centroid
+        lon, lat = centroid.x, centroid.y
+        uid = swb_props.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = swb_props.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
+        for num_uid_part in num_uid_parts_is:
+            rows.append(
+                {
+                    "UID": num_uid_part,
+                    "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
+                    "Waterbodies_name": swb_props.get("water_body_name"),
+                    "Latitude": lat,
+                    "Longitude": lon,
+                }
+            )
 
     df = pd.DataFrame(rows)
-
-    if not df.empty:
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-        df[numeric_cols] = df[numeric_cols].round(2)
-
     df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
     print("Excel sheet 'mws_intersect_swb' created successfully")
 
@@ -1233,7 +1223,7 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
 
             years = range(2017, 2020)
 
-            tree_forest_cols = [f"tree_forest_in_ha_{y}" for y in years]
+            tree_forest_cols = [f"tree_forest_area_in_ha_{y}" for y in years]
 
             tree_forest_idxs = [
                 header_idx[c] for c in tree_forest_cols if c in header_idx
@@ -1867,7 +1857,8 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
             "single_non_kharif_area_percent": properties.get(
                 "sing_non_k", properties.get("sing_non_kharif_crop")
             ),
-            "single_kharif_area_percent": properties.get(
+            "single_kharif_area_percent": properties["sing_crop"],
+            "double_cropping_area_percent": properties.get(
                 "double_cro", properties.get("double_crop")
             ),
             "triple_cropping_area_percent": properties.get(
@@ -1893,22 +1884,25 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
     for feature in features:
         properties = feature.get("properties", {})
-        uid = properties.get("MWS_UID", "Unknown")
+        uid = properties.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = properties.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
 
         def calculate_area(base_area, percentage):
             if base_area == 0 or percentage == 0:
                 return 0
             return base_area * (percentage / 100)
 
-        parts = uid.split("_")
-        num_uid_parts_is = [
-            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
-        ]
-        if len(parts) % 2 == 1:  # Check for an unpaired last part
-            num_uid_parts_is.append(parts[-1])
-
         # Generate years dynamically based on start_year and end_year
-        years = range(start_year, end_year)
+        years = range(start_year, end_year + 1)
 
         for num_uid_part in num_uid_parts_is:
             row = {"UID": num_uid_part}
@@ -2006,8 +2000,8 @@ def create_excel_for_nrega_assets(
     ]
 
     for _, row in joined.iterrows():
-        creation_t = row["creation_t"]
-        work_category = row["WorkCatego"]
+        creation_t = row.get("creation_t", row.get("creation_time"))
+        work_category = row.get("WorkCatego", row.get("WorkCategory"))
         mws_id = row["uid"]
 
         if isinstance(creation_t, pd.Timestamp):
@@ -2106,7 +2100,9 @@ def create_excel_village_nrega_assets(
         if year not in year_range:
             continue
 
-        category = workCategoryMapping.get(row["WorkCatego"])
+        category = workCategoryMapping.get(
+            row.get("WorkCatego", row.get("WorkCategory"))
+        )
         if not category:
             continue
 
@@ -2179,8 +2175,12 @@ def fetch_village_asset_count(
                 {
                     "geometry": point,
                     "Asset ID": properties.get("Asset ID", "MISSING"),
-                    "creation_t": properties.get("creation_t", ""),
-                    "WorkCatego": properties.get("WorkCatego", ""),
+                    "creation_t": properties.get(
+                        "creation_t", properties.get("creation_time")
+                    ),
+                    "WorkCatego": properties.get(
+                        "WorkCatego", properties.get("WorkCategory")
+                    ),
                 }
             )
         except:
@@ -2297,7 +2297,9 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
                 triply_c_key, 0
             )
 
-        row["sum_area_in_ha"] = properties.get("sum", 0) / 10000
+        croppable_area_key = f"total_cropable_area_ever_hydroyear_2017_{end_year}"
+        croppable_area = properties.get(croppable_area_key)
+        row["sum_area_in_ha"] = croppable_area
         df_data.append(row)
 
     # Create and format DataFrame
@@ -2427,7 +2429,6 @@ def get_season(month):
         return "kharif"
     elif month in (11, 12, 1, 2):
         return "rabi"
-
 
 def process_feature(feature):
     uid = feature["properties"]["uid"]
