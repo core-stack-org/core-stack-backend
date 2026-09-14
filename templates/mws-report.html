@@ -4644,12 +4644,222 @@
                     features: new ol.format.GeoJSON().readFeatures(data),
                 });
 
-                swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
+                // swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
+                const swbWaterbodyLayer = new ol.layer.Vector({
+                    source: swbVillageSource,
+                    style: waterbodyStyleFunction,
+                    zIndex: 4
+                });
+                // ================= WATERBODY POPUP =================
+
+                const popupEl = document.createElement('div');
+                popupEl.style.cssText = `
+    background: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 8px;
+    min-width: 150px;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    color: #333;
+    text-align: center;
+    display: none;
+`;
+
+                const popupOverlay = new ol.Overlay({
+    element: popupEl,
+    positioning: 'bottom-center',
+    offset: [0, -10],
+    stopEvent: true,
+    autoPan: true
+});
+
+                swbMap.addOverlay(popupOverlay);
+                swbMap.on('click', evt => {
+                    const feature = swbMap.forEachFeatureAtPixel(
+                        evt.pixel,
+                        feature => feature,
+                        {
+                            layerFilter: layer => layer === swbWaterbodyLayer
+                        }
+                    );
+
+                    if (!feature) {
+                        popupEl.style.display = 'none';
+                        popupOverlay.setPosition(undefined);
+                        return;
+                    }
+
+                    const properties = feature.getProperties();
+
+                    const waterbodyId =
+                        properties.wb_id ||
+                        properties.uid ||
+                        properties.UID ||
+                        'N/A';
+
+                    popupEl.innerHTML = `
+                        <strong style="
+                            display: block;
+                            margin-bottom: 8px;
+                            font-size: 14px;
+                        ">
+                            Waterbody ID: ${waterbodyId}
+                        </strong>
+                    `;
+
+                    const btn = document.createElement('button');
+
+                    btn.type = 'button';
+                    btn.textContent = 'Show Waterbody Profile';
+
+                    btn.style.cssText = `
+                        display: block;
+                        margin: 0 auto;
+                        padding: 7px 10px;
+                        background: #3498db;
+                        color: #ffffff;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        cursor: pointer;
+                    `;
+                btn.onclick = () => {
+                    const stateName = '{{state}}';
+                    const districtName = '{{district}}';
+                    const blockName = '{{block}}';
+
+                    const waterbodyId =
+                        properties.uid ||
+                        properties.wb_id ||
+                        properties.UID;
+
+                    const waterbodyProfileUrl =
+                        `https://www.explorer.core-stack.org/rwb` +
+                        `?type=tehsil` +
+                        `&state=${encodeURIComponent(stateName)}` +
+                        `&district=${encodeURIComponent(districtName)}` +
+                        `&block=${encodeURIComponent(blockName)}` +
+                        `&waterbody=${encodeURIComponent(waterbodyId)}`;
+
+                    window.open(waterbodyProfileUrl, '_blank');
+                };
+
+                    popupEl.appendChild(btn);
+
+                    popupEl.style.display = 'block';
+                    popupOverlay.setPosition(evt.coordinate);
+                });
+
+                swbMap.on('singleclick', function (evt) {
+    const feature = swbMap.forEachFeatureAtPixel(
+        evt.pixel,
+        function (feature) {
+            return feature;
+        }
+    );
+
+    if (!feature) {
+        popupOverlay.setPosition(undefined);
+        return;
+    }
+
+    const properties = feature.getProperties();
+
+    const waterbodyId =
+        properties.uid ||
+        properties.wb_id ||
+        properties.UID ||
+        'N/A';
+
+    const waterbodyType =
+        properties.waterbody_type_name ||
+        properties.waterbody_type ||
+        'N/A';
+
+    const totalArea =
+        properties.total_area !== null &&
+        properties.total_area !== undefined
+            ? properties.total_area
+            : 'N/A';
+
+    const area1718 =
+        properties['area_17-18'] !== null &&
+        properties['area_17-18'] !== undefined
+            ? properties['area_17-18']
+            : 'N/A';
+
+    popupElement.innerHTML = `
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        ">
+            <strong style="font-size: 15px; color: #333;">
+                Waterbody Details
+            </strong>
+
+            <button
+                id="closeWaterbodyPopup"
+                style="
+                    border: none;
+                    background: transparent;
+                    font-size: 18px;
+                    cursor: pointer;
+                    color: #666;
+                "
+            >
+                ×
+            </button>
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Waterbody ID:</b> ${waterbodyId}
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Type:</b> ${waterbodyType}
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Total Area:</b> ${totalArea}
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Area 17-18:</b> ${area1718}
+        </div>
+    `;
+
+    popupElement
+        .querySelector('#closeWaterbodyPopup')
+        .addEventListener('click', function () {
+            popupOverlay.setPosition(undefined);
+        });
+
+    popupOverlay.setPosition(evt.coordinate);
+});
+                swbMap.addLayer(swbWaterbodyLayer);
+                swbMap.on('pointermove', function (evt) {
+                    if (evt.dragging) {
+                        return;
+                    }
+
+                    const isWaterbody = swbMap.hasFeatureAtPixel(evt.pixel, {
+                        layerFilter: function (layer) {
+                            return layer === swbWaterbodyLayer;
+                        }
+                    });
+
+                    swbMap.getTargetElement().style.cursor =
+                        isWaterbody ? 'pointer' : '';
+                });
                 swbMap.addLayer(waterRaster);
                 swbMap.addLayer(riverLayer);
                 swbMap.addLayer(canalLayer);
             } catch (error) {
-                // Silently handle fetch errors
+                console.error('SWB Waterbody Error:', error);
             }
         })();
 
