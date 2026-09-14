@@ -69,17 +69,17 @@ def forest_fringes_on_AEZ(aez_no, gee_account_id=7):
 
 @app.task(bind=True)
 def generate_forest_fringe_degradation(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    gee_account_id=None,
-    app_type="MWS",
-    sync_to_db=True,
-    sync_to_geoserver=True,
+        self,
+        state=None,
+        district=None,
+        block=None,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        gee_account_id=None,
+        app_type="MWS",
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """
     Generate forest-fringe metrics as a vector layer.
@@ -111,7 +111,7 @@ def generate_forest_fringe_degradation(
 
     if state and district and block:
         asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -247,30 +247,30 @@ def generate_forest_fringe_degradation(
             )
 
             # ---- Ratios ----
-            fringe_to_mws_ratio = ee.Number(fringe_area).divide(mws_area)
-            degr_fringe_ratio = ee.Number(degr_fringe_area).divide(fringe_area)
-            defo_fringe_ratio = ee.Number(defo_fringe_area).divide(fringe_area)
+            # fringe_to_mws_ratio = ee.Number(fringe_area).divide(mws_area)
+            # degr_fringe_ratio = ee.Number(degr_fringe_area).divide(fringe_area)
+            # defo_fringe_ratio = ee.Number(defo_fringe_area).divide(fringe_area)
 
             return ee.Feature(f.geometry()).set(
                 {
                     "uid": f.get("uid"),
                     "mws_area_in_ha": mws_area.multiply(0.0001),
                     "forest_fringe_area_in_ha": fringe_area.multiply(0.0001),
-                    "forest_fringe_ratio": fringe_to_mws_ratio,
-                    "tree_degradation_mws_area_in_ha": ee.Number(
-                        degr_mws_area
-                    ).multiply(0.0001),
+                    # "forest_fringe_ratio": fringe_to_mws_ratio,
+                    "tree_degradation_area_in_ha": ee.Number(degr_mws_area).multiply(
+                        0.0001
+                    ),
                     "tree_degradation_fringe_area_in_ha": ee.Number(
                         degr_fringe_area
                     ).multiply(0.0001),
-                    "tree_degradation_fringe_ratio": degr_fringe_ratio,
-                    "tree_deforestation_mws_area_in_ha": ee.Number(
-                        defo_mws_area
-                    ).multiply(0.0001),
+                    # "tree_degradation_fringe_ratio": degr_fringe_ratio,
+                    "tree_deforestation_area_in_ha": ee.Number(defo_mws_area).multiply(
+                        0.0001
+                    ),
                     "tree_deforestation_fringe_area_in_ha": ee.Number(
                         defo_fringe_area
                     ).multiply(0.0001),
-                    "tree_deforestation_fringe_ratio": defo_fringe_ratio,
+                    # "tree_deforestation_fringe_ratio": defo_fringe_ratio,
                 }
             )
 
@@ -282,13 +282,10 @@ def generate_forest_fringe_degradation(
                 "uid",
                 "mws_area_in_ha",
                 "forest_fringe_area_in_ha",
-                "forest_fringe_ratio",
                 "tree_degradation_mws_area_in_ha",
                 "tree_degradation_fringe_area_in_ha",
-                "tree_degradation_fringe_ratio",
                 "tree_deforestation_mws_area_in_ha",
                 "tree_deforestation_fringe_area_in_ha",
-                "tree_deforestation_fringe_ratio",
             ]
         )
 
@@ -323,14 +320,14 @@ def generate_forest_fringe_degradation(
 
 
 def _save_to_db_and_sync_to_geoserver(
-    layer_name=None,
-    asset_id=None,
-    asset_suffix=None,
-    state=None,
-    district=None,
-    block=None,
-    sync_to_db=True,
-    sync_to_geoserver=True,
+        layer_name=None,
+        asset_id=None,
+        asset_suffix=None,
+        state=None,
+        district=None,
+        block=None,
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fringe: save_to_db_and_sync_to_geoserver")

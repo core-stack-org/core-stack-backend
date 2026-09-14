@@ -129,7 +129,6 @@ def generate_forest_fire_layer(
         end_year,
     )
 
-    frp_sum_img = fire_images["sum"]
     frp_mean_img = fire_images["mean"]
     frp_max_img = fire_images["max"]
     fire_count_img = fire_images["count"]
@@ -157,11 +156,6 @@ def generate_forest_fire_layer(
         return ee.Feature(f.geometry()).set(
             {
                 "uid": f.get("uid"),
-                "fire_frp_sum_per_year": reduce(
-                    frp_sum_img,
-                    ee.Reducer.sum(),
-                    "sum",
-                ),
                 "fire_frp_mean": reduce(
                     frp_mean_img,
                     ee.Reducer.mean(),
@@ -207,23 +201,11 @@ def generate_forest_fire_layer(
         [
             "uid",
             "area_in_ha",
-            "fire_frp_sum_per_year",
             "fire_frp_mean",
             "fire_frp_max",
             "fire_count_per_year",
         ]
     )
-
-    # print("Exporting locally...")
-    #
-    # geemap.ee_export_vector(
-    #     fc,
-    #     filename="forest_fire.geojson",
-    # )
-    #
-    # print("Done.")
-    #
-    # return fc
 
     # --------------------------------------------------------------
     # Export to GEE

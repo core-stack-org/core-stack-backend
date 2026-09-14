@@ -43,8 +43,7 @@ def prepare_frp_images(fire_image, start_year, end_year):
     firedays = fire_image.select(fireday_bands)
 
     return {
-        "sum": frp.reduce(ee.Reducer.sum()).divide(n_years),
-        "mean": frp.reduce(ee.Reducer.mean()),
+        "mean": frp.reduce(ee.Reducer.sum()).divide(n_years).rename("mean"),
         "max": frp.reduce(ee.Reducer.max()),
         "count": firedays.reduce(ee.Reducer.sum()).divide(n_years),
     }

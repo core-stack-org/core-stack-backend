@@ -215,25 +215,23 @@ def generate_tree_in_grassland_layer(
 
             return f.set(
                 {
-                    "grassland_area_in_ha": grassland_area,
-                    "tree_in_shrub_area_in_ha": tree_in_shrub_area,
+                    "shrubs_trees_area_in_ha": grassland_area,
+                    "tree_in_shrubs_trees_area_in_ha": tree_in_shrub_area,
                     "isolated_shrub_area_in_ha": area(
                         lulc_start.eq(12).And(context_start.eq(0))
                     ),
                     "shrubland_area_in_ha": area(lulc_start.eq(12)),
-                    "tree_loss_area_in_ha": tree_loss_area,
-                    "tree_loss_to_grassland_ratio": ee.Number(tree_loss_area).divide(
-                        grassland_area
+                    "tree_loss_in_tree_in_shrub_area_in_ha": tree_loss_area,
+                    "tree_in_tree_in_shrub_to_barren_area_in_ha": area(tree_to_barren),
+                    "tree_in_tree_in_shrub_to_built_area_in_ha": area(to_built),
+                    "tree_in_tree_in_shrub_to_kharif_water_area_in_ha": area(to_kharif),
+                    "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha": area(
+                        to_kharif_rabi
                     ),
-                    "tree_loss_to_tree_in_shrub_ratio": ee.Number(
-                        tree_loss_area
-                    ).divide(tree_in_shrub_area),
-                    "tree_shrub_to_barren_area_in_ha": area(tree_to_barren),
-                    "tree_shrub_to_built_area_in_ha": area(to_built),
-                    "tree_shrub_to_kharif_water_area_in_ha": area(to_kharif),
-                    "tree_shrub_to_kharif_rabi_water_area_in_ha": area(to_kharif_rabi),
-                    "tree_shrub_to_kharif_rabi_zaid_water_area_in_ha": area(to_zaid),
-                    "tree_shrub_to_crops_area_in_ha": area(to_crops),
+                    "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha": area(
+                        to_zaid
+                    ),
+                    "tree_in_tree_in_shrub_to_crops_area_in_ha": area(to_crops),
                 }
             )
 
@@ -243,19 +241,17 @@ def generate_tree_in_grassland_layer(
             [
                 "uid",
                 "area_in_ha",
-                "grassland_area_in_ha",
-                "tree_in_shrub_area_in_ha",
-                "isolated_shrub_area_in_ha",
                 "shrubland_area_in_ha",
-                "tree_loss_area_in_ha",
-                "tree_loss_to_grassland_ratio",
-                "tree_loss_to_tree_in_shrub_ratio",
-                "tree_shrub_to_barren_area_in_ha",
-                "tree_shrub_to_built_area_in_ha",
-                "tree_shrub_to_kharif_water_area_in_ha",
-                "tree_shrub_to_kharif_rabi_water_area_in_ha",
-                "tree_shrub_to_kharif_rabi_zaid_water_area_in_ha",
-                "tree_shrub_to_crops_area_in_ha",
+                "isolated_shrub_area_in_ha",
+                "shrubs_trees_area_in_ha",
+                "tree_in_shrubs_trees_area_in_ha",
+                "tree_loss_in_tree_in_shrub_area_in_ha",
+                "tree_in_tree_in_shrub_to_barren_area_in_ha",
+                "tree_in_tree_in_shrub_to_built_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_crops_area_in_ha",
             ]
         )
 
