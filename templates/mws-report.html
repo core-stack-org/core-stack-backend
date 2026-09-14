@@ -3475,7 +3475,8 @@
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wms',
                 params: {
-                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3"
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3",
+                    'STYLES': 'lulc_land_use_KYL'
                 },
                 ratio: 1,
                 serverType: 'geoserver',
