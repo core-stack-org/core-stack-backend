@@ -1688,7 +1688,7 @@ def get_change_detection_data(state, district, block, uid):
 
         if degradation >= 20:
             barren_percent = get_mws_barren_percent(state, district, block, uid)
-            parameter_land += f"{barren_percent}% of the area is barren in this microwatershed. There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2024. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
+            parameter_land += f"There has been a considerate level of degradation of farmlands in this micro watershed over the years 2017-2024. As compared to average degraded land area of {round(avg, 2)} hectares for the entire block, the degraded land area in this micro-watershed is close to {round(degradation, 2)} hectares."
 
         # ? Tree Reduction
         df_defo["total_deforestation_area_in_ha"] = df_defo[
@@ -2544,10 +2544,17 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             )
             if wb_large_count > 0:
                 parameter_intro += f"Of the {wb_total_count} number of total waterbodies, {wb_large_count} are more than 5 hectares. "
-            parameter_intro += (
-                f"{wb_declining_percent}% of water bodies have a declining trend of surface water availability "
-                f"over the years {year_range_text}. The drainage density in this micro-watershed is {drainage_density}. "
-            )
+            
+            if(wb_declining_percent == 0):
+                parameter_intro += (
+                    f"No water bodies seem to have a declining trend of surface water availability "
+                    f"over the years {year_range_text}. The drainage density in this micro-watershed is {drainage_density}. "
+                )
+            else:
+                parameter_intro += (
+                    f"{wb_declining_percent}% of water bodies have a declining trend of surface water availability "
+                    f"over the years {year_range_text}. The drainage density in this micro-watershed is {drainage_density}. "
+                )
             if river_count > 0:
                 parameter_intro += (
                     f"{river_count} river{'s' if river_count != 1 else ''} are present"

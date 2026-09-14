@@ -1783,7 +1783,7 @@
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #73bb53; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #1B5E20; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Trees</span>
                             </div>
@@ -2364,7 +2364,7 @@
             </div>
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #73bb53;"></div>
+                    <div class="legend-color" style="background-color: #1B5E20;"></div>
                     <span>Trees - Trees</span>
                 </div>
                 <div class="legend-item">
@@ -2471,7 +2471,7 @@
                     <span>Shrubs - Crops</span>
                 </div>
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #73bb53;"></div>
+                    <div class="legend-color" style="background-color: #1B5E20;"></div>
                     <span>Shrubs - Trees</span>
                 </div>
                 <div class="legend-item">
@@ -2794,7 +2794,7 @@
         </section>
 
         <section class="section">
-            <h3>Hydrological cycle</h3>
+            <h3>Water Balance</h3>
 
             <div class="chart-container">
                 <canvas id="lineChart-rainfall-fn"></canvas>
@@ -2895,7 +2895,7 @@
                 <canvas id="Chart-drought"></canvas>
             </div> -->
 
-            <div class="chart-container">
+            <div class="chart-container" style="margin-top: 40px;">
                 <canvas id="Chart-drought-weeks"></canvas>
             </div>
 
@@ -5570,7 +5570,7 @@ const legendHTML = `
         // Shrubland Diversion Sankey
         renderSankeyChart('shrubChangeSankey', JSON.parse('{{shrub_change_sankey|safe}}'), {
             'Farm': '#eee05d',
-            'Tree': '#73bb53',
+            'Tree': '#1B5E20',
             'Built up': '#ff0000',
             'Water': '#1ca3ec',
             'Barren': '#a9a9a9',
