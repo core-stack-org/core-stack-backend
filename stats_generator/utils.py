@@ -281,8 +281,30 @@ def create_excel_for_tree_in_grassland(geojson_data, writer):
             "tree_loss_to_tree_in_shrub_ratio",
         ]
         df = df.drop(columns=exclude_cols, errors="ignore")
-        df.rename(columns={"uid_left": "UID"}, inplace=True)
-        priority_cols = ["UID"]
+        df.rename(
+            columns={
+                "uid_left": "UID",
+                "grassland_area_in_ha": "shrubs_trees_area_in_ha",
+                "tree_in_shrub_area_in_ha": "tree_in_shrubs_trees_area_in_ha",
+                "tree_loss_area_in_ha": "tree_loss_in_tree_in_shrub_area_in_ha",
+                "tree_shrub_to_barren_area_in_ha": "tree_in_tree_in_shrub_to_barren_area_in_ha",
+                "tree_shrub_to_built_area_in_ha": "tree_in_tree_in_shrub_to_built_area_in_ha",
+                "tree_shrub_to_crops_area_in_ha": "tree_in_tree_in_shrub_to_crops_area_in_ha",
+                "tree_shrub_to_kharif_rabi_water_area_in_ha": "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha",
+                "tree_shrub_to_kharif_rabi_zaid_water_area_in_ha": "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha",
+                "tree_shrub_to_kharif_water_area_in_ha": "tree_in_tree_in_shrub_to_kharif_water_area_in_ha",
+            },
+            inplace=True,
+        )
+        priority_cols = [
+            "UID",
+            "area_in_ha",
+            "shrubland_area_in_ha",
+            "isolated_shrub_area_in_ha",
+            "shrubs_trees_area_in_ha",
+            "tree_in_shrubs_trees_area_in_ha",
+            "tree_loss_in_tree_in_shrub_area_in_ha",
+        ]
         priority_cols = [c for c in priority_cols if c in df.columns]
         other_cols = [c for c in df.columns if c not in priority_cols]
         new_order = priority_cols + other_cols
