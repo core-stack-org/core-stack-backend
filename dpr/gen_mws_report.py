@@ -982,8 +982,11 @@ def get_osm_data(state, district, block, uid):
         return parameter_block, parameter_mws
 
     except Exception as e:
+        block_display = display_name(block)
+        district_display = display_name(district)
+        state_display = display_name(state)
         logger.info("The geojson is empty !", e)
-        return "", ""
+        return f"The Tehsil {block_display} lies in district {district_display} in {state_display}.", f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong> which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>."
 
 
 def get_terrain_data(state, district, block, uid):
