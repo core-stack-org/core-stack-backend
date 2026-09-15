@@ -10,14 +10,14 @@ import geopandas as gpd
 DEFAULT_MICROWATERSHED_PATH = (
     "data/base_layers/Microwatershed_v2_with_details.geojson"
 )
-DEFAULT_TEHSIL_PATH = "data/admin-boundary/input/soi_tehsil.geojson"
+DEFAULT_TEHSIL_PATH = "data/base_layers/admin_boundary/soi_tehsil.geojson"
 DEFAULT_OUTPUT_DIR = "data/base_layers/tehsil_watersheds"
 
 STATE_COLUMN_CANDIDATES = ["STATE", "state", "state_name", "State"]
 DISTRICT_COLUMN_CANDIDATES = ["District", "district", "district_name", "DISTRICT"]
 TEHSIL_COLUMN_CANDIDATES = ["TEHSIL", "tehsil", "tehsil_name", "block", "block_name"]
 MWS_UID_COLUMN_CANDIDATES = ["uid", "UID", "Uid"]
-MWS_OPTIONAL_COLUMNS = ["area_in_ha", "bacode", "sbcode", "wsconc"]
+MWS_OPTIONAL_COLUMNS = ["id", "area_in_ha", "bacode", "sbcode", "wsconc"]
 
 OUTPUT_FORMATS = {
     "geojson": ("GeoJSON", ".geojson"),
