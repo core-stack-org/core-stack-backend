@@ -1,4 +1,4 @@
-name: corestack-backend-test
+name: corestack-backend
 
 channels:
   - rapidsai
