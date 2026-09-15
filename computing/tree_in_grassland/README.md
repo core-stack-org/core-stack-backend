@@ -1,221 +1,282 @@
-# Tree-in-Grassland Degradation Indicator Pipeline
+# Tree in Grassland
 
-Identifies degradation within grazing landscapes by analysing the spatial relationship between trees and shrub-dominated grasslands over time. Combines **neighbourhood-based spatial context classification** with **temporal land-use transition analysis** using multi-year LULC datasets in **Google Earth Engine (GEE)**.
+This pipeline produces per-micro-watershed tree-in-grassland context metrics from Pan-India LULC v3 data. It combines a neighbourhood shrub-density test with a multi-year temporal window to identify tree-shrub grassland systems and quantify land-use transitions away from those systems.
 
----
+## Scope
 
-## Overview
+The current implementation in this module is designed to:
 
-The pipeline identifies:
-
-- Trees embedded within shrubland-dominated grasslands
-- Degradation and loss of tree-grassland systems
-- Transitions from grassland-tree systems into barren land, cropland, built-up, or water
-
-Results characterize degradation within livestock-dependent grazing ecosystems.
+- Identify tree pixels embedded within shrub-dominated grassland neighbourhoods
+- Capture adjacent shrub pixels associated with those tree patches
+- Compare start- and end-period context to detect loss of tree-grassland systems
+- Measure transition of those systems into barren land, built-up, water, or crop classes
+- Export the result as a GEE vector asset or a local GeoPackage output
 
 ---
 
-## Data Sources
+## Entry points
 
-| Dataset | Purpose |
+The module exposes three main workflows:
+
+- `tree_in_grassland_for_AEZ(aez_no, start_year=None, end_year=None, gee_account_id=7)`
+  - Filters AEZ polygons and then runs the GEE-based micro-watershed pipeline.
+- `generate_tree_in_grassland_layer(...)`
+  - Main GEE pipeline that computes the asset, optionally publishes it, and saves metadata.
+- `generate_tree_in_grassland_local(...)`
+  - Local vector workflow that clips a precomputed pan-India tree-in-grassland layer to an ROI and writes the output locally.
+
+---
+
+## Data sources and inputs
+
+| Source | Purpose |
 |---|---|
-| Pan-India LULC v3 | Land-cover classification |
-| Microwatershed Boundaries | Spatial analysis units |
+| Pan-India LULC v3 | Annual land-cover classification used to compute context and transitions |
+| Micro-watershed boundary dataset | ROI used for per-feature statistics |
+| AEZ boundary dataset | Optional grouping used by `tree_in_grassland_for_AEZ` |
+| Local precomputed tree-in-grassland vector | Used by the local workflow when not running GEE export |
 
 ---
 
-## Core Parameters
+## Core constants
 
-Defined in `tree_in_grassland_utils.py`.
+Defined in `tree_in_grassland_utils.py`:
 
-| Parameter | Value | Description |
-|---|---|---|
-| `RADIUS_M` | 100 m | Neighbourhood radius |
-| `THRESHOLD` | 0.5 | Shrub dominance threshold |
-| `SCALE` | 30 m | Analysis resolution |
-| `MAXPIX` | 1e12 | Maximum reducer pixels |
+| Constant | Value | Meaning |
+|---|---:|---|
+| `TREE_CLASS` | 6 | Tree class in LULC |
+| `SHRUB_CLASS` | 12 | Shrub class in LULC |
+| `SHRUB_THRESHOLD` | 0.5 | Secondary shrub threshold constant |
+| `RADIUS_M` | 100 | 100 m neighbourhood radius |
+| `THRESHOLD` | 0.5 | Tree-in-shrub classification threshold |
+| `SCALE` | 30 | Raster resolution in metres |
+| `MAXPIX` | 1e12 | Maximum reducer pixel limit |
 
 ---
 
-## Pipeline Workflow
+## Workflow in the current code
 
-### Step 1 — Initialize GEE
-Initialize GEE, construct asset paths, load MWS boundaries, and prepare export metadata.
-Entry point: `generate_tree_in_grassland_layer()`
+### 1. Load annual LULC imagery
 
-### Step 2 — Load Microwatershed Boundaries
-```python
-mws_fc = ee.FeatureCollection(roi_path)
-```
-Each feature is one microwatershed polygon over which all indicators are computed.
-
-### Step 3 — Load Multi-Year LULC Data
-```python
-load_pan_india_lulc(year)
-# Asset path: pan_india_lulc_v3_{year-1}_{year}
-```
-Each image selects the `predicted_label` band, fills masked pixels with `0`, and casts to integer.
-
-### Step 4 — Construct Temporal Windows
-Overlapping 3-year windows are used for both the start and end periods to reduce classification noise.
+The pipeline loads one image per year in the selected analysis range:
 
 ```python
-start_years = [start_year-1, start_year, start_year+1]
-end_years   = [end_year-1,   end_year,   end_year+1]
+lulc_by_year = {
+    year: load_pan_india_lulc(year) for year in range(start_year, end_year + 1)
+}
 ```
 
-### Step 5 — Compute Modal LULC Layers
-The most frequent LULC class across each 3-year window is retained, capturing persistent land-cover rather than single-year anomalies.
+`load_pan_india_lulc(year)` loads the asset named as:
 
 ```python
-ee.ImageCollection([...]).reduce(ee.Reducer.mode())
+PAN_INDIA_LULC_V3_DATASET + f"{year}_{year + 1}"
 ```
 
-Computed separately for the start and end periods.
+and then does:
 
-### Step 6 — Neighbourhood-Based Tree-Grassland Classification
-The core methodological step. Implemented in `tree_context_all()`.
-
-**6.1 — Create neighbourhood kernel**
 ```python
-kernel = ee.Kernel.circle(RADIUS_M, "meters")  # RADIUS_M = 100
+.select("predicted_label")
+.unmask(0)
+.toInt()
 ```
 
-**6.2 — Identify tree and shrub pixels**
-```python
-tree_mask  = lulc_img.eq(TREE_CLASS)   # TREE_CLASS  = 6
-shrub_mask = lulc_img.eq(SHRUB_CLASS)  # SHRUB_CLASS = 12
-```
+### 2. Create the tree-shrub context image
 
-**6.3 — Compute shrub fraction in neighbourhood**
-```python
-shrub_frac = shrub_pixels / total_pixels  # via reduceNeighborhood(ee.Reducer.sum(), kernel)
-```
+The main classification function is `tree_context_all(lulc, aoi)`.
 
-**6.4 — Classify tree-in-grassland pixels**
-A tree pixel is classified as part of a shrubland ecosystem when >50% of its 100 m neighbourhood is shrub.
 ```python
-tree_in_shrub = tree_mask.And(shrub_frac.gt(THRESHOLD))  # THRESHOLD = 0.5
-```
+kernel = ee.Kernel.circle(RADIUS_M, "meters")
+lulc_img = lulc.clip(aoi.buffer(110))
 
-**6.5 — Identify associated shrub pixels**
-Shrub pixels spatially connected to tree-in-shrub regions are also captured.
-```python
+tree_mask = lulc_img.eq(TREE_CLASS)
+shrub_mask = lulc_img.eq(SHRUB_CLASS)
+
+shrub_frac = (
+    shrub_mask.toInt().reduceNeighborhood(ee.Reducer.sum(), kernel)
+    .divide(total_px)
+)
+
+tree_in_shrub = tree_mask.And(shrub_frac.gt(THRESHOLD))
 shrub_around_tree = shrub_mask.And(
     tree_in_shrub.focal_max(radius=RADIUS_M, units="meters")
 )
 ```
 
-**6.6 — Final context classification**
+Classification output values are:
 
 | Value | Meaning |
-|---|---|
-| `0` | Neither tree-in-shrub nor associated shrub |
-| `1` | Tree embedded in shrubland |
-| `2` | Shrub associated with embedded trees |
+|---:|---|
+| 0 | Neither tree-in-shrub nor associated shrub |
+| 1 | Tree pixel embedded in shrubland |
+| 2 | Shrub pixel associated with those trees |
+
+### 3. Build start and end temporal windows
+
+The code uses overlapping 3-year windows instead of a single-year comparison:
 
 ```python
-ee.Image(0).where(tree_in_shrub, 1).where(shrub_around_tree, 2)
+start_years = [start_year, start_year + 1, start_year + 2]
+end_years = [end_year - 2, end_year - 1, end_year]
 ```
 
-### Step 7 — Construct Stable Temporal Contexts
-The neighbourhood classification is computed for each year in both temporal windows, then the modal class is retained across each 3-year period. Implemented in `temporal_context()`.
+These are passed to `temporal_context(...)`, which computes a modal context image for each period:
 
 ```python
-context_start = ImageCollection(...).reduce(mode)
-context_end   = ImageCollection(...).reduce(mode)
+context_start = ee.ImageCollection(start_contexts).reduce(ee.Reducer.mode())
+context_end = ee.ImageCollection(end_contexts).reduce(ee.Reducer.mode())
 ```
 
-### Step 8 — Define Grassland Mask
+### 4. Define the grassland mask
+
+This is the start-period system mask used in transition analysis:
+
 ```python
 grassland_mask = context_start.eq(1).Or(context_start.eq(2))
 ```
-Includes both tree pixels embedded in shrubland and their associated shrubland pixels — representing the initial grazing landscape used for transition analysis.
 
-### Step 9 — Compute Tree Loss
-Pixels that belonged to the grassland-tree system at the start but no longer do at the end.
+This includes:
+
+- tree pixels embedded in shrubland
+- shrub pixels spatially associated with those embedded trees
+
+### 5. Detect losses and transitions
+
+The current implementation calculates:
 
 ```python
 tree_loss = grassland_mask.And(context_end.eq(0))
+tree_to_barren = grassland_mask.And(lulc_end.eq(7))
+
+to_built = grassland_mask.And(lulc_end.eq(1))
+to_kharif = grassland_mask.And(lulc_end.eq(2))
+to_kharif_rabi = grassland_mask.And(lulc_end.eq(3))
+to_zaid = grassland_mask.And(lulc_end.eq(4))
+
+to_crops = grassland_mask.And(
+    lulc_end.eq(5)
+    .Or(lulc_end.eq(8))
+    .Or(lulc_end.eq(9))
+    .Or(lulc_end.eq(10))
+    .Or(lulc_end.eq(11))
+)
 ```
 
-### Step 10 — Compute Transition-Based Indicators
+These represent the tree-in-grassland system transitioning into barren land, built-up, water classes, and crop classes.
 
-| Transition | Code |
-|---|---|
-| Barren land | `grassland_mask.And(lulc_end.eq(7))` |
-| Built-up | `grassland_mask.And(lulc_end.eq(1))` |
-| Kharif water | `grassland_mask.And(lulc_end.eq(2))` |
-| Kharif-Rabi water | `grassland_mask.And(lulc_end.eq(3))` |
-| Kharif-Rabi-Zaid water | `grassland_mask.And(lulc_end.eq(4))` |
-| Croplands (all types) | `lulc_end.eq(5\|8\|9\|10\|11)` |
+### 6. Compute area statistics
 
-Cropland classes covered:
+The final per-feature values are calculated using `ee.Image.pixelArea()` and a reducer over each geometry:
 
-| Class | Meaning |
-|---|---|
-| 5 | Crops |
-| 8 | Single Kharif |
-| 9 | Single Non-Kharif |
-| 10 | Double Cropping |
-| 11 | Triple / Perennial Cropping |
-
-### Step 11 — Compute Area Statistics
 ```python
-ee.Image.pixelArea().reduceRegion(...)
+area_in_m2 = (
+    pixel_area.updateMask(mask)
+    .reduceRegion(ee.Reducer.sum(), aoi, SCALE, maxPixels=MAXPIX)
+    .get("area")
+)
+return ee.Number(area_in_m2).multiply(0.0001)
 ```
-Computed per MWS. All areas in **square meters**.
 
-### Step 12 — Compute Normalized Indicators
-
-| Indicator | Formula |
-|---|---|
-| Tree Loss to Grassland Ratio | `Tree Loss Area / Grassland Area` |
-| Tree Loss to Tree-in-Shrub Ratio | `Tree Loss Area / Tree-in-Shrub Area` |
+This returns areas in hectares (`*_in_ha` fields), not square metres.
 
 ---
 
-## Output Attributes
+## Output fields in the generated vector
 
-| Attribute | Description |
+The final feature collection includes the following attributes, using the revised definitions below:
+
+| Field | Meaning |
 |---|---|
-| `grassland_area_m2` | Total grassland-system area |
-| `tree_in_shrub_area_m2` | Tree pixels embedded in shrubland |
-| `isolated_shrub_area_m2` | Shrub pixels not associated with trees |
-| `shrubland_area_m2` | Total shrubland area |
-| `tree_loss_area_m2` | Loss of tree-grassland systems |
-| `tree_loss_to_grassland_ratio` | Normalized tree loss |
-| `tree_loss_to_tree_in_shrub_ratio` | Embedded-tree loss ratio |
-| `tree_shrub_to_barren_area_m2` | Transition to barren land |
-| `tree_shrub_to_built_area_m2` | Transition to built-up |
-| `tree_shrub_to_kharif_water_area_m2` | Transition to kharif water |
-| `tree_shrub_to_kharif_rabi_water_area_m2` | Transition to kharif-rabi water |
-| `tree_shrub_to_kharif_rabi_zaid_water_area_m2` | Transition to kharif-rabi-zaid water |
-| `tree_shrub_to_crops_area_m2` | Transition to croplands |
+| `uid` | Watershed identifier |
+| `area_in_ha` | Feature area |
+| `shrubland_area_in_ha` | All shrub pixels (LULC class 12) |
+| `isolated_shrub_area_in_ha` | Shrub pixels (LULC class 12) that are not near tree pixels |
+| `shrubs_trees_area_in_ha` | Shrub and tree pixels for isolated tree pixels (> 50% shrubs around trees), in the first three years |
+| `tree_in_shrubs_trees_area_in_ha` | Isolated tree pixels inside shrub and tree pixels |
+| `tree_loss_in_tree_in_shrub_area_in_ha` | How much of the isolated tree pixels disappeared |
+| `tree_in_tree_in_shrub_to_barren_area_in_ha` | Area of isolated tree pixels that turned into barren land |
+| `tree_in_tree_in_shrub_to_built_area_in_ha` | Area of isolated tree pixels that turned into built-up |
+| `tree_in_tree_in_shrub_to_kharif_water_area_in_ha` | Area of isolated tree pixels that turned into kharif water |
+| `tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha` | Area of isolated tree pixels that turned into kharif-rabi water |
+| `tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha` | Area of isolated tree pixels that turned into kharif-rabi-zaid water |
+| `tree_in_tree_in_shrub_to_crops_area_in_ha` | Area of isolated tree pixels that turned into crops |
+
+### Field semantics
+
+- `shrubland_area_in_ha` = all shrub pixels (LULC class 12)
+- `isolated_shrub_area_in_ha` = shrub pixels (LULC class 12) that are not near tree pixels
+- `shrubs_trees_area_in_ha` = shrub and tree pixels for isolated tree pixels (> 50% shrubs around trees), in the first three years
+- `tree_in_shrubs_trees_area_in_ha` = isolated tree pixels inside shrub and tree pixels
+- `tree_loss_in_tree_in_shrub_area_in_ha` = how much of isolated tree pixels disappeared
+- `tree_in_tree_in_shrub_to_*_area_in_ha` = what the disappearing isolated tree pixels turned into
 
 ---
 
-## Export
+## Local compute workflow
 
-| Function | Purpose |
-|---|---|
-| `export_vector_asset_to_gee()` | Export results to GEE asset |
-| `sync_fc_to_geoserver()` | Sync FeatureCollection to GeoServer |
+The local pipeline in `tree_in_grassland_local_compute.py` does not recompute the classification itself. Instead, it:
+
+1. Loads the relevant watershed geometry
+2. Reads the pan-India tree-in-grassland vector
+3. Clips it to the ROI using `clip_vector_to_watersheds`
+4. Saves the result as a local GeoPackage under the configured output folder
+5. Optionally pushes the layer to GeoServer and updates layer metadata
+
+The function is:
+
+```python
+generate_tree_in_grassland_local(...)
+```
+
+with inputs such as:
+
+- `state`
+- `district`
+- `block`
+- `roi_path`
+- `precomputed_roi_dir`
+- `push_to_geoserver`
+- `sync_layer_metadata`
 
 ---
 
-## Workflow Summary
+## Export and publication
 
+After computing the result, the GEE workflow exports the vector to a GEE asset and optionally syncs it to GeoServer:
+
+- `export_vector_asset_to_gee(...)`
+- `sync_fc_to_geoserver(...)`
+- `save_layer_info_to_db(...)`
+- `update_layer_sync_status(...)`
+
+The layer metadata includes start and end years under the `misc` field when the layer is persisted.
+
+---
+
+## Operational notes
+
+- The module expects a valid ROI and an asset path configured through the project GEE settings.
+- The tree-in-grassland logic uses LULC class 6 (tree) and 12 (shrub).
+- The neighbourhood threshold is greater than 50% shrub coverage within 100 m.
+- The output is stored in hectares for the generated attributes, not square metres.
+
+---
+
+## Typical execution pattern
+
+```python
+from computing.tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+
+generate_tree_in_grassland_layer(
+    roi=some_feature_collection,
+    asset_suffix="sample_block",
+    asset_folder_list=["state", "district", "block"],
+    start_year=2018,
+    end_year=2021,
+    gee_account_id=7,
+    app_type="MWS",
+    sync_to_db=True,
+    sync_to_geoserver=True,
+)
 ```
-1.  Load yearly LULC layers
-2.  Build modal LULC representations (3-year windows)
-3.  Create neighbourhood shrub-density kernels (100 m radius)
-4.  Identify tree-in-grassland systems (shrub fraction > 50%)
-5.  Generate stable temporal context layers
-6.  Construct grassland masks (start period)
-7.  Detect tree-system loss (start → end context change)
-8.  Compute transition-based degradation indicators
-9.  Calculate area statistics and ratios per MWS
-10. Export to GEE and GeoServer
-```
+
+This matches the code in the current repository and reflects the actual implementation rather than the older documentation version.

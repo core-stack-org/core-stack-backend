@@ -1,5 +1,11 @@
 from computing.utils import generate_swb_layer_with_max_so_catchment
-from utilities.constants import GEE_PATHS
+from computing.surface_water_bodies.area_utils import ensure_gee_area_ored
+from utilities.constants import (
+    CATCHMENT_AREA,
+    GEE_PATHS,
+    PAN_INDIA_DRAINAGE_LINES_DATASET,
+    STREAM_ORDER_ASSET,
+)
 from utilities.gee_utils import (
     valid_gee_text,
     get_gee_dir_path,
@@ -232,6 +238,10 @@ def waterbody_catchment_streamorder_properties(
     river_asset_id=DEFAULT_PAN_INDIA_RIVER_ASSET,
     canal_asset_id=DEFAULT_PAN_INDIA_CANAL_ASSET,
     waterbody_type_buffer_m=DEFAULT_WATERBODY_TYPE_BUFFER_M,
+    swb2_asset_suffix=None,
+    stream_order_asset_id=STREAM_ORDER_ASSET,
+    catchment_area_asset_id=CATCHMENT_AREA,
+    drainage_lines_asset_id=PAN_INDIA_DRAINAGE_LINES_DATASET,
 ):
     print(f"asset suffix swb3: {asset_suffix}")
     print(f"[SWB4] river_asset_id: {river_asset_id}")
@@ -245,32 +255,30 @@ def waterbody_catchment_streamorder_properties(
         )
         + description
     )
+    if is_gee_asset_exists(asset_id):
+        return None, asset_id
+
+    swb2_asset_suffix = swb2_asset_suffix or asset_suffix
     swb2_asset = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
         + "swb2_"
-        + asset_suffix
+        + swb2_asset_suffix
     )
     # As requested: SWB3 always uses SWB2 as input.
-    water_bodies = ee.FeatureCollection(swb2_asset)
+    water_bodies = ee.FeatureCollection(swb2_asset).map(ensure_gee_area_ored)
 
     print(f"asset_i{water_bodies}")
     swb4_fs = generate_swb_layer_with_max_so_catchment(
         roi=water_bodies,
-        asset_suffix=asset_suffix,
-        asset_folder=asset_folder_list,
-        app_type=app_type,
         gee_account_id=gee_account_id,
+        stream_order_asset_id=stream_order_asset_id,
+        catchment_area_asset_id=catchment_area_asset_id,
     )
-    asset_id_dl = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + "drainage_lines_"
-        + asset_suffix
+    swb4_fs_on_drainage = add_on_drainage_flag(
+        swb4_fs, drainage_lines_asset_id
     )
-    swb4_fs_on_drainage = add_on_drainage_flag(swb4_fs, asset_id_dl)
     swb4_fc_with_waterbody_type = add_waterbody_type_flag(
         swb4_fs_on_drainage,
         river_asset_id=river_asset_id,

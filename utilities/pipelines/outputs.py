@@ -23,6 +23,14 @@ def slug(value: Any) -> str:
     return re.sub(r"[^a-z0-9]+", "_", str(value or "").lower()).strip("_")
 
 
+def layer_slug(value: Any) -> str:
+    """Return the established Core Stack spelling for a layer-name part."""
+
+    from utilities.gee_utils import valid_gee_text
+
+    return valid_gee_text(str(value or "").lower())
+
+
 def utc_now_text() -> str:
     """Return an ISO UTC timestamp without microseconds."""
 
@@ -43,18 +51,55 @@ def scope_output_identity(prefix: str, scope: Any) -> tuple[tuple[str, ...], str
     state = slug(getattr(scope, "state_name", None))
     district = slug(getattr(scope, "district_name", None))
     tehsil = slug(getattr(scope, "tehsil_name", None))
+    layer_state = layer_slug(getattr(scope, "state_name", None))
+    layer_district = layer_slug(getattr(scope, "district_name", None))
+    layer_tehsil = layer_slug(getattr(scope, "tehsil_name", None))
+    layer_prefix = layer_slug(prefix)
     if level == "state":
         parts = tuple(part for part in (state,) if part)
-        return parts, "_".join(part for part in (prefix, state) if part)
+        return parts, "_".join(
+            part for part in (layer_prefix, layer_state) if part
+        )
     if level == "district":
         parts = tuple(part for part in (state, district) if part)
-        return parts, "_".join(part for part in (prefix, district) if part)
+        return parts, "_".join(
+            part for part in (layer_prefix, layer_district) if part
+        )
     if level == "village":
         village_ids = tuple(str(value) for value in (getattr(scope, "village_ids", None) or ()))
         digest = stable_hash({"village_ids": village_ids})[:10] if village_ids else "unknown"
-        return ("village", digest), f"{prefix}_village_{digest}"
+        return ("village", digest), f"{layer_prefix}_village_{digest}"
     parts = tuple(part for part in (state, district, tehsil) if part)
-    return parts, "_".join(part for part in (prefix, district, tehsil) if part)
+    return parts, "_".join(
+        part
+        for part in (layer_prefix, layer_district, layer_tehsil)
+        if part
+    )
+
+
+def resolved_scope_output_identity(
+    admin_source: Any,
+    prefix: str,
+    scope: Any,
+    *,
+    include_geometry: bool,
+) -> tuple[Any, Any, tuple[str, ...], str]:
+    """Read a scope and derive its output and DB-compatible layer identity."""
+
+    from .admin import resolve_registration_scope
+
+    selection = admin_source.read_scope(
+        scope,
+        include_geometry=include_geometry,
+    )
+    output_parts, _ = scope_output_identity(prefix, selection.scope)
+    naming_scope = (
+        resolve_registration_scope(scope)
+        if str(getattr(scope, "level", "") or "").lower() == "tehsil"
+        else selection.scope
+    )
+    _, layer_name = scope_output_identity(prefix, naming_scope)
+    return selection, naming_scope, output_parts, layer_name
 
 
 def mark_cached_result(result: Mapping[str, Any], started: float) -> dict[str, Any]:
