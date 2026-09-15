@@ -310,11 +310,30 @@ def create_excel_for_ndvi(data, trend_column):
             ndvi_values = row[ndvi_columns].dropna().to_numpy(dtype=float)
             if len(ndvi_values) < 2:
                 trend = "No trend"
+                slope = -9999
+                mean = -9999
             else:
                 result = mk.original_test(ndvi_values)
                 trend = result.trend.capitalize()
-            trend_results.append({"UID": row["UID"], trend_column: trend})
-        return pd.DataFrame(trend_results, columns=["UID", trend_column])
+                slope = round(result.slope, 8)
+                mean = round(ndvi_values.mean(), 8)
+            trend_results.append(
+                {
+                    "UID": row["UID"],
+                    trend_column: trend,
+                    f"{trend_column.replace('_trend', '')}_slope": slope,
+                    f"{trend_column.replace('_trend', '')}_mean": mean,
+                }
+            )
+        return pd.DataFrame(
+            trend_results,
+            columns=[
+                "UID",
+                trend_column,
+                f"{trend_column.replace('_trend', '')}_slope",
+                f"{trend_column.replace('_trend', '')}_mean",
+            ],
+        )
     except Exception as e:
         print(f"Error occurred while generating " f"{trend_column}: {e}")
         return pd.DataFrame(columns=["UID", trend_column])
