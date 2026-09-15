@@ -16,7 +16,7 @@ The final village layer is keyed by LGD `village_code` corresponding to a matche
 
 **Geospatial Assets:**
 
-- GeoPackage: [pan_india_livestock.gpkg](https://drive.google.com/file/d/1kLSMPVb0Iysg8Ms_ViomHK-vyxogv0HM/view?usp=sharing)
+- Prepared resources: [CoRE Stack base-resources folder, including the pan-India livestock GeoPackage](https://drive.google.com/drive/folders/1-WD9t2t9C1OrF7P24MhBXA7tNfUK4N-q?usp=sharing)
 - Google Earth Engine asset: `projects/corestack-datasets/assets/datasets/pan_india_livestocks`
 
 ## Sources
@@ -25,6 +25,7 @@ The final village layer is keyed by LGD `village_code` corresponding to a matche
 
 The primary source is the Department of Animal Husbandry and Dairying, Government of India village/ward-level workbook:
 
+- Raw files: [20th Livestock Census folder](https://drive.google.com/drive/folders/14Gx-ebpS3tq11CS1pjxHCh-TJ7vipEez?usp=sharing)
 - Source page: https://dahd.gov.in/en/node/569
 - File: https://dahd.gov.in/sites/default/files/2023-07/VillageAndWardLevelDataMale-Female.xlsx
 - Page title: Village and Ward Level Data [Male & Female] - 20th LSC

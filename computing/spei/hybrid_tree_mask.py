@@ -1,4 +1,6 @@
 import ee
+from datetime import date
+
 from utilities.constants import AEZ
 from utilities.gee_utils import (
     export_raster_asset_to_gee,
@@ -10,22 +12,53 @@ from utilities.gee_utils import (
 def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_id=None):
     """
     Forest Sensitivity Analysis Pipeline — Script 1
-    Hybrid 30m Annual Tree Cover Mask + Contiguous Forest Period
+    Hybrid 30m Agricultural-Year Tree Cover Mask + Contiguous Forest Period
 
-    Produces per-pixel: length (years), start_year, end_year
-    of the most recent unbroken forest period (2003–2022).
+    AGRICULTURAL YEAR CONVENTION:
+    Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching Scripts 3a/3b.
 
-    Sources:
-      1. GLC-FCS30D (2003–2022)
-      2. . Dynamic World (2015–present)
-      3. IndiaSat LULC (2017–present), Core-stack.
+    Produces per-pixel: length (ag-years), start_year, end_year (ag-year
+    labels) of the most recent unbroken forest period.
 
-    Union logic: majority vote among active datasets per year.
-      GLC-FCS30D: 2003–2022 (classes 51–92)
-      Dynamic World: 2015–present (class 1 = Trees)
-      IndiaSat LULC: 2017–present (class 6 = Trees)
+    Sources, and how each maps onto an ag-year `y`:
+      1. GLC-FCS30D (2003-2022, one classification per CALENDAR year — no
+         finer time resolution exists). An ag-year straddles two calendar
+         years (Jul-Dec of `y`, Jan-Jun of `y+1`), so the ag-year signal is
+         the average/majority of the calendar-year-`y` and calendar-year-
+         `y+1` bands (>=50% of the two says forest -> forest). At the
+         trailing edge (ag-year 2022, whose `y+1`=2023 doesn't exist in
+         GLC's 2003-2022 coverage), only the single available band (2022)
+         is used rather than dropping GLC for that year.
+      2. Dynamic World (2015-present, near-continuous captures) — windowed
+         directly to Jul 1(y) -> Jun 30(y+1), same pattern as CHIRPS/Landsat
+         in Scripts 3a/3b.
+      3. IndiaSat LULC (2017-present), Core-stack — asset names are already
+         `pan_india_lulc_v3_{year}_{year+1}`, i.e. already Jul(year) ->
+         Jun(year+1) ag-year aligned. No windowing change needed; `year`
+         here already means exactly what our ag-year `y` means.
 
-    Temporal correction: ±2 year window as used in other places too by the team.
+    Union logic: majority vote among active datasets per ag-year.
+      GLC-FCS30D: active while year<=2022 (at least one of the two
+        contributing calendar bands exists)
+      Dynamic World: active from year>=2015
+      IndiaSat LULC: active from year>=2017, no upper cap — relies on the
+        per-year missing-asset handling in get_indiaSat_mask to silently
+        contribute 0 for any year without a real asset. NOTE: this means
+        IndiaSat still counts as "active" (raising requiredVotes to 2) even
+        in years where its actual contribution is silently zero — if a
+        future year's IndiaSat asset doesn't exist yet, GLC+DW alone would
+        then need to agree, a stricter bar than if IndiaSat were excluded.
+        Flagging this rather than silently tightening it, since the
+        simpler no-cap version was the explicit choice.
+
+    KNOWN PRE-EXISTING QUIRK (not touched): `start_year` is hardcoded to
+    2004 below regardless of the caller-supplied `start_year` argument.
+    Confirmed 2004 is correct — Script 3b's asset reference was the thing
+    that needed fixing (was pointing at a nonexistent "2003" asset name),
+    not this. Left as-is beyond that; the parameter-shadowing itself is a
+    separate, still-open question if you ever want start_year configurable.
+
+    Temporal correction: +/-2 ag-year window as used elsewhere by the team.
     """
 
     ee_initialize(gee_account_id)
@@ -37,11 +70,29 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
 
     OUTPUT_DESC = f"Hybrid_Tree_AEZ_{aez}_{str(start_year)}_{str(end_year)}"
     OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI/{OUTPUT_DESC}"
+        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
     )
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID
+
+    if end_year is None:
+        raise ValueError(
+            "end_year must be specified explicitly — agricultural-year pipelines "
+            "cannot infer a safe default."
+        )
+
+    # Dynamic World is a near-real-time product — ag-year end_year isn't
+    # complete until Jun 30 of end_year+1 has passed. GLC-FCS30D is a fixed
+    # historical release (doesn't need this check) and IndiaSat's missing
+    # years are already handled gracefully below, so DW is the only source
+    # where "not complete yet" can silently look like "no forest."
+    required_complete_by = date(end_year + 1, 6, 30)
+    if required_complete_by > date.today():
+        raise ValueError(
+            f"Agricultural year {end_year} (Jul {end_year} -> Jun {end_year + 1}) "
+            f"is not yet complete as of {date.today().isoformat()}. Reduce end_year."
+        )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
     # aoi = (
@@ -50,7 +101,6 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
     #     .geometry()
     # )
 
-    # DATASET PREPARATION :=
     # --- GLC-FCS30D ---
     glcMosaic = ee.ImageCollection(
         "projects/sat-io/open-datasets/GLC-FCS30D/annual"
@@ -59,12 +109,12 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
     # --- Dynamic World ---
     dwCol = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1").filterBounds(aoi)
 
-    # --- IndiaSat LULC ---
+    # --- IndiaSat LULC (already ag-year aligned, no windowing needed) ---
     indiaSatList = []
     for year in range(LULC_START_YEAR, end_year + 1):
         indiaSatList.append(
             ee.Image(
-                f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}_{year+1}"
+                f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}_{year + 1}"
             ).set("year", year)
         )
 
@@ -83,27 +133,44 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
     # HYBRID MASK GENERATION :=
     years = ee.List.sequence(start_year, end_year)
 
-    def annual_tree_cover(year):
-        year = ee.Number(year)
-
-        # GLC — always active, classes 51–92 are forests
-        bandName = ee.String("b").cat(year.subtract(1999).format("%.0f"))
-
-        glcMask = ee.Image(
+    def glc_band_for_calendar_year(calYear):
+        bandName = ee.String("b").cat(calYear.subtract(1999).format("%.0f"))
+        return ee.Image(
             ee.Algorithms.If(
-                year.lte(2022),
+                calYear.lte(2022),
                 glcMosaic.select(bandName)
                 .gte(51)
                 .And(glcMosaic.select(bandName).lte(92)),
                 ee.Image(0),
             )
         ).rename("tree")
+
+    def annual_tree_cover(year):
+        year = ee.Number(year)
+
+        # GLC — combine the two calendar-year bands this ag-year straddles.
+        glcY = glc_band_for_calendar_year(year)
+        glcY1 = glc_band_for_calendar_year(year.add(1))
+        glcAvailCount = ee.Number(ee.Algorithms.If(year.lte(2022), 1, 0)).add(
+            ee.Algorithms.If(year.add(1).lte(2022), 1, 0)
+        )
+        # average >= 0.5 over whichever of the two bands actually exist;
+        # with 2 binary inputs this is "at least one says forest", and
+        # gracefully degrades to "use the single available band as-is"
+        # when only one calendar year is in GLC's coverage.
+        glcMask = ee.Image(
+            ee.Algorithms.If(
+                glcAvailCount.gt(0),
+                glcY.add(glcY1).divide(glcAvailCount.max(1)).gte(0.5),
+                ee.Image(0),
+            )
+        ).rename("tree")
         proj = glcMask.projection()
 
-        # Dynamic World — active from 2015
-        dwYear = dwCol.filter(ee.Filter.calendarRange(year, year, "year")).select(
-            "label"
-        )
+        # Dynamic World — windowed to the ag-year (Jul 1(year) -> Jun 30(year+1))
+        dwStart = ee.Date.fromYMD(year, 7, 1)
+        dwEnd = ee.Date.fromYMD(year.add(1), 6, 30).advance(1, "day")
+        dwYear = dwCol.filterDate(dwStart, dwEnd).select("label")
         dwMask = (
             ee.Image(
                 ee.Algorithms.If(
@@ -114,14 +181,14 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
             .reproject(crs=proj, scale=30)
         )
 
-        # IndiaSat — active from 2017
+        # IndiaSat — already ag-year aligned, `year` here already means Jul(year)->Jun(year+1)
         indiaSatMask = get_indiaSat_mask(year).reproject(crs=proj, scale=30)
 
         # Majority vote
         glcActive = ee.Algorithms.If(year.lte(2022), 1, 0)
         forestSum = glcMask.unmask(0).add(dwMask.unmask(0)).add(indiaSatMask.unmask(0))
         dwActive = ee.Algorithms.If(year.gte(2015), 1, 0)
-        indiasatActive = ee.Algorithms.If(year.gte(2017).And(year.lte(2024)), 1, 0)
+        indiasatActive = ee.Algorithms.If(year.gte(2017), 1, 0)
         activeDatasets = ee.Number(glcActive).add(dwActive).add(indiasatActive)
         requiredVotes = ee.Algorithms.If(activeDatasets.eq(1), 1, 2)
         hybridMask = forestSum.gte(ee.Number(requiredVotes))

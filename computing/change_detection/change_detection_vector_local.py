@@ -14,12 +14,11 @@ from computing.local_compute_helper import (
     compute_categorical_raster_areas_for_watersheds,
     ensure_file_exists,
     load_precomputed_watersheds,
-    push_local_vector_to_geoserver,
+    queue_local_vector_for_geoserver,
     write_vector_output,
 )
 from computing.utils import (
     save_layer_info_to_db,
-    update_layer_sync_status,
 )
 
 GEOSERVER_WORKSPACE = "change_detection"
@@ -173,20 +172,8 @@ def run_change_detection_vector_local(
             layer_name=published_layer_name,
         )
         print(f"Saved local change detection vector: {asset_id}")
-        if push_to_geoserver:
-            geoserver_response = push_local_vector_to_geoserver(
-                path=os.path.splitext(asset_id)[0],
-                layer_name=published_layer_name,
-                workspace=GEOSERVER_WORKSPACE,
-                file_type="gpkg",
-            )
-            print(f"GeoServer response for {param_name}: {geoserver_response}")
-            if not isinstance(geoserver_response, dict) or geoserver_response.get(
-                "status_code"
-            ) not in (200, 201):
-                return False
-            geoserver_statuses.append(True)
 
+        layer_id = None
         if sync_layer_metadata:
             layer_id = save_layer_info_to_db(
                 state=state,
@@ -197,8 +184,19 @@ def run_change_detection_vector_local(
                 dataset_name="Change Detection Vector",
                 misc={"is_generated_locally": True},
             )
-            if layer_id and push_to_geoserver:
-                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+
+        if push_to_geoserver:
+            geoserver_response = queue_local_vector_for_geoserver(
+                path=os.path.splitext(asset_id)[0],
+                layer_name=published_layer_name,
+                workspace=GEOSERVER_WORKSPACE,
+                file_type="gpkg",
+                layer_id=layer_id,
+            )
+            print(f"GeoServer response for {param_name}: {geoserver_response}")
+            if geoserver_response.get("status_code") != 202:
+                return False
+            geoserver_statuses.append(True)
 
     return all(geoserver_statuses) if push_to_geoserver else True
 

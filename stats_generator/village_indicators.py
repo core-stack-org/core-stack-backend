@@ -5,7 +5,7 @@ import pandas as pd
 from nrm_app.settings import EXCEL_PATH
 from django.http import HttpResponse
 from rest_framework import status
-
+import math
 
 import pandas as pd
 
@@ -114,14 +114,15 @@ def extract_soc_eco(df_soc_eco_indi, v_id):
 
 def extract_livestock(df_livestock, v_id):
     village_row = df_livestock[df_livestock["village_id"] == v_id]
-    livestock_cols = [
-        "cattle_total",
-        "buffalo_total",
-        "sheep_total",
-        "goat_total",
-        "pig_total",
-    ]
-    return village_row[livestock_cols].fillna(0).sum(axis=1).iloc[0]
+    if village_row.empty:
+        return {
+            "large_animals_total": 0,
+            "small_animals_total": 0,
+        }
+    return {
+        "large_animals_total": village_row["large_animals_total"].iloc[0],
+        "small_animals_total": village_row["small_animals_total"].iloc[0],
+    }
 
 
 # def extract_antyodaya(df_antyodaya, v_id):
@@ -390,20 +391,21 @@ def extract_antyodaya(df_antyodaya, v_id):
         ),
     }
 
-    if df_antyodaya.empty or "village_id" not in df_antyodaya.columns:
-        return {}
-
-    village_rows = df_antyodaya[df_antyodaya["village_id"] == v_id]
-    if village_rows.empty:
-        return {}
-
     required_columns = []
     for category, raw_columns in category_raw_columns.items():
         required_columns.extend(
             (f"{category}_cat_cluster", f"{category}_cat_value", *raw_columns)
         )
-    # Raw inputs shared by categories remain a single field in the flat KYL row.
     required_columns = list(dict.fromkeys(required_columns))
+
+    default_row = {column: -9999 for column in required_columns}
+
+    if df_antyodaya.empty or "village_id" not in df_antyodaya.columns:
+        return default_row
+
+    village_rows = df_antyodaya[df_antyodaya["village_id"] == v_id]
+    if village_rows.empty:
+        return default_row
 
     missing_columns = [
         column for column in required_columns if column not in df_antyodaya.columns
@@ -421,6 +423,16 @@ def extract_antyodaya(df_antyodaya, v_id):
         return value.item() if hasattr(value, "item") else value
 
     return {column: excel_value(row[column]) for column in required_columns}
+
+
+def clean_results(results):
+    return [
+        {
+            key: -9999 if isinstance(value, float) and math.isnan(value) else value
+            for key, value in row.items()
+        }
+        for row in results
+    ]
 
 
 def get_generate_filter_data_village(state, district, block, regenerate=0):
@@ -551,11 +563,11 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
         # ----------------------------------------------
         try:
             livestock_data = (
-                extract_livestock(df_livestock, v_id) if not df_livestock.empty else 0
+                extract_livestock(df_livestock, v_id) if not df_livestock.empty else {}
             )
         except Exception as e:
             print(f"extract_livestock failed " f"for village {v_id}: {e}")
-            livestock_data = 0
+            livestock_data = {}
 
         # ----------------------------------------------
         # Antyodaya data
@@ -577,13 +589,14 @@ def get_generate_filter_data_village(state, district, block, regenerate=0):
                 **soc_eco,
                 "total_assets": total_assets,
                 **fac_data,
-                "total_livestock_available": int(livestock_data),
+                **livestock_data,
                 **antyodaya_data,
             }
         )
     # --------------------------------------------------
     # Save generated json
     # --------------------------------------------------
+    results = clean_results(results)
     with open(json_path, "w") as f:
         json.dump(results, f, indent=4, default=str)
 

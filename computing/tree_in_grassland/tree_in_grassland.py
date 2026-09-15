@@ -58,19 +58,19 @@ def tree_in_grassland_for_AEZ(aez_no, start_year=None, end_year=None, gee_accoun
 
 @app.task(bind=True)
 def generate_tree_in_grassland_layer(
-    self,
-    state=None,
-    district=None,
-    block=None,
-    roi=None,
-    asset_suffix=None,
-    asset_folder_list=None,
-    start_year=None,
-    end_year=None,
-    gee_account_id=None,
-    app_type="MWS",
-    sync_to_db=True,
-    sync_to_geoserver=True,
+        self,
+        state=None,
+        district=None,
+        block=None,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        start_year=None,
+        end_year=None,
+        gee_account_id=None,
+        app_type="MWS",
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """
     Generate tree-in-grassland context metrics as a vector layer.
@@ -113,7 +113,7 @@ def generate_tree_in_grassland_layer(
 
     if state and district and block:
         asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -215,29 +215,45 @@ def generate_tree_in_grassland_layer(
 
             return f.set(
                 {
-                    "grassland_area_in_ha": grassland_area,
-                    "tree_in_shrub_area_in_ha": tree_in_shrub_area,
+                    "shrubs_trees_area_in_ha": grassland_area,
+                    "tree_in_shrubs_trees_area_in_ha": tree_in_shrub_area,
                     "isolated_shrub_area_in_ha": area(
                         lulc_start.eq(12).And(context_start.eq(0))
                     ),
                     "shrubland_area_in_ha": area(lulc_start.eq(12)),
-                    "tree_loss_area_in_ha": tree_loss_area,
-                    "tree_loss_to_grassland_ratio": ee.Number(tree_loss_area).divide(
-                        grassland_area
+                    "tree_loss_in_tree_in_shrub_area_in_ha": tree_loss_area,
+                    "tree_in_tree_in_shrub_to_barren_area_in_ha": area(tree_to_barren),
+                    "tree_in_tree_in_shrub_to_built_area_in_ha": area(to_built),
+                    "tree_in_tree_in_shrub_to_kharif_water_area_in_ha": area(to_kharif),
+                    "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha": area(
+                        to_kharif_rabi
                     ),
-                    "tree_loss_to_tree_in_shrub_ratio": ee.Number(
-                        tree_loss_area
-                    ).divide(tree_in_shrub_area),
-                    "tree_shrub_to_barren_area_in_ha": area(tree_to_barren),
-                    "tree_shrub_to_built_area_in_ha": area(to_built),
-                    "tree_shrub_to_kharif_water_area_in_ha": area(to_kharif),
-                    "tree_shrub_to_kharif_rabi_water_area_in_ha": area(to_kharif_rabi),
-                    "tree_shrub_to_kharif_rabi_zaid_water_area_in_ha": area(to_zaid),
-                    "tree_shrub_to_crops_area_in_ha": area(to_crops),
+                    "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha": area(
+                        to_zaid
+                    ),
+                    "tree_in_tree_in_shrub_to_crops_area_in_ha": area(to_crops),
                 }
             )
 
-        fc = roi.map(compute_stats)
+        results_fc = roi.map(compute_stats)
+
+        fc = results_fc.select(
+            [
+                "uid",
+                "area_in_ha",
+                "shrubland_area_in_ha",
+                "isolated_shrub_area_in_ha",
+                "shrubs_trees_area_in_ha",
+                "tree_in_shrubs_trees_area_in_ha",
+                "tree_loss_in_tree_in_shrub_area_in_ha",
+                "tree_in_tree_in_shrub_to_barren_area_in_ha",
+                "tree_in_tree_in_shrub_to_built_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_crops_area_in_ha",
+            ]
+        )
 
         # --------------------------------------------------------------
         # Export to GEE
@@ -271,16 +287,16 @@ def generate_tree_in_grassland_layer(
 
 
 def _save_to_db_and_sync_to_geoserver(
-    layer_name=None,
-    asset_id=None,
-    start_year=None,
-    end_year=None,
-    asset_suffix=None,
-    state=None,
-    district=None,
-    block=None,
-    sync_to_db=True,
-    sync_to_geoserver=True,
+        layer_name=None,
+        asset_id=None,
+        start_year=None,
+        end_year=None,
+        asset_suffix=None,
+        state=None,
+        district=None,
+        block=None,
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Tree in Grassland: save_to_db_and_sync_to_geoserver")

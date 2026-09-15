@@ -5,13 +5,12 @@ from computing.local_compute_helper import (
     build_output_raster_path,
     clip_raster_with_roi,
     load_precomputed_roi,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
     read_validated_vector_file,
     resolve_lulc_raster_paths,
 )
 from computing.models import Dataset
-from computing.STAC_specs import generate_STAC_layerwise
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -71,21 +70,6 @@ def _build_layer_name(start_year, end_year, filename_prefix):
 def _resolve_dataset_name():
     return (
         "LULC_v3" if Dataset.objects.filter(name="LULC_v3").exists() else "LULC_level_3"
-    )
-
-
-def _sync_lulc_stac(layer_id, state, district, block, start_year):
-
-    layer_stac_generated = generate_STAC_layerwise.generate_raster_stac(
-        state=state,
-        district=district,
-        block=block,
-        layer_name="land_use_land_cover_raster",
-        start_year=str(start_year),
-    )
-    update_layer_sync_status(
-        layer_id=layer_id,
-        is_stac_specs_generated=layer_stac_generated,
     )
 
 
@@ -178,28 +162,20 @@ def run_lulc_v3_local(
             continue
 
         try:
-            upload_res, style_res = push_local_raster_to_geoserver(
+            geoserver_response = queue_local_raster_for_geoserver(
                 file_path=clipped_raster_path,
                 layer_name=layer_name,
                 workspace=GEOSERVER_WORKSPACE,
                 style_name=GEOSERVER_STYLE,
+                layer_id=layer_id,
             )
-            print(f"GeoServer upload response for {layer_name}: {upload_res}")
-            print(f"GeoServer style response for {layer_name}: {style_res}")
+            print(f"GeoServer response for {layer_name}: {geoserver_response}")
+            if geoserver_response.get("status_code") != 202:
+                raise RuntimeError(str(geoserver_response))
         except Exception as error:
             print(f"Failed to sync local LULC raster {layer_name}: {error}")
             layer_at_geoserver = False
             continue
-
-        if layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            _sync_lulc_stac(
-                layer_id=layer_id,
-                state=state,
-                district=district,
-                block=block,
-                start_year=current_year,
-            )
 
     return layer_at_geoserver if push_to_geoserver else True
 

@@ -1,4 +1,5 @@
 import json
+import inspect
 import logging
 import os
 
@@ -47,6 +48,12 @@ from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
 from utilities.gee_utils import check_gee_task_status, download_gee_layer
 from utilities.pipelines import api_request_payload
+from utilities.layer_generation_mode import (
+    sync_layer_generation_if_enabled,
+)
+from utilities.layer_generation_logging import (
+    layer_generation_api_logging,
+)
 from .STAC_specs.stac_collection import generate_stac_collection_task
 from .clart.clart import generate_clart_layer
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
@@ -230,6 +237,10 @@ from .tree_health.local.overall_change_vector_local import (
     tree_health_overall_change_vector_local,
 )
 from .tree_in_grassland.tree_in_grassland import generate_tree_in_grassland_layer
+from .tree_in_grassland.tree_in_grassland_local_compute import (
+    generate_tree_in_grassland_local,
+)
+from .forest_fringe.forest_fringe_local_compute import generate_forest_fringe_local
 from .utils import (
     Geoserver,
     kml_to_shp,
@@ -271,6 +282,7 @@ PAN_INDIA_LOCATION_FIELDS = ("state", "district", "block", "tehsil", "year")
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_admin_boundary(request):
     print("Inside generate_block_layer API.")
     try:
@@ -291,6 +303,7 @@ def generate_admin_boundary(request):
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_nrega_layer(request):
     print("Inside generate_nrega_layer API.")
     try:
@@ -323,6 +336,7 @@ def generate_nrega_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_drainage_layer(request):
     print("Inside generate_drainage_layer API.")
     try:
@@ -414,6 +428,7 @@ def upload_kml(request):
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_mws_layer(request):
     print("Inside generate_mws_layer")
     try:
@@ -435,6 +450,7 @@ def generate_mws_layer(request):
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_fortnightly_hydrology(request):
     print("Inside generate_fortnightly_hydrology")
     try:
@@ -452,6 +468,7 @@ def generate_fortnightly_hydrology(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_annual_hydrology(request):
     print("Inside generate_annual_hydrology")
     try:
@@ -744,6 +761,7 @@ def et_download(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def lulc_for_tehsil(request):
     print("Inside lulc_v3 api.")
     try:
@@ -779,6 +797,7 @@ def lulc_for_tehsil(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def lulc_v2_river_basin(request):
     """
         To generate LULC v2 layers on river basin.
@@ -806,6 +825,7 @@ def lulc_v2_river_basin(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def lulc_v3_river_basin(request):
     """
         To generate LULC v3 layers on river basin.
@@ -834,6 +854,7 @@ def lulc_v3_river_basin(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def lulc_v3(request):
     print("Inside lulc_v3 api.")
     try:
@@ -866,6 +887,7 @@ def lulc_v3(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def lulc_vector(request):
     print("Inside lulc_vector")
     try:
@@ -899,6 +921,7 @@ def lulc_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def lulc_v4(request):
     print("Inside lulc_time_series")
     try:
@@ -939,6 +962,7 @@ def get_gee_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_ci_layer(request):
     print("Inside generate_cropping_intensity_layer")
     try:
@@ -979,6 +1003,7 @@ def generate_ci_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_swb(request):
     print("Inside generate_swf")
     try:
@@ -1027,6 +1052,7 @@ def generate_swb(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_drought_layer(request):
     print("Inside generate_drought_layer")
     try:
@@ -1058,6 +1084,7 @@ def generate_drought_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_terrain_descriptor(request):
     print("Inside generate_terrain_descriptor")
     try:
@@ -1086,6 +1113,7 @@ def generate_terrain_descriptor(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_terrain_compute_all(request):
     print("Inside generate_terrain_compute_all")
     try:
@@ -1117,6 +1145,7 @@ def generate_terrain_compute_all(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_terrain_raster(request):
     print("Inside generate_terrain_raster")
     try:
@@ -1154,6 +1183,7 @@ def generate_terrain_raster(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def terrain_lulc_slope_cluster(request):
     print("Inside terrain_lulc_slope_cluster")
     try:
@@ -1187,6 +1217,7 @@ def terrain_lulc_slope_cluster(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def terrain_lulc_plain_cluster(request):
     print("Inside terrain_lulc_plain_cluster")
     try:
@@ -1220,6 +1251,7 @@ def terrain_lulc_plain_cluster(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_clart(request):
     print("Inside generate_clart")
     try:
@@ -1241,6 +1273,7 @@ def generate_clart(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def change_detection(request):
     print("Inside change_detection")
     try:
@@ -1274,6 +1307,7 @@ def change_detection(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def change_detection_vector(request):
     print("Inside change_detection_vector")
     try:
@@ -1308,6 +1342,7 @@ def change_detection_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def crop_grid(request):
     print("Inside crop_grid api")
     try:
@@ -1329,6 +1364,7 @@ def crop_grid(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def mws_drought_causality(request):
     print("Inside Drought Causality API")
     try:
@@ -1353,6 +1389,7 @@ def mws_drought_causality(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def tree_health_raster(request):
     print("Inside tree_health_change API")
     try:
@@ -1418,6 +1455,7 @@ def tree_health_raster(request):
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@sync_layer_generation_if_enabled
 def tree_health_vector(request):
     print("Inside Overall_change_vector")
     try:
@@ -1512,6 +1550,7 @@ def gee_task_status(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def stream_order(request):
     print("Inside stream_order_vector api")
     try:
@@ -1533,6 +1572,7 @@ def stream_order(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def restoration_opportunity(request):
     print("Inside restoration_opportunity api")
     try:
@@ -1558,6 +1598,7 @@ def restoration_opportunity(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def plantation_site_suitability(request):
     print("Inside plantation_site_suitability API")
     try:
@@ -1599,6 +1640,7 @@ def plantation_site_suitability(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def aquifer_vector(request):
     print("Inside Aquifer vector layer api")
     try:
@@ -1627,6 +1669,7 @@ def aquifer_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def soge_vector(request):
     print("Inside soge vector layer api")
     try:
@@ -1653,6 +1696,7 @@ def soge_vector(request):
 @api_view(["POST"])
 @schema(None)
 @parser_classes([MultiPartParser, FormParser])
+@sync_layer_generation_if_enabled
 def fes_clart_upload_layer(request):
     try:
         print("Inside upload_fes_clart_layer API")
@@ -1702,6 +1746,7 @@ def fes_clart_upload_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def swb_pond_merging(request):
     print("Inside merge_swb_ponds API.")
     try:
@@ -1848,6 +1893,7 @@ def wells_compute(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_layer_in_order(request):
     print("inside generate_layer_order_first")
     try:
@@ -1926,6 +1972,7 @@ def layer_status_dashboard(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_lcw(request):
     print("Inside generate_lcw_conflict_data API.")
     try:
@@ -1950,6 +1997,7 @@ def generate_lcw(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_agroecological(request):
     print("Inside generate_agroecological_data API.")
     try:
@@ -1974,6 +2022,7 @@ def generate_agroecological(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_factory_csr(request):
     print("Inside generate_factory_csr_to_gee API.")
     try:
@@ -1998,6 +2047,7 @@ def generate_factory_csr(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_green_credit(request):
     print("Inside generate_green_credit_to_gee API.")
     try:
@@ -2022,6 +2072,7 @@ def generate_green_credit(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_mining(request):
     print("Inside generate_mining_to_gee API.")
     try:
@@ -2059,6 +2110,7 @@ def get_layers_for_workspace(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_natural_depression(request):
     print("Inside generate_natural_depression_to_gee API.")
     try:
@@ -2083,6 +2135,7 @@ def generate_natural_depression(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_distance_nearest_upstream_DL(request):
     print("Inside generate_distance_nearest_upstream_DL_to_gee API.")
     try:
@@ -2107,6 +2160,7 @@ def generate_distance_nearest_upstream_DL(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_catchment_area_SF(request):
     print("Inside generate_catchment_area_SF_to_gee API.")
     try:
@@ -2131,6 +2185,7 @@ def generate_catchment_area_SF(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_slope_percentage(request):
     print("Inside generate_slope_percentage_to_gee API.")
     try:
@@ -2155,6 +2210,7 @@ def generate_slope_percentage(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_ndvi_timeseries(request):
     print("Inside generate_ndvi_timeseries API.")
     try:
@@ -2191,33 +2247,81 @@ def generate_ndvi_timeseries(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_zoi_to_gee(request):
     print("Inside generate zoi layers")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
         gee_account_id = request.data.get("gee_account_id")
+        start_date = request.data.get("start_date") or request.data.get("startDate")
+        end_date = request.data.get("end_date") or request.data.get("endDate")
+        start_year = request.data.get("start_year") or request.data.get("startYear")
+        end_year = request.data.get("end_year") or request.data.get("endYear")
+
+        if not state or not district or not block:
+            return Response(
+                {"error": "state, district, and block are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Allow start_year/end_year as hydrological-year shorthand.
+        if not start_date and start_year is not None:
+            start_date = f"{int(start_year)}-07-01"
+        if not end_date and end_year is not None:
+            end_date = f"{int(end_year) + 1}-06-30"
+
+        if not start_date or not end_date:
+            return Response(
+                {
+                    "error": (
+                        "start_date and end_date are required (YYYY-MM-DD), "
+                        "or provide start_year and end_year (hydrological years)."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from computing.zoi_layers.zoi import _resolve_zoi_time_window
+
+        try:
+            start_date, end_date, _, _ = _resolve_zoi_time_window(start_date, end_date)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        state = state.lower()
+        district = district.lower()
+        block = block.lower()
+
         generate_zoi.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
                 "gee_account_id": gee_account_id,
+                "start_date": start_date,
+                "end_date": end_date,
             },
             queue="waterbody",
         )
 
         return Response(
-            {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
+            {
+                "Success": "Successfully initiated",
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+            status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_mining_to_gee api :: ", e)
+        print("Exception in generate_zoi_to_gee api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_mws_connectivity(request):
     print("Inside generate_mws_connectivity API.")
     try:
@@ -2254,6 +2358,7 @@ def generate_mws_connectivity(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_mws_centroid(request):
     print("Inside generate_mws_centroid API.")
     try:
@@ -2278,6 +2383,7 @@ def generate_mws_centroid(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_facilities_proximity(request):
     print("Inside generate_facilities_proximity API.")
     try:
@@ -2306,6 +2412,7 @@ def generate_facilities_proximity(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_antyodaya(request):
     print("Inside generate_antyodaya API.")
     try:
@@ -2334,6 +2441,7 @@ def generate_antyodaya(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_livestocks(request):
     print("Inside generate_livestocks API.")
     try:
@@ -2362,6 +2470,7 @@ def generate_livestocks(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def et_downscale(request):
     print("Inside generate_et_downscale API.")
     try:
@@ -2395,6 +2504,7 @@ def et_downscale(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_stac_collection(request):
     try:
         state = request.data.get("state")
@@ -2711,6 +2821,7 @@ def refresh_layer_cache(request, workspace=None):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_fabdem_layer(request):
     print("Inside generate DEM raster and vector layer API.")
     try:
@@ -2731,6 +2842,7 @@ def generate_fabdem_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_spei(request):
     print("Inside generate_spei API.")
     try:
@@ -2754,6 +2866,7 @@ def generate_spei(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_canal_vector(request):
     print("Inside generate canal vector layer API.")
     try:
@@ -2774,6 +2887,7 @@ def generate_canal_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def drought_resilience_resistance(request):
     print("Inside drought_resilience_resistance API.")
     try:
@@ -2798,6 +2912,7 @@ def drought_resilience_resistance(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def rainfall_resilience_resistance(request):
     print("Inside rainfall_resilience_resistance API.")
     try:
@@ -2822,6 +2937,7 @@ def rainfall_resilience_resistance(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def forest_fire_resilience_resistance(request):
     print("Inside forest_fire_resilience_resistance API.")
     try:
@@ -2844,6 +2960,7 @@ def forest_fire_resilience_resistance(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def high_wind_resilience_resistance(request):
     print("Inside run_high_wind_resistance_resilience API.")
     try:
@@ -2866,6 +2983,7 @@ def high_wind_resilience_resistance(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_fabdem_raster_vector(request):
     print("Inside generate DEM raster layer API.")
     try:
@@ -2895,6 +3013,7 @@ def generate_fabdem_raster_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_canal_vector(request):
     print("Inside generate canal vector layer API.")
     try:
@@ -2925,6 +3044,7 @@ def generate_canal_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_river_data(request):
     print("Inside river data API.")
     try:
@@ -2955,6 +3075,7 @@ def generate_river_data(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_drainage_density_data(request):
     print("Inside river data API.")
     try:
@@ -2985,37 +3106,52 @@ def generate_drainage_density_data(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_tree_in_grassland(request):
     print("Inside generate_tree_in_grassland API.")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_tree_in_grassland_layer.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "gee_account_id": gee_account_id,
-            },
-            queue="nrm",
+        location = {
+            field: request.data.get(field) for field in ("state", "district", "block")
+        }
+        missing_fields = [field for field, value in location.items() if not value]
+        if missing_fields:
+            return Response(
+                {"Exception": f"Missing required fields: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        compute = _normalize_layer_order_compute(
+            request.data.get("compute") or "local"
         )
+        task = (
+            generate_tree_in_grassland_local
+            if compute == "local"
+            else generate_tree_in_grassland_layer
+        )
+        kwargs = {field: value.lower() for field, value in location.items()}
+        if compute == "gee":
+            kwargs.update(
+                start_year=request.data.get("start_year"),
+                end_year=request.data.get("end_year"),
+                gee_account_id=request.data.get("gee_account_id"),
+            )
+        task.apply_async(kwargs=kwargs, queue="nrm")
         return Response(
-            {"Success": "Tree in Grassland task initiated"},
+            {"Success": f"Tree in Grassland {compute} task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_tree_in_grassland api :: ", e)
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        logger.exception("Exception in generate_tree_in_grassland api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def forest_fringe_degradation(request):
     print("Inside forest_fringe_degradation API.")
     try:
@@ -3043,6 +3179,7 @@ def forest_fringe_degradation(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_forest_fire(request):
     print("Inside generate_forest_fire API.")
     try:
@@ -3085,6 +3222,7 @@ def missing_excel(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_soil_health(request):
     print("Inside generate_soil_health API.")
     try:
@@ -3104,11 +3242,11 @@ def generate_soil_health(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_soil_type(request):
     try:
         location = {
-            field: request.data.get(field)
-            for field in ("state", "district", "block")
+            field: request.data.get(field) for field in ("state", "district", "block")
         }
         compute = request.data.get("compute")
         missing_fields = [field for field, value in location.items() if not value]
@@ -3143,6 +3281,7 @@ def generate_soil_type(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_ltp_stp(request):
     print("Inside generate_ltp_stp API.")
     try:
@@ -3161,6 +3300,7 @@ def generate_ltp_stp(request):
 
 @api_view(["POST"])
 @schema(None)
+@sync_layer_generation_if_enabled
 def generate_ltp_stp_change(request):
     print("Inside generate_ltp_stp API.")
     try:
@@ -3177,3 +3317,33 @@ def generate_ltp_stp_change(request):
     except Exception as e:
         print("Exception in generate_ltp_stp api :: ", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+@sync_layer_generation_if_enabled
+def generate_forest_fringe(request):
+    print("Inside generate_forest_fringe API.")
+    try:
+        location = {
+            field: request.data.get(field) for field in ("state", "district", "block")
+        }
+        missing_fields = [field for field, value in location.items() if not value]
+        if missing_fields:
+            return Response(
+                {"Exception": f"Missing required fields: {', '.join(missing_fields)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        generate_forest_fringe_local.apply_async(
+            kwargs={field: value.lower() for field, value in location.items()},
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "Successfully initiated generate_forest_fringe task"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        logger.exception("Exception in generate_forest_fringe api")
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

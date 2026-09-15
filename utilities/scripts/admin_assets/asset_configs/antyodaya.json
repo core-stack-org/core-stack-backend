@@ -3,8 +3,8 @@
   "name": "antyodaya",
   "description": "Pan-India Mission Antyodaya 2020 cluster, value, raw parameter, and unit asset.",
   "admin": {
-    "gpkg": "data/admin-boundary/cs_admin_sanitised.gpkg",
-    "layer": "cs_admin_sanitised",
+    "gpkg": "data/base_resources/cs_admin_standard.gpkg",
+    "layer": "cs_admin_standard",
     "left_key": "pc11_village_id"
   },
   "source": {
@@ -27,14 +27,14 @@
     ]
   },
   "output": {
-    "gpkg": "data/antyodaya/output/antyodaya_2020.gpkg",
-    "geojson": "data/antyodaya/output/antyodaya_2020.geojson",
-    "layer": "antyodaya_2020",
+    "gpkg": "data/antyodaya/output/cs_antyodaya_2020.gpkg",
+    "geojson": "data/antyodaya/output/cs_antyodaya_2020.geojson",
+    "layer": "cs_antyodaya_2020",
     "formats": [
       "gpkg",
       "geojson"
     ],
-    "reports_dir": "data/antyodaya/output/antyodaya_2020_asset_reports",
+    "reports_dir": "data/antyodaya/output/cs_antyodaya_2020_asset_reports",
     "admin_columns": [
       "state_name",
       "district_name",

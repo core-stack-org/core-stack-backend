@@ -12,11 +12,11 @@ from computing.local_compute_helper import (
     build_output_raster_path,
     get_union_geometry,
     load_precomputed_roi,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
     read_validated_vector_file,
     validate_geometry,
 )
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -300,16 +300,15 @@ def tree_health_overall_change_raster_local(
         )
 
     if push_to_geoserver:
-        upload_res, style_res = push_local_raster_to_geoserver(
+        geoserver_response = queue_local_raster_for_geoserver(
             file_path=raster_path,
             layer_name=layer_name,
             workspace=GEOSERVER_WORKSPACE,
             style_name=GEOSERVER_STYLE,
+            layer_id=layer_id,
         )
-        print(f"GeoServer upload response for {layer_name}: {upload_res}")
-        print(f"GeoServer style response for {layer_name}: {style_res}")
-
-    if layer_id and push_to_geoserver:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+        print(f"GeoServer response for {layer_name}: {geoserver_response}")
+        if geoserver_response.get("status_code") != 202:
+            raise RuntimeError(str(geoserver_response))
 
     return True

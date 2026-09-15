@@ -349,7 +349,6 @@ def run_lulc_on_slope_cluster_local(
                 "start_year": start_year,
                 "end_year": end_year,
                 "is_generated_locally": True,
-                "geoserver_available": geoserver_ok,
             },
         )
         logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)

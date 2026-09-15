@@ -101,9 +101,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_swb(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-                create_excel_for_mws_intersect_swb(
-                    geojson_data, writer, district, block
-                )
+                create_excel_for_mws_intersect_swb(geojson_data, writer)
             elif workspace == "nrega_assets":
                 mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                 mws_file_url = get_url("mws_layers", mws_lay_name)
@@ -210,6 +208,11 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_chan_detection_urbanization(
                     geojson_data, xlsx_file, writer
                 )
+            elif (
+                workspace == "change_detection"
+                and layer_name == f"change_vector_{district}_{block}_ShrubChange"
+            ):
+                create_excel_change_detection_ShrubChange(geojson_data, writer)
             elif workspace == "restoration":
                 create_excel_for_restoration(geojson_data, xlsx_file, writer)
             elif workspace == "aquifer":
@@ -248,12 +251,148 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_antyodaya_20(geojson_data, writer)
             elif workspace == "livestocks":
                 create_excel_for_livestock(geojson_data, writer)
-
+            elif workspace == "soil_type":
+                create_excel_for_soil_type(geojson_data, writer)
+            elif workspace == "soil_health_vector":
+                create_excel_for_soil_health(geojson_data, writer)
+            elif workspace == "ndvi_timeseries":
+                create_excel_for_ndvi_shrub(geojson_data, writer)
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
 
     return results
+
+
+def create_excel_for_ndvi_shrub(data, writer):
+    print("Inside ndvi shrub excel generation")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        df.rename(columns={"uid": "UID"}, inplace=True)
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="ndvi_shrub", index=False)
+        print("Excel file created for ndvi_shrub")
+    except Exception as e:
+        print(f"Error occurred while generating excel for ndvi shrub {e} ")
+
+
+def create_excel_for_soil_health(data, writer):
+    print("Inside excel generation of Soil health")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = [
+            "STATE",
+            "District",
+            "TEHSIL",
+            "bacode",
+            "sbcode",
+            "wsconc",
+            "N_count",
+            "K_count",
+            "P_count",
+            "OC_OLM_count",
+            "OC_count",
+            "id",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+
+        # Rename nutrient columns
+        df.rename(
+            columns={
+                **{
+                    col: f"{col}_in_kg_per_ha"
+                    for col in df.columns
+                    if col.startswith(
+                        ("N_p", "K_p", "P_p", "N_mean", "K_mean", "P_mean")
+                    )
+                },
+                **{
+                    col: f"{col}_in_percent"
+                    for col in df.columns
+                    if col.startswith(("OC_mean", "OC_p", "OC_OLM_mean", "OC_OLM_p"))
+                },
+                "crop_cover_area": "area_under_cropping_in_ha",
+                "tree_shrub_area": "area_under_tree_cover_in_ha",
+                "uid": "UID",
+            },
+            inplace=True,
+        )
+
+        priority_cols = [
+            "UID",
+            "area_in_ha",
+            "area_under_cropping_in_ha",
+            "area_under_tree_cover_in_ha",
+        ]
+        priority_cols = [
+            c for c in priority_cols if c in df.columns
+        ]  # keep only existing ones
+        other_cols = [c for c in df.columns if c not in priority_cols]
+
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="soil_health", index=False)
+        print("Excel file created for soil_health")
+    except Exception as e:
+        print("Issue while generating excel for Soil Health:", e)
+
+
+def create_excel_for_soil_type(data, writer):
+    print("Inside excel generation of Soil Type")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = [
+            "STATE",
+            "District",
+            "TEHSIL",
+            "bacode",
+            "sbcode",
+            "wsconc",
+            "id",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+
+        rename_cols = {
+            "uid": "UID",
+            "available_water_capacity": "available_water_capacity_in_mm_per_m",
+            "subsoil_bulk_density": "subsoil_bulk_density_in_kg_per_dm3",
+            "subsoil_exchange_capacity": "subsoil_exchange_capacity_in_cmol_per_kg",
+            "topsoil_bulk_density": "topsoil_bulk_density_in_kg_per_dm3",
+            "topsoil_exchange_capacity": "topsoil_exchange_capacity_in_cmol_per_kg",
+        }
+        df = df.rename(columns=rename_cols)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+
+        priority_cols = [
+            "UID",
+            "area_in_ha",
+        ]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+
+        df.to_excel(writer, sheet_name="soil_type", index=False)
+        print("Excel file created for soil_type")
+    except Exception as e:
+        print("issue while generating excel for Soil Type:: ", e)
 
 
 def create_excel_for_livestock(data, writer):
@@ -425,26 +564,20 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
     features = data["features"]
     years = list(range(start_year, end_year + 1))
 
-    classes = {
-        "barrenland": ("barrenland", "barrenla"),
-        "built_up_area": ("built-up_a", "built-up"),
-        "cropland": ("cropland_a", "cropland"),
-        "double_crop": ("doubly_cro", "doubly_c"),
-        "triple_crop": ("triply_cro", "triply_c"),
-        "tree_forest": ("tree_fores", "tree_for"),
-        "shrub_scrub": ("shrub_scru", "shrub_sc"),
-        "single_kharif": ("single_kha", "single_k"),
-        "single_non_kharif": ("single_non", "single_n"),
-        "k_water": ("k_water_ar", "k_water_"),
-        "kr_water": ("kr_water_a", "kr_water"),
-        "krz_water": ("krz_water_", "krz_wate"),
-    }
-
-    def get_key(base_key, trunc_prefix, idx):
-        """Derive the property key for a given year index."""
-        if idx == 0:
-            return base_key
-        return f"{trunc_prefix}_{idx}"
+    columns = [
+        "barrenlands_area_",
+        "built-up_area_",
+        "cropland_area_",
+        "doubly_cropped_area_",
+        "triply_cropped_area_",
+        "tree_forest_area_",
+        "shrub_scrub_area_",
+        "single_kharif_cropped_area_",
+        "single_non_kharif_cropped_area_",
+        "k_water_area_",
+        "kr_water_area_",
+        "krz_water_area_",
+    ]
 
     for feature in features:
         properties = feature["properties"]
@@ -452,13 +585,10 @@ def create_excel_for_lulc_vector(data, writer, start_year, end_year):
         row = {
             "UID": properties.get("uid", ""),
             "area_in_ha": properties.get("area_in_ha", ""),
-            "sum_in_ha": (properties.get("sum") or 0) / 10000,
         }
-
-        for idx, year in enumerate(years):
-            for class_name, (base_key, trunc_prefix) in classes.items():
-                key = get_key(base_key, trunc_prefix, idx)
-                row[f"{class_name}_in_ha_{year}"] = properties.get(key, 0)
+        for year in years:
+            for column in columns:
+                row[f"{column}in_ha_{year}"] = properties.get(f"{column}{year}")
 
         df_data.append(row)
 
@@ -544,59 +674,38 @@ def create_excel_for_dem(data, writer):
     print("Excel file created for dem")
 
 
-def create_excel_for_mws_intersect_swb(swb_geojson, writer, district, block):
+def create_excel_for_mws_intersect_swb(swb_geojson, writer):
     print("Inside create_excel_for_mws_intersect_swb")
-
-    # --- Fetch MWS layer ---
-    mws_layer_name = f"mws_{district}_{block}"
-    mws_data_url = get_url("mws", mws_layer_name)
-
-    mws_response = requests.get(mws_data_url)
-    if mws_response.status_code != 200:
-        print(f"Error fetching MWS data: {mws_response.status_code}")
-        return
-
-    mws_geojson = mws_response.json()
-
-    def calculate_intersection_area(geom1, geom2):
-        if geom1.intersects(geom2):
-            return geom1.intersection(geom2).area
-        return 0
-
     rows = []
 
-    for mws_feature in mws_geojson["features"]:
-        mws_props = mws_feature["properties"]
-        mws_uid = mws_props.get("uid")
-        mws_geom = shape(mws_feature["geometry"])
-
-        for swb_feature in swb_geojson["features"]:
-            swb_props = swb_feature["properties"]
-            swb_geom = shape(swb_feature["geometry"])
-
-            intersection_area = calculate_intersection_area(mws_geom, swb_geom)
-
-            if intersection_area > 0:
-                # waterbodies centroid calculation
-                centroid = swb_geom.centroid
-                lon, lat = centroid.x, centroid.y
-
-                rows.append(
-                    {
-                        "UID": mws_uid,
-                        "SWB_UID": swb_props.get("UID"),
-                        "Waterbodies_name": swb_props.get("water_body_name"),
-                        "Latitude": lat,
-                        "Longitude": lon,
-                    }
-                )
+    for swb_feature in swb_geojson["features"]:
+        swb_props = swb_feature["properties"]
+        swb_geom = shape(swb_feature["geometry"])
+        centroid = swb_geom.centroid
+        lon, lat = centroid.x, centroid.y
+        uid = swb_props.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = swb_props.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
+        for num_uid_part in num_uid_parts_is:
+            rows.append(
+                {
+                    "UID": num_uid_part,
+                    "SWB_UID": swb_props.get("UID", swb_props.get("wb_id")),
+                    "Waterbodies_name": swb_props.get("water_body_name"),
+                    "Latitude": lat,
+                    "Longitude": lon,
+                }
+            )
 
     df = pd.DataFrame(rows)
-
-    if not df.empty:
-        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
-        df[numeric_cols] = df[numeric_cols].round(2)
-
     df.to_excel(writer, sheet_name="mws_intersect_swb", index=False)
     print("Excel sheet 'mws_intersect_swb' created successfully")
 
@@ -1088,7 +1197,7 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
     for feature in features:
         properties = feature["properties"]
         row = {
-            "UID": properties["uid"],
+            "uid": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
             "afforestation_area_in_ha": properties["Afforestation"],
             "deforestation_area_in_ha": properties["Deforestation"],
@@ -1101,6 +1210,65 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
 
         df_data.append(row)
     df = pd.DataFrame(df_data)
+    try:
+        wb = writer.book
+
+        if "lulc_vector" in wb.sheetnames:
+            ws = wb["lulc_vector"]
+
+            headers = [cell.value for cell in ws[1]]
+            header_idx = {h: i for i, h in enumerate(headers)}
+
+            uid_idx = header_idx["UID"]
+
+            years = range(2017, 2020)
+
+            tree_forest_cols = [f"tree_forest_area_in_ha_{y}" for y in years]
+
+            tree_forest_idxs = [
+                header_idx[c] for c in tree_forest_cols if c in header_idx
+            ]
+
+            missing = [c for c in tree_forest_cols if c not in header_idx]
+            if missing:
+                print("Warning - missing lulc columns:", missing)
+
+            lulc_rows = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                # Tree cover
+                tree_forest_sum = sum((row[i] or 0) for i in tree_forest_idxs)
+                area_under_tree_cover = tree_forest_sum / 3
+
+                lulc_rows.append(
+                    {
+                        "uid": row[uid_idx],
+                        "area_under_tree_cover": area_under_tree_cover,
+                    }
+                )
+
+            lulc_df = pd.DataFrame(lulc_rows)
+
+            df = df.merge(lulc_df, on="uid", how="left")
+
+    except Exception as e:
+        print("Error while reading lulc_vector sheet:", e)
+
+    # Rename columns
+    df.rename(
+        columns={
+            "uid": "UID",
+            "area_under_tree_cover": "area_under_tree_cover_in_ha",
+        },
+        inplace=True,
+    )
+    df["degradation_in_percent"] = (
+        df["degradation_area_in_ha"] / df["area_under_tree_cover_in_ha"]
+    ) * 100
+
+    df["improvement_in_percent"] = (
+        df["improvement_area_in_ha"] / df["area_under_tree_cover_in_ha"]
+    ) * 100
+
     df = df.sort_values(["UID"])
 
     ## for roundoff all numeric value upto 2 decimal
@@ -1375,6 +1543,38 @@ def create_excel_chan_detection_urbanization(data, xlsx_file, writer):
     print(f"Excel file created for change_detection_urbanization")
 
 
+def create_excel_change_detection_ShrubChange(data, writer):
+    df_data = []
+    features = data["features"]
+
+    for feature in features:
+        properties = feature["properties"]
+        uid = properties.get("uid", "Unknown")
+        df_data.append(
+            {
+                "UID": uid,
+                "area_in_ha": properties.get("area_in_ha", None),
+                "shrub_to_shrub_area_in_ha": properties.get("sh_sh", None),
+                "shrub_to_farm_area_in_ha": properties.get("sh_fa", None),
+                "shrub_to_tree_area_in_ha": properties.get("sh_tr", None),
+                "shrub_to_built_up_area_in_ha": properties.get("sh_bu", None),
+                "shrub_to_water_area_in_ha": properties.get("sh_wa", None),
+                "shrub_to_barren_area_in_ha": properties.get("sh_ba", None),
+                "total_change_area_in_ha": properties.get("total_change", None),
+            }
+        )
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+
+    ## for roundoff all numeric value upto 2 decimal
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+
+    df.to_excel(writer, sheet_name="change_detection_shrubchange", index=False)
+    print(f"Excel file created for change_detection_shrubchange")
+
+
 def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, block):
     print("Inside create_excel_mws_inters_villages")
     admin_layer_name = district + "_" + block
@@ -1544,13 +1744,21 @@ def create_excel_for_terrain(data, output_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "terrain_cluster_id": properties["terrainClu"],
-            "terrain_description": terrain_description.get(properties["terrainClu"]),
-            "hill_slope_area_percent": properties["hill_slope"],
+            "terrain_cluster_id": properties.get(
+                "terrainClu", properties.get("terrainClusters")
+            ),
+            "terrain_description": terrain_description.get(
+                properties.get("terrainClu", properties.get("terrainClusters"))
+            ),
+            "hill_slope_area_percent": properties.get(
+                "hill_slope", properties.get("hill_slopes_area")
+            ),
             "plain_area_percent": properties["plain_area"],
             "ridge_area_percent": properties["ridge_area"],
             "slopy_area_percent": properties["slopy_area"],
-            "valley_area_percent": properties["valley_are"],
+            "valley_area_percent": properties.get(
+                "valley_are", properties.get("valley_area")
+            ),
         }
 
         df_data.append(row)
@@ -1583,14 +1791,24 @@ def create_excel_for_terrain_lulc_slope(data, output_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "terrain_cluster_id": properties["terrain_cl"],
-            "terrain_description": terrain_description.get(properties["terrain_cl"]),
+            "terrain_cluster_id": properties.get(
+                "terrain_cl", properties.get("terrain_cluster")
+            ),
+            "terrain_description": terrain_description.get(
+                properties.get("terrain_cl", properties.get("terrain_cluster"))
+            ),
             "cluster_name": properties["clust_name"],
             "barren_area_percent": properties["barren"],
             "forests_area_percent": properties["forests"],
-            "shrub_scrubs_area_percent": properties["shrub_scru"],
-            "single_kharif_area_percent": properties["sing_khari"],
-            "single_non_kharif_area_percent": properties["sing_non_k"],
+            "shrub_scrubs_area_percent": properties.get(
+                "shrub_scru", properties.get("shrub_scrub")
+            ),
+            "single_kharif_area_percent": properties.get(
+                "sing_khari", properties.get("sing_kharif")
+            ),
+            "single_non_kharif_area_percent": properties.get(
+                "sing_non_k", properties.get("sing_non_kharif")
+            ),
             "double_cropping_area_percent": properties["double"],
             "triple_cropping_area_percent": properties["triple"],
         }
@@ -1624,16 +1842,28 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "terrain_cluster_id": properties["terrain_cl"],
-            "terrain_description": terrain_description.get(properties["terrain_cl"]),
+            "terrain_cluster_id": properties.get(
+                "terrain_cl", properties.get("terrain_cluster")
+            ),
+            "terrain_description": terrain_description.get(
+                properties.get("terrain_cl", properties.get("terrain_cluster"))
+            ),
             "cluster_name": properties["clust_name"],
             "barren_area_percent": properties["barren"],
             "forests_area_percent": properties["forest"],
-            "shrub_scrubs_area_percent": properties["shrubs_scr"],
-            "single_non_kharif_area_percent": properties["sing_non_k"],
+            "shrub_scrubs_area_percent": properties.get(
+                "shrubs_scr", properties.get("shrubs_scrubs")
+            ),
+            "single_non_kharif_area_percent": properties.get(
+                "sing_non_k", properties.get("sing_non_kharif_crop")
+            ),
             "single_kharif_area_percent": properties["sing_crop"],
-            "double_cropping_area_percent": properties["double_cro"],
-            "triple_cropping_area_percent": properties["triple_cro"],
+            "double_cropping_area_percent": properties.get(
+                "double_cro", properties.get("double_crop")
+            ),
+            "triple_cropping_area_percent": properties.get(
+                "triple_cro", properties.get("triple_crop")
+            ),
         }
 
         df_data.append(row)
@@ -1654,22 +1884,25 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
 
     for feature in features:
         properties = feature.get("properties", {})
-        uid = properties.get("MWS_UID", "Unknown")
+        uid = properties.get("MWS_UID")
+        if uid:
+            parts = uid.split("_")
+            num_uid_parts_is = [
+                f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
+            ]
+            if len(parts) % 2 == 1:  # Check for an unpaired last part
+                num_uid_parts_is.append(parts[-1])
+        else:
+            uid = properties.get("mws_uid_list")
+            num_uid_parts_is = uid.split("|")
 
         def calculate_area(base_area, percentage):
             if base_area == 0 or percentage == 0:
                 return 0
             return base_area * (percentage / 100)
 
-        parts = uid.split("_")
-        num_uid_parts_is = [
-            f"{parts[i]}_{parts[i + 1]}" for i in range(0, len(parts) - 1, 2)
-        ]
-        if len(parts) % 2 == 1:  # Check for an unpaired last part
-            num_uid_parts_is.append(parts[-1])
-
         # Generate years dynamically based on start_year and end_year
-        years = range(start_year, end_year)
+        years = range(start_year, end_year + 1)
 
         for num_uid_part in num_uid_parts_is:
             row = {"UID": num_uid_part}
@@ -1767,8 +2000,8 @@ def create_excel_for_nrega_assets(
     ]
 
     for _, row in joined.iterrows():
-        creation_t = row["creation_t"]
-        work_category = row["WorkCatego"]
+        creation_t = row.get("creation_t", row.get("creation_time"))
+        work_category = row.get("WorkCatego", row.get("WorkCategory"))
         mws_id = row["uid"]
 
         if isinstance(creation_t, pd.Timestamp):
@@ -1867,7 +2100,9 @@ def create_excel_village_nrega_assets(
         if year not in year_range:
             continue
 
-        category = workCategoryMapping.get(row["WorkCatego"])
+        category = workCategoryMapping.get(
+            row.get("WorkCatego", row.get("WorkCategory"))
+        )
         if not category:
             continue
 
@@ -1940,8 +2175,12 @@ def fetch_village_asset_count(
                 {
                     "geometry": point,
                     "Asset ID": properties.get("Asset ID", "MISSING"),
-                    "creation_t": properties.get("creation_t", ""),
-                    "WorkCatego": properties.get("WorkCatego", ""),
+                    "creation_t": properties.get(
+                        "creation_t", properties.get("creation_time")
+                    ),
+                    "WorkCatego": properties.get(
+                        "WorkCatego", properties.get("WorkCategory")
+                    ),
                 }
             )
         except:
@@ -2058,7 +2297,13 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
                 triply_c_key, 0
             )
 
-        row["sum_area_in_ha"] = properties.get("sum", 0) / 10000
+        croppable_area_key = (
+            f"total_cropable_area_ever_hydroyear_2017_{end_year}"
+        )
+        croppable_area = properties.get(croppable_area_key)
+        if croppable_area is None:
+            croppable_area = properties.get("sum", 0) / 10000
+        row["sum_area_in_ha"] = croppable_area
         df_data.append(row)
 
     # Create and format DataFrame
@@ -2188,7 +2433,6 @@ def get_season(month):
         return "kharif"
     elif month in (11, 12, 1, 2):
         return "rabi"
-
 
 def process_feature(feature):
     uid = feature["properties"]["uid"]

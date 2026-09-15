@@ -10,9 +10,9 @@ description: >
   runtime outputs can carry consistent human-readable column documentation.
 
 source_asset:
-  facilities_gpkg: data/facilities/outputs/cs_pan_india_facilities.gpkg
-  facility_rows: 4192404
-  built_by: utilities/scripts/facilities_utils/build_pan_india_facilities.py
+  facilities_gpkg: data/base_resources/cs_pan_india_facilities.gpkg
+  facility_rows: 4209378
+  built_by: utilities/scripts/facilities_utils/facility_pipeline.py
   column_metadata: utilities/scripts/facilities_utils/facilities_column_metadata.yaml
   source_datasets:
     - school

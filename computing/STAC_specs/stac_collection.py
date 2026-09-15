@@ -730,22 +730,23 @@ class CatalogManager:
 
 
 class S3Syncer:
-    def __init__(self, access_key, secret_key):
+    def __init__(self, access_key, secret_key, local_data_dir):
         self.access_key = access_key
         self.secret_key = secret_key
+        self.local_data_dir = local_data_dir
 
     def sync(self, folder_path, s3_uri):
-        source = os.path.relpath(folder_path, BASE_DIR)
-        destination = s3_uri + os.path.basename(folder_path) + "/"
+        destination = (
+            s3_uri + os.path.relpath(folder_path, self.local_data_dir) + "/"
+        )
         env = {
             **os.environ,
             "AWS_ACCESS_KEY_ID": self.access_key,
             "AWS_SECRET_ACCESS_KEY": self.secret_key,
         }
-        log.info("S3 sync starting: %s -> %s (cwd=%s)", source, destination, BASE_DIR)
+        log.info("S3 sync starting: %s -> %s", folder_path, destination)
         result = subprocess.run(
-            ["aws", "s3", "sync", source, destination],
-            cwd=BASE_DIR,
+            ["aws", "s3", "sync", folder_path, destination],
             env=env,
             capture_output=True,
             text=True,
@@ -753,7 +754,7 @@ class S3Syncer:
         if result.returncode == 0:
             log.info(
                 "S3 sync OK: %s -> %s\n%s",
-                source,
+                folder_path,
                 destination,
                 result.stdout.strip() or "(no changes)",
             )
@@ -761,7 +762,7 @@ class S3Syncer:
             log.error(
                 "S3 sync FAILED [rc=%s]: %s -> %s\nstdout:\n%s\nstderr:\n%s",
                 result.returncode,
-                source,
+                folder_path,
                 destination,
                 result.stdout.strip(),
                 result.stderr.strip(),
@@ -780,17 +781,15 @@ class S3Syncer:
             if not os.path.exists(path):
                 log.warning("S3 upload skipped (does not exist): %s", path)
                 continue
-            rel = os.path.relpath(path, BASE_DIR)
+            rel = os.path.relpath(path, self.local_data_dir)
             if os.path.isdir(path):
                 dest = s3_uri + rel + "/"
-                cmd = ["aws", "s3", "sync", rel, dest]
+                cmd = ["aws", "s3", "sync", path, dest]
             else:
                 dest = s3_uri + rel
-                cmd = ["aws", "s3", "cp", rel, dest]
-            log.info("S3 upload: %s -> %s", rel, dest)
-            result = subprocess.run(
-                cmd, cwd=BASE_DIR, env=env, capture_output=True, text=True
-            )
+                cmd = ["aws", "s3", "cp", path, dest]
+            log.info("S3 upload: %s -> %s", path, dest)
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
             if result.returncode == 0:
                 log.info(
                     "S3 upload OK: %s\n%s",
@@ -1144,7 +1143,9 @@ class STACCollectionGenerator:
         self.metadata = MetadataProvider(self.config)
         self.style_parser = StyleParser(self.config.style_file_dir)
         self.catalog_mgr = CatalogManager(self.config)
-        self.s3_syncer = S3Syncer(S3_ACCESS_KEY, S3_SECRET_KEY)
+        self.s3_syncer = S3Syncer(
+            S3_ACCESS_KEY, S3_SECRET_KEY, self.config.local_data_dir
+        )
 
     def _builder_args(self):
         return (self.config, self.geoserver, self.metadata, self.style_parser)

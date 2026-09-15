@@ -1,8 +1,20 @@
-
 # SPEI Pipeline
-# Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
-# write 3 multiband output GeoTIFFs with named bands.
-# Here the reference baseline period is taken as 2004-2023.
+# Read multiband P-PET GeoTIFF (Jan(start_year) -> Jun(end_year+1)),
+# compute SPEI-1/3/12 pixel-wise, write 3 multiband output GeoTIFFs with
+# named bands.
+#
+# SPEI-1 and SPEI-3 are calendar-month indices — they don't care about
+# agricultural-year framing — so they're reported on the literal calendar
+# range Jan(start_year) -> Dec(end_year). SPEI-12 IS agricultural-year
+# framed: each reported value is the 12-month accumulation ending in June,
+# i.e. Jul(Y)-Jun(Y+1) for ag-year Y. The extra 6 trailing months in the
+# input (Jan-Jun of end_year+1) exist only to give SPEI-12 a full 12-month
+# history for the last requested ag-year — they are not reported as
+# SPEI-1/3 output themselves.
+#
+# The reference baseline period is taken as 2004-2024 (calendar Jan-Dec),
+# matching BASELINE_START_YEAR/BASELINE_END_YEAR used across the rest of
+# the pipeline (rain/fire/wind/tree-mask).
 # Change the end_year variable to whatever year you wanna extend the pipeline to.
 # If it is not intentional, don't touch the ref_start and ref_end variables for
 # extending the pipeline as it will change the SPEI values for all previous years too.
@@ -19,9 +31,6 @@ library(terra)
 run_spei_pipeline <- function(aez, start_year, end_year) {
 
     input_file <- paste0("data/base_layers/spei/inputs/", aez, "/monthly/P_PET_AEZ_", aez, "_monthly_multiband.tif")
-    # output_dir <- paste0("data/base_layers/spei/outputs")
-
-    # if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
     output_base <- "data/base_layers/spei/outputs"
 
@@ -34,10 +43,16 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     dir.create(output_dir12, recursive = TRUE, showWarnings = FALSE)
 
     # --- YEAR RANGE ---
-    ref_start  <- 2004   # baseline period start — distribution fitted on this range
-    ref_end    <- 2023   # baseline period end   — freeze this when extending to future years
+    ref_start  <- 2004   # baseline period start (calendar Jan) — distribution fitted on this range
+    ref_end    <- 2024   # baseline period end (calendar Dec) — freeze this when extending to future years
 
     n_years    <- end_year - start_year + 1
+
+    # Input P-PET spans Jan(start_year) -> Jun(end_year+1). The trailing 6
+    # months exist purely as SPEI-12 lead-in (see header comment) and are
+    # never part of the reported SPEI-1/SPEI-3 output.
+    n_full     <- n_years * 12 + 6
+
     n_monthly  <- n_years * 12
     n_seasonal <- n_years * 4
     n_annual   <- n_years
@@ -50,14 +65,19 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     # }
 
     # =============================================================================
-    # SPEI FUNCTION — do not modify
-    # Input:  variable-length P-PET time series
-    # Output: variable-length vector (SPEI-1 all: 12*(no. of years), SPEI-3 seasonal: 4*(no. of years), SPEI-12 annual: no. of years)
+    # SPEI FUNCTION — do not modify without re-deriving the index math below
+    # Input:  P-PET time series, Jan(start_year) -> Jun(end_year+1), length n_full
+    # Output: c(SPEI-1 for Jan(start_year)-Dec(end_year),
+    #           SPEI-3 for the 4 calendar quarters of each year in that range,
+    #           SPEI-12 for each requested ag-year start_year..end_year)
     # =============================================================================
     spei_function <- function(x, ...) {
       tryCatch({
         if (all(is.na(x))) return(rep(NA, n_output))
 
+        # start=c(start_year,1) is now literally true: position 1 IS
+        # January of start_year, since the input data genuinely starts there
+        # (see generate_ppet_multiband.py — no more Jul-start reordering).
         pixel_ts <- ts(x, start = c(start_year, 1), frequency = 12)
 
         spei1_all  <- as.vector(spei(pixel_ts, 1,
@@ -76,12 +96,27 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
                         ref.end   = c(ref_end, 12),
                         na.rm = TRUE)$fitted)
 
-        if (length(spei1_all) != n_monthly) stop("Incorrect output length.")
+        if (length(spei1_all) != n_full) stop("Incorrect output length.")
 
-        seasonal_idx <- which(((seq_along(spei3_all) - 1) %% 12 + 1) %in% c(3,6,9,12))
-        annual_idx   <- seq(12, n_monthly, by = 12)
+        # SPEI-1: trim to the reported Jan(start_year)-Dec(end_year) range.
+        # Position 1 = Jan(start_year), so this is simply the first n_monthly values.
+        spei1_reported <- spei1_all[1:n_monthly]
 
-        c(spei1_all, spei3_all[seasonal_idx], spei12_all[annual_idx])
+        # SPEI-3: quarter-end months (Mar, Jun, Sep, Dec) within the reported
+        # range — position 1 = Jan(start_year), so quarter-ends fall at
+        # positions divisible by 3.
+        seasonal_idx <- which((seq_len(n_monthly) %% 3) == 0)
+        spei3_reported <- spei3_all[seasonal_idx]
+
+        # SPEI-12: June-ending 12-month sums, one per requested ag-year.
+        # June(Y) = 12mo sum Jul(Y-1)-Jun(Y) = ag-year (Y-1)'s SPEI-12.
+        # We want ag-years start_year..end_year, i.e. June(start_year+1)..June(end_year+1).
+        # Position of June(Y), given position 1 = Jan(start_year), is (Y - start_year)*12 + 6.
+        # June(start_year+1) -> position 18. June(end_year+1) -> position n_full (the last point).
+        annual_idx <- seq(18, n_full, by = 12)
+        spei12_reported <- spei12_all[annual_idx]
+
+        c(spei1_reported, spei3_reported, spei12_reported)
 
       }, error = function(e) rep(NA, n_output))
     }
@@ -89,35 +124,23 @@ run_spei_pipeline <- function(aez, start_year, end_year) {
     # --- Load input ---
     cat(paste("Loading:", input_file, "\n"))
     p_pet_brick <- brick(input_file)
-    cat(paste("Loaded", nlayers(p_pet_brick), "bands (expected", n_monthly, ")\n"))
+    cat(paste("Loaded", nlayers(p_pet_brick), "bands (expected", n_full, ")\n"))
 
     # --- Band names ---
-    agri_months <- c(7:12, 1:6)
+    # SPEI-1/SPEI-3 reported on a plain calendar range (Jan(start_year)-Dec(end_year)) —
+    # they don't care about ag-year framing.
+    monthly_years  <- rep(start_year:end_year, each = 12)
+    monthly_months <- rep(1:12, times = n_years)
+    spei1_names <- paste0("y", monthly_years, "_m", sprintf("%02d", monthly_months))
 
-    years <- unlist(lapply(start_year:end_year, function(y) {
-      c(rep(y, 6), rep(y + 1, 6))
-    }))
-
-    spei1_names <- paste0(
-      "y",
-      years,
-      "_m",
-      sprintf("%02d", rep(agri_months, n_years))
-    )
-
-    agri_quarter_months <- c("07_09", "10_12", "01_03", "04_06")
-
-    years3 <- unlist(lapply(start_year:end_year, function(y) {
-      c(y, y, y + 1, y + 1)
-    }))
-
+    quarter_labels <- c("01_03", "04_06", "07_09", "10_12")
     spei3_names <- paste0(
-      "y",
-      years3,
-      "_m",
-      sprintf("%s", rep(agri_quarter_months, n_years))
+        "y", rep(start_year:end_year, each = 4),
+        "_m", rep(quarter_labels, times = n_years)
     )
 
+    # SPEI-12 stays ag-year labeled — this is the one index where ag-year
+    # framing genuinely applies, since it's a true annual accumulation.
     spei12_names <- paste0(
         start_year:end_year,
         "_",

@@ -695,7 +695,7 @@
         .legend-close {
             background: none;
             border: none;
-            font-size: 20px;
+            font-size: 14px;
             color: #70757a;
             cursor: pointer;
             padding: 0;
@@ -704,12 +704,96 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: color 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
             flex-shrink: 0;
         }
 
         .legend-close:hover {
             color: #202124;
+        }
+
+        .google-maps-legend.collapsed .legend-close {
+            transform: rotate(-90deg);
+        }
+
+        .google-maps-legend.collapsed .legend-section {
+            display: none;
+        }
+
+        /* Collapsible raster/class legend boxes (DEM, terrain, LULC, farm/tree loss, demographics) */
+        .raster-legend-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .raster-legend-chevron {
+            font-size: 9px;
+            color: #6b7280;
+            flex-shrink: 0;
+            transition: transform 0.2s ease;
+        }
+
+        .raster-legend.collapsed .raster-legend-chevron {
+            transform: rotate(-90deg);
+        }
+
+        .raster-legend.collapsed .raster-legend-body {
+            display: none;
+        }
+
+        .raster-legend.collapsed .raster-legend-header h4 {
+            margin: 0 !important;
+        }
+
+        /* Info button + one-line description tooltip, shown on each map in the map grid */
+        .map-info-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #9ca3af;
+            color: #374151;
+            font-size: 12px;
+            font-weight: 700;
+            font-style: italic;
+            font-family: Georgia, 'Times New Roman', serif;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 1001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .map-info-btn:hover {
+            background: #fff;
+            border-color: #6b7280;
+        }
+
+        .map-info-tooltip {
+            position: absolute;
+            top: 30px;
+            right: 6px;
+            max-width: 70%;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            font-size: 11px;
+            line-height: 1.4;
+            padding: 6px 10px;
+            border-radius: 4px;
+            z-index: 1001;
+            display: none;
+        }
+
+        .map-info-tooltip.show {
+            display: block;
         }
 
         .legend-section {
@@ -1176,6 +1260,26 @@
                 visibility: hidden !important;
             }
 
+            /* LULC year slider is interactive-only; keep the year label, hide the control in print */
+            .lulc-year-control input[type="range"] {
+                display: none !important;
+            }
+
+            /* Info buttons/tooltips are interactive-only, not useful in print */
+            .map-info-btn,
+            .map-info-tooltip {
+                display: none !important;
+            }
+
+            /* Raster/class legends always fully expanded in print, regardless of on-screen collapse state */
+            .raster-legend .raster-legend-body {
+                display: block !important;
+            }
+
+            .raster-legend .raster-legend-chevron {
+                display: none !important;
+            }
+
             /* SCALE IN PRINT MODE */
             .ol-scale {
                 display: block !important;
@@ -1338,8 +1442,8 @@
     <div class="container">
 
         <section class="section">
-            <h2>Landscape Overview</h2>
-            <p>{{mws_osm}}</p>
+            <h2>Landscape Overview11</h2>
+            <p>{{mws_osm|safe}}</p>
 
             <div id="mainMap" class="map" style="position: relative;">
             </div>
@@ -1348,10 +1452,16 @@
 
             <div class="map-group-3">
                 <div id="demMap" class="map" style="position: relative;">
-                    <div
-                        style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; transform: scale(0.75); transform-origin: bottom left;">
-                        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute
-                            Elevation (m)</h4>
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Ground elevation across the microwatershed, from lowest (blue) to highest (brown/white), with contour lines.</div>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 8px; left: 8px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; transform: scale(0.75); transform-origin: bottom left;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Absolute
+                                Elevation (m)</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; gap: 8px;">
                             <div
                                 style="width: 18px; height: 160px; background: linear-gradient(to top, #0d0030 0.0%, #1a0f6e 7.1%, #1746a0 14.3%, #1a72c0 21.4%, #2191c0 28.6%, #1aab9e 35.7%, #16a085 42.9%, #1cb870 48.6%, #27ae60 54.3%, #5ab836 58.6%, #95c623 62.9%, #d4d400 67.1%, #f1c40f 71.4%, #e09a30 75.7%, #d4845a 80.0%, #b0623a 84.3%, #8b5e3c 88.6%, #c4a882 94.3%, #f5f0e8 100.0%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;">
@@ -1407,14 +1517,24 @@
                             </div>
                             <span style="font-size: 10px; color: #6b7280;">Contour lines</span>
                         </div>
+                        </div>
                     </div>
                 </div>
-                <div id="drainageMap" class="map"></div>
+                <div id="drainageMap" class="map" style="position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">The natural drainage/stream network within the microwatershed.</div>
+                </div>
                 <div id="terrainRasterMap" class="map" style="position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 60%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Terrain
-                            Classes</h4>
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Landscape classified into terrain forms such as valleys, ridges, flat areas, and slopes.</div>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 60%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Terrain
+                                Classes</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1468,22 +1588,30 @@
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Upper Slopes</span>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 32%; text-align: center;">DEM Raster</div>
+                <div style="width: 32%; text-align: center;">Digital Elevation Model</div>
                 <div style="width: 32%; text-align: center;">Drainage Lines</div>
-                <div style="width: 32%; text-align: center;">Terrain Raster</div>
+                <div style="width: 32%; text-align: center;">Terrain</div>
             </div>
 
-            <div id="landscapeLulcMap" class="map" style="position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes
-                        </h4>
+            <div class="map-group">
+                <div id="landscapeLulcMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Land use and land cover classes (cropping, forest, built-up, water, etc.); use the slider to change year.</div>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">LULC Classes
+                            </h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1554,15 +1682,17 @@
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Shrubs and Scrubs</span>
                             </div>
                         </div>
+                        </div>
+                    </div>
+                    <div class="lulc-year-control"
+                        style="position: absolute; bottom: 6px; right: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px 10px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; display: flex; align-items: center; gap: 8px;">
+                        <span id="lulcYearLabel" style="font-size: 11px; font-weight: 600; color: #374151; white-space: nowrap;">2024-25</span>
+                        <input type="range" id="lulcYearSlider" min="0" max="7" step="1" value="7" style="width: 110px;">
                     </div>
                 </div>
-
-            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                LULC Raster
-            </div>
-
-            <div class="map-group">
-                <div id="hydroVectorMap" class="map" style="position: relative;">
+                <div id="hydroVectorMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Surface waterbodies, rivers, and canals mapped within the microwatershed.</div>
                     <div
                         style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
                         <!-- <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Hydrology Features</h4> -->
@@ -1586,8 +1716,10 @@
                 </div>
             </div>
 
-            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Map showing Waterbodies, Rivers and Canals
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Land use and land cover (2024-25)</div>
+                <div style="width: 48%; text-align: center;">Waterbodies (24-25), rivers, and canals</div>
             </div>
 
             <div class="chart-container">
@@ -1599,10 +1731,15 @@
 
             <div class="map-group">
                 <div id="farmLossMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Farm Cover
-                            Loss</h4>
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Farmland that degraded into barren land, shrubs, or built-up area between 2017 and 2024.</div>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Cropping Degradation</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
@@ -1630,17 +1767,23 @@
                                     style="font-size: 9px; color: #4b5563; line-height: 1.1;">Crops-Shrubs_and_Scrubs</span>
                             </div>
                         </div>
+                        </div>
                     </div>
                 </div>
                 <div id="treeLossMap" class="map" style="flex: 1 1 48%; position: relative;">
-                    <div
-                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: none; max-width: 65%;">
-                        <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Tree Cover
-                            Loss</h4>
+                    <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                    <div class="map-info-tooltip">Tree cover lost to barren land, shrubs, cropland, or built-up area between 2017 and 2024.</div>
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; max-width: 65%;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Reduction in Tree Cover</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
                         <div style="display: flex; flex-direction: column; gap: 3px;">
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #73bb53; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #1B5E20; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Trees</span>
                             </div>
@@ -1664,11 +1807,12 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #4c4ef5; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #eaa4f0; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span
                                     style="font-size: 9px; color: #4b5563; line-height: 1.1;">Trees-Shrubs_and_Scrubs</span>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -1676,8 +1820,8 @@
 
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 48%; text-align: center;">Farm Cover Loss</div>
-                <div style="width: 48%; text-align: center;">Tree Cover Loss</div>
+                <div style="width: 48%; text-align: center;">Cropping Degradation (2017-24)</div>
+                <div style="width: 48%; text-align: center;">Reduction in Tree Cover (2017-24)</div>
             </div>
 
             <div class="map-group-3">
@@ -1687,11 +1831,13 @@
             </div>
             <div
                 style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 32%; text-align: center;">Total Population</div>
-                <div style="width: 32%; text-align: center;">Literacy</div>
-                <div style="width: 32%; text-align: center;">Marginal Communities</div>
+                <div style="width: 32%; text-align: center;">Total Population (Census 2011)</div>
+                <div style="width: 32%; text-align: center;">Literacy (Census 2011)</div>
+                <div style="width: 32%; text-align: center;">Marginal Communities (Census 2011)</div>
             </div>
         </section>
+
+        <hr style="border: none; border-top: 2px solid #ddd; margin: 0 0 30px;">
 
         <section class="section" id="hydro-table-section">
             <h2>Hydrology and Land Use Land Cover in this Microwatershed</h2>
@@ -1701,18 +1847,15 @@
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
                     <tr style="font-weight: bold;">
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Area<br>(hectares)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Perimeter<br>(km)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">
-                            Compactness<br>(Kc)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Max Elev<br>(m)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Min Elev<br>(m)</td>
-                        <td style="padding: 10px; border: 1px solid black; width: 16%;">Relief<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Area<br>(hectares)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Perimeter<br>(km)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Max Elev<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Min Elev<br>(m)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Relief<br>(m)</td>
                     </tr>
                     <tr>
                         <td id="tbl-area" style="padding: 10px; border: 1px solid black;">{{ area }}</td>
                         <td id="tbl-perimeter" style="padding: 10px; border: 1px solid black;">{{ perimeter }}</td>
-                        <td id="tbl-compactness" style="padding: 10px; border: 1px solid black;">{{ compactness }}</td>
                         <td id="tbl-max-elev" style="padding: 10px; border: 1px solid black;">{{ max_elev }}</td>
                         <td id="tbl-min-elev" style="padding: 10px; border: 1px solid black;">{{ min_elev }}</td>
                         <td id="tbl-relief" style="padding: 10px; border: 1px solid black;">{{ dem_relief }}</td>
@@ -1744,19 +1887,27 @@
                 style="width: 100%; border-collapse: collapse; text-align: center; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
                     <tr style="font-weight: bold;">
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">Aquifer</td>
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">State of Groundwater Extraction (2020)</td>
-                        <td colspan="2" style="padding: 10px; border: 1px solid black;">Water Balance Trend</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Aquifer</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">State of Groundwater Extraction (2020)</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">SOGE dev %</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Water Balance Trend</td>
+                        <td style="padding: 10px; border: 1px solid black; width: 20%;">Mean Annual Water Balance (mm)</td>
                     </tr>
                     <tr>
-                        <td colspan="2" id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">
+                        <td id="tbl-aquifer" style="padding: 10px; border: 1px solid black;">
                             {{ aquifer_class }}
                         </td>
-                        <td colspan="2" id="tbl-soge" style="padding: 10px; border: 1px solid black;">
+                        <td id="tbl-soge" style="padding: 10px; border: 1px solid black;">
                             {{ soge_class }}
                         </td>
-                        <td colspan="2" id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">
+                        <td id="tbl-soge-dev" style="padding: 10px; border: 1px solid black;">
+                            {{ soge_dev_percent }}
+                        </td>
+                        <td id="tbl-water-balance" style="padding: 10px; border: 1px solid black;">
                             {{ water_balance_trend }}
+                        </td>
+                        <td id="tbl-mean-water-balance" style="padding: 10px; border: 1px solid black;">
+                            {{ mean_water_balance }}
                         </td>
                     </tr>
                 </tbody>
@@ -1770,7 +1921,7 @@
                 <!-- Top Box -->
                 <div
                     style="background-color: #71a2d5; padding: 10px; font-size: 16px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; margin-bottom: 0;">
-                    Terrain Category - {{ terrain_desc }}
+                    Terrain Category - {{ terrain_desc }} ({{ terrain_category_pct }})
                 </div>
 
                 <!-- Columns -->
@@ -1778,14 +1929,14 @@
                     <div id="plainColumn" style="display: none; flex-direction: column; min-width: 0;">
                         <div
                             style="background-color: #71a2d5; padding: 8px; font-size: 15px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; border-top: none; margin-bottom: 0;">
-                            Area type = Plains</div>
+                            Area type = Plains ({{ terrain_plain_pct }}%)</div>
                         <div id="plainTreemap"
                             style="height: 300px; border: 1px solid #ddd; border-top: none; width: 100%;"></div>
                     </div>
                     <div id="slopeColumn" style="display: none; flex-direction: column; min-width: 0;">
                         <div
                             style="background-color: #71a2d5; padding: 8px; font-size: 15px; font-weight: bold; color: #000; text-align: center; border: 1px solid #5a8cb5; border-top: none; margin-bottom: 0;">
-                            Area type = Slope</div>
+                            Area type = Slope ({{ terrain_slope_pct }}%)</div>
                         <div id="slopeTreemap"
                             style="height: 300px; border: 1px solid #ddd; border-top: none; width: 100%;"></div>
                     </div>
@@ -1814,6 +1965,7 @@
 
                     const getOption = (data) => ({
                         tooltip: {
+                            trigger: 'item',
                             formatter: function (info) {
                                 return [
                                     '<div class="tooltip-title">' + info.name + '</div>',
@@ -1821,24 +1973,25 @@
                                 ].join('');
                             }
                         },
+                        legend: {
+                            show: true,
+                            bottom: 0,
+                            textStyle: { fontSize: 11 }
+                        },
                         series: [
                             {
-                                type: 'treemap',
-                                width: '100%',
-                                height: '100%',
-                                roam: false,
-                                nodeClick: false,
-                                breadcrumb: { show: false },
+                                type: 'pie',
+                                radius: '60%',
+                                center: ['50%', '45%'],
                                 label: {
                                     show: true,
                                     formatter: '{b}\n{c}%',
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     color: '#333'
                                 },
                                 itemStyle: {
                                     borderWidth: 2,
-                                    borderColor: '#fff',
-                                    gapWidth: 2
+                                    borderColor: '#fff'
                                 },
                                 data: data
                             }
@@ -1878,7 +2031,7 @@
         </section>
 
         <section class="section" id="cropping-water-table-section">
-            <h5 style="margin-bottom: 5px;">CROPPING LAND USE AND WATER AVAILABILITY</h5>
+            <h5 style="margin-bottom: 5px;">SEASONAL WATER AVAILABILITY AND CROPPING AREA</h5>
             <table
                 style="width: 100%; border-collapse: collapse; text-align: left; border: 1px solid black; font-size: 0.85em; margin-bottom: 20px;">
                 <tbody>
@@ -2057,9 +2210,110 @@
                 cropping, double cropping and triple cropping using pixels which are classified as single kharif, single
                 non-kharif, double and triple classes of LULC classifier to determine cropping intensity. The data used
                 is from {{year_range_text}}.</p>
+
+            {% if ndvi_labels %}
+            <div class="chart-container">
+                <canvas id="lineChart-ndvi"></canvas>
+            </div>
+            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over cropped areas
+                in this microwatershed at ~14-day intervals using satellite imagery, and reflects the vigour of
+                vegetation/crop growth over time. Green dots are the raw NDVI values; the blue line is a
+                Whittaker-smoothed trend fitted through them. Whittaker smoothing balances two goals at once —
+                staying close to the raw values while penalizing sharp changes in the curve's slope (its second
+                derivative) — solved as a single linear system rather than a moving average, so it smooths out
+                cloud/noise-driven spikes while preserving the underlying seasonal growth pattern.</p>
+            {% endif %}
         </section>
 
-        {% if land_degrad or tree_degrad %}
+        {% if soil_health_desc %}
+        <section class="section">
+            <h3>Soil Health</h3>
+            <p>{{soil_health_desc|safe}}</p>
+
+            <div class="map-group">
+                <div id="soilHealthMap" class="map" style="flex: 1 1 48%; position: relative;">
+                    <div class="raster-legend"
+                        style="position: absolute; top: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 6px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 style="margin: 0 0 4px 0; font-size: 10px; font-weight: 600; color: #374151;">Soil Parameter</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="N" checked onchange="toggleSoilHealthLayer(this)">
+                                    Nitrogen (N)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="P" onchange="toggleSoilHealthLayer(this)">
+                                    Phosphorus (P)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="K" onchange="toggleSoilHealthLayer(this)">
+                                    Potassium (K)
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 5px; font-size: 10px; color: #374151; cursor: pointer;">
+                                    <input type="checkbox" class="soil-health-toggle" data-layer="OC" onchange="toggleSoilHealthLayer(this)">
+                                    Organic Carbon (OC)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="raster-legend"
+                        style="position: absolute; bottom: 6px; left: 6px; background: rgba(255, 255, 255, 0.9); padding: 8px; border-radius: 4px; border: 1px solid #d1d5db; z-index: 1000; font-family: sans-serif; pointer-events: auto; transform: scale(0.85); transform-origin: bottom left;">
+                        <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true">
+                            <h4 id="soilLegendTitle" style="margin: 0 0 6px 0; font-size: 11px; font-weight: 500; color: #4b5563;">Nitrogen (kg/ha)</h4>
+                            <span class="raster-legend-chevron">&#9660;</span>
+                        </div>
+                        <div class="raster-legend-body">
+                            <div id="soilLegend-N" class="soil-legend-panel" style="display: flex; gap: 8px;">
+                                <div
+                                    style="width: 16px; height: 140px; background: linear-gradient(to top, #8B0000 0%, #D73027 10%, #F46D43 20%, #FDAE61 30%, #FEE08B 40%, #FFFFBF 50%, #D9EF8B 60%, #A6D96A 70%, #66BD63 80%, #1A9850 90%, #006837 100%); border-radius: 4px; border: 1px solid #d1d5db; flex-shrink: 0;">
+                                </div>
+                                <div style="position: relative; height: 140px; flex: 1; min-width: 30px;">
+                                    <div style="position: absolute; bottom: 0%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">0</span></div>
+                                    <div style="position: absolute; bottom: 20%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">100</span></div>
+                                    <div style="position: absolute; bottom: 40%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">200</span></div>
+                                    <div style="position: absolute; bottom: 60%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">300</span></div>
+                                    <div style="position: absolute; bottom: 80%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">400</span></div>
+                                    <div style="position: absolute; bottom: 100%; left: 0; display: flex; align-items: center; gap: 4px; transform: translateY(50%);"><div style="width: 5px; height: 1px; background: #9ca3af;"></div><span style="font-size: 9px; color: #6b7280; line-height: 1;">500</span></div>
+                                </div>
+                            </div>
+                            <div id="soilLegend-P" class="soil-legend-panel" style="display: none; flex-direction: column; gap: 3px;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #D73027; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Low (&lt;10)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #FEE08B; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Medium (10-25)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #1A9850; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">High (&gt;25)</span></div>
+                            </div>
+                            <div id="soilLegend-K" class="soil-legend-panel" style="display: none; flex-direction: column; gap: 3px;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #FF0000; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Low (&lt;120 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #EEE05D; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Medium (120-280 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #73BB53; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">High (&gt;280 kg/ha)</span></div>
+                            </div>
+                            <div id="soilLegend-OC" class="soil-legend-panel" style="display: none; flex-direction: column; gap: 3px;">
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #C8E6C9; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Low (0-120 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #66BB6A; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">Medium (120-280 kg/ha)</span></div>
+                                <div style="display: flex; align-items: center; gap: 4px;"><div style="width: 12px; height: 12px; background-color: #2E7D32; border: 1px solid #999; flex-shrink: 0;"></div><span style="font-size: 9px; color: #4b5563;">High (&gt;280 kg/ha)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="soilHealthBoundaryMap" class="map" style="flex: 1 1 48%;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                <div style="width: 48%; text-align: center;">Soil Nutrient Raster - use checkboxes to toggle between Nitrogen, Phosphorus, Potassium and Organic Carbon</div>
+                <div style="width: 48%; text-align: center;">MWS and Village Boundaries</div>
+            </div>
+
+            <p class="legend-note">Note: Ground truth sampling data from Government of India&rsquo;s Soil Health Card
+                portal was integrated with satellite derived features to compute all parameters. A cropland LULC mask
+                was applied prior to prediction to restrict outputs to active agricultural land. Final rasters are
+                generated at 30 m spatial resolution.</p>
+        </section>
+        {% endif %}
+
+        {% if land_degrad or tree_degrad or tree_gain %}
         <section class="section">
             {% if land_degrad %}
             <h3>Cropping degradation</h3>
@@ -2092,7 +2346,7 @@
             {% if crop_intensity_sankey %}
             <div id="cropIntensitySankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
             <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Cropping Intensity Change (Single / Double / Triple)
+                Cropland Degradation (Crops &rarr; Built up / Barren / Shrubs and Scrubs)
             </div>
             {% endif %}
 
@@ -2101,17 +2355,16 @@
             {% endif %}
 
             {% if tree_degrad %}
-            <h3>Reduction in tree cover</h3>
+            <h3>Reduction and degradation of tree cover</h3>
             <p>{{tree_degrad}}</p>
 
             <div class="map-group">
                 <div id="treeReduceMap" class="map"></div>
                 <div id="compMap4" class="map"></div>
             </div>
-
             <div class="legend">
                 <div class="legend-item">
-                    <div class="legend-color" style="background-color: #73bb53;"></div>
+                    <div class="legend-color" style="background-color: #1B5E20;"></div>
                     <span>Trees - Trees</span>
                 </div>
                 <div class="legend-item">
@@ -2132,10 +2385,22 @@
                 </div>
             </div>
 
+
+            {% if ndvi_tree_labels %}
+            <div class="chart-container">
+                <canvas id="lineChart-ndvi-tree"></canvas>
+            </div>
+            <p class="legend-note">Note: NDVI (Normalized Difference Vegetation Index) is computed over tree-covered
+                areas in this microwatershed at ~14-day intervals using satellite imagery, and reflects the vigour of
+                tree/forest growth over time. Green dots are the raw NDVI values; the blue line is a
+                Whittaker-smoothed trend fitted through them (see the Cropping Intensity section for how the
+                smoothing is computed).</p>
+            {% endif %}
+
             {% if tree_reduction_sankey %}
             <div id="treeReductionSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
             <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                Forest Cover Change (Sankey)
+                Tree Cover Change (Sankey)
             </div>
             {% endif %}
 
@@ -2145,6 +2410,94 @@
 
             <p>{{restore_desc}}</p>
             {% endif %}
+
+            {% if tree_gain %}
+            <h3>Increase in Tree Cover</h3>
+            <p>{{tree_gain}}</p>
+
+            <div class="map-group">
+                <div id="afforestMap" class="map"></div>
+                <div id="compMap6" class="map"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <span>Built Up - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eee05d;"></div>
+                    <span>Crops - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Barren - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                    <span>Shrubs and Scrubs - Trees</span>
+                </div>
+            </div>
+
+            {% if afforestation_sankey %}
+            <div id="afforestationSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Afforestation (Barren / Built up / Farm / Shrubs and Scrubs &rarr; Forest)
+            </div>
+            {% endif %}
+
+            <p class="legend-note">Note: The increase in tree cover is computed using the IndiaSAT Land Use Land
+                Cover outputs. Transitions from barren land, human settlements (built-up), farmland or shrubs to
+                tree cover are computed.</p>
+            {% endif %}
+        </section>
+        {% endif %}
+
+        {% if shrub_degrad %}
+        <section class="section">
+            <h3>Shrubland Diversion</h3>
+            <p>{{shrub_degrad}}</p>
+
+            <div class="map-group">
+                <div id="shrubMap" class="map"></div>
+                <div id="compMap7" class="map"></div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #eaa4f0;"></div>
+                    <span>Shrubs - Shrubs</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #BAD93E;"></div>
+                    <span>Shrubs - Crops</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #1B5E20;"></div>
+                    <span>Shrubs - Trees</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ff0000;"></div>
+                    <span>Shrubs - Built Up</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #1ca3ec;"></div>
+                    <span>Shrubs - Water</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #a9a9a9;"></div>
+                    <span>Shrubs - Barren</span>
+                </div>
+            </div>
+
+            {% if shrub_change_sankey %}
+            <div id="shrubChangeSankey" style="height: 400px; width: 100%; margin: 20px 0;"></div>
+            <div style="text-align: center; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                Shrubland Diversion (Shrub &rarr; Farm / Tree / Built up / Water / Barren)
+            </div>
+            {% endif %}
+
+            <p class="legend-note">Note: The diversion of shrubland is computed using the IndiaSAT Land Use Land
+                Cover outputs. Transitions from shrubland to farmland, tree cover, human settlements (built-up),
+                water or barren land are computed.</p>
         </section>
         {% endif %}
 
@@ -2388,8 +2741,20 @@
         <section class="section">
             <h3>Water availability in this microwatershed</h3>
 
-            <div id="swbVillageMap" class="map" style="position: relative;"></div>
-            <p class="legend-note" style="margin-bottom: 20px;">Fig: Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color).</p>
+            <div class="map-group">
+                <!-- <div id="swbMap" class="map" style="flex: 1 1 48%;"></div> -->
+                 <div id="swbMap" class="map" style="flex: 1 1 48%; position: relative;">
+
+    
+
+</div>
+                <div id="swbVillageMap" class="map" style="flex: 1 1 48%; position: relative;"></div>
+            </div>
+            <div
+                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
+                                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
+                <div style="width: 48%; text-align: center;">Villages intersecting this MWS, with waterbodies (rivers shown in a distinct color)</div>
+            </div>
 
             <p>{{swb_intro_desc}}</p>
 
@@ -2406,16 +2771,6 @@
             </div>
 
             <p>{{swb_season_avg_desc}}</p>
-
-            <div class="map-group">
-                <div id="swbMap" class="map"></div>
-                <div id="swbVillageMap2" class="map"></div>
-            </div>
-            <div
-                style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 5px; margin-bottom: 20px;">
-                <div style="width: 48%; text-align: center;">Seasonal Surface Water Availability</div>
-                <div style="width: 48%; text-align: center;">MWS, Village Boundaries and Waterbodies</div>
-            </div>
 
             <div class="legend">
                 <div class="legend-item">
@@ -2439,7 +2794,7 @@
         </section>
 
         <section class="section">
-            <h3>Hydrological cycle</h3>
+            <h3>Water Balance</h3>
 
             <div class="chart-container">
                 <canvas id="lineChart-rainfall-fn"></canvas>
@@ -2540,7 +2895,7 @@
                 <canvas id="Chart-drought"></canvas>
             </div> -->
 
-            <div class="chart-container">
+            <div class="chart-container" style="margin-top: 40px;">
                 <canvas id="Chart-drought-weeks"></canvas>
             </div>
 
@@ -2656,7 +3011,116 @@
             return '';
         };
 
-        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false) => {
+        const getVillageId = feature => {
+            const candidates = ['vill_ID', 'vill_id', 'VILL_ID', 'village_id'];
+            for (const key of candidates) {
+                const val = feature.get(key);
+                if (val !== undefined && val !== null && val !== '') return val;
+            }
+            return null;
+        };
+
+        const getVillageReportUrl = villageId => {
+            const base = '{{ base_url }}'.replace(/\/$/, '');
+            const state = encodeURIComponent('{{ state }}');
+            const district = encodeURIComponent('{{ district }}');
+            const block = encodeURIComponent('{{ block }}');
+            return `${base}/generate_village_report/?state=${state}&district=${district}&block=${block}&villageId=${encodeURIComponent(villageId)}`;
+        };
+
+        const villagesIdForLinks = JSON.parse('{{ villages_id|safe }}');
+        const villagesIntersectPctForPopup = JSON.parse('{{ villages_intersect_pct|safe }}');
+        const villageNamesForPopup = JSON.parse('{{ villages_name|safe }}');
+
+        // Click popup: village name + "Show Village Report" button, on the given map/layer.
+        // Reused across every map that renders villages. When showIntersectPct is true, also
+        // shows the % of MWS area falling within the clicked village.
+        const attachVillageClickPopup = (map, villageLayer, showIntersectPct = false) => {
+            const targetEl = map.getTargetElement ? map.getTargetElement() : document.getElementById(map.get('target'));
+            if (!targetEl || targetEl.querySelector('.village-click-popup')) return;
+
+            const popupEl = document.createElement('div');
+            popupEl.className = 'village-click-popup';
+            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; z-index: 25; display: none;';
+            targetEl.appendChild(popupEl);
+
+            const popupOverlay = new ol.Overlay({
+                element: popupEl,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+            });
+            map.addOverlay(popupOverlay);
+
+            map.on('click', evt => {
+                const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, { layerFilter: l => l === villageLayer });
+                if (!feature) {
+                    popupEl.style.display = 'none';
+                    return;
+                }
+
+                const villageId = getVillageId(feature);
+                const name = getVillageLabelName(feature) || 'This village';
+
+                let pctLine = '';
+                if (showIntersectPct && villageId !== null) {
+                    const idx = villagesIdForLinks.findIndex(id => String(id) === String(villageId));
+                    if (idx !== -1) {
+                        pctLine = `<br/>${villagesIntersectPctForPopup[idx]}% of this MWS's area falls within this village.`;
+                    }
+                }
+
+                popupEl.innerHTML = `<strong>${name}</strong>${pctLine}`;
+                if (villageId !== null) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = 'Show Village Report';
+                    btn.style.cssText = 'display: block; margin-top: 6px; padding: 4px 10px; background: #3498db; color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;';
+                    btn.onclick = () => window.open(getVillageReportUrl(villageId), '_blank');
+                    popupEl.appendChild(btn);
+                }
+                popupEl.style.display = 'block';
+                popupOverlay.setPosition(evt.coordinate);
+            });
+        };
+
+        // Shows a small floating tooltip with the village name while hovering over a village
+        // boundary feature on the given map/layer. Reused across every map that renders villages.
+        const attachVillageHoverTooltip = (map, villageLayer) => {
+            const targetEl = map.getTargetElement ? map.getTargetElement() : document.getElementById(map.get('target'));
+            if (!targetEl || targetEl.querySelector('.village-hover-tooltip')) return;
+
+            const tooltipEl = document.createElement('div');
+            tooltipEl.className = 'village-hover-tooltip';
+            tooltipEl.style.cssText = 'position: absolute; background: rgba(0,0,0,0.75); color: #fff; padding: 3px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; pointer-events: none; z-index: 20; display: none;';
+            targetEl.appendChild(tooltipEl);
+
+            const tooltipOverlay = new ol.Overlay({
+                element: tooltipEl,
+                positioning: 'bottom-center',
+                offset: [0, -10],
+            });
+            map.addOverlay(tooltipOverlay);
+
+            map.on('pointermove', evt => {
+                if (evt.dragging) {
+                    tooltipEl.style.display = 'none';
+                    return;
+                }
+                const feature = map.forEachFeatureAtPixel(evt.pixel, f => f, { layerFilter: l => l === villageLayer });
+                const name = feature ? getVillageLabelName(feature) : '';
+                if (name) {
+                    tooltipEl.textContent = name;
+                    tooltipEl.style.display = 'block';
+                    tooltipOverlay.setPosition(evt.coordinate);
+                    targetEl.style.cursor = 'pointer';
+                } else {
+                    tooltipEl.style.display = 'none';
+                    targetEl.style.cursor = '';
+                }
+            });
+        };
+
+        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false, showIntersectPct = false) => {
             try {
                 const mwsGeometry = mwsFeature.getGeometry();
                 const mwsUid = mwsFeature.get('uid');
@@ -2716,6 +3180,9 @@
                             color: 'yellow',
                             width: 1.5,
                         }),
+                        fill: new ol.style.Fill({
+                            color: 'rgba(0, 0, 0, 0)',
+                        }),
                         text: showLabels ? new ol.style.Text({
                             text: getVillageLabelName(feature),
                             font: '11px sans-serif',
@@ -2729,6 +3196,8 @@
 
                 // Add layer to map
                 map.addLayer(villageLayer);
+                attachVillageHoverTooltip(map, villageLayer);
+                attachVillageClickPopup(map, villageLayer, showIntersectPct);
 
                 // Handle errors silently
                 villageSource.on('change', (e) => {
@@ -2742,31 +3211,34 @@
             }
         };
 
+        // Cream -> Red (5 buckets, low to high)
         const getPopColor = (val) => {
             if (!val) return 'rgba(0,0,0,0)';
-            if (val < 500) return '#ffb3ba';
-            if (val < 1000) return '#ffdfba';
-            if (val < 2000) return '#ffffba';
-            if (val < 4000) return '#baffc9';
-            return '#bae1ff';
+            if (val < 500) return '#fff5cc';
+            if (val < 1000) return '#ffb899';
+            if (val < 2000) return '#ff7b66';
+            if (val < 4000) return '#ff3d33';
+            return '#ff0000';
         };
 
+        // White -> Red (5 buckets, low to high)
         const getLitColor = (val) => {
             if (!val) return 'rgba(0,0,0,0)';
-            if (val < 40) return '#f3c5ff';
-            if (val < 55) return '#c5ebff';
-            if (val < 70) return '#e2ffc5';
-            if (val < 85) return '#ffc5d9';
-            return '#ffe8c5';
+            if (val < 40) return '#ffffff';
+            if (val < 55) return '#ffbfbf';
+            if (val < 70) return '#ff8080';
+            if (val < 85) return '#ff4040';
+            return '#ff0000';
         };
 
+        // Red -> White (5 buckets, low to high)
         const getMargColor = (val) => {
             if (!val) return 'rgba(0,0,0,0)';
-            if (val < 20) return '#d4a5a5';
-            if (val < 40) return '#a5c4d4';
-            if (val < 60) return '#d4d4a5';
-            if (val < 80) return '#a5d4a5';
-            return '#d4a5d4';
+            if (val < 20) return '#ffffff';
+            if (val < 40) return '#ffbfbf';
+            if (val < 60) return '#ff8080';
+            if (val < 80) return '#ff4040';
+            return '#ff0000';
         };
 
         const withOpacity = (color, alpha) => {
@@ -2811,6 +3283,7 @@
                     zIndex: 5,
                 });
                 demographicPopMap.addLayer(popLayer);
+                attachVillageHoverTooltip(demographicPopMap, popLayer);
 
                 // Literacy Layer
                 const litSource = new ol.source.Vector({ features: features });
@@ -2828,6 +3301,7 @@
                     zIndex: 5,
                 });
                 demographicLitMap.addLayer(litLayer);
+                attachVillageHoverTooltip(demographicLitMap, litLayer);
 
                 // Marginalized Layer
                 const margSource = new ol.source.Vector({ features: features });
@@ -2846,6 +3320,7 @@
                     zIndex: 5,
                 });
                 demographicMargMap.addLayer(margLayer);
+                attachVillageHoverTooltip(demographicMargMap, margLayer);
 
                 // MWS Boundary Layer
                 const mwsSource = new ol.source.Vector({ features: [mwsFeature] });
@@ -2858,44 +3333,50 @@
                 demographicMargMap.addLayer(new ol.layer.Vector({ source: mwsSource, style: mwsStyle, zIndex: 10 }));
 
                 // Embedded Map Legends
-                const legendStyle = 'position: absolute; bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; pointer-events: none; font-size: 10px; line-height: 1.2; border: 1px solid #ccc; z-index: 1000;';
+                const legendStyle = 'position: absolute; bottom: 5px; background: rgba(255,255,255,0.9); padding: 5px; border-radius: 4px; pointer-events: auto; font-size: 10px; line-height: 1.2; border: 1px solid #ccc; z-index: 1000;';
 
                 const popLegend = document.createElement('div');
-                popLegend.className = 'ol-unselectable ol-control';
+                popLegend.className = 'ol-unselectable ol-control raster-legend';
                 popLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 popLegend.innerHTML = `
-                    <div style="font-weight: bold; margin-bottom: 3px;">Total Population</div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffb3ba; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 500</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffdfba; border: 1px solid #999; margin-right: 4px;"></div><span>500-1000</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffba; border: 1px solid #999; margin-right: 4px;"></div><span>1000-2000</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #baffc9; border: 1px solid #999; margin-right: 4px;"></div><span>2000-4000</span></div>
-                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #bae1ff; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 4000</span></div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Total Population</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-body">
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #fff5cc; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 500</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffb899; border: 1px solid #999; margin-right: 4px;"></div><span>500-1000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff7b66; border: 1px solid #999; margin-right: 4px;"></div><span>1000-2000</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff3d33; border: 1px solid #999; margin-right: 4px;"></div><span>2000-4000</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ff0000; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 4000</span></div>
+                    </div>
                 `;
                 demographicPopMap.addControl(new ol.control.Control({ element: popLegend }));
 
                 const litLegend = document.createElement('div');
-                litLegend.className = 'ol-unselectable ol-control';
+                litLegend.className = 'ol-unselectable ol-control raster-legend';
                 litLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 litLegend.innerHTML = `
-                    <div style="font-weight: bold; margin-bottom: 3px;">Literacy (%)</div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #f3c5ff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 40%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #c5ebff; border: 1px solid #999; margin-right: 4px;"></div><span>40-55%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #e2ffc5; border: 1px solid #999; margin-right: 4px;"></div><span>55-70%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffc5d9; border: 1px solid #999; margin-right: 4px;"></div><span>70-85%</span></div>
-                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ffe8c5; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 85%</span></div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Literacy (%)</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-body">
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 40%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffbfbf; border: 1px solid #999; margin-right: 4px;"></div><span>40-55%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff8080; border: 1px solid #999; margin-right: 4px;"></div><span>55-70%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff4040; border: 1px solid #999; margin-right: 4px;"></div><span>70-85%</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ff0000; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 85%</span></div>
+                    </div>
                 `;
                 demographicLitMap.addControl(new ol.control.Control({ element: litLegend }));
 
                 const margLegend = document.createElement('div');
-                margLegend.className = 'ol-unselectable ol-control';
+                margLegend.className = 'ol-unselectable ol-control raster-legend';
                 margLegend.style.cssText = legendStyle + ' left: 5px; right: auto;';
                 margLegend.innerHTML = `
-                    <div style="font-weight: bold; margin-bottom: 3px;">Marginalized Communities (%)</div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4a5a5; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 20%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5c4d4; border: 1px solid #999; margin-right: 4px;"></div><span>20-40%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #d4d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>40-60%</span></div>
-                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #a5d4a5; border: 1px solid #999; margin-right: 4px;"></div><span>60-80%</span></div>
-                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #d4a5d4; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 80%</span></div>
+                    <div class="raster-legend-header" onclick="toggleRasterLegend(this)" role="button" tabindex="0" aria-expanded="true" style="font-weight: bold; margin-bottom: 3px;"><span>Marginal Communities (%)</span><span class="raster-legend-chevron">&#9660;</span></div>
+                    <div class="raster-legend-body">
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffffff; border: 1px solid #999; margin-right: 4px;"></div><span>&lt; 20%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ffbfbf; border: 1px solid #999; margin-right: 4px;"></div><span>20-40%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff8080; border: 1px solid #999; margin-right: 4px;"></div><span>40-60%</span></div>
+                    <div style="display: flex; align-items: center; margin-bottom: 2px;"><div style="width: 12px; height: 12px; background-color: #ff4040; border: 1px solid #999; margin-right: 4px;"></div><span>60-80%</span></div>
+                    <div style="display: flex; align-items: center;"><div style="width: 12px; height: 12px; background-color: #ff0000; border: 1px solid #999; margin-right: 4px;"></div><span>&ge; 80%</span></div>
+                    </div>
                 `;
                 demographicMargMap.addControl(new ol.control.Control({ element: margLegend }));
 
@@ -2992,9 +3473,10 @@
 
         const landscapeLulcRasterLayer = new ol.layer.Image({
             source: new ol.source.ImageWMS({
-                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_1/wms',
+                url: 'https://geoserver.core-stack.org:8443/geoserver/LULC_level_3/wms',
                 params: {
-                    'LAYERS': "LULC_level_1:LULC_17_18_{{district}}_{{block}}_level_1"
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3",
+                    'STYLES': 'lulc_land_use_KYL'
                 },
                 ratio: 1,
                 serverType: 'geoserver',
@@ -3104,14 +3586,15 @@
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
                 params: {
-                    'LAYERS': "LULC_level_3:LULC_22_23_{{district}}_{{block}}_level_3",
+                    'LAYERS': "LULC_level_3:LULC_24_25_{{district}}_{{block}}_level_3",
                     'STYLES': "lulc_water_pixels"
                 },
                 ratio: 1,
                 serverType: 'geoserver',
             }),
             visible: true,
-            name: 'water_raster'
+            name: 'water_raster',
+            zIndex: 6
         })
 
         const urbanRaster = new ol.layer.Image({
@@ -3128,6 +3611,63 @@
             name: 'tree_raster'
         })
 
+        // Soil Health rasters (Nitrogen / Phosphorus / Potassium / Organic Carbon) - toggled via checkboxes, one visible at a time
+        const soilNRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_N",
+                    'STYLES': 'Soil_Health_Nitrogen',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'soil_n_raster'
+        })
+
+        const soilPRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_P",
+                    'STYLES': 'Soil_Health_Phosphorus',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: false,
+            name: 'soil_p_raster'
+        })
+
+        const soilKRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_K",
+                    'STYLES': 'Soil_Health_Potassium',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: false,
+            name: 'soil_k_raster'
+        })
+
+        const soilOCRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "soil_health_raster:{{district}}_{{block}}_soil_health_raster_OC",
+                    'STYLES': 'Soil_Health_Organic_carbon',
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: false,
+            name: 'soil_oc_raster'
+        })
+
         const treeReduceRaster = new ol.layer.Image({
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
@@ -3140,6 +3680,34 @@
             }),
             visible: true,
             name: 'tree_raster'
+        })
+
+        const afforestRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_Afforestation",
+                    'STYLES': "afforestation"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'afforest_raster'
+        })
+
+        const shrubRaster = new ol.layer.Image({
+            source: new ol.source.ImageWMS({
+                url: 'https://geoserver.core-stack.org:8443/geoserver/wms',
+                params: {
+                    'LAYERS': "change_detection:change_{{district}}_{{block}}_ShrubChange",
+                    'STYLES': "shrubchange"
+                },
+                ratio: 1,
+                serverType: 'geoserver',
+            }),
+            visible: true,
+            name: 'shrub_raster'
         })
 
         // ============================================================================
@@ -3323,6 +3891,22 @@
             ])
         })
 
+        // LULC year slider (defaults to the most recent year, 2024-25)
+        const lulcYears = ['17_18', '18_19', '19_20', '20_21', '21_22', '22_23', '23_24', '24_25'];
+        const lulcYearLabels = ['2017-18', '2018-19', '2019-20', '2020-21', '2021-22', '2022-23', '2023-24', '2024-25'];
+        const lulcYearSlider = document.getElementById('lulcYearSlider');
+        const lulcYearLabel = document.getElementById('lulcYearLabel');
+
+        if (lulcYearSlider) {
+            lulcYearSlider.addEventListener('input', () => {
+                const idx = parseInt(lulcYearSlider.value, 10);
+                lulcYearLabel.textContent = lulcYearLabels[idx];
+                landscapeLulcRasterLayer.getSource().updateParams({
+                    'LAYERS': `LULC_level_3:LULC_${lulcYears[idx]}_{{district}}_{{block}}_level_3`
+                });
+            });
+        }
+
         const farmLossRasterMapLayer = new ol.layer.Image({
             source: new ol.source.ImageWMS({
                 url: 'https://geoserver.core-stack.org:8443/geoserver/change_detection/wms',
@@ -3437,6 +4021,21 @@
                 new ol.interaction.KeyboardPan(),
                 new ol.interaction.KeyboardZoom(),
             ])
+        });
+
+        // Info buttons for the demographic maps (built dynamically, so no static HTML to hook into)
+        const demographicMapInfo = [
+            ['demographicPopMap', 'Total village population from Census 2011, shaded low (cream) to high (red).'],
+            ['demographicLitMap', 'Village literacy rate from Census 2011, shaded low (white) to high (red).'],
+            ['demographicMargMap', '% of SC + ST population per village from Census 2011, shaded low (white) to high (red).'],
+        ];
+        demographicMapInfo.forEach(([mapId, infoText]) => {
+            const el = document.getElementById(mapId);
+            if (!el) return;
+            el.insertAdjacentHTML('beforeend', `
+                <button type="button" class="map-info-btn" onclick="toggleMapInfo(this)" aria-label="Map info">i</button>
+                <div class="map-info-tooltip">${infoText}</div>
+            `);
         });
 
         const hydroVectorMap = new ol.Map({
@@ -3576,10 +4175,145 @@
             ])
         })
 
+        const soilHealthMap = new ol.Map({
+            target: 'soilHealthMap',
+            layers: [getBaseLayer(), soilNRaster, soilPRaster, soilKRaster, soilOCRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const soilHealthBoundaryMap = new ol.Map({
+            target: 'soilHealthBoundaryMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
         const treeReduceMap = new ol.Map({
             target: 'treeReduceMap',
             layers: [getBaseLayer(), treeReduceRaster],
             view: tempView4,
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const AfforestMap = new ol.Map({
+            target: 'afforestMap',
+            layers: [getBaseLayer(), afforestRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ComparisonMap6 = new ol.Map({
+            target: 'compMap6',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ShrubMap = new ol.Map({
+            target: 'shrubMap',
+            layers: [getBaseLayer(), shrubRaster],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        })
+
+        const ComparisonMap7 = new ol.Map({
+            target: 'compMap7',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
                 new ol.interaction.KeyboardPan(),
@@ -3627,26 +4361,6 @@
             target: 'swbVillageMap',
             layers: [getBaseLayer()],
             view: swbVillageMapView,
-            interactions: new ol.Collection([
-                new ol.interaction.DragPan(),
-                new ol.interaction.KeyboardPan(),
-                new ol.interaction.KeyboardZoom(),
-            ])
-        })
-
-        const swbVillageMap2View = new ol.View({
-            center: [78.9, 23.6],
-            zoom: 10,
-            projection: "EPSG:4326",
-            constrainResolution: true,
-            smoothExtentConstraint: true,
-            smoothResolutionConstraint: true,
-        })
-
-        const swbVillageMap2 = new ol.Map({
-            target: 'swbVillageMap2',
-            layers: [getBaseLayer()],
-            view: swbVillageMap2View,
             interactions: new ol.Collection([
                 new ol.interaction.DragPan(),
                 new ol.interaction.KeyboardPan(),
@@ -3801,16 +4515,27 @@
                         farmLossRasterMapLayer.addFilter(crop);
                         treeLossRasterMapLayer.addFilter(crop);
 
+                        soilNRaster.addFilter(crop);
+                        soilPRaster.addFilter(crop);
+                        soilKRaster.addFilter(crop);
+                        soilOCRaster.addFilter(crop);
+
+                        afforestRaster.addFilter(crop);
+                        shrubRaster.addFilter(crop);
+
 
                         // Add village boundaries to all comparison maps with spatial filter
                         addVillageBoundariesToMap(ComparisonMap1, feature);
                         addVillageBoundariesToMap(ComparisonMap3, feature);
                         addVillageBoundariesToMap(ComparisonMap4, feature);
                         addVillageBoundariesToMap(ComparisonMap5, feature);
+                        addVillageBoundariesToMap(ComparisonMap6, feature);
+                        addVillageBoundariesToMap(ComparisonMap7, feature);
                         addVillageBoundariesToMap(sogeMap, feature);
-                        addVillageBoundariesToMap(swbVillageMap, feature, true);
-                        addVillageBoundariesToMap(swbVillageMap2, feature, true);
-                        addVillageBoundariesToMap(villageIntersectMap, feature, true);
+                        addVillageBoundariesToMap(soilHealthBoundaryMap, feature);
+                        // addVillageBoundariesToMap(swbMap, feature);
+                        addVillageBoundariesToMap(swbVillageMap, feature);
+                        addVillageBoundariesToMap(villageIntersectMap, feature, false, true);
                         addDemographicBoundariesToMap(feature);
 
                     }
@@ -3839,9 +4564,11 @@
                     addMwsBoundaryToMap(ComparisonMap3);
                     addMwsBoundaryToMap(ComparisonMap4);
                     addMwsBoundaryToMap(ComparisonMap5);
+                    addMwsBoundaryToMap(ComparisonMap6);
+                    addMwsBoundaryToMap(ComparisonMap7);
+                    addMwsBoundaryToMap(soilHealthBoundaryMap);
                     addMwsBoundaryToMap(swbMap);
                     addMwsBoundaryToMap(swbVillageMap);
-                    addMwsBoundaryToMap(swbVillageMap2);
                     addMwsBoundaryToMap(villageIntersectMap);
 
                     addMwsBoundaryToMap(demMap);
@@ -3863,10 +4590,16 @@
                     hydroVectorMap.getView().fit(arr, fitOptions);
                     DegradMap.getView().fit(arr, fitOptions);
                     treeReduceMap.getView().fit(arr, fitOptions);
+                    AfforestMap.getView().fit(arr, fitOptions);
+                    ShrubMap.getView().fit(arr, fitOptions);
                     ComparisonMap1.getView().fit(arr, fitOptions);
                     ComparisonMap3.getView().fit(arr, fitOptions);
                     ComparisonMap4.getView().fit(arr, fitOptions);
                     ComparisonMap5.getView().fit(arr, fitOptions);
+                    ComparisonMap6.getView().fit(arr, fitOptions);
+                    ComparisonMap7.getView().fit(arr, fitOptions);
+                    soilHealthMap.getView().fit(arr, fitOptions);
+                    soilHealthBoundaryMap.getView().fit(arr, fitOptions);
                     urbanMap.getView().fit(arr, fitOptions);
                     farmLossMap.getView().fit(arr, fitOptions);
                     treeLossMap.getView().fit(arr, fitOptions);
@@ -3875,7 +4608,6 @@
                     demographicMargMap.getView().fit(arr, fitOptions);
                     swbMap.getView().fit(arr, fitOptions);
                     swbVillageMap.getView().fit(arr, fitOptions);
-                    swbVillageMap2.getView().fit(arr, fitOptions);
                     villageIntersectMap.getView().fit(arr, fitOptions);
                     sogeMap.getView().fit(arr, fitOptions);
                 })
@@ -3888,28 +4620,23 @@
         // FETCH SURFACE WATERBODIES
         // ============================================================================
 
-        fetch("https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json")
-            .then(response => response.json())
-            .then(data => {
-                swbMap.addLayer(waterRaster);
-            })
-            .catch(error => {
-                // Silently handle fetch errors
-            });
-
         // Waterbodies for this MWS, colored by type (river vs other), for the village maps
-        fetch(`https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=swb:surface_waterbodies_{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=MWS_UID='{{mws_id}}'`)
-            .then(response => response.json())
-            .then(data => {
+        (async () => {
+            const typeName = `swb:surface_waterbodies_{{district}}_{{block}}`;
+            const url = `https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=${typeName}&outputFormat=application/json`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
                 const waterbodyStyleFunction = feature => {
-                    const isRiver = (feature.get('waterbody_type') || '').toLowerCase() === 'river';
                     return new ol.style.Style({
                         stroke: new ol.style.Stroke({
-                            color: isRiver ? 'rgb(255, 140, 0)' : 'rgb(0, 150, 255)',
+                            color: 'rgb(0, 150, 255)',
                             width: 2,
                         }),
                         fill: new ol.style.Fill({
-                            color: isRiver ? 'rgba(255, 140, 0, 0.4)' : 'rgba(137, 207, 240, 0.4)',
+                            color:'rgba(137, 207, 240, 0.4)',
                         }),
                     });
                 };
@@ -3918,12 +4645,224 @@
                     features: new ol.format.GeoJSON().readFeatures(data),
                 });
 
-                swbVillageMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
-                swbVillageMap2.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
-            })
-            .catch(error => {
-                // Silently handle fetch errors
-            });
+                // swbMap.addLayer(new ol.layer.Vector({ source: swbVillageSource, style: waterbodyStyleFunction, zIndex: 4 }));
+                const swbWaterbodyLayer = new ol.layer.Vector({
+                    source: swbVillageSource,
+                    style: waterbodyStyleFunction,
+                    zIndex: 4
+                });
+                // ================= WATERBODY POPUP =================
+
+                const popupEl = document.createElement('div');
+                popupEl.style.cssText = `
+    background: #ffffff;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 8px;
+    min-width: 150px;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    color: #333;
+    text-align: center;
+    display: none;
+`;
+
+                const popupOverlay = new ol.Overlay({
+    element: popupEl,
+    positioning: 'bottom-center',
+    offset: [0, -10],
+    stopEvent: true,
+    autoPan: true
+});
+
+                swbMap.addOverlay(popupOverlay);
+                swbMap.on('click', evt => {
+                    const feature = swbMap.forEachFeatureAtPixel(
+                        evt.pixel,
+                        feature => feature,
+                        {
+                            layerFilter: layer => layer === swbWaterbodyLayer
+                        }
+                    );
+
+                    if (!feature) {
+                        popupEl.style.display = 'none';
+                        popupOverlay.setPosition(undefined);
+                        return;
+                    }
+
+                    const properties = feature.getProperties();
+
+                    const waterbodyId =
+                        properties.wb_id ||
+                        properties.uid ||
+                        properties.UID ||
+                        'N/A';
+
+                    popupEl.innerHTML = `
+                        <strong style="
+                            display: block;
+                            margin-bottom: 8px;
+                            font-size: 14px;
+                        ">
+                            Waterbody ID: ${waterbodyId}
+                        </strong>
+                    `;
+
+                    const btn = document.createElement('button');
+
+                    btn.type = 'button';
+                    btn.textContent = 'Show Waterbody Profile';
+
+                    btn.style.cssText = `
+                        display: block;
+                        margin: 0 auto;
+                        padding: 7px 10px;
+                        background: #3498db;
+                        color: #ffffff;
+                        border: none;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        cursor: pointer;
+                    `;
+                btn.onclick = () => {
+                    const stateName = '{{state}}';
+                    const districtName = '{{district}}';
+                    const blockName = '{{block}}';
+
+                    const waterbodyId =
+                        properties.uid ||
+                        properties.wb_id ||
+                        properties.UID;
+
+                    const waterbodyProfileUrl =
+                        `https://www.explorer.core-stack.org/rwb` +
+                        `?type=tehsil` +
+                        `&state=${encodeURIComponent(stateName)}` +
+                        `&district=${encodeURIComponent(districtName)}` +
+                        `&block=${encodeURIComponent(blockName)}` +
+                        `&waterbody=${encodeURIComponent(waterbodyId)}`;
+
+                    window.open(waterbodyProfileUrl, '_blank');
+                };
+
+                    popupEl.appendChild(btn);
+
+                    popupEl.style.display = 'block';
+                    popupOverlay.setPosition(evt.coordinate);
+                });
+
+                swbMap.on('singleclick', function (evt) {
+    const feature = swbMap.forEachFeatureAtPixel(
+        evt.pixel,
+        function (feature) {
+            return feature;
+        }
+    );
+
+    if (!feature) {
+        popupOverlay.setPosition(undefined);
+        return;
+    }
+
+    const properties = feature.getProperties();
+
+    const waterbodyId =
+        properties.uid ||
+        properties.wb_id ||
+        properties.UID ||
+        'N/A';
+
+    const waterbodyType =
+        properties.waterbody_type_name ||
+        properties.waterbody_type ||
+        'N/A';
+
+    const totalArea =
+        properties.total_area !== null &&
+        properties.total_area !== undefined
+            ? properties.total_area
+            : 'N/A';
+
+    const area1718 =
+        properties['area_17-18'] !== null &&
+        properties['area_17-18'] !== undefined
+            ? properties['area_17-18']
+            : 'N/A';
+
+    popupElement.innerHTML = `
+        <div style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        ">
+            <strong style="font-size: 15px; color: #333;">
+                Waterbody Details
+            </strong>
+
+            <button
+                id="closeWaterbodyPopup"
+                style="
+                    border: none;
+                    background: transparent;
+                    font-size: 18px;
+                    cursor: pointer;
+                    color: #666;
+                "
+            >
+                ×
+            </button>
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Waterbody ID:</b> ${waterbodyId}
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Type:</b> ${waterbodyType}
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Total Area:</b> ${totalArea}
+        </div>
+
+        <div style="margin-bottom: 5px;">
+            <b>Area 17-18:</b> ${area1718}
+        </div>
+    `;
+
+    popupElement
+        .querySelector('#closeWaterbodyPopup')
+        .addEventListener('click', function () {
+            popupOverlay.setPosition(undefined);
+        });
+
+    popupOverlay.setPosition(evt.coordinate);
+});
+                swbMap.addLayer(swbWaterbodyLayer);
+                swbMap.on('pointermove', function (evt) {
+                    if (evt.dragging) {
+                        return;
+                    }
+
+                    const isWaterbody = swbMap.hasFeatureAtPixel(evt.pixel, {
+                        layerFilter: function (layer) {
+                            return layer === swbWaterbodyLayer;
+                        }
+                    });
+
+                    swbMap.getTargetElement().style.cursor =
+                        isWaterbody ? 'pointer' : '';
+                });
+                swbMap.addLayer(waterRaster);
+                swbMap.addLayer(riverLayer);
+                swbMap.addLayer(canalLayer);
+            } catch (error) {
+                console.error('SWB Waterbody Error:', error);
+            }
+        })();
 
         // ============================================================================
         // FETCH GROUNDWATER EXTRACTION STATUS
@@ -3995,39 +4934,187 @@
             map.addControl(scaleControl);
         };
 
+        // Toggle collapse for the raster/class legend boxes (DEM, terrain, LULC, farm/tree loss, demographics)
+        function toggleRasterLegend(headerEl) {
+            const box = headerEl.closest('.raster-legend');
+            if (!box) return;
+            const collapsed = box.classList.toggle('collapsed');
+            headerEl.setAttribute('aria-expanded', String(!collapsed));
+        }
+        window.toggleRasterLegend = toggleRasterLegend;
+
+        // Toggle the one-line info tooltip for a map's info (i) button
+        function toggleMapInfo(btn) {
+            const tooltip = btn.nextElementSibling;
+            if (!tooltip || !tooltip.classList.contains('map-info-tooltip')) return;
+            const isShown = tooltip.classList.contains('show');
+            document.querySelectorAll('.map-info-tooltip.show').forEach(el => el.classList.remove('show'));
+            if (!isShown) tooltip.classList.add('show');
+        }
+        window.toggleMapInfo = toggleMapInfo;
+
+        // Toggle between the N/P/K/OC soil health rasters on the Soil Health map (single layer visible at a time)
+        function toggleSoilHealthLayer(checkbox) {
+            const layerMap = { N: soilNRaster, P: soilPRaster, K: soilKRaster, OC: soilOCRaster };
+            const titleMap = { N: 'Nitrogen (kg/ha)', P: 'Phosphorus', K: 'Potassium', OC: 'Organic Carbon' };
+            if (!checkbox.checked) {
+                // Always keep exactly one parameter visible
+                checkbox.checked = true;
+                return;
+            }
+            document.querySelectorAll('.soil-health-toggle').forEach(cb => {
+                const layer = layerMap[cb.dataset.layer];
+                if (!layer) return;
+                if (cb === checkbox) {
+                    layer.setVisible(true);
+                } else {
+                    cb.checked = false;
+                    layer.setVisible(false);
+                }
+            });
+
+            const activeParam = checkbox.dataset.layer;
+            document.querySelectorAll('.soil-legend-panel').forEach(panel => {
+                panel.style.display = panel.id === 'soilLegend-' + activeParam ? 'flex' : 'none';
+            });
+            const legendTitle = document.getElementById('soilLegendTitle');
+            if (legendTitle) legendTitle.textContent = titleMap[activeParam] || 'Soil Parameter';
+        }
+        window.toggleSoilHealthLayer = toggleSoilHealthLayer;
+
+        document.addEventListener('click', evt => {
+            if (!evt.target.closest('.map-info-btn')) {
+                document.querySelectorAll('.map-info-tooltip.show').forEach(el => el.classList.remove('show'));
+            }
+        });
+
         const addGoogleMapsLegend = (mapElement) => {
             if (mapElement.querySelector('.google-maps-legend')) {
                 return;
             }
 
-            const legendHTML = `
-            <div class="google-maps-legend">
-                
-                <div class="legend-section">
-                    <div class="legend-section-title">Boundaries</div>
-                    
-                    <div class="legend-item">
-                        <div class="legend-checkbox">
-                            <label for="village-${mapElement.id}">
-                                <span class="legend-line village-line"></span>
-                                <span class="legend-text">Village Boundary</span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="legend-item">
-                        <div class="legend-checkbox">
-                            <label for="mws-${mapElement.id}">
-                                <span class="legend-line mws-line"></span>
-                                <span class="legend-text">MWS Boundary</span>
-                            </label>
-                        </div>
+        //     const legendHTML = `
+        //     <div class="google-maps-legend">
+        //         <div class="legend-header">
+        //             <p class="legend-title">Legend</p>
+        //             <button type="button" class="legend-close" aria-label="Toggle legend" aria-expanded="true">&#9660;</button>
+        //         </div>
+
+        //         <div class="legend-section">
+        //             <div class="legend-section-title">Boundaries</div>
+
+        //             <div class="legend-item">
+        //                 <div class="legend-checkbox">
+        //                     <label for="village-${mapElement.id}">
+        //                         <span class="legend-line village-line"></span>
+        //                         <span class="legend-text">Village Boundary</span>
+        //                     </label>
+        //                 </div>
+        //             </div>
+
+        //             <div class="legend-item">
+        //                 <div class="legend-checkbox">
+        //                     <label for="mws-${mapElement.id}">
+        //                         <span class="legend-line mws-line"></span>
+        //                         <span class="legend-text">MWS Boundary</span>
+        //                     </label>
+        //                 </div>
+        //             </div>
+        //         </div>
+        //     </div>
+        // `;
+
+const legendHTML = `
+    <div class="google-maps-legend">
+        <div class="legend-header">
+            <p class="legend-title">Legend</p>
+            <button type="button" class="legend-close" aria-label="Toggle legend" aria-expanded="true">&#9660;</button>
+        </div>
+
+        <div class="legend-section">
+
+            ${mapElement.id === 'swbMap' ? `
+                <div class="legend-section-title">Water Features</div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line"
+                                  style="width: 18px; height: 8px; background-color: #00FFFF; border: 1px solid #0000FF;">
+                            </span>
+                            <span class="legend-text">Waterbodies</span>
+                        </label>
                     </div>
                 </div>
-            </div>
-        `;
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line"
+                                  style="width: 18px; height: 3px; background-color: #0000FF;">
+                            </span>
+                            <span class="legend-text">Rivers</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line"
+                                  style="width: 18px; height: 3px; background-color: #FF4500;">
+                            </span>
+                            <span class="legend-text">Canals</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="legend-section-title">Boundaries</div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label>
+                            <span class="legend-line mws-line"></span>
+                            <span class="legend-text">MWS Boundary</span>
+                        </label>
+                    </div>
+                </div>
+
+            ` : `
+
+                <div class="legend-section-title">Boundaries</div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label for="village-${mapElement.id}">
+                            <span class="legend-line village-line"></span>
+                            <span class="legend-text">Village Boundary</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="legend-item">
+                    <div class="legend-checkbox">
+                        <label for="mws-${mapElement.id}">
+                            <span class="legend-line mws-line"></span>
+                            <span class="legend-text">MWS Boundary</span>
+                        </label>
+                    </div>
+                </div>
+
+            `}
+        </div>
+    </div>
+`;
 
             mapElement.insertAdjacentHTML('beforeend', legendHTML);
+
+            const legendEl = mapElement.querySelector('.google-maps-legend');
+            const toggleBtn = legendEl.querySelector('.legend-close');
+            toggleBtn.addEventListener('click', () => {
+                const collapsed = legendEl.classList.toggle('collapsed');
+                toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+            });
         };
 
         const initializeMapControls = () => {
@@ -4047,22 +5134,27 @@
             if (typeof hydroVectorMap !== 'undefined') addVisualScaleBar(hydroVectorMap);
             if (typeof DegradMap !== 'undefined') addVisualScaleBar(DegradMap);
             if (typeof treeReduceMap !== 'undefined') addVisualScaleBar(treeReduceMap);
+            if (typeof AfforestMap !== 'undefined') addVisualScaleBar(AfforestMap);
+            if (typeof ShrubMap !== 'undefined') addVisualScaleBar(ShrubMap);
+            if (typeof soilHealthMap !== 'undefined') addVisualScaleBar(soilHealthMap);
+            if (typeof soilHealthBoundaryMap !== 'undefined') addVisualScaleBar(soilHealthBoundaryMap);
 
             if (typeof ComparisonMap1 !== 'undefined') addVisualScaleBar(ComparisonMap1);
             if (typeof ComparisonMap3 !== 'undefined') addVisualScaleBar(ComparisonMap3);
             if (typeof ComparisonMap4 !== 'undefined') addVisualScaleBar(ComparisonMap4);
             if (typeof ComparisonMap5 !== 'undefined') addVisualScaleBar(ComparisonMap5);
+            if (typeof ComparisonMap6 !== 'undefined') addVisualScaleBar(ComparisonMap6);
+            if (typeof ComparisonMap7 !== 'undefined') addVisualScaleBar(ComparisonMap7);
 
 
             if (typeof swbMap !== 'undefined') addVisualScaleBar(swbMap);
             if (typeof swbVillageMap !== 'undefined') addVisualScaleBar(swbVillageMap);
-            if (typeof swbVillageMap2 !== 'undefined') addVisualScaleBar(swbVillageMap2);
             if (typeof villageIntersectMap !== 'undefined') addVisualScaleBar(villageIntersectMap);
             if (typeof sogeMap !== 'undefined') addVisualScaleBar(sogeMap);
             if (typeof urbanMap !== 'undefined') addVisualScaleBar(urbanMap);
 
             // Add legends to boundary maps
-            const boundaryMaps = ['mainMap', 'compMap1', 'compMap3', 'compMap4', 'compMap5', 'swbMap', 'swbVillageMap', 'swbVillageMap2', 'villageIntersectMap', 'sogeMap'];
+            const boundaryMaps = ['compMap1', 'compMap3', 'compMap4', 'compMap5', 'compMap6', 'compMap7', 'soilHealthBoundaryMap', 'swbMap', 'swbVillageMap', 'villageIntersectMap', 'sogeMap'];
 
             boundaryMaps.forEach(mapId => {
                 const mapElement = document.getElementById(mapId);
@@ -4208,6 +5300,187 @@
                 },
             }
         });
+
+        // NDVI Timeseries (Crops)
+        //
+        // Whittaker smoother (Eilers, 2003 "A Perfect Smoother"): fits a curve z to the raw
+        // series y by minimizing sum((y - z)^2) + lambda * sum((D^order z)^2), i.e. it trades
+        // off closeness to the raw points against a penalty on the curve's order-th order
+        // discrete derivative (order=2 penalizes curvature, giving a smooth trend). This is
+        // solved as the linear system (I + lambda * D'D) z = y, where D is the order-th
+        // difference matrix. We build that matrix densely and solve it via Gaussian
+        // elimination with partial pivoting — the series here (~150-200 points) is small
+        // enough that an O(n^3) dense solve runs in a few milliseconds in-browser.
+        function buildDifferenceMatrix(n, order) {
+            let D = Array.from({ length: n }, (_, i) => {
+                const row = new Array(n).fill(0);
+                row[i] = 1;
+                return row;
+            });
+            for (let k = 0; k < order; k++) {
+                const next = [];
+                for (let i = 0; i < D.length - 1; i++) {
+                    next.push(D[i + 1].map((v, j) => v - D[i][j]));
+                }
+                D = next;
+            }
+            return D; // (n - order) x n
+        }
+
+        function solveLinearSystem(A, b) {
+            const n = b.length;
+            const M = A.map(row => row.slice());
+            const x = b.slice();
+
+            for (let k = 0; k < n; k++) {
+                let maxRow = k;
+                let maxVal = Math.abs(M[k][k]);
+                for (let i = k + 1; i < n; i++) {
+                    if (Math.abs(M[i][k]) > maxVal) {
+                        maxVal = Math.abs(M[i][k]);
+                        maxRow = i;
+                    }
+                }
+                if (maxRow !== k) {
+                    [M[k], M[maxRow]] = [M[maxRow], M[k]];
+                    [x[k], x[maxRow]] = [x[maxRow], x[k]];
+                }
+                const pivot = M[k][k];
+                if (Math.abs(pivot) < 1e-12) continue;
+                for (let i = k + 1; i < n; i++) {
+                    const factor = M[i][k] / pivot;
+                    if (factor === 0) continue;
+                    for (let j = k; j < n; j++) M[i][j] -= factor * M[k][j];
+                    x[i] -= factor * x[k];
+                }
+            }
+
+            const z = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                let sum = x[i];
+                for (let j = i + 1; j < n; j++) sum -= M[i][j] * z[j];
+                z[i] = sum / M[i][i];
+            }
+            return z;
+        }
+
+        function whittakerSmooth(y, lambda = 10, order = 2) {
+            const n = y.length;
+            if (n < order + 2) return y.slice();
+
+            const D = buildDifferenceMatrix(n, order);
+            const A = Array.from({ length: n }, () => new Array(n).fill(0));
+            for (let i = 0; i < n; i++) A[i][i] = 1;
+
+            for (let r = 0; r < D.length; r++) {
+                const drow = D[r];
+                for (let i = 0; i < n; i++) {
+                    if (drow[i] === 0) continue;
+                    for (let j = 0; j < n; j++) {
+                        if (drow[j] === 0) continue;
+                        A[i][j] += lambda * drow[i] * drow[j];
+                    }
+                }
+            }
+
+            return solveLinearSystem(A, y);
+        }
+
+        // For labels formatted 'YYYY-MM-DD', finds the index of the first July date-point of each
+        // start of the series (e.g. 07/2018) and the last June date-point of each subsequent
+        // year (agricultural-year end), so the x-axis reads like 07/2018, 06/2019, 06/2020,
+        // 06/2021, ... — matching how the cropping-intensity bar chart bins a "year" as Jul-Jun.
+        const getAgYearBoundaryIndices = labels => {
+            const boundaryIndices = new Set();
+            if (labels.length > 0) boundaryIndices.add(0);
+
+            const lastJuneIndexByYear = {};
+            labels.forEach((dateStr, idx) => {
+                const [year, month] = dateStr.split('-');
+                if (month === '06') {
+                    lastJuneIndexByYear[year] = idx; // last occurrence wins
+                }
+            });
+            Object.values(lastJuneIndexByYear).forEach(idx => boundaryIndices.add(idx));
+
+            return boundaryIndices;
+        };
+
+        // Renders an NDVI chart (raw dots + Whittaker-smoothed line) into the given canvas.
+        // agYearTicks: when true, x-axis ticks only show agricultural-year (Jul-Jun) boundaries
+        // instead of a generic evenly-spaced date axis.
+        const renderNdviChart = (canvasId, labels, data, chartTitle, agYearTicks = false) => {
+            const canvas = document.getElementById(canvasId);
+            if (!labels || labels.length === 0 || !canvas) return;
+
+            const smoothed = whittakerSmooth(data, 10, 2);
+
+            let xTicks = { maxTicksLimit: 12 };
+            if (agYearTicks) {
+                const boundaryIndices = getAgYearBoundaryIndices(labels);
+                xTicks = {
+                    autoSkip: false,
+                    maxRotation: 60,
+                    minRotation: 60,
+                    callback: function (value, index) {
+                        if (!boundaryIndices.has(index)) return null;
+                        const [year, month] = labels[index].split('-');
+                        return `${month}/${year}`;
+                    }
+                };
+            }
+
+            new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'NDVI Raw',
+                            data: data,
+                            showLine: false,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#57ad2b',
+                            pointBorderColor: '#57ad2b',
+                        },
+                        {
+                            label: 'Whittaker Smoothed',
+                            data: smoothed,
+                            borderColor: '#2952e3',
+                            backgroundColor: 'rgba(41, 82, 227, 0.08)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.3,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: { display: true, text: 'NDVI' }
+                        },
+                        x: {
+                            title: { display: true, text: agYearTicks ? 'Agricultural Year (Jul - Jun)' : 'Date' },
+                            ticks: xTicks
+                        }
+                    },
+                    animation: { duration: 0 },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: chartTitle
+                        },
+                        legend: { display: true, position: 'top' }
+                    }
+                }
+            });
+        };
+
+        renderNdviChart('lineChart-ndvi', JSON.parse('{{ndvi_labels|safe}}'), JSON.parse('{{ndvi_data|safe}}'), 'NDVI Time Series (Cropped Area)', true);
+        renderNdviChart('lineChart-ndvi-tree', JSON.parse('{{ndvi_tree_labels|safe}}'), JSON.parse('{{ndvi_tree_data|safe}}'), 'NDVI Time Series (Tree Cover)');
 
         // WaterBalance Graphs and descriptions
         const dgData = JSON.parse('{{dg_data|safe}}')
@@ -4479,20 +5752,40 @@
             window.addEventListener('resize', () => chart.resize());
         };
 
-        // Cropping Intensity Change Sankey
+        // Cropland Degradation Sankey
         renderSankeyChart('cropIntensitySankey', JSON.parse('{{crop_intensity_sankey|safe}}'), {
-            'Single': '#F0F4A3',
-            'Double': '#B7D43A',
-            'Triple': '#7FAF2E',
+            'Crops': '#F0F4A3',
+            'Built up': '#ff0000',
+            'Barren': '#a9a9a9',
+            'Shrubs and Scrubs': '#8C7A4F',
         });
 
         // Tree Cover Change Sankey
         renderSankeyChart('treeReductionSankey', JSON.parse('{{tree_reduction_sankey|safe}}'), {
-            'Forest': '#73bb53',
+            'Trees': '#73bb53',
             'Built Up': '#ff0000',
             'Farm': '#eee05d',
             'Barren': '#a9a9a9',
             'Scrub Land': '#eaa4f0',
+        });
+
+        // Afforestation Sankey
+        renderSankeyChart('afforestationSankey', JSON.parse('{{afforestation_sankey|safe}}'), {
+            'Barren': '#a9a9a9',
+            'Built up': '#ff0000',
+            'Farm': '#eee05d',
+            'Scrub Land': '#eaa4f0',
+            'Forest': '#73bb53',
+        });
+
+        // Shrubland Diversion Sankey
+        renderSankeyChart('shrubChangeSankey', JSON.parse('{{shrub_change_sankey|safe}}'), {
+            'Farm': '#eee05d',
+            'Tree': '#1B5E20',
+            'Built up': '#ff0000',
+            'Water': '#1ca3ec',
+            'Barren': '#a9a9a9',
+            'Shrub': '#eaa4f0',
         });
 
         // Urbanization Change Sankey
@@ -4524,6 +5817,7 @@
         const st_pop = JSON.parse('{{ villages_st|safe }}')
         const tot_pop = JSON.parse('{{ villages_pop|safe }}')
         const villagesIntersectPct = JSON.parse('{{ villages_intersect_pct|safe }}')
+        const villagesIdList = JSON.parse('{{ villages_id|safe }}')
 
         // Iterate and append villages as list items
         villageNames.forEach(function (village) {
@@ -4537,8 +5831,13 @@
         villageNames.map((item, idx) => {
             var row = document.createElement("tr");
 
+            const villageId = villagesIdList[idx];
+            const nameCell = villageId !== undefined && villageId !== null
+                ? `<a href="${getVillageReportUrl(villageId)}" target="_blank">${item}</a>`
+                : item;
+
             row.innerHTML = `
-                <td>${item}</td>
+                <td>${nameCell}</td>
                 <td>${tot_pop[idx]}</td>
                 <td>${sc_pop[idx]}</td>
                 <td>${st_pop[idx]}</td>
@@ -4553,44 +5852,6 @@
 
             tableBody.appendChild(row);
         })
-
-        // Village intersection click popup
-        (function () {
-            const mapEl = document.getElementById('villageIntersectMap');
-            if (!mapEl || typeof villageIntersectMap === 'undefined') return;
-
-            const popupEl = document.createElement('div');
-            popupEl.style.cssText = 'position: absolute; background: white; border: 1px solid #666; border-radius: 4px; padding: 8px 10px; font-size: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); max-width: 220px; pointer-events: none;';
-            mapEl.appendChild(popupEl);
-
-            const popupOverlay = new ol.Overlay({
-                element: popupEl,
-                positioning: 'bottom-center',
-                offset: [0, -10],
-            });
-            villageIntersectMap.addOverlay(popupOverlay);
-
-            villageIntersectMap.on('click', function (evt) {
-                const feature = villageIntersectMap.forEachFeatureAtPixel(evt.pixel, f => f);
-                if (!feature) {
-                    popupEl.style.display = 'none';
-                    return;
-                }
-
-                const clickedName = getVillageLabelName(feature);
-                const idx = villageNames.findIndex(name => name && clickedName && name.toLowerCase() === clickedName.toLowerCase());
-
-                if (idx === -1) {
-                    popupEl.style.display = 'none';
-                    return;
-                }
-
-                const pct = villagesIntersectPct[idx];
-                popupEl.innerHTML = `<strong>${villageNames[idx]}</strong><br/>${pct}% of this MWS's area falls within this village.`;
-                popupEl.style.display = 'block';
-                popupOverlay.setPosition(evt.coordinate);
-            });
-        })();
 
         // Toggle show more/less for collapsible lists
         function toggleList(listId, button) {
@@ -4632,9 +5893,9 @@
 
         // Beforeprint event handler
         window.addEventListener('beforeprint', function () {
-            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, AfforestMap, ShrubMap, soilHealthMap, soilHealthBoundaryMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap, sogeMap];
+                ComparisonMap4, ComparisonMap5, ComparisonMap6, ComparisonMap7, demMap, demMapTerrain, drainageMap, terrainRasterMap, swbMap, swbVillageMap, villageIntersectMap, sogeMap];
 
             allMaps.forEach(function (map) {
                 if (map) {
@@ -4650,9 +5911,9 @@
                 item.classList.remove('print-visible');
             });
 
-            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
+            const allMaps = [mainMap, TerrainMap, DegradMap, treeReduceMap, AfforestMap, ShrubMap, soilHealthMap, soilHealthBoundaryMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 urbanMap, ComparisonMap1, ComparisonMap3,
-                ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap, sogeMap, demMapTerrain];
+                ComparisonMap4, ComparisonMap5, ComparisonMap6, ComparisonMap7, swbMap, swbVillageMap, villageIntersectMap, sogeMap, demMapTerrain];
 
             setTimeout(function () {
                 allMaps.forEach(function (map) {
@@ -4701,7 +5962,7 @@
 
             [mainMap, TerrainMap, DegradMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap]
+                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, villageIntersectMap]
                 .filter(Boolean)
                 .forEach(m => m.once('rendercomplete', afterRender));
 
@@ -4715,7 +5976,7 @@
                         try {
                             [mainMap, TerrainMap, DegradMap, treeReduceMap, urbanMap, farmLossMap, treeLossMap, demographicPopMap, demographicLitMap, demographicMargMap,
                                 demMap, demMapTerrain, drainageMap, terrainRasterMap,
-                                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, swbVillageMap2, villageIntersectMap]
+                                ComparisonMap1, ComparisonMap3, ComparisonMap4, ComparisonMap5, swbMap, swbVillageMap, villageIntersectMap]
                                 .filter(Boolean)
                                 .forEach(m => m.renderSync());
                         } catch (e) { }

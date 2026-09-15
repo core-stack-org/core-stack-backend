@@ -13,15 +13,12 @@ from computing.local_compute_helper import (
     load_precomputed_watersheds,
     read_validated_vector_file,
     clip_raster_with_roi,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
     compute_categorical_raster_areas_for_watersheds,
     build_output_raster_path,
     build_output_vector_path,
     write_vector_output,
 )
-from computing.STAC_specs import generate_STAC_layerwise
-
-
 from computing.config_loader import (
     PAN_INDIA_RESTORATION_PATH,
     LOCAL_RESTORATION_OUTPUT,
@@ -84,15 +81,7 @@ def run_raster_restoration_local(
     )
     print(f"Saved clipped restoration raster to: {clipped_raster_path}")
 
-    if push_to_geoserver:
-        push_local_raster_to_geoserver(
-            file_path=str(clipped_raster_path),
-            layer_name=layer_name,
-            workspace=GEOSERVER_WORKSPACE,
-            style_name=RESTORATION_STYLE_NAME,
-        )
-        print(f"Pushed raster {layer_name} to GeoServer.")
-
+    raster_layer_id = None
     if sync_layer_metadata and state and district and block:
         raster_layer_id = save_layer_info_to_db(
             state=state,
@@ -103,24 +92,18 @@ def run_raster_restoration_local(
             dataset_name="Restoration Raster",
             misc={"is_generated_locally": True},
         )
-        if raster_layer_id:
-            update_layer_sync_status(layer_id=raster_layer_id, sync_to_geoserver=True)
-            print(f"Database record updated for raster layer_id: {raster_layer_id}")
-            
-            # STAC Specs for Raster
-            # try:
-            #     layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-            #         state=state,
-            #         district=district,
-            #         block=block,
-            #         layer_name="wri_restoration_raster",
-            #     )
-            #     update_layer_sync_status(
-            #         layer_id=raster_layer_id, is_stac_specs_generated=layer_STAC_generated
-            #     )
-            #     print("STAC metadata updated for restoration raster")
-            # except Exception as e:
-            #     print(f"Error generating STAC for raster: {e}")
+
+    if push_to_geoserver:
+        response = queue_local_raster_for_geoserver(
+            file_path=str(clipped_raster_path),
+            layer_name=layer_name,
+            workspace=GEOSERVER_WORKSPACE,
+            style_name=RESTORATION_STYLE_NAME,
+            layer_id=raster_layer_id,
+        )
+        if response.get("status_code") != 202:
+            return False, clipped_raster_path
+        print(f"Queued raster {layer_name} for GeoServer.")
 
     return True, clipped_raster_path
 

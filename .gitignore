@@ -56,3 +56,4 @@ CLAUDE.md
 .codex/
 .cursor/
 .ruff_cache
+computing/migrations/0004_layermapping.py

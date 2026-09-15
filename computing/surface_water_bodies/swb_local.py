@@ -1,4 +1,5 @@
 import logging
+import re
 from pathlib import Path
 
 import ee
@@ -50,6 +51,7 @@ DATASET_NAME = "Surface Water Bodies"
 GEOSERVER_WORKSPACE = "swb"
 logger = logging.getLogger(__name__)
 GEE_EXPORT_CHUNK_SIZE = 1000
+ANNUAL_COLUMN_PATTERN = re.compile(r"^(area|k|kr|krz)_(\d{4})$")
 
 
 def _slug(value, fallback):
@@ -151,6 +153,30 @@ def _resolve_gee_asset_id(state, district, block, asset_suffix, app_type):
     return description, asset_id, asset_folder_list
 
 
+def _delete_existing_swb_outputs(
+    output_path,
+    swb2_asset_id,
+    asset_suffix,
+    asset_folder_list,
+    app_type,
+):
+    asset_dir = get_gee_dir_path(
+        asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    )
+    asset_ids = (
+        asset_dir + f"swb4_{asset_suffix}",
+        asset_dir + f"swb3_{asset_suffix}",
+        swb2_asset_id,
+    )
+    for asset_id in asset_ids:
+        if is_gee_asset_exists(asset_id):
+            ee.data.deleteAsset(asset_id)
+            logger.info("Deleted existing SWB GEE asset: %s", asset_id)
+
+    output_path.unlink(missing_ok=True)
+    logger.info("Deleted existing local SWB output: %s", output_path)
+
+
 def _prepare_gdf_for_gee(gdf):
     prepared = gdf.copy()
     if prepared.crs is None:
@@ -190,6 +216,25 @@ def _convert_area_columns_to_hectares(gdf):
     return converted, converted_columns
 
 
+def _restore_legacy_columns(gdf):
+    renamed_columns = {}
+    for column in gdf.columns:
+        match = ANNUAL_COLUMN_PATTERN.fullmatch(column)
+        if not match:
+            continue
+
+        prefix, end_year = match.groups()
+        end_year = int(end_year)
+        target_column = f"{prefix}_{(end_year - 1) % 100:02d}-{end_year % 100:02d}"
+        if target_column in gdf.columns:
+            raise ValueError(
+                f"Cannot rename SWB column {column} to existing column {target_column}."
+            )
+        renamed_columns[column] = target_column
+
+    return gdf.rename(columns=renamed_columns)
+
+
 def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
@@ -198,6 +243,7 @@ def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
     clipped_gdf, converted_area_columns = _convert_area_columns_to_hectares(
         clipped_gdf
     )
+    clipped_gdf = _restore_legacy_columns(clipped_gdf)
     logger.info(
         "Clipped SWB features: count=%s columns=%s",
         len(clipped_gdf),
@@ -322,6 +368,7 @@ def _continue_swb_in_gee(
     app_type,
     gee_account_id,
     roi,
+    stage_completed=None,
 ):
     swb2_asset_suffix = f"{asset_suffix}_local"
     swb3_task_id, swb3_asset_id = waterbody_catchment_streamorder_properties(
@@ -336,31 +383,47 @@ def _continue_swb_in_gee(
         check_task_status([swb3_task_id])
     if not is_gee_asset_exists(swb3_asset_id):
         raise RuntimeError(f"SWB3 GEE asset was not created: {swb3_asset_id}")
-
-    swb4_task_id, swb4_asset_id = waterbody_wbc_intersection(
-        roi=roi,
-        state=state,
-        asset_suffix=asset_suffix,
-        asset_folder_list=asset_folder_list,
-        app_type=app_type,
-    )
-    if swb4_task_id:
-        check_task_status([swb4_task_id])
-    if not is_gee_asset_exists(swb4_asset_id):
-        raise RuntimeError(f"SWB4 GEE asset was not created: {swb4_asset_id}")
-
     make_asset_public(swb3_asset_id)
-    make_asset_public(swb4_asset_id)
-    return asset_suffix, swb3_asset_id
+    if stage_completed:
+        stage_completed("swb3", swb3_asset_id)
+
+    swb4_sync_started = False
+    try:
+        swb4_task_id, swb4_asset_id = waterbody_wbc_intersection(
+            roi=roi,
+            state=state,
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+        )
+        if swb4_task_id:
+            check_task_status([swb4_task_id])
+        if not is_gee_asset_exists(swb4_asset_id):
+            raise RuntimeError(f"SWB4 GEE asset was not created: {swb4_asset_id}")
+        make_asset_public(swb4_asset_id)
+        if stage_completed:
+            swb4_sync_started = True
+            stage_completed("swb4", swb4_asset_id)
+    except Exception:
+        logger.exception(
+            "SWB4 enrichment failed for %s; retaining the SWB3 GeoServer layer",
+            asset_suffix,
+        )
+        if stage_completed and swb4_sync_started:
+            stage_completed("swb3", swb3_asset_id)
+        return asset_suffix, swb3_asset_id
+
+    return asset_suffix, swb4_asset_id
 
 
-def _sync_final_swb(
+def _sync_swb_stage(
     state,
     district,
     block,
     layer_name,
     asset_suffix,
     asset_id,
+    source_stage,
     start_year,
     end_year,
     push_to_geoserver,
@@ -370,7 +433,7 @@ def _sync_final_swb(
     if sync_layer_metadata:
         misc = {
             "is_generated_locally": True,
-            "source_stage": "swb3_gee_from_swb2_local",
+            "source_stage": f"{source_stage}_gee_from_swb2_local",
         }
         if start_year is not None:
             misc["start_year"] = start_year
@@ -399,7 +462,9 @@ def _sync_final_swb(
     )
     synced = bool(response) and response.get("status_code") in (200, 201, 202)
     if not synced:
-        raise RuntimeError(f"Failed to sync final SWB layer to GeoServer: {layer_name}")
+        raise RuntimeError(
+            f"Failed to sync {source_stage.upper()} layer to GeoServer: {layer_name}"
+        )
     if synced and layer_id:
         update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
     return synced
@@ -419,26 +484,31 @@ def _complete_swb_pipeline(
     push_to_geoserver,
     sync_layer_metadata,
 ):
-    final_asset_suffix, final_asset_id = _continue_swb_in_gee(
+    def sync_stage(source_stage, asset_id):
+        return _sync_swb_stage(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=_final_layer_name(asset_suffix),
+            asset_suffix=asset_suffix,
+            asset_id=asset_id,
+            source_stage=source_stage,
+            start_year=start_year,
+            end_year=end_year,
+            push_to_geoserver=push_to_geoserver,
+            sync_layer_metadata=sync_layer_metadata,
+        )
+
+    _continue_swb_in_gee(
         state=state,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
         app_type=app_type,
         gee_account_id=gee_account_id,
         roi=roi,
+        stage_completed=sync_stage,
     )
-    return _sync_final_swb(
-        state=state,
-        district=district,
-        block=block,
-        layer_name=_final_layer_name(asset_suffix),
-        asset_suffix=final_asset_suffix,
-        asset_id=final_asset_id,
-        start_year=start_year,
-        end_year=end_year,
-        push_to_geoserver=push_to_geoserver,
-        sync_layer_metadata=sync_layer_metadata,
-    )
+    return True
 
 
 def run_swb_local(
@@ -455,6 +525,7 @@ def run_swb_local(
     app_type="MWS",
     start_year=None,
     end_year=None,
+    overwrite=False,
 ):
     state = str(state).strip().lower() if state else None
     district = str(district).strip().lower() if district else None
@@ -509,6 +580,14 @@ def run_swb_local(
     logger.info("Local SWB output path: %s", output_path)
 
     ee_initialize(gee_account_id)
+    if overwrite:
+        _delete_existing_swb_outputs(
+            output_path=output_path,
+            swb2_asset_id=gee_asset_id,
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder_list,
+            app_type=app_type,
+        )
     gee_roi = gdf_to_ee_fc(_prepare_gdf_for_gee(roi_gdf[["geometry"]]))
 
     if is_gee_asset_exists(gee_asset_id):
@@ -693,6 +772,7 @@ def _generate_swb_local_task(
     end_year=None,
     gee_account_id=None,
     app_type="MWS",
+    overwrite=False,
 ):
     return run_swb_local(
         state=state,
@@ -707,6 +787,7 @@ def _generate_swb_local_task(
         app_type=app_type,
         start_year=start_year,
         end_year=end_year,
+        overwrite=overwrite,
     )
 
 
@@ -723,6 +804,7 @@ def generate_swb_layer(
     end_year=None,
     gee_account_id=None,
     app_type="MWS",
+    overwrite=False,
 ):
     _ = self
     return _generate_swb_local_task(
@@ -736,4 +818,5 @@ def generate_swb_layer(
         end_year=end_year,
         gee_account_id=gee_account_id,
         app_type=app_type,
+        overwrite=overwrite,
     )

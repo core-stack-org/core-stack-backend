@@ -1,19 +1,15 @@
 import os
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
-from computing.utils import (
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
+from computing.utils import save_layer_info_to_db
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_raster_path,
     load_precomputed_watersheds,
     read_validated_vector_file,
     clip_raster_with_roi,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
 )
-from computing.STAC_specs import generate_STAC_layerwise
 from computing.config_loader import (
     PAN_INDIA_DISTANCETONEARESTDRAINAGE_PATH,
     LOCAL_DISTANCETONEARESTDRAINAGE_OUTPUT,
@@ -76,16 +72,7 @@ def generate_distance_to_nearest_drainage_line_local(
     print(f"Saved clipped raster to: {clipped_raster_path}")
 
     layer_at_geoserver = False
-    if push_to_geoserver:
-        push_local_raster_to_geoserver(
-            file_path=str(clipped_raster_path),
-            layer_name=raster_layer_name,
-            workspace=GEOSERVER_WORKSPACE,
-            style_name=DISTANCE_TO_DRAINAGE_STYLE_NAME,
-        )
-        print(f"Pushed raster {raster_layer_name} to GeoServer.")
-        layer_at_geoserver = True
-
+    raster_layer_id = None
     if sync_layer_metadata and state and district and block:
         raster_layer_id = save_layer_info_to_db(
             state=state,
@@ -96,24 +83,16 @@ def generate_distance_to_nearest_drainage_line_local(
             dataset_name="Distance to Drainage Line",
             misc={"is_generated_locally": True},
         )
-        if raster_layer_id:
-            update_layer_sync_status(layer_id=raster_layer_id, sync_to_geoserver=True)
-            print(f"Database record updated for raster layer_id: {raster_layer_id}")
 
-            # STAC Specs for Raster
-            try:
-                layer_STAC_generated = generate_STAC_layerwise.generate_raster_stac(
-                    state=state,
-                    district=district,
-                    block=block,
-                    layer_name="distance_to_nearest_drainage_line_raster",
-                )
-                update_layer_sync_status(
-                    layer_id=raster_layer_id,
-                    is_stac_specs_generated=layer_STAC_generated,
-                )
-                print("STAC metadata updated for Distance to Drainage Line raster")
-            except Exception as e:
-                print(f"Error generating STAC for raster: {e}")
+    if push_to_geoserver:
+        response = queue_local_raster_for_geoserver(
+            file_path=str(clipped_raster_path),
+            layer_name=raster_layer_name,
+            workspace=GEOSERVER_WORKSPACE,
+            style_name=DISTANCE_TO_DRAINAGE_STYLE_NAME,
+            layer_id=raster_layer_id,
+        )
+        layer_at_geoserver = response.get("status_code") == 202
+        print(f"Queued raster {raster_layer_name} for GeoServer.")
 
     return layer_at_geoserver

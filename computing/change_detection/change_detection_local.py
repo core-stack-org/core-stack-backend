@@ -19,22 +19,13 @@ from computing.local_compute_helper import (
     build_output_raster_path,
     get_union_geometry,
     load_precomputed_roi,
-    push_local_raster_to_geoserver,
+    queue_local_raster_for_geoserver,
     resolve_lulc_raster_paths,
     validate_geometry,
 )
-from computing.utils import save_layer_info_to_db, update_layer_sync_status
+from computing.utils import save_layer_info_to_db
 
 GEOSERVER_WORKSPACE = "change_detection"
-
-CHANGE_STAC_LAYER_NAMES = {
-    "Urbanization": "change_urbanization_raster",
-    "Degradation": "change_cropping_reduction_raster",
-    "Deforestation": "change_tree_cover_loss_raster",
-    "Afforestation": "change_tree_cover_gain_raster",
-    "CropIntensity": "change_cropping_intensity_raster",
-    "ShrubChange": "change_shrub_change_raster",
-}
 
 BUILT_UP_REMAP = {
     1: 1,
@@ -568,17 +559,7 @@ def run_change_detection_local(
         print(f"Saved local change detection raster: {raster_path}")
 
         published_layer_name = _published_layer_name(district, block, param_name)
-        if push_to_geoserver:
-            upload_res, style_res = push_local_raster_to_geoserver(
-                file_path=raster_path,
-                layer_name=published_layer_name,
-                workspace=GEOSERVER_WORKSPACE,
-                style_name=param_name.lower(),
-            )
-            print(f"GeoServer upload response for {param_name}: {upload_res}")
-            print(f"GeoServer style response for {param_name}: {style_res}")
-            geoserver_statuses.append(True)
-
+        layer_id = None
         if sync_layer_metadata:
             layer_id = save_layer_info_to_db(
                 state=state,
@@ -593,20 +574,21 @@ def run_change_detection_local(
                     "is_generated_locally": True,
                 },
             )
-            if layer_id and push_to_geoserver:
-                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-                from computing.STAC_specs import generate_STAC_layerwise
 
-                layer_stac_generated = generate_STAC_layerwise.generate_raster_stac(
-                    state=state,
-                    district=district,
-                    block=block,
-                    layer_name=CHANGE_STAC_LAYER_NAMES[param_name],
+        if push_to_geoserver:
+            geoserver_response = queue_local_raster_for_geoserver(
+                file_path=raster_path,
+                layer_name=published_layer_name,
+                workspace=GEOSERVER_WORKSPACE,
+                style_name=param_name.lower(),
+                layer_id=layer_id,
+            )
+            print(f"GeoServer response for {param_name}: {geoserver_response}")
+            if geoserver_response.get("status_code") != 202:
+                raise RuntimeError(
+                    f"Failed to queue change raster: {geoserver_response}"
                 )
-                update_layer_sync_status(
-                    layer_id=layer_id,
-                    is_stac_specs_generated=layer_stac_generated,
-                )
+            geoserver_statuses.append(True)
 
     return all(geoserver_statuses) if push_to_geoserver else True
 

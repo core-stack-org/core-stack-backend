@@ -196,7 +196,12 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
 
         # Save as GeoPackage
         gdf.to_file(path + ".gpkg", driver="GPKG")
-        res = push_shape_to_geoserver(path, workspace=workspace, file_type="gpkg")
+        res = push_shape_to_geoserver(
+            path,
+            workspace=workspace,
+            layer_name=layer_name,
+            file_type="gpkg",
+        )
         if style_name:
             style_res = geo.publish_style(
                 layer_name=layer_name, style_name=style_name, workspace=workspace
@@ -360,8 +365,14 @@ def get_agri_year_key(season_key):
 
 
 def calculate_precipitation_season(
-        geojson_filepath, draught_asset_id, start_year=2017, end_year=2024
+        geojson_filepath, draught_asset_id, start_year=None, end_year=None
 ):
+    if start_year is None or end_year is None:
+        raise ValueError(
+            "start_year and end_year are required for calculate_precipitation_season."
+        )
+    start_year = int(start_year)
+    end_year = int(end_year)
 
     # Load the GeoJSON file
     with open(geojson_filepath, "r") as f:
@@ -1037,6 +1048,13 @@ def update_layer_sync_status(
             sync_to_geoserver=sync_to_geoserver,
             is_stac_specs_generated=is_stac_specs_generated,
         )
+        if sync_to_geoserver:
+            try:
+                from utilities.layer_generation_mode import record_sync_layer_id
+
+                record_sync_layer_id(layer_id)
+            except Exception:
+                pass
         return layer_id
 
     try:
@@ -1060,6 +1078,13 @@ def update_layer_sync_status(
                 f"Updated {update_fields} for layer ID: {layer_id} "
                 f"(sync={sync_to_geoserver}, stac={is_stac_specs_generated})"
             )
+            if sync_to_geoserver:
+                try:
+                    from utilities.layer_generation_mode import record_sync_layer_id
+
+                    record_sync_layer_id(layer_id)
+                except Exception:
+                    pass
             return layer_id
 
     except Exception as e:

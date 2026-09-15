@@ -7,7 +7,7 @@ from computing.utils import (
     get_existing_end_year,
     get_layer_object,
 )
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -24,6 +24,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 geo = Geoserver()
+
+
+def _pan_india_lulc_asset_id(year):
+    return f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{year}_{year + 1}"
 
 
 @app.task(bind=True)
@@ -171,10 +175,13 @@ def generate_gee_asset(
     initial_year = 2017
     s_year = initial_year  # start_year  # START_YEAR
     while s_year <= end_year:
-        lulc_js_list.append(
-            ee.Image(
+        if zoi:
+            lulc_asset_id = _pan_india_lulc_asset_id(s_year)
+        else:
+            lulc_asset_id = (
                 get_gee_dir_path(
-                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                    asset_folder_list,
+                    asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
                 )
                 + asset_suffix
                 + "_"
@@ -183,7 +190,7 @@ def generate_gee_asset(
                 + str(s_year + 1)
                 + "-06-30_LULCmap_10m"
             )
-        )
+        lulc_js_list.append(ee.Image(lulc_asset_id))
         s_year += 1
     lulc = ee.List(lulc_js_list)
     # Label New
