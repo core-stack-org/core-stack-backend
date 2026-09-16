@@ -39,7 +39,7 @@ CRS = "EPSG:4326"
 
 # Map from alu_type value in the API response to output parquet filename
 ALU_TYPE_TO_PARQUET = {
-    "field":      "farm_boundaries.parquet",
+    "field":      "farm_static.parquet",
     "trees":      "trees.parquet",
     "dug_well":   "dug_wells.parquet",
     "farm_pond":  "farm_ponds.parquet",

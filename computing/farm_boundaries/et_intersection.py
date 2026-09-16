@@ -90,7 +90,7 @@ def _block_dir(state, district, block):
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block)
 
 def _farm_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_boundaries.parquet")
+    return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
 
 def _static_parquet_path(state, district, block):
     return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
