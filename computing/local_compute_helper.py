@@ -76,36 +76,32 @@ def read_validated_vector_file(path, empty_message):
     return gdf
 
 
-def clip_vector_to_watersheds(watersheds_gdf, source_gdf):
-    watersheds_gdf = validate_geometry(watersheds_gdf)
-    source_gdf = validate_geometry(source_gdf)
+def clip_vector_to_mws(watersheds_gdf, source_gdf):
+    """
+    Clips pan-India forest fringe data to the watershed boundaries
+    """
     if source_gdf.empty:
-        return source_gdf
+        return gpd.GeoDataFrame(
+            columns=source_gdf.columns,
+            geometry="geometry",
+            crs=source_gdf.crs,
+        )
 
-    if (
-        watersheds_gdf.crs
-        and source_gdf.crs
-        and watersheds_gdf.crs != source_gdf.crs
-    ):
-        source_gdf = source_gdf.to_crs(watersheds_gdf.crs)
+    # Match CRS before clipping
+    if watersheds_gdf.crs != source_gdf.crs:
+        watersheds_gdf = watersheds_gdf.to_crs(source_gdf.crs)
 
-    outer_boundary = watersheds_gdf.geometry.unary_union
-    source_gdf = source_gdf[source_gdf.intersects(outer_boundary)].copy()
-    if source_gdf.empty:
-        return source_gdf
+    matched_gdf = source_gdf[source_gdf["uid"].isin(watersheds_gdf["uid"])].copy()
 
-    clipped_gdf = validate_geometry(gpd.clip(source_gdf, outer_boundary))
-    if clipped_gdf.empty:
-        return clipped_gdf
+    if matched_gdf.empty:
+        return gpd.GeoDataFrame(
+            columns=source_gdf.columns, geometry="geometry", crs=source_gdf.crs
+        )
 
-    joined_gdf = gpd.sjoin(
-        clipped_gdf,
-        watersheds_gdf[["uid", "geometry"]],
-        how="inner",
-        predicate="intersects",
-    )
-    joined_gdf = joined_gdf[~joined_gdf.index.duplicated(keep="first")]
-    return joined_gdf.drop(columns=["index_right"], errors="ignore")
+    # clip
+    result_gdf = gpd.clip(matched_gdf, watersheds_gdf)
+
+    return result_gdf
 
 
 def resolve_precomputed_vector_file(
@@ -258,7 +254,9 @@ def load_precomputed_roi(
             missing_file_label="Precomputed tehsil watershed file",
         )
     except FileNotFoundError:
-        print(f"Precomputed ROI not found for {state}/{district}/{block}. Downloading...")
+        print(
+            f"Precomputed ROI not found for {state}/{district}/{block}. Downloading..."
+        )
         ensure_tehsil_watershed(
             state=state,
             district=district,
@@ -663,7 +661,6 @@ def queue_local_vector_for_geoserver(
     )
 
 
-
 def compute_pixel_area_grid(transform, height, width, crs):
     if crs is None:
         raise ValueError("Raster CRS is missing; cannot compute pixel areas.")
@@ -674,14 +671,15 @@ def compute_pixel_area_grid(transform, height, width, crs):
         lat_top = transform.f + (row_indices * transform.e)
         lat_bottom = lat_top + transform.e
         earth_radius_m = 6378137.0
-        row_areas = (earth_radius_m**2) * lon_width_radians * np.abs(
-            np.sin(np.deg2rad(lat_top)) - np.sin(np.deg2rad(lat_bottom))
+        row_areas = (
+            (earth_radius_m**2)
+            * lon_width_radians
+            * np.abs(np.sin(np.deg2rad(lat_top)) - np.sin(np.deg2rad(lat_bottom)))
         )
         return np.broadcast_to(row_areas[:, None], (height, width))
 
     pixel_area = abs(transform.a * transform.e)
     return np.full((height, width), pixel_area, dtype=np.float64)
-
 
 
 def compute_categorical_raster_areas_for_watersheds(
@@ -703,8 +701,7 @@ def compute_categorical_raster_areas_for_watersheds(
         nodata = src.nodata
         computed_rows = []
         empty_result = {
-            class_definition["label"]: 0.0
-            for class_definition in class_definitions
+            class_definition["label"]: 0.0 for class_definition in class_definitions
         }
 
         total = len(working_gdf)
@@ -749,7 +746,9 @@ def compute_categorical_raster_areas_for_watersheds(
 
             row_result = {}
             for class_definition in class_definitions:
-                raw_values = class_definition.get("values", class_definition.get("value"))
+                raw_values = class_definition.get(
+                    "values", class_definition.get("value")
+                )
                 if isinstance(raw_values, (list, tuple, set, np.ndarray)):
                     class_values = list(raw_values)
                 else:
@@ -780,7 +779,9 @@ def compute_union_categorical_area_across_rasters_for_watersheds(
     output_column,
 ):
     if not raster_paths:
-        raise ValueError("At least one raster path is required for union area computation.")
+        raise ValueError(
+            "At least one raster path is required for union area computation."
+        )
 
     for raster_path in raster_paths:
         ensure_file_exists(raster_path, "Categorical raster")
@@ -926,9 +927,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
     with rasterio.open(raster_path) as src:
         working_gdf = watersheds_gdf.copy()
         if working_gdf.crs is None:
-            raise ValueError(
-                "Watershed CRS is missing; cannot align with raster CRS."
-            )
+            raise ValueError("Watershed CRS is missing; cannot align with raster CRS.")
         if src.crs and working_gdf.crs != src.crs:
             working_gdf = working_gdf.to_crs(src.crs)
 
@@ -988,9 +987,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
 
             plain_prop = _fraction(values, valid_mask, PLAIN_CLASSES)
             valley_prop = _fraction(values, valid_mask, VALLEY_CLASSES)
-            hill_slopes_prop = _fraction(
-                values, valid_mask, HILL_SLOPES_CLASSES
-            )
+            hill_slopes_prop = _fraction(values, valid_mask, HILL_SLOPES_CLASSES)
             ridge_prop = _fraction(values, valid_mask, RIDGE_CLASSES)
             slopy_prop = _fraction(values, valid_mask, SLOPY_CLASSES)
 
@@ -1017,9 +1014,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
             )
 
             if index % 200 == 0 or index == total:
-                print(
-                    f"Computed terrain properties for {index}/{total} watersheds"
-                )
+                print(f"Computed terrain properties for {index}/{total} watersheds")
 
     result = watersheds_gdf.copy()
     computed_df = pd.DataFrame(computed_rows)
@@ -1043,9 +1038,7 @@ def resolve_lulc_raster_paths(
 
 def get_watershed_areas_in_hectares(watersheds_gdf):
     if "area_in_ha" in watersheds_gdf.columns:
-        area_in_ha = pd.to_numeric(
-            watersheds_gdf["area_in_ha"], errors="coerce"
-        )
+        area_in_ha = pd.to_numeric(watersheds_gdf["area_in_ha"], errors="coerce")
         if area_in_ha.notna().any():
             return area_in_ha
     projected = watersheds_gdf.to_crs("EPSG:6933")
@@ -1132,29 +1125,34 @@ def read_geojson_with_string_coords(path, mask_gdf):
     Pre-filters using the bounding box of mask_gdf to prevent high memory usage.
     """
     import json
-    with open(path, 'r') as f:
+
+    with open(path, "r") as f:
         data = json.load(f)
-        
+
     def _convert_coords(coords):
         if not coords:
             return coords
         if isinstance(coords[0], (list, tuple)):
             return [_convert_coords(c) for c in coords]
         return [float(c) for c in coords]
-        
+
     minx, miny, maxx, maxy = mask_gdf.total_bounds
     buffer_deg = 0.05
-    
+
     def _is_roughly_in_bounds(coords):
-        if not coords: return False
+        if not coords:
+            return False
         if isinstance(coords[0], (list, tuple)):
             for c in coords:
-                if _is_roughly_in_bounds(c): return True
+                if _is_roughly_in_bounds(c):
+                    return True
             return False
         else:
             try:
                 x, y = float(coords[0]), float(coords[1])
-                return (minx - buffer_deg <= x <= maxx + buffer_deg) and (miny - buffer_deg <= y <= maxy + buffer_deg)
+                return (minx - buffer_deg <= x <= maxx + buffer_deg) and (
+                    miny - buffer_deg <= y <= maxy + buffer_deg
+                )
             except Exception:
                 return True
 
@@ -1168,6 +1166,5 @@ def read_geojson_with_string_coords(path, mask_gdf):
                     filtered_features.append(feature)
                 except Exception:
                     pass
-                
-    return gpd.GeoDataFrame.from_features(filtered_features, crs="EPSG:4326")
 
+    return gpd.GeoDataFrame.from_features(filtered_features, crs="EPSG:4326")

@@ -4,7 +4,7 @@ from nrm_app.celery import app
 
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
-    clip_vector_to_watersheds,
+    clip_vector_to_mws,
     load_precomputed_watersheds,
     read_validated_vector_file,
     validate_geometry,
@@ -18,10 +18,6 @@ from computing.utils import (
 )
 
 from computing.config_loader import PAN_INDIA_FOREST_FRINGE, LOCAL_FOREST_FRINGE_OUTPUT
-
-
-def _compute_forest_fringe_for_watersheds(watersheds_gdf, forest_fringe_gdf):
-    return clip_vector_to_watersheds(watersheds_gdf, forest_fringe_gdf)
 
 
 @app.task(bind=True)
@@ -68,13 +64,11 @@ def generate_forest_fringe_local(
         )
     print(f"Loaded {len(forest_fringe_gdf)} forest fringe features")
 
-    result_gdf = _compute_forest_fringe_for_watersheds(
+    result_gdf = clip_vector_to_mws(
         watersheds_gdf=watersheds_gdf,
-        forest_fringe_gdf=forest_fringe_gdf,
+        source_gdf=forest_fringe_gdf,
     )
-    print(
-        f"Final valid forest fringe features after clipping: {len(result_gdf)}"
-    )
+    print(f"Final valid forest fringe features after clipping: {len(result_gdf)}")
 
     output_path = build_output_vector_path(
         layer_name=layer_name,
