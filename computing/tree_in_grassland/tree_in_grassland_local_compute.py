@@ -4,7 +4,7 @@ from nrm_app.celery import app
 
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
-    clip_vector_to_watersheds,
+    clip_vector_to_watershed,
     load_precomputed_watersheds,
     read_validated_vector_file,
     validate_geometry,
@@ -21,10 +21,6 @@ from computing.config_loader import (
     PAN_INDIA_TREE_IN_GRASSLAND,
     LOCAL_TREE_IN_GRASSLAND_OUTPUT,
 )
-
-
-def _compute_tree_in_grassland_for_watersheds(watersheds_gdf, tree_in_grassland_gdf):
-    return clip_vector_to_watersheds(watersheds_gdf, tree_in_grassland_gdf)
 
 
 @app.task(bind=True)
@@ -73,9 +69,9 @@ def generate_tree_in_grassland_local(
         )
     print(f"Loaded {len(tree_in_grassland_gdf)} tree in grassland features")
 
-    result_gdf = _compute_tree_in_grassland_for_watersheds(
+    result_gdf = clip_vector_to_watershed(
         watersheds_gdf=watersheds_gdf,
-        tree_in_grassland_gdf=tree_in_grassland_gdf,
+        source_gdf=tree_in_grassland_gdf,
     )
     print(
         f"Final valid tree in grassland features after spatial join: {len(result_gdf)}"
