@@ -274,26 +274,10 @@ def create_excel_for_tree_in_grassland(geojson_data, writer):
         features = geojson_data["features"]
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
-        exclude_cols = [
-            "uid_right",
-            "id",
-            "tree_loss_to_grassland_ratio",
-            "tree_loss_to_tree_in_shrub_ratio",
-        ]
+        exclude_cols = ["id"]
         df = df.drop(columns=exclude_cols, errors="ignore")
         df.rename(
-            columns={
-                "uid_left": "UID",
-                "grassland_area_in_ha": "shrubs_trees_area_in_ha",
-                "tree_in_shrub_area_in_ha": "tree_in_shrubs_trees_area_in_ha",
-                "tree_loss_area_in_ha": "tree_loss_in_tree_in_shrub_area_in_ha",
-                "tree_shrub_to_barren_area_in_ha": "tree_in_tree_in_shrub_to_barren_area_in_ha",
-                "tree_shrub_to_built_area_in_ha": "tree_in_tree_in_shrub_to_built_area_in_ha",
-                "tree_shrub_to_crops_area_in_ha": "tree_in_tree_in_shrub_to_crops_area_in_ha",
-                "tree_shrub_to_kharif_rabi_water_area_in_ha": "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha",
-                "tree_shrub_to_kharif_rabi_zaid_water_area_in_ha": "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha",
-                "tree_shrub_to_kharif_water_area_in_ha": "tree_in_tree_in_shrub_to_kharif_water_area_in_ha",
-            },
+            columns={"uid": "UID"},
             inplace=True,
         )
         priority_cols = [
@@ -324,15 +308,9 @@ def create_excel_for_forest_fringe(geojson_data, writer):
         features = geojson_data["features"]
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
-        exclude_cols = [
-            "uid_right",
-            "id",
-            "forest_fringe_ratio",
-            "tree_deforestation_fringe_ratio",
-            "tree_degradation_fringe_ratio",
-        ]
+        exclude_cols = ["id"]
         df = df.drop(columns=exclude_cols, errors="ignore")
-        df.rename(columns={"uid_left": "UID"}, inplace=True)
+        df.rename(columns={"uid": "UID"}, inplace=True)
         priority_cols = ["UID", "mws_area_in_ha"]
         priority_cols = [c for c in priority_cols if c in df.columns]
         other_cols = [c for c in df.columns if c not in priority_cols]
