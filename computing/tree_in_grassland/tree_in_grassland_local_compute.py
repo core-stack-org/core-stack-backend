@@ -4,7 +4,7 @@ from nrm_app.celery import app
 
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
-    clip_vector_to_watershed,
+    clip_vector_to_mws,
     load_precomputed_watersheds,
     read_validated_vector_file,
     validate_geometry,
@@ -69,7 +69,7 @@ def generate_tree_in_grassland_local(
         )
     print(f"Loaded {len(tree_in_grassland_gdf)} tree in grassland features")
 
-    result_gdf = clip_vector_to_watershed(
+    result_gdf = clip_vector_to_mws(
         watersheds_gdf=watersheds_gdf,
         source_gdf=tree_in_grassland_gdf,
     )
