@@ -162,39 +162,49 @@ def _manifest_layer_index() -> dict[str, list[dict]]:
     return index
 
 
+def _s3_client():
+    try:
+        import boto3
+        from botocore import UNSIGNED
+        from botocore.config import Config
+    except ImportError as exc:
+        raise RuntimeError("boto3 is required to download base layers from S3") from exc
+
+    client_kwargs = {}
+    try:
+        from django.conf import settings
+
+        if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY:
+            client_kwargs.update(
+                aws_access_key_id=settings.S3_ACCESS_KEY,
+                aws_secret_access_key=settings.S3_SECRET_KEY,
+            )
+        if getattr(settings, "S3_REGION", None):
+            client_kwargs["region_name"] = settings.S3_REGION
+    except Exception:
+        logger.debug(
+            "Django S3 settings unavailable; using anonymous public-read access.",
+            exc_info=True,
+        )
+
+    if "aws_access_key_id" not in client_kwargs:
+        client_kwargs["config"] = Config(signature_version=UNSIGNED)
+        logger.info("Using anonymous S3 access for public-read base layers.")
+
+    return boto3.client("s3", **client_kwargs)
+
+
 def _download_s3_file(source: str, destination: Path):
     parsed = urlparse(source)
     if parsed.scheme != "s3" or not parsed.netloc or not parsed.path:
         raise ValueError(f"Invalid S3 source: {source}")
-
-    try:
-        import boto3
-    except ImportError as exc:
-        raise RuntimeError("boto3 is required to download base layers from S3") from exc
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     temp_destination = destination.with_suffix(destination.suffix + ".part")
 
     logger.info("Downloading %s to %s", source, destination)
     try:
-        client_kwargs = {}
-        try:
-            from django.conf import settings
-
-            if settings.S3_ACCESS_KEY and settings.S3_SECRET_KEY:
-                client_kwargs.update(
-                    aws_access_key_id=settings.S3_ACCESS_KEY,
-                    aws_secret_access_key=settings.S3_SECRET_KEY,
-                )
-            if getattr(settings, "S3_REGION", None):
-                client_kwargs["region_name"] = settings.S3_REGION
-        except Exception:
-            logger.debug(
-                "Django S3 settings unavailable; using boto3 credential provider chain.",
-                exc_info=True,
-            )
-
-        boto3.client("s3", **client_kwargs).download_file(
+        _s3_client().download_file(
             parsed.netloc,
             parsed.path.lstrip("/"),
             str(temp_destination),

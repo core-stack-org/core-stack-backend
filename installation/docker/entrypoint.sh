@@ -120,6 +120,15 @@ ensure_dirs() {
     touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
 }
 
+ensure_migration_packages() {
+    echo "Ensuring Django migration packages exist..."
+    cd "$BACKEND_DIR"
+    while IFS= read -r f; do
+        mkdir -p "$(dirname "$f")/migrations"
+        touch "$(dirname "$f")/migrations/__init__.py"
+    done < <(find . -maxdepth 2 -name "apps.py" -type f)
+}
+
 maybe_download_admin_boundary() {
     if [ "${DOWNLOAD_ADMIN_BOUNDARY:-1}" != "1" ]; then
         echo "Skipping admin-boundary download (DOWNLOAD_ADMIN_BOUNDARY=${DOWNLOAD_ADMIN_BOUNDARY})."
@@ -153,6 +162,7 @@ run_database() {
     python manage.py collectstatic --noinput --clear --skip-checks
 
     echo "Building Django database (makemigrations + migrate)..."
+    ensure_migration_packages
     python manage.py makemigrations --skip-checks
     python manage.py migrate --fake-initial --skip-checks
 
