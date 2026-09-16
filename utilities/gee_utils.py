@@ -7,10 +7,15 @@ from nrm_app.settings import (
     BASE_DIR,
     EARTH_DATA_USER,
     EARTH_DATA_PASSWORD,
+    GEE_SERVICE_ACCOUNT_KEY_PATH,
     GEE_DEFAULT_ACCOUNT_ID,
     GEE_HELPER_ACCOUNT_ID,
     FERNET_KEY,
+)
+from utilities.constants import (
+    GEE_ASSET_PATH,
     GCS_BUCKET_NAME,
+    GEE_PATHS,
 )
 from utilities.constants import GEE_ASSET_PATH
 import ee, geetools
@@ -592,22 +597,40 @@ def is_asset_public(asset_id):
         return False
 
 
-def sync_raster_to_gcs(image, scale, layer_name):
+def sync_raster_to_gcs(image, scale, layer_name, region=None):
     print("inside sync_raster_to_gcs")
-    export_task = ee.batch.Export.image.toCloudStorage(
-        image=image,
-        description="gcs_" + layer_name,
-        bucket=GCS_BUCKET_NAME,
-        fileNamePrefix="nrm_raster/" + layer_name,
-        scale=scale,
-        fileFormat="GeoTIFF",
-        crs="EPSG:4326",
-        maxPixels=1e13,
-    )
+
+    export_args = {
+        "image": image,
+        "description": "gcs_" + layer_name,
+        "bucket": GCS_BUCKET_NAME,
+        "fileNamePrefix": "nrm_raster/" + layer_name,
+        "scale": scale,
+        "fileFormat": "GeoTIFF",
+        "crs": "EPSG:4326",
+        "maxPixels": 1e13,
+    }
+
+    if region is not None:
+        export_args["region"] = region
+
+    export_task = ee.batch.Export.image.toCloudStorage(**export_args)
 
     export_task.start()
     print("Successfully started the sync_raster_to_gcs", export_task.status())
     return export_task.status()["id"]
+
+
+def download_tif_from_gcs(source_blob_name, destination_file_name):
+    bucket = gcs_config()
+
+    # Get the blob (file)
+    blob = bucket.blob(source_blob_name)
+
+    # Download the file
+    blob.download_to_filename(destination_file_name)
+
+    print(f"Downloaded {source_blob_name} to {destination_file_name}")
 
 
 def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name=None):
