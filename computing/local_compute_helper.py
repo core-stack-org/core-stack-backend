@@ -76,7 +76,7 @@ def read_validated_vector_file(path, empty_message):
     return gdf
 
 
-def clip_vector_to_watershed(watersheds_gdf, source_gdf):
+def clip_vector_to_mws(watersheds_gdf, source_gdf):
     """
     Clips pan-India forest fringe data to the watershed boundaries
     """
