@@ -68,6 +68,10 @@ apply_geoserver_and_gee_env() {
     upsert_env "$APP_ENV_FILE" "GEE_STORAGE_PROJECT" "${GEE_STORAGE_PROJECT:-}"
     upsert_env "$APP_ENV_FILE" "GEE_STORAGE_PROJECT_HELPER" "${GEE_STORAGE_PROJECT_HELPER:-}"
     upsert_env "$APP_ENV_FILE" "GCS_BUCKET_NAME" "${GCS_BUCKET_NAME:-}"
+    upsert_env "$APP_ENV_FILE" "S3_ACCESS_KEY" "${S3_ACCESS_KEY:-}"
+    upsert_env "$APP_ENV_FILE" "S3_SECRET_KEY" "${S3_SECRET_KEY:-}"
+    upsert_env "$APP_ENV_FILE" "S3_REGION" "${S3_REGION:-}"
+    upsert_env "$APP_ENV_FILE" "S3_BUCKET" "${S3_BUCKET:-}"
     upsert_env "$APP_ENV_FILE" "GEE_SERVICE_ACCOUNT_KEY_PATH" "${GEE_SERVICE_ACCOUNT_KEY_PATH:-}"
     upsert_env "$APP_ENV_FILE" "GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH" "${GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH:-}"
     export GEOSERVER_URL="${GEOSERVER_URL:-}"
@@ -111,6 +115,7 @@ ensure_dirs() {
         "$DATA_DIR/activated_locations" \
         "$DATA_DIR/excel_files" \
         "$DATA_DIR/admin-boundary" \
+        "$DATA_DIR/base_layers" \
         "$DATA_DIR/gee_confs"
     touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
 }
@@ -126,6 +131,20 @@ maybe_download_admin_boundary() {
         bash /usr/local/bin/download-data.sh
     else
         bash "$BACKEND_DIR/installation/docker/download-data.sh"
+    fi
+}
+
+download_tehsil_watersheds_from_geoserver() {
+    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
+        echo "Skipping tehsil watershed setup (SKIP_LAYER_SETUP=1)."
+        return 0
+    fi
+    if [ -f /opt/corestack-scripts/download-data.sh ]; then
+        DOWNLOAD_TEHSIL_WATERSHEDS_ONLY=1 bash /opt/corestack-scripts/download-data.sh
+    elif [ -f /usr/local/bin/download-data.sh ]; then
+        DOWNLOAD_TEHSIL_WATERSHEDS_ONLY=1 bash /usr/local/bin/download-data.sh
+    else
+        DOWNLOAD_TEHSIL_WATERSHEDS_ONLY=1 bash "$BACKEND_DIR/installation/docker/download-data.sh"
     fi
 }
 
@@ -186,6 +205,7 @@ ensure_dirs
 if [ "${SKIP_DB_SETUP:-0}" != "1" ]; then
     maybe_download_admin_boundary
     run_database
+    download_tehsil_watersheds_from_geoserver
     echo "Django is ready. Superuser password is test_change_me"
     echo "Mount GEE JSON under /app/data/gee_confs (./gee_confs on the host)."
 fi

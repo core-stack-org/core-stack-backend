@@ -1,6 +1,7 @@
 # User compose: pull the published runtime image and run Postgres + GeoServer.
 # App code is bind-mounted from this checkout onto /app (not baked into the image).
-# First start downloads admin-boundary data inside Docker onto the data volume.
+# First start downloads admin-boundary data and local-compute base layers
+# inside Docker onto the data volume.
 # Creates GeoServer workspaces/styles.
 #
 #   mkdir -p gee_confs
@@ -41,6 +42,11 @@ x-backend-env: &backend-env
   GEE_STORAGE_PROJECT: ${GEE_STORAGE_PROJECT:-}
   GEE_STORAGE_PROJECT_HELPER: ${GEE_STORAGE_PROJECT_HELPER:-}
   GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  S3_REGION: ${S3_REGION:-}
+  S3_BUCKET: ${S3_BUCKET:-}
+  SKIP_LAYER_SETUP: ${SKIP_LAYER_SETUP:-0}
   ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
   DEBUG: "True"
   LAYER_GENERATION_SYNC_MODE: "True"
@@ -106,6 +112,7 @@ services:
       <<: *backend-env
       FORCE_DATA_DOWNLOAD: ${FORCE_DATA_DOWNLOAD:-0}
     volumes:
+      - ${BACKEND_CODE_DIR:-.}:/app
       - core_stack_data:/var/tmp/core-stack-data
       - ./installation/docker:/opt/corestack-scripts:ro
     command: ["bash", "/opt/corestack-scripts/download-data.sh"]
