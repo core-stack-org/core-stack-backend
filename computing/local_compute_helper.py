@@ -91,8 +91,15 @@ def clip_vector_to_watershed(watersheds_gdf, source_gdf):
     if watersheds_gdf.crs != source_gdf.crs:
         watersheds_gdf = watersheds_gdf.to_crs(source_gdf.crs)
 
+    matched_gdf = source_gdf[source_gdf["uid"].isin(watersheds_gdf["uid"])].copy()
+
+    if matched_gdf.empty:
+        return gpd.GeoDataFrame(
+            columns=source_gdf.columns, geometry="geometry", crs=source_gdf.crs
+        )
+
     # clip
-    result_gdf = gpd.clip(source_gdf, watersheds_gdf)
+    result_gdf = gpd.clip(matched_gdf, watersheds_gdf)
 
     return result_gdf
 
