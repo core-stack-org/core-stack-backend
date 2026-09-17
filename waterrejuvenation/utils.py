@@ -832,7 +832,7 @@ def add_on_drainage_flag(swb_fc, dl_asset_id):
         ee.FeatureCollection: SWB FC with added property 'on_drainage_line'
     """
 
-    dl_fc = ee.FeatureCollection(dl_asset_id)
+    dl_fc = ee.FeatureCollection(dl_asset_id).filterBounds(swb_fc.geometry())
 
     # Map over each SWB feature
     def set_flag(feature):
@@ -881,7 +881,7 @@ def get_merged_waterbodies_with_zoi(
             f"&maxFeatures={maxf}&outputFormat=application/json"
         )
 
-    standard_layer = f"swb3_{district_l}_{block_l}"
+    standard_layer = f"surface_waterbodies_{district_l}_{block_l}"
     zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
 
     standard_wfs = build_wfs("swb", standard_layer, max_features)

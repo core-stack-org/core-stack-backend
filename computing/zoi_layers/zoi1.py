@@ -150,13 +150,14 @@ def create_ring(feature):
     geom = feature.geometry()  # can be point or polygon
     zoi = ee.Number(feature.get("zoi_wb"))
     uid = ee.Algorithms.If(
+        ee.Algorithms.IsEqual(feature.get("UID"), None),
+        feature.get("wb_id"),
         feature.get("UID"),
-        feature.get("UID"),
-        ee.Algorithms.If(
-            feature.get("uid"),
-            feature.get("uid"),
-            feature.get("MWS_UID"),
-        ),
+    )
+    wb_id = ee.Algorithms.If(
+        ee.Algorithms.IsEqual(feature.get("wb_id"), None),
+        uid,
+        feature.get("wb_id"),
     )
 
     # Make circle buffer from centroid
@@ -169,6 +170,7 @@ def create_ring(feature):
         {
             "zoi": zoi,
             "UID": uid,
+            "wb_id": wb_id,
             "zoi_area": zoi_area,
         }
     )
