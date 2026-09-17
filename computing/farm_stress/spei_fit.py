@@ -268,15 +268,20 @@ def fit_spei3_archive_banded_tiled(
     os.makedirs(params_dir, exist_ok=True)
     os.makedirs(timeseries_dir, exist_ok=True)
 
+    # BIGTIFF=YES: a full-India 500m float64 raster with ~13 bands lands
+    # right at/over classic TIFF's 4GB (32-bit offset) limit - same error
+    # hit earlier merging the rainfall/PET shards with gdal_translate.
+    # Harmless to set even on the smaller 3-band param files - GDAL only
+    # actually uses BigTIFF's 64-bit offsets if the file needs them.
     param_profile = profile.copy()
-    param_profile.update(count=3, dtype="float64", nodata=np.nan)
+    param_profile.update(count=3, dtype="float64", nodata=np.nan, BIGTIFF="YES")
     param_paths = [f"{params_dir}/spei3_params_month{m:02d}.tif" for m in range(1, 13)]
     param_dsts = [rasterio.open(p, "w", **param_profile) for p in param_paths]
 
     ts_dsts_by_year = {}
     for year in by_year:
         ts_profile = profile.copy()
-        ts_profile.update(count=len(by_year[year]), dtype="float64", nodata=np.nan)
+        ts_profile.update(count=len(by_year[year]), dtype="float64", nodata=np.nan, BIGTIFF="YES")
         ts_dsts_by_year[year] = rasterio.open(f"{timeseries_dir}/spei3_{year}.tif", "w", **ts_profile)
 
     try:
