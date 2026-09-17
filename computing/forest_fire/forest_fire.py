@@ -1,269 +1,252 @@
 """
 Forest Fire pipeline.
 
-Generates a vector layer with MODIS-based fire metrics per micro-watershed.
-Uses MODIS Terra (MOD14A1) and Aqua (MYD14A1) active fire products to
-quantify fire radiative power and fire frequency across a user-defined
-time window.
-
-For each MWS the pipeline computes four metrics:
-  - fire_frp_sum_per_year   – yearly-normalised total Fire Radiative Power
-  - fire_frp_mean           – temporal mean FRP
-  - fire_frp_max            – peak FRP observed
-  - fire_count_per_year     – yearly-normalised fire pixel count
 """
 
 import ee
+import geemap
+
 from computing.utils import (
-    sync_fc_to_geoserver,
     save_layer_info_to_db,
+    sync_fc_to_geoserver,
     update_layer_sync_status,
 )
-from utilities.constants import GEE_PATHS
-from utilities.gee_utils import (
-    ee_initialize,
-    check_task_status,
-    valid_gee_text,
-    get_gee_dir_path,
-    is_gee_asset_exists,
-    make_asset_public,
-    export_vector_asset_to_gee,
-)
-from nrm_app.celery import app
 from .forest_fire_utils import (
     SCALE,
-    load_fire_collections,
+    MAXPIX,
+    load_fire_image,
     prepare_frp_images,
 )
+from gee_computing.models import GEEAccount
+from utilities.constants import GEE_PATHS, AEZ, MWS_DATASET
+from utilities.gee_utils import (
+    ee_initialize,
+    valid_gee_text,
+    get_gee_dir_path,
+    export_vector_asset_to_gee,
+    check_task_status,
+    make_asset_public,
+)
+from nrm_app.celery import app
+
+
+def forest_fire_on_AEZ(aez_no, gee_account_id=7):
+    ee_initialize(gee_account_id)
+    aez = ee.FeatureCollection(AEZ)
+    mwses = ee.FeatureCollection(MWS_DATASET)
+
+    filter_aez = aez.filter(ee.Filter.eq("ae_regcode", aez_no)).geometry()
+
+    roi = mwses.filterBounds(filter_aez)
+
+    asset_suffix = f"AEZ_{aez_no}"
+    asset_folder_list = ["forest_fire"]
+    generate_forest_fire_layer(
+        roi=roi,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        gee_account_id=gee_account_id,
+        app_type="forest_fire",
+        sync_to_db=False,
+        sync_to_geoserver=False,
+    )
 
 
 @app.task(bind=True)
 def generate_forest_fire_layer(
-    self,
-    state,
-    district,
-    block,
-    start_year=2001,
-    end_year=2022,
-    gee_account_id=None,
-    app_type="MWS",
+        self,
+        state=None,
+        district=None,
+        block=None,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        start_year=2004,
+        end_year=2022,
+        gee_account_id=None,
+        app_type="MWS",
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """
-    Generate MODIS fire-risk metrics as a vector layer.
-
-    For each micro-watershed the task computes four fire metrics from
-    merged MODIS Terra + Aqua active fire products, exports the result
-    as a vector asset to GEE, syncs to GeoServer, and saves metadata.
-
-    Args:
-        state:          str – state name.
-        district:       str – district name.
-        block:          str – block / tehsil name.
-        start_year:     int – first year of the analysis window (default 2001).
-        end_year:       int – last year of the analysis window  (default 2022).
-        gee_account_id: int – GEE service-account ID for authentication.
-        app_type:       str – application type key in GEE_PATHS (default "MWS").
+    Generate MODIS fire metrics for a FeatureCollection.
     """
-
-    # ------------------------------------------------------------------
-    # STEP 1: Initialize GEE and set up paths
-    # ------------------------------------------------------------------
     ee_initialize(gee_account_id)
 
     start_year = int(start_year)
     end_year = int(end_year)
     n_years = end_year - start_year + 1
 
-    asset_suffix = (
-        valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_folder_list = [state, district, block]
+    print("Forest Fire pipeline started")
 
-    description = f"forest_fire_{asset_suffix}_{start_year}_{end_year}"
-    layer_name = f"{asset_suffix}_forest_fire"
-
-    asset_id = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+    if state and district and block:
+        asset_suffix = (
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
-        + description
+        asset_folder_list = [state, district, block]
+
+        roi = ee.FeatureCollection(
+            get_gee_dir_path(
+                asset_folder_list,
+                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
+            )
+            + f"filtered_mws_{valid_gee_text(district.lower())}"
+            + f"_{valid_gee_text(block.lower())}_uid"
+        )
+
+    description = f"forest_fire_{asset_suffix}"
+    if app_type in GEE_PATHS:
+        asset_path = GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    else:
+        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+        asset_path = f"projects/{gee_obj.name}/assets/"
+
+    asset_id = get_gee_dir_path(asset_folder_list, asset_path=asset_path) + description
+
+    # print("Total features:", roi.size().getInfo())
+
+    # def flag_bad_geom(f):
+    #     area = f.geometry().area(1)
+    #     return f.set("area_m2", area)
+    #
+    # debug_fc = roi.map(flag_bad_geom)
+    # bad = debug_fc.filter(ee.Filter.eq("area_m2", 0))
+
+    # print("Bad geometry count:", bad.size().getInfo())
+    # print("Bad UIDs:", bad.aggregate_array("uid").getInfo())
+
+    fire_image = (
+        load_fire_image()
+        if state and district and block
+        else load_fire_image(asset_suffix)
     )
 
-    print(f"Forest Fire pipeline started: {asset_id=}")
+    # print(fire_image.bandNames().getInfo())
 
-    # ------------------------------------------------------------------
-    # STEP 2: Set up ROI (MWS boundaries from GEE)
-    # ------------------------------------------------------------------
-    roi_path = (
-        get_gee_dir_path(
-            asset_folder_list,
-            asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-        )
-        + f"filtered_mws_{valid_gee_text(district.lower())}"
-        + f"_{valid_gee_text(block.lower())}_uid"
+    fire_images = prepare_frp_images(
+        fire_image,
+        start_year,
+        end_year,
     )
-    mws_fc = ee.FeatureCollection(roi_path)
 
-    # Add this debug block before the map to identify bad features
-    print("Total features:", mws_fc.size().getInfo())
+    frp_mean_img = fire_images["mean"]
+    frp_max_img = fire_images["max"]
+    fire_count_img = fire_images["count"]
 
-    # Check for features whose geometry area is 0
-    def flag_bad_geom(f):
-        area = f.geometry().area(1)
-        return f.set("area_m2", area)
+    def compute_fire_metrics(f):
+        geom = f.geometry()
 
-    debug_fc = mws_fc.map(flag_bad_geom)
-    bad = debug_fc.filter(ee.Filter.eq("area_m2", 0))
-    print("Bad geometry count:", bad.size().getInfo())
-    print("Bad UIDs:", bad.aggregate_array("uid").getInfo())
+        def reduce(img, reducer, band):
+            val = img.reduceRegion(
+                reducer=reducer,
+                geometry=geom,
+                scale=SCALE,
+                maxPixels=MAXPIX,
+                bestEffort=True,
+            ).get(band)
 
-    # ------------------------------------------------------------------
-    # STEP 3: Compute fire metrics
-    # ------------------------------------------------------------------
-    if not is_gee_asset_exists(asset_id):
+            return ee.Number(
+                ee.Algorithms.If(
+                    ee.Algorithms.IsEqual(val, None),
+                    0,
+                    val,
+                )
+            )
 
-        # Prepare temporally-aggregated fire images
-        frp_collection = load_fire_collections(start_year, end_year)
-        fire_images = prepare_frp_images(frp_collection, n_years)
-
-        frp_sum_img = fire_images["sum"]
-        frp_mean_img = fire_images["mean"]
-        frp_max_img = fire_images["max"]
-        fire_count_img = fire_images["count"]
-        # ---- map compute over all MWS features ----
-        mws_fc = mws_fc.filter(ee.Filter.notNull(["uid"]))
-
-        # After your area filter, add geometry repair
-        def repair_geometry(f):
-            return f.setGeometry(f.geometry().buffer(0).simplify(10))
-
-        def validate_feature(f):
-            geom = f.geometry()
-
-            return f.set({"geom_type": geom.type(), "area_m2": geom.area(1)})
-
-        validated = mws_fc.map(validate_feature)
-
-        mws_fc = validated.filter(ee.Filter.gt("area_m2", 0))
-        mws_fc = mws_fc.map(repair_geometry)
-
-        fire_projection = ee.Image(frp_collection.first()).select("MaxFRP").projection()
-        metric_images = {
-            "fire_frp_sum_per_year": frp_sum_img.rename(
-                "fire_frp_sum_per_year"
-            ).setDefaultProjection(fire_projection),
-            "fire_frp_mean": frp_mean_img.rename("fire_frp_mean").setDefaultProjection(
-                fire_projection
-            ),
-            "fire_frp_max": frp_max_img.rename("fire_frp_max").setDefaultProjection(
-                fire_projection
-            ),
-            "fire_count_per_year": fire_count_img.rename(
-                "fire_count_per_year"
-            ).setDefaultProjection(fire_projection),
-        }
-
-        fc = _reduce_fire_metric(
-            mws_fc,
-            metric_images["fire_frp_sum_per_year"],
-            ee.Reducer.sum(),
-            "fire_frp_sum_per_year",
-            fire_projection,
+        return ee.Feature(f.geometry()).set(
+            {
+                "uid": f.get("uid"),
+                "fire_frp_mean": reduce(
+                    frp_mean_img,
+                    ee.Reducer.mean(),
+                    "mean",
+                ),
+                "fire_frp_max": reduce(
+                    frp_max_img,
+                    ee.Reducer.max(),
+                    "max",
+                ),
+                "fire_count_per_year": reduce(
+                    fire_count_img,
+                    ee.Reducer.sum(),
+                    "sum",
+                ),
+            }
         )
-        fc = _reduce_fire_metric(
-            fc,
-            metric_images["fire_frp_mean"],
-            ee.Reducer.mean(),
+
+    # roi = roi.filter(ee.Filter.notNull(["uid"]))
+
+    # def repair_geometry(f):
+    #     return f.setGeometry(f.geometry().buffer(0).simplify(10))
+    #
+    # def validate_feature(f):
+    #     geom = f.geometry()
+    #
+    #     return f.set(
+    #         {
+    #             "geom_type": geom.type(),
+    #             "area_m2": geom.area(1),
+    #         }
+    #     )
+    #
+    # validated = roi.map(validate_feature)
+    #
+    # roi = validated.filter(ee.Filter.gt("area_m2", 0))
+    #
+    # roi = roi.map(repair_geometry)
+
+    fc = roi.map(compute_fire_metrics)
+
+    fc = fc.select(
+        [
+            "uid",
+            "area_in_ha",
             "fire_frp_mean",
-            fire_projection,
-        )
-        fc = _reduce_fire_metric(
-            fc,
-            metric_images["fire_frp_max"],
-            ee.Reducer.mean(),
             "fire_frp_max",
-            fire_projection,
-        )
-        fc = _reduce_fire_metric(
-            fc,
-            metric_images["fire_count_per_year"],
-            ee.Reducer.sum(),
             "fire_count_per_year",
-            fire_projection,
-        )
+        ]
+    )
 
-        fc = fc.select(
-            [
-                "uid",
-                "fire_frp_sum_per_year",
-                "fire_frp_mean",
-                "fire_frp_max",
-                "fire_count_per_year",
-            ]
-        )
+    # --------------------------------------------------------------
+    # Export to GEE
+    # --------------------------------------------------------------
+    task_id = export_vector_asset_to_gee(fc, description, asset_id)
 
-        # --------------------------------------------------------------
-        # STEP 4: Export to GEE
-        # --------------------------------------------------------------
-        task_id = export_vector_asset_to_gee(fc, description, asset_id)
-        if task_id:
-            check_task_status([task_id])
-            print("Forest Fire layer exported to GEE.")
+    if sync_to_geoserver and task_id:
+        check_task_status([task_id])
+        print("Forest Fire layer exported to GEE.")
 
     # ------------------------------------------------------------------
-    # STEP 5: Publish to GeoServer and save metadata to DB
+    # Publish to GeoServer and save metadata to DB
     # ------------------------------------------------------------------
     layer_at_geoserver = _save_to_db_and_sync_to_geoserver(
-        layer_name=layer_name,
+        layer_name=description,
         asset_id=asset_id,
-        start_year=start_year,
-        end_year=end_year,
         asset_suffix=asset_suffix,
         state=state,
         district=district,
         block=block,
+        sync_to_db=sync_to_db,
+        sync_to_geoserver=sync_to_geoserver,
     )
     return layer_at_geoserver
 
 
-def _reduce_fire_metric(fc, image, reducer, metric_name, projection):
-    reduced = image.reduceRegions(
-        collection=fc,
-        reducer=reducer,
-        scale=SCALE,
-        crs=projection,
-        tileScale=4,
-    )
-
-    def fill_null(feature):
-        value = feature.get(metric_name)
-        value = ee.Algorithms.If(ee.Algorithms.IsEqual(value, None), 0, value)
-        return feature.set(metric_name, ee.Number(value))
-
-    return reduced.map(fill_null)
-
-
-# ------------------------------------------------------------------
-# Private helpers (publish / persist)
-# ------------------------------------------------------------------
-
-
 def _save_to_db_and_sync_to_geoserver(
-    layer_name=None,
-    asset_id=None,
-    start_year=None,
-    end_year=None,
-    asset_suffix=None,
-    state=None,
-    district=None,
-    block=None,
+        layer_name=None,
+        asset_id=None,
+        asset_suffix=None,
+        state=None,
+        district=None,
+        block=None,
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fire: save_to_db_and_sync_to_geoserver")
 
     layer_id = None
-    if state and district and block:
+    if sync_to_db and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,
@@ -271,22 +254,19 @@ def _save_to_db_and_sync_to_geoserver(
             layer_name=layer_name,
             asset_id=asset_id,
             dataset_name="Forest Fire",
-            misc={
-                "start_year": start_year,
-                "end_year": end_year,
-            },
         )
 
-    make_asset_public(asset_id)
+        make_asset_public(asset_id)
+    if sync_to_geoserver:
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fire")
+        print(res)
 
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "forest_fire")
-    print(res)
+        layer_at_geoserver = False
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("Forest Fire: sync to geoserver flag updated")
+            layer_at_geoserver = True
 
-    layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("Forest Fire: sync to geoserver flag updated")
-        layer_at_geoserver = True
-
-    return layer_at_geoserver
+        return layer_at_geoserver
+    return False

@@ -118,3 +118,5 @@ def generate_zoi(
             start_year=start_year,
             end_year=end_year,
         )
+
+    return True
