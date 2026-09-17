@@ -298,6 +298,7 @@ EXCEL_DIR = resolve_env_path(
     default="$BACKEND_DIR/data/excel_files",
     trailing_sep=True,
 )
+DATA_DIR = resolve_env_path("DATA_DIR", default="$BACKEND_DIR/data")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

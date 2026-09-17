@@ -58,7 +58,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`docker compose pull` only fetches images. The first `docker compose up` downloads admin-boundary data into the `core_stack_data` volume (`DATA_DIR=/var/tmp/core-stack-data`). Local-compute layers (terrain, MWS, LULC v3, static layers) are optional; enable them with `DOWNLOAD_LOCAL_COMPUTE_LAYERS=1`.
+`docker compose pull` only fetches images. The first `docker compose up` downloads admin-boundary data into the `core_stack_data` volume (`DATA_DIR=/var/tmp/core-stack-data`). Local-compute layers are optional; set `DOWNLOAD_LOCAL_COMPUTE_LAYERS` to `all` or a comma-separated list such as `terrain,mws`.
 
 The image is public:
 
@@ -76,13 +76,16 @@ The first `docker compose up` does extra work. Later starts reuse Docker volumes
 2. GeoServer comes up and workspaces/styles are created.
 3. Django runs migrations, loads seed data, and starts on port 8000.
 
-Local-compute layers are **off by default**. To download terrain, MWS, LULC v3, and static layers into the same volume:
+Local-compute layers are **off by default**. Download only the layers you need:
 
 ```bash
-DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=terrain docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=terrain,mws docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=lulc_v3 docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=all docker compose up -d
 ```
 
-That also fetches active tehsil watershed GPKGs from GeoServer into `$DATA_DIR/base_layers/tehsil_watersheds/` when those layers exist. These files are large (many GB) and the first run can take a long time.
+`all` (or `1`) downloads terrain, MWS, LULC v3, static layers, tehsil-level placeholders, SOI tehsil, and tehsil watersheds. `tehsil_watersheds` is fetched from GeoServer after Django seed. These files can be large; first run can take a long time.
 
 Watch progress:
 
@@ -169,11 +172,14 @@ Force a fresh admin-boundary download:
 FORCE_DATA_DOWNLOAD=1 docker compose up -d
 ```
 
-Download optional local-compute layers (terrain, MWS, LULC v3, static layers):
+Download selected local-compute layers into the same data volume:
 
 ```bash
-DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=terrain,mws docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=all docker compose up -d
 ```
+
+Common selectors: `terrain`, `mws`, `lulc_v3`, `static_layers`, `tehsil_level`, `soi_tehsil`, `tehsil_watersheds`. Use `python manage.py local_compute_layer_setup --list` inside the backend container to see every selector.
 
 ## Troubleshooting
 
@@ -187,7 +193,7 @@ The package should be public. Confirm you can open [ghcr.io/core-stack-org/core-
 Use Compose (`docker compose pull`), not a bare `docker pull` on Apple Silicon. Compose sets `platform: linux/amd64`.
 
 **Backend keeps restarting**  
-`docker compose logs backend`. Common first-run waits: GeoServer health, the 8 GB admin-boundary download, or seed load. Local-compute layer downloads only run when `DOWNLOAD_LOCAL_COMPUTE_LAYERS=1`.
+`docker compose logs backend`. Common first-run waits: GeoServer health, the 8 GB admin-boundary download, or seed load. Local-compute layer downloads only run when `DOWNLOAD_LOCAL_COMPUTE_LAYERS` is set.
 
 **GEE jobs fail after a successful start**  
 Mount the JSON under `gee_confs/gee-service-account.json` and add the account in Django admin. Restart is not required for the file mount if the directory already existed; recreate the backend container if you added the file later:

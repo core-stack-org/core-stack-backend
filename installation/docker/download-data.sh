@@ -122,11 +122,76 @@ download_admin_boundary() {
     echo "Admin-boundary data ready at $ADMIN_DIR"
 }
 
+layer_setup_tokens() {
+    local raw="${DOWNLOAD_LOCAL_COMPUTE_LAYERS:-}"
+    raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | tr ',;' ' ')"
+    set -f
+    # shellcheck disable=SC2086
+    set -- $raw
+    set +f
+    if [ "$#" -eq 0 ]; then
+        return 0
+    fi
+    printf '%s\n' "$@"
+}
+
 layer_setup_enabled() {
+    local token
     if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
         return 1
     fi
-    [ "${DOWNLOAD_LOCAL_COMPUTE_LAYERS:-0}" = "1" ]
+    while IFS= read -r token; do
+        [ -n "$token" ] || continue
+        case "$token" in
+            0|false|no|off) return 1 ;;
+            *) return 0 ;;
+        esac
+    done < <(layer_setup_tokens)
+    return 1
+}
+
+layer_setup_is_all() {
+    local token
+    while IFS= read -r token; do
+        [ -n "$token" ] || continue
+        case "$token" in
+            1|true|yes|all) return 0 ;;
+        esac
+    done < <(layer_setup_tokens)
+    return 1
+}
+
+layer_selected() {
+    local needle="$1"
+    local token
+    if layer_setup_is_all; then
+        return 0
+    fi
+    while IFS= read -r token; do
+        token="${token//-/_}"
+        [ "$token" = "$needle" ] && return 0
+    done < <(layer_setup_tokens)
+    return 1
+}
+
+selected_manifest_layers() {
+    local token
+    if layer_setup_is_all; then
+        printf '%s\n' terrain mws lulc_v3 static_layers tehsil_level soi_tehsil
+        return 0
+    fi
+    while IFS= read -r token; do
+        [ -n "$token" ] || continue
+        token="${token//-/_}"
+        case "$token" in
+            1|true|yes|all|0|false|no|off|tehsil_watersheds) continue ;;
+            *) printf '%s\n' "$token" ;;
+        esac
+    done < <(layer_setup_tokens)
+}
+
+tehsil_watersheds_selected() {
+    layer_setup_is_all || layer_selected tehsil_watersheds
 }
 
 run_layer_setup() {
@@ -137,9 +202,12 @@ run_layer_setup() {
 }
 
 download_local_compute_layers() {
+    local -a layers=()
+    local layer
+
     if ! layer_setup_enabled; then
         echo "Skipping local compute layer setup (optional)."
-        echo "Set DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 to download terrain, MWS, LULC v3, and static layers."
+        echo "Set DOWNLOAD_LOCAL_COMPUTE_LAYERS=terrain,mws (or all) to download selected layers."
         return 0
     fi
 
@@ -152,21 +220,28 @@ download_local_compute_layers() {
         return 1
     fi
 
+    while IFS= read -r layer; do
+        [ -n "$layer" ] || continue
+        layers+=("$layer")
+    done < <(selected_manifest_layers)
+
     ensure_django_env
     mkdir -p "$DATA_DIR/base_layers" "$DATA_DIR/excel_files"
     cd "$BACKEND_DIR"
     export DATA_DIR
 
-    echo "Downloading local compute layers into $DATA_DIR ..."
-    run_layer_setup local_compute_layer_setup terrain mws lulc_v3
-    run_layer_setup local_compute_layer_setup static_layers
-    run_layer_setup local_compute_layer_setup tehsil_level
-    run_layer_setup local_compute_layer_setup --ensure-soi-tehsil
+    if [ "${#layers[@]}" -eq 0 ]; then
+        echo "No file-based local compute layers selected."
+        return 0
+    fi
+
+    echo "Downloading local compute layers into $DATA_DIR: ${layers[*]}"
+    run_layer_setup local_compute_layer_setup "${layers[@]}"
     echo "Local compute layers ready under $DATA_DIR"
 }
 
 download_tehsil_watersheds() {
-    if ! layer_setup_enabled; then
+    if ! layer_setup_enabled || ! tehsil_watersheds_selected; then
         echo "Skipping tehsil watershed setup (optional)."
         return 0
     fi

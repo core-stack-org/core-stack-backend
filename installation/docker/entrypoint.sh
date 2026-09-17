@@ -144,10 +144,6 @@ maybe_download_admin_boundary() {
 }
 
 download_tehsil_watersheds_from_geoserver() {
-    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ] || [ "${DOWNLOAD_LOCAL_COMPUTE_LAYERS:-0}" != "1" ]; then
-        echo "Skipping tehsil watershed setup (optional). Set DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 to enable."
-        return 0
-    fi
     if [ -f /opt/corestack-scripts/download-data.sh ]; then
         DOWNLOAD_TEHSIL_WATERSHEDS_ONLY=1 bash /opt/corestack-scripts/download-data.sh
     elif [ -f /usr/local/bin/download-data.sh ]; then
@@ -170,6 +166,16 @@ run_database() {
         echo "Loading seed data..."
         python manage.py loaddata --skip-checks "$SEED_FILE" || true
         python manage.py seed_default_plantation --skip-checks || true
+        echo "Writing activated locations JSON..."
+        python manage.py shell --skip-checks <<'PY' || true
+from geoadmin.signals import generate_activated_locations_json_data
+
+try:
+    generate_activated_locations_json_data()
+    print("activated_locations json ready")
+except Exception as exc:
+    print(f"WARNING: could not write activated_locations json: {exc}")
+PY
     fi
 
     echo "Ensuring installer superuser..."
