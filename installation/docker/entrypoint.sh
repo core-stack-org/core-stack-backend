@@ -144,8 +144,8 @@ maybe_download_admin_boundary() {
 }
 
 download_tehsil_watersheds_from_geoserver() {
-    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
-        echo "Skipping tehsil watershed setup (SKIP_LAYER_SETUP=1)."
+    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ] || [ "${DOWNLOAD_LOCAL_COMPUTE_LAYERS:-0}" != "1" ]; then
+        echo "Skipping tehsil watershed setup (optional). Set DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 to enable."
         return 0
     fi
     if [ -f /opt/corestack-scripts/download-data.sh ]; then

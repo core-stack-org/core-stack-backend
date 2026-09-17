@@ -21,11 +21,28 @@ def run_bash(script: str) -> subprocess.CompletedProcess[str]:
 
 
 class DownloadDataScriptTests(unittest.TestCase):
-    def test_skip_layer_setup_does_not_call_manage_py(self) -> None:
+    def test_layer_setup_skipped_by_default(self) -> None:
         result = run_bash(
             textwrap.dedent(
                 f"""
                 source "{DOWNLOAD_SCRIPT}"
+                download_local_compute_layers
+                download_tehsil_watersheds
+                """
+            )
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Skipping local compute layer setup (optional).", result.stdout)
+        self.assertIn("Skipping tehsil watershed setup (optional).", result.stdout)
+        self.assertIn("DOWNLOAD_LOCAL_COMPUTE_LAYERS=1", result.stdout)
+
+    def test_skip_flag_overrides_enable(self) -> None:
+        result = run_bash(
+            textwrap.dedent(
+                f"""
+                source "{DOWNLOAD_SCRIPT}"
+                DOWNLOAD_LOCAL_COMPUTE_LAYERS=1
                 SKIP_LAYER_SETUP=1
                 download_local_compute_layers
                 download_tehsil_watersheds
@@ -34,8 +51,22 @@ class DownloadDataScriptTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Skipping local compute layer setup", result.stdout)
-        self.assertIn("Skipping tehsil watershed setup", result.stdout)
+        self.assertIn("Skipping local compute layer setup (optional).", result.stdout)
+
+    def test_layer_setup_enabled_requires_manage_py(self) -> None:
+        result = run_bash(
+            textwrap.dedent(
+                f"""
+                source "{DOWNLOAD_SCRIPT}"
+                DOWNLOAD_LOCAL_COMPUTE_LAYERS=1
+                BACKEND_DIR="/tmp/corestack-missing-backend"
+                download_local_compute_layers
+                """
+            )
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("manage.py not found", result.stdout + result.stderr)
 
     def test_script_invokes_requested_layer_setup_commands(self) -> None:
         script = DOWNLOAD_SCRIPT.read_text(encoding="utf-8")

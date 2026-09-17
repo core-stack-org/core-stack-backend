@@ -122,6 +122,13 @@ download_admin_boundary() {
     echo "Admin-boundary data ready at $ADMIN_DIR"
 }
 
+layer_setup_enabled() {
+    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
+        return 1
+    fi
+    [ "${DOWNLOAD_LOCAL_COMPUTE_LAYERS:-0}" = "1" ]
+}
+
 run_layer_setup() {
     local command="$1"
     shift
@@ -130,8 +137,9 @@ run_layer_setup() {
 }
 
 download_local_compute_layers() {
-    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
-        echo "Skipping local compute layer setup (SKIP_LAYER_SETUP=1)."
+    if ! layer_setup_enabled; then
+        echo "Skipping local compute layer setup (optional)."
+        echo "Set DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 to download terrain, MWS, LULC v3, and static layers."
         return 0
     fi
 
@@ -158,8 +166,8 @@ download_local_compute_layers() {
 }
 
 download_tehsil_watersheds() {
-    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
-        echo "Skipping tehsil watershed setup (SKIP_LAYER_SETUP=1)."
+    if ! layer_setup_enabled; then
+        echo "Skipping tehsil watershed setup (optional)."
         return 0
     fi
 

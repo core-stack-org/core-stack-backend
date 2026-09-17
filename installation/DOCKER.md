@@ -15,7 +15,7 @@ Postgres listens on `localhost:5432` (`corestack_admin` / `corestack@123`, datab
 ## Requirements
 
 - [Docker](https://docs.docker.com/get-docker/) with Compose v2 (`docker compose version`)
-- About **50 GB** free disk (images, the first-run admin-boundary download ~8 GB, and local-compute base layers such as terrain, MWS, and LULC v3)
+- About **20 GB** free disk (images plus the first-run admin-boundary download, ~8 GB). Local-compute layers are optional and need much more space if enabled.
 - Ports **8000**, **8080**, and **5432** free on your machine
 - Git, to clone this repository (Compose mounts helper scripts from `installation/docker`)
 
@@ -58,7 +58,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`docker compose pull` only fetches images. The first `docker compose up` downloads admin-boundary data and local-compute layers into the `core_stack_data` volume (`DATA_DIR=/var/tmp/core-stack-data`). Terrain, MWS, LULC v3, and static layers come from the public-read `corestack-datasets` S3 bucket; no AWS keys are required. Use `SKIP_LAYER_SETUP=1` to start without those layers.
+`docker compose pull` only fetches images. The first `docker compose up` downloads admin-boundary data into the `core_stack_data` volume (`DATA_DIR=/var/tmp/core-stack-data`). Local-compute layers (terrain, MWS, LULC v3, static layers) are optional; enable them with `DOWNLOAD_LOCAL_COMPUTE_LAYERS=1`.
 
 The image is public:
 
@@ -73,10 +73,16 @@ No `docker login` is required. On Apple Silicon a plain `docker pull` of that ta
 The first `docker compose up` does extra work. Later starts reuse Docker volumes and skip most of it.
 
 1. **Admin-boundary data** (~8 GB) downloads into the `core_stack_data` volume (`DATA_DIR=/var/tmp/core-stack-data`). This is the slow step.
-2. **Local compute layers** download into the same volume (`$DATA_DIR/base_layers/`): terrain, MWS, LULC v3, static layers, tehsil-level placeholders, and SOI tehsil.
-3. GeoServer comes up and workspaces/styles are created.
-4. Django runs migrations, loads seed data, and starts on port 8000.
-5. Active tehsil watershed GPKGs are fetched from GeoServer into `$DATA_DIR/base_layers/tehsil_watersheds/` when those layers exist.
+2. GeoServer comes up and workspaces/styles are created.
+3. Django runs migrations, loads seed data, and starts on port 8000.
+
+Local-compute layers are **off by default**. To download terrain, MWS, LULC v3, and static layers into the same volume:
+
+```bash
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 docker compose up -d
+```
+
+That also fetches active tehsil watershed GPKGs from GeoServer into `$DATA_DIR/base_layers/tehsil_watersheds/` when those layers exist. These files are large (many GB) and the first run can take a long time.
 
 Watch progress:
 
@@ -123,7 +129,7 @@ docker compose down        # remove containers, keep volumes
 docker compose pull && docker compose up -d   # update to the latest published image
 ```
 
-Wipe the database, GeoServer data, and downloaded datasets (you will re-download admin-boundary and local-compute layers next start):
+Wipe the database, GeoServer data, and downloaded datasets (you will re-download admin-boundary next start):
 
 ```bash
 docker compose down -v
@@ -163,10 +169,10 @@ Force a fresh admin-boundary download:
 FORCE_DATA_DOWNLOAD=1 docker compose up -d
 ```
 
-Skip local-compute layer downloads (admin-boundary still downloads):
+Download optional local-compute layers (terrain, MWS, LULC v3, static layers):
 
 ```bash
-SKIP_LAYER_SETUP=1 docker compose up -d
+DOWNLOAD_LOCAL_COMPUTE_LAYERS=1 docker compose up -d
 ```
 
 ## Troubleshooting
@@ -181,7 +187,7 @@ The package should be public. Confirm you can open [ghcr.io/core-stack-org/core-
 Use Compose (`docker compose pull`), not a bare `docker pull` on Apple Silicon. Compose sets `platform: linux/amd64`.
 
 **Backend keeps restarting**  
-`docker compose logs backend`. Common first-run waits: GeoServer health, the 8 GB admin-boundary download, local-compute layer downloads from S3, or seed load.
+`docker compose logs backend`. Common first-run waits: GeoServer health, the 8 GB admin-boundary download, or seed load. Local-compute layer downloads only run when `DOWNLOAD_LOCAL_COMPUTE_LAYERS=1`.
 
 **GEE jobs fail after a successful start**  
 Mount the JSON under `gee_confs/gee-service-account.json` and add the account in Django admin. Restart is not required for the file mount if the directory already existed; recreate the backend container if you added the file later:

@@ -1,7 +1,7 @@
 # User compose: pull the published runtime image and run Postgres + GeoServer.
 # App code is bind-mounted from this checkout onto /app (not baked into the image).
-# First start downloads admin-boundary data and local-compute base layers
-# inside Docker onto the data volume.
+# First start downloads admin-boundary data inside Docker onto the data volume.
+# Local-compute layers are optional (DOWNLOAD_LOCAL_COMPUTE_LAYERS=1).
 # Creates GeoServer workspaces/styles.
 #
 #   mkdir -p gee_confs
@@ -46,6 +46,7 @@ x-backend-env: &backend-env
   S3_SECRET_KEY: ${S3_SECRET_KEY:-}
   S3_REGION: ${S3_REGION:-}
   S3_BUCKET: ${S3_BUCKET:-}
+  DOWNLOAD_LOCAL_COMPUTE_LAYERS: ${DOWNLOAD_LOCAL_COMPUTE_LAYERS:-0}
   SKIP_LAYER_SETUP: ${SKIP_LAYER_SETUP:-0}
   ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
   DEBUG: "True"
