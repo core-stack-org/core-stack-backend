@@ -13,6 +13,7 @@ from .models import LayerInfo
 from django.http import HttpResponse
 from rest_framework import status
 from pathlib import Path
+import pymannkendall as mk
 
 
 def fetch_layers_for_excel_generation():
@@ -46,6 +47,10 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     results = []
     file_exists = os.path.exists(xlsx_file)
     mode = "a" if file_exists else "w"
+
+    shrub_df = None
+    tree_df = None
+    crop_df = None
 
     # Use append mode with if_sheet_exists='replace'
     with pd.ExcelWriter(
@@ -257,21 +262,67 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_health(geojson_data, writer)
             elif workspace == "ndvi_timeseries":
                 create_excel_for_ndvi_shrub(geojson_data, writer)
+            elif workspace == "forest_fringes":
+                create_excel_for_forest_fringe(geojson_data, writer)
+            elif workspace == "tree_in_grassland":
+                create_excel_for_tree_in_grassland(geojson_data, writer)
+            elif (
+                workspace == "ndvi_timeseries"
+                and layer_name == f"ndvi_timeseries_{district}_{block}_shrub"
+            ):
+                shrub_df = create_excel_for_ndvi(geojson_data, "shrub_trend")
+            elif (
+                workspace == "ndvi_timeseries"
+                and layer_name == f"ndvi_timeseries_{district}_{block}_tree"
+            ):
+                tree_df = create_excel_for_ndvi(geojson_data, "tree_trend")
+            elif (
+                workspace == "ndvi_timeseries"
+                and layer_name == f"ndvi_timeseries_{district}_{block}_crop"
+            ):
+                crop_df = create_excel_for_ndvi(geojson_data, "crop_trend")
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
-
+        ndvi_df = None
+        if shrub_df is not None:
+            ndvi_df = shrub_df
+        if tree_df is not None:
+            if ndvi_df is None:
+                ndvi_df = tree_df
+            else:
+                ndvi_df = ndvi_df.merge(tree_df, on="UID", how="outer")
+        if crop_df is not None:
+            if ndvi_df is None:
+                ndvi_df = crop_df
+            else:
+                ndvi_df = ndvi_df.merge(crop_df, on="UID", how="outer")
+        if ndvi_df is not None:
+            ndvi_df.to_excel(writer, sheet_name="ndvi", index=False)
     return results
 
 
-def create_excel_for_ndvi_shrub(data, writer):
-    print("Inside ndvi shrub excel generation")
+def create_excel_for_tree_in_grassland(geojson_data, writer):
+    print("inside tree in grassland excel generation")
     try:
-        features = data["features"]
+        features = geojson_data["features"]
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
-        df.rename(columns={"uid": "UID"}, inplace=True)
-        priority_cols = ["UID"]
+        exclude_cols = ["id"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(
+            columns={"uid": "UID"},
+            inplace=True,
+        )
+        priority_cols = [
+            "UID",
+            "area_in_ha",
+            "shrubland_area_in_ha",
+            "isolated_shrub_area_in_ha",
+            "shrubs_trees_area_in_ha",
+            "tree_in_shrubs_trees_area_in_ha",
+            "tree_loss_in_tree_in_shrub_area_in_ha",
+        ]
         priority_cols = [c for c in priority_cols if c in df.columns]
         other_cols = [c for c in df.columns if c not in priority_cols]
         new_order = priority_cols + other_cols
@@ -279,10 +330,78 @@ def create_excel_for_ndvi_shrub(data, writer):
         df = df.fillna(-9999)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
-        df.to_excel(writer, sheet_name="ndvi_shrub", index=False)
-        print("Excel file created for ndvi_shrub")
+        df.to_excel(writer, sheet_name="tree_in_grassland", index=False)
+        print("Excel file created for tree in grassland")
     except Exception as e:
-        print(f"Error occurred while generating excel for ndvi shrub {e} ")
+        print(f"Error occurred while generating excel for tree in grassland {e} ")
+
+
+def create_excel_for_forest_fringe(geojson_data, writer):
+    print("inside forest fringe excel generation")
+    try:
+        features = geojson_data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = ["id"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(columns={"uid": "UID"}, inplace=True)
+        priority_cols = ["UID", "mws_area_in_ha"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="forest_fringes", index=False)
+        print("Excel file created for forest fringes")
+    except Exception as e:
+        print(f"Error occurred while generating excel for forest fringes {e} ")
+
+
+def create_excel_for_ndvi_shrub(data, writer):
+    print("Inside ndvi shrub excel generation")
+def create_excel_for_ndvi(data, trend_column):
+    print(f"Inside {trend_column} excel generation")
+    try:
+        features = data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        df.rename(columns={"uid": "UID"}, inplace=True)
+        ndvi_columns = [col for col in df.columns if col != "UID"]
+        df[ndvi_columns] = df[ndvi_columns].apply(pd.to_numeric, errors="coerce")
+        trend_results = []
+        for _, row in df.iterrows():
+            ndvi_values = row[ndvi_columns].dropna().to_numpy(dtype=float)
+            if len(ndvi_values) < 2:
+                trend = "No trend"
+                slope = -9999
+                mean = -9999
+            else:
+                result = mk.original_test(ndvi_values)
+                trend = result.trend.capitalize()
+                slope = round(result.slope, 8)
+                mean = round(ndvi_values.mean(), 8)
+            trend_results.append(
+                {
+                    "UID": row["UID"],
+                    trend_column: trend,
+                    f"{trend_column.replace('_trend', '')}_slope": slope,
+                    f"{trend_column.replace('_trend', '')}_mean": mean,
+                }
+            )
+        return pd.DataFrame(
+            trend_results,
+            columns=[
+                "UID",
+                trend_column,
+                f"{trend_column.replace('_trend', '')}_slope",
+                f"{trend_column.replace('_trend', '')}_mean",
+            ],
+        )
+    except Exception as e:
+        print(f"Error occurred while generating " f"{trend_column}: {e}")
+        return pd.DataFrame(columns=["UID", trend_column])
 
 
 def create_excel_for_soil_health(data, writer):
@@ -2433,6 +2552,7 @@ def get_season(month):
         return "kharif"
     elif month in (11, 12, 1, 2):
         return "rabi"
+
 
 def process_feature(feature):
     uid = feature["properties"]["uid"]
