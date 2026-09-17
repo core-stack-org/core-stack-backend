@@ -1,0 +1,19 @@
+# Image build file. Changing this (or Dockerfile / installation/docker) on
+# `main` triggers GitHub Actions to build and publish to GHCR:
+#   ghcr.io/core-stack-org/core-stack-backend
+#
+# Local build/push:
+#   docker compose -f docker.yml build
+#   docker compose -f docker.yml push
+
+name: core-stack-image
+
+services:
+  core-stack:
+    platform: ${COMPOSE_PLATFORM:-linux/amd64}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${CORESTACK_IMAGE:-ghcr.io/core-stack-org/core-stack-backend:latest}
+    restart: "no"
+    command: ["true"]

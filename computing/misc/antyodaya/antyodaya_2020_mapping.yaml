@@ -1,0 +1,503 @@
+categories:
+  - category: "Institutionalization"
+    village_cluster_share: "Low: 288,571 (45.7%); Medium: 229,884 (36.4%); High: 112,794 (17.9%)"
+    constituent_features:
+      - "shg_pen_feature::SHG Penetration"
+      - "shg_fed_feature::SHG Federation"
+      - "pg_pen_feature::PG Penetration"
+      - "fpo_feature::FPO/PACS Strength"
+    raw_columns_used:
+      - "availability_of_fpos_pacs"
+      - "total_hhd"
+      - "total_hhd_mobilized_into_pg"
+      - "total_hhd_mobilized_into_shg"
+      - "total_no_of_shg_promoted"
+      - "total_shg"
+    raw_to_category_maps: |
+      RAW::total_hhd, total_hhd_mobilized_into_shg -> DERIVED::none -> FEATURE::shg_pen_feature -> CATEGORY::institutionalization_category -> CATEGORY_CLUSTER::institutionalization_category_cluster
+      RAW::total_no_of_shg_promoted, total_shg -> DERIVED::none -> FEATURE::shg_fed_feature -> CATEGORY::institutionalization_category -> CATEGORY_CLUSTER::institutionalization_category_cluster
+      RAW::total_hhd, total_hhd_mobilized_into_pg -> DERIVED::none -> FEATURE::pg_pen_feature -> CATEGORY::institutionalization_category -> CATEGORY_CLUSTER::institutionalization_category_cluster
+      RAW::availability_of_fpos_pacs -> DERIVED::farmers_collective_score -> FEATURE::fpo_feature -> CATEGORY::institutionalization_category -> CATEGORY_CLUSTER::institutionalization_category_cluster
+    calculations_formulae: |
+      CALC::shg_pen_feature := normalize(total_hhd_mobilized_into_shg / total_hhd)
+      CALC::shg_fed_feature := normalize(total_no_of_shg_promoted / total_shg)
+      CALC::pg_pen_feature := normalize(total_hhd_mobilized_into_pg / total_hhd)
+      CALC::farmers_collective_score := ordinal_map(availability_of_fpos_pacs); FORMULA::FPO=1, PACS=1, both FPO and PACS=2, none=0; normalized during feature scoring
+      CALC::fpo_feature := normalize(farmers_collective_score)
+      CALC::institutionalization_category := mean(feature_class_score(shg_pen_feature, shg_fed_feature, pg_pen_feature, fpo_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Social Protection"
+    village_cluster_share: "Low: 216,650 (34.3%); Medium: 262,915 (41.6%); High: 151,684 (24.0%)"
+    constituent_features:
+      - "pds_util_feature::PDS Utilization"
+      - "bpl_cov_feature::BPL Coverage"
+      - "nfsa_cov_feature::NFSA Coverage"
+      - "pension_cov_feature::Pension Coverage"
+    raw_columns_used:
+      - "gp_total_hhd_eligible_under_nfsa"
+      - "gp_total_hhd_receiving_food_grains_from_fps"
+      - "total_hhd"
+      - "total_hhd_availing_pension_under_nsap"
+      - "total_hhd_having_bpl_cards"
+    raw_to_category_maps: |
+      RAW::gp_total_hhd_eligible_under_nfsa, gp_total_hhd_receiving_food_grains_from_fps -> DERIVED::none -> FEATURE::pds_util_feature -> CATEGORY::social_protection_category -> CATEGORY_CLUSTER::social_protection_category_cluster
+      RAW::total_hhd, total_hhd_having_bpl_cards -> DERIVED::none -> FEATURE::bpl_cov_feature -> CATEGORY::social_protection_category -> CATEGORY_CLUSTER::social_protection_category_cluster
+      RAW::gp_total_hhd_eligible_under_nfsa, total_hhd -> DERIVED::none -> FEATURE::nfsa_cov_feature -> CATEGORY::social_protection_category -> CATEGORY_CLUSTER::social_protection_category_cluster
+      RAW::total_hhd, total_hhd_availing_pension_under_nsap -> DERIVED::none -> FEATURE::pension_cov_feature -> CATEGORY::social_protection_category -> CATEGORY_CLUSTER::social_protection_category_cluster
+    calculations_formulae: |
+      CALC::pds_util_feature := normalize(gp_total_hhd_receiving_food_grains_from_fps / gp_total_hhd_eligible_under_nfsa)
+      CALC::bpl_cov_feature := normalize(total_hhd_having_bpl_cards / total_hhd)
+      CALC::nfsa_cov_feature := normalize(gp_total_hhd_eligible_under_nfsa / total_hhd)
+      CALC::pension_cov_feature := normalize(total_hhd_availing_pension_under_nsap / total_hhd)
+      CALC::social_protection_category := mean(feature_class_score(pds_util_feature, bpl_cov_feature, nfsa_cov_feature, pension_cov_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Civic Infrastructure"
+    village_cluster_share: "Low: 284,571 (45.1%); Medium: 243,967 (38.6%); High: 102,711 (16.3%)"
+    constituent_features:
+      - "panchayat_bhawan_feature::Panchayat Bhawan"
+      - "post_office_feature::Post Office Availability"
+      - "rep_training_feature::Representative Training"
+      - "rep_orientation_feature::Representative Orientation"
+      - "info_board_feature::Public Information Board"
+      - "public_library_feature::Public Library Availability"
+    raw_columns_used:
+      - "availability_of_panchayat_bhawan"
+      - "availability_of_public_information_board"
+      - "availability_of_public_library"
+      - "is_post_office_available"
+      - "total_no_of_elect_rep_oriented_under_rgsa"
+      - "total_no_of_elect_rep_undergone_training_under_rgsa"
+      - "total_no_of_elected_representatives"
+    raw_to_category_maps: |
+      RAW::availability_of_panchayat_bhawan -> DERIVED::none -> FEATURE::panchayat_bhawan_feature -> CATEGORY::civic_infrastructure_category -> CATEGORY_CLUSTER::civic_infrastructure_category_cluster
+      RAW::is_post_office_available -> DERIVED::none -> FEATURE::post_office_feature -> CATEGORY::civic_infrastructure_category -> CATEGORY_CLUSTER::civic_infrastructure_category_cluster
+      RAW::total_no_of_elect_rep_undergone_training_under_rgsa, total_no_of_elected_representatives -> DERIVED::none -> FEATURE::rep_training_feature -> CATEGORY::civic_infrastructure_category -> CATEGORY_CLUSTER::civic_infrastructure_category_cluster
+      RAW::total_no_of_elect_rep_oriented_under_rgsa, total_no_of_elected_representatives -> DERIVED::none -> FEATURE::rep_orientation_feature -> CATEGORY::civic_infrastructure_category -> CATEGORY_CLUSTER::civic_infrastructure_category_cluster
+      RAW::availability_of_public_information_board -> DERIVED::none -> FEATURE::info_board_feature -> CATEGORY::civic_infrastructure_category -> CATEGORY_CLUSTER::civic_infrastructure_category_cluster
+      RAW::availability_of_public_library -> DERIVED::none -> FEATURE::public_library_feature -> CATEGORY::civic_infrastructure_category -> CATEGORY_CLUSTER::civic_infrastructure_category_cluster
+    calculations_formulae: |
+      CALC::panchayat_bhawan_feature := binary_presence(availability_of_panchayat_bhawan)
+      CALC::post_office_feature := binary_presence(is_post_office_available)
+      CALC::rep_training_feature := normalize(total_no_of_elect_rep_undergone_training_under_rgsa / total_no_of_elected_representatives)
+      CALC::rep_orientation_feature := normalize(total_no_of_elect_rep_oriented_under_rgsa / total_no_of_elected_representatives)
+      CALC::info_board_feature := binary_presence(availability_of_public_information_board)
+      CALC::public_library_feature := binary_presence(availability_of_public_library)
+      CALC::civic_infrastructure_category := mean(feature_class_score(panchayat_bhawan_feature, post_office_feature, rep_training_feature, rep_orientation_feature, info_board_feature, public_library_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Financial Inclusion"
+    village_cluster_share: "Low: 400,652 (63.5%); Medium: 149,809 (23.7%); High: 80,788 (12.8%)"
+    constituent_features:
+      - "bank_feature::Bank Availability"
+      - "atm_feature::ATM Availability"
+      - "bank_correspondent_feature::Bank Correspondent"
+      - "shg_credit_feature::SHG Credit Access"
+      - "jan_dhan_pen_feature::Jan Dhan Penetration"
+    raw_columns_used:
+      - "is_atm_available"
+      - "is_bank_available"
+      - "is_bank_buss_correspondent_with_internet"
+      - "total_hhd"
+      - "total_hhd_availing_pmjdy_bank_ac"
+      - "total_shg"
+      - "total_shg_accessed_bank_loans"
+    raw_to_category_maps: |
+      RAW::is_bank_available -> DERIVED::none -> FEATURE::bank_feature -> CATEGORY::financial_inclusion_category -> CATEGORY_CLUSTER::financial_inclusion_category_cluster
+      RAW::is_atm_available -> DERIVED::none -> FEATURE::atm_feature -> CATEGORY::financial_inclusion_category -> CATEGORY_CLUSTER::financial_inclusion_category_cluster
+      RAW::is_bank_buss_correspondent_with_internet -> DERIVED::none -> FEATURE::bank_correspondent_feature -> CATEGORY::financial_inclusion_category -> CATEGORY_CLUSTER::financial_inclusion_category_cluster
+      RAW::total_shg, total_shg_accessed_bank_loans -> DERIVED::none -> FEATURE::shg_credit_feature -> CATEGORY::financial_inclusion_category -> CATEGORY_CLUSTER::financial_inclusion_category_cluster
+      RAW::total_hhd, total_hhd_availing_pmjdy_bank_ac -> DERIVED::none -> FEATURE::jan_dhan_pen_feature -> CATEGORY::financial_inclusion_category -> CATEGORY_CLUSTER::financial_inclusion_category_cluster
+    calculations_formulae: |
+      CALC::bank_feature := binary_presence(is_bank_available)
+      CALC::atm_feature := binary_presence(is_atm_available)
+      CALC::bank_correspondent_feature := binary_presence(is_bank_buss_correspondent_with_internet)
+      CALC::shg_credit_feature := normalize(total_shg_accessed_bank_loans / total_shg)
+      CALC::jan_dhan_pen_feature := normalize(total_hhd_availing_pmjdy_bank_ac / total_hhd)
+      CALC::financial_inclusion_category := mean(feature_class_score(bank_feature, atm_feature, bank_correspondent_feature, shg_credit_feature, jan_dhan_pen_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Energy Access"
+    village_cluster_share: "Low: 255,875 (40.5%); Medium: 150,514 (23.8%); High: 224,860 (35.6%)"
+    constituent_features:
+      - "electrification_rate_feature::Electrification Rate"
+      - "electricity_supply_to_msme_feature::Electricity Supply to MSME"
+      - "clean_energy_penetration_feature::Clean Energy Penetration"
+    raw_columns_used:
+      - "availability_of_elect_supply_to_msme"
+      - "availablility_hours_of_domestic_electricity"
+      - "total_hhd"
+      - "total_hhd_with_clean_energy"
+    raw_to_category_maps: |
+      RAW::availablility_hours_of_domestic_electricity -> DERIVED::domestic_electricity_hours_score -> FEATURE::electrification_rate_feature -> CATEGORY::energy_access_category -> CATEGORY_CLUSTER::energy_access_category_cluster
+      RAW::availability_of_elect_supply_to_msme -> DERIVED::none -> FEATURE::electricity_supply_to_msme_feature -> CATEGORY::energy_access_category -> CATEGORY_CLUSTER::energy_access_category_cluster
+      RAW::total_hhd, total_hhd_with_clean_energy -> DERIVED::none -> FEATURE::clean_energy_penetration_feature -> CATEGORY::energy_access_category -> CATEGORY_CLUSTER::energy_access_category_cluster
+    calculations_formulae: |
+      CALC::domestic_electricity_hours_score := ordinal_map(availablility_hours_of_domestic_electricity); FORMULA::1-4 hrs=0.25, 4-8 hrs=0.50, 8-12 hrs=0.75, >12 hrs=1.00, no electricity=0.00
+      CALC::electrification_rate_feature := normalize(domestic_electricity_hours_score)
+      CALC::electricity_supply_to_msme_feature := binary_presence(availability_of_elect_supply_to_msme)
+      CALC::clean_energy_penetration_feature := normalize(total_hhd_with_clean_energy / total_hhd)
+      CALC::energy_access_category := mean(feature_class_score(electrification_rate_feature, electricity_supply_to_msme_feature, clean_energy_penetration_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Road Connectivity"
+    village_cluster_share: "Low: 90,511 (14.3%); Medium: 275,772 (43.7%); High: 264,966 (42.0%)"
+    constituent_features:
+      - "all_weather_road_feature::All-Weather Road Connection"
+      - "internal_pucca_road_feature::Internal Pucca Road Quality"
+      - "public_transport_feature::Public Transport Availability"
+      - "railway_station_feature::Railway Station Availability"
+    raw_columns_used:
+      - "availability_of_internal_pucca_road"
+      - "availability_of_public_transport"
+      - "availability_of_railway_station"
+      - "is_village_connected_to_all_weather_road"
+    raw_to_category_maps: |
+      RAW::is_village_connected_to_all_weather_road -> DERIVED::none -> FEATURE::all_weather_road_feature -> CATEGORY::road_connectivity_category -> CATEGORY_CLUSTER::road_connectivity_category_cluster
+      RAW::availability_of_internal_pucca_road -> DERIVED::internal_pucca_road_quality_score -> FEATURE::internal_pucca_road_feature -> CATEGORY::road_connectivity_category -> CATEGORY_CLUSTER::road_connectivity_category_cluster
+      RAW::availability_of_public_transport -> DERIVED::public_transport -> FEATURE::public_transport_feature -> CATEGORY::road_connectivity_category -> CATEGORY_CLUSTER::road_connectivity_category_cluster
+      RAW::availability_of_railway_station -> DERIVED::none -> FEATURE::railway_station_feature -> CATEGORY::road_connectivity_category -> CATEGORY_CLUSTER::road_connectivity_category_cluster
+    calculations_formulae: |
+      CALC::all_weather_road_feature := binary_presence(is_village_connected_to_all_weather_road)
+      CALC::internal_pucca_road_quality_score := ordinal_map(availability_of_internal_pucca_road); FORMULA::fully covered=1.00, partially covered=0.50, not covered=0.00
+      CALC::internal_pucca_road_feature := normalize(internal_pucca_road_quality_score)
+      CALC::public_transport_feature := normalize(public_transport)
+      CALC::railway_station_feature := binary_presence(availability_of_railway_station)
+      CALC::road_connectivity_category := mean(feature_class_score(all_weather_road_feature, internal_pucca_road_feature, public_transport_feature, railway_station_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Housing Quality"
+    village_cluster_share: "Low: 225,541 (35.7%); Medium: 286,500 (45.4%); High: 119,208 (18.9%)"
+    constituent_features:
+      - "pucca_housing_rate_feature::Pucca Housing Rate"
+      - "housing_scheme_coverage_feature::Housing Scheme Coverage"
+      - "pmay_demand_met_feature::PMAY Demand Met"
+      - "ujjwala_coverage_feature::Ujjwala Coverage"
+    raw_columns_used:
+      - "total_hhd"
+      - "total_hhd_availing_pmuy_benefits"
+      - "total_hhd_got_benefit_under_state_housing_scheme"
+      - "total_hhd_have_got_pmay_house"
+      - "total_hhd_in_pmay_permanent_wait_list"
+      - "total_hhd_with_kuccha_wall_kuccha_roof"
+    raw_to_category_maps: |
+      RAW::total_hhd, total_hhd_with_kuccha_wall_kuccha_roof -> DERIVED::pucca_housing_rate_score -> FEATURE::pucca_housing_rate_feature -> CATEGORY::housing_quality_category -> CATEGORY_CLUSTER::housing_quality_category_cluster
+      RAW::total_hhd, total_hhd_got_benefit_under_state_housing_scheme, total_hhd_have_got_pmay_house -> DERIVED::housing_scheme_coverage_score -> FEATURE::housing_scheme_coverage_feature -> CATEGORY::housing_quality_category -> CATEGORY_CLUSTER::housing_quality_category_cluster
+      RAW::total_hhd_have_got_pmay_house, total_hhd_in_pmay_permanent_wait_list -> DERIVED::pmay_demand_met_score -> FEATURE::pmay_demand_met_feature -> CATEGORY::housing_quality_category -> CATEGORY_CLUSTER::housing_quality_category_cluster
+      RAW::total_hhd, total_hhd_availing_pmuy_benefits -> DERIVED::ujjwala_coverage_score -> FEATURE::ujjwala_coverage_feature -> CATEGORY::housing_quality_category -> CATEGORY_CLUSTER::housing_quality_category_cluster
+    calculations_formulae: |
+      CALC::pucca_housing_rate_score := 1.0 - min(1.0, total_hhd_with_kuccha_wall_kuccha_roof / total_hhd); INVERSE::higher score means lower burden/rate
+      CALC::pucca_housing_rate_feature := normalize(pucca_housing_rate_score)
+      CALC::housing_scheme_coverage_score := weighted_mean(pmay_and_state_housing_benefit_share); FORMULA::min(1.0, (total_hhd_have_got_pmay_house + total_hhd_got_benefit_under_state_housing_scheme) / total_hhd)
+      CALC::housing_scheme_coverage_feature := normalize(housing_scheme_coverage_score)
+      CALC::pmay_demand_met_score := weighted_mean(pmay_houses_over_pmay_houses_plus_waitlist); FORMULA::min(1.0, total_hhd_have_got_pmay_house / (total_hhd_have_got_pmay_house + total_hhd_in_pmay_permanent_wait_list))
+      CALC::pmay_demand_met_feature := normalize(pmay_demand_met_score)
+      CALC::ujjwala_coverage_score := min(1.0, total_hhd_availing_pmuy_benefits / total_hhd)
+      CALC::ujjwala_coverage_feature := normalize(ujjwala_coverage_score)
+      CALC::housing_quality_category := mean(feature_class_score(pucca_housing_rate_feature, housing_scheme_coverage_feature, pmay_demand_met_feature, ujjwala_coverage_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Maternal and Child Health"
+    village_cluster_share: "Low: 103,980 (16.5%); Medium: 213,177 (33.8%); High: 314,092 (49.8%)"
+    constituent_features:
+      - "awc_infra_enrollment_coverage_feature::AWC Infrastructure and Enrollment Coverage"
+      - "maternal_health_care_access_feature::Maternal Health and Care Access"
+      - "child_nutrition_development_feature::Child Nutrition and Development"
+      - "newborn_health_outcomes_feature::Newborn Health Outcomes"
+      - "health_schemes_utilization_feature::Health Schemes Utilization"
+    raw_columns_used:
+      - "availability_of_mother_child_health_facilities"
+      - "gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay"
+      - "gp_total_no_of_eligible_beneficiaries_under_pmjay"
+      - "is_aanganwadi_centre_available"
+      - "is_early_childhood_edu_provided_in_anganwadi"
+      - "total_anemic_pregnant_women"
+      - "total_childs_aged_0_to_3_years"
+      - "total_childs_aged_0_to_3_years_immunized"
+      - "total_childs_aged_0_to_3_years_reg_under_aanganwadi"
+      - "total_childs_aged_3_to_6_years_reg_under_aanganwadi"
+      - "total_childs_categorized_non_stunted_as_per_icds"
+      - "total_female_child_age_bw_0_6"
+      - "total_hhd"
+      - "total_hhd_registered_under_pmjay"
+      - "total_male_child_age_bw_0_6"
+      - "total_no_of_beneficiaries_receiving_benefits_under_pmmvy"
+      - "total_no_of_children_in_icds_cas"
+      - "total_no_of_eligible_beneficiaries_under_pmmvy"
+      - "total_no_of_lactating_mothers"
+      - "total_no_of_lactating_mothers_receiving_services_under_icds"
+      - "total_no_of_newly_born_children"
+      - "total_no_of_newly_born_underweight_children"
+      - "total_no_of_pregnant_women"
+      - "total_no_of_pregnant_women_receiving_services_under_icds"
+      - "total_no_of_registered_children_in_anganwadi"
+      - "total_no_of_women_delivered_babies_at_hospitals_registered_asha"
+      - "total_no_of_young_anemic_children_6_59_months_in_icds_cas"
+      - "total_underweight_child_age_under_6_years"
+    raw_to_category_maps: |
+      RAW::availability_of_mother_child_health_facilities, is_aanganwadi_centre_available, is_early_childhood_edu_provided_in_anganwadi, total_childs_aged_0_to_3_years, total_childs_aged_0_to_3_years_reg_under_aanganwadi, total_childs_aged_3_to_6_years_reg_under_aanganwadi, total_female_child_age_bw_0_6, total_male_child_age_bw_0_6, total_no_of_children_in_icds_cas, total_no_of_registered_children_in_anganwadi -> DERIVED::awc_0_3_coverage_score, awc_3_6_coverage_score, awc_infra_enrollment_coverage_score, awc_total_enrollment_score, children_3_6_estimated, children_under_age_6, overall_awc_enrollment_score -> FEATURE::awc_infra_enrollment_coverage_feature -> CATEGORY::maternal_child_health_category -> CATEGORY_CLUSTER::maternal_child_health_category_cluster
+      RAW::total_anemic_pregnant_women, total_no_of_lactating_mothers, total_no_of_lactating_mothers_receiving_services_under_icds, total_no_of_pregnant_women, total_no_of_pregnant_women_receiving_services_under_icds, total_no_of_women_delivered_babies_at_hospitals_registered_asha -> DERIVED::institutional_delivery_rate_score, lactating_service_coverage_score, maternal_anemia_score, maternal_health_care_access_score, pregnant_service_coverage_score -> FEATURE::maternal_health_care_access_feature -> CATEGORY::maternal_child_health_category -> CATEGORY_CLUSTER::maternal_child_health_category_cluster
+      RAW::total_childs_aged_0_to_3_years, total_childs_aged_0_to_3_years_immunized, total_childs_categorized_non_stunted_as_per_icds, total_female_child_age_bw_0_6, total_male_child_age_bw_0_6, total_no_of_children_in_icds_cas, total_no_of_registered_children_in_anganwadi, total_no_of_young_anemic_children_6_59_months_in_icds_cas, total_underweight_child_age_under_6_years -> DERIVED::child_anemia_score, child_immunization_rate_score, child_nutrition_development_score, child_nutrition_score, child_stunting_score, children_under_age_6, stunted_children -> FEATURE::child_nutrition_development_feature -> CATEGORY::maternal_child_health_category -> CATEGORY_CLUSTER::maternal_child_health_category_cluster
+      RAW::total_no_of_newly_born_children, total_no_of_newly_born_underweight_children -> DERIVED::newborn_health_score -> FEATURE::newborn_health_outcomes_feature -> CATEGORY::maternal_child_health_category -> CATEGORY_CLUSTER::maternal_child_health_category_cluster
+      RAW::gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay, gp_total_no_of_eligible_beneficiaries_under_pmjay, total_hhd, total_hhd_registered_under_pmjay, total_no_of_beneficiaries_receiving_benefits_under_pmmvy, total_no_of_eligible_beneficiaries_under_pmmvy -> DERIVED::ayushman_bharat_utilization_score, health_insurance_coverage_score, health_schemes_utilization_score, matru_vandana_utilization_score -> FEATURE::health_schemes_utilization_feature -> CATEGORY::maternal_child_health_category -> CATEGORY_CLUSTER::maternal_child_health_category_cluster
+    calculations_formulae: |
+      CALC::awc_0_3_coverage_score := min(1.0, total_childs_aged_0_to_3_years_reg_under_aanganwadi / total_childs_aged_0_to_3_years)
+      CALC::children_under_age_6 := total_male_child_age_bw_0_6 + total_female_child_age_bw_0_6
+      CALC::children_3_6_estimated := max(0, children_under_age_6 - total_childs_aged_0_to_3_years)
+      CALC::awc_3_6_coverage_score := min(1.0, total_childs_aged_3_to_6_years_reg_under_aanganwadi / children_3_6_estimated)
+      CALC::overall_awc_enrollment_score := min(1.0, total_no_of_children_in_icds_cas / children_under_age_6)
+      CALC::awc_total_enrollment_score := min(1.0, total_no_of_registered_children_in_anganwadi / children_under_age_6)
+      CALC::awc_infra_enrollment_coverage_score := mean(awc_available, mch_facility_available, ece_available, awc_0_3_coverage, awc_3_6_coverage, overall_awc_enrollment, awc_total_enrollment); FORMULA::mean(awc_available, mch_facility_available, ece_available, awc_0_3_coverage_score, awc_3_6_coverage_score, overall_awc_enrollment_score, awc_total_enrollment_score)
+      CALC::awc_infra_enrollment_coverage_feature := normalize(awc_infra_enrollment_coverage_score)
+      CALC::pregnant_service_coverage_score := min(1.0, total_no_of_pregnant_women_receiving_services_under_icds / total_no_of_pregnant_women)
+      CALC::lactating_service_coverage_score := min(1.0, total_no_of_lactating_mothers_receiving_services_under_icds / total_no_of_lactating_mothers)
+      CALC::maternal_anemia_score := 1.0 - min(1.0, total_anemic_pregnant_women / total_no_of_pregnant_women); INVERSE::higher score means lower burden/rate
+      CALC::institutional_delivery_rate_score := min(1.0, total_no_of_women_delivered_babies_at_hospitals_registered_asha / total_no_of_pregnant_women)
+      CALC::maternal_health_care_access_score := mean(pregnant_service_coverage, lactating_service_coverage, maternal_anemia_score, institutional_delivery_rate); FORMULA::mean(pregnant_service_coverage_score, lactating_service_coverage_score, maternal_anemia_score, institutional_delivery_rate_score)
+      CALC::maternal_health_care_access_feature := normalize(maternal_health_care_access_score)
+      CALC::child_immunization_rate_score := min(1.0, total_childs_aged_0_to_3_years_immunized / total_childs_aged_0_to_3_years)
+      CALC::children_under_age_6 := total_male_child_age_bw_0_6 + total_female_child_age_bw_0_6
+      CALC::child_nutrition_score := 1.0 - min(1.0, total_underweight_child_age_under_6_years / children_under_age_6); INVERSE::higher score means lower burden/rate
+      CALC::stunted_children := max(0, total_no_of_registered_children_in_anganwadi - total_childs_categorized_non_stunted_as_per_icds)
+      CALC::child_stunting_score := 1.0 - min(1.0, stunted_children / total_no_of_registered_children_in_anganwadi); INVERSE::higher score means lower burden/rate
+      CALC::child_anemia_score := 1.0 - min(1.0, total_no_of_young_anemic_children_6_59_months_in_icds_cas / total_no_of_children_in_icds_cas); INVERSE::higher score means lower burden/rate; NULL_RULE::denominator<=0 is treated as NULL before feature scoring
+      CALC::child_nutrition_development_score := mean(child_immunization_rate, child_nutrition_score, child_stunting_score, child_anemia_score); FORMULA::mean(child_immunization_rate_score, child_nutrition_score, child_stunting_score, child_anemia_score)
+      CALC::child_nutrition_development_feature := normalize(child_nutrition_development_score)
+      CALC::newborn_health_score := 1.0 - min(1.0, total_no_of_newly_born_underweight_children / total_no_of_newly_born_children); INVERSE::higher score means lower burden/rate; NULL_RULE::denominator<=0 is treated as NULL before feature scoring
+      CALC::newborn_health_outcomes_feature := normalize(newborn_health_score)
+      CALC::matru_vandana_utilization_score := min(1.0, total_no_of_beneficiaries_receiving_benefits_under_pmmvy / total_no_of_eligible_beneficiaries_under_pmmvy)
+      CALC::health_insurance_coverage_score := min(1.0, total_hhd_registered_under_pmjay / total_hhd)
+      CALC::ayushman_bharat_utilization_score := min(1.0, gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay / gp_total_no_of_eligible_beneficiaries_under_pmjay)
+      CALC::health_schemes_utilization_score := mean(matru_vandana_utilization, health_insurance_coverage, ayushman_bharat_utilization); FORMULA::mean(matru_vandana_utilization_score, health_insurance_coverage_score, ayushman_bharat_utilization_score)
+      CALC::health_schemes_utilization_feature := normalize(health_schemes_utilization_score)
+      CALC::maternal_child_health_category := mean(feature_class_score(awc_infra_enrollment_coverage_feature, maternal_health_care_access_feature, child_nutrition_development_feature, newborn_health_outcomes_feature, health_schemes_utilization_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Water and Sanitation"
+    village_cluster_share: "Low: 263,152 (41.7%); Medium: 242,168 (38.4%); High: 125,929 (19.9%)"
+    constituent_features:
+      - "piped_water_coverage_feature::Piped Water Coverage"
+      - "sanitation_coverage_feature::Sanitation Coverage"
+      - "drainage_quality_feature::Drainage Quality"
+      - "waste_disposal_feature::Community Waste Disposal"
+      - "biogas_waste_recycling_feature::Biogas or Waste Recycling"
+    raw_columns_used:
+      - "availability_of_drainage_system"
+      - "availability_of_piped_tap_water"
+      - "is_community_biogas_waste_recycle_for_production"
+      - "is_community_waste_disposal_system"
+      - "total_hhd"
+      - "total_hhd_having_piped_water_connection"
+      - "total_hhd_not_having_sanitary_latrines"
+    raw_to_category_maps: |
+      RAW::availability_of_piped_tap_water, total_hhd, total_hhd_having_piped_water_connection -> DERIVED::piped_tap_water_coverage_score, piped_water_coverage_score -> FEATURE::piped_water_coverage_feature -> CATEGORY::water_sanitation_category -> CATEGORY_CLUSTER::water_sanitation_category_cluster
+      RAW::total_hhd, total_hhd_not_having_sanitary_latrines -> DERIVED::none -> FEATURE::sanitation_coverage_feature -> CATEGORY::water_sanitation_category -> CATEGORY_CLUSTER::water_sanitation_category_cluster
+      RAW::availability_of_drainage_system -> DERIVED::drainage_quality_score -> FEATURE::drainage_quality_feature -> CATEGORY::water_sanitation_category -> CATEGORY_CLUSTER::water_sanitation_category_cluster
+      RAW::is_community_waste_disposal_system -> DERIVED::none -> FEATURE::waste_disposal_feature -> CATEGORY::water_sanitation_category -> CATEGORY_CLUSTER::water_sanitation_category_cluster
+      RAW::is_community_biogas_waste_recycle_for_production -> DERIVED::none -> FEATURE::biogas_waste_recycling_feature -> CATEGORY::water_sanitation_category -> CATEGORY_CLUSTER::water_sanitation_category_cluster
+    calculations_formulae: |
+      CALC::piped_tap_water_coverage_score := ordinal_map(availability_of_piped_tap_water); FORMULA::100% habitations=1.00, 50-100%=0.60, <50%=0.25, only one habitation=0.10, not covered=0.00
+      CALC::piped_water_coverage_score := mean(habitation_coverage, household_connection_ratio); FORMULA::mean(piped_tap_water_coverage_score, clipped(total_hhd_having_piped_water_connection / total_hhd))
+      CALC::piped_water_coverage_feature := normalize(piped_water_coverage_score)
+      CALC::sanitation_coverage_feature := normalize(total_hhd_not_having_sanitary_latrines / total_hhd); INVERSE::1 - normalized ratio
+      CALC::drainage_quality_score := ordinal_map(availability_of_drainage_system); FORMULA::closed=1.00, covered open=0.75, uncovered open=0.50, kuchha=0.25, no drainage=0.00
+      CALC::drainage_quality_feature := normalize(drainage_quality_score)
+      CALC::waste_disposal_feature := binary_presence(is_community_waste_disposal_system)
+      CALC::biogas_waste_recycling_feature := binary_presence(is_community_biogas_waste_recycle_for_production)
+      CALC::water_sanitation_category := mean(feature_class_score(piped_water_coverage_feature, sanitation_coverage_feature, drainage_quality_feature, waste_disposal_feature, biogas_waste_recycling_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Livelihoods Cottage and Traditional Industry"
+    village_cluster_share: "Low: 587,952 (93.1%); High: 43,297 (6.9%)"
+    constituent_features:
+      - "cottage_units_available_feature::Cottage Units Available"
+      - "cottage_industry_participation_feature::Cottage Industry Participation"
+      - "handloom_feature::Handloom"
+      - "handicrafts_feature::Handicrafts"
+    raw_columns_used:
+      - "availability_of_cottage_small_scale_units"
+      - "is_handicrafts"
+      - "is_handloom"
+      - "total_hhd"
+      - "total_hhd_engaged_cottage_small_scale_units"
+    raw_to_category_maps: |
+      RAW::availability_of_cottage_small_scale_units -> DERIVED::none -> FEATURE::cottage_units_available_feature -> CATEGORY::livelihoods_cottage_traditional_industry_category -> CATEGORY_CLUSTER::livelihoods_cottage_traditional_industry_category_cluster
+      RAW::total_hhd, total_hhd_engaged_cottage_small_scale_units -> DERIVED::none -> FEATURE::cottage_industry_participation_feature -> CATEGORY::livelihoods_cottage_traditional_industry_category -> CATEGORY_CLUSTER::livelihoods_cottage_traditional_industry_category_cluster
+      RAW::is_handloom -> DERIVED::none -> FEATURE::handloom_feature -> CATEGORY::livelihoods_cottage_traditional_industry_category -> CATEGORY_CLUSTER::livelihoods_cottage_traditional_industry_category_cluster
+      RAW::is_handicrafts -> DERIVED::none -> FEATURE::handicrafts_feature -> CATEGORY::livelihoods_cottage_traditional_industry_category -> CATEGORY_CLUSTER::livelihoods_cottage_traditional_industry_category_cluster
+    calculations_formulae: |
+      CALC::cottage_units_available_feature := binary_presence(availability_of_cottage_small_scale_units)
+      CALC::cottage_industry_participation_feature := normalize(total_hhd_engaged_cottage_small_scale_units / total_hhd)
+      CALC::handloom_feature := binary_presence(is_handloom)
+      CALC::handicrafts_feature := binary_presence(is_handicrafts)
+      CALC::livelihoods_cottage_traditional_industry_category := mean(feature_class_score(cottage_units_available_feature, cottage_industry_participation_feature, handloom_feature, handicrafts_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Farm Employment"
+    village_cluster_share: "Low: 144,994 (23.0%); Medium: 197,800 (31.3%); High: 288,455 (45.7%)"
+    constituent_features:
+      - "farm_employment_feature::Farm Employment"
+    raw_columns_used:
+      - "total_hhd"
+      - "total_hhd_engaged_in_farm_activities"
+    raw_to_category_maps: |
+      RAW::total_hhd, total_hhd_engaged_in_farm_activities -> DERIVED::none -> FEATURE::farm_employment_feature -> CATEGORY::livelihoods_employment_category -> CATEGORY_CLUSTER::livelihoods_employment_category_cluster
+    calculations_formulae: |
+      CALC::farm_employment_feature := normalize(total_hhd_engaged_in_farm_activities / total_hhd)
+      CALC::livelihoods_employment_category := mean(feature_class_score(farm_employment_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Livelihoods Forest Resources"
+    village_cluster_share: "Low: 575,044 (91.1%); High: 56,205 (8.9%)"
+    constituent_features:
+      - "community_forest_feature::Community Forest"
+      - "minor_forest_production_feature::Minor Forest Production"
+      - "forest_dependence_feature::Forest Dependence"
+    raw_columns_used:
+      - "availability_of_community_forest"
+      - "availability_of_minor_forest_production"
+      - "total_hhd"
+      - "total_hhd_source_of_minor_forest_production"
+    raw_to_category_maps: |
+      RAW::availability_of_community_forest -> DERIVED::none -> FEATURE::community_forest_feature -> CATEGORY::livelihoods_forest_resources_category -> CATEGORY_CLUSTER::livelihoods_forest_resources_category_cluster
+      RAW::availability_of_minor_forest_production -> DERIVED::none -> FEATURE::minor_forest_production_feature -> CATEGORY::livelihoods_forest_resources_category -> CATEGORY_CLUSTER::livelihoods_forest_resources_category_cluster
+      RAW::total_hhd, total_hhd_source_of_minor_forest_production -> DERIVED::none -> FEATURE::forest_dependence_feature -> CATEGORY::livelihoods_forest_resources_category -> CATEGORY_CLUSTER::livelihoods_forest_resources_category_cluster
+    calculations_formulae: |
+      CALC::community_forest_feature := binary_presence(availability_of_community_forest)
+      CALC::minor_forest_production_feature := binary_presence(availability_of_minor_forest_production)
+      CALC::forest_dependence_feature := normalize(total_hhd_source_of_minor_forest_production / total_hhd)
+      CALC::livelihoods_forest_resources_category := mean(feature_class_score(community_forest_feature, minor_forest_production_feature, forest_dependence_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Livelihoods Common Resources"
+    village_cluster_share: "Low: 488,032 (77.3%); High: 143,217 (22.7%)"
+    constituent_features:
+      - "common_pastures_feature::Common Pastures"
+    raw_columns_used:
+      - "is_common_pastures_available"
+    raw_to_category_maps: |
+      RAW::is_common_pastures_available -> DERIVED::none -> FEATURE::common_pastures_feature -> CATEGORY::livelihoods_common_resources_category -> CATEGORY_CLUSTER::livelihoods_common_resources_category_cluster
+    calculations_formulae: |
+      CALC::common_pastures_feature := binary_presence(is_common_pastures_available)
+      CALC::livelihoods_common_resources_category := mean(feature_class_score(common_pastures_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Livelihoods Alternative Farming"
+    village_cluster_share: "Low: 601,363 (95.3%); High: 29,886 (4.7%)"
+    constituent_features:
+      - "alternative_farming_feature::Alternative Farming"
+    raw_columns_used:
+      - "is_bee_farming"
+      - "is_sericulture"
+    raw_to_category_maps: |
+      RAW::is_bee_farming, is_sericulture -> DERIVED::none -> FEATURE::alternative_farming_feature -> CATEGORY::livelihoods_alternative_farming_category -> CATEGORY_CLUSTER::livelihoods_alternative_farming_category_cluster
+    calculations_formulae: |
+      CALC::alternative_farming_feature := mean(binary_presence(is_bee_farming, is_sericulture))
+      CALC::livelihoods_alternative_farming_category := mean(feature_class_score(alternative_farming_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Livelihoods Fisheries"
+    village_cluster_share: "Low: 498,601 (79.0%); Medium: 71,380 (11.3%); High: 61,268 (9.7%)"
+    constituent_features:
+      - "fisheries_aquaculture_feature::Fisheries and Aquaculture Access"
+    raw_columns_used:
+      - "availability_of_aquaculture_ext_facility"
+      - "availability_of_fish_community_ponds"
+      - "availability_of_fish_farming"
+    raw_to_category_maps: |
+      RAW::availability_of_aquaculture_ext_facility, availability_of_fish_community_ponds, availability_of_fish_farming -> DERIVED::fisheries_aquaculture_score -> FEATURE::fisheries_aquaculture_feature -> CATEGORY::livelihoods_fisheries_category -> CATEGORY_CLUSTER::livelihoods_fisheries_category_cluster
+    calculations_formulae: |
+      CALC::fisheries_aquaculture_score := mean(fish_farming_available, community_ponds_available, aquaculture_extension_facility_available); FORMULA::mean(fish_farming_available, fish_community_pond_available, aquaculture_extension_facility_available)
+      CALC::fisheries_aquaculture_feature := normalize(fisheries_aquaculture_score)
+      CALC::livelihoods_fisheries_category := mean(feature_class_score(fisheries_aquaculture_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Livestock and Veterinary"
+    village_cluster_share: "Low: 372,548 (59.0%); Medium: 168,348 (26.7%); High: 90,353 (14.3%)"
+    constituent_features:
+      - "veterinary_services_feature::Veterinary Services Access"
+      - "development_projects_feature::Livestock Development Projects"
+      - "milk_routes_feature::Milk Routes"
+    raw_columns_used:
+      - "availability_of_goatary_dev_project"
+      - "availability_of_livestock_extension_services"
+      - "availability_of_milk_routes"
+      - "availability_of_pigery_development"
+      - "availability_of_poultry_dev_project"
+      - "is_veterinary_hospital_available"
+    raw_to_category_maps: |
+      RAW::availability_of_livestock_extension_services, is_veterinary_hospital_available -> DERIVED::livestock_extension_services_score, veterinary_services_access_score -> FEATURE::veterinary_services_feature -> CATEGORY::livestock_veterinary_category -> CATEGORY_CLUSTER::livestock_veterinary_category_cluster
+      RAW::availability_of_goatary_dev_project, availability_of_pigery_development, availability_of_poultry_dev_project -> DERIVED::none -> FEATURE::development_projects_feature -> CATEGORY::livestock_veterinary_category -> CATEGORY_CLUSTER::livestock_veterinary_category_cluster
+      RAW::availability_of_milk_routes -> DERIVED::none -> FEATURE::milk_routes_feature -> CATEGORY::livestock_veterinary_category -> CATEGORY_CLUSTER::livestock_veterinary_category_cluster
+    calculations_formulae: |
+      CALC::livestock_extension_services_score := ordinal_map(availability_of_livestock_extension_services); FORMULA::1 if availability_of_livestock_extension_services is 1 or 2, else 0
+      CALC::veterinary_services_access_score := mean(veterinary_hospital_available, livestock_extension_service_access); FORMULA::mean(veterinary_hospital_available, livestock_extension_services_score)
+      CALC::veterinary_services_feature := normalize(veterinary_services_access_score)
+      CALC::development_projects_feature := mean(binary_presence(availability_of_poultry_dev_project, availability_of_goatary_dev_project, availability_of_pigery_development))
+      CALC::milk_routes_feature := binary_presence(availability_of_milk_routes)
+      CALC::livestock_veterinary_category := mean(feature_class_score(veterinary_services_feature, development_projects_feature, milk_routes_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Agriculture Land Cultivation"
+    village_cluster_share: "Low: 38,974 (6.2%); Medium: 339,387 (53.8%); High: 252,888 (40.1%)"
+    constituent_features:
+      - "land_utilization_feature::Land Utilization"
+    raw_columns_used:
+      - "area_irrigated_in_hac"
+      - "net_sown_area_in_hac"
+      - "net_sown_area_kharif_in_hac"
+      - "net_sown_area_other_in_hac"
+      - "net_sown_area_rabi_in_hac"
+      - "total_cultivable_area_in_hac"
+    raw_to_category_maps: |
+      RAW::area_irrigated_in_hac, net_sown_area_in_hac, net_sown_area_kharif_in_hac, net_sown_area_other_in_hac, net_sown_area_rabi_in_hac, total_cultivable_area_in_hac -> DERIVED::cropping_intensity, land_utilization_feature_score -> FEATURE::land_utilization_feature -> CATEGORY::agriculture_land_cultivation_category -> CATEGORY_CLUSTER::agriculture_land_cultivation_category_cluster
+    calculations_formulae: |
+      CALC::cropping_intensity := weighted_mean(weighted_seasonal_sown_area_over_net_sown_area); FORMULA::min((kharif + (2 * rabi) + (3 * other)) / net_sown, 3) / 3
+      CALC::land_utilization_feature_score := mean(land_cultivation_rate, irrigation_coverage, cropping_intensity); FORMULA::mean(clipped(net_sown_area_in_hac / total_cultivable_area_in_hac), clipped(area_irrigated_in_hac / total_cultivable_area_in_hac), cropping_intensity)
+      CALC::land_utilization_feature := normalize(land_utilization_feature_score)
+      CALC::agriculture_land_cultivation_category := mean(feature_class_score(land_utilization_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Agriculture Irrigation and Watershed"
+    village_cluster_share: "Low: 263,613 (41.8%); Medium: 175,705 (27.8%); High: 191,931 (30.4%)"
+    constituent_features:
+      - "irrigation_infra_watershed_dev_feature::Irrigation Infrastructure and Watershed Development"
+      - "nrega_nrm_exp_feature::NREGA NRM Expenditure"
+      - "modern_irrigation_feature::Modern Irrigation"
+    raw_columns_used:
+      - "availability_of_major_source_of_irrigation"
+      - "availability_of_rain_harvest_system"
+      - "availability_of_watershed_dev_project"
+      - "no_of_farmers_using_drip_sprinkler"
+      - "total_approved_labour_budget_for_year"
+      - "total_expenditure_approved_under_nrm_labour_budget_during_yr"
+      - "total_no_of_farmers"
+    raw_to_category_maps: |
+      RAW::availability_of_major_source_of_irrigation, availability_of_rain_harvest_system, availability_of_watershed_dev_project -> DERIVED::canal -> FEATURE::irrigation_infra_watershed_dev_feature -> CATEGORY::agriculture_irrigation_watershed_category -> CATEGORY_CLUSTER::agriculture_irrigation_watershed_category_cluster
+      RAW::total_approved_labour_budget_for_year, total_expenditure_approved_under_nrm_labour_budget_during_yr -> DERIVED::none -> FEATURE::nrega_nrm_exp_feature -> CATEGORY::agriculture_irrigation_watershed_category -> CATEGORY_CLUSTER::agriculture_irrigation_watershed_category_cluster
+      RAW::no_of_farmers_using_drip_sprinkler, total_no_of_farmers -> DERIVED::none -> FEATURE::modern_irrigation_feature -> CATEGORY::agriculture_irrigation_watershed_category -> CATEGORY_CLUSTER::agriculture_irrigation_watershed_category_cluster
+    calculations_formulae: |
+      CALC::irrigation_infra_watershed_dev_feature := mean(binary_presence(canal, availability_of_rain_harvest_system, availability_of_watershed_dev_project))
+      CALC::nrega_nrm_exp_feature := normalize(total_expenditure_approved_under_nrm_labour_budget_during_yr / total_approved_labour_budget_for_year)
+      CALC::modern_irrigation_feature := normalize(no_of_farmers_using_drip_sprinkler / total_no_of_farmers)
+      CALC::agriculture_irrigation_watershed_category := mean(feature_class_score(irrigation_infra_watershed_dev_feature, nrega_nrm_exp_feature, modern_irrigation_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Agriculture Organic Farming"
+    village_cluster_share: "Low: 540,895 (85.7%); Medium: 56,729 (9.0%); High: 33,625 (5.3%)"
+    constituent_features:
+      - "organic_farming_feature::Organic Farming"
+    raw_columns_used:
+      - "total_no_farmers_adopted_organic_farming"
+      - "total_no_of_farmers"
+    raw_to_category_maps: |
+      RAW::total_no_farmers_adopted_organic_farming, total_no_of_farmers -> DERIVED::none -> FEATURE::organic_farming_feature -> CATEGORY::agriculture_organic_farming_category -> CATEGORY_CLUSTER::agriculture_organic_farming_category_cluster
+    calculations_formulae: |
+      CALC::organic_farming_feature := normalize(total_no_farmers_adopted_organic_farming / total_no_of_farmers)
+      CALC::agriculture_organic_farming_category := mean(feature_class_score(organic_farming_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Agriculture Support Services"
+    village_cluster_share: "Low: 300,938 (47.7%); Medium: 168,029 (26.6%); High: 162,282 (25.7%)"
+    constituent_features:
+      - "agri_inputs_availability_feature::Agricultural Inputs Availability"
+      - "agri_risk_support_feature::Agricultural Risk Support"
+      - "soil_testing_adoption_feature::Soil Testing Adoption"
+    raw_columns_used:
+      - "is_fertilizer_shop_available"
+      - "is_govt_seed_centre_available"
+      - "is_soil_testing_centre_available"
+      - "total_no_of_farmers"
+      - "total_no_of_farmers_add_fert_in_soil_as_per_report"
+      - "total_no_of_farmers_received_benefit_under_pmfby"
+      - "total_no_of_farmers_registered_under_pmkpy"
+    raw_to_category_maps: |
+      RAW::is_fertilizer_shop_available, is_govt_seed_centre_available, is_soil_testing_centre_available -> DERIVED::agri_inputs_availability_score -> FEATURE::agri_inputs_availability_feature -> CATEGORY::agriculture_support_services_category -> CATEGORY_CLUSTER::agriculture_support_services_category_cluster
+      RAW::total_no_of_farmers, total_no_of_farmers_received_benefit_under_pmfby, total_no_of_farmers_registered_under_pmkpy -> DERIVED::agri_risk_support_score -> FEATURE::agri_risk_support_feature -> CATEGORY::agriculture_support_services_category -> CATEGORY_CLUSTER::agriculture_support_services_category_cluster
+      RAW::total_no_of_farmers, total_no_of_farmers_add_fert_in_soil_as_per_report -> DERIVED::none -> FEATURE::soil_testing_adoption_feature -> CATEGORY::agriculture_support_services_category -> CATEGORY_CLUSTER::agriculture_support_services_category_cluster
+    calculations_formulae: |
+      CALC::agri_inputs_availability_score := mean(soil_testing_centre_available, fertilizer_shop_available, government_seed_centre_available); FORMULA::mean(soil_testing_centre_available, fertilizer_shop_available, government_seed_centre_available)
+      CALC::agri_inputs_availability_feature := normalize(agri_inputs_availability_score)
+      CALC::agri_risk_support_score := mean(pmkpy_registration_coverage, crop_insurance_coverage); FORMULA::mean(clipped(total_no_of_farmers_registered_under_pmkpy / total_no_of_farmers), clipped(total_no_of_farmers_received_benefit_under_pmfby / total_no_of_farmers))
+      CALC::agri_risk_support_feature := normalize(agri_risk_support_score)
+      CALC::soil_testing_adoption_feature := normalize(total_no_of_farmers_add_fert_in_soil_as_per_report / total_no_of_farmers)
+      CALC::agriculture_support_services_category := mean(feature_class_score(agri_inputs_availability_feature, agri_risk_support_feature, soil_testing_adoption_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification
+  - category: "Agricultural Markets"
+    village_cluster_share: "Low: 449,486 (71.2%); Medium: 84,819 (13.4%); High: 96,944 (15.4%)"
+    constituent_features:
+      - "market_access_feature::Market Access"
+      - "food_storage_feature::Food Storage Availability"
+    raw_columns_used:
+      - "availability_of_food_storage_warehouse"
+      - "availability_of_market"
+    raw_to_category_maps: |
+      RAW::availability_of_market -> DERIVED::market_access_score -> FEATURE::market_access_feature -> CATEGORY::agricultural_markets_category -> CATEGORY_CLUSTER::agricultural_markets_category_cluster
+      RAW::availability_of_food_storage_warehouse -> DERIVED::none -> FEATURE::food_storage_feature -> CATEGORY::agricultural_markets_category -> CATEGORY_CLUSTER::agricultural_markets_category_cluster
+    calculations_formulae: |
+      CALC::market_access_score := ordinal_map(availability_of_market); FORMULA::mandi=1.00, regular market=0.75, weekly haat=0.50, no local market=0.00
+      CALC::market_access_feature := normalize(market_access_score)
+      CALC::food_storage_feature := binary_presence(availability_of_food_storage_warehouse)
+      CALC::agricultural_markets_category := mean(feature_class_score(market_access_feature, food_storage_feature)); CLASS_SCORE::Low=0, Medium=0.5, High=1; FINAL_CLASS::MiniBatchKMeans category classification

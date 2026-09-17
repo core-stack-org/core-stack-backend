@@ -1,0 +1,579 @@
+--- !DAG
+id: CoreStack_DAG_LocalCompute_DynamicLayers
+name: STACD Local Compute DAG - Dynamic Layers (v1)
+version: '1'
+description: Local-compute pipeline for dynamic layers (yearly/derived layers with
+  inter-dependencies) from local_layer_map.json.
+params:
+- state
+- district
+- block
+- start_year
+- end_year
+- gee_account_id
+alg_type_nodes:
+- NREGA_Clip
+- LULC_Algorithm
+- LULC_Vectorization
+- Change_Detection
+- Change_Detection_Vector
+- Terrain_Algorithm
+- Terrain_Clusters
+- LULC_Terrain_Plain
+- LULC_Terrain_Slope
+- Cropping_Intensity
+- SWB_Layer
+- ZOI
+- Tree_Health_CH_Raster
+- Tree_Health_CH_Vector
+- Tree_Health_CCD_Raster
+- Tree_Health_CCD_Vector
+- Tree_Health_OC_Raster
+- Tree_Health_OC_Vector
+- Soil_Health
+dataset_type_nodes:
+- Change_Detection_Asset
+- Change_Detection_Vector_Asset
+- Cropping_Intensity_Asset
+- LULC_Raster
+- LULC_Terrain_Plain_Asset
+- LULC_Terrain_Slope_Asset
+- LULC_Vector
+- MWS_Boundaries
+- NREGA_Layer
+- SWB_Layer_Asset
+- Soil_Health_Asset
+- Terrain_Raster
+- Terrain_Vector
+- Tree_Health_CCD_Raster_Asset
+- Tree_Health_CCD_Vector_Asset
+- Tree_Health_CH_Raster_Asset
+- Tree_Health_CH_Vector_Asset
+- Tree_Health_OC_Raster_Asset
+- Tree_Health_OC_Vector_Asset
+- ZOI_Asset
+
+
+--- !Dataset_Type
+id: Change_Detection_Asset
+name: Change Detection Asset
+description: Change Detection Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Change_Detection_Vector_Asset
+name: Change Detection Vector Asset
+description: Change Detection Vector Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Cropping_Intensity_Asset
+name: Cropping Intensity Asset
+description: Cropping Intensity Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: LULC_Raster
+name: LULC Raster
+description: LULC Raster
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: LULC_Terrain_Plain_Asset
+name: LULC Terrain Plain Asset
+description: LULC Terrain Plain Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: LULC_Terrain_Slope_Asset
+name: LULC Terrain Slope Asset
+description: LULC Terrain Slope Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: LULC_Vector
+name: LULC Vector
+description: LULC Vector
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: MWS_Boundaries
+name: MWS Boundaries
+description: MWS Boundaries
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: NREGA_Layer
+name: NREGA Layer
+description: NREGA Layer
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: SWB_Layer_Asset
+name: SWB Layer Asset
+description: SWB Layer Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Soil_Health_Asset
+name: Soil Health Asset
+description: Soil Health Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Terrain_Raster
+name: Terrain Raster
+description: Terrain Raster
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Terrain_Vector
+name: Terrain Vector
+description: Terrain Vector
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Tree_Health_CCD_Raster_Asset
+name: Tree Health CCD Raster Asset
+description: Tree Health CCD Raster Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Tree_Health_CCD_Vector_Asset
+name: Tree Health CCD Vector Asset
+description: Tree Health CCD Vector Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Tree_Health_CH_Raster_Asset
+name: Tree Health CH Raster Asset
+description: Tree Health CH Raster Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Tree_Health_CH_Vector_Asset
+name: Tree Health CH Vector Asset
+description: Tree Health CH Vector Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Tree_Health_OC_Raster_Asset
+name: Tree Health OC Raster Asset
+description: Tree Health OC Raster Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Tree_Health_OC_Vector_Asset
+name: Tree Health OC Vector Asset
+description: Tree Health OC Vector Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: ZOI_Asset
+name: ZOI Asset
+description: ZOI Asset
+format: GEEAsset
+
+
+--- !Algorithm_Type
+id: NREGA_Clip
+name: NREGA_Clip
+description: Clips the NREGA shapefile to the local watershed boundary.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- NREGA_Layer
+
+
+--- !Algorithm_Type
+id: LULC_Algorithm
+name: LULC_Algorithm
+description: Generates yearly LULC rasters (start_year to end_year) clipped to the
+  local watershed boundary.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- MWS_Boundaries
+outputs:
+- LULC_Raster
+
+
+--- !Algorithm_Type
+id: LULC_Vectorization
+name: LULC_Vectorization
+description: Vectorizes the local LULC raster into per-MWS area statistics.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- LULC_Raster
+outputs:
+- LULC_Vector
+
+
+--- !Algorithm_Type
+id: Change_Detection
+name: Change_Detection
+description: Computes change-detection classes from local LULC rasters.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Change_Detection_Asset
+
+
+--- !Algorithm_Type
+id: Change_Detection_Vector
+name: Change_Detection_Vector
+description: Vectorizes the local change-detection raster.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- Change_Detection_Asset
+outputs:
+- Change_Detection_Vector_Asset
+
+
+--- !Algorithm_Type
+id: Terrain_Algorithm
+name: Terrain_Algorithm
+description: Generates FABDEM terrain raster clipped to the local watershed boundary.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Terrain_Raster
+
+
+--- !Algorithm_Type
+id: Terrain_Clusters
+name: Terrain_Clusters
+description: Generates terrain cluster vector per MWS from the local terrain raster.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- Terrain_Raster
+outputs:
+- Terrain_Vector
+
+
+--- !Algorithm_Type
+id: LULC_Terrain_Plain
+name: LULC_Terrain_Plain
+description: Computes LULC proportions on plain terrain clusters.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- Terrain_Raster
+- LULC_Raster
+outputs:
+- LULC_Terrain_Plain_Asset
+
+
+--- !Algorithm_Type
+id: LULC_Terrain_Slope
+name: LULC_Terrain_Slope
+description: Computes LULC proportions on slope terrain clusters.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- Terrain_Raster
+- LULC_Raster
+outputs:
+- LULC_Terrain_Slope_Asset
+
+
+--- !Algorithm_Type
+id: Cropping_Intensity
+name: Cropping_Intensity
+description: Derives cropping intensity from local LULC rasters.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Cropping_Intensity_Asset
+
+
+--- !Algorithm_Type
+id: SWB_Layer
+name: SWB_Layer
+description: Generates the surface water body layer from precomputed local watershed
+  geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+- name: gee_account_id
+  type: integer
+input_datasets:
+- MWS_Boundaries
+outputs:
+- SWB_Layer_Asset
+
+
+--- !Algorithm_Type
+id: ZOI
+name: ZOI
+description: Generates the Zone of Influence layer from the local SWB layer.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: gee_account_id
+  type: integer
+input_datasets:
+- SWB_Layer_Asset
+outputs:
+- ZOI_Asset
+
+
+--- !Algorithm_Type
+id: Tree_Health_CH_Raster
+name: Tree_Health_CH_Raster
+description: Generates the canopy height raster from local LULC rasters.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- LULC_Raster
+outputs:
+- Tree_Health_CH_Raster_Asset
+
+
+--- !Algorithm_Type
+id: Tree_Health_CH_Vector
+name: Tree_Health_CH_Vector
+description: Vectorizes the local canopy height raster.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- Tree_Health_CH_Raster_Asset
+outputs:
+- Tree_Health_CH_Vector_Asset
+
+
+--- !Algorithm_Type
+id: Tree_Health_CCD_Raster
+name: Tree_Health_CCD_Raster
+description: Generates the canopy cover density raster from local LULC rasters.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- LULC_Raster
+outputs:
+- Tree_Health_CCD_Raster_Asset
+
+
+--- !Algorithm_Type
+id: Tree_Health_CCD_Vector
+name: Tree_Health_CCD_Vector
+description: Vectorizes the local canopy cover density raster.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- Tree_Health_CCD_Raster_Asset
+outputs:
+- Tree_Health_CCD_Vector_Asset
+
+
+--- !Algorithm_Type
+id: Tree_Health_OC_Raster
+name: Tree_Health_OC_Raster
+description: Generates the overall tree-health change raster from local change-detection
+  output.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+- name: start_year
+  type: integer
+- name: end_year
+  type: integer
+input_datasets:
+- Change_Detection_Asset
+outputs:
+- Tree_Health_OC_Raster_Asset
+
+
+--- !Algorithm_Type
+id: Tree_Health_OC_Vector
+name: Tree_Health_OC_Vector
+description: Vectorizes the local overall tree-health change raster.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- Tree_Health_OC_Raster_Asset
+outputs:
+- Tree_Health_OC_Vector_Asset
+
+
+--- !Algorithm_Type
+id: Soil_Health
+name: Soil_Health
+description: Generates soil health nutrient statistics from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Soil_Health_Asset
+

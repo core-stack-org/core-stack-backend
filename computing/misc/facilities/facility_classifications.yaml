@@ -1,0 +1,332 @@
+name: facilities_service_classification
+version: 2
+description: >
+  Classification, access-rollup, and column-description schema for the Core
+  Stack facilities runtime pipeline. L3 classes identify the nearest concrete
+  facility type. L2 groups collapse related L3 classes into a simpler access
+  measure for reports, CSV exports, and village-level interpretation. The
+  per-class source details and descriptions were consolidated from
+  utilities/scripts/facilities_utils/facilities_column_metadata.yaml so that
+  runtime outputs can carry consistent human-readable column documentation.
+
+source_asset:
+  facilities_gpkg: data/base_resources/cs_pan_india_facilities.gpkg
+  facility_rows: 4209378
+  built_by: utilities/scripts/facilities_utils/facility_pipeline.py
+  column_metadata: utilities/scripts/facilities_utils/facilities_column_metadata.yaml
+  source_datasets:
+    - school
+    - college
+    - universities
+    - health_center
+    - pds
+    - csc
+    - bank_mitra
+    - bank_branch
+    - bank_atm
+    - apmc
+    - agri_industry
+
+access_rollup_notes:
+  min: >
+    Use the nearest available L3 class when any one member of the group can
+    satisfy the access question. This is used for groups such as advanced
+    health, higher education, market access, and post-harvest infrastructure.
+  max: >
+    Use the farthest required L3 class when a village should have access to all
+    member services to be considered fully covered. This is used for grouped
+    essentials such as primary/upper-primary/secondary schooling, basic health,
+    and financial inclusion.
+  direct: >
+    Use the only configured L3 class directly. This is used when the L2 group
+    has one concrete service class.
+
+# Templates used to build the runtime column dictionary. `{label}` is replaced
+# with the L3 class label or L2 group label at runtime.
+output_column_descriptions:
+  status: >-
+    Row computation status: `computed` when nearest services were resolved,
+    `no village id available` when the admin row lacks a village identifier,
+    and `no data available for this village` when no facility candidates were
+    found near the requested scope.
+  category_distance:
+    max: >-
+      {label} bundle distance in km: the farthest of the required member
+      services, so a low value means the full baseline bundle is nearby.
+    min: >-
+      {label} gateway distance in km: the nearest of the alternative member
+      services, since reaching any one of them opens this access.
+    direct: >-
+      {label} distance in km to the single service class in this group.
+  nearest_facility: >-
+    Nearest {label}: compact facility detail with name, subtype, code, and
+    whether it lies inside the requested boundary.
+  nearest_distance: >-
+    Great-circle distance in km from the village locality point to the
+    nearest {label}.
+
+l2_groups:
+  - key: essential_education
+    label: Essential Education Access
+    class_l1_domain: education
+    rollup: max
+    explanation: Distance to the farthest required school tier among primary, upper-primary, and secondary access.
+  - key: higher_education
+    label: Higher Education Access
+    class_l1_domain: education
+    rollup: min
+    explanation: Distance to the nearest higher-education option among higher-secondary school, college, and university-type institutions.
+  - key: essential_health
+    label: Essential Health Access
+    class_l1_domain: health
+    rollup: max
+    explanation: Distance to the farthest required basic health tier among sub-centre and PHC access.
+  - key: advanced_health
+    label: Advanced Health Access
+    class_l1_domain: health
+    rollup: min
+    explanation: Distance to the nearest advanced health option among CHC, district hospital, and specialist/tertiary hospitals.
+  - key: essential_services
+    label: Essential Services Access
+    class_l1_domain: food_security
+    rollup: direct
+    explanation: Distance to the nearest public distribution system point.
+  - key: financial_inclusion
+    label: Financial Inclusion Access
+    class_l1_domain: finance
+    rollup: max
+    explanation: Distance to the farthest required financial inclusion service among CSC, bank mitra, branch, and ATM access.
+  - key: apmc_access
+    label: APMC And Market Access
+    class_l1_domain: agriculture
+    rollup: min
+    explanation: Distance to the nearest market or trading access point.
+  - key: post_harvest
+    label: Post-Harvest Infrastructure Access
+    class_l1_domain: agriculture
+    rollup: min
+    explanation: Distance to the nearest post-harvest infrastructure option across storage, distribution, processing, and industrial manufacturing.
+  - key: cooperative
+    label: Cooperative Access
+    class_l1_domain: agriculture
+    rollup: direct
+    explanation: Distance to the nearest cooperative or society.
+  - key: livestock
+    label: Livestock Support Access
+    class_l1_domain: agriculture
+    rollup: direct
+    explanation: Distance to the nearest dairy or animal husbandry support point.
+  - key: agri_support_infra
+    label: Agriculture Support Infrastructure Access
+    class_l1_domain: agriculture
+    rollup: direct
+    explanation: Distance to the nearest agriculture support infrastructure point.
+
+l3_classes:
+  - key: school_primary
+    label: Primary School
+    class_l1_domain: education
+    class_l2_filter_group: essential_education
+    description: School offering primary grades (classes 1-5), from UDISE-style school records.
+    source_dataset: school
+    cleaned_file: school_primary.csv
+    source_id_column: school_code
+    configured_subtypes: [Primary, Primary with Upper Primary, Pr. Up Pr. and Secondary Only, Pr. with Up.Pr. Sec. and H.Sec., Pre-Primary Only]
+  - key: school_upper_primary
+    label: Upper Primary School
+    class_l1_domain: education
+    class_l2_filter_group: essential_education
+    description: School offering upper-primary grades (classes 6-8), from UDISE-style school records.
+    source_dataset: school
+    cleaned_file: school_upper_primary.csv
+    source_id_column: school_code
+    configured_subtypes: [Primary with Upper Primary, Upper Primary only, Pr. Up Pr. and Secondary Only, Pr. with Up.Pr. Sec. and H.Sec., Upper Pr. and Secondary, Up. Pr. Secondary and Higher Sec]
+  - key: school_secondary
+    label: Secondary School
+    class_l1_domain: education
+    class_l2_filter_group: essential_education
+    description: School offering secondary grades (classes 9-10), from UDISE-style school records.
+    source_dataset: school
+    cleaned_file: school_secondary.csv
+    source_id_column: school_code
+    configured_subtypes: [Pr. Up Pr. and Secondary Only, Pr. with Up.Pr. Sec. and H.Sec., Upper Pr. and Secondary, Up. Pr. Secondary and Higher Sec, Secondary Only, Secondary with Higher Secondary]
+  - key: school_higher_secondary
+    label: Higher Secondary School
+    class_l1_domain: education
+    class_l2_filter_group: higher_education
+    description: School or junior college offering higher-secondary grades (classes 11-12).
+    source_dataset: school
+    cleaned_file: school_higher_secondary.csv
+    source_id_column: school_code
+    configured_subtypes: [Pr. with Up.Pr. Sec. and H.Sec., Up. Pr. Secondary and Higher Sec, Secondary with Higher Secondary, Higher Secondary only/Jr. College]
+  - key: college
+    label: College
+    class_l1_domain: education
+    class_l2_filter_group: higher_education
+    description: Degree college from AISHE records, including affiliated, constituent, autonomous, and PG-centre colleges.
+    source_dataset: college
+    cleaned_file: college.csv
+    source_id_column: college_aishe_uid
+    configured_subtypes: [Affiliated College, Constituent / University College, Recognized Center, PG Center / Off-Campus Center, Autonomous College]
+  - key: universities
+    label: University-Type Institution
+    class_l1_domain: education
+    class_l2_filter_group: higher_education
+    description: University-type or standalone institution from AISHE records, such as technical, nursing, teacher-training, and paramedical institutes.
+    source_dataset: universities
+    cleaned_file: universities.csv
+    source_id_column: uni_aishe_code
+    configured_subtypes: [Technical/Polytechnic, Nursing, Teacher Training, Paramedical, PGDM Institutes, Institutes under Ministries, Hotel Management and Catering]
+  - key: health_sub_cen
+    label: Health Sub-Centre
+    class_l1_domain: health
+    class_l2_filter_group: essential_health
+    description: Health sub-centre, the first contact point between the community and the public health system.
+    source_dataset: health_center
+    cleaned_file: health_sub_cen.csv
+    source_id_column: sub_cen_uid
+  - key: health_phc
+    label: Primary Health Centre
+    class_l1_domain: health
+    class_l2_filter_group: essential_health
+    description: Primary Health Centre, the first point of curative care staffed with a medical officer.
+    source_dataset: health_center
+    cleaned_file: health_phc.csv
+    source_id_column: phc_uid
+  - key: health_chc
+    label: Community Health Centre
+    class_l1_domain: health
+    class_l2_filter_group: advanced_health
+    description: Community Health Centre, a block-level referral unit with specialist services.
+    source_dataset: health_center
+    cleaned_file: health_chc.csv
+    source_id_column: chc_uid
+  - key: health_dis_h
+    label: District Hospital
+    class_l1_domain: health
+    class_l2_filter_group: advanced_health
+    description: District hospital, the main secondary-care referral facility of a district.
+    source_dataset: health_center
+    cleaned_file: health_dis_h.csv
+    source_id_column: dis_h_uid
+  - key: health_s_t_h
+    label: Specialist Or Tertiary Hospital
+    class_l1_domain: health
+    class_l2_filter_group: advanced_health
+    description: Specialist or tertiary/teaching hospital offering advanced medical care.
+    source_dataset: health_center
+    cleaned_file: health_s_t_h.csv
+    source_id_column: s_t_h_uid
+  - key: pds
+    label: Public Distribution System
+    class_l1_domain: food_security
+    class_l2_filter_group: essential_services
+    description: Fair price shop under the Public Distribution System supplying subsidised food grains.
+    source_dataset: pds
+    cleaned_file: pds.csv
+    source_id_column: fps_uid
+  - key: csc
+    label: Common Service Centre
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+    description: Common Service Centre providing assisted digital access to government and financial services.
+    source_dataset: csc
+    cleaned_file: csc.csv
+    source_id_column: csc_uid
+  - key: bank_mitra
+    label: Bank Mitra
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+    description: Bank mitra / business correspondent point offering doorstep banking services.
+    source_dataset: bank_mitra
+    cleaned_file: bank_mitra.csv
+    source_id_column: bank_mitra_uid
+  - key: bank_branch
+    label: Bank Branch
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+    description: Scheduled bank branch.
+    source_dataset: bank_branch
+    cleaned_file: bank_branch.csv
+    source_id_column: bank_uid
+  - key: bank_atm
+    label: Bank ATM
+    class_l1_domain: finance
+    class_l2_filter_group: financial_inclusion
+    description: Bank ATM.
+    source_dataset: bank_atm
+    cleaned_file: bank_atm.csv
+    source_id_column: bank_atm_uid
+  - key: apmc
+    label: APMC
+    class_l1_domain: agriculture
+    class_l2_filter_group: apmc_access
+    description: Agricultural Produce Market Committee mandi or regulated market yard.
+    source_dataset: apmc
+    cleaned_file: apmc.csv
+    source_id_column: gid
+    configured_subtypes: [Primary Market Yard, Sub Market Yard, Other, Regulated Primary Market, Regulated Sub Market, Farmers Consumer Market, Non-Regulated Market]
+  - key: agri_industry_markets_trading
+    label: Agriculture Markets And Trading
+    class_l1_domain: agriculture
+    class_l2_filter_group: apmc_access
+    description: Agri-industry unit engaged in markets and trading of agricultural produce.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_markets_trading.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_storage_warehousing
+    label: Storage And Warehousing
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+    description: Storage and warehousing unit such as godowns, warehouses, and cold storage.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_storage_warehousing.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_distribution_utilities
+    label: Distribution Utilities
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+    description: Distribution and utility infrastructure supporting agricultural supply chains.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_distribution_utilities.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_agri_processing
+    label: Agriculture Processing
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+    description: Agriculture processing unit such as mills and produce processing plants.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_agri_processing.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_industrial_manufacturing
+    label: Industrial Manufacturing
+    class_l1_domain: agriculture
+    class_l2_filter_group: post_harvest
+    description: Industrial or manufacturing unit relevant to the rural farm economy.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_industrial_manufacturing.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_co_operatives_societies
+    label: Cooperatives And Societies
+    class_l1_domain: agriculture
+    class_l2_filter_group: cooperative
+    description: Co-operative or society unit such as PACS and co-operative marketing or processing bodies.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_co_operatives_societies.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_dairy_animal_husbandry
+    label: Dairy And Animal Husbandry
+    class_l1_domain: agriculture
+    class_l2_filter_group: livestock
+    description: Dairy and animal husbandry support unit such as dairies, milk chilling centres, and veterinary-linked units.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_dairy_animal_husbandry.csv
+    source_id_column: agri_industry_id
+  - key: agri_industry_agri_support_infrastructure
+    label: Agriculture Support Infrastructure
+    class_l1_domain: agriculture
+    class_l2_filter_group: agri_support_infra
+    description: Agriculture support infrastructure such as custom hiring centres and farm input or machinery support.
+    source_dataset: agri_industry
+    cleaned_file: agri_industry_agri_support_infrastructure.csv
+    source_id_column: agri_industry_id

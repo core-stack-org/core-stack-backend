@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import site
 from datetime import timedelta
 from pathlib import Path
 
@@ -24,6 +25,18 @@ environ.Env.read_env(str(ENV_FILE))
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 os.environ.setdefault("BACKEND_DIR", str(BASE_DIR))
+
+PYTHON_ENV_DIR = Path(site.__file__).resolve()
+if "lib" in PYTHON_ENV_DIR.parts:
+    PYTHON_ENV_DIR = Path(*PYTHON_ENV_DIR.parts[: PYTHON_ENV_DIR.parts.index("lib")])
+    GDAL_DATA_DIR = PYTHON_ENV_DIR / "share" / "gdal"
+    PROJ_DATA_DIR = PYTHON_ENV_DIR / "share" / "proj"
+
+    if GDAL_DATA_DIR.is_dir():
+        os.environ.setdefault("GDAL_DATA", str(GDAL_DATA_DIR))
+    if PROJ_DATA_DIR.is_dir():
+        os.environ.setdefault("PROJ_LIB", str(PROJ_DATA_DIR))
+        os.environ.setdefault("PROJ_DATA", str(PROJ_DATA_DIR))
 
 
 def resolve_env_path(name, default="", *, trailing_sep=False):
@@ -70,11 +83,13 @@ ODK_USER_PASSWORD_SYNC = env("ODK_USER_PASSWORD_SYNC")
 DB_NAME = env("DB_NAME")
 DB_USER = env("DB_USER")
 DB_PASSWORD = env("DB_PASSWORD")
+DB_HOST = env("DB_HOST", default="127.0.0.1")
+DB_PORT = env("DB_PORT", default="5432")
 
 USERNAME_GESDISC = env("USERNAME_GESDISC")
 PASSWORD_GESDISC = env("PASSWORD_GESDISC")
 
-STATIC_ROOT = "static/"
+STATIC_ROOT = BASE_DIR / "static"
 GEE_HELPER_ACCOUNT_ID = env("GEE_HELPER_ACCOUNT_ID")
 GEE_DEFAULT_ACCOUNT_ID = env("GEE_DEFAULT_ACCOUNT_ID")
 ADMIN_GROUP_ID = env("ADMIN_GROUP_ID")
@@ -151,7 +166,7 @@ CORS_ALLOW_METHODS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000"]
+CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "https://www.cse.iitd.ernet.in", "https://cse.iitd.ernet.in"]
 
 # MARK: REST Framework
 
@@ -232,8 +247,8 @@ DATABASES = {
         "NAME": DB_NAME,
         "USER": DB_USER,
         "PASSWORD": DB_PASSWORD,
-        "HOST": "127.0.0.1",
-        "PORT": "",
+        "HOST": DB_HOST,
+        "PORT": DB_PORT,
     }
 }
 
@@ -267,15 +282,27 @@ USE_I18N = True
 USE_TZ = True
 
 # Celery
+CELERY_BROKER_URL = env(
+    "CELERY_BROKER_URL", default="amqp://guest:guest@127.0.0.1:5672//"
+)
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="rpc://")
+CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
+CELERY_TASK_EAGER_PROPAGATES = env.bool(
+    "CELERY_TASK_EAGER_PROPAGATES", default=False
+)
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
+SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
+STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
+STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=True)
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
 
-STATIC_URL = "static/"
-STATIC_ROOT = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static"
 ASSET_DIR = "/home/ubuntu/cfpt/core-stack-backend/assets/"
 
 # Media files (User uploaded content)
@@ -288,6 +315,7 @@ EXCEL_DIR = resolve_env_path(
     default="$BACKEND_DIR/data/excel_files",
     trailing_sep=True,
 )
+DATA_DIR = resolve_env_path("DATA_DIR", default="$BACKEND_DIR/data")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -329,6 +357,11 @@ LOGGING = {
             "level": "DEBUG",
             "propagate": False,
         },
+        "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -359,6 +392,13 @@ PROD_GEOSERVER_PASSWORD = env("PROD_GEOSERVER_PASSWORD", default="")
 PROD_BACKEND_URL = env("PROD_BACKEND_URL", default="")
 PROD_BACKEND_API_KEY = env("PROD_BACKEND_API_KEY", default="")
 
+PROD_GEOSERVER_URL = env("PROD_GEOSERVER_URL", default="")
+PROD_GEOSERVER_USERNAME = env("PROD_GEOSERVER_USERNAME", default="")
+PROD_GEOSERVER_PASSWORD = env("PROD_GEOSERVER_PASSWORD", default="")
+
+PROD_BACKEND_URL = env("PROD_BACKEND_URL", default="")
+PROD_BACKEND_API_KEY = env("PROD_BACKEND_API_KEY", default="")
+
 
 CE_BUCKET_URL = env("CE_BUCKET_URL")
 EARTH_DATA_USER = env("EARTH_DATA_USER")
@@ -372,6 +412,16 @@ GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH = env("GEE_DATASETS_SERVICE_ACCOUNT_KEY_PA
 GCS_BUCKET_NAME = env("GCS_BUCKET_NAME")
 
 LOCAL_COMPUTE_API_URL = env("LOCAL_COMPUTE_API_URL")
+
+# MongoDB cache settings (optional)
+MONGODB_URI = env("MONGODB_URI", default="")
+MONGODB_DB_NAME = env("MONGODB_DB_NAME", default="core_stack")
+MONGODB_WATERBODIES_COLLECTION = env(
+    "MONGODB_WATERBODIES_COLLECTION", default="waterbodies_cache"
+)
+MONGODB_PUBLIC_API_V2_COLLECTION = env(
+    "MONGODB_PUBLIC_API_V2_COLLECTION", default="public_api_mws_v2_cache"
+)
 
 # NREGA settings
 NREGA_BUCKET = env("NREGA_BUCKET")
@@ -411,6 +461,7 @@ PLAN_REPORT_RECIPIENTS = env.list("PLAN_REPORT_RECIPIENTS", default=[])
 FERNET_KEY = env("FERNET_KEY")
 
 API_KEY = env("API_KEY", default="")
+RECAPTCHA_SECRET_KEY = env("RECAPTCHA_SECRET_KEY", default="")
 
 
 lulc_years = [

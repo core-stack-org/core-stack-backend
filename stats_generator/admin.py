@@ -59,4 +59,4 @@ class LayerInfoAdmin(admin.ModelAdmin):
 
     # Fields to be read-only
     readonly_fields = ("created_at", "updated_at")
-    list_editable = ["can_be_absent", "excel_to_be_generated"]
+    list_editable = ["can_be_absent", "excel_to_be_generated", "sheet_name"]

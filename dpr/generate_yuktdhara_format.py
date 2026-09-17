@@ -8,6 +8,7 @@ import pandas as pd
 from xml.sax.saxutils import escape
 import os
 from plans.models import PlanApp
+from .mapping import ICON_MAP
 
 logger = setup_logger(__name__)
 
@@ -149,6 +150,9 @@ def export_csv(
     logger.info(f"CSV exported successfully: {file_name}")
 
 
+DEFAULT_ICON = "https://maps.google.com/mapfiles/kml/pushpin/blue-pushpin.png"
+
+
 def csv_to_kml(csv_file, output_kml):
     df = pd.read_csv(csv_file).fillna("")
 
@@ -191,6 +195,23 @@ def csv_to_kml(csv_file, output_kml):
             continue
 
         kml_parts.append("<Placemark>")
+        work_demand = str(row.get("Work demand", "")).strip()
+        icon_href = ICON_MAP.get(work_demand, DEFAULT_ICON)
+
+        kml_parts.append("""
+        <Style>
+            <IconStyle>
+                <scale>1.2</scale>
+                <Icon>
+        """)
+
+        kml_parts.append(f"<href>{escape(icon_href)}</href>")
+
+        kml_parts.append("""
+                </Icon>
+            </IconStyle>
+        </Style>
+        """)
 
         # extended data
         kml_parts.append('<ExtendedData><SchemaData schemaUrl="#yuktdhara">')

@@ -9,6 +9,7 @@ import pymannkendall as mk
 import json
 
 from datetime import datetime
+from functools import lru_cache
 from shapely.geometry import Polygon, MultiPolygon, Point, LineString
 from shapely.ops import unary_union
 from scipy.spatial.distance import jensenshannon
@@ -33,6 +34,27 @@ JSON_FILE_PATH = os.path.join(
 
 # TODO: fix the path issue <> shiv and ksheetiz
 DATA_DIR_TEMP = env("EXCEL_DIR")
+
+
+# A single tehsil report fires off a dozen+ get_* calls that each re-read the
+# same workbook (often the same sheet, e.g. "croppingIntensity_annual" is
+# parsed 9 times per report). Caching per (file_path, mtime) means the file is
+# only opened/parsed once, and stale data is picked up automatically if the
+# workbook on disk is regenerated.
+@lru_cache(maxsize=64)
+def _get_excel_file(file_path, mtime):
+    return pd.ExcelFile(file_path)
+
+
+@lru_cache(maxsize=1024)
+def _read_sheet_cached(file_path, mtime, sheet_name):
+    return _get_excel_file(file_path, mtime).parse(sheet_name)
+
+
+def read_sheet(file_path, sheet_name):
+    """Cached drop-in replacement for pd.read_excel(file_path, sheet_name=...)."""
+    mtime = os.path.getmtime(file_path)
+    return _read_sheet_cached(file_path, mtime, sheet_name)
 
 
 # ? MARK: HELPER FUNCTIONS
@@ -151,30 +173,7 @@ def get_tehsil_data(state, district, block):
             + ".xlsx"
         )
         # * Area of the Tehsil
-        excel_file = pd.ExcelFile(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx"
-        )
-
-        df = pd.read_excel(
-            DATA_DIR_TEMP
-            + state.upper()
-            + "/"
-            + district.upper()
-            + "/"
-            + district.lower()
-            + "_"
-            + block.lower()
-            + ".xlsx",
-            sheet_name="terrain",
-        )
+        df = read_sheet(file_path, "terrain")
         df["area_in_ha"] = pd.to_numeric(df["area_in_ha"], errors="coerce")
 
         total_area = int(df["area_in_ha"].sum())
@@ -732,7 +731,7 @@ def get_pattern_intensity(state, district, block):
 
         block_patterns = load_block_patterns()
 
-        df_temp = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
+        df_temp = read_sheet(file_path, "croppingIntensity_annual")
 
         # Initialize dictionaries to track intensity and pattern details
         mws_pattern_intensity = {}
@@ -775,7 +774,7 @@ def get_pattern_intensity(state, district, block):
                         # Load each sheet
                         try:
                             for sheet in sheet_name:
-                                df = pd.read_excel(file_path, sheet_name=sheet)
+                                df = read_sheet(file_path, sheet)
                                 dataframes[sheet] = df
 
                             # Type 7 logic
@@ -870,7 +869,7 @@ def get_pattern_intensity(state, district, block):
                     # Handle single sheet
                     else:
                         try:
-                            df = pd.read_excel(file_path, sheet_name=sheet_name)
+                            df = read_sheet(file_path, sheet_name)
 
                             # Type 2: Class/category comparison
                             if indicator_type == 2:
@@ -1242,12 +1241,11 @@ def get_pattern_intensity(state, district, block):
 
                             if pattern_name == "caste":
                                 try:
-                                    df_social = pd.read_excel(
-                                        file_path,
-                                        sheet_name="social_economic_indicator",
+                                    df_social = read_sheet(
+                                        file_path, "social_economic_indicator"
                                     )
-                                    df_mws = pd.read_excel(
-                                        file_path, sheet_name="mws_intersect_villages"
+                                    df_mws = read_sheet(
+                                        file_path, "mws_intersect_villages"
                                     )
                                     total_population = 0
 
@@ -1299,11 +1297,9 @@ def get_pattern_intensity(state, district, block):
                             elif pattern_name == "nrega":
                                 # Only add if actual matched villages exist
                                 try:
-                                    df_nrega = pd.read_excel(
-                                        file_path, sheet_name="nrega_annual"
-                                    )
-                                    df_mws = pd.read_excel(
-                                        file_path, sheet_name="mws_intersect_villages"
+                                    df_nrega = read_sheet(file_path, "nrega_annual")
+                                    df_mws = read_sheet(
+                                        file_path, "mws_intersect_villages"
                                     )
                                     matched_villages = set()
 
@@ -1429,9 +1425,9 @@ def get_agri_water_stress_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_soge = pd.read_excel(file_path, sheet_name="soge_vector")
-        df_water = pd.read_excel(file_path, sheet_name="hydrological_annual")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_soge = read_sheet(file_path, "soge_vector")
+        df_water = read_sheet(file_path, "hydrological_annual")
 
         mws_pattern = {}
         mws_intensity = {}
@@ -1549,8 +1545,8 @@ def get_agri_water_drought_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_drought = pd.read_excel(file_path, sheet_name="croppingDrought_kharif")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_drought = read_sheet(file_path, "croppingDrought_kharif")
 
         mws_pattern = {}
         mws_intensity = {}
@@ -1752,8 +1748,8 @@ def get_agri_water_irrigation_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_water = pd.read_excel(file_path, sheet_name="surfaceWaterBodies_annual")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_water = read_sheet(file_path, "surfaceWaterBodies_annual")
 
         mws_pattern = {}
         mws_intensity = {}
@@ -1980,11 +1976,9 @@ def get_agri_low_yield_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_cropIntensity = pd.read_excel(
-            file_path, sheet_name="change_detection_cropintensity"
-        )
-        df_degrade = pd.read_excel(file_path, sheet_name="change_detection_degradation")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_cropIntensity = read_sheet(file_path, "change_detection_cropintensity")
+        df_degrade = read_sheet(file_path, "change_detection_degradation")
 
         ci_columns = [
             col for col in df_area.columns if col.startswith("cropping_intensity_")
@@ -2144,10 +2138,8 @@ def get_forest_degrad_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_degrade = pd.read_excel(
-            file_path, sheet_name="change_detection_deforestation"
-        )
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_degrade = read_sheet(file_path, "change_detection_deforestation")
 
         ci_columns = [
             col for col in df_area.columns if col.startswith("cropping_intensity_")
@@ -2301,8 +2293,8 @@ def get_mining_presence_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_mining = pd.read_excel(file_path, sheet_name="mining")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_mining = read_sheet(file_path, "mining")
 
         mws_pattern = {}
 
@@ -2386,7 +2378,7 @@ def get_socio_economic_caste_data(state, district, block):
             + ".xlsx"
         )
 
-        df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
+        df_social = read_sheet(file_path, "social_economic_indicator")
 
         village_pattern = {}
         village_intensity = {}
@@ -2516,9 +2508,9 @@ def get_socio_economic_nrega_data(state, district, block):
             + ".xlsx"
         )
 
-        df_nrega = pd.read_excel(file_path, sheet_name="nrega_annual")
-        df_mws_villages = pd.read_excel(file_path, sheet_name="mws_intersect_villages")
-        df_social = pd.read_excel(file_path, sheet_name="social_economic_indicator")
+        df_nrega = read_sheet(file_path, "nrega_annual")
+        df_mws_villages = read_sheet(file_path, "mws_intersect_villages")
+        df_social = read_sheet(file_path, "social_economic_indicator")
 
         ci_columns = [
             col for col in df_nrega.columns if col.startswith("Community assets_count")
@@ -2699,8 +2691,8 @@ def get_fishery_water_potential_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_water = pd.read_excel(file_path, sheet_name="surfaceWaterBodies_annual")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_water = read_sheet(file_path, "surfaceWaterBodies_annual")
 
         ci_columns = [
             col for col in df_area.columns if col.startswith("cropping_intensity_")
@@ -2974,11 +2966,9 @@ def get_agroforestry_transition_data(state, district, block):
             + ".xlsx"
         )
 
-        df_area = pd.read_excel(file_path, sheet_name="croppingIntensity_annual")
-        df_cropIntensity = pd.read_excel(
-            file_path, sheet_name="change_detection_cropintensity"
-        )
-        df_degrade = pd.read_excel(file_path, sheet_name="change_detection_degradation")
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+        df_cropIntensity = read_sheet(file_path, "change_detection_cropintensity")
+        df_degrade = read_sheet(file_path, "change_detection_degradation")
 
         mws_pattern = {}
         mws_intensity = {}

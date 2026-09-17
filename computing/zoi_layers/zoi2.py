@@ -19,10 +19,19 @@ def generate_zoi_ci(
     gee_account_id=None,
     proj_id=None,
     roi=None,
+    start_date=None,
+    end_date=None,
+    start_year=None,
+    end_year=None,
 ):
     from computing.cropping_intensity.cropping_intensity import (
         generate_cropping_intensity,
     )
+
+    if not start_date or not end_date or start_year is None or end_year is None:
+        raise ValueError(
+            "start_date, end_date, start_year, and end_year are required for ZOI CI."
+        )
 
     if state and district and block:
         asset_suffix = (
@@ -38,26 +47,26 @@ def generate_zoi_ci(
         + description_zoi
     )
 
-    description_ci = "zoi_cropping_intensity_" + asset_suffix
-    asset_id_ci = (
+    description_zoi_ci = f"cropping_intensity_zoi_{asset_suffix}"
+    asset_id_zoi_ci = (
         get_gee_dir_path(
             asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
         )
-        + description_ci
+        + description_zoi_ci
     )
-    delete_asset_on_GEE(asset_id_ci)
+    delete_asset_on_GEE(asset_id_zoi_ci)
     if roi:
         roi = ee.FeatureCollection(roi)
     else:
         roi = ee.FeatureCollection(asset_id_zoi)
     generate_cropping_intensity(
         roi_path=roi,
-        zoi_ci_asset=asset_id_ci,
+        zoi_ci_asset=asset_id_zoi_ci,
         asset_folder_list=asset_folder_list,
         asset_suffix=asset_suffix,
         app_type=app_type,
-        start_year=2017,
-        end_year=2024,
+        start_year=start_year,
+        end_year=end_year,
         gee_account_id=gee_account_id,
     )
     start_date = "2017-07-01"

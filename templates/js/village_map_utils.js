@@ -47,8 +47,8 @@ function createLocationPin(map, coordinate) {
             text: 'You are here',
             offsetY: -38,
             font: '11px Georgia, serif',
-            fill: new ol.style.Fill({ color: '#ffffff' }),
-            backgroundFill: new ol.style.Fill({ color: 'rgba(62,39,35,0.85)' }),
+            fill: new ol.style.Fill({ color: '#110e0eff' }),
+            backgroundFill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.85)' }),
             padding: [3, 6, 3, 6],
             backgroundStroke: new ol.style.Stroke({ color: 'transparent', width: 0 }),
             textBaseline: 'bottom'

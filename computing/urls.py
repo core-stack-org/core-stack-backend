@@ -20,6 +20,18 @@ urlpatterns = [
         name="hydrology_fortnightly",
     ),
     path("hydrology_annual/", api.generate_annual_hydrology, name="hydrology_annual"),
+    path(
+        "pan-india/hydrology_fortnightly/",
+        api.generate_pan_india_fortnightly_hydrology,
+        name="pan_india_hydrology_fortnightly",
+    ),
+    path(
+        "pan-india/hydrology_annual/",
+        api.generate_pan_india_annual_hydrology,
+        name="pan_india_hydrology_annual",
+    ),
+    path("runoff_gpu/", api.generate_runoff_gpu, name="runoff_gpu"),
+    path("et_download/", api.et_download, name="et_download"),
     path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
     path("lulc_v2_river_basin/", api.lulc_v2_river_basin, name="lulc_v2_river_basin"),
     path("lulc_v3_river_basin/", api.lulc_v3_river_basin, name="lulc_v3_river_basin"),
@@ -39,6 +51,11 @@ urlpatterns = [
         "generate_terrain_descriptor/",
         api.generate_terrain_descriptor,
         name="generate_terrain_descriptor",
+    ),
+    path(
+        "generate_terrain_compute_all/",
+        api.generate_terrain_compute_all,
+        name="generate_terrain_compute_all",
     ),
     path(
         "generate_terrain_raster/",
@@ -247,5 +264,101 @@ urlpatterns = [
     path(
         "refresh_cache/<str:workspace>/", api.refresh_layer_cache, name="refresh_cache"
     ),
+    path("spei/", api.generate_spei, name="spei"),
+    path(
+        "drought_resilience_resistance/",
+        api.drought_resilience_resistance,
+        name="drought_resilience_resistance",
+    ),
+    path(
+        "rainfall_resilience_resistance/",
+        api.rainfall_resilience_resistance,
+        name="rainfall_resilience_resistance",
+    ),
+    path(
+        "forest_fire_resilience_resistance/",
+        api.forest_fire_resilience_resistance,
+        name="forest_fire_resilience_resistance",
+    ),
+    path(
+        "high_wind_resilience_resistance/",
+        api.high_wind_resilience_resistance,
+        name="high_wind_resilience_resistance",
+    ),
+    path(
+        "generate_dem_raster_vector/",
+        api.generate_fabdem_raster_vector,
+        name="generate-dem-raster-vector",
+    ),
+    path(
+        "generate_canal_vector/",
+        api.generate_canal_vector,
+        name="generate-canal-vector",
+    ),
+    path(
+        "generate_river_data/",
+        api.generate_river_data,
+        name="generate-river-data",
+    ),
+    path(
+        "generate_density_vector/",
+        api.generate_drainage_density_data,
+        name="generate-drainage-density-vector",
+    ),
+    path(
+        "generate_antyodaya/",
+        api.generate_antyodaya,
+        name="generate_antyodaya",
+    ),
+    path(
+        "generate_livestocks/",
+        api.generate_livestocks,
+        name="generate_livestocks",
+    ),
+    path(
+        "generate_soil_health/",
+        api.generate_soil_health,
+        name="generate_soil_health",
+    ),
+    path(
+        "generate_soil_type/",
+        api.generate_soil_type,
+        name="generate_soil_type",
+    ),
+    path(
+        "generate_ltp_stp/",
+        api.generate_ltp_stp,
+        name="generate_ltp_stp",
+    ),
+    path(
+        "generate_ltp_stp_change/",
+        api.generate_ltp_stp_change,
+        name="generate_ltp_stp_change",
+    ),
     path("missing_excel/", api.missing_excel, name="missing_excel"),
+    path(
+        "generate_tree_in_grassland/",
+        api.generate_tree_in_grassland,
+        name="generate_tree_in_grassland",
+    ),
+    path(
+        "forest_fringe_degradation/",
+        api.forest_fringe_degradation,
+        name="forest_fringe_degradation",
+    ),
+    path(
+        "generate_forest_fire/",
+        api.generate_forest_fire,
+        name="generate_forest_fire",
+    ),
+    path(
+        "generate_et_downscale/",
+        api.et_downscale,
+        name="et_downscale",
+    ),
+    path(
+        "generate_forest_fringe/",
+        api.generate_forest_fringe,
+        name="generate_forest_fringe",
+    ),
 ]

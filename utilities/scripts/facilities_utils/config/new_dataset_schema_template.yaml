@@ -1,0 +1,37 @@
+new_source_key:
+  active: true
+  processor: table
+  raw_files:
+    - new_raw_file.csv
+  facility_class: add_matching_class_from_taxonomy
+  facility_uid_prefix: short_stable_prefix
+  id_col: source_unique_id_column
+  lat_col: latitude_column
+  lon_col: longitude_column
+
+  # Optional useful row properties.
+  name_col: null
+  subtype_col: null
+  facility_code_col: null
+  urban_rural_col: null
+  pincode_col: null
+  establishment_year_col: null
+  district_lgd_col: null
+  village_census11_col: null
+  village_name_col: null
+  coord_fallback_col: null
+  uid_strategy: id
+
+  # Optional text cleanup.
+  clean_text_cols: []
+
+  # Optional source-specific classes/fields to keep in class_k columns.
+  # Use only compact, useful fields. Do not duplicate class_l4_facility_subtype
+  # or standard columns such as urban_rural, pincode, and district_lgd.
+  class_k:
+    class_k1:
+      source: source_column_name
+      label: human_readable_meaning
+
+# If the source needs short code-to-label or subtype-to-class rules, add them
+# under mappings in facilities_master.yaml. Keep large lookup tables as files.

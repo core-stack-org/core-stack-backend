@@ -16,23 +16,23 @@ from utilities.constants import CRS_4326
 
 
 def calculate_g(
-    delta_g_asset_id,
-    asset_folder_list,
-    asset_suffix,
-    app_type,
-    start_date,
-    end_date,
-    is_annual,
-    gee_account_id,
+        delta_g_asset_id,
+        asset_folder_list,
+        asset_suffix,
+        app_type,
+        start_date,
+        end_date,
+        is_annual,
+        gee_account_id,
 ):
     layer_name = (
-        "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
-    ) + asset_suffix
+                     "deltaG_well_depth_" if is_annual else "deltaG_fortnight_"
+                 ) + asset_suffix
     asset_id = (
-        get_gee_dir_path(
-            asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-        )
-        + layer_name
+            get_gee_dir_path(
+                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+            )
+            + layer_name
     )
     end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d")
     if is_gee_asset_exists(asset_id):
@@ -50,15 +50,16 @@ def calculate_g(
 
         if layer_obj:
             db_end_date = layer_obj.misc["end_date"]
+            db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
+            existing_end_year = db_end_date.year
         else:
             roi = ee.FeatureCollection(asset_id)
             col_names = roi.first().propertyNames().getInfo()
             filtered_col = [col for col in col_names if col.startswith("20")]
             filtered_col.sort()
-            db_end_date = filtered_col[-1]  # .split("-")[0].split("_")[-1]
+            existing_end_year = filtered_col[-1].split("_")[-1]
 
-        db_end_date = datetime.datetime.strptime(db_end_date, "%Y-%m-%d")
-        if db_end_date.year < end_date.year:
+        if existing_end_year < end_date.year:
             ee.data.deleteAsset(asset_id)
         else:
             return asset_id

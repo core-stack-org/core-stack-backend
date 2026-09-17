@@ -7,7 +7,12 @@ from nrm_app.celery import app
 from utilities.logger import setup_logger
 from utilities.mailutils import send_email
 
-from .reports import generate_plan_details_csv, generate_summary_csv
+from .reports import (
+    generate_dpr_demand_overview_csv,
+    generate_plan_details_csv,
+    generate_resource_demand_status_csv,
+    generate_summary_csv,
+)
 
 logger = setup_logger(__name__)
 
@@ -30,6 +35,8 @@ def send_monthly_plan_report(self, force=False):
 
     details_csv = generate_plan_details_csv(now)
     summary_csv = generate_summary_csv(now)
+    dpr_demand_overview_csv = generate_dpr_demand_overview_csv(now)
+    resource_demand_status_csv = generate_resource_demand_status_csv(now)
     suffix = now.strftime("%b_%Y").lower()
 
     send_email(
@@ -38,6 +45,8 @@ def send_monthly_plan_report(self, force=False):
             f"Please find attached the monthly plan report for {month_label}.\n\n"
             f"1. Plan Details - Complete list of all plans\n"
             f"2. Summary - Overview with organization-level breakdown\n"
+            f"3. DPR & Demand Overview - DPR review/approval and demand-type counts for the month\n"
+            f"4. Resource & Demand Status - per-type status counts for the month\n"
         ),
         to_emails=recipients,
         attachments=[
@@ -49,6 +58,16 @@ def send_monthly_plan_report(self, force=False):
             {
                 "filename": f"plan_summary_{suffix}.csv",
                 "content": summary_csv,
+                "mimetype": "text/csv",
+            },
+            {
+                "filename": f"dpr_demand_overview_{suffix}.csv",
+                "content": dpr_demand_overview_csv,
+                "mimetype": "text/csv",
+            },
+            {
+                "filename": f"resource_demand_status_{suffix}.csv",
+                "content": resource_demand_status_csv,
                 "mimetype": "text/csv",
             },
         ],

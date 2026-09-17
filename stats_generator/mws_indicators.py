@@ -94,6 +94,10 @@ def generate_mws_data_for_kyl_filters(
                 "river": -1,
                 "lulc_vector": -1,
                 "drainage_density": -1,
+                "overall_tree_change": -1,
+                "soil_health": -1,
+                "soil_type": -1,
+                "change_detection_shrubchange": -1,
             }
 
             try:
@@ -263,8 +267,7 @@ def generate_mws_data_for_kyl_filters(
                     avg_triply_cropped = -9999
                     print(f"Error occurred: {e}")
 
-            
-            ##################### SWB #####################
+                ##################### SWB #####################
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -369,7 +372,7 @@ def generate_mws_data_for_kyl_filters(
                     if not df_swb_annual_mws_data.empty:
                         total_swb_area = df_swb_annual_mws_data.iloc[0][
                             "total_swb_area_in_ha"
-                    ]
+                        ]
 
                     if total_swb_area != 0:  # Check if total_swb_area is not zero
                         swb_area_kharif_columns = df_swb_annual_mws_data.filter(
@@ -423,7 +426,7 @@ def generate_mws_data_for_kyl_filters(
                         avg_perc_kharif_surface_water_mws = (
                             avg_perc_rabi_surface_water_mws
                         ) = avg_perc_zaid_surface_water_mws = 0
-                    
+
                 except:
                     avg_perc_kharif_surface_water_mws = (
                         avg_perc_rabi_surface_water_mws
@@ -454,7 +457,9 @@ def generate_mws_data_for_kyl_filters(
                 try:
                     G_Trend = (
                         hydro_annual_mws_data.filter(like="G")
-                        .drop(columns=hydro_annual_mws_data.filter(like="DeltaG").columns)
+                        .drop(
+                            columns=hydro_annual_mws_data.filter(like="DeltaG").columns
+                        )
                         .dropna()
                     )
                     G_Trend = G_Trend.squeeze().tolist()
@@ -901,7 +906,6 @@ def generate_mws_data_for_kyl_filters(
                 try:
                     lulc_shrub_percent = -9999
                     lulc_forest_percent = -9999
-                    lulc_crop_percent = -9999
 
                     lulc_df = sheets["lulc_vector"]
 
@@ -920,7 +924,7 @@ def generate_mws_data_for_kyl_filters(
                             shrub_cols = [
                                 col
                                 for col in lulc_df.columns
-                                if col.startswith("shrub_scrub_in_ha_")
+                                if col.startswith("shrub_scrub_area_in_ha_")
                             ]
 
                             lulc_shrub_area = round(
@@ -931,7 +935,7 @@ def generate_mws_data_for_kyl_filters(
                             forest_cols = [
                                 col
                                 for col in lulc_df.columns
-                                if col.startswith("tree_forest_in_ha_")
+                                if col.startswith("tree_forest_area_in_ha_")
                             ]
 
                             lulc_forest_area = round(
@@ -947,29 +951,34 @@ def generate_mws_data_for_kyl_filters(
                                 lulc_forest_percent = round(
                                     (lulc_forest_area / area_in_ha) * 100, 2
                                 )
-
-                        df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
-                            sheets["croppingIntensity_annual"]["UID"] == specific_mws_id
-                        ]
-
-                        crp_row = df_crp_intensity_mws_data.iloc[0]
-                        area_in_ha = float(crp_row.get("area_in_ha", 0))
-                        cropped_area_in_ha = float(crp_row.get("sum_area_in_ha", 0))
-
-                        lulc_crop_percent = round(
-                            (cropped_area_in_ha / area_in_ha) * 100, 2
-                        )
-
                     else:
                         lulc_shrub_percent = -9999
                         lulc_forest_percent = -9999
-                        lulc_crop_percent = -9999
                 except Exception as e:
                     print(f"Error in LULC vector: {e}")
 
                     lulc_shrub_percent = -9999
                     lulc_forest_percent = -9999
-                    lulc_crop_percent = -9999
+
+                ################### cropping intensity ###############
+                try:
+                    crop_df = sheets["croppingIntensity_annual"]
+                    if crop_df is not -1 and not crop_df.empty:
+                        df_crp_intensity_mws_data = crop_df[
+                            crop_df["UID"] == specific_mws_id
+                        ]
+                        if not df_crp_intensity_mws_data.empty:
+                            row = df_crp_intensity_mws_data.iloc[0]
+                            area_in_ha = float(row.get("area_in_ha", 0))
+                            cropped_area_in_ha = float(row.get("sum_area_in_ha", 0))
+
+                            lulc_crop_percent = round(
+                                (cropped_area_in_ha / area_in_ha) * 100, 2
+                            )
+                        else:
+                            lulc_crop_percent = -9999
+                except Exception as e:
+                    print(f"error in croppingIntensity_annual{e}")
 
                 ############ Canal ########################
                 try:
@@ -980,17 +989,142 @@ def generate_mws_data_for_kyl_filters(
                         ]
                         if not mws_drainage_density_data.empty:
                             row = mws_drainage_density_data.iloc[0]
-                            drainage_density = round(row["drainage_density_std_in_km_per_km2"], 2)
+                            drainage_density = round(
+                                row["drainage_density_std_in_km_per_km2"], 2
+                            )
                         else:
                             drainage_density = 0
 
                     else:
                         drainage_density = -9999
 
-
                 except Exception as e:
                     print(f"Error in getting drainage_density data: {e}")
                     drainage_density = -9999
+
+                ############ overall_tree_change #################
+                try:
+                    reduction_canopy_density_height = -9999
+                    increase_canopy_density_height = -9999
+                    overall_tree_change_df = sheets["overall_tree_change"]
+                    if (
+                        overall_tree_change_df is not -1
+                        and not overall_tree_change_df.empty
+                    ):
+                        overall_tree_change_data = overall_tree_change_df[
+                            overall_tree_change_df["UID"] == specific_mws_id
+                        ]
+                        if not overall_tree_change_data.empty:
+                            row = overall_tree_change_data.iloc[0]
+                            reduction_canopy_density_height = row.get(
+                                "degradation_in_percent", -9999
+                            )
+                            increase_canopy_density_height = row.get(
+                                "improvement_in_percent", -9999
+                            )
+                except Exception as e:
+                    print(f"Error in getting overall_tree_change data: {e}")
+
+                ########## soil health ###########
+                try:
+                    nitrogen_levels = -9999
+                    phosphoros_levels = -9999
+                    potassium_levels = -9999
+                    organic_carbon = -9999
+                    organic_carbon_tree_cover = -9999
+
+                    soil_health_df = sheets["soil_health"]
+                    if soil_health_df is not -1 and not soil_health_df.empty:
+                        soil_health_data = soil_health_df[
+                            soil_health_df["UID"] == specific_mws_id
+                        ]
+                        if not soil_health_data.empty:
+                            row = soil_health_data.iloc[0]
+                            nitrogen_levels = row.get("N_p50_in_kg_per_ha", -9999)
+                            phosphoros_levels = row.get("P_p50_in_kg_per_ha", -9999)
+                            potassium_levels = row.get("K_p50_in_kg_per_ha", -9999)
+                            organic_carbon = row.get("OC_p50_in_percent", -9999)
+                            organic_carbon_tree_cover = row.get(
+                                "OC_OLM_p50_in_percent", -9999
+                            )
+                except Exception as e:
+                    print(f"Error while fetching data for soil health {e}")
+
+                ###### soil type ###########
+                soil_type_drainage_class = {
+                    "Excessively drained": 0,
+                    "Somewhat excessively drained": 0,
+                    "Well drained": 1,
+                    "Moderately well drained": 1,
+                    "Imperfectly drained": 3,
+                    "Poorly drained": 2,
+                    "Very poorly drained": 2,
+                }
+                soil_type_texture_class = {
+                    "Clay (heavy)": 3,
+                    "Silty clay": 3,
+                    "Clay": 3,
+                    "Sandy clay": 3,
+                    "Sandy clay loam": 2,
+                    "Silty clay loam": 2,
+                    "Clay loam": 2,
+                    "Silt": 1,
+                    "Silt loam": 1,
+                    "Loam": 1,
+                    "sandy loam": 0,
+                    "Loamy sand": 0,
+                    "sand": 0,
+                }
+
+                try:
+                    soil_drainage = -9999
+                    soil_texture = -9999
+                    soil_ph = -9999
+
+                    soil_type_df = sheets["soil_type"]
+                    if soil_type_df is not -1 and not soil_type_df.empty:
+                        soil_type_data = soil_type_df[
+                            soil_type_df["UID"] == specific_mws_id
+                        ]
+                        if not soil_type_data.empty:
+                            row = soil_type_data.iloc[0]
+                            soil_drainage = soil_type_drainage_class.get(
+                                row.get("soil_drainage_classes", -9999), -9999
+                            )
+                            soil_texture = soil_type_texture_class.get(
+                                row.get("subsoil_texture", -9999), -9999
+                            )
+                            soil_ph = row.get("topsoil_ph", -9999)
+
+                except Exception as e:
+                    print(f"Error occured while fetching data for soil type {e}")
+
+                ####### change vector Shrubchange ##########
+                try:
+                    reduction_in_shrubland_cover = -9999
+
+                    change_detection_shrubchange_df = sheets[
+                        "change_detection_shrubchange"
+                    ]
+                    if (
+                        change_detection_shrubchange_df is not -1
+                        and not change_detection_shrubchange_df.empty
+                    ):
+                        change_detection_shrubchange_data = (
+                            change_detection_shrubchange_df[
+                                change_detection_shrubchange_df["UID"]
+                                == specific_mws_id
+                            ]
+                        )
+                        if not change_detection_shrubchange_data.empty:
+                            row = change_detection_shrubchange_data.iloc[0]
+                            reduction_in_shrubland_cover = row.get(
+                                "total_change_area_in_ha", -9999
+                            )
+                except Exception as e:
+                    print(
+                        f"error occured while fetching data for change_detection_shrubchange {e}"
+                    )
 
                 results.append(
                     {
@@ -1042,10 +1176,22 @@ def generate_mws_data_for_kyl_filters(
                         "lulc_forest_percent": lulc_forest_percent,
                         "lulc_crop_percent": lulc_crop_percent,
                         "drainage_density": drainage_density,
+                        "reduction_canopy_density_height": reduction_canopy_density_height,
+                        "increase_canopy_density_height": increase_canopy_density_height,
+                        "nitrogen_levels": nitrogen_levels,
+                        "phosphoros_levels": phosphoros_levels,
+                        "potassium_levels": potassium_levels,
+                        "organic_carbon": organic_carbon,
+                        "soil_drainage": soil_drainage,
+                        "soil_texture": soil_texture,
+                        "soil_ph": soil_ph,
+                        "organic_carbon_tree_cover": organic_carbon_tree_cover,
+                        "reduction_in_shrubland_cover": reduction_in_shrubland_cover,
                     }
                 )
 
             results_df = pd.DataFrame(results)
+            results_df = results_df.fillna(-9999)
             if file_type == "xlsx":
                 results_df.to_excel(file_xl_path + "_KYL_filter_data.xlsx", index=False)
             elif file_type == "json":
