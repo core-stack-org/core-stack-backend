@@ -188,10 +188,57 @@ def _s3_client():
         )
 
     if "aws_access_key_id" not in client_kwargs:
-        client_kwargs["config"] = Config(signature_version=UNSIGNED)
+        client_kwargs.setdefault("region_name", "ap-south-1")
+        client_kwargs["config"] = Config(
+            signature_version=UNSIGNED,
+            s3={"addressing_style": "virtual"},
+        )
         logger.info("Using anonymous S3 access for public-read base layers.")
 
     return boto3.client("s3", **client_kwargs)
+
+
+def _is_skippable_s3_error(exc: Exception) -> bool:
+    response = getattr(exc, "response", None) or {}
+    code = str(response.get("Error", {}).get("Code", "") or "")
+    status = str(response.get("ResponseMetadata", {}).get("HTTPStatusCode", "") or "")
+    message = str(exc)
+    if code in {"403", "404", "AccessDenied", "NoSuchKey", "Forbidden"}:
+        return True
+    if status in {"403", "404"}:
+        return True
+    return "403" in message or "404" in message or "Forbidden" in message
+
+
+def _stream_to_file(body, destination: Path, chunk_size: int = 8 * 1024 * 1024):
+    with open(destination, "wb") as handle:
+        while True:
+            chunk = body.read(chunk_size)
+            if not chunk:
+                break
+            handle.write(chunk)
+
+
+def _s3_http_urls(bucket: str, key: str, region: str | None = None) -> list[str]:
+    region = region or "ap-south-1"
+    return [
+        f"https://{bucket}.s3.{region}.amazonaws.com/{key}",
+        f"https://s3.{region}.amazonaws.com/{bucket}/{key}",
+        f"https://{bucket}.s3.amazonaws.com/{key}",
+        f"https://s3.amazonaws.com/{bucket}/{key}",
+    ]
+
+
+def _download_http_file(url: str, destination: Path):
+    from urllib.error import HTTPError
+    from urllib.request import Request, urlopen
+
+    request = Request(url, method="GET")
+    try:
+        with urlopen(request, timeout=600) as response:
+            _stream_to_file(response, destination)
+    except HTTPError as exc:
+        raise RuntimeError(f"HTTP {exc.code} downloading {url}") from exc
 
 
 def _download_s3_file(source: str, destination: Path):
@@ -199,21 +246,44 @@ def _download_s3_file(source: str, destination: Path):
     if parsed.scheme != "s3" or not parsed.netloc or not parsed.path:
         raise ValueError(f"Invalid S3 source: {source}")
 
+    bucket = parsed.netloc
+    key = parsed.path.lstrip("/")
     destination.parent.mkdir(parents=True, exist_ok=True)
     temp_destination = destination.with_suffix(destination.suffix + ".part")
 
     logger.info("Downloading %s to %s", source, destination)
+    errors = []
     try:
-        _s3_client().download_file(
-            parsed.netloc,
-            parsed.path.lstrip("/"),
-            str(temp_destination),
-        )
+        response = _s3_client().get_object(Bucket=bucket, Key=key)
+        _stream_to_file(response["Body"], temp_destination)
         temp_destination.replace(destination)
+        return
+    except Exception as exc:
+        errors.append(exc)
+        if _is_skippable_s3_error(exc):
+            if temp_destination.exists():
+                temp_destination.unlink()
+            raise
+        logger.warning(
+            "S3 GetObject failed for %s (%s); trying public HTTPS URLs.",
+            source,
+            exc,
+        )
+
+    try:
+        for url in _s3_http_urls(bucket, key):
+            try:
+                logger.info("Downloading %s", url)
+                _download_http_file(url, temp_destination)
+                temp_destination.replace(destination)
+                return
+            except Exception as exc:
+                errors.append(exc)
+        raise errors[-1]
     except Exception:
         if temp_destination.exists():
             temp_destination.unlink()
-        raise
+        raise errors[0]
 
 
 def ensure_manifest_base_layers(*layers):
@@ -265,7 +335,18 @@ def ensure_manifest_base_layers(*layers):
                 continue
 
             if source.startswith("s3://"):
-                _download_s3_file(source, local_path)
+                try:
+                    _download_s3_file(source, local_path)
+                except Exception as exc:
+                    if _is_skippable_s3_error(exc):
+                        logger.warning(
+                            "Skipping base layer %s; %s is not publicly readable: %s",
+                            layer["name"],
+                            source,
+                            exc,
+                        )
+                        continue
+                    raise
             else:
                 raise ValueError(
                     f"Unsupported source for base layer '{layer['name']}': {source}"
