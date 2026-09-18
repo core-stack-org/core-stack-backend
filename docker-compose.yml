@@ -47,6 +47,16 @@ x-backend-env: &backend-env
   S3_REGION: ${S3_REGION:-}
   S3_BUCKET: ${S3_BUCKET:-}
   SKIP_LAYER_SETUP: ${SKIP_LAYER_SETUP:-0}
+  # Outbound proxy passthrough for campus/corporate networks. Empty when the
+  # host sets no proxy, which every HTTP client treats as "no proxy".
+  # Service names are always appended so container-to-container traffic
+  # (GeoServer REST, Postgres) never goes through the proxy.
+  HTTP_PROXY: ${HTTP_PROXY:-${http_proxy:-}}
+  HTTPS_PROXY: ${HTTPS_PROXY:-${https_proxy:-}}
+  http_proxy: ${HTTP_PROXY:-${http_proxy:-}}
+  https_proxy: ${HTTPS_PROXY:-${https_proxy:-}}
+  NO_PROXY: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,geoserver,backend
+  no_proxy: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,geoserver,backend
   ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
   DEBUG: "True"
   LAYER_GENERATION_SYNC_MODE: "True"
