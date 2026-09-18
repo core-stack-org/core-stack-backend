@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from celery.utils.log import get_task_logger
+from django.conf import settings
 
 from nrm_app.celery import app
 
@@ -17,6 +18,15 @@ from computing.config_loader import (
     TERRAIN_RASTER_PATH,
 )
 from utilities.gee_utils import valid_gee_text
+
+# computing.hydrology_gpu.runoff (and its downloads/algorithms submodules)
+# require cupy/CUDA, so only import them on GPU-enabled machines.
+if settings.GPU_AVAILABLE:
+    from computing.hydrology_gpu import runoff as hydro_runoff
+    from computing.hydrology_gpu.downloads import dem
+else:
+    hydro_runoff = None
+    dem = None
 
 
 DATA_ROOT = PROJECT_ROOT / "data"
@@ -258,6 +268,12 @@ def run_runoff_gpu_local(
     start_year=None,
     end_year=None,
 ):
+    if not settings.GPU_AVAILABLE:
+        raise RuntimeError(
+            "runoff_gpu requires a CUDA GPU with cupy installed; set "
+            "GPU_AVAILABLE=True in nrm_app/.env on a GPU-enabled machine."
+        )
+
     _ensure_default_inputs_exist()
     pan_india = _parse_bool(pan_india)
     start_date, end_date, lulc_start_year, lulc_end_year = _resolve_dates(
@@ -280,9 +296,6 @@ def run_runoff_gpu_local(
     )
 
     with _working_directory(PROJECT_ROOT):
-        from computing.hydrology_gpu import runoff as hydro_runoff
-        from computing.hydrology_gpu.downloads import dem
-
         hydro_runoff.validate_local_raster(args.local_lulc, "--local-lulc")
         hydro_runoff.validate_local_raster(args.local_soil, "--local-soil")
         watershed_root = ensure_runoff_tehsil_watersheds()
