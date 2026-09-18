@@ -297,6 +297,11 @@ SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
 STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
 STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=True)
 
+# Set to True only on machines with a CUDA GPU and cupy installed
+# (see installation/environment.yml). Gates GPU-only local hydrology compute
+# (computing/hydrology_gpu/, computing/mws/runoff_gpu.py).
+GPU_AVAILABLE = env.bool("GPU_AVAILABLE", default=False)
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 AUTH_USER_MODEL = "users.User"
@@ -315,7 +320,6 @@ EXCEL_DIR = resolve_env_path(
     default="$BACKEND_DIR/data/excel_files",
     trailing_sep=True,
 )
-DATA_DIR = resolve_env_path("DATA_DIR", default="$BACKEND_DIR/data")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field

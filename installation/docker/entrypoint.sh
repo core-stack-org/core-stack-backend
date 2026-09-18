@@ -120,15 +120,6 @@ ensure_dirs() {
     touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
 }
 
-ensure_migration_packages() {
-    echo "Ensuring Django migration packages exist..."
-    cd "$BACKEND_DIR"
-    while IFS= read -r f; do
-        mkdir -p "$(dirname "$f")/migrations"
-        touch "$(dirname "$f")/migrations/__init__.py"
-    done < <(find . -maxdepth 2 -name "apps.py" -type f)
-}
-
 maybe_download_admin_boundary() {
     if [ "${DOWNLOAD_ADMIN_BOUNDARY:-1}" != "1" ]; then
         echo "Skipping admin-boundary download (DOWNLOAD_ADMIN_BOUNDARY=${DOWNLOAD_ADMIN_BOUNDARY})."
@@ -144,6 +135,10 @@ maybe_download_admin_boundary() {
 }
 
 download_tehsil_watersheds_from_geoserver() {
+    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
+        echo "Skipping tehsil watershed setup (SKIP_LAYER_SETUP=1)."
+        return 0
+    fi
     if [ -f /opt/corestack-scripts/download-data.sh ]; then
         DOWNLOAD_TEHSIL_WATERSHEDS_ONLY=1 bash /opt/corestack-scripts/download-data.sh
     elif [ -f /usr/local/bin/download-data.sh ]; then
@@ -158,7 +153,6 @@ run_database() {
     python manage.py collectstatic --noinput --clear --skip-checks
 
     echo "Building Django database (makemigrations + migrate)..."
-    ensure_migration_packages
     python manage.py makemigrations --skip-checks
     python manage.py migrate --fake-initial --skip-checks
 
@@ -166,16 +160,6 @@ run_database() {
         echo "Loading seed data..."
         python manage.py loaddata --skip-checks "$SEED_FILE" || true
         python manage.py seed_default_plantation --skip-checks || true
-        echo "Writing activated locations JSON..."
-        python manage.py shell --skip-checks <<'PY' || true
-from geoadmin.signals import generate_activated_locations_json_data
-
-try:
-    generate_activated_locations_json_data()
-    print("activated_locations json ready")
-except Exception as exc:
-    print(f"WARNING: could not write activated_locations json: {exc}")
-PY
     fi
 
     echo "Ensuring installer superuser..."

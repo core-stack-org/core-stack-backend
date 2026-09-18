@@ -5,6 +5,8 @@ period start and within the administrative jurisdiction, and then computes the a
 hectares represented by observed and predicted deforestation.
 """
 
+import os
+
 import rasterio
 import numpy as np
 import pandas as pd
@@ -14,7 +16,7 @@ from rasterio.warp import reproject, Resampling
 
 
 def get_deforestation_area_estimation(
-    district_name, start_year, mid_pt, end_year, DATA_DIR
+    district_name, start_year, mid_pt, end_year, BASE_DIR, DATA_DIR
 ):
     # Directory that contains the generated prediction and mask rasters.
     # LABEL_BAND = "remapped"  # "9_deforestation"
@@ -39,12 +41,12 @@ def get_deforestation_area_estimation(
 
     def evaluate_area(cfg: RunConfig) -> dict:
         # TODO: this year tag is currently hard-coded until the full model pipeline is unified.
-        predict_year = "2010_15"
+        # predict_year = "2010_15"
 
-        if cfg.ex_ante:
-            suffix = "ex_ante"
-        else:
-            suffix = "ex_post"
+        # if cfg.ex_ante:
+        #     suffix = "ex_ante"
+        # else:
+        #     suffix = "ex_post"
 
         if cfg.udef_arp:
             pred_tif = DATA_DIR + "/Acre_Adjucted_Density_Map_VP.tif"
@@ -52,10 +54,10 @@ def get_deforestation_area_estimation(
         # elif cfg.counterfactual:
         #     pred_tif = PRED_DIR + f"counterfactual_prediction_FULL_{predict_year}_ex_{'ante' if cfg.ex_ante else 'post'}.tif"
 
-        else:
-            pred_tif = (
-                DATA_DIR + f"/deforestation_prob_{predict_year}_full_{suffix}.tif"
-            )
+        # else:
+        #     pred_tif = (
+        #         DATA_DIR + f"/deforestation_prob_{predict_year}_full_{suffix}.tif"
+        #     )
 
         # gt_tif = (
         #     DATA_DIR + f"/deforestation_map_{start_year}_{mid_pt}_gd.tif"  # TODO
@@ -181,13 +183,16 @@ def get_deforestation_area_estimation(
 
         return {
             "run": cfg.name,
-            "total_area_ha": total_area_ha,
-            "predicted_area_ha": predicted_area,
-            "ground_truth_area_ha": gt_area,
-            "area_difference_ha": diff,
-            "relative_error": rel_error,
-            "gt_fraction_of_total": gt_fraction,
-            "pred_fraction_of_total": pred_fraction,
+            "start_year": start_year,
+            "mid_year": mid_pt,
+            "end_year": end_year,
+            "total_forest_area_ha": total_area_ha,
+            "predicted_deforestation_area_ha": predicted_area,
+            "ground_truth_deforestation_area_ha": gt_area,
+            "deforestation_area_difference_ha": diff,
+            "deforestation_area_relative_error": rel_error,
+            "gt_deforestation_area_fraction_of_total": gt_fraction,
+            "pred_deforestation_area_fraction_of_total": pred_fraction,
         }
 
     results = []
@@ -201,9 +206,39 @@ def get_deforestation_area_estimation(
     df = pd.DataFrame(results)
 
     # Save the summary metrics to disk for downstream analysis or reporting.
-    out_csv = DATA_DIR + "/deforestation_area_estimates.csv"
+    out_csv = BASE_DIR + "/deforestation_area_estimates.csv"
 
-    df.to_csv(out_csv, index=False)
+    # A run is uniquely identified by its three period boundaries. Replace a
+    # prior row for the same period and retain all other periods.
+    if os.path.exists(out_csv):
+        existing_df = pd.read_csv(out_csv)
+    else:
+        existing_df = pd.DataFrame(columns=df.columns)
+
+    existing_df = existing_df.drop(
+        columns=["cumulative_additionality_ha"], errors="ignore"
+    )
+    all_columns = list(dict.fromkeys([*existing_df.columns, *df.columns]))
+    existing_df = existing_df.reindex(columns=all_columns)
+    df = df.reindex(columns=all_columns)
+
+    # Older reports may not contain period columns. They remain in the report,
+    # but cannot be matched to a new period-specific result.
+    period_columns = ["start_year", "mid_year", "end_year"]
+    if all(column in existing_df.columns for column in period_columns):
+        same_period = (
+            (pd.to_numeric(existing_df["start_year"], errors="coerce") == start_year)
+            & (pd.to_numeric(existing_df["mid_year"], errors="coerce") == mid_pt)
+            & (pd.to_numeric(existing_df["end_year"], errors="coerce") == end_year)
+        )
+        existing_df = existing_df.loc[~same_period]
+
+    # Remove summary rows written by earlier versions of this report.
+    existing_df = existing_df.loc[
+        existing_df["run"].fillna("") != "cumulative_additionality"
+    ]
+    report_df = pd.concat([existing_df, df], ignore_index=True)
+    report_df.to_csv(out_csv, index=False)
 
     print("\n=== Deforestation Area Estimates (ha) ===")
-    print(df)
+    print(report_df)
