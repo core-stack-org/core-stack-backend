@@ -1,10 +1,5 @@
 # import
-from nrm_app.settings import (
-    GCS_BUCKET_NAME as SETTINGS_GCS_BUCKET_NAME,
-    GEE_STORAGE_PROJECT,
-    GEE_STORAGE_PROJECT_HELPER,
-    GEOSERVER_URL,
-)
+from nrm_app.settings import GEE_STORAGE_PROJECT, GEE_STORAGE_PROJECT_HELPER
 
 # Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
@@ -176,7 +171,7 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 )
 
 # MARK: GEE Paths
-GCS_BUCKET_NAME = SETTINGS_GCS_BUCKET_NAME or "core_stack"
+GCS_BUCKET_NAME = "core_stack"
 
 GEE_LITHOLOGY_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
@@ -250,7 +245,7 @@ DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
 GLOBAL_DRAINAGE_EPS_M = 10.0
-GEOSERVER_BASE = (GEOSERVER_URL or "https://geoserver.core-stack.org:8443/geoserver/").rstrip("/") + "/"
+GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
 WORKSPACE_URL_END = "wms?service=WMS&request=GetCapabilities"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
