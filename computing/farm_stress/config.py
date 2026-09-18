@@ -80,7 +80,6 @@ LOCAL_DIR_MONSOON_ONSET = os.path.join(LOCAL_EXPORT_ROOT, "monsoon_onset")
 # 11km rainfall field resampled (bilinear) onto a 500m grid - no new
 # rainfall information is created - fused with PET at its true native
 # 500m resolution, which is where the real spatial detail comes from.
-# SPI-1 stays at 11km (rainfall-only, so upsampling it gains nothing).
 # Full timeseries (not just params) is generated, per the user, matching
 # the original 11km SPEI-3's analog-year-lookup requirement.
 LOCAL_DIR_GSMAP_500M = os.path.join(LOCAL_EXPORT_ROOT, "gsmap_500m")
@@ -90,6 +89,13 @@ LOCAL_DIR_SPEI3_PARAMS_500M = os.path.join(LOCAL_EXPORT_ROOT, "spei3_params_500m
 LOCAL_DIR_SPEI3_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries_500m")
 GCS_PATH_GSMAP_500M = "ksheetiz/farm_stress/gsmap_500m/"
 GCS_PATH_MODIS_PET_500M = "ksheetiz/farm_stress/modis_pet_500m/"
+
+# SPI-1 at 500m - later decision to also bring SPI-1 up from 11km,
+# reusing the same 500m rainfall already downloaded for SPEI-3 (SPI-1 is
+# rainfall-only, so no new export needed here at all). Same yearly-banded
+# layout as everything else at 500m.
+LOCAL_DIR_SPI1_PARAMS_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_params_500m")
+LOCAL_DIR_SPI1_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_timeseries_500m")
 
 # VCI (Script 03a) - the 26 yearly multi-band VCI COGs (one file per year,
 # up to 23 bands = 16-day periods) were exported to GEE, downloaded via
