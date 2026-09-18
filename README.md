@@ -6,6 +6,22 @@ Please find [full CoRE-Stack documentation](https://docs.core-stack.org/) and de
 
 ### Installation
 
+#### Docker (pull and run)
+
+To try the stack without installing Conda, Postgres, or Apache, pull the public image and start Compose. See **[installation/DOCKER.md](installation/DOCKER.md)**.
+
+```bash
+git clone https://github.com/core-stack-org/core-stack-backend.git
+cd core-stack-backend
+mkdir -p gee_confs
+docker compose pull
+docker compose up -d
+```
+
+Django: http://localhost:8000 &nbsp; GeoServer: http://localhost:8080/geoserver (`admin` / `geoserver`)
+
+#### Native installer
+
 We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
 - Installs **Miniconda** and sets up the Python environment
 - Installs & configures **PostgreSQL**
