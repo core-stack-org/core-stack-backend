@@ -1,5 +1,10 @@
 # import
-from nrm_app.settings import GEE_STORAGE_PROJECT, GEE_STORAGE_PROJECT_HELPER
+from nrm_app.settings import (
+    GCS_BUCKET_NAME as SETTINGS_GCS_BUCKET_NAME,
+    GEE_STORAGE_PROJECT,
+    GEE_STORAGE_PROJECT_HELPER,
+    GEOSERVER_URL,
+)
 
 # Directory Path
 ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
@@ -171,7 +176,7 @@ ODK_SYNC_URL_AGRI_FEEDBACK = (
 )
 
 # MARK: GEE Paths
-GCS_BUCKET_NAME = "core_stack"
+GCS_BUCKET_NAME = SETTINGS_GCS_BUCKET_NAME or "core_stack"
 
 GEE_LITHOLOGY_ASSET_PATH = "projects/ee-corestackdev/assets/apps/mws/"
 
@@ -245,7 +250,7 @@ DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
 GLOBAL_DRAINAGE_EPS_M = 10.0
-GEOSERVER_BASE = "https://geoserver.core-stack.org:8443/geoserver/"
+GEOSERVER_BASE = (GEOSERVER_URL or "https://geoserver.core-stack.org:8443/geoserver/").rstrip("/") + "/"
 WORKSPACE_URL_END = "wms?service=WMS&request=GetCapabilities"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
@@ -344,7 +349,7 @@ LIVESTOCK_GEOSERVER_WORKSPACE = "livestocks"
 
 # other
 FIRST_COMPUTING_API_PATH = "/api/v1/generate_block_layer/"
-WBC = "projects/ext-datasets/assets/datasets/WBC_"
+WBC = "projects/ext-datasets/assets/datasets/WBC/WBC_"
 WATERREJUVENATION_PROJECT = GEE_STORAGE_PROJECT
 
 # Plantation
@@ -370,7 +375,10 @@ PLANTATION_SITE_SCORE = "projects/ee-plantationsitescores/assets/so_thinned2"
 CCD_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ccd_"
 CH_RASTER = "projects/corestack-trees/assets/tree_characteristics/modal_ch_"
 TREE_OVERALL_CHANGE = (
-    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2022"
+    "projects/corestack-trees/assets/tree_characteristics/overall_change_2017_2023"
+)
+LTP_STP_CHANGE = (
+    "projects/corestack-trees/assets/tree_characteristics/ltp_stp_change_2017_2024"
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"

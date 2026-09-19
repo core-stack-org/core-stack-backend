@@ -13,7 +13,8 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
-from utilities.constants import GEE_PATHS
+from gee_computing.models import GEEAccount
+from utilities.constants import GEE_PATHS, AEZ, MWS_DATASET
 from utilities.gee_utils import (
     ee_initialize,
     check_task_status,
@@ -32,16 +33,44 @@ from .tree_in_grassland_utils import (
 )
 
 
+def tree_in_grassland_for_AEZ(aez_no, start_year=None, end_year=None, gee_account_id=7):
+    ee_initialize(gee_account_id)
+    aez = ee.FeatureCollection(AEZ)
+    mwses = ee.FeatureCollection(MWS_DATASET)
+
+    filter_aez = aez.filter(ee.Filter.eq("ae_regcode", aez_no))
+    roi = mwses.filterBounds(filter_aez.geometry())
+
+    asset_suffix = f"AEZ_{aez_no}"
+    asset_folder_list = ["tree_in_grassland"]
+    generate_tree_in_grassland_layer(
+        roi=roi,
+        asset_suffix=asset_suffix,
+        asset_folder_list=asset_folder_list,
+        start_year=start_year,
+        end_year=end_year,
+        gee_account_id=gee_account_id,
+        app_type="tree_in_grassland",
+        sync_to_db=False,
+        sync_to_geoserver=False,
+    )
+
+
 @app.task(bind=True)
 def generate_tree_in_grassland_layer(
         self,
-        state,
-        district,
-        block,
-        start_year,
-        end_year,
+        state=None,
+        district=None,
+        block=None,
+        roi=None,
+        asset_suffix=None,
+        asset_folder_list=None,
+        start_year=None,
+        end_year=None,
         gee_account_id=None,
         app_type="MWS",
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """
     Generate tree-in-grassland context metrics as a vector layer.
@@ -75,45 +104,42 @@ def generate_tree_in_grassland_layer(
         app_type:       str – application type key in GEE_PATHS (default "MWS").
     """
     # ------------------------------------------------------------------
-    # STEP 1: Initialize GEE and set up paths
+    # Initialize GEE and set up paths
     # ------------------------------------------------------------------
     ee_initialize(gee_account_id)
 
     start_year = int(start_year)
     end_year = int(end_year)
 
-    asset_suffix = (
-            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
-    )
-    asset_folder_list = [state, district, block]
+    if state and district and block:
+        asset_suffix = (
+                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+        )
+        asset_folder_list = [state, district, block]
 
-    description = f"tree_in_grassland_{asset_suffix}_{start_year}_{end_year}"
-    layer_name = f"{asset_suffix}_tree_in_grassland"
-
-    asset_id = (
-            get_gee_dir_path(
-                asset_folder_list,
-                asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
-            )
-            + description
-    )
-    print(f"Tree in Grassland pipeline started: {asset_id=}")
-
-    # ------------------------------------------------------------------
-    # STEP 2: Set up ROI (MWS boundaries from GEE)
-    # ------------------------------------------------------------------
-    roi_path = (
+        roi = ee.FeatureCollection(
             get_gee_dir_path(
                 asset_folder_list,
                 asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"],
             )
             + f"filtered_mws_{valid_gee_text(district.lower())}"
             + f"_{valid_gee_text(block.lower())}_uid"
-    )
-    mws_fc = ee.FeatureCollection(roi_path)
+        )
+
+    description = f"tree_in_grassland_{asset_suffix}_{start_year}_{end_year}"
+    layer_name = f"{asset_suffix}_tree_in_grassland"
+
+    if app_type in GEE_PATHS:
+        asset_path = GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+    else:
+        gee_obj = GEEAccount.objects.get(pk=gee_account_id)
+        asset_path = f"projects/{gee_obj.name}/assets/"
+
+    asset_id = get_gee_dir_path(asset_folder_list, asset_path=asset_path) + description
+    print(f"Tree in Grassland pipeline started: {asset_id=}")
 
     # ------------------------------------------------------------------
-    # STEP 3: Compute tree-in-grassland metrics
+    # Compute tree-in-grassland metrics
     # ------------------------------------------------------------------
     if not is_gee_asset_exists(asset_id):
 
@@ -189,32 +215,48 @@ def generate_tree_in_grassland_layer(
 
             return f.set(
                 {
-                    "grassland_area_in_ha": grassland_area,
-                    "tree_in_shrub_area_in_ha": tree_in_shrub_area,
+                    "shrubs_trees_area_in_ha": grassland_area,
+                    "tree_in_shrubs_trees_area_in_ha": tree_in_shrub_area,
                     "isolated_shrub_area_in_ha": area(
                         lulc_start.eq(12).And(context_start.eq(0))
                     ),
                     "shrubland_area_in_ha": area(lulc_start.eq(12)),
-                    "tree_loss_area_in_ha": tree_loss_area,
-                    "tree_loss_to_grassland_ratio": ee.Number(tree_loss_area).divide(
-                        grassland_area
+                    "tree_loss_in_tree_in_shrub_area_in_ha": tree_loss_area,
+                    "tree_in_tree_in_shrub_to_barren_area_in_ha": area(tree_to_barren),
+                    "tree_in_tree_in_shrub_to_built_area_in_ha": area(to_built),
+                    "tree_in_tree_in_shrub_to_kharif_water_area_in_ha": area(to_kharif),
+                    "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha": area(
+                        to_kharif_rabi
                     ),
-                    "tree_loss_to_tree_in_shrub_ratio": ee.Number(
-                        tree_loss_area
-                    ).divide(tree_in_shrub_area),
-                    "tree_shrub_to_barren_area_in_ha": area(tree_to_barren),
-                    "tree_shrub_to_built_area_in_ha": area(to_built),
-                    "tree_shrub_to_kharif_water_area_in_ha": area(to_kharif),
-                    "tree_shrub_to_kharif_rabi_water_area_in_ha": area(to_kharif_rabi),
-                    "tree_shrub_to_kharif_rabi_zaid_water_area_in_ha": area(to_zaid),
-                    "tree_shrub_to_crops_area_in_ha": area(to_crops),
+                    "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha": area(
+                        to_zaid
+                    ),
+                    "tree_in_tree_in_shrub_to_crops_area_in_ha": area(to_crops),
                 }
             )
 
-        fc = mws_fc.map(compute_stats)
+        results_fc = roi.map(compute_stats)
+
+        fc = results_fc.select(
+            [
+                "uid",
+                "area_in_ha",
+                "shrubland_area_in_ha",
+                "isolated_shrub_area_in_ha",
+                "shrubs_trees_area_in_ha",
+                "tree_in_shrubs_trees_area_in_ha",
+                "tree_loss_in_tree_in_shrub_area_in_ha",
+                "tree_in_tree_in_shrub_to_barren_area_in_ha",
+                "tree_in_tree_in_shrub_to_built_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha",
+                "tree_in_tree_in_shrub_to_crops_area_in_ha",
+            ]
+        )
 
         # --------------------------------------------------------------
-        # STEP 4: Export to GEE
+        # Export to GEE
         # --------------------------------------------------------------
         task_id = export_vector_asset_to_gee(fc, description, asset_id)
         if task_id:
@@ -222,7 +264,7 @@ def generate_tree_in_grassland_layer(
             print("Tree in Grassland layer exported to GEE.")
 
     # ------------------------------------------------------------------
-    # STEP 5: Publish to GeoServer and save metadata to DB
+    # Publish to GeoServer and save metadata to DB
     # ------------------------------------------------------------------
     layer_at_geoserver = _save_to_db_and_sync_to_geoserver(
         layer_name=layer_name,
@@ -233,6 +275,8 @@ def generate_tree_in_grassland_layer(
         state=state,
         district=district,
         block=block,
+        sync_to_db=sync_to_db,
+        sync_to_geoserver=sync_to_geoserver,
     )
     return layer_at_geoserver
 
@@ -251,12 +295,14 @@ def _save_to_db_and_sync_to_geoserver(
         state=None,
         district=None,
         block=None,
+        sync_to_db=True,
+        sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Tree in Grassland: save_to_db_and_sync_to_geoserver")
 
     layer_id = None
-    if state and district and block:
+    if sync_to_db and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,
@@ -271,15 +317,16 @@ def _save_to_db_and_sync_to_geoserver(
         )
 
     make_asset_public(asset_id)
+    if sync_to_geoserver:
+        layer_at_geoserver = False
+        fc = ee.FeatureCollection(asset_id)
+        res = sync_fc_to_geoserver(fc, asset_suffix, layer_name, "tree_in_grassland")
+        print(res)
 
-    fc = ee.FeatureCollection(asset_id)
-    res = sync_fc_to_geoserver(fc, state, layer_name, "tree_in_grassland")
-    print(res)
+        if res["status_code"] == 201 and layer_id:
+            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            print("Tree in Grassland: sync to geoserver flag updated")
+            layer_at_geoserver = True
 
-    layer_at_geoserver = False
-    if res["status_code"] == 201 and layer_id:
-        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-        print("Tree in Grassland: sync to geoserver flag updated")
-        layer_at_geoserver = True
-
-    return layer_at_geoserver
+        return layer_at_geoserver
+    return False

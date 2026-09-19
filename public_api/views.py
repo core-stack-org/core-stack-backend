@@ -487,9 +487,12 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
     return {"Mws_report_url": report_url}, None
 
 
-def get_mws_geometry(state, district, tehsil, mws_id):
+def get_mws_geometry(state, district, tehsil, mws_id=None):
     """
-    Fetch GeoJSON geometry for a single MWS uid from the generated MWS layer.
+    Fetch GeoJSON geometry from the generated MWS layer.
+
+    When ``mws_id`` is set, return that one feature. When it is omitted, return
+    every MWS in the tehsil as a GeoJSON FeatureCollection.
     """
     ee_initialize(GEE_HELPER_ACCOUNT_ID)
     asset_path = get_gee_asset_path(state, district, tehsil)
@@ -503,22 +506,38 @@ def get_mws_geometry(state, district, tehsil, mws_id):
 
     try:
         mws_fc = ee.FeatureCollection(mws_asset_id)
-        matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
-        feature_info = (
-            matching_feature.getInfo() if matching_feature is not None else None
-        )
-        if feature_info is None:
+        if mws_id:
+            matching_feature = mws_fc.filter(ee.Filter.eq("uid", mws_id)).first()
+            feature_info = (
+                matching_feature.getInfo() if matching_feature is not None else None
+            )
+            if feature_info is None:
+                return None, Response(
+                    {"error": "Data not found for the given mws_id"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            return (
+                {
+                    "uid": mws_id,
+                    "state": state,
+                    "district": district,
+                    "tehsil": tehsil,
+                    "geometry": feature_info.get("geometry"),
+                },
+                None,
+            )
+
+        fc_info = mws_fc.getInfo() or {}
+        features = fc_info.get("features") or []
+        if not features:
             return None, Response(
-                {"error": "Data not found for the given mws_id"},
+                {"error": "No features found in layer"},
                 status=status.HTTP_404_NOT_FOUND,
             )
         return (
             {
-                "uid": mws_id,
-                "state": state,
-                "district": district,
-                "tehsil": tehsil,
-                "geometry": feature_info.get("geometry"),
+                "type": "FeatureCollection",
+                "features": features,
             },
             None,
         )

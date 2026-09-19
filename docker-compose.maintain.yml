@@ -1,0 +1,3 @@
+# Wrapper around docker.yml so local maintain commands stay the same.
+include:
+  - path: docker.yml

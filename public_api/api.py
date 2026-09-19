@@ -19,6 +19,7 @@ from .views import (
     get_tehsil_json,
     generate_mws_report_url,
     get_mws_geometry,
+    get_mws_geometries_data,
     get_village_geometries,
 )
 from utilities.auth_check_decorator import api_security_check
@@ -689,15 +690,15 @@ def get_mws_report_urls(request):
 @api_security_check(auth_type="API_key")
 def get_mws_geometries(request):
     """
-    API endpoint to get GeoJSON geometry for a given MWS id.
+    API endpoint to get GeoJSON geometry for an MWS, or all MWS in a tehsil.
     """
     try:
         state, district, tehsil = _normalize_geo_params(request)
         mws_id = _get_required_query_param(request, "mws_id")
 
-        if state is None or district is None or tehsil is None or mws_id is None:
+        if state is None or district is None or tehsil is None:
             return _error_response(
-                "'state', 'district', 'tehsil', and 'mws_id' parameters are required.",
+                "'state', 'district', and 'tehsil' parameters are required.",
                 status.HTTP_400_BAD_REQUEST,
             )
 
@@ -711,11 +712,41 @@ def get_mws_geometries(request):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if not is_valid_mws_id(mws_id):
+        if mws_id is not None and not is_valid_mws_id(mws_id):
             return _error_response(
                 "MWS id can only contain numbers and underscores",
                 status.HTTP_400_BAD_REQUEST,
             )
+
+        if mws_id is None:
+            ok, geojson_or_err = get_mws_geometries_data(state, district, tehsil)
+            if ok:
+                return Response(
+                    success_envelope(geojson_or_err), status=status.HTTP_200_OK
+                )
+            result, error_response = get_mws_geometry(
+                state, district, tehsil, mws_id=None
+            )
+            if error_response:
+                err_payload = (
+                    error_response.data if hasattr(error_response, "data") else {}
+                )
+                err_message = (
+                    err_payload.get("error")
+                    or err_payload.get("message")
+                    or err_payload.get("Message")
+                    or (
+                        geojson_or_err
+                        if isinstance(geojson_or_err, str)
+                        else "Failed to fetch MWS geometries"
+                    )
+                )
+                return _error_response(
+                    err_message,
+                    error_response.status_code,
+                    details=err_payload,
+                )
+            return Response(success_envelope(result), status=status.HTTP_200_OK)
 
         result, error_response = get_mws_geometry(state, district, tehsil, mws_id)
         if error_response:

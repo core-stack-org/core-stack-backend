@@ -832,7 +832,7 @@ def add_on_drainage_flag(swb_fc, dl_asset_id):
         ee.FeatureCollection: SWB FC with added property 'on_drainage_line'
     """
 
-    dl_fc = ee.FeatureCollection(dl_asset_id)
+    dl_fc = ee.FeatureCollection(dl_asset_id).filterBounds(swb_fc.geometry())
 
     # Map over each SWB feature
     def set_flag(feature):

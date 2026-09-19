@@ -4,13 +4,15 @@ This module calculates afforestation area only from the observed afforestation r
 without using any modelled density or probability surface.
 """
 
+import os
+
 import numpy as np
 import pandas as pd
 import rasterio
 
 
 def get_afforestation_area_estimation(
-    district_name, start_year, mid_pt, end_year, DATA_DIR
+    district_name, start_year, mid_pt, end_year, BASE_DIR, DATA_DIR
 ):
     """Return observed afforestation area in hectares for the selected period.
 
@@ -67,17 +69,40 @@ def get_afforestation_area_estimation(
     )
 
     result = {
-        "district_name": district_name,
         "start_year": start_year,
-        "mid_pt": mid_pt,
+        "mid_year": mid_pt,
         "end_year": end_year,
         "total_eligible_area_ha": float(total_area_ha),
         "observed_afforestation_area_ha": float(observed_afforestation_area_ha),
         "observed_afforestation_fraction": float(observed_fraction),
     }
 
-    out_csv = DATA_DIR + "/observed_afforestation_area.csv"
-    pd.DataFrame([result]).to_csv(out_csv, index=False)
+    out_csv = BASE_DIR + "/observed_afforestation_area.csv"
+    result_df = pd.DataFrame([result])
+
+    # A run is uniquely identified by its three period boundaries. Replace a
+    # prior row for the same period and retain results for all other periods.
+    if os.path.exists(out_csv):
+        existing_df = pd.read_csv(out_csv)
+    else:
+        existing_df = pd.DataFrame(columns=result_df.columns)
+
+    all_columns = list(dict.fromkeys([*existing_df.columns, *result_df.columns]))
+    existing_df = existing_df.reindex(columns=all_columns)
+    result_df = result_df.reindex(columns=all_columns)
+
+    period_columns = ["start_year", "mid_year", "end_year"]
+    if all(column in existing_df.columns for column in period_columns):
+        same_period = (
+            pd.to_numeric(existing_df["start_year"], errors="coerce")
+            == start_year
+        ) & (
+            pd.to_numeric(existing_df["mid_year"], errors="coerce") == mid_pt
+        ) & (pd.to_numeric(existing_df["end_year"], errors="coerce") == end_year)
+        existing_df = existing_df.loc[~same_period]
+
+    report_df = pd.concat([existing_df, result_df], ignore_index=True)
+    report_df.to_csv(out_csv, index=False)
 
     print("\n=== Observed Afforestation Area Estimates (ha) ===")
     print(result)
