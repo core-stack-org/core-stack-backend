@@ -53,6 +53,14 @@ mws_id_param = openapi.Parameter(
     required=True,
 )
 
+mws_id_optional_param = openapi.Parameter(
+    "mws_id",
+    openapi.IN_QUERY,
+    description="Unique MWS identifier (e.g. '12_234647'). Optional; if omitted returns all MWS geometries in the tehsil.",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
 village_id_param = openapi.Parameter(
     "village_id",
     openapi.IN_QUERY,
@@ -247,20 +255,19 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS time series (ET, runoff, precipitation) for state, district, tehsil, and ``mws_id``.
+    Retrieve MWS time series data, including ET, Runoff, Precipitation and NDVI(crop, tree, shrubs) for a given state, district, tehsil, and MWS ID.
 
-    **``/api/v1/get_mws_data/``** — ``data`` contains legacy ``time_series`` rows:
-
-    ```json
+    **Response dataset details:**
+    ```
     {
-      "mws_id": "12_208104",
-      "time_series": [
-        {"date": "2024-01-01", "et": 2.5, "runoff": 1.3, "precipitation": 10.2}
-      ]
+        "status": "success",
+        "error_message": null,
+        "data": {
+            "mws_id": "12_208104",
+            "time_series": []
+        }
     }
     ```
-
-    For Open-Meteo-style fortnight arrays use **``/api/v2/get_mws_data/``** (see *Get MWS Time Series Data (v2 fortnight format)*).
     """,
     "manual_parameters": [
         state_param,
@@ -276,20 +283,7 @@ get_mws_data_schema = {
                 "application/json": success_example(
                     {
                         "mws_id": "12_208104",
-                        "time_series": [
-                            {
-                                "date": "2024-01-01",
-                                "et": 2.5,
-                                "runoff": 1.3,
-                                "precipitation": 10.2,
-                            },
-                            {
-                                "date": "2024-01-15",
-                                "et": 3.1,
-                                "runoff": 0.8,
-                                "precipitation": 5.4,
-                            },
-                        ],
+                        "time_series": [],
                     }
                 )
             },
@@ -613,46 +607,41 @@ mws_geometries_schema = {
     "operation_id": "get_mws_geometries",
     "operation_summary": "Get MWS Geometry",
     "operation_description": """
-    Retrieve GeoJSON geometry for a single ``mws_id``.
+    Retrieve GeoJSON geometry for a tehsil.
 
-    ``data`` contains ``mws_geometry`` (uid, location fields, geometry) and ``mws_geometry_field_hints``.
+    - With ``mws_id``: ``data`` contains ``mws_geometry`` (uid, location fields, geometry) and ``mws_geometry_field_hints``.
+    - Without ``mws_id``: ``data`` is a GeoJSON FeatureCollection of every MWS in the tehsil.
     """,
     "manual_parameters": [
         state_param,
         district_param,
         tehsil_param,
-        mws_id_param,
+        mws_id_optional_param,
         authorization_param,
     ],
     "responses": {
         200: openapi.Response(
-            description="Success - It will return geometry for the requested mws_id.",
+            description="Success - One MWS geometry, or all tehsil geometries when mws_id is omitted.",
             examples={
                 "application/json": success_example(
                     {
-                        "mws_geometry": {
-                            "uid": "12_208104",
-                            "state": "rajasthan",
-                            "district": "alwar",
-                            "tehsil": "alwar",
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [[[76.62, 27.55], [76.63, 27.56]]],
-                            },
-                        },
-                        "mws_geometry_field_hints": {
-                            "uid": "mws_identifier",
-                            "state": "normalized_state_name",
-                            "district": "normalized_district_name",
-                            "tehsil": "normalized_tehsil_name",
-                            "geometry": "geojson_geometry_object",
-                        },
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "properties": {"uid": "12_208104"},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [[[76.62, 27.55], [76.63, 27.56]]],
+                                },
+                            }
+                        ],
                     }
                 )
             },
         ),
         400: openapi.Response(
-            description="Bad Request - Invalid/missing parameters or invalid mws_id format"
+            description="Bad Request - 'state', 'district', and 'tehsil' are required. Invalid mws_id format if provided."
         ),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
         404: openapi.Response(
