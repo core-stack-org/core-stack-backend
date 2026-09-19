@@ -629,20 +629,60 @@ class MwsReportV2Tests(V2ApiTestCase):
         assert_string_unit_map(self, data["report_field_hints"], "report_field_hints")
 
 
-class MwsGeometriesV2Tests(V2ApiTestCase):
-    url_name = "get_mws_geometries_v2"
+ALL_MWS_GEOJSON = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {"uid": "12_100174"},
+            "geometry": {"type": "Polygon", "coordinates": []},
+        }
+    ],
+}
 
+
+class MwsGeometriesTestsMixin:
     def test_missing_api_key_returns_401(self):
         response = self._get(self.url_name, MWS, with_key=False)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_missing_params_returns_400_error_envelope(self):
-        response = self._get(self.url_name, GEO)
+        response = self._get(self.url_name, {"state": "Rajasthan"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        assert_error_envelope(self, response.json())
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertIn("'state', 'district', and 'tehsil'", body["error_message"])
+        self.assertNotIn("mws_id", body["error_message"])
+
+    @patch("public_api.api.get_mws_geometries_data")
+    def test_without_mws_id_returns_all_geometries(self, mock_all):
+        mock_all.return_value = (True, ALL_MWS_GEOJSON)
+        response = self._get(self.url_name, GEO)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        data = body["data"]
+        self.assertEqual(data["type"], "FeatureCollection")
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["properties"]["uid"], "12_100174")
+        mock_all.assert_called_once()
 
     @patch("public_api.api.get_mws_geometry")
-    def test_success_format(self, mock_geom):
+    @patch("public_api.api.get_mws_geometries_data")
+    def test_without_mws_id_falls_back_to_gee(self, mock_all, mock_geom):
+        mock_all.return_value = (False, "GeoServer request failed with status 404")
+        mock_geom.return_value = (ALL_MWS_GEOJSON, None)
+        response = self._get(self.url_name, GEO)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        self.assertEqual(body["data"]["type"], "FeatureCollection")
+        mock_geom.assert_called_once()
+        _state, _district, _tehsil = mock_geom.call_args.args[:3]
+        self.assertIsNone(mock_geom.call_args.kwargs.get("mws_id"))
+
+    @patch("public_api.api.get_mws_geometry")
+    def test_with_mws_id_returns_single_geometry(self, mock_geom):
         mock_geom.return_value = (
             {
                 "uid": "12_100174",
@@ -664,6 +704,14 @@ class MwsGeometriesV2Tests(V2ApiTestCase):
         assert_string_unit_map(
             self, data["mws_geometry_field_hints"], "mws_geometry_field_hints"
         )
+
+
+class MwsGeometriesV1Tests(MwsGeometriesTestsMixin, V2ApiTestCase):
+    url_name = "get-mws-geometries"
+
+
+class MwsGeometriesV2Tests(MwsGeometriesTestsMixin, V2ApiTestCase):
+    url_name = "get_mws_geometries_v2"
 
 
 class VillageGeometriesV2Tests(V2ApiTestCase):
