@@ -40,6 +40,12 @@ upsert_env() {
 
 mkdir -p "$GEE_DIR" "$DATA_DIR"
 
+if [ "${SKIP_GEE_CONFIG:-0}" = "1" ]; then
+    echo "Skipping GEE credential discovery (SKIP_GEE_CONFIG=1)."
+    : > "$RUNTIME_ENV"
+    exit 0
+fi
+
 jsons=()
 while IFS= read -r path; do
     jsons+=("$path")
@@ -111,6 +117,6 @@ echo "GEE helper project: ${helper_project:-<empty>}"
 if [ -n "$gcs_bucket" ]; then
     echo "GCS bucket: $gcs_bucket"
 else
-    echo "GCS_BUCKET_NAME is not set. Raster publish to GeoServer needs a bucket; set GCS_BUCKET_NAME in the Compose .env."
+    echo "GCS_BUCKET_NAME is not set. Raster publish to GeoServer needs a bucket; set it in .env.core-stack-docker."
 fi
 echo "GEE path written. Add the account in Django admin if it is not imported yet."
