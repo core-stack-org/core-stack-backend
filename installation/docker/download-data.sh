@@ -91,6 +91,11 @@ ensure_django_env() {
 download_admin_boundary() {
     mkdir -p "$DATA_DIR"
 
+    if [ "${SKIP_ADMIN_BOUNDARY_DOWNLOAD:-0}" = "1" ]; then
+        echo "Skipping admin-boundary download (SKIP_ADMIN_BOUNDARY_DOWNLOAD=1)."
+        return 0
+    fi
+
     if [ "${FORCE_DATA_DOWNLOAD:-0}" != "1" ] && admin_boundary_ready; then
         echo "Admin-boundary data already present at $ADMIN_DIR"
         return 0
@@ -130,8 +135,8 @@ run_layer_setup() {
 }
 
 download_local_compute_layers() {
-    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
-        echo "Skipping local compute layer setup (SKIP_LAYER_SETUP=1)."
+    if [ "${SKIP_BASE_LAYER_DOWNLOAD:-0}" = "1" ] || [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
+        echo "Skipping local compute base-layer downloads."
         return 0
     fi
 
@@ -158,8 +163,8 @@ download_local_compute_layers() {
 }
 
 download_tehsil_watersheds() {
-    if [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
-        echo "Skipping tehsil watershed setup (SKIP_LAYER_SETUP=1)."
+    if [ "${SKIP_TEHSIL_WATERSHEDS:-0}" = "1" ] || [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
+        echo "Skipping GeoServer tehsil watershed setup."
         return 0
     fi
 
@@ -168,7 +173,8 @@ download_tehsil_watersheds() {
     cd "$BACKEND_DIR"
     export DATA_DIR
 
-    echo "Downloading active tehsil watersheds from GeoServer into $DATA_DIR ..."
+    echo "Downloading active tehsil watershed layers from GeoServer into $DATA_DIR ..."
+    echo "This path does not generate or clip watersheds from the local pan-India MWS file."
     if ! python manage.py local_compute_layer_setup --ensure-tehsil-watersheds --geoserver --skip-checks; then
         echo "WARNING: tehsil watershed download from GeoServer failed."
         echo "Local GeoServer may not have mws layers yet; files that already exist were kept."

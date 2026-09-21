@@ -1,4 +1,6 @@
 data/
+backups/
+gee_confs/
 app_controller/migrations/__pycache__/
 computing/lulc/__pycache__
 computing/mws/__pycache__
@@ -6,6 +8,7 @@ computing/crop_grid/__pycache__
 dpr/__pycache__
 venv/
 .env
+.env.core-stack-docker
 *.pyc
 .idea/
 .DS_Store

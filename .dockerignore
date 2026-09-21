@@ -1,5 +1,10 @@
 .git
 .gitignore
+.env*
+**/.env*
+data/
+backups/
+gee_confs/
 **/.pyc
 **/__pycache__
 **/*.pyo
@@ -7,8 +12,6 @@
 IITD_setup_scripts
 zoi_fix
 ubuntu@geoserver.core-stack.org
-data/admin-boundary
-data/excel_files
 *.7z
 *.zip
 docs/**/*.pdf

@@ -56,8 +56,8 @@ ensure_workspace() {
     return 1
 }
 
-if [ "${FORCE_GEOSERVER_INIT:-0}" != "1" ] && [ -f "$MARKER" ]; then
-    echo "GeoServer already configured (${MARKER}). Skipping."
+if [ "${SKIP_GEOSERVER_INIT:-0}" = "1" ]; then
+    echo "Skipping GeoServer workspace/style reconciliation (SKIP_GEOSERVER_INIT=1)."
     exit 0
 fi
 
