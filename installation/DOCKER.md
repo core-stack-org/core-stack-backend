@@ -276,6 +276,34 @@ the account interactively:
 
 When the automated username already exists, setup leaves its password
 unchanged.
+## Behind a campus or corporate proxy
+
+Docker does not pass the host's proxy settings into containers. On a network where the only route out is an HTTP proxy, the first start fails while downloading the admin-boundary dataset:
+
+```
+Failed to establish a new connection: [Errno 101] Network is unreachable
+```
+
+Compose reads the proxy from your environment and passes it to the containers, so usually you only need the variables your shell already exports:
+
+```bash
+export HTTP_PROXY=http://proxy.example.org:3128/
+export HTTPS_PROXY=http://proxy.example.org:3128/
+docker compose up -d
+```
+
+To make it stick across shells, put them in the `.env` next to `docker-compose.yml` instead:
+
+```bash
+HTTP_PROXY=http://proxy.example.org:3128/
+HTTPS_PROXY=http://proxy.example.org:3128/
+```
+
+Lowercase `http_proxy` / `https_proxy` are picked up too, and `NO_PROXY` is honoured if you set it. The Compose service names are always added to `NO_PROXY`, so traffic between the backend, GeoServer, and Postgres stays off the proxy. If no proxy variables are set, nothing changes.
+
+Pulling the image is separate: that is done by the Docker daemon, not by a container, so it needs the daemon's own proxy configuration. Check with `docker info | grep -i proxy` and see [Docker's daemon proxy docs](https://docs.docker.com/engine/daemon/proxy/) if `docker compose pull` is what fails.
+
+## Troubleshooting
 
 ## Day-to-day operations
 
