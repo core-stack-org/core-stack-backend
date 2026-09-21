@@ -5,14 +5,32 @@ name: core-stack
 # GeoServer state use Docker-managed volumes; downloaded/generated layer data
 # stays in the host directory selected by CORESTACK_DATA_DIR (./data by default).
 
+# Outbound proxy for campus/corporate networks, taken from the host shell or
+# .env.core-stack-docker (either case). Used both as build args (apt, micromamba,
+# pip in the Dockerfile) and as runtime environment (gdown, Earth Engine, S3).
+# Empty when no proxy is set, which every client treats as "no proxy".
+# Service names are always appended to NO_PROXY so container-to-container
+# traffic (GeoServer REST, Postgres, Redis) never goes through the proxy.
+# Both cases are set because curl only reads lowercase http_proxy.
+x-proxy-environment: &proxy-environment
+  HTTP_PROXY: ${HTTP_PROXY:-${http_proxy:-}}
+  HTTPS_PROXY: ${HTTPS_PROXY:-${https_proxy:-}}
+  http_proxy: ${HTTP_PROXY:-${http_proxy:-}}
+  https_proxy: ${HTTPS_PROXY:-${https_proxy:-}}
+  NO_PROXY: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,redis,geoserver,backend,core-stack
+  no_proxy: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,redis,geoserver,backend,core-stack
+
 x-backend-image: &backend-image
   image: ${CORESTACK_IMAGE:-corestack-backend-local:${CORESTACK_IMAGE_TAG:-latest}}
   build:
     context: .
     dockerfile: Dockerfile
+    args: *proxy-environment
   platform: ${COMPOSE_PLATFORM:-linux/amd64}
 
 x-backend-environment: &backend-environment
+  <<: *proxy-environment
+
   BACKEND_DIR: /app
   APP_ENV_FILE: /app/nrm_app/.env
   DATA_DIR: /var/tmp/core-stack-data
@@ -87,16 +105,6 @@ x-worker-common: &worker-common
   environment:
     <<: *backend-environment
     SKIP_LAYER_SETUP: ${SKIP_LAYER_SETUP:-0}
-    # Outbound proxy passthrough for campus/corporate networks. Empty when the
-    # host sets no proxy, which every HTTP client treats as "no proxy".
-    # Service names are always appended so container-to-container traffic
-    # (GeoServer REST, Postgres) never goes through the proxy.
-    HTTP_PROXY: ${HTTP_PROXY:-${http_proxy:-}}
-    HTTPS_PROXY: ${HTTPS_PROXY:-${https_proxy:-}}
-    http_proxy: ${HTTP_PROXY:-${http_proxy:-}}
-    https_proxy: ${HTTPS_PROXY:-${https_proxy:-}}
-    NO_PROXY: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,geoserver,backend
-    no_proxy: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,geoserver,backend
     ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
     DEBUG: "True"
     LAYER_GENERATION_SYNC_MODE: "True"

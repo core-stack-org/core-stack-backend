@@ -62,6 +62,24 @@ class DockerComposeArchitectureTests(unittest.TestCase):
             download_script,
         )
 
+    def test_proxy_is_wired_into_build_and_runtime(self) -> None:
+        compose = COMPOSE_FILE.read_text(encoding="utf-8")
+
+        self.assertIn("x-proxy-environment: &proxy-environment", compose)
+        self.assertIn("args: *proxy-environment", compose)
+        backend_env = compose.split("x-backend-environment:", 1)[1]
+        self.assertTrue(
+            backend_env.split("\n", 2)[1].strip() == "<<: *proxy-environment"
+        )
+        for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            self.assertIn(f"  {key}: ", compose)
+        for key in ("NO_PROXY", "no_proxy"):
+            line = next(
+                l for l in compose.splitlines() if l.startswith(f"  {key}: ")
+            )
+            for service in ("postgres", "redis", "geoserver", "backend", "core-stack"):
+                self.assertIn(service, line.split(","))
+
 
 
 if __name__ == "__main__":

@@ -278,30 +278,29 @@ When the automated username already exists, setup leaves its password
 unchanged.
 ## Behind a campus or corporate proxy
 
-Docker does not pass the host's proxy settings into containers. On a network where the only route out is an HTTP proxy, the first start fails while downloading the admin-boundary dataset:
+Docker does not pass the host's proxy settings into image builds or containers. On a network where the only route out is an HTTP proxy, this shows up in two places:
 
-```
-Failed to establish a new connection: [Errno 101] Network is unreachable
-```
+- the image build fails at `apt-get install` with `Unable to locate package ...` (the preceding `apt-get update` could not reach the mirrors), or later in `micromamba`/`pip`;
+- the first start fails while downloading the admin-boundary dataset with `Failed to establish a new connection: [Errno 101] Network is unreachable`.
 
-Compose reads the proxy from your environment and passes it to the containers, so usually you only need the variables your shell already exports:
+Compose reads the proxy from your environment and passes it both as build arguments (for `apt`, `micromamba` and `pip` in the `Dockerfile`) and as environment variables to every backend, init and Celery container. Usually you only need the variables your shell already exports:
 
 ```bash
 export HTTP_PROXY=http://proxy.example.org:3128/
 export HTTPS_PROXY=http://proxy.example.org:3128/
-docker compose up -d
+./installation/docker/compose.sh up -d --build
 ```
 
-To make it stick across shells, put them in the `.env` next to `docker-compose.yml` instead:
+To make it stick across shells, set them in `.env.core-stack-docker` instead (see the commented block in `installation/docker/env.core-stack-docker.example`):
 
 ```bash
 HTTP_PROXY=http://proxy.example.org:3128/
 HTTPS_PROXY=http://proxy.example.org:3128/
 ```
 
-Lowercase `http_proxy` / `https_proxy` are picked up too, and `NO_PROXY` is honoured if you set it. The Compose service names are always added to `NO_PROXY`, so traffic between the backend, GeoServer, and Postgres stays off the proxy. If no proxy variables are set, nothing changes.
+Lowercase `http_proxy` / `https_proxy` are picked up too, and `NO_PROXY` is honoured if you set it. The Compose service names (`postgres`, `redis`, `geoserver`, `backend`, `core-stack`) are always added to `NO_PROXY`, so traffic between containers stays off the proxy. If no proxy variables are set, nothing changes. The proxy is passed as Docker's predefined proxy build arguments, so it is not stored in the built image.
 
-Pulling the image is separate: that is done by the Docker daemon, not by a container, so it needs the daemon's own proxy configuration. Check with `docker info | grep -i proxy` and see [Docker's daemon proxy docs](https://docs.docker.com/engine/daemon/proxy/) if `docker compose pull` is what fails.
+Pulling the base images (`micromamba`, `postgres`, `redis`, `geoserver`) is separate: that is done by the Docker daemon, not by a container, so it needs the daemon's own proxy configuration. Check with `docker info | grep -i proxy` and see [Docker's daemon proxy docs](https://docs.docker.com/engine/daemon/proxy/) if pulling is what fails.
 
 ## Troubleshooting
 

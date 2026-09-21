@@ -1,0 +1,13 @@
+# Opt-in GPU access for local GPU jobs (runoff_gpu runs on the nrm queue).
+# Requires an NVIDIA GPU and the NVIDIA Container Toolkit on the host, and
+# GPU_AVAILABLE=True in .env.core-stack-docker. Use with:
+#   ./installation/docker/compose.sh -f docker-compose.gpu.yml up -d
+services:
+  celery-nrm:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
