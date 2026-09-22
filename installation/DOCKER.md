@@ -276,6 +276,31 @@ the account interactively:
 
 When the automated username already exists, setup leaves its password
 unchanged.
+
+## NASA Earthdata (ET download)
+
+The ET download API fetches FLDAS rasters from NASA GES DISC and needs an
+Earthdata login. Create an account at https://urs.earthdata.nasa.gov and
+authorize the "NASA GESDISC DATA ARCHIVE" application in your profile, then
+set the credentials on the host in `.env.core-stack-docker`:
+
+```bash
+USERNAME_GESDISC=your-earthdata-username
+PASSWORD_GESDISC='your-earthdata-password'
+```
+
+Apply them:
+
+```bash
+./installation/docker/compose.sh up -d --force-recreate
+```
+
+`app-init` copies non-empty values into `nrm_app/.env`, which the backend and
+workers read, so nothing has to be edited inside a container. Wrap values that
+contain `$` in single quotes, because Compose substitutes variables in the env
+file. If the password is wrong or the application is not authorized, the task
+fails with an HTML response from GES DISC.
+
 ## Behind a campus or corporate proxy
 
 Docker does not pass the host's proxy settings into image builds or containers. On a network where the only route out is an HTTP proxy, this shows up in two places:

@@ -174,6 +174,13 @@ services:
 
   app-init:
     <<: *backend-service
+    environment:
+      <<: *backend-environment
+      # Credentials set in .env.core-stack-docker are copied into nrm_app/.env
+      # by app-init only (empty values are skipped), so other containers never
+      # get an empty variable that would mask a value in nrm_app/.env.
+      USERNAME_GESDISC: ${USERNAME_GESDISC:-}
+      PASSWORD_GESDISC: ${PASSWORD_GESDISC:-}
     command: ["bash", "/opt/corestack-scripts/app-init.sh"]
     restart: "no"
 
