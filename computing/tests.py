@@ -44,6 +44,7 @@ from computing.surface_water_bodies.swb3 import (
 )
 from computing.utils import generate_swb_layer_with_max_so_catchment
 from computing.tasks import bulk_generate_layer
+from computing.zoi_layers.zoi import generate_zoi, _resolve_zoi_time_window
 from computing.zoi_layers.zoi1 import create_ring
 from computing.zoi_layers.zoi2 import generate_zoi_ci
 from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
@@ -578,7 +579,54 @@ class BulkPipelineRegistryTests(SimpleTestCase):
         )
 
         self.assertEqual(zoi_node["depends_on"], ["generate_swb"])
+        self.assertTrue(zoi_node["use_global_args"])
         self.assertTrue(zoi_node["pass_gee_account_id"])
+
+        args = get_args(
+            iterator_name=zoi_node,
+            global_args={"start_year": 2017, "end_year": 2024},
+            gee_account_id="22",
+            compute="local",
+        )
+        self.assertEqual(
+            args,
+            {
+                "start_year": 2017,
+                "end_year": 2024,
+                "gee_account_id": "22",
+            },
+        )
+
+    def test_zoi_resolves_hydrological_years_to_dates(self):
+        self.assertEqual(
+            _resolve_zoi_time_window(start_year=2017, end_year=2024),
+            ("2017-07-01", "2025-06-30", 2017, 2024),
+        )
+
+    @patch("computing.zoi_layers.zoi.generate_zoi_ci")
+    @patch("computing.zoi_layers.zoi.generate_zoi1")
+    @patch("computing.zoi_layers.zoi.ee_initialize")
+    def test_zoi_task_accepts_hydrological_years(
+        self,
+        ee_initialize,
+        generate_zoi1,
+        generate_zoi_ci,
+    ):
+        result = generate_zoi.run(
+            state="odisha",
+            district="bhadrak",
+            block="chandabali",
+            gee_account_id="22",
+            start_year=2017,
+            end_year=2024,
+        )
+
+        self.assertTrue(result)
+        ee_initialize.assert_called_once_with("22")
+        self.assertEqual(generate_zoi1.call_args.kwargs["start_date"], "2017-07-01")
+        self.assertEqual(generate_zoi1.call_args.kwargs["end_date"], "2025-06-30")
+        self.assertEqual(generate_zoi_ci.call_args.kwargs["start_year"], 2017)
+        self.assertEqual(generate_zoi_ci.call_args.kwargs["end_year"], 2024)
 
     def test_all_local_pipelines_define_regeneration_datasets(self):
         for pipeline in pipeline_names("local"):

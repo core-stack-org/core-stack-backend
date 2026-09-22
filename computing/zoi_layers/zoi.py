@@ -8,17 +8,27 @@ from projects.models import Project
 from utilities.gee_utils import ee_initialize, valid_gee_text
 
 
-def _resolve_zoi_time_window(start_date=None, end_date=None):
+def _resolve_zoi_time_window(
+    start_date=None,
+    end_date=None,
+    start_year=None,
+    end_year=None,
+):
     """
     Validate and normalize ZOI date window.
 
-    Requires explicit start_date and end_date (YYYY-MM-DD). No year defaults —
-    callers must provide the analysis window.
+    Accepts explicit dates or hydrological start/end years. A hydrological year
+    runs from July 1 through June 30 of the following calendar year.
     """
+    if not start_date and start_year is not None:
+        start_date = f"{int(start_year)}-07-01"
+    if not end_date and end_year is not None:
+        end_date = f"{int(end_year) + 1}-06-30"
+
     if not start_date or not end_date:
         raise ValueError(
-            "start_date and end_date are required (YYYY-MM-DD). "
-            "Pass both parameters explicitly; no default date window is applied."
+            "start_date and end_date are required (YYYY-MM-DD), or provide "
+            "start_year and end_year (hydrological years)."
         )
 
     start_date = str(start_date).strip()
@@ -57,6 +67,8 @@ def generate_zoi(
     proj_id=None,
     start_date=None,
     end_date=None,
+    start_year=None,
+    end_year=None,
 ):
     print(f"gee account id {gee_account_id}")
     ee_initialize(gee_account_id)
@@ -71,7 +83,10 @@ def generate_zoi(
         asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
 
     start_date, end_date, start_year, end_year = _resolve_zoi_time_window(
-        start_date, end_date
+        start_date,
+        end_date,
+        start_year,
+        end_year,
     )
 
     generate_zoi1(
