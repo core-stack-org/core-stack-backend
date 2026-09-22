@@ -4,6 +4,10 @@
 #   ./installation/docker/compose.sh -f docker-compose.gpu.yml up -d
 services:
   celery-nrm:
+    # Solo pool: run tasks in the worker's main process. The default prefork
+    # pool fork()s the task process, and CUDA cannot be used in a forked child
+    # once the parent has touched it (cudaErrorInitializationError).
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=nrm", "--hostname=nrm@%h", "--pool=solo"]
     deploy:
       resources:
         reservations:
