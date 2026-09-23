@@ -79,6 +79,7 @@ x-backend-environment: &backend-environment
   SYNC_LAYER: ${SYNC_LAYER:-False}
   STAC_UPLOAD_TO_S3: ${STAC_UPLOAD_TO_S3:-False}
   GPU_AVAILABLE: ${GPU_AVAILABLE:-False}
+  HEAVY_WORKER_ENABLED: ${HEAVY_WORKER_ENABLED:-False}
 
 x-backend-volumes: &backend-volumes
   - ${BACKEND_CODE_DIR:-.}:/app
@@ -292,7 +293,24 @@ services:
 
   celery-nrm:
     <<: *worker-common
-    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=nrm", "--hostname=nrm@%h", "--concurrency=1"]
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=nrm", "--hostname=nrm@%h", "--concurrency=${CELERY_NRM_CONCURRENCY:-3}"]
+
+  # Long, serialized jobs (runoff_gpu, et_download, Pan-India hydrology). Only
+  # created by ./installation/docker/compose.sh --gpu, which also sets
+  # GPU_AVAILABLE and HEAVY_WORKER_ENABLED. The solo pool is required because
+  # CUDA cannot be used in a process forked after the parent touched it, and it
+  # also keeps these jobs strictly one at a time.
+  celery-heavy:
+    <<: *worker-common
+    profiles: ["heavy"]
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=heavy", "--hostname=heavy@%h", "--pool=solo", "--prefetch-multiplier=1"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   celery-layer-bulk:
     <<: *worker-common

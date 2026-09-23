@@ -13,6 +13,18 @@ if [ ! -f "$COMPOSE_ENV_FILE" ]; then
     exit 1
 fi
 
+# --gpu (first argument) enables the serialized heavy worker and GPU access:
+# the "heavy" Compose profile creates celery-heavy with the NVIDIA device, and
+# the app is told it may queue long tasks. Without it, no heavy container is
+# created and those endpoints answer with a clear error instead of queueing
+# work nothing would run. Requires an NVIDIA GPU and the Container Toolkit.
+if [ "${1:-}" = "--gpu" ]; then
+    shift
+    export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}heavy"
+    export GPU_AVAILABLE="${GPU_AVAILABLE:-True}"
+    export HEAVY_WORKER_ENABLED="${HEAVY_WORKER_ENABLED:-True}"
+fi
+
 exec docker compose \
     --project-directory "$REPO_ROOT" \
     --env-file "$COMPOSE_ENV_FILE" \
