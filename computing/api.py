@@ -259,6 +259,28 @@ from .zoi_layers.zoi import generate_zoi
 logger = logging.getLogger(__name__)
 
 
+class HeavyWorkerUnavailable(RuntimeError):
+    """Raised when a heavy-queue endpoint is called without a heavy worker."""
+
+
+def _heavy_queue():
+    """Queue for long, serialized tasks; raises when no heavy worker runs here.
+
+    The heavy worker (celery-heavy) only exists on deployments started with
+    compose.sh --gpu. Queueing to it elsewhere would leave the task waiting
+    forever, so fail fast with an explanation instead.
+    """
+    if not getattr(settings, "HEAVY_WORKER_ENABLED", False):
+        raise HeavyWorkerUnavailable(
+            "This endpoint runs on the serialized heavy worker "
+            "(celery-heavy), which is not enabled on this deployment. Start "
+            "the stack with './installation/docker/compose.sh --gpu up -d' on "
+            "a machine that runs long local-compute jobs, or set "
+            "HEAVY_WORKER_ENABLED=True in .env.core-stack-docker."
+        )
+    return getattr(settings, "HEAVY_TASK_QUEUE", "heavy")
+
+
 def _get_pan_india_flag(request):
     value = request.data.get(
         "pan_india",
@@ -621,7 +643,7 @@ def _generate_pan_india_hydrology_base_layer(request, is_annual):
             "is_annual": is_annual,
             "overwrite": request.data.get("overwrite", False),
         },
-        queue="nrm",
+        queue=_heavy_queue(),
     )
     return Response(
         {
@@ -644,6 +666,12 @@ def generate_pan_india_fortnightly_hydrology(request):
     print("Inside generate_pan_india_fortnightly_hydrology")
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=False)
+    except HeavyWorkerUnavailable as e:
+        print("Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     except ValueError as e:
         print(
             "Invalid request in generate_pan_india_fortnightly_hydrology api :: ",
@@ -667,6 +695,12 @@ def generate_pan_india_annual_hydrology(request):
     print("Inside generate_pan_india_annual_hydrology")
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=True)
+    except HeavyWorkerUnavailable as e:
+        print("Heavy worker unavailable in generate_pan_india_annual_hydrology api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
     except ValueError as e:
         print("Invalid request in generate_pan_india_annual_hydrology api :: ", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -700,7 +734,7 @@ def generate_runoff_gpu(request):
                 "start_year": request.data.get("start_year"),
                 "end_year": request.data.get("end_year"),
             },
-            queue="nrm",
+            queue=_heavy_queue(),
         )
         return Response(
             {
@@ -708,6 +742,12 @@ def generate_runoff_gpu(request):
                 "task_id": task.id,
             },
             status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        print("Heavy worker unavailable in generate_runoff_gpu api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
         print("Invalid request in generate_runoff_gpu api :: ", e)
@@ -739,7 +779,7 @@ def et_download(request):
                 "overwrite": request.data.get("overwrite", False),
                 "patch_fill": request.data.get("patch_fill", True),
             },
-            queue="nrm",
+            queue=_heavy_queue(),
         )
         return Response(
             {
@@ -747,6 +787,12 @@ def et_download(request):
                 "task_id": task.id,
             },
             status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        print("Heavy worker unavailable in et_download api :: ", e)
+        return Response(
+            {"Exception": str(e)},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
         print("Invalid request in et_download api :: ", e)
