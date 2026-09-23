@@ -76,7 +76,7 @@ upsert_env "$APP_ENV_FILE" "DATA_DIR" "$DATA_DIR"
 upsert_env "$APP_ENV_FILE" "EXCEL_DIR" "$DATA_DIR/excel_files"
 
 # Keep Django's host-mounted environment consistent with the values resolved
-# by Compose from .env.core-stack-docker. Container environment variables still
+# by Compose from nrm_app/.env. Container environment variables still
 # take precedence, but host-side inspection and management remain unambiguous.
 runtime_keys=(
     DB_NAME DB_USER DB_PASSWORD DB_HOST DB_PORT DB_CONN_MAX_AGE

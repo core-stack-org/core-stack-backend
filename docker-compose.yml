@@ -2,11 +2,11 @@ name: core-stack
 
 # This is the single supported CoRE Stack Compose definition.
 # Application source stays on the host and is mounted at /app. PostgreSQL and
-# GeoServer state use Docker-managed volumes; downloaded/generated layer data
-# stays in the host directory selected by CORESTACK_DATA_DIR (./data by default).
+# GeoServer state use Docker-managed volumes. Host files live beneath
+# CORESTACK_HOST_DATA_DIR (the repository root by default).
 
 # Outbound proxy for campus/corporate networks, taken from the host shell or
-# .env.core-stack-docker (either case). Used both as build args (apt, micromamba,
+# nrm_app/.env (either case). Used both as build args (apt, micromamba,
 # pip in the Dockerfile) and as runtime environment (gdown, Earth Engine, S3).
 # Empty when no proxy is set, which every client treats as "no proxy".
 # Service names are always appended to NO_PROXY so container-to-container
@@ -36,9 +36,9 @@ x-backend-environment: &backend-environment
   DATA_DIR: /var/tmp/core-stack-data
   EXCEL_DIR: /var/tmp/core-stack-data/excel_files
 
-  DB_NAME: ${POSTGRES_DB:-corestack_db}
-  DB_USER: ${POSTGRES_USER:-corestack_admin}
-  DB_PASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+  DB_NAME: ${DB_NAME:-corestack_db}
+  DB_USER: ${DB_USER:-corestack_admin}
+  DB_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
   DB_HOST: postgres
   DB_PORT: "5432"
   DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
@@ -78,13 +78,16 @@ x-backend-environment: &backend-environment
   LAYER_GENERATION_SYNC_MODE: ${LAYER_GENERATION_SYNC_MODE:-False}
   SYNC_LAYER: ${SYNC_LAYER:-False}
   STAC_UPLOAD_TO_S3: ${STAC_UPLOAD_TO_S3:-False}
-  GPU_AVAILABLE: ${GPU_AVAILABLE:-False}
-  HEAVY_WORKER_ENABLED: ${HEAVY_WORKER_ENABLED:-False}
+  # Both default to False, the GPU-less setup. Setting COMPOSE_PROFILES=heavy
+  # in nrm_app/.env creates celery-heavy and turns both on, so the container
+  # and the application cannot disagree; an explicit value still wins.
+  GPU_AVAILABLE: ${GPU_AVAILABLE:-${COMPOSE_PROFILES:+True}}
+  HEAVY_WORKER_ENABLED: ${HEAVY_WORKER_ENABLED:-${COMPOSE_PROFILES:+True}}
 
 x-backend-volumes: &backend-volumes
   - ${BACKEND_CODE_DIR:-.}:/app
-  - ${CORESTACK_DATA_DIR:-./data}:/var/tmp/core-stack-data
-  - ${GEE_CONFS_DIR:-./gee_confs}:/app/data/gee_confs:ro
+  - ${CORESTACK_HOST_DATA_DIR:-.}/data:/var/tmp/core-stack-data
+  - ${CORESTACK_HOST_DATA_DIR:-.}/gee_confs:/app/data/gee_confs:ro
   - ./installation/docker:/opt/corestack-scripts:ro
 
 x-backend-service: &backend-service
@@ -116,9 +119,9 @@ services:
     image: postgres:16-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-corestack_db}
-      POSTGRES_USER: ${POSTGRES_USER:-corestack_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+      POSTGRES_DB: ${DB_NAME:-corestack_db}
+      POSTGRES_USER: ${DB_USER:-corestack_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
       POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---data-checksums}
     ports:
       - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
@@ -177,9 +180,9 @@ services:
     <<: *backend-service
     environment:
       <<: *backend-environment
-      # Credentials set in .env.core-stack-docker are copied into nrm_app/.env
-      # by app-init only (empty values are skipped), so other containers never
-      # get an empty variable that would mask a value in nrm_app/.env.
+      # Credentials from nrm_app/.env are normalized by app-init only (empty
+      # values are skipped), so other containers never get an empty variable
+      # that would mask a value in the file.
       USERNAME_GESDISC: ${USERNAME_GESDISC:-}
       PASSWORD_GESDISC: ${PASSWORD_GESDISC:-}
     command: ["bash", "/opt/corestack-scripts/app-init.sh"]
@@ -296,10 +299,10 @@ services:
     command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=nrm", "--hostname=nrm@%h", "--concurrency=${CELERY_NRM_CONCURRENCY:-3}"]
 
   # Long, serialized jobs (runoff_gpu, et_download, Pan-India hydrology). Only
-  # created by ./installation/docker/compose.sh --gpu, which also sets
-  # GPU_AVAILABLE and HEAVY_WORKER_ENABLED. The solo pool is required because
-  # CUDA cannot be used in a process forked after the parent touched it, and it
-  # also keeps these jobs strictly one at a time.
+  # created when COMPOSE_PROFILES=heavy is set in nrm_app/.env, which also
+  # turns on GPU_AVAILABLE and HEAVY_WORKER_ENABLED. The solo pool is required
+  # because CUDA cannot be used in a process forked after the parent touched
+  # it, and it also keeps these jobs strictly one at a time.
   celery-heavy:
     <<: *worker-common
     profiles: ["heavy"]
@@ -338,11 +341,11 @@ services:
     environment:
       PGHOST: postgres
       PGPORT: "5432"
-      PGDATABASE: ${POSTGRES_DB:-corestack_db}
-      PGUSER: ${POSTGRES_USER:-corestack_admin}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+      PGDATABASE: ${DB_NAME:-corestack_db}
+      PGUSER: ${DB_USER:-corestack_admin}
+      PGPASSWORD: ${DB_PASSWORD:-change-this-database-password}
     volumes:
-      - ${POSTGRES_BACKUP_DIR:-./backups/postgres}:/backups
+      - ${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres:/backups
     entrypoint: ["bash", "-euc"]
     command: ['pg_dump --format=custom --file="/backups/corestack_$$(date -u +%Y%m%dT%H%M%SZ).dump" "$${PGDATABASE}"']
     networks:
@@ -353,7 +356,7 @@ services:
     profiles: ["maintenance"]
     volumes:
       - geoserver_data:/source:ro
-      - ${GEOSERVER_BACKUP_DIR:-./backups/geoserver}:/backups
+      - ${CORESTACK_HOST_DATA_DIR:-.}/backups/geoserver:/backups
     entrypoint: ["sh", "-euc"]
     command: ['tar -czf "/backups/geoserver_$$(date -u +%Y%m%dT%H%M%SZ).tgz" -C /source .']
 

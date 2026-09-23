@@ -50,6 +50,7 @@
         {
             "name": "generate_zoi",
             "depends_on": ["generate_swb"],
+            "use_global_args": true,
             "pass_gee_account_id": true
         },
         {

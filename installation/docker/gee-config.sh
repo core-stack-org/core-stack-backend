@@ -53,7 +53,7 @@ done < <(find "$GEE_DIR" -maxdepth 2 -type f -name '*.json' 2>/dev/null | sort)
 
 echo "GEE config directory: $GEE_DIR"
 if [ "${#jsons[@]}" -eq 0 ]; then
-    echo "No GEE JSON found. Copy your service-account file to ./gee_confs/ and restart."
+    echo "No GEE JSON found. Copy your service-account file to CORESTACK_HOST_DATA_DIR/gee_confs/ and restart."
     echo "Expected name (optional): gee-service-account.json"
     echo "missing" > "$MARKER"
     : > "$RUNTIME_ENV"
@@ -117,6 +117,6 @@ echo "GEE helper project: ${helper_project:-<empty>}"
 if [ -n "$gcs_bucket" ]; then
     echo "GCS bucket: $gcs_bucket"
 else
-    echo "GCS_BUCKET_NAME is not set. Raster publish to GeoServer needs a bucket; set it in .env.core-stack-docker."
+    echo "GCS_BUCKET_NAME is not set. Raster publish to GeoServer needs a bucket; set it in nrm_app/.env."
 fi
 echo "GEE path written. Add the account in Django admin if it is not imported yet."
