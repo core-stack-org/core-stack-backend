@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import requests
 from django.conf import settings
@@ -132,6 +132,30 @@ def _gesdisc_auth():
     return username, password
 
 
+EARTHDATA_AUTH_HOST = "urs.earthdata.nasa.gov"
+
+
+class _EarthdataSession(requests.Session):
+    """Keep Basic auth across the GES DISC -> Earthdata login redirect.
+
+    requests drops session.auth whenever a redirect changes host, and every
+    GES DISC download redirects to urs.earthdata.nasa.gov to log in. Without
+    this, the login hop has no credentials (HTTP 401) unless ~/.netrc
+    happens to provide them.
+    """
+
+    def rebuild_auth(self, prepared_request, response):
+        headers = prepared_request.headers
+        if "Authorization" in headers:
+            original_host = urlparse(response.request.url).hostname
+            redirect_host = urlparse(prepared_request.url).hostname
+            if (
+                original_host != redirect_host
+                and EARTHDATA_AUTH_HOST not in (original_host, redirect_host)
+            ):
+                del headers["Authorization"]
+
+
 def _raise_if_html_response(response, first_chunk: bytes, url: str):
     content_type = response.headers.get("Content-Type", "").lower()
     stripped = first_chunk.lstrip().lower()
@@ -191,7 +215,7 @@ def _write_json(path: Path, payload):
 
 
 def _download_record(record, auth, overwrite, logger, max_attempts, retry_delay_seconds):
-    session = requests.Session()
+    session = _EarthdataSession()
     session.auth = auth
     try:
         for attempt in range(1, max_attempts + 1):
