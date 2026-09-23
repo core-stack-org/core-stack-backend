@@ -2,11 +2,11 @@ name: core-stack
 
 # This is the single supported CoRE Stack Compose definition.
 # Application source stays on the host and is mounted at /app. PostgreSQL and
-# GeoServer state use Docker-managed volumes; downloaded/generated layer data
-# stays in the host directory selected by CORESTACK_DATA_DIR (./data by default).
+# GeoServer state use Docker-managed volumes. Host files live beneath
+# CORESTACK_HOST_DATA_DIR (the repository root by default).
 
 # Outbound proxy for campus/corporate networks, taken from the host shell or
-# .env.core-stack-docker (either case). Used both as build args (apt, micromamba,
+# nrm_app/.env (either case). Used both as build args (apt, micromamba,
 # pip in the Dockerfile) and as runtime environment (gdown, Earth Engine, S3).
 # Empty when no proxy is set, which every client treats as "no proxy".
 # Service names are always appended to NO_PROXY so container-to-container
@@ -82,8 +82,8 @@ x-backend-environment: &backend-environment
 
 x-backend-volumes: &backend-volumes
   - ${BACKEND_CODE_DIR:-.}:/app
-  - ${CORESTACK_DATA_DIR:-./data}:/var/tmp/core-stack-data
-  - ${GEE_CONFS_DIR:-./gee_confs}:/app/data/gee_confs:ro
+  - ${CORESTACK_HOST_DATA_DIR:-.}/data:/var/tmp/core-stack-data
+  - ${CORESTACK_HOST_DATA_DIR:-.}/gee_confs:/app/data/gee_confs:ro
   - ./installation/docker:/opt/corestack-scripts:ro
 
 x-backend-service: &backend-service
@@ -176,9 +176,9 @@ services:
     <<: *backend-service
     environment:
       <<: *backend-environment
-      # Credentials set in .env.core-stack-docker are copied into nrm_app/.env
-      # by app-init only (empty values are skipped), so other containers never
-      # get an empty variable that would mask a value in nrm_app/.env.
+      # Credentials from nrm_app/.env are normalized by app-init only (empty
+      # values are skipped), so other containers never get an empty variable
+      # that would mask a value in the file.
       USERNAME_GESDISC: ${USERNAME_GESDISC:-}
       PASSWORD_GESDISC: ${PASSWORD_GESDISC:-}
     command: ["bash", "/opt/corestack-scripts/app-init.sh"]
@@ -324,7 +324,7 @@ services:
       PGUSER: ${DB_USER:-corestack_admin}
       PGPASSWORD: ${DB_PASSWORD:-change-this-database-password}
     volumes:
-      - ${POSTGRES_BACKUP_DIR:-./backups/postgres}:/backups
+      - ${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres:/backups
     entrypoint: ["bash", "-euc"]
     command: ['pg_dump --format=custom --file="/backups/corestack_$$(date -u +%Y%m%dT%H%M%SZ).dump" "$${PGDATABASE}"']
     networks:
@@ -335,7 +335,7 @@ services:
     profiles: ["maintenance"]
     volumes:
       - geoserver_data:/source:ro
-      - ${GEOSERVER_BACKUP_DIR:-./backups/geoserver}:/backups
+      - ${CORESTACK_HOST_DATA_DIR:-.}/backups/geoserver:/backups
     entrypoint: ["sh", "-euc"]
     command: ['tar -czf "/backups/geoserver_$$(date -u +%Y%m%dT%H%M%SZ).tgz" -C /source .']
 

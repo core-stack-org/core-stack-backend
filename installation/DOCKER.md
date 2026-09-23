@@ -10,11 +10,13 @@ initialization jobs in dependency order.
 | State | Location | Persistence |
 | --- | --- | --- |
 | Backend source | Host checkout mounted at `/app` | Git/host filesystem |
-| Downloaded and generated layers | `${CORESTACK_DATA_DIR:-./data}` mounted at `/var/tmp/core-stack-data` | Host filesystem |
+| Downloaded and generated layers | `${CORESTACK_HOST_DATA_DIR:-.}/data` mounted at `/var/tmp/core-stack-data` | Host filesystem |
 | PostgreSQL | Separate `postgres` container | Docker volume `postgres_data` |
 | GeoServer catalog | Separate `geoserver` container | Docker volume `geoserver_data` |
 | Celery broker | Separate `redis` container with AOF | Docker volume `redis_data` |
-| GEE JSON | `${GEE_CONFS_DIR:-./gee_confs}` | Read-only host mount |
+| GEE JSON | `${CORESTACK_HOST_DATA_DIR:-.}/gee_confs` | Read-only host mount |
+| Database backups | `${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres` | Host filesystem |
+| GeoServer backups | `${CORESTACK_HOST_DATA_DIR:-.}/backups/geoserver` | Host filesystem |
 
 PostgreSQL is never stored in the backend container. `docker compose --env-file
 nrm_app/.env down` keeps all volumes. Adding `-v` deliberately
@@ -35,9 +37,30 @@ From the backend repository:
 ```bash
 cp installation/docker/env.template nrm_app/.env
 chmod 600 nrm_app/.env
-mkdir -p data gee_confs backups/postgres backups/geoserver
+# Optionally set CORESTACK_HOST_DATA_DIR=/srv/core-stack-data in nrm_app/.env.
 docker compose --env-file nrm_app/.env up -d --build
 ```
+
+`CORESTACK_HOST_DATA_DIR` is the single root for downloaded/generated data,
+GEE credentials and backups. It defaults to the repository root, preserving
+the `./data`, `./gee_confs` and `./backups` layout. For a server installation,
+set an absolute path in `nrm_app/.env` before the first start:
+
+```dotenv
+CORESTACK_HOST_DATA_DIR=/srv/core-stack-data
+```
+
+Compose creates the derived bind-mount directories when the stack starts. A
+shell value can temporarily override the file:
+
+```bash
+CORESTACK_HOST_DATA_DIR=/srv/core-stack-data \
+  docker compose --env-file nrm_app/.env up -d --build
+```
+
+Persist the value in `nrm_app/.env` for normal operation so later Compose
+commands use the same host directories. Host-path examples below assume the
+server value `/srv/core-stack-data`; substitute your configured location.
 
 For a local evaluation, the placeholder passwords work. Before any shared or
 production deployment, replace both passwords in `nrm_app/.env`.
@@ -128,7 +151,7 @@ It queries active tehsils from PostgreSQL and downloads each
 `mws:mws_<district>_<tehsil>` layer from GeoServer WFS into:
 
 ```text
-data/base_layers/tehsil_watersheds/<state>/<district>/<tehsil>.gpkg
+<CORESTACK_HOST_DATA_DIR>/data/base_layers/tehsil_watersheds/<state>/<district>/<tehsil>.gpkg
 ```
 
 This path does not run the alternative local process that intersects or copies
@@ -144,15 +167,15 @@ docker compose --env-file nrm_app/.env run --rm tehsil-watershed-setup
 The stack starts without GEE. For Earth Engine jobs:
 
 ```bash
-cp /secure/path/service-account.json gee_confs/gee-service-account.json
-chmod 600 gee_confs/gee-service-account.json
+cp /secure/path/service-account.json /srv/core-stack-data/gee_confs/gee-service-account.json
+chmod 600 /srv/core-stack-data/gee_confs/gee-service-account.json
 docker compose --env-file nrm_app/.env run --rm gee-config
 docker compose --env-file nrm_app/.env up -d --force-recreate backend \
   celery-nrm celery-layer-bulk celery-geoserver celery-general
 ```
 
 The mount is read-only. The setup reads `project_id` and writes only derived
-runtime values under `CORESTACK_DATA_DIR`. Add the corresponding
+runtime values under `CORESTACK_HOST_DATA_DIR/data`. Add the corresponding
 `GEEAccount` through Django admin if it is not already in the database.
 Raster export/publishing also requires `GCS_BUCKET_NAME`.
 
@@ -176,16 +199,15 @@ major version, filesystem ownership and initialization settings must match.
 ### Backup
 
 ```bash
-mkdir -p backups/postgres
 docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup
-ls -lh backups/postgres
+ls -lh /srv/core-stack-data/backups/postgres
 ```
 
 Because migrations are intentionally ignored by Git and are installation-local,
 back up the local `*/migrations/` directories with the database:
 
 ```bash
-tar -czf backups/postgres/local-migrations.tgz \
+tar -czf /srv/core-stack-data/backups/postgres/local-migrations.tgz \
   */migrations
 ```
 
@@ -204,7 +226,7 @@ docker compose --env-file nrm_app/.env exec -T postgres dropdb --if-exists -U co
 docker compose --env-file nrm_app/.env exec -T postgres createdb -U corestack_admin corestack_db
 docker compose --env-file nrm_app/.env exec -T postgres pg_restore \
   --exit-on-error --no-owner -U corestack_admin -d corestack_db \
-  < backups/postgres/<validated-backup>.dump
+  < /srv/core-stack-data/backups/postgres/<validated-backup>.dump
 docker compose --env-file nrm_app/.env run --rm database-init
 docker compose --env-file nrm_app/.env up -d
 ```
@@ -249,7 +271,6 @@ configuration in the `geoserver_data` named volume. Back it up while GeoServer
 is stopped so the archive is internally consistent:
 
 ```bash
-mkdir -p backups/geoserver
 docker compose --env-file nrm_app/.env stop geoserver
 docker compose --env-file nrm_app/.env --profile maintenance run --rm geoserver-backup
 docker compose --env-file nrm_app/.env start geoserver
@@ -260,9 +281,10 @@ as one release backup. Test a GeoServer restore on a non-production volume
 before replacing production state.
 
 Downloaded inputs and generated layers are not in the GeoServer volume. They
-remain in `CORESTACK_DATA_DIR` on the host. Snapshot or synchronize that
-directory with the host's normal backup system; do not add it to a Docker
-image. GEE JSON remains in `GEE_CONFS_DIR` and must be backed up as a secret.
+remain in `CORESTACK_HOST_DATA_DIR/data` on the host. Snapshot or synchronize
+that directory with the host's normal backup system; do not add it to a Docker
+image. GEE JSON remains in `CORESTACK_HOST_DATA_DIR/gee_confs` and must be
+backed up as a secret.
 
 ## Superuser
 
@@ -281,7 +303,7 @@ unchanged.
 The ET download API fetches FLDAS rasters from NASA GES DISC and needs an
 Earthdata login. Create an account at https://urs.earthdata.nasa.gov and
 authorize the "NASA GESDISC DATA ARCHIVE" application in your profile, then
-set the credentials on the host in `.env.core-stack-docker`:
+set the credentials in `nrm_app/.env`:
 
 ```bash
 USERNAME_GESDISC=your-earthdata-username
@@ -291,7 +313,7 @@ PASSWORD_GESDISC='your-earthdata-password'
 Apply them:
 
 ```bash
-./installation/docker/compose.sh up -d --force-recreate
+docker compose --env-file nrm_app/.env up -d --force-recreate
 ```
 
 `app-init` copies non-empty values into `nrm_app/.env`, which the backend and
@@ -398,7 +420,7 @@ run with `DEBUG=False` and explicit public host/origin settings.
 3. Set `DEBUG=False`, exact `ALLOWED_HOSTS`, and trusted HTTPS origins.
 4. Keep 8000, 8080 and 5432 on loopback; expose only the HTTPS reverse proxy.
 5. Back up PostgreSQL, local migration files, the GeoServer catalog,
-   `CORESTACK_DATA_DIR` and GEE secrets.
+   `CORESTACK_HOST_DATA_DIR/data` and GEE secrets.
 6. Run tests and `check --deploy`; review the plan printed by
    `database-init` on a restored clone.
 7. Run `database-init` once before recreating Gunicorn/Celery.
@@ -414,5 +436,5 @@ This is destructive:
 docker compose --env-file nrm_app/.env down -v
 ```
 
-It deletes PostgreSQL, Redis and GeoServer volumes. Host-mounted `./data`,
-`./gee_confs` and backups are not deleted.
+It deletes PostgreSQL, Redis and GeoServer volumes. Files beneath
+`CORESTACK_HOST_DATA_DIR` are not deleted.

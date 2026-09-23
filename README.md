@@ -17,7 +17,7 @@ git clone https://github.com/core-stack-org/core-stack-backend.git
 cd core-stack-backend
 cp installation/docker/env.template nrm_app/.env
 chmod 600 nrm_app/.env
-mkdir -p data gee_confs backups/postgres backups/geoserver
+# Set CORESTACK_HOST_DATA_DIR=/srv/core-stack-data in nrm_app/.env if desired.
 docker compose --env-file nrm_app/.env up -d --build
 ```
 

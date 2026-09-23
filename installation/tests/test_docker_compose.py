@@ -20,9 +20,28 @@ class DockerComposeArchitectureTests(unittest.TestCase):
         self.assertIn("postgres_data:/var/lib/postgresql/data", compose)
         self.assertIn("geoserver_data:/opt/geoserver/data_dir", compose)
         self.assertIn(
-            "${CORESTACK_DATA_DIR:-./data}:/var/tmp/core-stack-data",
+            "${CORESTACK_HOST_DATA_DIR:-.}/data:/var/tmp/core-stack-data",
             compose,
         )
+        self.assertIn(
+            "${CORESTACK_HOST_DATA_DIR:-.}/gee_confs:/app/data/gee_confs:ro",
+            compose,
+        )
+        self.assertIn(
+            "${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres:/backups",
+            compose,
+        )
+        self.assertIn(
+            "${CORESTACK_HOST_DATA_DIR:-.}/backups/geoserver:/backups",
+            compose,
+        )
+        for old_variable in (
+            "CORESTACK_DATA_DIR",
+            "GEE_CONFS_DIR:-",
+            "POSTGRES_BACKUP_DIR",
+            "GEOSERVER_BACKUP_DIR",
+        ):
+            self.assertNotIn(old_variable, compose)
         self.assertIn("${BACKEND_CODE_DIR:-.}:/app", compose)
 
     def test_startup_uses_one_shot_initialisation_services(self) -> None:
