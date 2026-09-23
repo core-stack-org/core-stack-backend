@@ -43,9 +43,9 @@ def forest_additionality(
     )
 
     get_deforestation_area_estimation(
-        district_name, start_year, mid_pt, end_year, working_directory
+        district_name, start_year, mid_pt, end_year, base_file_path, working_directory
     )
 
     get_afforestation_area_estimation(
-        district_name, start_year, mid_pt, end_year, working_directory
+        district_name, start_year, mid_pt, end_year, base_file_path, working_directory
     )

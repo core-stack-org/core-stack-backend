@@ -6,6 +6,25 @@ Please find [full CoRE-Stack documentation](https://docs.core-stack.org/) and de
 
 ### Installation
 
+#### Docker (build and run)
+
+To run the complete stack without installing Conda, PostgreSQL, Redis, or
+GeoServer on the host, build and start the repository Compose setup. See
+**[installation/DOCKER.md](installation/DOCKER.md)**.
+
+```bash
+git clone https://github.com/core-stack-org/core-stack-backend.git
+cd core-stack-backend
+cp installation/docker/env.template nrm_app/.env
+chmod 600 nrm_app/.env
+# Set CORESTACK_HOST_DATA_DIR=/srv/core-stack-data in nrm_app/.env if desired.
+docker compose --env-file nrm_app/.env up -d --build
+```
+
+Django: http://localhost:8000 &nbsp; GeoServer: http://localhost:8080/geoserver
+
+#### Native installer
+
 We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
 - Installs **Miniconda** and sets up the Python environment
 - Installs & configures **PostgreSQL**
@@ -49,6 +68,32 @@ After the successfull installation of all the packages, run the following comman
 conda activate corestack-backend (or whatever is the name of your virtual environment)
 python manage.py runserver
 ```
+
+#### Download base layers
+
+After installation, download the local base layers into `data/` before running local compute pipelines:
+
+```bash
+conda activate corestack-backend
+python manage.py local_compute_layer_setup
+```
+
+To inspect available layer selectors:
+
+```bash
+python manage.py local_compute_layer_setup --list
+```
+
+To download only specific layers or groups:
+
+```bash
+python manage.py local_compute_layer_setup terrain mws lulc_v3
+python manage.py local_compute_layer_setup static_layers
+python manage.py local_compute_layer_setup tehsil_level
+python manage.py local_compute_layer_setup --ensure-soi-tehsil 
+python manage.py local_compute_layer_setup --ensure-tehsil-watersheds geoserver
+```
+
 - **Running celery:**
 If you are running some tasks, you need to run 
 ```bash

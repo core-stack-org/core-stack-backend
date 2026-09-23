@@ -284,6 +284,7 @@ def main() -> int:
         ("/get_mws_kyl_indicators/", mws, "kyl"),
         ("/get_generated_layer_urls/", geo, "layers"),
         ("/get_mws_report/", mws, "mws_report"),
+        ("/get_mws_geometries/", geo, "mws_geom_all"),
         ("/get_mws_geometries/", mws, "mws_geom"),
         ("/get_village_geometries/", geo, "village_geom"),
         ("/get_waterbodies_data_by_admin/", geo, "waterbodies_admin"),
@@ -354,6 +355,14 @@ def main() -> int:
             if not isinstance(data, dict) or "report" not in data:
                 failures.add(path, "data.report required")
             validate_hints_or_units(path, data, "report_field_hints", failures)
+        elif kind == "mws_geom_all":
+            if not isinstance(data, dict) or data.get("type") != "FeatureCollection":
+                failures.add(
+                    path,
+                    "data must be a GeoJSON FeatureCollection when mws_id is omitted",
+                )
+            elif not isinstance(data.get("features"), list) or not data["features"]:
+                failures.add(path, "data.features must be a non-empty list")
         elif kind == "mws_geom":
             if not isinstance(data, dict) or "mws_geometry" not in data:
                 failures.add(path, "data.mws_geometry required")

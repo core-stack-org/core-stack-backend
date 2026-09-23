@@ -1,4 +1,6 @@
 data/
+backups/
+gee_confs/
 app_controller/migrations/__pycache__/
 computing/lulc/__pycache__
 computing/mws/__pycache__
@@ -6,10 +8,11 @@ computing/crop_grid/__pycache__
 dpr/__pycache__
 venv/
 .env
+.env.core-stack-docker
 *.pyc
 .idea/
 .DS_Store
-.cursor/
+.installation_state/
 
 # Django
 *.log
@@ -48,3 +51,12 @@ users/migrations/*.py
 
 */migrations/*.py
 */migrations/__pycache__/
+
+
+# ai
+AGENTS.md
+CLAUDE.md
+.codex/
+.cursor/
+.ruff_cache
+computing/migrations/0004_layermapping.py
