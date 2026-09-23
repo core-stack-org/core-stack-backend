@@ -47,6 +47,39 @@ supplies `--env-file .env.core-stack-docker`, fixes the project directory, and
 fails clearly when the environment file is missing. To use a different file
 deliberately, set `CORESTACK_COMPOSE_ENV_FILE` to its absolute path.
 
+## GPU machines and long-running jobs
+
+Four endpoints run jobs that take hours and must not run concurrently:
+
+| Endpoint | Needs a GPU |
+| --- | --- |
+| `/api/v1/runoff_gpu/` | yes |
+| `/api/v1/et_download/` | no |
+| `/api/v1/pan-india/hydrology_annual/` | no |
+| `/api/v1/pan-india/hydrology_fortnightly/` | no |
+
+They are queued on `heavy` and served by `celery-heavy`, a single worker that
+runs one task at a time and holds the GPU. Everything else keeps using
+`celery-nrm`, which runs `CELERY_NRM_CONCURRENCY` tasks in parallel (3 by
+default), so a multi-hour hydrology run no longer blocks other layers.
+
+Start the stack with `--gpu` on a machine that should run these jobs:
+
+```bash
+./installation/docker/compose.sh --gpu up -d
+./installation/docker/compose.sh --gpu logs -f celery-heavy
+```
+
+`--gpu` creates `celery-heavy` with the NVIDIA device attached and sets
+`GPU_AVAILABLE=True` and `HEAVY_WORKER_ENABLED=True` for that run. It needs an
+NVIDIA GPU on the host plus the NVIDIA Container Toolkit
+(`docker run --rm --gpus all nvidia/cuda:12.9.0-base-ubuntu22.04 nvidia-smi`
+must work). Pass `--gpu` to every command that creates containers.
+
+Without `--gpu` — on EC2 and other GPU-less hosts — no `celery-heavy`
+container is created, and the four endpoints answer `503` explaining that the
+heavy worker is not enabled, instead of queueing work nothing would run.
+
 The retired parent-repository `.env.core-stack` is not read. If it exists,
 manually transfer only the values still needed into this repository's
 `.env.core-stack-docker`, verify the stack, and securely delete the legacy

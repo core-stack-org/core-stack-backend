@@ -62,6 +62,25 @@ class DockerComposeArchitectureTests(unittest.TestCase):
             download_script,
         )
 
+    def test_heavy_worker_is_opt_in_and_serialized(self) -> None:
+        compose = COMPOSE_FILE.read_text(encoding="utf-8")
+        wrapper = COMPOSE_WRAPPER.read_text(encoding="utf-8")
+
+        heavy = compose.split("celery-heavy:", 1)[1].split("\n\n", 1)[0]
+        self.assertIn('profiles: ["heavy"]', heavy)
+        self.assertIn("--queues=heavy", heavy)
+        self.assertIn("--pool=solo", heavy)
+        self.assertIn("driver: nvidia", heavy)
+
+        nrm = compose.split("celery-nrm:", 1)[1].split("\n\n", 1)[0]
+        self.assertIn("--concurrency=${CELERY_NRM_CONCURRENCY:-3}", nrm)
+        self.assertNotIn("--pool=solo", nrm)
+        self.assertNotIn("driver: nvidia", nrm)
+
+        self.assertIn('"--gpu"', wrapper)
+        self.assertIn("COMPOSE_PROFILES", wrapper)
+        self.assertIn("HEAVY_WORKER_ENABLED", wrapper)
+
     def test_proxy_is_wired_into_build_and_runtime(self) -> None:
         compose = COMPOSE_FILE.read_text(encoding="utf-8")
 
