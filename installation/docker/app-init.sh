@@ -91,6 +91,16 @@ for key in "${runtime_keys[@]}"; do
 done
 
 chmod 600 "$APP_ENV_FILE"
+# upsert_env rewrites the file as root, which would leave it unreadable on the
+# host. Compose reads the same file for every "--env-file nrm_app/.env"
+# command, so hand it back to whoever owns the mounted checkout. The mode stays
+# 600, so no other account gains access.
+checkout_owner="$(stat -c '%u:%g' "$BACKEND_DIR" 2>/dev/null || true)"
+if [ -n "$checkout_owner" ] && ! chown "$checkout_owner" "$APP_ENV_FILE" 2>/dev/null; then
+    echo "WARNING: could not restore ownership of $APP_ENV_FILE to $checkout_owner;" \
+         "Compose may not be able to read it from the host."
+fi
+
 runtime_dirs=(
     "$BACKEND_DIR/logs"
     "$BACKEND_DIR/tmp"

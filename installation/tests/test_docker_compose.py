@@ -81,6 +81,10 @@ class DockerComposeArchitectureTests(unittest.TestCase):
         self.assertIn("POSTGRES_USER: ${DB_USER:-corestack_admin}", compose)
         for key in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT"):
             self.assertIn(key, app_init)
+        # Compose reads the same file from the host on every command, so
+        # app-init must not leave it owned by root after rewriting it.
+        self.assertIn('chmod 600 "$APP_ENV_FILE"', app_init)
+        self.assertIn('chown "$checkout_owner" "$APP_ENV_FILE"', app_init)
 
     def test_tehsil_bootstrap_explicitly_uses_geoserver(self) -> None:
         download_script = (
