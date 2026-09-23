@@ -189,6 +189,9 @@ SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
     "topsoil_ph": SOIL_TYPE_BASE_DIR / "topsoil_pH.tif",
     "topsoil_texture": SOIL_TYPE_BASE_DIR / "topsoil_texture.tif",
 }
+PAN_INDIA_OUTER_BOUNDARY_PATH: Path = (
+    DATA_DIR / "india_state_outer_no_islands.geojson"
+)
 
 ADMIN_BOUNDARY_INPUT_DIR: Path = DATA_DIR / "admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR: Path = DATA_DIR / "admin-boundary/output"
@@ -226,6 +229,7 @@ LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
 SWB_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("generate_swb")
 SOIL_TYPE_OUTPUT_DIR: Path = _derived_output_dir("soil type")
+PAN_INDIA_SOIL_TYPE_OUTPUT_DIR: Path = DATA_DIR
 HYDROLOGY_LOCAL_OUTPUT_DIR: Path = _derived_output_dir("hydrology_fortnightly")
 
 PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
