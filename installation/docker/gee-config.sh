@@ -117,6 +117,6 @@ echo "GEE helper project: ${helper_project:-<empty>}"
 if [ -n "$gcs_bucket" ]; then
     echo "GCS bucket: $gcs_bucket"
 else
-    echo "GCS_BUCKET_NAME is not set. Raster publish to GeoServer needs a bucket; set it in .env.core-stack-docker."
+    echo "GCS_BUCKET_NAME is not set. Raster publish to GeoServer needs a bucket; set it in nrm_app/.env."
 fi
 echo "GEE path written. Add the account in Django admin if it is not imported yet."

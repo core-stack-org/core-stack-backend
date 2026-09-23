@@ -6,10 +6,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+DOCKER_GUIDE = REPO_ROOT / "installation" / "DOCKER.md"
 ENTRYPOINT = REPO_ROOT / "installation" / "docker" / "entrypoint.sh"
 DATABASE_INIT = REPO_ROOT / "installation" / "docker" / "database-init.sh"
 APP_INIT = REPO_ROOT / "installation" / "docker" / "app-init.sh"
-COMPOSE_WRAPPER = REPO_ROOT / "installation" / "docker" / "compose.sh"
+REMOVED_COMPOSE_WRAPPER = REPO_ROOT / "installation" / "docker" / "compose.sh"
 
 
 class DockerComposeArchitectureTests(unittest.TestCase):
@@ -44,11 +45,21 @@ class DockerComposeArchitectureTests(unittest.TestCase):
         self.assertIn("migrate --fake-initial --noinput", database_init)
 
     def test_named_compose_env_and_django_env_are_wired_explicitly(self) -> None:
-        wrapper = COMPOSE_WRAPPER.read_text(encoding="utf-8")
+        docker_guide = DOCKER_GUIDE.read_text(encoding="utf-8")
+        compose = COMPOSE_FILE.read_text(encoding="utf-8")
         app_init = APP_INIT.read_text(encoding="utf-8")
 
-        self.assertIn(".env.core-stack-docker", wrapper)
-        self.assertIn('--env-file "$COMPOSE_ENV_FILE"', wrapper)
+        self.assertFalse(REMOVED_COMPOSE_WRAPPER.exists())
+        self.assertNotIn("compose.sh", docker_guide)
+        self.assertIn(
+            "docker compose --env-file nrm_app/.env",
+            docker_guide,
+        )
+        self.assertNotIn("${POSTGRES_DB:-", compose)
+        self.assertNotIn("${POSTGRES_USER:-", compose)
+        self.assertNotIn("${POSTGRES_PASSWORD:-", compose)
+        self.assertIn("POSTGRES_DB: ${DB_NAME:-corestack_db}", compose)
+        self.assertIn("POSTGRES_USER: ${DB_USER:-corestack_admin}", compose)
         for key in ("DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT"):
             self.assertIn(key, app_init)
 

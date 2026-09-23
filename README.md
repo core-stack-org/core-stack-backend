@@ -15,10 +15,10 @@ GeoServer on the host, build and start the repository Compose setup. See
 ```bash
 git clone https://github.com/core-stack-org/core-stack-backend.git
 cd core-stack-backend
-cp installation/docker/env.core-stack-docker.example .env.core-stack-docker
-chmod 600 .env.core-stack-docker
+cp installation/docker/env.template nrm_app/.env
+chmod 600 nrm_app/.env
 mkdir -p data gee_confs backups/postgres backups/geoserver
-./installation/docker/compose.sh up -d --build
+docker compose --env-file nrm_app/.env up -d --build
 ```
 
 Django: http://localhost:8000 &nbsp; GeoServer: http://localhost:8080/geoserver

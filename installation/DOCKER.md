@@ -16,9 +16,9 @@ initialization jobs in dependency order.
 | Celery broker | Separate `redis` container with AOF | Docker volume `redis_data` |
 | GEE JSON | `${GEE_CONFS_DIR:-./gee_confs}` | Read-only host mount |
 
-PostgreSQL is never stored in the backend container. `./installation/docker/compose.sh down`
-keeps all volumes. `./installation/docker/compose.sh down -v` deliberately destroys the
-database, GeoServer catalog and Redis data.
+PostgreSQL is never stored in the backend container. `docker compose --env-file
+nrm_app/.env down` keeps all volumes. Adding `-v` deliberately
+destroys the database, GeoServer catalog and Redis data.
 
 ## Requirements
 
@@ -26,37 +26,36 @@ database, GeoServer catalog and Redis data.
 - Linux/amd64 support; Apple Silicon uses Docker emulation
 - Enough free disk for images and requested layers
 - Ports 8000, 8080 and 5432 free on loopback, or overridden in
-  `.env.core-stack-docker`
+  `nrm_app/.env`
 
 ## One-click first start
 
 From the backend repository:
 
 ```bash
-cp installation/docker/env.core-stack-docker.example .env.core-stack-docker
-chmod 600 .env.core-stack-docker
+cp installation/docker/env.template nrm_app/.env
+chmod 600 nrm_app/.env
 mkdir -p data gee_confs backups/postgres backups/geoserver
-./installation/docker/compose.sh up -d --build
+docker compose --env-file nrm_app/.env up -d --build
 ```
 
 For a local evaluation, the placeholder passwords work. Before any shared or
-production deployment, replace both passwords in `.env.core-stack-docker`.
+production deployment, replace both passwords in `nrm_app/.env`.
 
-Always use `./installation/docker/compose.sh` for this stack. The wrapper
-supplies `--env-file .env.core-stack-docker`, fixes the project directory, and
-fails clearly when the environment file is missing. To use a different file
-deliberately, set `CORESTACK_COMPOSE_ENV_FILE` to its absolute path.
+Run all Compose commands in this guide from the repository root. Both Compose
+and Django use the single `nrm_app/.env` file. The explicit
+`--env-file nrm_app/.env` option is required because Compose only auto-loads
+`.env` from the repository root.
 
 The retired parent-repository `.env.core-stack` is not read. If it exists,
 manually transfer only the values still needed into this repository's
-`.env.core-stack-docker`, verify the stack, and securely delete the legacy
+`nrm_app/.env`, verify the stack, and securely delete the legacy
 credentials.
 
 Compose runs these one-shot services before starting Gunicorn:
 
-1. `app-init` creates the ignored `nrm_app/.env`, generates secret keys, and
-   copies the resolved database, GeoServer, Celery and runtime values from the
-   Compose container environment into that Django environment file.
+1. `app-init` completes the ignored `nrm_app/.env`, generates secret keys, and
+   normalizes the resolved database, GeoServer, Celery and runtime values.
 2. `database-init` creates/updates installation-local migration files, prints
    the plan, applies it with `--fake-initial`, collects static files and loads
    seed data once.
@@ -70,8 +69,8 @@ Compose runs these one-shot services before starting Gunicorn:
 Follow first-start progress:
 
 ```bash
-./installation/docker/compose.sh ps
-./installation/docker/compose.sh logs -f app-init database-init data-download geoserver-init \
+docker compose --env-file nrm_app/.env ps
+docker compose --env-file nrm_app/.env logs -f app-init database-init data-download geoserver-init \
   gee-config tehsil-watershed-setup backend
 ```
 
@@ -91,21 +90,21 @@ Each expensive data family has its own switch:
 | `SKIP_BASE_LAYER_DOWNLOAD` | Do not download terrain, MWS, LULC and static/tehsil-level base layers |
 | `SKIP_TEHSIL_WATERSHEDS` | Do not fetch active tehsil watershed GPKGs from GeoServer |
 
-Set the flags in `.env.core-stack-docker` before the first start, or for one
+Set the flags in `nrm_app/.env` before the first start, or for one
 invocation:
 
 ```bash
 SKIP_ADMIN_BOUNDARY_DOWNLOAD=1 \
 SKIP_BASE_LAYER_DOWNLOAD=1 \
 SKIP_TEHSIL_WATERSHEDS=1 \
-./installation/docker/compose.sh up -d --build
+docker compose --env-file nrm_app/.env up -d --build
 ```
 
 Existing files are skipped individually. To intentionally refresh the
 admin-boundary archive:
 
 ```bash
-FORCE_DATA_DOWNLOAD=1 ./installation/docker/compose.sh run --rm data-download
+FORCE_DATA_DOWNLOAD=1 docker compose --env-file nrm_app/.env run --rm data-download
 ```
 
 To fetch base layers later:
@@ -113,7 +112,7 @@ To fetch base layers later:
 ```bash
 SKIP_ADMIN_BOUNDARY_DOWNLOAD=1 \
 SKIP_BASE_LAYER_DOWNLOAD=0 \
-./installation/docker/compose.sh run --rm data-download
+docker compose --env-file nrm_app/.env run --rm data-download
 ```
 
 ### Tehsil watersheds
@@ -137,7 +136,7 @@ the pan-India microwatershed file. Missing GeoServer layers are reported, and
 the backend can still start so they can be published and retried later:
 
 ```bash
-./installation/docker/compose.sh run --rm tehsil-watershed-setup
+docker compose --env-file nrm_app/.env run --rm tehsil-watershed-setup
 ```
 
 ## GEE setup
@@ -147,8 +146,8 @@ The stack starts without GEE. For Earth Engine jobs:
 ```bash
 cp /secure/path/service-account.json gee_confs/gee-service-account.json
 chmod 600 gee_confs/gee-service-account.json
-./installation/docker/compose.sh run --rm gee-config
-./installation/docker/compose.sh up -d --force-recreate backend \
+docker compose --env-file nrm_app/.env run --rm gee-config
+docker compose --env-file nrm_app/.env up -d --force-recreate backend \
   celery-nrm celery-layer-bulk celery-geoserver celery-general
 ```
 
@@ -178,7 +177,7 @@ major version, filesystem ownership and initialization settings must match.
 
 ```bash
 mkdir -p backups/postgres
-./installation/docker/compose.sh --profile maintenance run --rm database-backup
+docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup
 ls -lh backups/postgres
 ```
 
@@ -199,15 +198,15 @@ maintenance window. Stop backend/workers, take another backup, then restore a
 validated custom-format dump:
 
 ```bash
-./installation/docker/compose.sh stop backend celery-nrm celery-layer-bulk \
+docker compose --env-file nrm_app/.env stop backend celery-nrm celery-layer-bulk \
   celery-geoserver celery-general celery-beat
-./installation/docker/compose.sh exec -T postgres dropdb --if-exists -U corestack_admin corestack_db
-./installation/docker/compose.sh exec -T postgres createdb -U corestack_admin corestack_db
-./installation/docker/compose.sh exec -T postgres pg_restore \
+docker compose --env-file nrm_app/.env exec -T postgres dropdb --if-exists -U corestack_admin corestack_db
+docker compose --env-file nrm_app/.env exec -T postgres createdb -U corestack_admin corestack_db
+docker compose --env-file nrm_app/.env exec -T postgres pg_restore \
   --exit-on-error --no-owner -U corestack_admin -d corestack_db \
   < backups/postgres/<validated-backup>.dump
-./installation/docker/compose.sh run --rm database-init
-./installation/docker/compose.sh up -d
+docker compose --env-file nrm_app/.env run --rm database-init
+docker compose --env-file nrm_app/.env up -d
 ```
 
 Substitute the configured database/user. Restore the matching
@@ -215,7 +214,7 @@ Substitute the configured database/user. Restore the matching
 not available, the job generates a current initial migration set and
 `--fake-initial` recognizes matching tables. Test this on a cloned database
 first; a dump whose schema does not match the checked-out code must not be
-started. Never use `./installation/docker/compose.sh down -v` as a restore procedure.
+started. Never use `docker compose --env-file nrm_app/.env down -v` as a restore procedure.
 
 ## Installation-local migrations
 
@@ -251,9 +250,9 @@ is stopped so the archive is internally consistent:
 
 ```bash
 mkdir -p backups/geoserver
-./installation/docker/compose.sh stop geoserver
-./installation/docker/compose.sh --profile maintenance run --rm geoserver-backup
-./installation/docker/compose.sh start geoserver
+docker compose --env-file nrm_app/.env stop geoserver
+docker compose --env-file nrm_app/.env --profile maintenance run --rm geoserver-backup
+docker compose --env-file nrm_app/.env start geoserver
 ```
 
 Treat that catalog archive, the PostgreSQL dump and the matching Git revision
@@ -271,7 +270,7 @@ Either set the three `DJANGO_SUPERUSER_*` values before first start, or create
 the account interactively:
 
 ```bash
-./installation/docker/compose.sh exec backend python manage.py createsuperuser
+docker compose --env-file nrm_app/.env exec backend python manage.py createsuperuser
 ```
 
 When the automated username already exists, setup leaves its password
@@ -313,10 +312,10 @@ Compose reads the proxy from your environment and passes it both as build argume
 ```bash
 export HTTP_PROXY=http://proxy.example.org:3128/
 export HTTPS_PROXY=http://proxy.example.org:3128/
-./installation/docker/compose.sh up -d --build
+docker compose --env-file nrm_app/.env up -d
 ```
 
-To make it stick across shells, set them in `.env.core-stack-docker` instead (see the commented block in `installation/docker/env.core-stack-docker.example`):
+To make it stick across shells, put them in `nrm_app/.env` instead:
 
 ```bash
 HTTP_PROXY=http://proxy.example.org:3128/
@@ -332,18 +331,18 @@ Pulling the base images (`micromamba`, `postgres`, `redis`, `geoserver`) is sepa
 ## Day-to-day operations
 
 ```bash
-./installation/docker/compose.sh ps
-./installation/docker/compose.sh logs -f backend
-./installation/docker/compose.sh logs -f celery-nrm celery-layer-bulk celery-geoserver celery-general
-./installation/docker/compose.sh stop
-./installation/docker/compose.sh start
-./installation/docker/compose.sh down
+docker compose --env-file nrm_app/.env ps
+docker compose --env-file nrm_app/.env logs -f backend
+docker compose --env-file nrm_app/.env logs -f celery-nrm celery-layer-bulk celery-geoserver celery-general
+docker compose --env-file nrm_app/.env stop
+docker compose --env-file nrm_app/.env start
+docker compose --env-file nrm_app/.env down
 ```
 
 Celery Beat is intentionally opt-in:
 
 ```bash
-./installation/docker/compose.sh --profile periodic up -d celery-beat
+docker compose --env-file nrm_app/.env --profile periodic up -d celery-beat
 ```
 
 ## Code and dependency updates
@@ -353,8 +352,8 @@ process recreation:
 
 ```bash
 git pull --ff-only
-./installation/docker/compose.sh run --rm database-init
-./installation/docker/compose.sh up -d --force-recreate backend \
+docker compose --env-file nrm_app/.env run --rm database-init
+docker compose --env-file nrm_app/.env up -d --force-recreate backend \
   celery-nrm celery-layer-bulk celery-geoserver celery-general
 ```
 
@@ -362,8 +361,8 @@ When `Dockerfile` or `installation/environment.yml` changes, rebuild the
 environment and recreate every backend service:
 
 ```bash
-./installation/docker/compose.sh build --pull
-./installation/docker/compose.sh up -d --force-recreate
+docker compose --env-file nrm_app/.env build --pull
+docker compose --env-file nrm_app/.env up -d --force-recreate
 ```
 
 Do not install packages in running containers. Production releases should pin
@@ -375,7 +374,7 @@ dependencies can be rolled back together.
 Fast host-side checks:
 
 ```bash
-./installation/docker/compose.sh config --quiet
+docker compose --env-file nrm_app/.env config --quiet
 bash -n installation/docker/*.sh
 python3 -m unittest discover -s installation/tests
 ```
@@ -383,9 +382,9 @@ python3 -m unittest discover -s installation/tests
 Container checks:
 
 ```bash
-./installation/docker/compose.sh run --rm backend python manage.py check
-./installation/docker/compose.sh run --rm backend python manage.py check --deploy
-./installation/docker/compose.sh run --rm backend python manage.py test
+docker compose --env-file nrm_app/.env run --rm backend python manage.py check
+docker compose --env-file nrm_app/.env run --rm backend python manage.py check --deploy
+docker compose --env-file nrm_app/.env run --rm backend python manage.py test
 ```
 
 The deployment check intentionally warns in development mode. Production must
@@ -395,7 +394,7 @@ run with `DEBUG=False` and explicit public host/origin settings.
 
 1. Pin the Git commit and image tag; do not deploy moving `latest`.
 2. Replace PostgreSQL and GeoServer passwords in the protected
-   `.env.core-stack-docker` before creating the database volume.
+   `nrm_app/.env` before creating the database volume.
 3. Set `DEBUG=False`, exact `ALLOWED_HOSTS`, and trusted HTTPS origins.
 4. Keep 8000, 8080 and 5432 on loopback; expose only the HTTPS reverse proxy.
 5. Back up PostgreSQL, local migration files, the GeoServer catalog,
@@ -412,7 +411,7 @@ run with `DEBUG=False` and explicit public host/origin settings.
 This is destructive:
 
 ```bash
-./installation/docker/compose.sh down -v
+docker compose --env-file nrm_app/.env down -v
 ```
 
 It deletes PostgreSQL, Redis and GeoServer volumes. Host-mounted `./data`,

@@ -36,9 +36,9 @@ x-backend-environment: &backend-environment
   DATA_DIR: /var/tmp/core-stack-data
   EXCEL_DIR: /var/tmp/core-stack-data/excel_files
 
-  DB_NAME: ${POSTGRES_DB:-corestack_db}
-  DB_USER: ${POSTGRES_USER:-corestack_admin}
-  DB_PASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+  DB_NAME: ${DB_NAME:-corestack_db}
+  DB_USER: ${DB_USER:-corestack_admin}
+  DB_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
   DB_HOST: postgres
   DB_PORT: "5432"
   DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
@@ -115,9 +115,9 @@ services:
     image: postgres:16-bookworm
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-corestack_db}
-      POSTGRES_USER: ${POSTGRES_USER:-corestack_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+      POSTGRES_DB: ${DB_NAME:-corestack_db}
+      POSTGRES_USER: ${DB_USER:-corestack_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
       POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---data-checksums}
     ports:
       - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
@@ -320,9 +320,9 @@ services:
     environment:
       PGHOST: postgres
       PGPORT: "5432"
-      PGDATABASE: ${POSTGRES_DB:-corestack_db}
-      PGUSER: ${POSTGRES_USER:-corestack_admin}
-      PGPASSWORD: ${POSTGRES_PASSWORD:-change-this-database-password}
+      PGDATABASE: ${DB_NAME:-corestack_db}
+      PGUSER: ${DB_USER:-corestack_admin}
+      PGPASSWORD: ${DB_PASSWORD:-change-this-database-password}
     volumes:
       - ${POSTGRES_BACKUP_DIR:-./backups/postgres}:/backups
     entrypoint: ["bash", "-euc"]
