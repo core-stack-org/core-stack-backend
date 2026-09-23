@@ -107,8 +107,8 @@ The GPU itself requires an NVIDIA GPU on the host and the NVIDIA Container
 Toolkit, so `docker run --rm --gpus all nvidia/cuda:12.9.0-base-ubuntu22.04
 nvidia-smi` must work first.
 
-Without the profile — the default, and what EC2 and other GPU-less hosts use —
-no `celery-heavy` container is created, and the four endpoints answer `503`
+Without the profile — the default, and what GPU-less hosts use — no
+`celery-heavy` container is created, and the four endpoints answer `503`
 explaining that the heavy worker is not enabled, instead of queueing work
 nothing would run. A host without a GPU can still serialize the three
 CPU-bound jobs by selecting the profile and setting `GPU_AVAILABLE=False`.
