@@ -1,0 +1,370 @@
+name: core-stack
+
+# This is the single supported CoRE Stack Compose definition.
+# Application source stays on the host and is mounted at /app. PostgreSQL and
+# GeoServer state use Docker-managed volumes. Host files live beneath
+# CORESTACK_HOST_DATA_DIR (the repository root by default).
+
+# Outbound proxy for campus/corporate networks, taken from the host shell or
+# nrm_app/.env (either case). Used both as build args (apt, micromamba,
+# pip in the Dockerfile) and as runtime environment (gdown, Earth Engine, S3).
+# Empty when no proxy is set, which every client treats as "no proxy".
+# Service names are always appended to NO_PROXY so container-to-container
+# traffic (GeoServer REST, Postgres, Redis) never goes through the proxy.
+# Both cases are set because curl only reads lowercase http_proxy.
+x-proxy-environment: &proxy-environment
+  HTTP_PROXY: ${HTTP_PROXY:-${http_proxy:-}}
+  HTTPS_PROXY: ${HTTPS_PROXY:-${https_proxy:-}}
+  http_proxy: ${HTTP_PROXY:-${http_proxy:-}}
+  https_proxy: ${HTTPS_PROXY:-${https_proxy:-}}
+  NO_PROXY: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,redis,geoserver,backend,core-stack
+  no_proxy: ${NO_PROXY:-${no_proxy:-}},localhost,127.0.0.1,postgres,redis,geoserver,backend,core-stack
+
+x-backend-image: &backend-image
+  image: ${CORESTACK_IMAGE:-corestack-backend-local:${CORESTACK_IMAGE_TAG:-latest}}
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args: *proxy-environment
+  platform: ${COMPOSE_PLATFORM:-linux/amd64}
+
+x-backend-environment: &backend-environment
+  <<: *proxy-environment
+
+  BACKEND_DIR: /app
+  APP_ENV_FILE: /app/nrm_app/.env
+  DATA_DIR: /var/tmp/core-stack-data
+  EXCEL_DIR: /var/tmp/core-stack-data/excel_files
+
+  DB_NAME: ${DB_NAME:-corestack_db}
+  DB_USER: ${DB_USER:-corestack_admin}
+  DB_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
+
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  CELERY_TASK_ALWAYS_EAGER: ${CELERY_TASK_ALWAYS_EAGER:-False}
+  CELERY_BROKER_VISIBILITY_TIMEOUT: ${CELERY_BROKER_VISIBILITY_TIMEOUT:-43200}
+  CELERY_WORKER_MAX_TASKS_PER_CHILD: ${CELERY_WORKER_MAX_TASKS_PER_CHILD:-20}
+
+  GEOSERVER_URL: ${GEOSERVER_URL:-http://geoserver:8080/geoserver/}
+  GEOSERVER_USERNAME: ${GEOSERVER_USERNAME:-admin}
+  GEOSERVER_PASSWORD: ${GEOSERVER_PASSWORD:-change-this-geoserver-password}
+
+  GEE_CONFS_DIR: /app/data/gee_confs
+  GEE_SERVICE_ACCOUNT_KEY_PATH: /app/data/gee_confs/gee-service-account.json
+  GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH: /app/data/gee_confs/gee-helper-account.json
+  GEE_STORAGE_PROJECT: ${GEE_STORAGE_PROJECT:-}
+  GEE_STORAGE_PROJECT_HELPER: ${GEE_STORAGE_PROJECT_HELPER:-}
+  GCS_BUCKET_NAME: ${GCS_BUCKET_NAME:-}
+
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  S3_REGION: ${S3_REGION:-}
+  S3_BUCKET: ${S3_BUCKET:-}
+
+  SKIP_ADMIN_BOUNDARY_DOWNLOAD: ${SKIP_ADMIN_BOUNDARY_DOWNLOAD:-0}
+  SKIP_BASE_LAYER_DOWNLOAD: ${SKIP_BASE_LAYER_DOWNLOAD:-0}
+  SKIP_TEHSIL_WATERSHEDS: ${SKIP_TEHSIL_WATERSHEDS:-0}
+  SKIP_GEE_CONFIG: ${SKIP_GEE_CONFIG:-0}
+  SKIP_GEOSERVER_INIT: ${SKIP_GEOSERVER_INIT:-0}
+  SKIP_SEED_DATA: ${SKIP_SEED_DATA:-0}
+  RESET_LOCAL_MIGRATIONS: ${RESET_LOCAL_MIGRATIONS:-0}
+
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,backend,0.0.0.0}
+  DEBUG: ${DEBUG:-True}
+  LAYER_GENERATION_SYNC_MODE: ${LAYER_GENERATION_SYNC_MODE:-False}
+  SYNC_LAYER: ${SYNC_LAYER:-False}
+  STAC_UPLOAD_TO_S3: ${STAC_UPLOAD_TO_S3:-False}
+  # Both default to False, the GPU-less setup. Setting COMPOSE_PROFILES=heavy
+  # in nrm_app/.env creates celery-heavy and turns both on, so the container
+  # and the application cannot disagree; an explicit value still wins.
+  GPU_AVAILABLE: ${GPU_AVAILABLE:-${COMPOSE_PROFILES:+True}}
+  HEAVY_WORKER_ENABLED: ${HEAVY_WORKER_ENABLED:-${COMPOSE_PROFILES:+True}}
+
+x-backend-volumes: &backend-volumes
+  - ${BACKEND_CODE_DIR:-.}:/app
+  - ${CORESTACK_HOST_DATA_DIR:-.}/data:/var/tmp/core-stack-data
+  - ${CORESTACK_HOST_DATA_DIR:-.}/gee_confs:/app/data/gee_confs:ro
+  - ./installation/docker:/opt/corestack-scripts:ro
+
+x-backend-service: &backend-service
+  <<: *backend-image
+  environment: *backend-environment
+  volumes: *backend-volumes
+  networks:
+    - corestack-network
+
+x-worker-common: &worker-common
+  <<: *backend-service
+  restart: unless-stopped
+  depends_on:
+    backend:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  stop_grace_period: 2h
+  environment:
+    <<: *backend-environment
+    SKIP_LAYER_SETUP: ${SKIP_LAYER_SETUP:-0}
+    ALLOWED_HOSTS: localhost,127.0.0.1,backend,0.0.0.0
+    DEBUG: "True"
+    LAYER_GENERATION_SYNC_MODE: "True"
+    DOWNLOAD_ADMIN_BOUNDARY: "1"
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-corestack_db}
+      POSTGRES_USER: ${DB_USER:-corestack_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
+      POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---data-checksums}
+    ports:
+      - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    shm_size: ${POSTGRES_SHM_SIZE:-256mb}
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - corestack-network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - corestack-network
+
+  geoserver:
+    platform: ${GEOSERVER_PLATFORM:-linux/amd64}
+    image: kartoza/geoserver:2.24.4
+    restart: unless-stopped
+    environment:
+      GEOSERVER_ADMIN_USER: ${GEOSERVER_USERNAME:-admin}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_PASSWORD:-change-this-geoserver-password}
+      CONSOLE_HANDLER_LEVEL: ${GEOSERVER_LOG_LEVEL:-WARNING}
+    ports:
+      - "${GEOSERVER_BIND_IP:-127.0.0.1}:${GEOSERVER_PORT:-8080}:8080"
+    volumes:
+      - geoserver_data:/opt/geoserver/data_dir
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf -u $$GEOSERVER_ADMIN_USER:$$GEOSERVER_ADMIN_PASSWORD http://localhost:8080/geoserver/web/ >/dev/null",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
+    networks:
+      - corestack-network
+
+  app-init:
+    <<: *backend-service
+    environment:
+      <<: *backend-environment
+      # Credentials from nrm_app/.env are normalized by app-init only (empty
+      # values are skipped), so other containers never get an empty variable
+      # that would mask a value in the file.
+      USERNAME_GESDISC: ${USERNAME_GESDISC:-}
+      PASSWORD_GESDISC: ${PASSWORD_GESDISC:-}
+    command: ["bash", "/opt/corestack-scripts/app-init.sh"]
+    restart: "no"
+
+  database-init:
+    <<: *backend-service
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *backend-environment
+      FORCE_SEED_DATA: ${FORCE_SEED_DATA:-0}
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
+    command: ["bash", "/opt/corestack-scripts/database-init.sh"]
+    restart: "no"
+
+  geoserver-init:
+    <<: *backend-service
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+      geoserver:
+        condition: service_healthy
+    command: ["bash", "/opt/corestack-scripts/geoserver-init.sh"]
+    restart: "no"
+
+  data-download:
+    <<: *backend-service
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-environment
+      FORCE_DATA_DOWNLOAD: ${FORCE_DATA_DOWNLOAD:-0}
+    command: ["bash", "/opt/corestack-scripts/download-data.sh"]
+    restart: "no"
+
+  gee-config:
+    <<: *backend-service
+    depends_on:
+      app-init:
+        condition: service_completed_successfully
+    command: ["bash", "/opt/corestack-scripts/gee-config.sh"]
+    restart: "no"
+
+  tehsil-watershed-setup:
+    <<: *backend-service
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+      geoserver-init:
+        condition: service_completed_successfully
+    environment:
+      <<: *backend-environment
+      DOWNLOAD_TEHSIL_WATERSHEDS_ONLY: "1"
+    command: ["bash", "/opt/corestack-scripts/download-data.sh"]
+    restart: "no"
+
+  backend:
+    <<: *backend-service
+    restart: unless-stopped
+    networks:
+      corestack-network:
+        aliases:
+          - core-stack
+    depends_on:
+      database-init:
+        condition: service_completed_successfully
+      data-download:
+        condition: service_completed_successfully
+      gee-config:
+        condition: service_completed_successfully
+      geoserver-init:
+        condition: service_completed_successfully
+      tehsil-watershed-setup:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_BIND_IP:-127.0.0.1}:${BACKEND_PORT:-8000}:8000"
+    command:
+      [
+        "bash",
+        "/opt/corestack-scripts/entrypoint.sh",
+        "gunicorn",
+        "nrm_app.wsgi:application",
+        "--bind",
+        "0.0.0.0:8000",
+        "--workers",
+        "${GUNICORN_WORKERS:-2}",
+        "--timeout",
+        "${GUNICORN_TIMEOUT:-7500}",
+        "--graceful-timeout",
+        "${GUNICORN_GRACEFUL_TIMEOUT:-120}",
+        "--access-logfile",
+        "-",
+        "--error-logfile",
+        "-",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8000), 5).close()"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  celery-nrm:
+    <<: *worker-common
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=nrm", "--hostname=nrm@%h", "--concurrency=${CELERY_NRM_CONCURRENCY:-3}"]
+
+  # Long, serialized jobs (runoff_gpu, et_download, Pan-India hydrology). Only
+  # created when COMPOSE_PROFILES=heavy is set in nrm_app/.env, which also
+  # turns on GPU_AVAILABLE and HEAVY_WORKER_ENABLED. The solo pool is required
+  # because CUDA cannot be used in a process forked after the parent touched
+  # it, and it also keeps these jobs strictly one at a time.
+  celery-heavy:
+    <<: *worker-common
+    profiles: ["heavy"]
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=heavy", "--hostname=heavy@%h", "--pool=solo", "--prefetch-multiplier=1"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  celery-layer-bulk:
+    <<: *worker-common
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=layer_bulk", "--hostname=layer-bulk@%h", "--concurrency=1"]
+
+  celery-geoserver:
+    <<: *worker-common
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=geoserver", "--hostname=geoserver@%h", "--concurrency=1"]
+
+  celery-general:
+    <<: *worker-common
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=celery,dpr,waterbody,waterbody1,whatsapp", "--hostname=general@%h", "--concurrency=1"]
+
+  celery-beat:
+    <<: *worker-common
+    profiles: ["periodic"]
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "beat", "--loglevel=INFO", "--scheduler=django_celery_beat.schedulers:DatabaseScheduler", "--pidfile=/tmp/celerybeat.pid"]
+
+  database-backup:
+    image: postgres:16-bookworm
+    profiles: ["maintenance"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${DB_NAME:-corestack_db}
+      PGUSER: ${DB_USER:-corestack_admin}
+      PGPASSWORD: ${DB_PASSWORD:-change-this-database-password}
+    volumes:
+      - ${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres:/backups
+    entrypoint: ["bash", "-euc"]
+    command: ['pg_dump --format=custom --file="/backups/corestack_$$(date -u +%Y%m%dT%H%M%SZ).dump" "$${PGDATABASE}"']
+    networks:
+      - corestack-network
+
+  geoserver-backup:
+    image: alpine:3.20
+    profiles: ["maintenance"]
+    volumes:
+      - geoserver_data:/source:ro
+      - ${CORESTACK_HOST_DATA_DIR:-.}/backups/geoserver:/backups
+    entrypoint: ["sh", "-euc"]
+    command: ['tar -czf "/backups/geoserver_$$(date -u +%Y%m%dT%H%M%SZ).tgz" -C /source .']
+
+volumes:
+  postgres_data:
+  redis_data:
+  geoserver_data:
+
+networks:
+  corestack-network:
+    name: corestack-network

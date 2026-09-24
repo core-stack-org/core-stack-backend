@@ -7,7 +7,6 @@ API, GeoServer, metadata, and GIS handoff use.
 """
 
 from .admin import AdminScope, CSAdminSource
-from .publish import register_layer
 from .schema import StandardRequest, api_request_payload, load_config
 
 __all__ = [
@@ -15,6 +14,5 @@ __all__ = [
     "CSAdminSource",
     "StandardRequest",
     "api_request_payload",
-    "register_layer",
     "load_config",
 ]
