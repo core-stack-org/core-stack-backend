@@ -73,6 +73,7 @@ defaults = {
     "is_active": True,
     "is_staff": True,
     "is_superuser": True,
+    "is_superadmin": True,
 }
 user, created = User.objects.get_or_create(username=username, defaults=defaults)
 if created:

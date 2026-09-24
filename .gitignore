@@ -60,3 +60,7 @@ CLAUDE.md
 .cursor/
 .ruff_cache
 computing/migrations/0004_layermapping.py
+
+# Vim swap files
+*.swp
+*.swo
