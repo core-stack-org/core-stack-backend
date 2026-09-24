@@ -293,6 +293,11 @@ CELERY_TASK_EAGER_PROPAGATES = env.bool(
 )
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+# Long-running tasks (runoff_gpu, et_download, Pan-India hydrology) are queued
+# on the "heavy" queue, served by a single serialized worker that only runs on
+# deployments started with compose.sh --gpu.
+HEAVY_TASK_QUEUE = env("HEAVY_TASK_QUEUE", default="heavy")
+HEAVY_WORKER_ENABLED = env.bool("HEAVY_WORKER_ENABLED", default=False)
 LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
 SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
 STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
