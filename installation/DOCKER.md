@@ -70,6 +70,49 @@ and Django use the single `nrm_app/.env` file. The explicit
 `--env-file nrm_app/.env` option is required because Compose only auto-loads
 `.env` from the repository root.
 
+## GPU machines and long-running jobs
+
+Four endpoints run jobs that take hours and must not run concurrently:
+
+| Endpoint | Needs a GPU |
+| --- | --- |
+| `/api/v1/runoff_gpu/` | yes |
+| `/api/v1/et_download/` | no |
+| `/api/v1/pan-india/hydrology_annual/` | no |
+| `/api/v1/pan-india/hydrology_fortnightly/` | no |
+
+They are queued on `heavy` and served by `celery-heavy`, a single worker that
+runs one task at a time and holds the GPU. Everything else keeps using
+`celery-nrm`, which runs `CELERY_NRM_CONCURRENCY` tasks in parallel (3 by
+default), so a multi-hour hydrology run no longer blocks other layers.
+
+`celery-heavy` is not created unless the `heavy` Compose profile is selected.
+On a machine that should run these jobs, set one line in `nrm_app/.env`:
+
+```dotenv
+COMPOSE_PROFILES=heavy
+```
+
+Then start the stack as usual:
+
+```bash
+docker compose --env-file nrm_app/.env up -d
+docker compose --env-file nrm_app/.env logs -f celery-heavy
+```
+
+Selecting the profile also makes `GPU_AVAILABLE` and `HEAVY_WORKER_ENABLED`
+default to `True`, so the container and the application cannot disagree.
+Either can still be set explicitly in `nrm_app/.env`; an explicit value wins.
+The GPU itself requires an NVIDIA GPU on the host and the NVIDIA Container
+Toolkit, so `docker run --rm --gpus all nvidia/cuda:12.9.0-base-ubuntu22.04
+nvidia-smi` must work first.
+
+Without the profile — the default, and what GPU-less hosts use — no
+`celery-heavy` container is created, and the four endpoints answer `503`
+explaining that the heavy worker is not enabled, instead of queueing work
+nothing would run. A host without a GPU can still serialize the three
+CPU-bound jobs by selecting the profile and setting `GPU_AVAILABLE=False`.
+
 The retired parent-repository `.env.core-stack` is not read. If it exists,
 manually transfer only the values still needed into this repository's
 `nrm_app/.env`, verify the stack, and securely delete the legacy
