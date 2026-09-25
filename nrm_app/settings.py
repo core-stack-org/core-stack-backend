@@ -180,6 +180,20 @@ REST_FRAMEWORK = {
     ],
 }
 
+SWAGGER_SETTINGS = {
+    "TAGS_SORTER": None,
+    "OPERATIONS_SORTER": "alpha",
+    "DOC_EXPANSION": "list",
+}
+
+REDOC_SETTINGS = {
+    "LAZY_RENDERING": False,
+    "HIDE_HOSTNAME": False,
+    "EXPAND_RESPONSES": "200",
+    "PATH_IN_MIDDLE": False,
+    "NATIVE_SCROLLBARS": True,
+}
+
 # MARK: JWT settings
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=90),

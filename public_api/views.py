@@ -1,6 +1,7 @@
 import ee
 import os
 import json
+import math
 import requests
 import pandas as pd
 import numpy as np
@@ -545,6 +546,79 @@ def get_mws_geometry(state, district, tehsil, mws_id=None):
         return None, Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+def json_safe_geojson(obj):
+    """Convert numpy / tuples to JSON types without rounding coordinates."""
+    if isinstance(obj, dict):
+        return {key: json_safe_geojson(value) for key, value in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [json_safe_geojson(item) for item in obj]
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    try:
+        if isinstance(obj, np.generic):
+            if np.issubdtype(type(obj), np.floating):
+                val = float(obj)
+                return val if math.isfinite(val) else None
+            if np.issubdtype(type(obj), np.integer):
+                return int(obj)
+            if np.issubdtype(type(obj), np.bool_):
+                return bool(obj)
+    except Exception:
+        pass
+    return obj
+
+
+def village_geometry_to_geojson(geometry):
+    if geometry is None:
+        return None
+    if hasattr(geometry, "__geo_interface__"):
+        geometry = geometry.__geo_interface__
+    return json_safe_geojson(geometry)
+
+
+def village_rows_to_feature_collection(rows):
+    features = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "vill_ID": row.get("village_id"),
+                    "vill_name": row.get("village_name"),
+                    "state": row.get("state"),
+                    "district": row.get("district"),
+                    "tehsil": row.get("tehsil"),
+                },
+                "geometry": village_geometry_to_geojson(row.get("geometry")),
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
+def _village_feature_id(feature):
+    props = feature.get("properties") if isinstance(feature, dict) else None
+    if not isinstance(props, dict):
+        return None
+    for key in ("vill_ID", "vill_id", "village_id", "id"):
+        if props.get(key) is not None:
+            return str(props.get(key))
+    return None
+
+
+def filter_village_feature_collection(geojson, village_id):
+    if village_id is None or not isinstance(geojson, dict):
+        return geojson
+    wanted = str(village_id)
+    features = [
+        feature
+        for feature in (geojson.get("features") or [])
+        if _village_feature_id(feature) == wanted
+    ]
+    return {**geojson, "features": features}
+
+
 def get_village_geometries(state, district, tehsil, village_id=None):
     """
     Fetch village geometries from panchayat boundaries layer for a block.
@@ -607,9 +681,7 @@ def get_village_geometries(state, district, tehsil, village_id=None):
                     "state": state,
                     "district": district,
                     "tehsil": tehsil,
-                    "geometry": row.get("geometry").__geo_interface__
-                    if row.get("geometry") is not None
-                    else None,
+                    "geometry": village_geometry_to_geojson(row.get("geometry")),
                 }
             )
         return rows, None
@@ -712,12 +784,15 @@ def get_village_geometries_data(state, district, tehsil):
         if response.status_code != 200:
             return False, f"GeoServer request failed with status {response.status_code}"
 
-        geojson_data = response.json()
+        try:
+            geojson_data = response.json()
+        except ValueError:
+            return False, "GeoServer returned non-JSON for village geometries"
 
-        if not geojson_data.get("features"):
+        if not isinstance(geojson_data, dict) or not geojson_data.get("features"):
             return False, "No features found in layer"
 
-        return True, geojson_data
+        return True, json_safe_geojson(geojson_data)
 
     except Exception as e:
         return False, f"Internal error: {str(e)}"
