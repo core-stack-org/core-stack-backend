@@ -199,13 +199,17 @@ admin_by_latlon_schema = {
     "operation_id": "get_admin_details_by_latlon",
     "operation_summary": "Get Admin Details by Lat Lon",
     "operation_description": """
-    Look up the SOI state, district, and tehsil that contain a WGS84 coordinate.
+    Resolve a WGS84 coordinate to the same ``State``, ``District``, and
+    ``Tehsil`` strings used by Get Active Locations.
 
-    ``latitude`` and ``longitude`` are required and must be finite numbers.
-    The point must fall inside the Survey of India boundary.
+    Core Stack datasets are generated at tehsil level. Copy these three
+    strings into the other dataset APIs (tehsil data, MWS geometries,
+    layers, and so on). Confirm the tehsil is listed in Get Active Locations
+    before you call those routes; if it is missing, request it with the
+    [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 
-    v1 returns the raw admin object (``State``, ``District``, ``Tehsil``).
-    There is no status envelope. Out-of-boundary points return ``{"error": "..."}``.
+    ``latitude`` and ``longitude`` are required. v1 returns the raw admin
+    object. Out-of-boundary points return ``{"error": "..."}``.
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
     "responses": {
@@ -548,10 +552,13 @@ generated_layer_urls_schema = {
     "operation_id": "get_generated_layer_urls",
     "operation_summary": "Get Generated Layer Url",
     "operation_description": """
-    List generated GeoServer layers for a tehsil: WFS/WCS URLs, styles, and GEE asset ids.
+    Return every generated dataset layer for one tehsil.
 
-    Requires ``state``, ``district``, and ``tehsil``.
-    Use ``layer_url`` in QGIS or any WFS/WCS client.
+    Requires ``state``, ``district``, and ``tehsil`` — the same strings from
+    Get Active Locations or Get Admin Details by Lat Lon. Each record has a
+    GeoServer ``layer_url`` (WFS for vectors, WCS for rasters). Open that URL
+    to read the raw layer and use it in QGIS, a WFS client, or any analysis
+    or integration.
 
     v1 returns the raw layer records. Missing locations return ``{"error": "..."}``.
     """,
@@ -786,13 +793,19 @@ generate_active_locations_schema = {
     "operation_id": "generate_active_locations",
     "operation_summary": "Get Active Locations",
     "operation_description": """
-    List every activated state, district, and block/tehsil on the public surface.
+    Return the state → district → tehsil tree for locations where the full
+    public dataset is already generated.
 
-    No location query parameters on v1. Use the returned labels as the exact
-    names for other dataset routes.
+    Building every tehsil takes time, so this list is not all of India.
+    Partners request specific tehsils; we generate those first. Use the
+    returned names as the exact ``state``, ``district``, and ``tehsil``
+    values on other dataset routes.
+
+    To request a new location, submit the
+    [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 
     v1 returns the raw nested tree. There is no status envelope and no
-    state / district / tehsil filter.
+    place filter.
     """,
     "manual_parameters": [
         authorization_param,
@@ -1108,13 +1121,18 @@ admin_by_latlon_schema_v2 = v2_schema_from(
     "get_admin_details_by_latlon/",
 )
 admin_by_latlon_schema_v2["operation_description"] = """
-Look up the SOI state, district, and tehsil for a WGS84 coordinate.
+Resolve a WGS84 coordinate to the same ``State``, ``District``, and
+``Tehsil`` strings used by Get Active Locations.
 
-``latitude`` and ``longitude`` are required. The point must fall inside
-the Survey of India boundary.
+Core Stack datasets are generated at tehsil level. Copy these three
+strings into the other dataset APIs (tehsil data, MWS geometries,
+layers, and so on). Confirm the tehsil is listed in Get Active Locations
+before you call those routes; if it is missing, request it with the
+[Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 
-v2 returns ``{status, error_message, data}``. On success, ``data`` has
-``admin_details`` and ``admin_field_hints``.
+``latitude`` and ``longitude`` are required. v2 returns
+``{status, error_message, data}`` with ``admin_details`` and
+``admin_field_hints``.
 """
 mws_by_latlon_schema_v2 = v2_schema_from(
     mws_by_latlon_schema,
@@ -1169,13 +1187,16 @@ generated_layer_urls_schema_v2 = v2_schema_from(
     "get_generated_layer_urls/",
 )
 generated_layer_urls_schema_v2["operation_description"] = """
-List generated GeoServer layers for a tehsil.
+Return every generated dataset layer for one tehsil.
 
-Requires ``state``, ``district``, and ``tehsil``. Each record includes
-``layer_url``, ``layer_type``, and an optional GEE asset path.
+Requires ``state``, ``district``, and ``tehsil`` — the same strings from
+Get Active Locations or Get Admin Details by Lat Lon. Each record has a
+GeoServer ``layer_url`` (WFS for vectors, WCS for rasters). Open that URL
+to read the raw layer and use it in QGIS, a WFS client, or any analysis
+or integration.
 
 v2 returns ``{status, error_message, data}`` with ``layers`` and
-``layer_field_units``. Use ``layer_url`` in QGIS or a WFS/WCS client.
+``layer_field_units``.
 """
 mws_report_urls_schema_v2 = v2_schema_from(
     mws_report_urls_schema,
@@ -1207,11 +1228,19 @@ generate_active_locations_schema_v2 = v2_schema_from(
     "get_active_locations/",
 )
 generate_active_locations_schema_v2["operation_description"] = """
-List activated states, districts, and blocks/tehsils on the public surface.
+Return the state → district → tehsil tree for locations where the full
+public dataset is already generated.
 
-Use the returned labels as the exact names for other dataset routes.
+Building every tehsil takes time, so this list is not all of India.
+Partners request specific tehsils; we generate those first. Use the
+returned names as the exact ``state``, ``district``, and ``tehsil``
+values on other dataset routes.
+
 Optional filters: ``state``, ``district``, and ``tehsil`` (alias ``block``).
 Name matches are case-insensitive.
+
+To request a new location, submit the
+[Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 
 v2 returns ``{status, error_message, data}`` with ``locations`` and
 ``location_field_hints``.
