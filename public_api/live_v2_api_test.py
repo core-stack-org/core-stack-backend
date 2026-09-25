@@ -104,6 +104,22 @@ def request_json(path: str, params: dict[str, Any] | None = None) -> tuple[int, 
         return exc.code, body
 
 
+def validate_polygon_coordinates(endpoint: str, value: Any, failures: Failures) -> None:
+    if isinstance(value, dict):
+        geom_type = value.get("type")
+        if geom_type in {"Polygon", "MultiPolygon"} and "coordinates" in value:
+            coords = value["coordinates"]
+            if not isinstance(coords, list) or not coords:
+                failures.add(endpoint, f"{geom_type} coordinates must be a non-empty ring")
+            return
+        if "geometry" in value:
+            validate_polygon_coordinates(endpoint, value["geometry"], failures)
+        if "features" in value:
+            for feature in value["features"] or []:
+                validate_polygon_coordinates(endpoint, feature, failures)
+        return
+
+
 def assert_success_envelope(endpoint: str, body: Any, failures: Failures) -> dict | None:
     if not isinstance(body, dict):
         failures.add(endpoint, f"body is not an object: {type(body)}")
@@ -363,14 +379,24 @@ def main() -> int:
                 )
             elif not isinstance(data.get("features"), list) or not data["features"]:
                 failures.add(path, "data.features must be a non-empty list")
+            else:
+                validate_polygon_coordinates(path, data, failures)
         elif kind == "mws_geom":
             if not isinstance(data, dict) or "mws_geometry" not in data:
                 failures.add(path, "data.mws_geometry required")
+            else:
+                validate_polygon_coordinates(path, data.get("mws_geometry"), failures)
             validate_hints_or_units(path, data, "mws_geometry_field_hints", failures)
         elif kind == "village_geom":
-            if not isinstance(data, dict) or "villages" not in data:
-                failures.add(path, "data.villages required")
-            validate_hints_or_units(path, data, "village_field_hints", failures)
+            if not isinstance(data, dict) or data.get("type") != "FeatureCollection":
+                failures.add(
+                    path,
+                    "data must be a GeoJSON FeatureCollection of village polygons",
+                )
+            elif not isinstance(data.get("features"), list) or not data["features"]:
+                failures.add(path, "data.features must be a non-empty list")
+            else:
+                validate_polygon_coordinates(path, data, failures)
 
     print(f"Base: {BASE}")
     print(f"Geo: {STATE}/{DISTRICT}/{TEHSIL} mws_id={MWS_ID} uid={UID}")
