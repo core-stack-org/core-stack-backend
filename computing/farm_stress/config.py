@@ -75,28 +75,6 @@ LOCAL_DIR_SPEI3_TIMESERIES = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries")
 # climatological median.
 LOCAL_DIR_MONSOON_ONSET = os.path.join(LOCAL_EXPORT_ROOT, "monsoon_onset")
 
-# SPEI-3 at 500m (revision of Script 01a/01b) - decided with the user:
-# GSMaP rainfall is only ~11km natively, so "500m SPEI" means the same
-# 11km rainfall field resampled (bilinear) onto a 500m grid - no new
-# rainfall information is created - fused with PET at its true native
-# 500m resolution, which is where the real spatial detail comes from.
-# Full timeseries (not just params) is generated, per the user, matching
-# the original 11km SPEI-3's analog-year-lookup requirement.
-LOCAL_DIR_GSMAP_500M = os.path.join(LOCAL_EXPORT_ROOT, "gsmap_500m")
-LOCAL_DIR_MODIS_PET_500M = os.path.join(LOCAL_EXPORT_ROOT, "modis_pet_500m")
-LOCAL_DIR_WATER_BALANCE_500M = os.path.join(LOCAL_EXPORT_ROOT, "water_balance_500m")
-LOCAL_DIR_SPEI3_PARAMS_500M = os.path.join(LOCAL_EXPORT_ROOT, "spei3_params_500m")
-LOCAL_DIR_SPEI3_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spei3_timeseries_500m")
-GCS_PATH_GSMAP_500M = "ksheetiz/farm_stress/gsmap_500m/"
-GCS_PATH_MODIS_PET_500M = "ksheetiz/farm_stress/modis_pet_500m/"
-
-# SPI-1 at 500m - later decision to also bring SPI-1 up from 11km,
-# reusing the same 500m rainfall already downloaded for SPEI-3 (SPI-1 is
-# rainfall-only, so no new export needed here at all). Same yearly-banded
-# layout as everything else at 500m.
-LOCAL_DIR_SPI1_PARAMS_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_params_500m")
-LOCAL_DIR_SPI1_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_timeseries_500m")
-
 # VCI (Script 03a) - the 26 yearly multi-band VCI COGs (one file per year,
 # up to 23 bands = 16-day periods) were exported to GEE, downloaded via
 # Drive, merged, and converted to COG manually (not via this repo's
@@ -108,12 +86,13 @@ LOCAL_DIR_VCI_RASTERS = os.path.join(LOCAL_EXPORT_ROOT, "vci_rasters")
 LOCAL_DIR_VCI_CLIMATOLOGY = os.path.join(LOCAL_EXPORT_ROOT, "vci_climatology")
 
 # Phenology curve fitting (Script 03b) - local, double-logistic per pixel
-# per year on the VCI timeseries. Not in plan.md, decided with the user:
-# a pixel/year needs at least this many valid (non-NaN) periods out of 23
-# to attempt a fit - roughly a third of the year's data, a floor against
-# fitting 6 free parameters to near-nothing without being so strict that
-# heavily cloud-masked pixels (periods 9-14) never get fit at all.
-PHENOLOGY_MIN_VALID_PERIODS = 8
+# per year on the VCI timeseries. There used to be a discretionary
+# minimum-valid-periods floor here (8 of 23) to avoid fitting 6 free
+# parameters to near-nothing; removed per the user's decision to attempt
+# a fit on every pixel regardless of how few valid periods it has. The
+# only floor left is the one scipy's curve_fit enforces mathematically
+# (it can't solve for 6 parameters with 0 data points) - handled directly
+# in phenology_fit.py, not configurable here.
 LOCAL_DIR_PHENOLOGY = os.path.join(LOCAL_EXPORT_ROOT, "phenology")
 
 # GCS is still used for the much larger weekly 500m operational alert

@@ -27,7 +27,6 @@ from scipy.optimize import curve_fit
 from scipy.special import expit
 
 from computing.farm_stress.config import (
-    PHENOLOGY_MIN_VALID_PERIODS,
     MODIS_16DAY_PERIOD_START_DOYS,
     LOCAL_DIR_VCI_RASTERS,
     LOCAL_DIR_PHENOLOGY,
@@ -95,18 +94,31 @@ def _initial_guess(t, y):
     return [c1, c2, 0.15, c4, 0.15, c6]
 
 
-def fit_phenology(vci_series, doy_array):
+def fit_phenology(vci_series, doy_array, maxfev=MAXFEV):
     """Fit one pixel/year. vci_series and doy_array are both length-23
     (NaN entries in vci_series are dropped before fitting).
 
-    Returns (greenup_doy, peak_doy, greendown_doy), all NaN if there
-    aren't enough valid periods or the fit fails/is degenerate.
+    No discretionary minimum-valid-periods floor - a fit is attempted on
+    every pixel regardless of how few valid periods it has, per the
+    user's decision. The only guard here is the hard mathematical one:
+    a completely empty series (0 valid periods) has nothing to fit and
+    would crash np.min/np.max in _initial_guess, so that case alone
+    returns NaN immediately. Any pixel with 1+ valid periods is handed
+    to curve_fit, which will itself fail (caught below, returned as NaN)
+    if there's too little data to solve for the model's 6 parameters.
+
+    maxfev defaults to the module-level MAXFEV but can be overridden per
+    call - threaded through from the driver scripts' CLI so it's tunable
+    without editing this file.
+
+    Returns (greenup_doy, peak_doy, greendown_doy), all NaN if there's no
+    data at all or the fit fails/is degenerate.
     """
     vci_series = np.asarray(vci_series, dtype=np.float64)
     doy_array = np.asarray(doy_array, dtype=np.float64)
     mask = ~np.isnan(vci_series)
 
-    if mask.sum() < PHENOLOGY_MIN_VALID_PERIODS:
+    if mask.sum() == 0:
         return np.nan, np.nan, np.nan
 
     t, y = doy_array[mask], vci_series[mask]
@@ -115,7 +127,7 @@ def fit_phenology(vci_series, doy_array):
         return np.nan, np.nan, np.nan
 
     try:
-        popt, _ = curve_fit(double_logistic, t, y, p0=p0, bounds=PARAM_BOUNDS, maxfev=MAXFEV)
+        popt, _ = curve_fit(double_logistic, t, y, p0=p0, bounds=PARAM_BOUNDS, maxfev=maxfev)
     except Exception:
         return np.nan, np.nan, np.nan
 
@@ -130,25 +142,36 @@ def fit_phenology(vci_series, doy_array):
 
 
 def _fit_pixel_chunk(args):
-    """args: (vci_chunk (23, n_pixels_in_chunk), doy_array) -> (n_pixels_in_chunk, 3)."""
-    vci_chunk, doy_array = args
+    """args: (vci_chunk (23, n_pixels_in_chunk), doy_array, maxfev) -> (n_pixels_in_chunk, 3)."""
+    vci_chunk, doy_array, maxfev = args
     n_pixels = vci_chunk.shape[1]
     out = np.full((n_pixels, 3), np.nan, dtype=np.float64)
     for j in range(n_pixels):
-        out[j] = fit_phenology(vci_chunk[:, j], doy_array)
+        out[j] = fit_phenology(vci_chunk[:, j], doy_array, maxfev=maxfev)
     return out
 
 
-def batch_fit_phenology_year(vci_year_stack, doy_array, n_workers=None, chunk_size=50_000):
-    """Fit every pixel in one year's (23, rows, cols) VCI stack.
+def batch_fit_phenology_year(vci_year_stack, doy_array, n_workers=None, chunk_size=50_000, maxfev=MAXFEV):
+    """Fit every pixel in one year's (23, rows, cols) VCI stack. A fit is
+    attempted on every pixel that has at least 1 valid period, regardless
+    of how few - no discretionary minimum, per the user's decision.
 
-    Pre-filters to only pixels with >= PHENOLOGY_MIN_VALID_PERIODS valid
-    periods before dispatching to workers - at 500m over India, the vast
-    majority of pixels (ocean, non-agri, or too cloud-masked) would fail
-    that check trivially, and iterating all of them through curve_fit
-    setup/multiprocessing overhead is wasted work at this scale (same
-    lesson as the climatology's redundant-decompression bug: filter
-    before the expensive part, not after).
+    Still pre-filters out pixels with exactly 0 valid periods before
+    dispatching to workers - at 500m over India, a large fraction of
+    pixels (ocean, non-agri - already masked out entirely by VCI's own
+    agricultural mask) are guaranteed-all-NaN and can only ever produce
+    NaN here, so skipping them is pure performance (same lesson as the
+    climatology's redundant-decompression bug: filter out guaranteed-
+    wasted work before the expensive part, not after), not a quality
+    threshold like the removed 8-period floor was.
+
+    maxfev is threaded through to every pixel's fit_phenology call - see
+    that function's docstring.
+
+    n_workers defaults to 2/3 of available cores rather than all of them
+    when not given explicitly - this runs on a shared workstation, and
+    leaving a third of the cores free avoids other people on the machine
+    noticing a slowdown while this runs.
 
     Returns three (rows, cols) arrays: greenup_doy, peak_doy, greendown_doy.
     """
@@ -156,7 +179,7 @@ def batch_fit_phenology_year(vci_year_stack, doy_array, n_workers=None, chunk_si
     flat = vci_year_stack.reshape(n_periods, rows * cols)
 
     valid_count = np.sum(~np.isnan(flat), axis=0)
-    fit_idx = np.where(valid_count >= PHENOLOGY_MIN_VALID_PERIODS)[0]
+    fit_idx = np.where(valid_count >= 1)[0]
 
     greenup = np.full(rows * cols, np.nan, dtype=np.float64)
     peak = np.full(rows * cols, np.nan, dtype=np.float64)
@@ -166,9 +189,9 @@ def batch_fit_phenology_year(vci_year_stack, doy_array, n_workers=None, chunk_si
         return greenup.reshape(rows, cols), peak.reshape(rows, cols), greendown.reshape(rows, cols)
 
     to_fit = flat[:, fit_idx]
-    n_workers = n_workers or multiprocessing.cpu_count()
+    n_workers = n_workers or max(1, int(multiprocessing.cpu_count() * 2 / 3))
     chunks = [
-        (to_fit[:, i : i + chunk_size], doy_array) for i in range(0, to_fit.shape[1], chunk_size)
+        (to_fit[:, i : i + chunk_size], doy_array, maxfev) for i in range(0, to_fit.shape[1], chunk_size)
     ]
 
     with multiprocessing.Pool(n_workers) as pool:
@@ -208,6 +231,7 @@ def fit_phenology_archive(
     overwrite=False,
     n_workers=None,
     chunk_size=50_000,
+    maxfev=MAXFEV,
 ):
     """Fit double-logistic phenology per pixel per year (2000-2025),
     write per-year greenup/peak/greendown rasters, then a multi-year
@@ -216,6 +240,9 @@ def fit_phenology_archive(
     Safe to interrupt and re-run: years already on disk are skipped
     unless overwrite=True (climatology is always recomputed at the end,
     since it's cheap and depends on whichever years exist on disk).
+
+    maxfev overrides the module-level MAXFEV default for this whole run -
+    exposed on the driver script's CLI for tuning without editing code.
     """
     from computing.farm_stress.vci_climatology import _get_year_band_periods  # avoid import cycle at module load
 
@@ -253,7 +280,7 @@ def fit_phenology_archive(
 
             print(f"[{i}/{len(to_fit_years)}] Fitting {year} ({stack.shape[1]}x{stack.shape[2]} pixels) ...")
             greenup, peak, greendown = batch_fit_phenology_year(
-                stack, doy_array, n_workers=n_workers, chunk_size=chunk_size
+                stack, doy_array, n_workers=n_workers, chunk_size=chunk_size, maxfev=maxfev
             )
             del stack
 
