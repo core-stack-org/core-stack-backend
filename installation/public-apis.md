@@ -23,7 +23,7 @@ If you need place names before you use the public routes, start with [GeoAdmin (
 Two direct tools are useful here:
 
 - [Swagger](https://geoserver.core-stack.org/swagger/): better for trying requests quickly.
-- [ReDoc](https://api-doc.core-stack.org/): better for reading grouped routes and schema details carefully.
+- [ReDoc](https://api-doc.core-stack.org/): public docs grouped as **Dataset APIs v1**, **Dataset APIs v2**, **Waterbody APIs v1**, and **Waterbody APIs v2**.
 
 ---
 

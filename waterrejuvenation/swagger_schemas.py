@@ -189,7 +189,7 @@ waterbodies_by_admin_schema = {
             examples={"application/json": waterbodies_error_example},
         ),
     },
-    "tags": ["Waterbodies API"],
+    "tags": ["Waterbody APIs v1"],
 }
 
 waterbodies_by_uuid = {
@@ -246,18 +246,14 @@ waterbodies_by_uuid = {
             examples={"application/json": waterbodies_error_example},
         ),
     },
-    "tags": ["Waterbodies API"],
+    "tags": ["Waterbody APIs v1"],
 }
 
 
 def v2_waterbodies_schema_from(base_schema, operation_id, path_suffix):
     schema = dict(base_schema)
     schema["operation_id"] = operation_id
-    schema["tags"] = ["Waterbodies API v2"]
-    base_desc = (schema.get("operation_description") or "").strip()
-    schema["operation_description"] = (
-        f"{base_desc}\n\n**Path:** ``GET /api/v2/{path_suffix}``"
-    )
+    schema["tags"] = ["Waterbody APIs v2"]
     return schema
 
 

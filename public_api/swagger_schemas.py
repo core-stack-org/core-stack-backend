@@ -1,5 +1,7 @@
 from drf_yasg import openapi
 
+from .dataset_filters import tehsil_data_type_help_markdown
+
 # ============= COMMON PARAMETERS =============
 
 # Location Parameters
@@ -65,6 +67,50 @@ village_id_param = openapi.Parameter(
     "village_id",
     openapi.IN_QUERY,
     description="Village identifier (vill_ID). Optional; if omitted returns all villages in the tehsil layer.",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+tehsil_data_filter_param = openapi.Parameter(
+    "data",
+    openapi.IN_QUERY,
+    description=(
+        "Optional v2 sheet filter. Omit or pass `all` for every sheet. "
+        "Pass one or more sheet names: `data=drought,stream_order` or "
+        "`data=drought&data=stream_order`."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_state_filter_param = openapi.Parameter(
+    "state",
+    openapi.IN_QUERY,
+    description="Optional state name filter (e.g. 'Rajasthan').",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_district_filter_param = openapi.Parameter(
+    "district",
+    openapi.IN_QUERY,
+    description="Optional district name filter (e.g. 'Bhilwara').",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_tehsil_filter_param = openapi.Parameter(
+    "tehsil",
+    openapi.IN_QUERY,
+    description="Optional tehsil / block name filter (e.g. 'Mandalgarh'). Alias: `block`.",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_block_filter_param = openapi.Parameter(
+    "block",
+    openapi.IN_QUERY,
+    description="Optional block name filter. Same as `tehsil`.",
     type=openapi.TYPE_STRING,
     required=False,
 )
@@ -142,10 +188,6 @@ def v2_schema_from(base_schema, operation_id, path_suffix):
     schema = dict(base_schema)
     schema["operation_id"] = operation_id
     schema["tags"] = ["Dataset APIs v2"]
-    base_desc = (schema.get("operation_description") or "").strip()
-    schema["operation_description"] = (
-        f"{base_desc}\n\n**Path:** ``GET /api/v2/{path_suffix}``"
-    )
     return schema
 
 
@@ -203,7 +245,7 @@ admin_by_latlon_schema = {
         ),
         500: internal_error_response,
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # MWS ID by Lat Lon Schema
@@ -246,7 +288,7 @@ mws_by_latlon_schema = {
         404: not_found_response,
         500: internal_error_response,
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # MWS Data Schema
@@ -255,19 +297,9 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS time series data, including ET, Runoff, Precipitation and NDVI(crop, tree, shrubs) for a given state, district, tehsil, and MWS ID.
+    Retrieve MWS time series data, including ET, runoff, precipitation, and NDVI for a given state, district, tehsil, and MWS ID.
 
-    **Response dataset details:**
-    ```
-    {
-        "status": "success",
-        "error_message": null,
-        "data": {
-            "mws_id": "12_208104",
-            "time_series": []
-        }
-    }
-    ```
+    v1 returns the raw payload (no `{status, data}` envelope).
     """,
     "manual_parameters": [
         state_param,
@@ -280,40 +312,37 @@ get_mws_data_schema = {
         200: openapi.Response(
             description="Success - Returns MWS time series data",
             examples={
-                "application/json": success_example(
-                    {
-                        "mws_id": "12_208104",
-                        "time_series": [],
-                    }
-                )
+                "application/json": {
+                    "mws_id": "12_208104",
+                    "time_series": [],
+                }
             },
         ),
         400: openapi.Response(
             description="Bad Request - Missing required parameters or invalid format",
             examples={
-                "application/json": error_example(
-                    "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
-                )
+                "application/json": {
+                    "error": "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                }
             },
         ),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
         404: openapi.Response(
             description="Not Found - MWS ID not found",
             examples={
-                "application/json": error_example("Data not found for the given mws_id")
+                "application/json": {"error": "Data not found for the given mws_id"}
             },
         ),
         500: openapi.Response(
             description="Internal Server Error",
             examples={
-                "application/json": error_example(
-                    "Internal server error while fetching MWS data",
-                    details="Error message details",
-                )
+                "application/json": {
+                    "Exception": "Error message details",
+                }
             },
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -438,7 +467,7 @@ tehsil_data_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -492,7 +521,7 @@ kyl_indicators_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # Generated Layer URLs Schema
@@ -551,7 +580,7 @@ generated_layer_urls_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -597,7 +626,7 @@ mws_report_urls_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -632,7 +661,14 @@ mws_geometries_schema = {
                                 "properties": {"uid": "12_208104"},
                                 "geometry": {
                                     "type": "Polygon",
-                                    "coordinates": [[[76.62, 27.55], [76.63, 27.56]]],
+                                    "coordinates": [
+                                        [
+                                            [75.02716659, 25.2401886],
+                                            [75.0868641493802, 25.20231618101583],
+                                            [75.091234567, 25.251234567],
+                                            [75.02716659, 25.2401886],
+                                        ]
+                                    ],
                                 },
                             }
                         ],
@@ -649,7 +685,7 @@ mws_geometries_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -661,7 +697,8 @@ village_geometries_schema = {
     Retrieve village boundary geometries for state, district, tehsil.
     Optionally filter with ``village_id``.
 
-    ``data`` contains ``villages`` (array with geometry) and ``village_field_hints``.
+    ``data`` is a GeoJSON FeatureCollection of village MultiPolygon / Polygon rings.
+    Coordinates are the actual vertices from GeoServer, not 2-decimal points.
     """,
     "manual_parameters": [
         state_param,
@@ -672,31 +709,34 @@ village_geometries_schema = {
     ],
     "responses": {
         200: openapi.Response(
-            description="Success - Returns village geometry objects",
+            description="Success - Returns a GeoJSON FeatureCollection of village polygons",
             examples={
                 "application/json": success_example(
                     {
-                        "villages": [
+                        "type": "FeatureCollection",
+                        "features": [
                             {
-                                "village_id": "12345",
-                                "village_name": "Example Village",
-                                "state": "rajasthan",
-                                "district": "alwar",
-                                "tehsil": "alwar",
+                                "type": "Feature",
+                                "id": "jamui_jamui.1",
                                 "geometry": {
-                                    "type": "Polygon",
-                                    "coordinates": [[[76.62, 27.55], [76.63, 27.56]]],
+                                    "type": "MultiPolygon",
+                                    "coordinates": [
+                                        [
+                                            [
+                                                [86.11306, 24.75025],
+                                                [86.11629, 24.74811],
+                                                [86.12035, 24.74641],
+                                                [86.11306, 24.75025],
+                                            ]
+                                        ]
+                                    ],
+                                },
+                                "properties": {
+                                    "vill_ID": 258411,
+                                    "vill_name": "Example Village",
                                 },
                             }
                         ],
-                        "village_field_hints": {
-                            "village_id": "vill_ID_from_layer",
-                            "village_name": "vill_name_from_layer",
-                            "state": "normalized_state_name",
-                            "district": "normalized_district_name",
-                            "tehsil": "normalized_tehsil_name",
-                            "geometry": "geojson_geometry_object",
-                        },
                     }
                 )
             },
@@ -706,7 +746,7 @@ village_geometries_schema = {
         404: openapi.Response(description="Not Found - layer or village not found"),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -761,7 +801,7 @@ generate_active_locations_schema = {
             },
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -889,7 +929,7 @@ get_mws_geometries_schema = {
             examples={"application/json": {"error": "Internal server error"}},
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -1017,7 +1057,7 @@ get_village_geometries_schema = {
             },
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # ============= V2 API SCHEMAS (distinct operation_id for Swagger/ReDoc) =============
@@ -1037,6 +1077,20 @@ tehsil_data_schema_v2 = v2_schema_from(
     "get_tehsil_data_v2",
     "get_tehsil_data/",
 )
+tehsil_data_schema_v2["operation_description"] = f"""
+Retrieve tehsil-level JSON for a given state, district, and tehsil.
+
+``data`` contains:
+- ``tehsil_data``: sheet keys with tabular rows per MWS
+- ``tehsil_units``: units for those sheets
+
+Filter sheets with the ``data`` query parameter.
+
+{tehsil_data_type_help_markdown()}
+"""
+tehsil_data_schema_v2["manual_parameters"] = list(
+    tehsil_data_schema_v2["manual_parameters"]
+) + [tehsil_data_filter_param]
 kyl_indicators_schema_v2 = v2_schema_from(
     kyl_indicators_schema,
     "get_mws_kyl_indicators_v2",
@@ -1067,3 +1121,19 @@ generate_active_locations_schema_v2 = v2_schema_from(
     "get_active_locations_v2",
     "get_active_locations/",
 )
+generate_active_locations_schema_v2["operation_description"] = """
+Return the hierarchical list of activated states → districts → blocks/tehsils.
+
+``data`` contains ``locations`` and ``location_field_hints``.
+
+Optional filters: ``state``, ``district``, and ``tehsil`` (alias ``block``).
+All filters are case-insensitive name matches.
+"""
+generate_active_locations_schema_v2["manual_parameters"] = list(
+    generate_active_locations_schema_v2["manual_parameters"]
+) + [
+    active_locations_state_filter_param,
+    active_locations_district_filter_param,
+    active_locations_tehsil_filter_param,
+    active_locations_block_filter_param,
+]

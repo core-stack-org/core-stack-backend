@@ -21,58 +21,36 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from bot_interface.api import whatsapp_webhook
+from public_api.schema import PublicAPISchemaGenerator
 
 
-_API_V2_REDOC_DESCRIPTION = """
-## CoRE Stack Public APIs
+_PUBLIC_API_REDOC_DESCRIPTION = """
+Authenticate every request with:
 
-Authenticate every request with header: **`X-API-Key: <your-api-key>`**
+`X-API-Key: <your-api-key>`
 
-Public dataset and waterbody APIs are available under **`/api/v1/`** and **`/api/v2/`** (see **Dataset APIs v2** and **Waterbodies API v2** in the sidebar).
+The sidebar has four groups:
 
----
+- **Dataset APIs v1** — `/api/v1/` dataset routes, raw JSON
+- **Dataset APIs v2** — `/api/v2/` dataset routes, `{status, error_message, data}`
+- **Waterbody APIs v1** — `/api/v1/` waterbody routes
+- **Waterbody APIs v2** — `/api/v2/` waterbody routes
 
-### Get MWS Time Series Data (v2 fortnight format)
-
-**`GET /api/v2/get_mws_data/`** — same query params as v1 (`state`, `district`, `tehsil`, `mws_id`). Optional `regenerate=true` bypasses MongoDB cache.
-
-```json
-{
-  "status": "success",
-  "error_message": null,
-  "data": {
-    "metadata": { "mws_id": "12_208104" },
-    "fortnight": {
-      "time": ["2024-01-01", "2024-01-15"],
-      "et": [2.5, 3.1],
-      "runoff": [1.3, 0.8],
-      "precipitation": [10.2, 5.4]
-    },
-    "fortnight_units": {
-      "time": "iso8601",
-      "time_step": "15_days",
-      "et": "mm",
-      "runoff": "mm",
-      "precipitation": "mm"
-    }
-  }
-}
-```
-
-**`GET /api/v1/get_mws_data/`** returns legacy `data.time_series` rows (not the fortnight arrays above).
+Create an API key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
 """
 
 schema_view = get_schema_view(
     openapi.Info(
         title="CoRE Stack APIs",
-        default_version="v2",
-        description=_API_V2_REDOC_DESCRIPTION,
+        default_version="public",
+        description=_PUBLIC_API_REDOC_DESCRIPTION,
         terms_of_service="",
         contact=openapi.Contact(email="support@core-stack.org"),
         license=openapi.License(name="CC BY 4.0"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    generator_class=PublicAPISchemaGenerator,
 )
 
 urlpatterns = [
