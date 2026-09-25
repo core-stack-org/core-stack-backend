@@ -66,7 +66,7 @@ x-backend-environment: &backend-environment
   S3_BUCKET: ${S3_BUCKET:-}
 
   SKIP_ADMIN_BOUNDARY_DOWNLOAD: ${SKIP_ADMIN_BOUNDARY_DOWNLOAD:-0}
-  SKIP_BASE_LAYER_DOWNLOAD: ${SKIP_BASE_LAYER_DOWNLOAD:-0}
+  SKIP_BASE_LAYER_DOWNLOAD: ${SKIP_BASE_LAYER_DOWNLOAD:-1}
   SKIP_TEHSIL_WATERSHEDS: ${SKIP_TEHSIL_WATERSHEDS:-0}
   SKIP_GEE_CONFIG: ${SKIP_GEE_CONFIG:-0}
   SKIP_GEOSERVER_INIT: ${SKIP_GEOSERVER_INIT:-0}
@@ -185,6 +185,15 @@ services:
       # that would mask a value in the file.
       USERNAME_GESDISC: ${USERNAME_GESDISC:-}
       PASSWORD_GESDISC: ${PASSWORD_GESDISC:-}
+      GEE_CONFS_HOST_DIR: /opt/gee-confs-host
+    # Runs as root: it hands host files back to the checkout owner, including
+    # gee_confs/, which every other service mounts read-only.
+    volumes:
+      - ${BACKEND_CODE_DIR:-.}:/app
+      - ${CORESTACK_HOST_DATA_DIR:-.}/data:/var/tmp/core-stack-data
+      - ${CORESTACK_HOST_DATA_DIR:-.}/gee_confs:/app/data/gee_confs:ro
+      - ${CORESTACK_HOST_DATA_DIR:-.}/gee_confs:/opt/gee-confs-host
+      - ./installation/docker:/opt/corestack-scripts:ro
     command: ["bash", "/opt/corestack-scripts/app-init.sh"]
     restart: "no"
 
@@ -201,7 +210,7 @@ services:
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
-    command: ["bash", "/opt/corestack-scripts/database-init.sh"]
+    command: ["bash", "/opt/corestack-scripts/as-owner.sh", "bash", "/opt/corestack-scripts/database-init.sh"]
     restart: "no"
 
   geoserver-init:
@@ -211,7 +220,7 @@ services:
         condition: service_completed_successfully
       geoserver:
         condition: service_healthy
-    command: ["bash", "/opt/corestack-scripts/geoserver-init.sh"]
+    command: ["bash", "/opt/corestack-scripts/as-owner.sh", "bash", "/opt/corestack-scripts/geoserver-init.sh"]
     restart: "no"
 
   data-download:
@@ -222,7 +231,7 @@ services:
     environment:
       <<: *backend-environment
       FORCE_DATA_DOWNLOAD: ${FORCE_DATA_DOWNLOAD:-0}
-    command: ["bash", "/opt/corestack-scripts/download-data.sh"]
+    command: ["bash", "/opt/corestack-scripts/as-owner.sh", "bash", "/opt/corestack-scripts/download-data.sh"]
     restart: "no"
 
   gee-config:
@@ -230,7 +239,7 @@ services:
     depends_on:
       app-init:
         condition: service_completed_successfully
-    command: ["bash", "/opt/corestack-scripts/gee-config.sh"]
+    command: ["bash", "/opt/corestack-scripts/as-owner.sh", "bash", "/opt/corestack-scripts/gee-config.sh"]
     restart: "no"
 
   tehsil-watershed-setup:
@@ -243,7 +252,7 @@ services:
     environment:
       <<: *backend-environment
       DOWNLOAD_TEHSIL_WATERSHEDS_ONLY: "1"
-    command: ["bash", "/opt/corestack-scripts/download-data.sh"]
+    command: ["bash", "/opt/corestack-scripts/as-owner.sh", "bash", "/opt/corestack-scripts/download-data.sh"]
     restart: "no"
 
   backend:

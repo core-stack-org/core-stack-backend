@@ -1,483 +1,381 @@
-# Reliable CoRE Stack Docker setup
+# Docker installation
 
-The repository-root `docker-compose.yml` is the only supported CoRE Stack
-Compose definition. It builds the backend environment, mounts source from the
-host, starts PostgreSQL, Redis, GeoServer, Gunicorn and Celery, and runs
-initialization jobs in dependency order.
+Runs the CoRE Stack backend with PostgreSQL, Redis, GeoServer and Celery in
+Docker. Nothing else is installed on the host.
 
-## Architecture
+When it is done you have:
 
-| State | Location | Persistence |
-| --- | --- | --- |
-| Backend source | Host checkout mounted at `/app` | Git/host filesystem |
-| Downloaded and generated layers | `${CORESTACK_HOST_DATA_DIR:-.}/data` mounted at `/var/tmp/core-stack-data` | Host filesystem |
-| PostgreSQL | Separate `postgres` container | Docker volume `postgres_data` |
-| GeoServer catalog | Separate `geoserver` container | Docker volume `geoserver_data` |
-| Celery broker | Separate `redis` container with AOF | Docker volume `redis_data` |
-| GEE JSON | `${CORESTACK_HOST_DATA_DIR:-.}/gee_confs` | Read-only host mount |
-| Database backups | `${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres` | Host filesystem |
-| GeoServer backups | `${CORESTACK_HOST_DATA_DIR:-.}/backups/geoserver` | Host filesystem |
+- the API and Django admin at http://localhost:8000
+- GeoServer at http://localhost:8080/geoserver
 
-PostgreSQL is never stored in the backend container. `docker compose --env-file
-nrm_app/.env down` keeps all volumes. Adding `-v` deliberately
-destroys the database, GeoServer catalog and Redis data.
+## 1. Before you start
 
-## Requirements
+| You need | Check |
+| --- | --- |
+| Docker Engine with Compose v2 | `docker compose version` |
+| Your user can run Docker (member of the `docker` group) | `docker ps` works without `sudo` |
+| git | `git --version` |
+| About 20 GB free disk, plus space for the [data](#data-for-local-compute) you add | `df -h .` |
+| Ports 8000, 8080 and 5432 free | `ss -ltn \| grep -E ':(8000\|8080\|5432) '` prints nothing |
 
-- Docker Engine or Docker Desktop with Compose v2
-- Linux/amd64 support; Apple Silicon uses Docker emulation
-- Enough free disk for images and requested layers
-- Ports 8000, 8080 and 5432 free on loopback, or overridden in
-  `nrm_app/.env`
+For the GPU jobs you also need an NVIDIA driver and the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html).
+This must print your GPU:
 
-## One-click first start
+```bash
+docker run --rm --gpus all nvidia/cuda:12.9.0-base-ubuntu22.04 nvidia-smi
+```
 
-From the backend repository:
+On a network that only reaches the internet through a proxy (for example a
+campus network), read [Behind a proxy](#behind-a-proxy) first.
+
+## 2. Install
+
+**1. Get the code**
+
+```bash
+git clone https://github.com/core-stack-org/core-stack-backend.git
+cd core-stack-backend
+```
+
+**2. Create the settings file**
 
 ```bash
 cp installation/docker/env.template nrm_app/.env
 chmod 600 nrm_app/.env
-# Optionally set CORESTACK_HOST_DATA_DIR=/srv/core-stack-data in nrm_app/.env.
+```
+
+`nrm_app/.env` holds every setting and password. Docker Compose and Django
+both read it.
+
+**3. Edit `nrm_app/.env`**
+
+Set the admin account you will log in with:
+
+```dotenv
+DJANGO_SUPERUSER_USERNAME=admin
+DJANGO_SUPERUSER_EMAIL=you@example.com
+DJANGO_SUPERUSER_PASSWORD='choose-a-password'
+```
+
+On a machine with an NVIDIA GPU, uncomment this line (see
+[GPU and long jobs](#gpu-and-long-jobs)):
+
+```dotenv
+COMPOSE_PROFILES=heavy
+```
+
+Leave everything else as it is for now.
+
+**4. Optional: download the admin boundaries yourself**
+
+The first start downloads the admin-boundary archive (about 600 MB) from
+Google Drive. To use a browser download instead, which is often faster,
+download it from
+[here](https://drive.google.com/file/d/1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d/view)
+and save it as `data/dataset.7z` in the repository.
+
+**5. Build and start**
+
+```bash
 docker compose --env-file nrm_app/.env up -d --build
 ```
 
-`CORESTACK_HOST_DATA_DIR` is the single root for downloaded/generated data,
-GEE credentials and backups. It defaults to the repository root, preserving
-the `./data`, `./gee_confs` and `./backups` layout. For a server installation,
-set an absolute path in `nrm_app/.env` before the first start:
+The first run takes 5 to 60 minutes, depending on your connection. The
+command waits while the database is set up and the data is downloaded; let
+it finish. If it is interrupted, run the same command again.
 
-```dotenv
-CORESTACK_HOST_DATA_DIR=/srv/core-stack-data
-```
+Every Compose command needs `--env-file nrm_app/.env`, and must be run
+from the repository root.
 
-Compose creates the derived bind-mount directories when the stack starts. A
-shell value can temporarily override the file:
+**6. Check that it works**
 
 ```bash
-CORESTACK_HOST_DATA_DIR=/srv/core-stack-data \
-  docker compose --env-file nrm_app/.env up -d --build
+docker compose --env-file nrm_app/.env ps -a
 ```
 
-Persist the value in `nrm_app/.env` for normal operation so later Compose
-commands use the same host directories. Host-path examples below assume the
-server value `/srv/core-stack-data`; substitute your configured location.
+- `app-init`, `database-init`, `geoserver-init`, `data-download`,
+  `gee-config` and `tehsil-watershed-setup` show `Exited (0)`.
+- `backend`, `postgres`, `redis` and `geoserver` show `Up (healthy)`.
+- The `celery-*` workers show `Up`. `celery-heavy` is there only with
+  `COMPOSE_PROFILES=heavy`.
 
-For a local evaluation, the placeholder passwords work. Before any shared or
-production deployment, replace both passwords in `nrm_app/.env`.
+If a job shows a non-zero exit code, read its log:
+`docker compose --env-file nrm_app/.env logs <service>`.
 
-Run all Compose commands in this guide from the repository root. Both Compose
-and Django use the single `nrm_app/.env` file. The explicit
-`--env-file nrm_app/.env` option is required because Compose only auto-loads
-`.env` from the repository root.
+Log in to the API. This reads the username and password from `nrm_app/.env`
+and keeps the token in `$TOKEN` for the requests in
+[Test the APIs](#test-the-apis):
 
-## GPU machines and long-running jobs
+```bash
+export no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,127.0.0.1
+TOKEN=$(set -a; . nrm_app/.env; set +a; python3 -c '
+import json, os, urllib.request
+req = urllib.request.Request("http://localhost:8000/api/v1/auth/login/",
+    data=json.dumps({"username": os.environ["DJANGO_SUPERUSER_USERNAME"],
+                     "password": os.environ["DJANGO_SUPERUSER_PASSWORD"]}).encode(),
+    headers={"Content-Type": "application/json"})
+print(json.load(urllib.request.urlopen(req))["access"])')
+echo "${TOKEN:0:20}"
+```
 
-Four endpoints run jobs that take hours and must not run concurrently:
+It prints the start of a token (`eyJhbGci...`). You can also log in to
+Django admin at http://localhost:8000/admin/.
 
-| Endpoint | Needs a GPU |
+## 3. What to set up next
+
+The stack now runs. Set up only what you need:
+
+| To | Set up |
+| --- | --- |
+| Compute layers locally (LULC, hydrology, runoff) | [Data for local compute](#data-for-local-compute) |
+| Run Google Earth Engine jobs | [Google Earth Engine](#google-earth-engine) |
+| Download ET (evapotranspiration) data | [NASA Earthdata](#nasa-earthdata) |
+| Run the GPU and multi-hour jobs | [GPU and long jobs](#gpu-and-long-jobs) |
+| Work behind a proxy | [Behind a proxy](#behind-a-proxy) |
+
+Other settings are listed in [Settings](#settings).
+
+## Data for local compute
+
+Local computation (`"compute": "local"` in a request) reads its inputs from
+`data/base_layers/`. Download what the APIs you use need and place it as
+shown.
+
+| Data | Download | Place at `data/base_layers/` | Needed by |
+| --- | --- | --- | --- |
+| Terrain (569 MB) | `<link>` | `terrain_raster_fabdam_pan_india.tif` | runoff |
+| Soil (6 MB) | `<link>` | `soil/hysogs_india_250m_4326.tif` | runoff |
+| LULC, one file per year (63 GB) | `<link>` | `lulc/lulc_v3_<year>_<year+1>.tif` | runoff, LULC |
+| India boundary (8 MB) | `<link>` | `PanIndia_Boundaries/india_state_outer_no_islands.geojson` | pan-India runoff |
+| Aquifer (102 MB) | `<link>` | `aquifer/aquifer.geojson` | pan-India hydrology |
+| Microwatersheds (5.4 GB) | `<link>` | `static_layers/mws/Microwatershed_v2_with_details.geojson` | MWS layers |
+| SOI tehsils (316 MB) | `<link>` | `admin_boundary/soi_tehsil.geojson` | tehsil watersheds |
+| Tehsil watersheds | `<link>` | `tehsil_watersheds/<state>/<district>/<tehsil>.gpkg` | every tehsil-level request |
+| Runoff (164 GB) | `<link>` | `hydrology/runoff/` | pan-India hydrology |
+| ET (114 GB) | `<link>` | `hydrology/et/` | pan-India hydrology |
+| Pan-India annual hydrology (20 GB) | `<link>` | `hydrology/annual/` | tehsil hydrology |
+
+Files can be added while the stack runs; no restart is needed.
+
+Runoff, ET and pan-India annual hydrology can also be generated with the
+APIs in [Test the APIs](#test-the-apis), but that takes many hours.
+Tehsil hydrology needs the pan-India annual layer for every year it covers;
+the API tells you which years are missing.
+
+With S3 credentials for the CoRE Stack datasets bucket, terrain, LULC,
+aquifer and microwatersheds can be downloaded automatically: set
+`S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION`, `S3_BUCKET` and
+`SKIP_BASE_LAYER_DOWNLOAD=0`, then run
+`docker compose --env-file nrm_app/.env run --rm data-download`.
+
+## Google Earth Engine
+
+You need a Google Cloud service account with Earth Engine access and its JSON
+key.
+
+1. Open http://localhost:8000/admin/gee_computing/geeaccount/add/ and log in.
+2. Fill in a name, the `client_email` from the JSON as the service account
+   email, and upload the JSON as the credentials file. Save.
+3. Open the account again, set **Helper account** to the same account, and
+   save.
+4. The account id is the number in the page address
+   (`.../geeaccount/1/change/`). Put it in `nrm_app/.env`:
+
+   ```dotenv
+   GEE_DEFAULT_ACCOUNT_ID=1
+   GEE_HELPER_ACCOUNT_ID=1
+   ```
+
+5. Apply it:
+
+   ```bash
+   docker compose --env-file nrm_app/.env up -d --force-recreate
+   ```
+
+The key is stored encrypted in the database and the uploaded file is deleted,
+so keep your own copy. The encryption key is `FERNET_KEY` in `nrm_app/.env`;
+if it changes, upload the JSON again.
+
+## NASA Earthdata
+
+The ET download (`/api/v1/et_download/`) fetches FLDAS data from NASA GES
+DISC.
+
+1. Create an account at https://urs.earthdata.nasa.gov.
+2. In your profile, under **Applications → Authorized Apps**, approve
+   **NASA GESDISC DATA ARCHIVE**.
+3. Put the login in `nrm_app/.env`. Keep the single quotes if the password
+   contains `$`:
+
+   ```dotenv
+   USERNAME_GESDISC=your-username
+   PASSWORD_GESDISC='your-password'
+   ```
+
+4. Apply it:
+
+   ```bash
+   docker compose --env-file nrm_app/.env up -d --force-recreate
+   ```
+
+A wrong password or an unapproved application makes the task fail with an
+HTML page from GES DISC in the `celery-heavy` log.
+
+## GPU and long jobs
+
+Four endpoints start jobs that run for hours:
+
+| Endpoint | Uses the GPU |
 | --- | --- |
 | `/api/v1/runoff_gpu/` | yes |
 | `/api/v1/et_download/` | no |
 | `/api/v1/pan-india/hydrology_annual/` | no |
 | `/api/v1/pan-india/hydrology_fortnightly/` | no |
 
-They are queued on `heavy` and served by `celery-heavy`, a single worker that
-runs one task at a time and holds the GPU. Everything else keeps using
-`celery-nrm`, which runs `CELERY_NRM_CONCURRENCY` tasks in parallel (3 by
-default), so a multi-hour hydrology run no longer blocks other layers.
+They run on the `celery-heavy` worker, one at a time, so they never block
+the other layers. `COMPOSE_PROFILES=heavy` in `nrm_app/.env` creates that
+worker and gives it the GPU. Without it, these four endpoints answer `503`.
 
-`celery-heavy` is not created unless the `heavy` Compose profile is selected.
-On a machine that should run these jobs, set one line in `nrm_app/.env`:
+To run the three CPU jobs on a machine without a GPU, set both:
 
 ```dotenv
 COMPOSE_PROFILES=heavy
+GPU_AVAILABLE=False
 ```
 
-Then start the stack as usual:
+After changing the profile, run
+`docker compose --env-file nrm_app/.env up -d --remove-orphans`.
+
+Check that the worker sees the GPU:
 
 ```bash
-docker compose --env-file nrm_app/.env up -d
-docker compose --env-file nrm_app/.env logs -f celery-heavy
+docker compose --env-file nrm_app/.env exec celery-heavy nvidia-smi
 ```
 
-Selecting the profile also makes `GPU_AVAILABLE` and `HEAVY_WORKER_ENABLED`
-default to `True`, so the container and the application cannot disagree.
-Either can still be set explicitly in `nrm_app/.env`; an explicit value wins.
-The GPU itself requires an NVIDIA GPU on the host and the NVIDIA Container
-Toolkit, so `docker run --rm --gpus all nvidia/cuda:12.9.0-base-ubuntu22.04
-nvidia-smi` must work first.
+## Behind a proxy
 
-Without the profile — the default, and what GPU-less hosts use — no
-`celery-heavy` container is created, and the four endpoints answer `503`
-explaining that the heavy worker is not enabled, instead of queueing work
-nothing would run. A host without a GPU can still serialize the three
-CPU-bound jobs by selecting the profile and setting `GPU_AVAILABLE=False`.
+Image pulls are done by the Docker daemon, which needs its own proxy
+setting: see [Docker daemon proxy](https://docs.docker.com/engine/daemon/proxy/).
+`docker info | grep -i proxy` shows the current one.
 
-The retired parent-repository `.env.core-stack` is not read. If it exists,
-manually transfer only the values still needed into this repository's
-`nrm_app/.env`, verify the stack, and securely delete the legacy
-credentials.
+Builds and containers use the proxy from your shell. If `http_proxy` and
+`https_proxy` are exported, nothing else is needed. Otherwise uncomment and
+set these in `nrm_app/.env`:
 
-Compose runs these one-shot services before starting Gunicorn:
+```dotenv
+HTTP_PROXY=http://proxy.example.org:3128
+HTTPS_PROXY=http://proxy.example.org:3128
+```
 
-1. `app-init` completes the ignored `nrm_app/.env`, generates secret keys, and
-   normalizes the resolved database, GeoServer, Celery and runtime values.
-2. `database-init` creates/updates installation-local migration files, prints
-   the plan, applies it with `--fake-initial`, collects static files and loads
-   seed data once.
-3. `geoserver-init` reconciles workspaces and bundled styles.
-4. `data-download` downloads only the requested/missing source layers.
-5. `gee-config` discovers optional mounted GEE JSON credentials.
-6. `tehsil-watershed-setup` downloads active tehsil watershed layers directly
-   from the GeoServer `mws` WFS workspace.
-7. Gunicorn and the queue-specific Celery workers start.
-
-Follow first-start progress:
+For your own `curl` calls to the stack, keep local addresses off the proxy:
 
 ```bash
-docker compose --env-file nrm_app/.env ps
-docker compose --env-file nrm_app/.env logs -f app-init database-init data-download geoserver-init \
-  gee-config tehsil-watershed-setup backend
+export no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,127.0.0.1
 ```
 
-Local URLs:
+## Settings
 
-- Django: http://localhost:8000
-- GeoServer: http://localhost:8080/geoserver
-- PostgreSQL: `127.0.0.1:5432`
+All in `nrm_app/.env`. After a change, run
+`docker compose --env-file nrm_app/.env up -d --force-recreate`.
 
-## Large-download controls
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `CORESTACK_HOST_DATA_DIR` | `.` | Where `data/`, `gee_confs/` and `backups/` live on the host. Set before the first start. |
+| `BACKEND_PORT`, `GEOSERVER_PORT`, `POSTGRES_PORT` | `8000`, `8080`, `5432` | Host ports, bound to `127.0.0.1` only. |
+| `DB_PASSWORD`, `GEOSERVER_PASSWORD` | placeholders | Change before the first start on any shared machine. |
+| `CELERY_NRM_CONCURRENCY` | `3` | Layer jobs that run in parallel. |
+| `SKIP_ADMIN_BOUNDARY_DOWNLOAD` | `0` | `1` skips the admin-boundary download. |
+| `SKIP_BASE_LAYER_DOWNLOAD` | `1` | `0` downloads base layers from S3 (needs S3 credentials). |
+| `SKIP_TEHSIL_WATERSHEDS` | `0` | `1` skips fetching tehsil watersheds from GeoServer. |
+| `CELERY_TASK_ALWAYS_EAGER` | `False` | Keep `False`. `True` runs every task inside the web server and bypasses the workers. |
 
-Each expensive data family has its own switch:
+## Test the APIs
 
-| Variable | Effect when set to `1` |
-| --- | --- |
-| `SKIP_ADMIN_BOUNDARY_DOWNLOAD` | Do not download the approximately 8 GB admin-boundary archive |
-| `SKIP_BASE_LAYER_DOWNLOAD` | Do not download terrain, MWS, LULC and static/tehsil-level base layers |
-| `SKIP_TEHSIL_WATERSHEDS` | Do not fetch active tehsil watershed GPKGs from GeoServer |
-
-Set the flags in `nrm_app/.env` before the first start, or for one
-invocation:
+Log in first ([step 6](#2-install)). Each request answers at once and queues
+a task; follow it in the worker log, for example
+`docker compose --env-file nrm_app/.env logs -f celery-nrm`.
 
 ```bash
-SKIP_ADMIN_BOUNDARY_DOWNLOAD=1 \
-SKIP_BASE_LAYER_DOWNLOAD=1 \
-SKIP_TEHSIL_WATERSHEDS=1 \
-docker compose --env-file nrm_app/.env up -d --build
+api() { curl -s -X POST "http://localhost:8000/api/v1/$1/" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$2"; echo; }
 ```
 
-Existing files are skipped individually. To intentionally refresh the
-admin-boundary archive:
+| Test | Request | Worker | Output |
+| --- | --- | --- | --- |
+| LULC | `api lulc_vector '{"compute":"local","state":"karnataka","district":"raichur","block":"devadurga","start_year":2023,"end_year":2023}'` | `celery-nrm` | `data/lulc/lulc_vector_local/...`, GeoServer workspace `lulc_vector` |
+| Tehsil hydrology | `api hydrology_annual '{"compute":"local","state":"karnataka","district":"raichur","block":"devadurga","start_year":2017,"end_year":2024}'` | `celery-nrm` | `data/hydrology/hydrology_local/...`, GeoServer workspace `mws_layers` |
+| ET download | `api et_download '{"compute":"local","pan_india":true,"start_date":"2023-07-01","end_date":"2023-07-03"}'` | `celery-heavy` | `data/base_layers/hydrology/et/` |
+| Pan-India annual | `api pan-india/hydrology_annual '{"compute":"local","start_year":2017,"end_year":2018}'` | `celery-heavy` | `data/base_layers/hydrology/annual/` |
+| Pan-India fortnightly | `api pan-india/hydrology_fortnightly '{"compute":"local","start_year":2017,"end_year":2018}'` | `celery-heavy` | `data/base_layers/hydrology/fortnightly/` |
+| Runoff (hours) | `api runoff_gpu '{"compute":"local","pan_india":true,"start_year":2023,"end_year":2024}'` | `celery-heavy` | `data/base_layers/hydrology/runoff/` |
+
+Tehsil hydrology needs `start_year` 2017. Pan-India requests take one year
+per call: `end_year` is `start_year + 1`.
+
+## Everyday use
 
 ```bash
-FORCE_DATA_DOWNLOAD=1 docker compose --env-file nrm_app/.env run --rm data-download
+docker compose --env-file nrm_app/.env ps            # status
+docker compose --env-file nrm_app/.env logs -f backend
+docker compose --env-file nrm_app/.env stop          # stop, keep everything
+docker compose --env-file nrm_app/.env up -d         # start again
 ```
 
-To fetch base layers later:
+After `git pull`:
 
 ```bash
-SKIP_ADMIN_BOUNDARY_DOWNLOAD=1 \
-SKIP_BASE_LAYER_DOWNLOAD=0 \
-docker compose --env-file nrm_app/.env run --rm data-download
+docker compose --env-file nrm_app/.env up -d --build --force-recreate
 ```
 
-### Tehsil watersheds
-
-The Compose bootstrap always calls:
+Commands that write files, such as `manage.py` commands, should run as your
+user so the files stay yours:
 
 ```bash
-python manage.py local_compute_layer_setup \
-  --ensure-tehsil-watersheds --geoserver
+docker compose --env-file nrm_app/.env exec --user "$(id -u):$(id -g)" backend python manage.py <command>
 ```
 
-It queries active tehsils from PostgreSQL and downloads each
-`mws:mws_<district>_<tehsil>` layer from GeoServer WFS into:
-
-```text
-<CORESTACK_HOST_DATA_DIR>/data/base_layers/tehsil_watersheds/<state>/<district>/<tehsil>.gpkg
-```
-
-This path does not run the alternative local process that intersects or copies
-the pan-India microwatershed file. Missing GeoServer layers are reported, and
-the backend can still start so they can be published and retried later:
-
-```bash
-docker compose --env-file nrm_app/.env run --rm tehsil-watershed-setup
-```
-
-## GEE setup
-
-The stack starts without GEE. For Earth Engine jobs:
-
-```bash
-cp /secure/path/service-account.json /srv/core-stack-data/gee_confs/gee-service-account.json
-chmod 600 /srv/core-stack-data/gee_confs/gee-service-account.json
-docker compose --env-file nrm_app/.env run --rm gee-config
-docker compose --env-file nrm_app/.env up -d --force-recreate backend \
-  celery-nrm celery-layer-bulk celery-geoserver celery-general
-```
-
-The mount is read-only. The setup reads `project_id` and writes only derived
-runtime values under `CORESTACK_HOST_DATA_DIR/data`. Add the corresponding
-`GEEAccount` through Django admin if it is not already in the database.
-Raster export/publishing also requires `GCS_BUCKET_NAME`.
-
-Use `SKIP_GEE_CONFIG=1` when GEE must be completely disabled.
-
-## Database reliability
-
-PostgreSQL 16 runs separately with:
-
-- an explicitly named persistent volume;
-- data checksums on new database volumes;
-- a readiness check before migrations;
-- a one-minute graceful shutdown window;
-- loopback-only host exposure by default;
-- persistent Django connections through `DB_CONN_MAX_AGE`;
-- migrations in a single one-shot service, never in every web/worker restart.
-
-Do not copy a random host PostgreSQL data directory into the volume. PostgreSQL
-major version, filesystem ownership and initialization settings must match.
-
-### Backup
-
-```bash
-docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup
-ls -lh /srv/core-stack-data/backups/postgres
-```
-
-Because migrations are intentionally ignored by Git and are installation-local,
-back up the local `*/migrations/` directories with the database:
-
-```bash
-tar -czf /srv/core-stack-data/backups/postgres/local-migrations.tgz \
-  */migrations
-```
-
-Copy both artifacts off the Docker host and periodically test restoration.
-
-### Restore
-
-Restoration replaces database contents and must be performed during a
-maintenance window. Stop backend/workers, take another backup, then restore a
-validated custom-format dump:
-
-```bash
-docker compose --env-file nrm_app/.env stop backend celery-nrm celery-layer-bulk \
-  celery-geoserver celery-general celery-beat
-docker compose --env-file nrm_app/.env exec -T postgres dropdb --if-exists -U corestack_admin corestack_db
-docker compose --env-file nrm_app/.env exec -T postgres createdb -U corestack_admin corestack_db
-docker compose --env-file nrm_app/.env exec -T postgres pg_restore \
-  --exit-on-error --no-owner -U corestack_admin -d corestack_db \
-  < /srv/core-stack-data/backups/postgres/<validated-backup>.dump
-docker compose --env-file nrm_app/.env run --rm database-init
-docker compose --env-file nrm_app/.env up -d
-```
-
-Substitute the configured database/user. Restore the matching
-`local-migrations.tgz` before `database-init` when it is available. If it is
-not available, the job generates a current initial migration set and
-`--fake-initial` recognizes matching tables. Test this on a cloned database
-first; a dump whose schema does not match the checked-out code must not be
-started. Never use `docker compose --env-file nrm_app/.env down -v` as a restore procedure.
-
-## Installation-local migrations
-
-Migration files remain in Git ignore, matching `installation/install.sh`.
-Every installation keeps its migration history in the host checkout alongside
-its PostgreSQL volume. `database-init` performs:
-
-```bash
-python manage.py makemigrations --skip-checks
-python manage.py migrate --plan --skip-checks
-python manage.py migrate --fake-initial --noinput --skip-checks
-```
-
-For a new empty database, Django creates all tables. For a restored database,
-`--fake-initial` marks matching initial tables without recreating them and
-then applies later local migrations.
-
-Do not delete local migration files during a normal upgrade. They are the
-state Django uses to generate the next incremental migration for that machine.
-Set `RESET_LOCAL_MIGRATIONS=1` only for a fresh database or a restored
-database already verified to match the checked-out models.
-
-The Gunicorn/Celery runtime entrypoint never changes schema. Only the
-`database-init` one-shot job does. Back up PostgreSQL and local migration
-files before every code update, inspect its printed plan, and test schema
-changes on a restored clone before production.
-
-## GeoServer and layer-data recovery
-
-GeoServer runs in its own container and keeps its catalog, workspaces and
-configuration in the `geoserver_data` named volume. Back it up while GeoServer
-is stopped so the archive is internally consistent:
-
-```bash
-docker compose --env-file nrm_app/.env stop geoserver
-docker compose --env-file nrm_app/.env --profile maintenance run --rm geoserver-backup
-docker compose --env-file nrm_app/.env start geoserver
-```
-
-Treat that catalog archive, the PostgreSQL dump and the matching Git revision
-as one release backup. Test a GeoServer restore on a non-production volume
-before replacing production state.
-
-Downloaded inputs and generated layers are not in the GeoServer volume. They
-remain in `CORESTACK_HOST_DATA_DIR/data` on the host. Snapshot or synchronize
-that directory with the host's normal backup system; do not add it to a Docker
-image. GEE JSON remains in `CORESTACK_HOST_DATA_DIR/gee_confs` and must be
-backed up as a secret.
-
-## Superuser
-
-Either set the three `DJANGO_SUPERUSER_*` values before first start, or create
-the account interactively:
-
-```bash
-docker compose --env-file nrm_app/.env exec backend python manage.py createsuperuser
-```
-
-When the automated username already exists, setup leaves its password
-unchanged.
-
-## NASA Earthdata (ET download)
-
-The ET download API fetches FLDAS rasters from NASA GES DISC and needs an
-Earthdata login. Create an account at https://urs.earthdata.nasa.gov and
-authorize the "NASA GESDISC DATA ARCHIVE" application in your profile, then
-set the credentials in `nrm_app/.env`:
-
-```bash
-USERNAME_GESDISC=your-earthdata-username
-PASSWORD_GESDISC='your-earthdata-password'
-```
-
-Apply them:
-
-```bash
-docker compose --env-file nrm_app/.env up -d --force-recreate
-```
-
-`app-init` copies non-empty values into `nrm_app/.env`, which the backend and
-workers read, so nothing has to be edited inside a container. Wrap values that
-contain `$` in single quotes, because Compose substitutes variables in the env
-file. If the password is wrong or the application is not authorized, the task
-fails with an HTML response from GES DISC.
-
-## Behind a campus or corporate proxy
-
-Docker does not pass the host's proxy settings into image builds or containers. On a network where the only route out is an HTTP proxy, this shows up in two places:
-
-- the image build fails at `apt-get install` with `Unable to locate package ...` (the preceding `apt-get update` could not reach the mirrors), or later in `micromamba`/`pip`;
-- the first start fails while downloading the admin-boundary dataset with `Failed to establish a new connection: [Errno 101] Network is unreachable`.
-
-Compose reads the proxy from your environment and passes it both as build arguments (for `apt`, `micromamba` and `pip` in the `Dockerfile`) and as environment variables to every backend, init and Celery container. Usually you only need the variables your shell already exports:
-
-```bash
-export HTTP_PROXY=http://proxy.example.org:3128/
-export HTTPS_PROXY=http://proxy.example.org:3128/
-docker compose --env-file nrm_app/.env up -d
-```
-
-To make it stick across shells, put them in `nrm_app/.env` instead:
-
-```bash
-HTTP_PROXY=http://proxy.example.org:3128/
-HTTPS_PROXY=http://proxy.example.org:3128/
-```
-
-Lowercase `http_proxy` / `https_proxy` are picked up too, and `NO_PROXY` is honoured if you set it. The Compose service names (`postgres`, `redis`, `geoserver`, `backend`, `core-stack`) are always added to `NO_PROXY`, so traffic between containers stays off the proxy. If no proxy variables are set, nothing changes. The proxy is passed as Docker's predefined proxy build arguments, so it is not stored in the built image.
-
-Pulling the base images (`micromamba`, `postgres`, `redis`, `geoserver`) is separate: that is done by the Docker daemon, not by a container, so it needs the daemon's own proxy configuration. Check with `docker info | grep -i proxy` and see [Docker's daemon proxy docs](https://docs.docker.com/engine/daemon/proxy/) if pulling is what fails.
+`docker compose --env-file nrm_app/.env down -v` deletes the database,
+GeoServer and Redis data. `data/` on the host is kept.
 
 ## Troubleshooting
 
-## Day-to-day operations
+| Problem | Cause and fix |
+| --- | --- |
+| `curl` to `localhost` returns `503` | Your proxy is answering. `export no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,127.0.0.1`. |
+| `backend` never starts | An init job failed. `ps -a` shows which; read its log. |
+| Build fails at `apt-get` or `pip` | No internet from the build. See [Behind a proxy](#behind-a-proxy). |
+| `Missing Pan-India hydrology annual base layer(s)` | Tehsil hydrology needs the pan-India annual layer for those years. Add it from [Data](#data-for-local-compute) or generate it. |
+| `JSONDecodeError` on a tehsil request | `data/base_layers/tehsil_watersheds/<state>/<district>/<tehsil>.gpkg` is missing. |
+| The four long-job endpoints return `503` | `COMPOSE_PROFILES=heavy` is not set. See [GPU and long jobs](#gpu-and-long-jobs). |
+| `Earth Engine client library not initialized` in logs | Earth Engine is not set up. Harmless for local compute. |
+| `401` from `geoserver.core-stack.org` in logs | The STAC catalog step uses the public CoRE Stack GeoServer. The layer itself is saved and published locally. |
+| Admin page has no styling | Static files are not served by the web server. The admin still works. |
+| `Permission denied` on files in the repository | Left by an older setup that ran as root. `docker compose --env-file nrm_app/.env up -d` gives them back to you. |
+| A second copy of the repository uses the first one's database | All copies share the Compose project name `core-stack`. Run one installation per machine. |
+
+To stop a long job that is running on `celery-heavy`:
 
 ```bash
-docker compose --env-file nrm_app/.env ps
-docker compose --env-file nrm_app/.env logs -f backend
-docker compose --env-file nrm_app/.env logs -f celery-nrm celery-layer-bulk celery-geoserver celery-general
-docker compose --env-file nrm_app/.env stop
-docker compose --env-file nrm_app/.env start
-docker compose --env-file nrm_app/.env down
+docker compose --env-file nrm_app/.env kill celery-heavy
+docker compose --env-file nrm_app/.env exec celery-nrm celery -A nrm_app purge -Q heavy -f
+docker compose --env-file nrm_app/.env exec redis redis-cli del unacked unacked_index
+docker compose --env-file nrm_app/.env up -d celery-heavy
 ```
 
-Celery Beat is intentionally opt-in:
+Without the `purge` and `redis-cli` steps the job starts again when the worker
+restarts.
+The `redis-cli` step also drops tasks started but not finished on other
+workers.
 
-```bash
-docker compose --env-file nrm_app/.env --profile periodic up -d celery-beat
-```
+## Running on a server
 
-## Code and dependency updates
-
-Source is host-mounted, so a code-only update needs a pinned Git checkout and
-process recreation:
-
-```bash
-git pull --ff-only
-docker compose --env-file nrm_app/.env run --rm database-init
-docker compose --env-file nrm_app/.env up -d --force-recreate backend \
-  celery-nrm celery-layer-bulk celery-geoserver celery-general
-```
-
-When `Dockerfile` or `installation/environment.yml` changes, rebuild the
-environment and recreate every backend service:
-
-```bash
-docker compose --env-file nrm_app/.env build --pull
-docker compose --env-file nrm_app/.env up -d --force-recreate
-```
-
-Do not install packages in running containers. Production releases should pin
-`CORESTACK_IMAGE_TAG` or `CORESTACK_IMAGE` and the Git commit so code and
-dependencies can be rolled back together.
-
-## Testing
-
-Fast host-side checks:
-
-```bash
-docker compose --env-file nrm_app/.env config --quiet
-bash -n installation/docker/*.sh
-python3 -m unittest discover -s installation/tests
-```
-
-Container checks:
-
-```bash
-docker compose --env-file nrm_app/.env run --rm backend python manage.py check
-docker compose --env-file nrm_app/.env run --rm backend python manage.py check --deploy
-docker compose --env-file nrm_app/.env run --rm backend python manage.py test
-```
-
-The deployment check intentionally warns in development mode. Production must
-run with `DEBUG=False` and explicit public host/origin settings.
-
-## Production checklist
-
-1. Pin the Git commit and image tag; do not deploy moving `latest`.
-2. Replace PostgreSQL and GeoServer passwords in the protected
-   `nrm_app/.env` before creating the database volume.
-3. Set `DEBUG=False`, exact `ALLOWED_HOSTS`, and trusted HTTPS origins.
-4. Keep 8000, 8080 and 5432 on loopback; expose only the HTTPS reverse proxy.
-5. Back up PostgreSQL, local migration files, the GeoServer catalog,
-   `CORESTACK_HOST_DATA_DIR/data` and GEE secrets.
-6. Run tests and `check --deploy`; review the plan printed by
-   `database-init` on a restored clone.
-7. Run `database-init` once before recreating Gunicorn/Celery.
-8. Review Beat schedules before enabling the `periodic` profile.
-9. Monitor container health, queue depth, disk space and backup completion.
-10. Test rollback and database restore before launch.
-
-## Complete reset
-
-This is destructive:
-
-```bash
-docker compose --env-file nrm_app/.env down -v
-```
-
-It deletes PostgreSQL, Redis and GeoServer volumes. Files beneath
-`CORESTACK_HOST_DATA_DIR` are not deleted.
+- Change `DB_PASSWORD`, `GEOSERVER_PASSWORD` and the admin password before
+  the first start.
+- Set `DEBUG=False`, and `ALLOWED_HOSTS` to the server's host name.
+- Keep ports bound to `127.0.0.1`; put an HTTPS reverse proxy in front.
+- Set `CORESTACK_HOST_DATA_DIR` to a path on a disk with room for the data,
+  for example `/srv/core-stack-data`.
+- Back up the database regularly:
+  `docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup`
+  writes a dump to `backups/postgres/`.
