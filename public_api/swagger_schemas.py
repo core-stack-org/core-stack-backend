@@ -1,3 +1,5 @@
+import copy
+
 from drf_yasg import openapi
 
 from .dataset_filters import tehsil_data_type_help_markdown
@@ -158,6 +160,202 @@ def error_example(message, details=None):
     return payload
 
 
+def v1_error_example(message):
+    return {"error": message}
+
+
+def _set_json_example(schema, status_code, payload, description=None):
+    existing = (schema.get("responses") or {}).get(status_code)
+    desc = description
+    if desc is None and existing is not None:
+        desc = getattr(existing, "description", None) or "Response"
+    schema.setdefault("responses", {})[status_code] = openapi.Response(
+        description=desc,
+        examples={"application/json": payload},
+    )
+
+
+ADMIN_V1_EXAMPLE = {
+    "State": "UTTAR PRADESH",
+    "District": "JAUNPUR",
+    "Tehsil": "BADLAPUR",
+}
+ADMIN_V2_EXAMPLE = {
+    "admin_details": dict(ADMIN_V1_EXAMPLE),
+    "admin_field_hints": {
+        "State": "state_name",
+        "District": "district_name",
+        "Tehsil": "tehsil_or_block_name",
+    },
+}
+MWS_LATLON_V1_EXAMPLE = {
+    "State": "UTTAR PRADESH",
+    "District": "JAUNPUR",
+    "Tehsil": "BADLAPUR",
+    "mws_id": "12_234647",
+    "uid": "12_234647",
+}
+MWS_LATLON_V2_EXAMPLE = {
+    "mws_details": {
+        "uid": "12_234647",
+        "State": "UTTAR PRADESH",
+        "District": "JAUNPUR",
+        "Tehsil": "BADLAPUR",
+    },
+    "mws_field_hints": {
+        "uid": "mws_identifier",
+        "State": "state_name",
+        "District": "district_name",
+        "Tehsil": "tehsil_or_block_name",
+    },
+}
+TEHSIL_V1_EXAMPLE = {
+    "aquifer_vector": [
+        {
+            "uid": "12_207597",
+            "area_in_ha": 2336.11,
+            "aquifer_class": "Alluvium",
+        }
+    ],
+    "Soge_vector": ["..............."],
+}
+TEHSIL_V2_EXAMPLE = {
+    "tehsil_data": {
+        "aquifer_vector": [
+            {
+                "uid": "12_207597",
+                "area_in_ha": 2336.11,
+                "aquifer_class": "Alluvium",
+            }
+        ]
+    },
+    "tehsil_units": {
+        "aquifer_vector": {"area_in_ha": "ha"},
+    },
+}
+KYL_V1_EXAMPLE = [
+    {
+        "mws_id": "12_234647",
+        "terraincluster_id": 1,
+        "avg_precipitation": 764.45,
+        "total_nrega_assets": 550,
+    }
+]
+KYL_V2_EXAMPLE = {
+    "indicators": {
+        "mws_id": "12_234647",
+        "terraincluster_id": 1,
+        "avg_precipitation": 764.45,
+        "total_nrega_assets": 550,
+    },
+    "indicator_units": {
+        "mws_id": "id",
+        "terraincluster_id": "id",
+        "avg_precipitation": "mm",
+        "total_nrega_assets": "count",
+    },
+}
+LAYER_V1_EXAMPLE = [
+    {
+        "layer_name": "SOGE",
+        "dataset_name": "SOGE",
+        "layer_type": "vector",
+        "layer_url": "https://geoserver.core-stack.org/geoserver/wfs?...",
+        "layer_version": "1.0",
+        "style_url": "",
+        "gee_asset_path": "projects/ee-.../asset",
+    }
+]
+LAYER_V2_EXAMPLE = {
+    "layers": LAYER_V1_EXAMPLE,
+    "layer_field_units": {
+        "layer_name": "name",
+        "dataset_name": "name",
+        "layer_type": "vector|raster|point|custom",
+        "layer_url": "geoserver_wfs_or_wcs_url",
+        "layer_version": "version_label",
+        "style_url": "style_url_or_empty",
+        "gee_asset_path": "earth_engine_asset_id_or_null",
+    },
+}
+REPORT_V1_EXAMPLE = {
+    "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104"
+}
+REPORT_V2_EXAMPLE = {
+    "report": dict(REPORT_V1_EXAMPLE),
+    "report_field_hints": {"Mws_report_url": "mws_pdf_or_html_report_url"},
+}
+ACTIVE_LOCATIONS_V1_EXAMPLE = [
+    {
+        "label": "Rajasthan",
+        "value": "1251",
+        "state_id": "8",
+        "district": [
+            {
+                "label": "Bhilwara",
+                "district_id": "123",
+                "blocks": [{"label": "Mandalgarh", "value": 1}],
+            }
+        ],
+    }
+]
+ACTIVE_LOCATIONS_V2_EXAMPLE = {
+    "locations": ACTIVE_LOCATIONS_V1_EXAMPLE,
+    "location_field_hints": {
+        "label": "display_name",
+        "value": "ordinal_code_in_ui_list",
+        "state_id": "state_identifier",
+        "district_id": "district_identifier",
+        "block_id": "block_tehsil_identifier",
+        "district": "districts_under_state",
+        "blocks": "blocks_tehsils_under_district",
+    },
+}
+MWS_FC_EXAMPLE = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {"uid": "12_208104"},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [75.02716659, 25.2401886],
+                        [75.0868641493802, 25.20231618101583],
+                        [75.091234567, 25.251234567],
+                        [75.02716659, 25.2401886],
+                    ]
+                ],
+            },
+        }
+    ],
+}
+VILLAGE_FC_EXAMPLE = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "id": "jamui_jamui.1",
+            "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [86.11306, 24.75025],
+                            [86.11629, 24.74811],
+                            [86.12035, 24.74641],
+                            [86.11306, 24.75025],
+                        ]
+                    ]
+                ],
+            },
+            "properties": {"vill_ID": 258411, "vill_name": "Example Village"},
+        }
+    ],
+}
+
+
 V2_MWS_FORTNIGHT_DESCRIPTION = """
 **``/api/v2/get_mws_data/`` only** — ``data`` uses Open-Meteo-style **fortnight** arrays (~15-day steps):
 
@@ -188,6 +386,10 @@ def v2_schema_from(base_schema, operation_id, path_suffix):
     schema = dict(base_schema)
     schema["operation_id"] = operation_id
     schema["tags"] = ["Dataset APIs v2"]
+    if "responses" in schema:
+        schema["responses"] = copy.deepcopy(schema["responses"])
+    if "manual_parameters" in schema:
+        schema["manual_parameters"] = list(schema["manual_parameters"])
     return schema
 
 
@@ -215,27 +417,12 @@ admin_by_latlon_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data having admin details.",
-            examples={
-                "application/json": success_example(
-                    {
-                        "admin_details": {
-                            "State": "UTTAR PRADESH",
-                            "District": "JAUNPUR",
-                            "Tehsil": "BADLAPUR",
-                        },
-                        "admin_field_hints": {
-                            "State": "state_name",
-                            "District": "district_name",
-                            "Tehsil": "tehsil_or_block_name",
-                        },
-                    }
-                )
-            },
+            examples={"application/json": ADMIN_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - Invalid latitude/longitude input.",
             examples={
-                "application/json": error_example(
+                "application/json": v1_error_example(
                     "Both 'latitude' and 'longitude' parameters are required."
                 )
             },
@@ -244,7 +431,7 @@ admin_by_latlon_schema = {
         404: openapi.Response(
             description="Not Found - Latitude and longitude is not in SOI boundary.",
             examples={
-                "application/json": error_example(
+                "application/json": v1_error_example(
                     "Latitude and longitude is not in SOI boundary."
                 )
             },
@@ -272,24 +459,7 @@ mws_by_latlon_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data having admin detail with mws_id.",
-            examples={
-                "application/json": success_example(
-                    {
-                        "mws_details": {
-                            "uid": "12_234647",
-                            "State": "UTTAR PRADESH",
-                            "District": "JAUNPUR",
-                            "Tehsil": "BADLAPUR",
-                        },
-                        "mws_field_hints": {
-                            "uid": "mws_identifier",
-                            "State": "state_name",
-                            "District": "district_name",
-                            "Tehsil": "tehsil_or_block_name",
-                        },
-                    }
-                )
-            },
+            examples={"application/json": MWS_LATLON_V1_EXAMPLE},
         ),
         400: bad_request_response,
         401: unauthorized_response,
@@ -463,20 +633,7 @@ tehsil_data_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data for the tehsil.",
-            examples={
-                "application/json": success_example(
-                    {
-                        "aquifer_vector": [
-                            {
-                                "uid": "12_207597",
-                                "area_in_ha": 2336.11,
-                                "aquifer_class": "Alluvium",
-                            }
-                        ],
-                        "Soge_vector": ["..............."],
-                    }
-                )
-            },
+            examples={"application/json": TEHSIL_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', and 'tehsil' are required. OR State/District/Tehsil must contain only letters, spaces, and underscores"
@@ -515,24 +672,7 @@ kyl_indicators_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data of the KYL Indicator for the mws_id.",
-            examples={
-                "application/json": success_example(
-                    {
-                        "indicators": {
-                            "mws_id": "12_234647",
-                            "terraincluster_id": 1,
-                            "avg_precipitation": 764.45,
-                            "total_nrega_assets": 550,
-                        },
-                        "indicator_units": {
-                            "mws_id": "id",
-                            "terraincluster_id": "id",
-                            "avg_precipitation": "mm",
-                            "total_nrega_assets": "count",
-                        },
-                    }
-                )
-            },
+            examples={"application/json": KYL_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores OR MWS id can only contain numbers and underscores"
@@ -571,31 +711,7 @@ generated_layer_urls_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data for the generated layers.",
-            examples={
-                "application/json": success_example(
-                    {
-                        "layers": [
-                            {
-                                "layer_name": "SOGE",
-                                "layer_type": "vector",
-                                "layer_url": "https://example/geoserver/wfs?...",
-                                "layer_version": "1.0",
-                                "style_url": "",
-                                "gee_asset_path": "projects/ee-.../asset",
-                            }
-                        ],
-                        "layer_field_units": {
-                            "layer_name": "name",
-                            "dataset_name": "name",
-                            "layer_type": "vector|raster|point|custom",
-                            "layer_url": "geoserver_wfs_or_wcs_url",
-                            "layer_version": "version_label",
-                            "style_url": "style_url_or_empty",
-                            "gee_asset_path": "earth_engine_asset_id_or_null",
-                        },
-                    }
-                )
-            },
+            examples={"application/json": LAYER_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', and 'tehsil' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores"
@@ -633,18 +749,7 @@ mws_report_urls_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON having mws report url.",
-            examples={
-                "application/json": success_example(
-                    {
-                        "report": {
-                            "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104"
-                        },
-                        "report_field_hints": {
-                            "Mws_report_url": "mws_pdf_or_html_report_url"
-                        },
-                    }
-                )
-            },
+            examples={"application/json": REPORT_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores OR MWS id can only contain numbers and underscores"
@@ -813,38 +918,13 @@ generate_active_locations_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - Returns activated locations data",
-            examples={
-                "application/json": success_example(
-                    {
-                        "locations": [
-                            {
-                                "label": "Rajasthan",
-                                "value": "1251",
-                                "state_id": "8",
-                                "district": [],
-                            }
-                        ],
-                        "location_field_hints": {
-                            "label": "display_name",
-                            "value": "ordinal_code_in_ui_list",
-                            "state_id": "state_identifier",
-                            "district_id": "district_identifier",
-                            "block_id": "block_tehsil_identifier",
-                            "district": "districts_under_state",
-                            "blocks": "blocks_tehsils_under_district",
-                        },
-                    }
-                )
-            },
+            examples={"application/json": ACTIVE_LOCATIONS_V1_EXAMPLE},
         ),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
         500: openapi.Response(
             description="Internal Server Error",
             examples={
-                "application/json": error_example(
-                    "Internal server error while generating active locations",
-                    details="Error message details",
-                )
+                "application/json": {"Exception": "Error message details"}
             },
         ),
     },
@@ -1120,6 +1200,24 @@ admin_by_latlon_schema_v2 = v2_schema_from(
     "get_admin_details_by_latlon_v2",
     "get_admin_details_by_latlon/",
 )
+_set_json_example(
+    admin_by_latlon_schema_v2,
+    200,
+    success_example(ADMIN_V2_EXAMPLE),
+    "Success - admin details in the v2 envelope",
+)
+_set_json_example(
+    admin_by_latlon_schema_v2,
+    400,
+    error_example("Both 'latitude' and 'longitude' parameters are required."),
+    "Bad Request - Invalid latitude/longitude input.",
+)
+_set_json_example(
+    admin_by_latlon_schema_v2,
+    404,
+    error_example("Latitude and longitude is not in SOI boundary."),
+    "Not Found - Latitude and longitude is not in SOI boundary.",
+)
 admin_by_latlon_schema_v2["operation_description"] = """
 Resolve a WGS84 coordinate to the same ``State``, ``District``, and
 ``Tehsil`` strings used by Get Active Locations.
@@ -1138,6 +1236,12 @@ mws_by_latlon_schema_v2 = v2_schema_from(
     mws_by_latlon_schema,
     "get_mwsid_by_latlon_v2",
     "get_mwsid_by_latlon/",
+)
+_set_json_example(
+    mws_by_latlon_schema_v2,
+    200,
+    success_example(MWS_LATLON_V2_EXAMPLE),
+    "Success - MWS id and admin details in the v2 envelope",
 )
 mws_by_latlon_schema_v2["operation_description"] = """
 Resolve the micro-watershed ``uid`` and admin names for a WGS84 coordinate.
@@ -1167,6 +1271,12 @@ Filter sheets with ``data=all`` (default) or one or more sheet names:
 tehsil_data_schema_v2["manual_parameters"] = list(
     tehsil_data_schema_v2["manual_parameters"]
 ) + [tehsil_data_filter_param]
+_set_json_example(
+    tehsil_data_schema_v2,
+    200,
+    success_example(TEHSIL_V2_EXAMPLE),
+    "Success - tehsil sheets in the v2 envelope",
+)
 kyl_indicators_schema_v2 = v2_schema_from(
     kyl_indicators_schema,
     "get_mws_kyl_indicators_v2",
@@ -1181,6 +1291,12 @@ This is a flat table, not a time series.
 v2 returns ``{status, error_message, data}``. ``data`` has ``indicators``
 and ``indicator_units`` (mm, ha, count, and similar).
 """
+_set_json_example(
+    kyl_indicators_schema_v2,
+    200,
+    success_example(KYL_V2_EXAMPLE),
+    "Success - KYL indicators in the v2 envelope",
+)
 generated_layer_urls_schema_v2 = v2_schema_from(
     generated_layer_urls_schema,
     "get_generated_layer_urls_v2",
@@ -1198,6 +1314,12 @@ or integration.
 v2 returns ``{status, error_message, data}`` with ``layers`` and
 ``layer_field_units``.
 """
+_set_json_example(
+    generated_layer_urls_schema_v2,
+    200,
+    success_example(LAYER_V2_EXAMPLE),
+    "Success - generated layer URLs in the v2 envelope",
+)
 mws_report_urls_schema_v2 = v2_schema_from(
     mws_report_urls_schema,
     "get_mws_report_urls_v2",
@@ -1212,15 +1334,33 @@ The stats file and MWS layer must already exist.
 v2 returns ``{status, error_message, data}``. ``data`` has
 ``report.Mws_report_url`` and ``report_field_hints``.
 """
+_set_json_example(
+    mws_report_urls_schema_v2,
+    200,
+    success_example(REPORT_V2_EXAMPLE),
+    "Success - MWS report URL in the v2 envelope",
+)
 mws_geometries_schema_v2 = v2_schema_from(
     mws_geometries_schema,
     "get_mws_geometries_v2",
     "get_mws_geometries/",
 )
+_set_json_example(
+    mws_geometries_schema_v2,
+    200,
+    success_example(MWS_FC_EXAMPLE),
+    "Success - MWS FeatureCollection in the v2 envelope",
+)
 village_geometries_schema_v2 = v2_schema_from(
     village_geometries_schema,
     "get_village_geometries_v2",
     "get_village_geometries/",
+)
+_set_json_example(
+    village_geometries_schema_v2,
+    200,
+    success_example(VILLAGE_FC_EXAMPLE),
+    "Success - village FeatureCollection in the v2 envelope",
 )
 generate_active_locations_schema_v2 = v2_schema_from(
     generate_active_locations_schema,
@@ -1253,3 +1393,18 @@ generate_active_locations_schema_v2["manual_parameters"] = list(
     active_locations_tehsil_filter_param,
     active_locations_block_filter_param,
 ]
+_set_json_example(
+    generate_active_locations_schema_v2,
+    200,
+    success_example(ACTIVE_LOCATIONS_V2_EXAMPLE),
+    "Success - activated locations in the v2 envelope",
+)
+_set_json_example(
+    generate_active_locations_schema_v2,
+    500,
+    error_example(
+        "Internal server error while generating active locations",
+        details="Error message details",
+    ),
+    "Internal Server Error",
+)
