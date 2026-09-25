@@ -199,11 +199,13 @@ admin_by_latlon_schema = {
     "operation_id": "get_admin_details_by_latlon",
     "operation_summary": "Get Admin Details by Lat Lon",
     "operation_description": """
-    Retrieve admin details for the provided coordinates.
+    Look up the SOI state, district, and tehsil that contain a WGS84 coordinate.
 
-    ``data`` contains:
-    - ``admin_details`` with ``State``, ``District``, ``Tehsil``
-    - ``admin_field_hints`` with field semantics
+    ``latitude`` and ``longitude`` are required and must be finite numbers.
+    The point must fall inside the Survey of India boundary.
+
+    v1 returns the raw admin object (``State``, ``District``, ``Tehsil``).
+    There is no status envelope. Out-of-boundary points return ``{"error": "..."}``.
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
     "responses": {
@@ -254,11 +256,13 @@ mws_by_latlon_schema = {
     "operation_id": "get_mwsid_by_latlon",
     "operation_summary": "Get MWSID by Lat Lon",
     "operation_description": """
-    Retrieve MWS ID and admin details for the provided coordinates.
+    Resolve the micro-watershed that contains a WGS84 coordinate, plus its admin names.
 
-    ``data`` contains:
-    - ``mws_details`` with ``uid``, ``State``, ``District``, ``Tehsil``
-    - ``mws_field_hints`` with field semantics
+    ``latitude`` and ``longitude`` are required. The ``uid`` (also called ``mws_id``)
+    is the join key for tehsil tables, KYL indicators, and geometry routes.
+
+    v1 returns the raw object with ``mws_id`` / ``uid`` and admin fields.
+    There is no status envelope.
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
     "responses": {
@@ -297,9 +301,13 @@ get_mws_data_schema = {
     "operation_id": "get_mws_data",
     "operation_summary": "Get MWS Time Series Data",
     "operation_description": """
-    Retrieve MWS time series data, including ET, runoff, precipitation, and NDVI for a given state, district, tehsil, and MWS ID.
+    Fetch hydrology time series for one micro-watershed: ET, runoff, precipitation, and NDVI.
 
-    v1 returns the raw payload (no `{status, data}` envelope).
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+    Names may use spaces or underscores.
+
+    v1 returns the raw payload with ``mws_id`` and a ``time_series`` row list.
+    There is no ``{status, data}`` envelope. Missing IDs return ``{"error": "..."}``.
     """,
     "manual_parameters": [
         state_param,
@@ -351,9 +359,13 @@ get_mws_data_v2_schema = {
     "operation_id": "get_mws_data_v2",
     "operation_summary": "Get MWS Time Series Data (v2 fortnight format)",
     "operation_description": """
-    Retrieve MWS hydrology time series in **Open-Meteo-style fortnight arrays** (~15-day steps from GeoServer).
+    Fetch hydrology time series for one micro-watershed in Open-Meteo-style fortnight arrays.
 
-    **``GET /api/v2/get_mws_data/``** only.
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+    Optional ``regenerate=true`` skips the MongoDB cache and rereads GeoServer.
+
+    v2 returns ``{status, error_message, data}``. ``data`` has ``metadata``,
+    aligned ``fortnight`` arrays (~15-day steps), and ``fortnight_units``.
     """
     + "\n\n"
     + V2_MWS_FORTNIGHT_DESCRIPTION.strip(),
@@ -430,9 +442,13 @@ tehsil_data_schema = {
     "operation_id": "get_tehsil_data",
     "operation_summary": "Get Tehsil Data",
     "operation_description": """
-    Retrieve tehsil-level JSON data for a given state, district, and tehsil.
+    Download every analytical sheet for a tehsil (drought, hydrology, LULC, NREGA, and others).
 
-    ``data`` contains sheet keys (e.g. ``aquifer_vector``) with tabular rows per MWS.
+    Requires ``state``, ``district``, and ``tehsil``. Stats must already exist
+    for that location.
+
+    v1 returns a raw object keyed by sheet name, with one row per MWS.
+    There is no ``data=`` sheet filter and no status envelope.
     """,
     "manual_parameters": [
         state_param,
@@ -477,11 +493,13 @@ kyl_indicators_schema = {
     "operation_id": "get_mws_kyl_indicators",
     "operation_summary": "Get MWS KYL Indicators",
     "operation_description": """
-    Retrieve **flat tabular KYL indicators** for a given MWS (not time series).
+    Return a single-row KYL indicator snapshot for one micro-watershed (not a time series).
 
-    ``data`` contains:
-    - ``indicators``: object or array for the requested ``mws_id``
-    - ``indicator_units``: field name → unit (``mm``, ``ha``, ``ratio``, ``count``, ``code``, …)
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+    Use this for terrain class, average rainfall, and asset counts on one watershed.
+
+    v1 returns the raw indicator object for that ``mws_id``.
+    There is no status envelope.
     """,
     "manual_parameters": [
         state_param,
@@ -530,11 +548,12 @@ generated_layer_urls_schema = {
     "operation_id": "get_generated_layer_urls",
     "operation_summary": "Get Generated Layer Url",
     "operation_description": """
-    Retrieve generated GeoServer layer URLs for a given state, district, and tehsil.
+    List generated GeoServer layers for a tehsil: WFS/WCS URLs, styles, and GEE asset ids.
 
-    ``data`` contains:
-    - ``layers``: array of flat objects (``layer_name``, ``layer_type``, ``layer_url``, …)
-    - ``layer_field_units``: map describing each field
+    Requires ``state``, ``district``, and ``tehsil``.
+    Use ``layer_url`` in QGIS or any WFS/WCS client.
+
+    v1 returns the raw layer records. Missing locations return ``{"error": "..."}``.
     """,
     "manual_parameters": [
         state_param,
@@ -590,9 +609,12 @@ mws_report_urls_schema = {
     "operation_id": "get_mws_report",
     "operation_summary": "Get MWS Report url",
     "operation_description": """
-    Retrieve MWS report URL for a given state, district, tehsil, and mws_id.
+    Get a URL that opens or generates the MWS PDF/HTML report.
 
-    ``data`` contains ``report`` (with ``Mws_report_url``) and ``report_field_hints``.
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+    The stats file and MWS layer must already exist.
+
+    v1 returns a raw object with ``Mws_report_url``. There is no status envelope.
     """,
     "manual_parameters": [
         state_param,
@@ -636,10 +658,15 @@ mws_geometries_schema = {
     "operation_id": "get_mws_geometries",
     "operation_summary": "Get MWS Geometry",
     "operation_description": """
-    Retrieve GeoJSON geometry for a tehsil.
+    Return micro-watershed polygons for a tehsil.
 
-    - With ``mws_id``: ``data`` contains ``mws_geometry`` (uid, location fields, geometry) and ``mws_geometry_field_hints``.
-    - Without ``mws_id``: ``data`` is a GeoJSON FeatureCollection of every MWS in the tehsil.
+    Requires ``state``, ``district``, and ``tehsil``. Omit ``mws_id`` for every MWS;
+    pass ``mws_id`` for a single feature.
+
+    v2 wraps the result as ``{status, error_message, data}``. Without ``mws_id``,
+    ``data`` is a GeoJSON FeatureCollection with actual vertices. With ``mws_id``,
+    ``data`` has ``mws_geometry`` and field hints. Save ``data`` to open the
+    collection in QGIS.
     """,
     "manual_parameters": [
         state_param,
@@ -694,11 +721,14 @@ village_geometries_schema = {
     "operation_id": "get_village_geometries",
     "operation_summary": "Get Village Geometries",
     "operation_description": """
-    Retrieve village boundary geometries for state, district, tehsil.
-    Optionally filter with ``village_id``.
+    Return village / panchayat polygons for a tehsil.
 
-    ``data`` is a GeoJSON FeatureCollection of village MultiPolygon / Polygon rings.
-    Coordinates are the actual vertices from GeoServer, not 2-decimal points.
+    Requires ``state``, ``district``, and ``tehsil``. Optional ``village_id``
+    keeps a single feature.
+
+    v2 wraps a GeoJSON FeatureCollection in ``data``. Rings are the actual
+    GeoServer vertices, not two-decimal points. Save ``data`` to open the
+    file in QGIS.
     """,
     "manual_parameters": [
         state_param,
@@ -756,9 +786,13 @@ generate_active_locations_schema = {
     "operation_id": "generate_active_locations",
     "operation_summary": "Get Active Locations",
     "operation_description": """
-    Return the hierarchical list of activated states → districts → blocks/tehsils.
+    List every activated state, district, and block/tehsil on the public surface.
 
-    ``data`` contains ``locations`` and ``location_field_hints``.
+    No location query parameters on v1. Use the returned labels as the exact
+    names for other dataset routes.
+
+    v1 returns the raw nested tree. There is no status envelope and no
+    state / district / tehsil filter.
     """,
     "manual_parameters": [
         authorization_param,
@@ -812,10 +846,13 @@ get_mws_geometries_schema = {
     "operation_id": "get_mws_geometries",
     "operation_summary": "Get MWS Geometries",
     "operation_description": """
-    Retrieve MWS geometries for a given state, district, tehsil.
+    Return every micro-watershed boundary in a tehsil as a GeoJSON FeatureCollection.
 
-    **Response format:**
-    Returns a GeoJSON geometry object containing the polygon coordinates of all the MWS boundary in a tehsil.
+    Requires ``state``, ``district``, and ``tehsil``. Each feature has
+    ``properties.uid`` and a MultiPolygon or Polygon ring.
+
+    v1 returns the FeatureCollection at the top level so QGIS can open the file.
+    Vertices are the actual GeoServer coordinates, not two-decimal points.
 
     **Example response:**
     ```json
@@ -939,10 +976,13 @@ get_village_geometries_schema = {
     "operation_id": "get_village_geometries",
     "operation_summary": "Get Village Geometries",
     "operation_description": """
-    Retrieve village geometries for a given state, district and tehsil.
+    Return every village / panchayat boundary in a tehsil as a GeoJSON FeatureCollection.
 
-    **Response format:**
-    Returns a GeoJSON geometry object containing the polygon coordinates of all the village boundary in a tehsil.
+    Requires ``state``, ``district``, and ``tehsil``. Features include
+    ``vill_ID``, ``vill_name``, and MultiPolygon rings.
+
+    v1 returns the FeatureCollection at the top level so QGIS can open it.
+    Coordinates are the actual vertices from GeoServer.
 
     **Example response:**
     ```json
@@ -1067,24 +1107,42 @@ admin_by_latlon_schema_v2 = v2_schema_from(
     "get_admin_details_by_latlon_v2",
     "get_admin_details_by_latlon/",
 )
+admin_by_latlon_schema_v2["operation_description"] = """
+Look up the SOI state, district, and tehsil for a WGS84 coordinate.
+
+``latitude`` and ``longitude`` are required. The point must fall inside
+the Survey of India boundary.
+
+v2 returns ``{status, error_message, data}``. On success, ``data`` has
+``admin_details`` and ``admin_field_hints``.
+"""
 mws_by_latlon_schema_v2 = v2_schema_from(
     mws_by_latlon_schema,
     "get_mwsid_by_latlon_v2",
     "get_mwsid_by_latlon/",
 )
+mws_by_latlon_schema_v2["operation_description"] = """
+Resolve the micro-watershed ``uid`` and admin names for a WGS84 coordinate.
+
+``latitude`` and ``longitude`` are required. Use the ``uid`` as ``mws_id``
+on other v2 dataset routes.
+
+v2 returns ``{status, error_message, data}`` with ``mws_details`` and
+``mws_field_hints`` inside ``data``.
+"""
 tehsil_data_schema_v2 = v2_schema_from(
     tehsil_data_schema,
     "get_tehsil_data_v2",
     "get_tehsil_data/",
 )
 tehsil_data_schema_v2["operation_description"] = f"""
-Retrieve tehsil-level JSON for a given state, district, and tehsil.
+Download analytical sheets for a tehsil (drought, hydrology, LULC, NREGA, and others).
 
-``data`` contains:
-- ``tehsil_data``: sheet keys with tabular rows per MWS
-- ``tehsil_units``: units for those sheets
+Requires ``state``, ``district``, and ``tehsil``. v2 returns
+``{{status, error_message, data}}`` with ``tehsil_data`` and ``tehsil_units``.
 
-Filter sheets with the ``data`` query parameter.
+Filter sheets with ``data=all`` (default) or one or more sheet names:
+``data=drought,stream_order`` or ``data=drought&data=stream_order``.
 
 {tehsil_data_type_help_markdown()}
 """
@@ -1096,16 +1154,43 @@ kyl_indicators_schema_v2 = v2_schema_from(
     "get_mws_kyl_indicators_v2",
     "get_mws_kyl_indicators/",
 )
+kyl_indicators_schema_v2["operation_description"] = """
+Return a single-row KYL indicator snapshot for one micro-watershed.
+
+Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+This is a flat table, not a time series.
+
+v2 returns ``{status, error_message, data}``. ``data`` has ``indicators``
+and ``indicator_units`` (mm, ha, count, and similar).
+"""
 generated_layer_urls_schema_v2 = v2_schema_from(
     generated_layer_urls_schema,
     "get_generated_layer_urls_v2",
     "get_generated_layer_urls/",
 )
+generated_layer_urls_schema_v2["operation_description"] = """
+List generated GeoServer layers for a tehsil.
+
+Requires ``state``, ``district``, and ``tehsil``. Each record includes
+``layer_url``, ``layer_type``, and an optional GEE asset path.
+
+v2 returns ``{status, error_message, data}`` with ``layers`` and
+``layer_field_units``. Use ``layer_url`` in QGIS or a WFS/WCS client.
+"""
 mws_report_urls_schema_v2 = v2_schema_from(
     mws_report_urls_schema,
     "get_mws_report_urls_v2",
     "get_mws_report/",
 )
+mws_report_urls_schema_v2["operation_description"] = """
+Get the report URL for one micro-watershed.
+
+Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+The stats file and MWS layer must already exist.
+
+v2 returns ``{status, error_message, data}``. ``data`` has
+``report.Mws_report_url`` and ``report_field_hints``.
+"""
 mws_geometries_schema_v2 = v2_schema_from(
     mws_geometries_schema,
     "get_mws_geometries_v2",
@@ -1122,12 +1207,14 @@ generate_active_locations_schema_v2 = v2_schema_from(
     "get_active_locations/",
 )
 generate_active_locations_schema_v2["operation_description"] = """
-Return the hierarchical list of activated states → districts → blocks/tehsils.
+List activated states, districts, and blocks/tehsils on the public surface.
 
-``data`` contains ``locations`` and ``location_field_hints``.
-
+Use the returned labels as the exact names for other dataset routes.
 Optional filters: ``state``, ``district``, and ``tehsil`` (alias ``block``).
-All filters are case-insensitive name matches.
+Name matches are case-insensitive.
+
+v2 returns ``{status, error_message, data}`` with ``locations`` and
+``location_field_hints``.
 """
 generate_active_locations_schema_v2["manual_parameters"] = list(
     generate_active_locations_schema_v2["manual_parameters"]

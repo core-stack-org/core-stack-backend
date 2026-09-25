@@ -25,18 +25,11 @@ from public_api.schema import PublicAPISchemaGenerator
 
 
 _PUBLIC_API_REDOC_DESCRIPTION = """
-Authenticate every request with:
+Send **`X-API-Key: <your-api-key>`** on every request. Create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
 
-`X-API-Key: <your-api-key>`
+**v1** (`/api/v1/`) is the original public surface. Responses are the raw payload: GeoJSON FeatureCollections, location trees, or sheet tables. Errors look like `{"error": "..."}`. Geometry routes return actual polygon rings that QGIS can open. There are no sheet or place query filters.
 
-The sidebar has four groups:
-
-- **Dataset APIs v1** — `/api/v1/` dataset routes, raw JSON
-- **Dataset APIs v2** — `/api/v2/` dataset routes, `{status, error_message, data}`
-- **Waterbody APIs v1** — `/api/v1/` waterbody routes
-- **Waterbody APIs v2** — `/api/v2/` waterbody routes
-
-Create an API key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
+**v2** (`/api/v2/`) uses the same paths with a stable envelope: `{"status", "error_message", "data"}`. On success, `data` holds the payload; geometry `data` is a FeatureCollection with unrounded vertices. Tehsil sheets accept `data=drought,stream_order`. Active locations accept optional `state`, `district`, and `tehsil`. Time series use fortnight arrays plus unit maps.
 """
 
 schema_view = get_schema_view(
