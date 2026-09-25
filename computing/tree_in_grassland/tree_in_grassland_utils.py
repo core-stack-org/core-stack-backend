@@ -7,14 +7,12 @@ using LULC raster data from Google Earth Engine.
 
 import ee
 
-from utilities.constants import PAN_INDIA_LULC_V3_DATASET
+from utilities.constants import LulcClass, PAN_INDIA_LULC_V3_DATASET
 
 # ----------------------------------------
 # PARAMETERS / CONSTANTS
 # ----------------------------------------
 
-TREE_CLASS = 6
-SHRUB_CLASS = 12
 SHRUB_THRESHOLD = 0.5
 RADIUS_M = 100
 SCALE = 30
@@ -65,8 +63,8 @@ def tree_context_all(lulc, aoi):
     kernel = ee.Kernel.circle(RADIUS_M, "meters")
     lulc_img = lulc.clip(aoi.buffer(110))
 
-    tree_mask = lulc_img.eq(TREE_CLASS)
-    shrub_mask = lulc_img.eq(SHRUB_CLASS)
+    tree_mask = lulc_img.eq(LulcClass.TREES)
+    shrub_mask = lulc_img.eq(LulcClass.SHRUBS_SCRUBS)
 
     total_px = (
         ee.Image.constant(1)

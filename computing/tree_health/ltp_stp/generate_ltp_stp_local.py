@@ -17,6 +17,7 @@ from math import floor
 from rasterio.transform import Affine
 
 from nrm_app.celery import app
+from utilities.constants import LulcClass
 
 """
 Generate Long-Term Tree Patches (LTP) and Short-Term Tree Patches (STP) rasters.
@@ -35,9 +36,6 @@ tree patches based on size thresholds. It follows this workflow:
               -> Save GeoTIFF output
 """
 
-
-# LULC classification value for tree/forest cover
-TREE_CLASS = 6
 
 # Minimum area threshold (in hectares) to classify a patch as Large Tree Patch (LTP)
 # Patches below this are classified as Short-term Tree Patches (STP)
@@ -237,7 +235,7 @@ def get_lulc_mode(lulc_sources, district, scale):
         )
 
     # Extract only tree class pixels as binary mask
-    tree = (modal == TREE_CLASS).astype(np.uint8)
+    tree = (modal == LulcClass.TREES).astype(np.uint8)
     return tree, transform, profile
 
 

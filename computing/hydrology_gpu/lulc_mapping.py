@@ -2,6 +2,8 @@ from datetime import datetime
 
 import cupy as cp
 
+from utilities.constants import LulcClass
+
 
 LULC_SOURCE_DYNAMICWORLD = "dynamicworld"
 LULC_SOURCE_INDIASATV3 = "indiasatv3"
@@ -18,19 +20,6 @@ DW_CROPS = 4
 DW_SHRUB_AND_SCRUB = 5
 DW_BUILT = 6
 DW_BARE = 7
-
-INDIASAT_BACKGROUND = 0
-INDIASAT_BUILT_UP = 1
-INDIASAT_WATER_KHARIF = 2
-INDIASAT_WATER_KHARIF_RABI = 3
-INDIASAT_WATER_ALL_SEASONS = 4
-INDIASAT_TREE_FORESTS = 6
-INDIASAT_BARRENLANDS = 7
-INDIASAT_SINGLE_CROPPING = 8
-INDIASAT_SINGLE_NON_KHARIF_CROPPING = 9
-INDIASAT_DOUBLE_CROPPING = 10
-INDIASAT_TRIPLE_CROPPING = 11
-INDIASAT_SHRUB_SCRUB = 12
 
 
 def normalize_lulc_source(source: str) -> str:
@@ -80,7 +69,7 @@ def nodata_lulc_value_for_source(source: str) -> int:
     source = normalize_lulc_source(source)
     if source == LULC_SOURCE_DYNAMICWORLD:
         return DW_SHRUB_AND_SCRUB
-    return INDIASAT_BACKGROUND
+    return LulcClass.BACKGROUND
 
 
 def map_lulc_to_dynamic_world(raw_lulc: cp.ndarray, source: str, timestamp) -> cp.ndarray:
@@ -96,33 +85,33 @@ def map_indiasatv3_to_dynamic_world(raw_lulc: cp.ndarray, season: str) -> cp.nda
     # Background/unknown classes stay shrub/scrub instead of becoming water.
     mapped = cp.full(raw_lulc.shape, DW_SHRUB_AND_SCRUB, dtype=cp.uint8)
 
-    mapped = cp.where(raw_lulc == INDIASAT_BUILT_UP, DW_BUILT, mapped)
-    mapped = cp.where(raw_lulc == INDIASAT_TREE_FORESTS, DW_TREES, mapped)
-    mapped = cp.where(raw_lulc == INDIASAT_BARRENLANDS, DW_BARE, mapped)
-    mapped = cp.where(raw_lulc == INDIASAT_SHRUB_SCRUB, DW_SHRUB_AND_SCRUB, mapped)
+    mapped = cp.where(raw_lulc == LulcClass.BUILT_UP, DW_BUILT, mapped)
+    mapped = cp.where(raw_lulc == LulcClass.TREES, DW_TREES, mapped)
+    mapped = cp.where(raw_lulc == LulcClass.BARREN_LAND, DW_BARE, mapped)
+    mapped = cp.where(raw_lulc == LulcClass.SHRUBS_SCRUBS, DW_SHRUB_AND_SCRUB, mapped)
 
     water = (
-        (raw_lulc == INDIASAT_WATER_KHARIF)
-        | (raw_lulc == INDIASAT_WATER_KHARIF_RABI)
-        | (raw_lulc == INDIASAT_WATER_ALL_SEASONS)
+        (raw_lulc == LulcClass.KHARIF_WATER)
+        | (raw_lulc == LulcClass.KHARIF_RABI_WATER)
+        | (raw_lulc == LulcClass.KHARIF_RABI_ZAID_WATER)
     )
     mapped = cp.where(water, DW_WATER, mapped)
 
     mapped = cp.where(
-        raw_lulc == INDIASAT_SINGLE_CROPPING,
+        raw_lulc == LulcClass.SINGLE_KHARIF,
         DW_CROPS if season == SEASON_KHARIF else DW_SHRUB_AND_SCRUB,
         mapped,
     )
     mapped = cp.where(
-        raw_lulc == INDIASAT_SINGLE_NON_KHARIF_CROPPING,
+        raw_lulc == LulcClass.SINGLE_NON_KHARIF,
         DW_CROPS if season == SEASON_RABI else DW_SHRUB_AND_SCRUB,
         mapped,
     )
     mapped = cp.where(
-        raw_lulc == INDIASAT_DOUBLE_CROPPING,
+        raw_lulc == LulcClass.DOUBLE_CROPPING,
         DW_CROPS if season in (SEASON_KHARIF, SEASON_RABI) else DW_SHRUB_AND_SCRUB,
         mapped,
     )
-    mapped = cp.where(raw_lulc == INDIASAT_TRIPLE_CROPPING, DW_CROPS, mapped)
+    mapped = cp.where(raw_lulc == LulcClass.TRIPLE_ANNUAL_PERENNIAL, DW_CROPS, mapped)
 
     return mapped.astype(cp.uint8, copy=False)
