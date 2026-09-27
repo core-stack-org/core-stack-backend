@@ -147,20 +147,21 @@ waterbodies_error_example = {
 waterbodies_by_admin_schema = {
     "method": "get",
     "operation_id": "get_waterbodies_by_admin_and_uid",
-    "operation_summary": "Get remotely sensed waterbodies by admin",
+    "operation_summary": "List remotely sensed waterbodies",
     "operation_description": """
-    Return every surface waterbody in a state, district, and tehsil (or block).
-    These are waterbodies detected by a remote-sensing method developed by
-    IIT Delhi students and implemented by the Core Stack team.
+    Lists every surface waterbody in a tehsil.
 
-    Requires ``state``, ``district``, and ``tehsil`` (or ``block``). Each
-    record includes identity and mapped properties: ``UID``, ``MWS_UID``,
+    Waterbodies are detected by a remote-sensing method developed by IIT
+    Delhi students and implemented by the Core Stack team.
+
+    **Returns**
+    The full inventory. Each record includes ``UID``, ``MWS_UID``,
     ``waterbody_name``, detected-water flag, area (``sum``), zone of
     influence (``zoi``, ``zoi_area``), and ``zoi_properties`` such as
     cropping intensity and cropable area.
 
-    v1 returns the raw inventory for the admin area. There is no status
-    envelope. Use this when you need every detected waterbody in the tehsil.
+    **Related**
+    Retrieve a waterbody
     """,
     "manual_parameters": [
         state_param,
@@ -216,14 +217,17 @@ waterbodies_by_admin_schema = {
 waterbodies_by_uuid = {
     "method": "get",
     "operation_id": "get_waterbodies_by_uid",
-    "operation_summary": "Get Waterbodies by uid",
+    "operation_summary": "Retrieve a waterbody",
     "operation_description": """
-    Return one waterbody from the merged dataset, keyed by UID.
+    Retrieves one remotely sensed waterbody by ``uid``.
 
     Requires ``state``, ``district``, ``tehsil`` (or ``block``), and ``uid``.
-    Optional ``regenerate`` refreshes the merge from source layers.
 
-    v1 returns the raw record for that UID. A missing UID returns a not-found error.
+    **Returns**
+    The raw record for that UID. A missing UID returns 404.
+
+    **Related**
+    List remotely sensed waterbodies
     """,
     "manual_parameters": [
         state_param,
@@ -291,33 +295,35 @@ waterbodies_by_admin_schema_v2 = v2_waterbodies_schema_from(
     "get_waterbodies_data_by_admin/",
 )
 waterbodies_by_admin_schema_v2["operation_summary"] = (
-    "Get remotely sensed waterbodies by admin"
+    "List remotely sensed waterbodies"
 )
 waterbodies_by_admin_schema_v2["operation_description"] = """
-Return every surface waterbody in a state, district, and tehsil (or block).
-These are waterbodies detected by a remote-sensing method developed by
-IIT Delhi students and implemented by the Core Stack team.
+Lists every surface waterbody in a tehsil.
 
-Requires ``state``, ``district``, and ``tehsil`` (or ``block``). Each
-record includes identity and mapped properties: ``UID``, ``MWS_UID``,
-``waterbody_name``, detected-water flag, area (``sum``), zone of
-influence (``zoi``, ``zoi_area``), and ``zoi_properties`` such as
-cropping intensity and cropable area.
+Waterbodies are detected by a remote-sensing method developed by IIT
+Delhi students and implemented by the Core Stack team.
 
-v2 returns ``{status, error_message, data}``. On success, ``data`` is
-the full inventory with field units.
+**Returns**
+``{status, error_message, data}``. ``data`` is the full inventory with
+field units. Each record includes ``UID``, ``MWS_UID``,
+``waterbody_name``, area, ``zoi``, and ``zoi_properties``.
+
+**Related**
+Retrieve a waterbody
 """
 waterbodies_by_uuid_schema_v2 = v2_waterbodies_schema_from(
     waterbodies_by_uuid,
     "get_waterbodies_by_uid_v2",
     "get_waterbody_data/",
 )
+waterbodies_by_uuid_schema_v2["operation_summary"] = "Retrieve a waterbody"
 waterbodies_by_uuid_schema_v2["operation_description"] = """
-Return one waterbody from the merged dataset, keyed by UID.
+Retrieves one remotely sensed waterbody by ``uid``.
 
-Requires ``state``, ``district``, ``tehsil`` (or ``block``), and ``uid``.
-Optional ``regenerate`` refreshes the merge from source layers.
+**Returns**
+``{status, error_message, data}`` for that UID. A missing UID sets
+``error_message`` and 404.
 
-v2 returns ``{status, error_message, data}`` for that UID. A missing UID
-sets ``error_message`` and a 404 status.
+**Related**
+List remotely sensed waterbodies
 """

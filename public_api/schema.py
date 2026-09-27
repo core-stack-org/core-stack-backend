@@ -5,47 +5,38 @@ PUBLIC_API_TAGS = [
     {
         "name": "Auth APIs",
         "description": (
-            "Issue a JWT, then mint the X-API-Key used on dataset and "
-            "waterbody routes. Login with username and password at "
-            "`/api/v1/auth/login/`. Send that access token as "
-            "`Authorization: Bearer <access>` to "
-            "`/api/v1/generate_api_key/`."
+            "Create a session, then create an API key. Login returns a JWT. "
+            "Generate API Key returns the `X-API-Key` used on Dataset and "
+            "Waterbody routes."
         ),
     },
     {
         "name": "Dataset APIs v1",
         "description": (
-            "Original `/api/v1/` dataset routes. The body is the raw payload, "
-            "not a status envelope. Geometry endpoints return a GeoJSON "
-            "FeatureCollection with actual polygon rings. Errors are "
-            '`{"error": "..."}`. Use this group if you already consume v1.'
+            "Raw JSON for existing integrations. Geometry routes return a "
+            "FeatureCollection. Errors are `{\"error\": \"...\"}`."
         ),
     },
     {
         "name": "Dataset APIs v2",
         "description": (
-            "Same dataset routes under `/api/v2/`, wrapped as "
-            "`{status, error_message, data}`. Geometry `data` is a "
-            "FeatureCollection with unrounded vertices. Filter tehsil sheets "
-            "with `data=all` or sheet names, and active locations with "
-            "optional `state`, `district`, and `tehsil`."
+            "Same resources under `/api/v2/`, wrapped as "
+            "`{status, error_message, data}`. Filter tehsil sheets with "
+            "`data=` and active locations with `state`, `district`, or `tehsil`."
         ),
     },
     {
         "name": "Waterbody APIs v1",
         "description": (
-            "Original `/api/v1/` waterbody routes. Responses are the raw "
-            "merged waterbody payload. Errors use the legacy error object. "
-            "Look up by admin location or by waterbody UID."
+            "Remotely sensed surface waterbodies for a tehsil, or one record "
+            "by UID. Raw JSON."
         ),
     },
     {
         "name": "Waterbody APIs v2",
         "description": (
-            "Same waterbody routes under `/api/v2/`, wrapped as "
-            "`{status, error_message, data}`. Success puts the merged "
-            "dataset in `data` with field units. Errors set `error_message` "
-            "and leave `data` empty."
+            "Same waterbody resources under `/api/v2/`, wrapped as "
+            "`{status, error_message, data}` with field units."
         ),
     },
 ]

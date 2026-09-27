@@ -25,11 +25,40 @@ from public_api.schema import PublicAPISchemaGenerator
 
 
 _PUBLIC_API_REDOC_DESCRIPTION = """
-Send **`X-API-Key: <your-api-key>`** on every dataset and waterbody request. Generate the key from **Auth APIs**: `POST /api/v1/auth/login/` for a JWT, then `POST /api/v1/generate_api_key/` with `Authorization: Bearer <access>`. You can also create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
+The Core Stack API is organized around REST. It uses predictable URLs, query parameters or JSON bodies, JSON responses, and standard HTTP status codes.
 
-**v1** (`/api/v1/`) is the original public surface. Responses are the raw payload: GeoJSON FeatureCollections, location trees, or sheet tables. Errors look like `{"error": "..."}`. Geometry routes return actual polygon rings that QGIS can open. There are no sheet or place query filters.
+# Authentication
 
-**v2** (`/api/v2/`) uses the same paths with a stable envelope: `{"status", "error_message", "data"}`. On success, `data` holds the payload; geometry `data` is a FeatureCollection with unrounded vertices. Tehsil sheets accept `data=drought,stream_order`. Active locations accept optional `state`, `district`, and `tehsil`. Time series use fortnight arrays plus unit maps.
+Authenticate Dataset and Waterbody requests with an API key:
+
+```
+X-API-Key: <your-api-key>
+```
+
+1. `POST /api/v1/auth/login/` with `username` and `password` — returns a JWT `access` token.
+2. `POST /api/v1/generate_api_key/` with `Authorization: Bearer <access>` — returns `data.api_key`.
+3. Send that key as `X-API-Key` on every subsequent request.
+
+You can also create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
+
+# Base URL
+
+`https://geoserver.core-stack.org`
+
+| Version | Prefix | Response | Use |
+| --- | --- | --- | --- |
+| **v1** | `/api/v1/` | Raw JSON. Errors: `{"error": "..."}`. | Existing integrations |
+| **v2** | `/api/v2/` | `{status, error_message, data}` | New integrations |
+
+v2 tehsil sheets accept `data=drought,stream_order`. v2 active locations accept optional `state`, `district`, and `tehsil`. Geometry `data` is a GeoJSON FeatureCollection you can open in QGIS.
+
+# First request
+
+1. **List active locations** — tehsils that already have data.
+2. **Retrieve admin details** or **Retrieve a micro-watershed ID** — if you start from a coordinate.
+3. **List tehsil datasets** or **List MWS geometries** — use the exact place names from step 1 or 2.
+
+To request a new tehsil, use the [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 """
 
 schema_view = get_schema_view(
