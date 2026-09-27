@@ -145,14 +145,16 @@ import os
 import logging
 from nrm_app.celery import app
 from computing.models import Layer
+from django.conf import settings
 import json
 
 logger = logging.getLogger(__name__)
 
 VALID_COMPUTE_TYPES = {"gee", "local"}
 
-CONFIG_DIR = os.path.dirname(__file__)
-EXTERNAL_CONFIG_DIR = os.path.join("data", "layers", "layer_dependency")
+EXTERNAL_CONFIG_DIR = os.path.join(
+    settings.BASE_DIR, "data", "layers", "layer_dependency"
+)
 
 MAP_CONFIG_FILES = {
     "gee": "layer_map.json",
@@ -431,23 +433,17 @@ def normalize_compute(compute):
     return compute
 
 
-def _candidate_config_paths(filename):
-    return [
-        os.path.join(EXTERNAL_CONFIG_DIR, filename),
-        os.path.join(CONFIG_DIR, filename),
-    ]
-
-
-def _load_json_config(filename, default=None):
-    for config_path in _candidate_config_paths(filename):
-        if os.path.exists(config_path):
-            with open(config_path, "r") as f:
-                return json.load(f)
+def _load_json_config(filename, compute="gee", default=None):
+    config_path = os.path.join(
+        EXTERNAL_CONFIG_DIR, normalize_compute(compute), filename
+    )
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return json.load(f)
     if default is not None:
         return default
     raise FileNotFoundError(
-        f"Layer dependency config not found. Checked: "
-        f"{_candidate_config_paths(filename)}"
+        f"Layer dependency config not found. Checked: {config_path}"
     )
 
 
@@ -456,7 +452,9 @@ def load_map_config(map_order, compute="gee"):
     Load map configuration from JSON file based on map_order.
     """
     compute = normalize_compute(compute)
-    all_configs = _load_json_config(MAP_CONFIG_FILES[compute], default={})
+    all_configs = _load_json_config(
+        MAP_CONFIG_FILES[compute], compute=compute, default={}
+    )
     return all_configs.get(map_order, [])
 
 
@@ -465,7 +463,9 @@ def load_end_year_rules(compute="gee"):
     Load end year rules from JSON.
     """
     compute = normalize_compute(compute)
-    return _load_json_config(END_YEAR_RULE_FILES[compute], default={})
+    return _load_json_config(
+        END_YEAR_RULE_FILES[compute], compute=compute, default={}
+    )
 
 
 def flatten_map_nodes(map_config):
