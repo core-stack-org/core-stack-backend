@@ -94,6 +94,16 @@ def assert_string_unit_map(testcase, unit_map, map_name):
         testcase.assertIsInstance(value, str, msg=f"{map_name}[{key}]={value!r}")
 
 
+SAMPLE_MWS_POLYGON = [
+    [
+        [75.02716659, 25.2401886],
+        [75.0868641493802, 25.20231618101583],
+        [75.091234567, 25.251234567],
+        [75.02716659, 25.2401886],
+    ]
+]
+
+
 def assert_aligned_series(testcase, block, units, time_key="time", time_pattern=None):
     testcase.assertIsInstance(block, dict)
     testcase.assertIsInstance(units, dict)
@@ -131,6 +141,27 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
         self.assertIsNone(envelope["error_message"])
         self.assertEqual(envelope["data"], {"ok": True})
         assert_json_roundtrip(self, envelope)
+
+    def test_success_envelope_keeps_actual_polygon_coordinates(self):
+        envelope = success_envelope(
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"area": 10.555},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": SAMPLE_MWS_POLYGON,
+                        },
+                    }
+                ],
+            }
+        )
+        feature = envelope["data"]["features"][0]
+        self.assertEqual(feature["geometry"]["type"], "Polygon")
+        self.assertEqual(feature["geometry"]["coordinates"], SAMPLE_MWS_POLYGON)
+        self.assertEqual(feature["properties"]["area"], 10.56)
 
     def test_error_envelope_keys_and_json(self):
         envelope = error_envelope("missing params", details={"field": "state"})
@@ -335,10 +366,16 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
                 "state": "rajasthan",
                 "district": "bhilwara",
                 "tehsil": "mandalgarh",
-                "geometry": {"type": "Polygon", "coordinates": []},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": SAMPLE_MWS_POLYGON,
+                },
             }
         )
         self.assertEqual(set(geom.keys()), {"mws_geometry", "mws_geometry_field_hints"})
+        self.assertEqual(
+            geom["mws_geometry"]["geometry"]["coordinates"], SAMPLE_MWS_POLYGON
+        )
         self.assertEqual(
             geom["mws_geometry_field_hints"], dict(MWS_GEOMETRY_FIELD_HINTS)
         )
@@ -351,11 +388,17 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
                     "state": "rajasthan",
                     "district": "bhilwara",
                     "tehsil": "mandalgarh",
-                    "geometry": {"type": "Polygon", "coordinates": []},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": SAMPLE_MWS_POLYGON,
+                    },
                 }
             ]
         )
         self.assertEqual(set(villages.keys()), {"villages", "village_field_hints"})
+        self.assertEqual(
+            villages["villages"][0]["geometry"]["coordinates"], SAMPLE_MWS_POLYGON
+        )
         self.assertEqual(
             villages["village_field_hints"], dict(VILLAGE_GEOMETRY_FIELD_HINTS)
         )
@@ -505,6 +548,34 @@ class TehsilDataV2Tests(V2ApiTestCase):
             self, drought_row["annual"], drought_row["annual_units"]
         )
 
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_data_filter_keeps_requested_sheets(self, _mock_exists, mock_json):
+        mock_json.return_value = {
+            "drought": [{"uid": "12_1", "area_in_ha": 10, "no_drought_2017": 2}],
+            "stream_order": [{"uid": "12_1", "stream_order": 3}],
+            "mws": [{"uid": "12_1", "area_in_ha": 10}],
+        }
+        response = self._get(self.url_name, {**GEO, "data": "drought,stream_order"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        self.assertEqual(
+            set(body["data"]["tehsil_data"].keys()), {"drought", "stream_order"}
+        )
+        self.assertNotIn("mws", body["data"]["tehsil_data"])
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_unknown_data_filter_returns_400(self, _mock_exists, mock_json):
+        mock_json.return_value = {"drought": [{"uid": "12_1"}]}
+        response = self._get(self.url_name, {**GEO, "data": "not_a_real_sheet"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertIn("Unknown data filter", body["error_message"])
+        mock_json.assert_not_called()
+
 
 class KylIndicatorsV2Tests(V2ApiTestCase):
     url_name = "get_mws_kyl_indicators_v2"
@@ -635,13 +706,46 @@ ALL_MWS_GEOJSON = {
         {
             "type": "Feature",
             "properties": {"uid": "12_100174"},
-            "geometry": {"type": "Polygon", "coordinates": []},
+            "geometry": {"type": "Polygon", "coordinates": SAMPLE_MWS_POLYGON},
         }
     ],
 }
 
 
-class MwsGeometriesTestsMixin:
+class MwsGeometriesV1Tests(V2ApiTestCase):
+    url_name = "get-mws-geometries"
+
+    def test_missing_api_key_returns_401(self):
+        response = self._get(self.url_name, GEO, with_key=False)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_missing_params_returns_legacy_error(self):
+        response = self._get(self.url_name, {"state": "Rajasthan"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        body = response.json()
+        self.assertEqual(
+            body["error"], "All parameters (state, district, tehsil) are required"
+        )
+        self.assertNotIn("status", body)
+        self.assertNotIn("data", body)
+
+    @patch("public_api.api.get_mws_geometries_data")
+    def test_returns_raw_feature_collection(self, mock_all):
+        mock_all.return_value = (True, ALL_MWS_GEOJSON)
+        response = self._get(self.url_name, GEO)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["type"], "FeatureCollection")
+        self.assertNotIn("status", body)
+        self.assertNotIn("data", body)
+        self.assertEqual(len(body["features"]), 1)
+        self.assertEqual(body["features"][0]["properties"]["uid"], "12_100174")
+        mock_all.assert_called_once()
+
+
+class MwsGeometriesV2Tests(V2ApiTestCase):
+    url_name = "get_mws_geometries_v2"
+
     def test_missing_api_key_returns_401(self):
         response = self._get(self.url_name, MWS, with_key=False)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -665,6 +769,9 @@ class MwsGeometriesTestsMixin:
         self.assertEqual(data["type"], "FeatureCollection")
         self.assertEqual(len(data["features"]), 1)
         self.assertEqual(data["features"][0]["properties"]["uid"], "12_100174")
+        self.assertEqual(
+            data["features"][0]["geometry"]["coordinates"], SAMPLE_MWS_POLYGON
+        )
         mock_all.assert_called_once()
 
     @patch("public_api.api.get_mws_geometry")
@@ -689,7 +796,10 @@ class MwsGeometriesTestsMixin:
                 "state": "rajasthan",
                 "district": "bhilwara",
                 "tehsil": "mandalgarh",
-                "geometry": {"type": "Polygon", "coordinates": [[[75.0, 25.0]]]},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": SAMPLE_MWS_POLYGON,
+                },
             },
             None,
         )
@@ -701,17 +811,12 @@ class MwsGeometriesTestsMixin:
         self.assertEqual(set(data.keys()), {"mws_geometry", "mws_geometry_field_hints"})
         self.assertEqual(data["mws_geometry"]["uid"], "12_100174")
         self.assertEqual(data["mws_geometry"]["geometry"]["type"], "Polygon")
+        self.assertEqual(
+            data["mws_geometry"]["geometry"]["coordinates"], SAMPLE_MWS_POLYGON
+        )
         assert_string_unit_map(
             self, data["mws_geometry_field_hints"], "mws_geometry_field_hints"
         )
-
-
-class MwsGeometriesV1Tests(MwsGeometriesTestsMixin, V2ApiTestCase):
-    url_name = "get-mws-geometries"
-
-
-class MwsGeometriesV2Tests(MwsGeometriesTestsMixin, V2ApiTestCase):
-    url_name = "get_mws_geometries_v2"
 
 
 class VillageGeometriesV2Tests(V2ApiTestCase):
@@ -731,8 +836,75 @@ class VillageGeometriesV2Tests(V2ApiTestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         assert_error_envelope(self, response.json())
 
+    @patch("public_api.api.get_village_geometries_data")
+    def test_returns_feature_collection_with_actual_coordinates(self, mock_all):
+        mock_all.return_value = (
+            True,
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"vill_ID": 101, "vill_name": "Sample"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": SAMPLE_MWS_POLYGON,
+                        },
+                    }
+                ],
+            },
+        )
+        response = self._get(self.url_name, GEO)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        data = body["data"]
+        self.assertEqual(data["type"], "FeatureCollection")
+        self.assertEqual(len(data["features"]), 1)
+        self.assertEqual(data["features"][0]["properties"]["vill_ID"], 101)
+        self.assertEqual(
+            data["features"][0]["geometry"]["coordinates"], SAMPLE_MWS_POLYGON
+        )
+        mock_all.assert_called_once()
+
+    @patch("public_api.api.get_village_geometries_data")
+    def test_village_id_filters_feature_collection(self, mock_all):
+        mock_all.return_value = (
+            True,
+            {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"vill_ID": 101, "vill_name": "Keep"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": SAMPLE_MWS_POLYGON,
+                        },
+                    },
+                    {
+                        "type": "Feature",
+                        "properties": {"vill_ID": 202, "vill_name": "Drop"},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": SAMPLE_MWS_POLYGON,
+                        },
+                    },
+                ],
+            },
+        )
+        response = self._get(self.url_name, {**GEO, "village_id": "101"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        features = body["data"]["features"]
+        self.assertEqual(len(features), 1)
+        self.assertEqual(features[0]["properties"]["vill_ID"], 101)
+
     @patch("public_api.api.get_village_geometries")
-    def test_success_format(self, mock_geom):
+    @patch("public_api.api.get_village_geometries_data")
+    def test_falls_back_to_geopandas_feature_collection(self, mock_wfs, mock_geom):
+        mock_wfs.return_value = (False, "GeoServer request failed with status 404")
         mock_geom.return_value = (
             [
                 {
@@ -741,7 +913,10 @@ class VillageGeometriesV2Tests(V2ApiTestCase):
                     "state": "rajasthan",
                     "district": "bhilwara",
                     "tehsil": "mandalgarh",
-                    "geometry": {"type": "Polygon", "coordinates": []},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": SAMPLE_MWS_POLYGON,
+                    },
                 }
             ],
             None,
@@ -750,11 +925,11 @@ class VillageGeometriesV2Tests(V2ApiTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         assert_success_envelope(self, body)
-        data = body["data"]
-        self.assertEqual(set(data.keys()), {"villages", "village_field_hints"})
-        self.assertEqual(len(data["villages"]), 1)
-        self.assertEqual(data["villages"][0]["village_id"], "101")
-        assert_string_unit_map(self, data["village_field_hints"], "village_field_hints")
+        self.assertEqual(body["data"]["type"], "FeatureCollection")
+        self.assertEqual(
+            body["data"]["features"][0]["geometry"]["coordinates"], SAMPLE_MWS_POLYGON
+        )
+        mock_geom.assert_called_once()
 
 
 class ActiveLocationsV2Tests(V2ApiTestCase):
@@ -790,4 +965,60 @@ class ActiveLocationsV2Tests(V2ApiTestCase):
         self.assertEqual(data["locations"][0]["label"], "Rajasthan")
         self.assertEqual(
             data["location_field_hints"], dict(ACTIVE_LOCATION_FIELD_HINTS)
+        )
+
+    @patch("public_api.api.get_activated_location_json")
+    def test_state_district_tehsil_filter(self, mock_locations):
+        mock_locations.return_value = [
+            {
+                "label": "Rajasthan",
+                "value": 1,
+                "state_id": "8",
+                "district": [
+                    {
+                        "label": "Bhilwara",
+                        "value": 1,
+                        "district_id": "123",
+                        "blocks": [
+                            {"label": "Mandalgarh", "value": 1},
+                            {"label": "Jahazpur", "value": 2},
+                        ],
+                    },
+                    {
+                        "label": "Jaipur",
+                        "value": 2,
+                        "district_id": "124",
+                        "blocks": [{"label": "Amber", "value": 1}],
+                    },
+                ],
+            },
+            {
+                "label": "Uttar Pradesh",
+                "value": 2,
+                "state_id": "9",
+                "district": [
+                    {
+                        "label": "Jaunpur",
+                        "value": 1,
+                        "district_id": "200",
+                        "blocks": [{"label": "Badlapur", "value": 1}],
+                    }
+                ],
+            },
+        ]
+        response = self._get(
+            self.url_name,
+            {"state": "Rajasthan", "district": "Bhilwara", "tehsil": "Mandalgarh"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        locations = body["data"]["locations"]
+        self.assertEqual(len(locations), 1)
+        self.assertEqual(locations[0]["label"], "Rajasthan")
+        self.assertEqual(len(locations[0]["district"]), 1)
+        self.assertEqual(locations[0]["district"][0]["label"], "Bhilwara")
+        self.assertEqual(
+            [block["label"] for block in locations[0]["district"][0]["blocks"]],
+            ["Mandalgarh"],
         )

@@ -6,7 +6,12 @@ from rest_framework.renderers import JSONRenderer
 
 def round_floats(payload, precision=2):
     if isinstance(payload, dict):
-        return {key: round_floats(value, precision) for key, value in payload.items()}
+        return {
+            key: value
+            if key == "coordinates"
+            else round_floats(value, precision)
+            for key, value in payload.items()
+        }
     if isinstance(payload, list):
         return [round_floats(item, precision) for item in payload]
     if isinstance(payload, tuple):

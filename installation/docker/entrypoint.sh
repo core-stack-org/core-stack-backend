@@ -25,9 +25,13 @@ runtime_dirs=(
     "$DATA_DIR/base_layers/tehsil_watersheds"
 )
 mkdir -p "${runtime_dirs[@]}"
+if [ "$(id -u)" = "0" ]; then
+    chown --reference="$BACKEND_DIR" "${runtime_dirs[@]}" "$DATA_DIR/base_layers"
+fi
 
 if [ "$#" -eq 0 ]; then
     set -- gunicorn nrm_app.wsgi:application --bind 0.0.0.0:8000 --workers "${GUNICORN_WORKERS:-2}" --timeout "${GUNICORN_TIMEOUT:-7500}" --graceful-timeout "${GUNICORN_GRACEFUL_TIMEOUT:-120}" --access-logfile - --error-logfile -
 fi
 
-exec "$@"
+# Drop root last, so the directories above are handed to the checkout owner.
+exec bash /opt/corestack-scripts/as-owner.sh "$@"

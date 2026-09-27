@@ -20,3 +20,8 @@ logs
 tmp
 .venv
 miniconda.sh
+# Written at runtime into the mounted checkout; not part of the image.
+*/migrations/*.py
+!*/migrations/__init__.py
+bot_interface/whatsapp_media
+cufile.log

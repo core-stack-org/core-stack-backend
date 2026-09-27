@@ -114,4 +114,15 @@ runtime_dirs=(
 mkdir -p "${runtime_dirs[@]}"
 touch "$BACKEND_DIR/logs/app.log" "$BACKEND_DIR/logs/nrm_app.log"
 
+# Every other job and worker runs as the checkout owner (as-owner.sh). Hand
+# back what root created here, what Docker created for missing bind mounts,
+# and anything root-owned left by earlier releases that ran everything as root.
+# GEE_CONFS_HOST_DIR is the writable host view of the read-only gee_confs mount.
+if [ -n "$checkout_owner" ] && [ "${checkout_owner%%:*}" != "0" ]; then
+    for tree in "$BACKEND_DIR" "$DATA_DIR" ${GEE_CONFS_HOST_DIR:+"$GEE_CONFS_HOST_DIR"}; do
+        find "$tree" -xdev \( -path "$BACKEND_DIR/.git" -o -path "$BACKEND_DIR/data/gee_confs" \) -prune \
+            -o -user 0 -print0 | xargs -0 -r chown -h "$checkout_owner"
+    done
+fi
+
 echo "Runtime directories and Django environment are ready."

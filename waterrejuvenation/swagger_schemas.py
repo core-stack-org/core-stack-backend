@@ -140,7 +140,15 @@ waterbodies_by_admin_schema = {
     "method": "get",
     "operation_id": "get_waterbodies_by_admin_and_uid",
     "operation_summary": "Get Waterbodies by admin data",
-    "operation_description": "Retrieve waterbodies for a given state, district and tehsil/block.",
+    "operation_description": """
+    Return the merged waterbody dataset for a state, district, and tehsil or block.
+
+    ``state``, ``district``, and ``tehsil`` (or ``block``) are required.
+    Optional ``regenerate`` rebuilds the merge from source layers.
+
+    v1 returns the raw waterbody payload for every waterbody in that admin area.
+    Use this when you need the full tehsil inventory.
+    """,
     "manual_parameters": [
         state_param,
         district_param,
@@ -189,14 +197,21 @@ waterbodies_by_admin_schema = {
             examples={"application/json": waterbodies_error_example},
         ),
     },
-    "tags": ["Waterbodies API"],
+    "tags": ["Waterbody APIs v1"],
 }
 
 waterbodies_by_uuid = {
     "method": "get",
     "operation_id": "get_waterbodies_by_uid",
     "operation_summary": "Get Waterbodies by uid",
-    "operation_description": "Retrieve one waterbody by UID for the given state, district and tehsil/block.",
+    "operation_description": """
+    Return one waterbody from the merged dataset, keyed by UID.
+
+    Requires ``state``, ``district``, ``tehsil`` (or ``block``), and ``uid``.
+    Optional ``regenerate`` refreshes the merge from source layers.
+
+    v1 returns the raw record for that UID. A missing UID returns a not-found error.
+    """,
     "manual_parameters": [
         state_param,
         district_param,
@@ -246,18 +261,14 @@ waterbodies_by_uuid = {
             examples={"application/json": waterbodies_error_example},
         ),
     },
-    "tags": ["Waterbodies API"],
+    "tags": ["Waterbody APIs v1"],
 }
 
 
 def v2_waterbodies_schema_from(base_schema, operation_id, path_suffix):
     schema = dict(base_schema)
     schema["operation_id"] = operation_id
-    schema["tags"] = ["Waterbodies API v2"]
-    base_desc = (schema.get("operation_description") or "").strip()
-    schema["operation_description"] = (
-        f"{base_desc}\n\n**Path:** ``GET /api/v2/{path_suffix}``"
-    )
+    schema["tags"] = ["Waterbody APIs v2"]
     return schema
 
 
@@ -266,8 +277,26 @@ waterbodies_by_admin_schema_v2 = v2_waterbodies_schema_from(
     "get_waterbodies_by_admin_and_uid_v2",
     "get_waterbodies_data_by_admin/",
 )
+waterbodies_by_admin_schema_v2["operation_description"] = """
+Return the merged waterbody dataset for a state, district, and tehsil or block.
+
+``state``, ``district``, and ``tehsil`` (or ``block``) are required.
+Optional ``regenerate`` rebuilds the merge from source layers.
+
+v2 returns ``{status, error_message, data}``. On success, ``data`` holds
+the merged inventory with field units.
+"""
 waterbodies_by_uuid_schema_v2 = v2_waterbodies_schema_from(
     waterbodies_by_uuid,
     "get_waterbodies_by_uid_v2",
     "get_waterbody_data/",
 )
+waterbodies_by_uuid_schema_v2["operation_description"] = """
+Return one waterbody from the merged dataset, keyed by UID.
+
+Requires ``state``, ``district``, ``tehsil`` (or ``block``), and ``uid``.
+Optional ``regenerate`` refreshes the merge from source layers.
+
+v2 returns ``{status, error_message, data}`` for that UID. A missing UID
+sets ``error_message`` and a 404 status.
+"""

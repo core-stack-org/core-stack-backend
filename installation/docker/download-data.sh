@@ -109,12 +109,23 @@ download_admin_boundary() {
         fi
     fi
 
-    echo "Downloading admin-boundary dataset inside Docker (~8GB, first run only)..."
-    python -m pip install --quiet gdown
-    rm -rf "$EXTRACT" "$ARCHIVE"
+    rm -rf "$EXTRACT"
     mkdir -p "$EXTRACT"
-    gdown "$FILE_ID" -O "$ARCHIVE"
-    7z x "$ARCHIVE" -o"$EXTRACT"
+    # A browser download saved as data/dataset.7z is used as is. gdown writes to
+    # a .part file first, so an interrupted download is never mistaken for one.
+    if [ "${FORCE_DATA_DOWNLOAD:-0}" != "1" ] && [ -f "$ARCHIVE" ]; then
+        echo "Using existing archive $ARCHIVE"
+    else
+        echo "Downloading admin-boundary dataset (~600 MB, first run only)..."
+        python -c "import gdown" 2>/dev/null || python -m pip install --quiet --user gdown
+        rm -f "$ARCHIVE" "$ARCHIVE.part"
+        gdown "$FILE_ID" -O "$ARCHIVE.part"
+        mv "$ARCHIVE.part" "$ARCHIVE"
+    fi
+    if ! 7z x -y "$ARCHIVE" -o"$EXTRACT"; then
+        echo "ERROR: could not extract $ARCHIVE. Delete it and start again to re-download."
+        return 1
+    fi
     rm -f "$ARCHIVE"
     place_extraction
     rm -rf "$EXTRACT"
@@ -135,7 +146,7 @@ run_layer_setup() {
 }
 
 download_local_compute_layers() {
-    if [ "${SKIP_BASE_LAYER_DOWNLOAD:-0}" = "1" ] || [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
+    if [ "${SKIP_BASE_LAYER_DOWNLOAD:-1}" = "1" ] || [ "${SKIP_LAYER_SETUP:-0}" = "1" ]; then
         echo "Skipping local compute base-layer downloads."
         return 0
     fi

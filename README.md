@@ -6,22 +6,10 @@ Please find [full CoRE-Stack documentation](https://docs.core-stack.org/) and de
 
 ### Installation
 
-#### Docker (build and run)
+#### Docker
 
-To run the complete stack without installing Conda, PostgreSQL, Redis, or
-GeoServer on the host, build and start the repository Compose setup. See
-**[installation/DOCKER.md](installation/DOCKER.md)**.
-
-```bash
-git clone https://github.com/core-stack-org/core-stack-backend.git
-cd core-stack-backend
-cp installation/docker/env.template nrm_app/.env
-chmod 600 nrm_app/.env
-# Set CORESTACK_HOST_DATA_DIR=/srv/core-stack-data in nrm_app/.env if desired.
-docker compose --env-file nrm_app/.env up -d --build
-```
-
-Django: http://localhost:8000 &nbsp; GeoServer: http://localhost:8080/geoserver
+Runs the whole stack without installing Conda, PostgreSQL, Redis or GeoServer
+on the host. Follow **[installation/DOCKER.md](installation/DOCKER.md)**.
 
 #### Native installer
 
