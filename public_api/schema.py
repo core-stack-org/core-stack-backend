@@ -3,6 +3,16 @@ from drf_yasg.generators import OpenAPISchemaGenerator
 
 PUBLIC_API_TAGS = [
     {
+        "name": "Auth APIs",
+        "description": (
+            "Issue a JWT, then mint the X-API-Key used on dataset and "
+            "waterbody routes. Login with username and password at "
+            "`/api/v1/auth/login/`. Send that access token as "
+            "`Authorization: Bearer <access>` to "
+            "`/api/v1/generate_api_key/`."
+        ),
+    },
+    {
         "name": "Dataset APIs v1",
         "description": (
             "Original `/api/v1/` dataset routes. The body is the raw payload, "
@@ -52,7 +62,7 @@ def _operation_tags(operation):
 
 
 class PublicAPISchemaGenerator(OpenAPISchemaGenerator):
-    """Keep ReDoc limited to the four public API groups."""
+    """Keep ReDoc limited to Auth plus the four public API groups."""
 
     def get_schema(self, request=None, public=False):
         schema = super().get_schema(request=request, public=public)

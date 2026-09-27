@@ -8,8 +8,8 @@ This page is a one-stop path if you simply want to access and use CoRE Stack pub
 
 For public dataset access:
 
-1. Register or sign in at [dashboard.core-stack.org](https://dashboard.core-stack.org/)
-2. Generate an API key from the dashboard
+1. Register or sign in at [dashboard.core-stack.org](https://dashboard.core-stack.org/), **or** call `POST /api/v1/auth/login/` with username and password to get a JWT
+2. Generate an API key from the dashboard, **or** call `POST /api/v1/generate_api_key/` with `Authorization: Bearer <access>`
 3. Send it as the `X-API-Key` header on `public_api` routes
 
 [Register or sign in at dashboard.core-stack.org](https://dashboard.core-stack.org/){ .md-button .md-button--primary }
@@ -23,7 +23,7 @@ If you need place names before you use the public routes, start with [GeoAdmin (
 Two direct tools are useful here:
 
 - [Swagger](https://geoserver.core-stack.org/swagger/): better for trying requests quickly.
-- [ReDoc](https://api-doc.core-stack.org/): public docs grouped as **Dataset APIs v1**, **Dataset APIs v2**, **Waterbody APIs v1**, and **Waterbody APIs v2**.
+- [ReDoc](https://api-doc.core-stack.org/): public docs grouped as **Auth APIs**, **Dataset APIs v1**, **Dataset APIs v2**, **Waterbody APIs v1**, and **Waterbody APIs v2**.
 
 ---
 

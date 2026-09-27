@@ -25,7 +25,7 @@ from public_api.schema import PublicAPISchemaGenerator
 
 
 _PUBLIC_API_REDOC_DESCRIPTION = """
-Send **`X-API-Key: <your-api-key>`** on every request. Create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
+Send **`X-API-Key: <your-api-key>`** on every dataset and waterbody request. Generate the key from **Auth APIs**: `POST /api/v1/auth/login/` for a JWT, then `POST /api/v1/generate_api_key/` with `Authorization: Bearer <access>`. You can also create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
 
 **v1** (`/api/v1/`) is the original public surface. Responses are the raw payload: GeoJSON FeatureCollections, location trees, or sheet tables. Errors look like `{"error": "..."}`. Geometry routes return actual polygon rings that QGIS can open. There are no sheet or place query filters.
 

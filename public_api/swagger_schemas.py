@@ -135,6 +135,14 @@ authorization_param = openapi.Parameter(
     required=True,
 )
 
+jwt_authorization_param = openapi.Parameter(
+    "Authorization",
+    openapi.IN_HEADER,
+    description="JWT from POST /api/v1/auth/login/. Format: Bearer <access>",
+    type=openapi.TYPE_STRING,
+    required=True,
+)
+
 # ============= COMMON RESPONSES =============
 
 # Error Responses
@@ -356,32 +364,6 @@ VILLAGE_FC_EXAMPLE = {
 }
 
 
-V2_MWS_FORTNIGHT_DESCRIPTION = """
-**``/api/v2/get_mws_data/`` only** — ``data`` uses Open-Meteo-style **fortnight** arrays (~15-day steps):
-
-```json
-{
-  "metadata": { "mws_id": "12_208104" },
-  "fortnight": {
-    "time": ["2024-01-01", "2024-01-15"],
-    "et": [2.5, 3.1],
-    "runoff": [1.3, 0.8],
-    "precipitation": [10.2, 5.4]
-  },
-  "fortnight_units": {
-    "time": "iso8601",
-    "time_step": "15_days",
-    "et": "mm",
-    "runoff": "mm",
-    "precipitation": "mm"
-  }
-}
-```
-
-Query ``regenerate=true`` bypasses MongoDB cache. ``/api/v1/get_mws_data/`` returns legacy ``data.time_series`` rows instead.
-"""
-
-
 def v2_schema_from(base_schema, operation_id, path_suffix):
     schema = dict(base_schema)
     schema["operation_id"] = operation_id
@@ -392,6 +374,145 @@ def v2_schema_from(base_schema, operation_id, path_suffix):
         schema["manual_parameters"] = list(schema["manual_parameters"])
     return schema
 
+
+# ============= AUTH SCHEMAS =============
+
+LOGIN_V1_EXAMPLE = {
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+        "id": 12,
+        "username": "partner",
+        "email": "partner@example.org",
+    },
+}
+
+GENERATE_API_KEY_V1_EXAMPLE = {
+    "action": "generate",
+    "success": True,
+    "message": "API key generated successfully",
+    "data": {
+        "api_key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2",
+        "is_active": True,
+        "expires_at": "2034-01-15T10:30:00Z",
+        "created_at": "2026-01-15T10:30:00Z",
+    },
+}
+
+login_schema = {
+    "operation_id": "auth_login",
+    "operation_summary": "Login and generate JWT",
+    "operation_description": """
+    Exchange a Core Stack username and password for a JWT access token.
+
+    This is the first step before you can mint an ``X-API-Key``. Send
+    ``username`` and ``password`` in the JSON body. The response includes
+    ``access``, ``refresh``, and the signed-in user. Use ``access`` as
+    ``Authorization: Bearer <access>`` on Generate API Key. Tokens expire;
+    call this route again to get a new pair.
+    """,
+    "request_body": openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=["username", "password"],
+        properties={
+            "username": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Core Stack account username",
+                example="partner",
+            ),
+            "password": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Account password",
+                example="your-password",
+            ),
+        },
+    ),
+    "responses": {
+        200: openapi.Response(
+            description="Success - JWT access and refresh tokens.",
+            examples={"application/json": LOGIN_V1_EXAMPLE},
+        ),
+        401: openapi.Response(
+            description="Unauthorized - invalid username or password.",
+            examples={
+                "application/json": {
+                    "detail": "No active account found with the given credentials"
+                }
+            },
+        ),
+    },
+    "tags": ["Auth APIs"],
+    "security": [],
+}
+
+generate_api_key_schema = {
+    "method": "post",
+    "operation_id": "generate_api_key",
+    "operation_summary": "Generate API key",
+    "operation_description": """
+    Mint the ``X-API-Key`` used on Dataset and Waterbody APIs.
+
+    Login first, then send ``Authorization: Bearer <access>``. An empty
+    body, or ``name`` and ``expiry_days``, creates a new key. Copy
+    ``data.api_key`` into ``X-API-Key`` on public routes. Default expiry
+    is 3000 days. Optional ``action=deactivate`` with ``user_id`` and
+    ``api_key`` turns an existing key off.
+    """,
+    "manual_parameters": [jwt_authorization_param],
+    "request_body": openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "name": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Optional label for the key",
+                example="Partner integration key",
+            ),
+            "expiry_days": openapi.Schema(
+                type=openapi.TYPE_INTEGER,
+                description="Days until the key expires. Default 3000.",
+                example=3000,
+            ),
+            "action": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="``generate`` (default) or ``deactivate``",
+                example="generate",
+            ),
+            "user_id": openapi.Schema(
+                type=openapi.TYPE_INTEGER,
+                description="Required only when action is deactivate",
+            ),
+            "api_key": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Required only when action is deactivate",
+            ),
+        },
+    ),
+    "responses": {
+        201: openapi.Response(
+            description="Created - new API key. Copy data.api_key into X-API-Key.",
+            examples={"application/json": GENERATE_API_KEY_V1_EXAMPLE},
+        ),
+        400: openapi.Response(
+            description="Bad Request - invalid action or expiry_days.",
+            examples={
+                "application/json": {
+                    "success": False,
+                    "error": "Invalid expiry_days value",
+                }
+            },
+        ),
+        401: openapi.Response(
+            description="Unauthorized - missing or invalid JWT.",
+            examples={
+                "application/json": {
+                    "error": "Authentication failed",
+                    "details": "JWT token required in Authorization header",
+                }
+            },
+        ),
+    },
+    "tags": ["Auth APIs"],
+}
 
 # ============= API SCHEMAS =============
 
@@ -533,28 +654,24 @@ get_mws_data_v2_schema = {
     "operation_id": "get_mws_data_v2",
     "operation_summary": "Get MWS Time Series Data (v2 fortnight format)",
     "operation_description": """
-    Fetch hydrology time series for one micro-watershed in Open-Meteo-style fortnight arrays.
+    Return hydrology time series for one micro-watershed: evapotranspiration
+    (ET), runoff, and precipitation.
 
-    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
-    Optional ``regenerate=true`` skips the MongoDB cache and rereads GeoServer.
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``. Use the same
+    place names as Get Active Locations and the ``uid`` from Get MWSID by Lat
+    Lon.
 
-    v2 returns ``{status, error_message, data}``. ``data`` has ``metadata``,
-    aligned ``fortnight`` arrays (~15-day steps), and ``fortnight_units``.
-    """
-    + "\n\n"
-    + V2_MWS_FORTNIGHT_DESCRIPTION.strip(),
+    v2 returns ``{status, error_message, data}``. ``data.fortnight`` is aligned
+    ~15-day arrays (``time``, ``et``, ``runoff``, ``precipitation``).
+    ``data.fortnight_units`` names the units (``mm``, ``iso8601``). This is
+    not the v1 ``time_series`` row list. The tehsil must already have Core
+    Stack hydrology layers (see Get Active Locations).
+    """,
     "manual_parameters": [
         state_param,
         district_param,
         tehsil_param,
         mws_id_param,
-        openapi.Parameter(
-            "regenerate",
-            openapi.IN_QUERY,
-            description="Set true/1/yes to bypass MongoDB cache and refresh from GeoServer",
-            type=openapi.TYPE_STRING,
-            required=False,
-        ),
         authorization_param,
     ],
     "responses": {
@@ -898,13 +1015,14 @@ generate_active_locations_schema = {
     "operation_id": "generate_active_locations",
     "operation_summary": "Get Active Locations",
     "operation_description": """
-    Return the state → district → tehsil tree for locations where the full
-    public dataset is already generated.
+    Return the state → district → tehsil tree for places where the
+    full Core Stack dataset is already available.
 
-    Building every tehsil takes time, so this list is not all of India.
-    Partners request specific tehsils; we generate those first. Use the
-    returned names as the exact ``state``, ``district``, and ``tehsil``
-    values on other dataset routes.
+    Each tehsil needs several Core Stack layers computed on Google Earth
+    Engine, and that compute takes time for a single tehsil. We generate
+    locations on request from partners. This API lists only those
+    state / district / tehsil values. Use them as the exact names on other
+    dataset routes.
 
     To request a new location, submit the
     [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
@@ -1368,13 +1486,14 @@ generate_active_locations_schema_v2 = v2_schema_from(
     "get_active_locations/",
 )
 generate_active_locations_schema_v2["operation_description"] = """
-Return the state → district → tehsil tree for locations where the full
-public dataset is already generated.
+Return the state → district → tehsil tree for places where the
+full Core Stack dataset is already available.
 
-Building every tehsil takes time, so this list is not all of India.
-Partners request specific tehsils; we generate those first. Use the
-returned names as the exact ``state``, ``district``, and ``tehsil``
-values on other dataset routes.
+Each tehsil needs several Core Stack layers computed on Google Earth
+Engine, and that compute takes time for a single tehsil. We generate
+locations on request from partners. This API lists only those
+state / district / tehsil values. Use them as the exact names on other
+dataset routes.
 
 Optional filters: ``state``, ``district``, and ``tehsil`` (alias ``block``).
 Name matches are case-insensitive.

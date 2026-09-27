@@ -106,7 +106,15 @@ waterbodies_success_example = {
         {
             "UID": "12_100174_104",
             "MWS_UID": "12_100174",
+            "waterbody_name": "Talab",
             "water": 1,
+            "sum": 2.56,
+            "zoi": 3,
+            "zoi_area": 10.13,
+            "zoi_properties": {
+                "cropping_intensity_2017": 1.23,
+                "total_cropable_area_ever_hydroyear_2017_2024": 50.02,
+            },
         }
     ],
 }
@@ -139,15 +147,20 @@ waterbodies_error_example = {
 waterbodies_by_admin_schema = {
     "method": "get",
     "operation_id": "get_waterbodies_by_admin_and_uid",
-    "operation_summary": "Get Waterbodies by admin data",
+    "operation_summary": "Get remotely sensed waterbodies by admin",
     "operation_description": """
-    Return the merged waterbody dataset for a state, district, and tehsil or block.
+    Return every surface waterbody in a state, district, and tehsil (or block).
+    These are waterbodies detected by a remote-sensing method developed by
+    IIT Delhi students and implemented by the Core Stack team.
 
-    ``state``, ``district``, and ``tehsil`` (or ``block``) are required.
-    Optional ``regenerate`` rebuilds the merge from source layers.
+    Requires ``state``, ``district``, and ``tehsil`` (or ``block``). Each
+    record includes identity and mapped properties: ``UID``, ``MWS_UID``,
+    ``waterbody_name``, detected-water flag, area (``sum``), zone of
+    influence (``zoi``, ``zoi_area``), and ``zoi_properties`` such as
+    cropping intensity and cropable area.
 
-    v1 returns the raw waterbody payload for every waterbody in that admin area.
-    Use this when you need the full tehsil inventory.
+    v1 returns the raw inventory for the admin area. There is no status
+    envelope. Use this when you need every detected waterbody in the tehsil.
     """,
     "manual_parameters": [
         state_param,
@@ -277,14 +290,22 @@ waterbodies_by_admin_schema_v2 = v2_waterbodies_schema_from(
     "get_waterbodies_by_admin_and_uid_v2",
     "get_waterbodies_data_by_admin/",
 )
+waterbodies_by_admin_schema_v2["operation_summary"] = (
+    "Get remotely sensed waterbodies by admin"
+)
 waterbodies_by_admin_schema_v2["operation_description"] = """
-Return the merged waterbody dataset for a state, district, and tehsil or block.
+Return every surface waterbody in a state, district, and tehsil (or block).
+These are waterbodies detected by a remote-sensing method developed by
+IIT Delhi students and implemented by the Core Stack team.
 
-``state``, ``district``, and ``tehsil`` (or ``block``) are required.
-Optional ``regenerate`` rebuilds the merge from source layers.
+Requires ``state``, ``district``, and ``tehsil`` (or ``block``). Each
+record includes identity and mapped properties: ``UID``, ``MWS_UID``,
+``waterbody_name``, detected-water flag, area (``sum``), zone of
+influence (``zoi``, ``zoi_area``), and ``zoi_properties`` such as
+cropping intensity and cropable area.
 
-v2 returns ``{status, error_message, data}``. On success, ``data`` holds
-the merged inventory with field units.
+v2 returns ``{status, error_message, data}``. On success, ``data`` is
+the full inventory with field units.
 """
 waterbodies_by_uuid_schema_v2 = v2_waterbodies_schema_from(
     waterbodies_by_uuid,
