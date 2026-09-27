@@ -260,8 +260,6 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_soil_type(geojson_data, writer)
             elif workspace == "soil_health_vector":
                 create_excel_for_soil_health(geojson_data, writer)
-            elif workspace == "ndvi_timeseries":
-                create_excel_for_ndvi_shrub(geojson_data, writer)
             elif workspace == "forest_fringes":
                 create_excel_for_forest_fringe(geojson_data, writer)
             elif workspace == "tree_in_grassland":
@@ -299,6 +297,11 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 ndvi_df = ndvi_df.merge(crop_df, on="UID", how="outer")
         if ndvi_df is not None:
             ndvi_df.to_excel(writer, sheet_name="ndvi", index=False)
+            if hasattr(writer, "book") and "ndvi_shrub" in writer.book.sheetnames:
+                del writer.book["ndvi_shrub"]
+                if hasattr(writer, "sheets") and "ndvi_shrub" in writer.sheets:
+                    del writer.sheets["ndvi_shrub"]
+                print("Deleted existing 'ndvi_shrub' sheet")
     return results
 
 
@@ -359,8 +362,6 @@ def create_excel_for_forest_fringe(geojson_data, writer):
         print(f"Error occurred while generating excel for forest fringes {e} ")
 
 
-def create_excel_for_ndvi_shrub(data, writer):
-    print("Inside ndvi shrub excel generation")
 def create_excel_for_ndvi(data, trend_column):
     print(f"Inside {trend_column} excel generation")
     try:
@@ -2416,9 +2417,7 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
                 triply_c_key, 0
             )
 
-        croppable_area_key = (
-            f"total_cropable_area_ever_hydroyear_2017_{end_year}"
-        )
+        croppable_area_key = f"total_cropable_area_ever_hydroyear_2017_{end_year}"
         croppable_area = properties.get(croppable_area_key)
         if croppable_area is None:
             croppable_area = properties.get("sum", 0) / 10000
