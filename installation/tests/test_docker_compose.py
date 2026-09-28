@@ -70,8 +70,12 @@ class DockerComposeArchitectureTests(unittest.TestCase):
 
         self.assertFalse(REMOVED_COMPOSE_WRAPPER.exists())
         self.assertNotIn("compose.sh", docker_guide)
+        self.assertIn("env_file:", compose)
+        self.assertIn("path: nrm_app/.env", compose)
+        self.assertIn("required: true", compose)
+        self.assertIn("POSTGRES_PASSWORD: ${DB_PASSWORD:-replace-with-a-long-random-password}", compose)
         self.assertIn(
-            "docker compose --env-file nrm_app/.env",
+            "Compose reads `nrm_app/.env` on its own",
             docker_guide,
         )
         self.assertNotIn("${POSTGRES_DB:-", compose)

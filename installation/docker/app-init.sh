@@ -92,8 +92,8 @@ done
 
 chmod 600 "$APP_ENV_FILE"
 # upsert_env rewrites the file as root, which would leave it unreadable on the
-# host. Compose reads the same file for every "--env-file nrm_app/.env"
-# command, so hand it back to whoever owns the mounted checkout. The mode stays
+# host. Compose interpolates nrm_app/.env on every command, so hand it
+# back to whoever owns the mounted checkout. The mode stays
 # 600, so no other account gains access.
 checkout_owner="$(stat -c '%u:%g' "$BACKEND_DIR" 2>/dev/null || true)"
 if [ -n "$checkout_owner" ] && ! chown "$checkout_owner" "$APP_ENV_FILE" 2>/dev/null; then

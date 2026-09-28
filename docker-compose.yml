@@ -5,6 +5,14 @@ name: core-stack
 # GeoServer state use Docker-managed volumes. Host files live beneath
 # CORESTACK_HOST_DATA_DIR (the repository root by default).
 
+# Interpolate ${DB_PASSWORD} and the rest of nrm_app/.env so Postgres,
+# GeoServer, backups, and the backend all use the same values Django reads.
+# Copy installation/docker/env.template to nrm_app/.env before the first up.
+# Requires Docker Compose 2.24+. A CLI --env-file still overrides this file.
+env_file:
+  - path: nrm_app/.env
+    required: true
+
 # Outbound proxy for campus/corporate networks, taken from the host shell or
 # nrm_app/.env (either case). Used both as build args (apt, micromamba,
 # pip in the Dockerfile) and as runtime environment (gdown, Earth Engine, S3).
@@ -38,7 +46,7 @@ x-backend-environment: &backend-environment
 
   DB_NAME: ${DB_NAME:-corestack_db}
   DB_USER: ${DB_USER:-corestack_admin}
-  DB_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
+  DB_PASSWORD: ${DB_PASSWORD:-replace-with-a-long-random-password}
   DB_HOST: postgres
   DB_PORT: "5432"
   DB_CONN_MAX_AGE: ${DB_CONN_MAX_AGE:-60}
@@ -51,7 +59,7 @@ x-backend-environment: &backend-environment
 
   GEOSERVER_URL: ${GEOSERVER_URL:-http://geoserver:8080/geoserver/}
   GEOSERVER_USERNAME: ${GEOSERVER_USERNAME:-admin}
-  GEOSERVER_PASSWORD: ${GEOSERVER_PASSWORD:-change-this-geoserver-password}
+  GEOSERVER_PASSWORD: ${GEOSERVER_PASSWORD:-replace-with-a-long-random-password}
 
   GEE_CONFS_DIR: /app/data/gee_confs
   GEE_SERVICE_ACCOUNT_KEY_PATH: /app/data/gee_confs/gee-service-account.json
@@ -121,7 +129,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-corestack_db}
       POSTGRES_USER: ${DB_USER:-corestack_admin}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-this-database-password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-replace-with-a-long-random-password}
       POSTGRES_INITDB_ARGS: ${POSTGRES_INITDB_ARGS:---data-checksums}
     ports:
       - "${POSTGRES_BIND_IP:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
@@ -157,7 +165,7 @@ services:
     restart: unless-stopped
     environment:
       GEOSERVER_ADMIN_USER: ${GEOSERVER_USERNAME:-admin}
-      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_PASSWORD:-change-this-geoserver-password}
+      GEOSERVER_ADMIN_PASSWORD: ${GEOSERVER_PASSWORD:-replace-with-a-long-random-password}
       CONSOLE_HANDLER_LEVEL: ${GEOSERVER_LOG_LEVEL:-WARNING}
     ports:
       - "${GEOSERVER_BIND_IP:-127.0.0.1}:${GEOSERVER_PORT:-8080}:8080"
@@ -352,7 +360,7 @@ services:
       PGPORT: "5432"
       PGDATABASE: ${DB_NAME:-corestack_db}
       PGUSER: ${DB_USER:-corestack_admin}
-      PGPASSWORD: ${DB_PASSWORD:-change-this-database-password}
+      PGPASSWORD: ${DB_PASSWORD:-replace-with-a-long-random-password}
     volumes:
       - ${CORESTACK_HOST_DATA_DIR:-.}/backups/postgres:/backups
     entrypoint: ["bash", "-euc"]

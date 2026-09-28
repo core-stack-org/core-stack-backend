@@ -12,7 +12,7 @@ When it is done you have:
 
 | You need | Check |
 | --- | --- |
-| Docker Engine with Compose v2 | `docker compose version` |
+| Docker Engine with Compose v2.24+ | `docker compose version` |
 | Your user can run Docker (member of the `docker` group) | `docker ps` works without `sudo` |
 | git | `git --version` |
 | About 20 GB free disk, plus space for the [data](#data-for-local-compute) you add | `df -h .` |
@@ -45,8 +45,10 @@ cp installation/docker/env.template nrm_app/.env
 chmod 600 nrm_app/.env
 ```
 
-`nrm_app/.env` holds every setting and password. Docker Compose and Django
-both read it.
+`nrm_app/.env` holds every setting and password. Docker Compose loads it
+automatically (see `env_file` in `docker-compose.yml`) and Django reads the
+same file. Set `DB_PASSWORD` there before the first `up`; Postgres uses that
+value as `POSTGRES_PASSWORD`.
 
 **3. Edit `nrm_app/.env`**
 
@@ -78,20 +80,20 @@ and save it as `data/dataset.7z` in the repository.
 **5. Build and start**
 
 ```bash
-docker compose --env-file nrm_app/.env up -d --build
+docker compose up -d --build
 ```
 
 The first run takes 5 to 60 minutes, depending on your connection. The
 command waits while the database is set up and the data is downloaded; let
 it finish. If it is interrupted, run the same command again.
 
-Every Compose command needs `--env-file nrm_app/.env`, and must be run
-from the repository root.
+Compose reads `nrm_app/.env` on its own. Run commands from the repository
+root. Use `--env-file` only if you need to point at a different file.
 
 **6. Check that it works**
 
 ```bash
-docker compose --env-file nrm_app/.env ps -a
+docker compose ps -a
 ```
 
 - `app-init`, `database-init`, `geoserver-init`, `data-download`,
@@ -101,7 +103,7 @@ docker compose --env-file nrm_app/.env ps -a
   `COMPOSE_PROFILES=heavy`.
 
 If a job shows a non-zero exit code, read its log:
-`docker compose --env-file nrm_app/.env logs <service>`.
+`docker compose logs <service>`.
 
 Log in to the API. This reads the username and password from `nrm_app/.env`
 and keeps the token in `$TOKEN` for the requests in
@@ -167,7 +169,7 @@ With S3 credentials for the CoRE Stack datasets bucket, terrain, LULC,
 aquifer and microwatersheds can be downloaded automatically: set
 `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION`, `S3_BUCKET` and
 `SKIP_BASE_LAYER_DOWNLOAD=0`, then run
-`docker compose --env-file nrm_app/.env run --rm data-download`.
+`docker compose run --rm data-download`.
 
 ## Google Earth Engine
 
@@ -190,7 +192,7 @@ key.
 5. Apply it:
 
    ```bash
-   docker compose --env-file nrm_app/.env up -d --force-recreate
+   docker compose up -d --force-recreate
    ```
 
 The key is stored encrypted in the database and the uploaded file is deleted,
@@ -216,7 +218,7 @@ DISC.
 4. Apply it:
 
    ```bash
-   docker compose --env-file nrm_app/.env up -d --force-recreate
+   docker compose up -d --force-recreate
    ```
 
 A wrong password or an unapproved application makes the task fail with an
@@ -245,12 +247,12 @@ GPU_AVAILABLE=False
 ```
 
 After changing the profile, run
-`docker compose --env-file nrm_app/.env up -d --remove-orphans`.
+`docker compose up -d --remove-orphans`.
 
 Check that the worker sees the GPU:
 
 ```bash
-docker compose --env-file nrm_app/.env exec celery-heavy nvidia-smi
+docker compose exec celery-heavy nvidia-smi
 ```
 
 ## Behind a proxy
@@ -277,13 +279,13 @@ export no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,127.0.0.1
 ## Settings
 
 All in `nrm_app/.env`. After a change, run
-`docker compose --env-file nrm_app/.env up -d --force-recreate`.
+`docker compose up -d --force-recreate`.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `CORESTACK_HOST_DATA_DIR` | `.` | Where `data/`, `gee_confs/` and `backups/` live on the host. Set before the first start. |
 | `BACKEND_PORT`, `GEOSERVER_PORT`, `POSTGRES_PORT` | `8000`, `8080`, `5432` | Host ports, bound to `127.0.0.1` only. |
-| `DB_PASSWORD`, `GEOSERVER_PASSWORD` | placeholders | Change before the first start on any shared machine. |
+| `DB_PASSWORD`, `GEOSERVER_PASSWORD` | from `nrm_app/.env` | Compose passes `DB_PASSWORD` to Postgres as `POSTGRES_PASSWORD`. Change before the first start. |
 | `CELERY_NRM_CONCURRENCY` | `3` | Layer jobs that run in parallel. |
 | `SKIP_ADMIN_BOUNDARY_DOWNLOAD` | `0` | `1` skips the admin-boundary download. |
 | `SKIP_BASE_LAYER_DOWNLOAD` | `1` | `0` downloads base layers from S3 (needs S3 credentials). |
@@ -294,7 +296,7 @@ All in `nrm_app/.env`. After a change, run
 
 Log in first ([step 6](#2-install)). Each request answers at once and queues
 a task; follow it in the worker log, for example
-`docker compose --env-file nrm_app/.env logs -f celery-nrm`.
+`docker compose logs -f celery-nrm`.
 
 ```bash
 api() { curl -s -X POST "http://localhost:8000/api/v1/$1/" \
@@ -316,26 +318,26 @@ per call: `end_year` is `start_year + 1`.
 ## Everyday use
 
 ```bash
-docker compose --env-file nrm_app/.env ps            # status
-docker compose --env-file nrm_app/.env logs -f backend
-docker compose --env-file nrm_app/.env stop          # stop, keep everything
-docker compose --env-file nrm_app/.env up -d         # start again
+docker compose ps            # status
+docker compose logs -f backend
+docker compose stop          # stop, keep everything
+docker compose up -d         # start again
 ```
 
 After `git pull`:
 
 ```bash
-docker compose --env-file nrm_app/.env up -d --build --force-recreate
+docker compose up -d --build --force-recreate
 ```
 
 Commands that write files, such as `manage.py` commands, should run as your
 user so the files stay yours:
 
 ```bash
-docker compose --env-file nrm_app/.env exec --user "$(id -u):$(id -g)" backend python manage.py <command>
+docker compose exec --user "$(id -u):$(id -g)" backend python manage.py <command>
 ```
 
-`docker compose --env-file nrm_app/.env down -v` deletes the database,
+`docker compose down -v` deletes the database,
 GeoServer and Redis data. `data/` on the host is kept.
 
 ## Troubleshooting
@@ -351,16 +353,17 @@ GeoServer and Redis data. `data/` on the host is kept.
 | `Earth Engine client library not initialized` in logs | Earth Engine is not set up. Harmless for local compute. |
 | `401` from `geoserver.core-stack.org` in logs | The STAC catalog step uses the public CoRE Stack GeoServer. The layer itself is saved and published locally. |
 | Admin page has no styling | Static files are not served by the web server. The admin still works. |
-| `Permission denied` on files in the repository | Left by an older setup that ran as root. `docker compose --env-file nrm_app/.env up -d` gives them back to you. |
+| `Permission denied` on files in the repository | Left by an older setup that ran as root. `docker compose up -d` gives them back to you. |
+| `password authentication failed for user "corestack_admin"` | Postgres stored the password from the first `up`. `DB_PASSWORD` in `nrm_app/.env` no longer matches. Put the original value back, or run `docker compose exec postgres psql -U corestack_admin -d corestack_db -c "ALTER USER corestack_admin WITH PASSWORD '<same-as-DB_PASSWORD>';"` then `docker compose restart backend`. A new empty install can `down -v` instead (that deletes the database). |
 | A second copy of the repository uses the first one's database | All copies share the Compose project name `core-stack`. Run one installation per machine. |
 
 To stop a long job that is running on `celery-heavy`:
 
 ```bash
-docker compose --env-file nrm_app/.env kill celery-heavy
-docker compose --env-file nrm_app/.env exec celery-nrm celery -A nrm_app purge -Q heavy -f
-docker compose --env-file nrm_app/.env exec redis redis-cli del unacked unacked_index
-docker compose --env-file nrm_app/.env up -d celery-heavy
+docker compose kill celery-heavy
+docker compose exec celery-nrm celery -A nrm_app purge -Q heavy -f
+docker compose exec redis redis-cli del unacked unacked_index
+docker compose up -d celery-heavy
 ```
 
 Without the `purge` and `redis-cli` steps the job starts again when the worker
@@ -370,12 +373,12 @@ workers.
 
 ## Running on a server
 
-- Change `DB_PASSWORD`, `GEOSERVER_PASSWORD` and the admin password before
-  the first start.
+- Change `DB_PASSWORD` and `GEOSERVER_PASSWORD` in `nrm_app/.env` before
+  the first start. Compose passes `DB_PASSWORD` to Postgres automatically.
 - Set `DEBUG=False`, and `ALLOWED_HOSTS` to the server's host name.
 - Keep ports bound to `127.0.0.1`; put an HTTPS reverse proxy in front.
 - Set `CORESTACK_HOST_DATA_DIR` to a path on a disk with room for the data,
   for example `/srv/core-stack-data`.
 - Back up the database regularly:
-  `docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup`
+  `docker compose --profile maintenance run --rm database-backup`
   writes a dump to `backups/postgres/`.
