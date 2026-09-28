@@ -26,16 +26,29 @@ Missing data protocol (mirrors Shuvam's divide_where_valid approach):
     - Farm-level  : column = NaN if the farm has zero valid pixels for that band
     - Annual MAI  : mean of all valid monthly MAI values (NaN months excluded)
     - No imputation is performed on missing farms or missing months.
+
+Crop columns (crop1/conf1, crop2/conf2, crop3/conf3):
+    farms/static.parquet does NOT carry monitoring_prediction, so it is
+    sourced separately from the raw per-cell metadata JSON files
+    (_load_crop_metadata_df) and left-merged onto gdf by farm_id
+    (_attach_crop_metadata) before the annual parquet is built. Each
+    prediction is then assigned to the single agricultural year
+    (Jul Y -> Jun Y+1, half-open) it overlaps the most, and its
+    crop_1/2/3 + conf_1/2/3 values are carried through unchanged into that
+    farm/year row — no season splitting, no long-duration-crop special case.
 """
 
 import logging
 import os
 import warnings
 from datetime import date
+import json
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import rasterio
 import rasterio.features
 import rasterio.merge
@@ -89,23 +102,29 @@ CRS = "EPSG:4326"
 def _block_dir(state, district, block):
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block)
 
+def _metadata_dir(state: str, district: str, block: str) -> str:
+    return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "raw_metadata")
+
 def _farm_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
+    return os.path.join(_block_dir(state, district, block), "farms/static.parquet")
 
 def _static_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_static.parquet")
+    return os.path.join(_block_dir(state, district, block), "farms/static.parquet")
 
 def _annual_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_annual.parquet")
+    return os.path.join(_block_dir(state, district, block), "farms/annual.parquet")
 
 def _monthly_parquet_path(state, district, block):
-    return os.path.join(_block_dir(state, district, block), "farm_monthly.parquet")
+    return os.path.join(_block_dir(state, district, block), "farms/sub_annual.parquet")
 
 def _local_aet_path(aez, year):
-    return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_AET_{aez}_{year}_cog.tif")
+    return os.path.join(LOCAL_ET_RASTERS_PATH, f"AET_latest/AET_AEZ_{aez}/AET_{aez}_{year}_cog.tif")
 
 def _local_pet_path(aez, year):
-    return os.path.join(LOCAL_ET_RASTERS_PATH, f"merge_PET_{aez}_{year}_cog.tif")
+    return os.path.join(LOCAL_ET_RASTERS_PATH, f"PET_drive_data/PET{aez}/merge_PET_{aez}_{year}_cog.tif")
+
+def _manifest_path(state: str, district: str, block: str) -> str:
+    return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "manifest.json")
 
 def _get_tehsil_polygon(state, district, block):
     """
@@ -128,6 +147,164 @@ def _get_tehsil_polygon(state, district, block):
 
 
 AEZ_MIN_OVERLAP_FRAC = 0.001  # 0.1% of tehsil area — filters boundary-snapping slivers
+
+
+def _extract_all_features_python_fallback(raw_dir: str, tokens: list) -> list:
+    """
+    Pure-Python fallback: reads every cell JSON file and collects ALL
+    landscape features. Used when DuckDB JSON parsing fails.
+    """
+    features = []
+    for token in tokens:
+        path = os.path.join(raw_dir, f"{token}.json")
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path) as f:
+                data = json.load(f)
+        except Exception as exc:
+            logger.warning("Could not parse %s: %s", path, exc)
+            continue
+
+        landscape = data.get("monitoredLandscape", {})
+        geojson_raw = landscape.get("geojson", "")
+        if not geojson_raw:
+            continue
+
+        try:
+            fc = json.loads(geojson_raw) if isinstance(geojson_raw, str) else geojson_raw
+        except json.JSONDecodeError as exc:
+            logger.warning("Invalid GeoJSON in cell %s: %s", token, exc)
+            continue
+
+        for feat in fc.get("features", []):
+            props = feat.get("properties", {})
+            alu_type = props.get("alu_type", "")
+            if not alu_type:
+                continue
+            features.append(
+                {
+                    "cell_token": token,
+                    "plus_code": feat.get("id", ""),
+                    "farm_uid": feat.get("id", ""),
+                    "alu_type": alu_type,
+                    "geometry_geojson": json.dumps(feat.get("geometry", {})),
+                    "properties_json": json.dumps(props),
+                }
+            )
+    return features
+
+
+def _load_fetched_tokens(manifest_file: str) -> list:
+    """Return only the tokens that have actual landscape data."""
+    if not os.path.exists(manifest_file):
+        raise FileNotFoundError(
+            f"Manifest not found at {manifest_file}. "
+            "Run Phase 1 (fetch_raw_boundaries) first."
+        )
+    with open(manifest_file) as f:
+        manifest = json.load(f)
+    return manifest.get("fetched", [])
+
+
+def _build_metadata_geodataframe(records: list) -> gpd.GeoDataFrame:
+
+    if not records:
+        return pd.DataFrame(
+            columns=[
+                "farm_id",
+                "monitoring_prediction",
+            ]
+        )
+
+    rows = []
+
+    for rec in records:
+        try:
+            props = (
+                json.loads(rec["properties_json"])
+                if rec.get("properties_json")
+                else {}
+            )
+
+        except Exception as e:
+            logger.debug("Could not parse metadata properties: %s", e)
+            continue
+
+        farm_id = (
+            rec.get("farm_uid","")
+            or rec.get("plus_code", "")
+        )
+
+        if not farm_id:
+            continue
+
+        rows.append(
+            {
+                "farm_id" : farm_id,
+                "monitoring_prediction" : props.get(
+                    "monitoring_prediction"
+                ),
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
+def _load_crop_metadata_df(state, district, block):
+    """
+    Load farm-level monitoring_prediction from the raw per-cell metadata JSON
+    files. farms/static.parquet does not carry this column, so it's sourced
+    here instead. Returns a DataFrame: farm_id, monitoring_prediction
+    (one row per farm; a farm never repeats across cell JSONs).
+    """
+    manifest_file = _manifest_path(state, district, block)
+    fetched_tokens = _load_fetched_tokens(manifest_file)
+    metadata_dir = _metadata_dir(state, district, block)
+    all_metadata = _extract_all_features_python_fallback(metadata_dir, fetched_tokens)
+    metadata_df = _build_metadata_geodataframe(all_metadata)
+
+    if "farm_id" in metadata_df.columns:
+        metadata_df["farm_id"] = metadata_df["farm_id"].astype(str).str.strip()
+
+    logger.info("Loaded crop metadata for %d farms from %s.", len(metadata_df), metadata_dir)
+    return metadata_df
+
+
+def _attach_crop_metadata(gdf, state, district, block):
+    """
+    Left-merge monitoring_prediction into gdf by farm_id so
+    _build_crop_year_table can find it on each row. No-op (with a warning) if
+    farm_id is missing or no metadata is found.
+    """
+    if "farm_id" not in gdf.columns:
+        logger.warning("gdf has no farm_id column — cannot attach crop metadata.")
+        return gdf
+
+    metadata_df = _load_crop_metadata_df(state, district, block)
+    if metadata_df.empty or "monitoring_prediction" not in metadata_df.columns:
+        logger.warning("No crop metadata found for %s/%s/%s.", state, district, block)
+        return gdf
+
+    if "monitoring_prediction" in gdf.columns:
+        gdf = gdf.drop(columns=["monitoring_prediction"])
+
+    gdf = gdf.copy()
+    gdf["farm_id"] = gdf["farm_id"].astype(str).str.strip()
+
+    gdf = gdf.merge(
+        metadata_df[["farm_id", "monitoring_prediction"]],
+        on="farm_id",
+        how="left",
+    )
+    n_matched = int(gdf["monitoring_prediction"].notna().sum())
+    logger.info("Crop metadata attached: %d/%d farms matched by farm_id.", n_matched, len(gdf))
+    if n_matched == 0:
+        logger.warning(
+            "Zero farms matched on farm_id between farms/static.parquet and "
+            "raw metadata JSONs — check farm_id format on both sides."
+        )
+    return gdf
 
 
 def _get_aez_zones(state, district, block, min_overlap_frac=AEZ_MIN_OVERLAP_FRAC):
@@ -593,45 +770,329 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=
     return gdf
 
 
-# ── output writers ─────────────────────────────────────────────────────────────
+# ── crop-year mapping from monitoring_prediction ────────────────────────────────
+# monitoring_prediction is a farm-level time series, attached onto gdf by
+# _attach_crop_metadata (farm_id merge). Each prediction's crop_1/conf_1..
+# crop_3/conf_3 are carried through as-is, assigned to whichever single
+# agricultural year (Jul Y -> Jun Y+1, half-open) the prediction interval
+# overlaps the most.
 
-def _save_static_parquet(gdf, state, district, block):
+CROP_RANKS = (1, 2, 3)
+CROP_RANK_OUTPUT_COLUMNS = ["crop1", "conf1", "crop2", "conf2", "crop3", "conf3"]
+CROP_NAME_COLUMNS = ["crop1", "crop2", "crop3"]
+CROP_CONF_COLUMNS = ["conf1", "conf2", "conf3"]
+
+
+def _normalise_crop_name(value):
+    """Return a stable crop label, or None if missing/blank."""
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return None
+    value = str(value).strip().upper()
+    return value or None
+
+
+def _parse_monitoring_prediction(value):
     """
-    Write farm_static.parquet — one row per farm, geometry + static properties.
-    Skips if file already exists (static data never changes).
+    Parse monitoring_prediction regardless of how it was persisted.
+
+    The value may already be a Python list/dict or may be a JSON string.
+    This function deliberately accepts both forms and returns only a list of
+    prediction dictionaries.
     """
-    out_path = _static_parquet_path(state, district, block)
-    if os.path.exists(out_path):
-        logger.info("farm_static.parquet already exists — skipping.")
-        return out_path
+    if value is None:
+        return []
 
-    keep = ["farm_id", "plus_code", "cell_token", "alu_type",
-            "class_confidence", "capture_date", "geometry"]
-    static = gdf[[c for c in keep if c in gdf.columns]].copy()
-    static.insert(0, "state",    state)
-    static.insert(0, "district", district)
-    static.insert(0, "tehsil",   block)
-    if "area_m2" in gdf.columns:
-        static["area_in_ha"] = (gdf["area_m2"] / 10_000).round(4)
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return []
 
-    # Bounding box struct
-    static["bbox"] = static.geometry.apply(
-        lambda g: {
-            "xmin": round(g.bounds[0], 6), "ymin": round(g.bounds[1], 6),
-            "xmax": round(g.bounds[2], 6), "ymax": round(g.bounds[3], 6),
-        }
+    if isinstance(value, dict):
+        # Support either the prediction list itself or a properties object.
+        if "monitoring_prediction" in value:
+            value = value["monitoring_prediction"]
+        else:
+            value = [value]
+
+    if not isinstance(value, (list, tuple, np.ndarray)):
+        return []
+
+    return [p for p in value if isinstance(p, dict)]
+
+
+def _farm_monitoring_predictions(row):
+    """
+    Extract monitoring_prediction from one farm row.
+
+    Preferred source is a dedicated `monitoring_prediction` column (attached
+    by _attach_crop_metadata). If the row instead carries `properties_json`,
+    use that as a fallback. Geometry is never read or duplicated here.
+    """
+    if "monitoring_prediction" in row.index:
+        predictions = _parse_monitoring_prediction(row["monitoring_prediction"])
+        if predictions:
+            return predictions
+
+    if "properties_json" in row.index:
+        raw = row["properties_json"]
+        if isinstance(raw, str):
+            try:
+                properties = json.loads(raw)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                properties = None
+            if isinstance(properties, dict):
+                return _parse_monitoring_prediction(properties.get("monitoring_prediction"))
+        elif isinstance(raw, dict):
+            return _parse_monitoring_prediction(raw.get("monitoring_prediction"))
+
+    return []
+
+
+def _prediction_interval(prediction):
+    """Convert one API prediction interval to UTC timestamps, or return None."""
+    try:
+        start = pd.to_datetime(float(prediction["start_timestamp_sec"]), unit="s", utc=True)
+        end = pd.to_datetime(float(prediction["end_timestamp_sec"]), unit="s", utc=True)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+    if pd.isna(start) or pd.isna(end) or end <= start:
+        return None
+    return start, end
+
+
+def _agri_year_window(agri_year):
+    """
+    Canonical agricultural-year window as UTC timestamps.
+    Agri year Y = Jul Y -> Jun Y+1 (half-open: [start, end)).
+    """
+    y = int(agri_year)
+    start = pd.Timestamp(year=y, month=7, day=1, tz="UTC")
+    end = pd.Timestamp(year=y + 1, month=7, day=1, tz="UTC")
+    return start, end
+
+
+def _prediction_agri_year_matches(prediction):
+    """
+    Every agricultural year a prediction interval overlaps, with the overlap
+    duration in seconds, so the caller can pick the best-overlapping year.
+    """
+    interval = _prediction_interval(prediction)
+    if interval is None:
+        return []
+    pred_start, pred_end = interval
+
+    # A prediction can only overlap agri years surrounding its calendar
+    # years.  -1/+1 safely covers a multi-year-spanning interval.
+    candidate_years = range(pred_start.year - 1, pred_end.year + 1)
+    matches = []
+    for agri_year in candidate_years:
+        season_start, season_end = _agri_year_window(agri_year)
+        overlap_start = max(pred_start, season_start)
+        overlap_end = min(pred_end, season_end)
+        if overlap_end <= overlap_start:
+            continue
+        matches.append({
+            "year": agri_year,
+            "overlap_seconds": (overlap_end - overlap_start).total_seconds(),
+        })
+    return matches
+
+
+def _best_agri_year(prediction):
+    """
+    Pick the single agricultural year a prediction belongs to: the one with
+    the largest temporal overlap. Ties broken by higher conf_1, then by the
+    earlier agri year, to stay deterministic.
+    """
+    matches = _prediction_agri_year_matches(prediction)
+    if not matches:
+        return None
+
+    try:
+        confidence = float(prediction.get("conf_1"))
+    except (TypeError, ValueError):
+        confidence = float("nan")
+    conf_key = confidence if np.isfinite(confidence) else -np.inf
+
+    matches.sort(key=lambda m: (m["overlap_seconds"], conf_key, -m["year"]), reverse=True)
+    return matches[0]
+
+
+def _build_crop_year_table(gdf):
+    """
+    Build one row per farm/agricultural-year containing the raw top-3 crop
+    predictions for that year:
+
+        crop1, conf1, crop2, conf2, crop3, conf3
+
+    No season splitting: each prediction is assigned to the single
+    agricultural year it overlaps the most, and its crop_1/2/3 + conf_1/2/3
+    are carried through unchanged. If more than one prediction lands on the
+    same farm/year, the one with the greatest overlap wins, then the higher
+    conf_1, then the earliest prediction start.
+    """
+    empty_cols = ["farm_id", "year"] + CROP_RANK_OUTPUT_COLUMNS
+    records = []
+    farms_with_preds = 0
+
+    for _, row in gdf.iterrows():
+        farm_id = row.get("farm_id")
+        if pd.isna(farm_id):
+            continue
+
+        preds = _farm_monitoring_predictions(row)
+        if preds:
+            farms_with_preds += 1
+
+        for prediction in preds:
+            interval = _prediction_interval(prediction)
+            if interval is None:
+                logger.warning("Farm %s: invalid monitoring_prediction interval skipped.", farm_id)
+                continue
+            pred_start, _ = interval
+
+            crop_fields = {}
+            for rank in CROP_RANKS:
+                crop_name = _normalise_crop_name(prediction.get(f"crop_{rank}"))
+                try:
+                    conf = float(prediction.get(f"conf_{rank}"))
+                except (TypeError, ValueError):
+                    conf = np.nan
+                if not np.isfinite(conf):
+                    conf = np.nan
+                crop_fields[f"crop{rank}"] = crop_name
+                crop_fields[f"conf{rank}"] = conf
+
+            if not crop_fields["crop1"]:
+                # No primary crop on this prediction — nothing usable to store.
+                continue
+
+            best = _best_agri_year(prediction)
+            if best is None:
+                continue
+
+            records.append({
+                "farm_id": farm_id,
+                "year": int(best["year"]),
+                "overlap_seconds": best["overlap_seconds"],
+                "prediction_start": pred_start,
+                **crop_fields,
+            })
+
+    logger.info("monitoring_prediction found on %d/%d farms.", farms_with_preds, len(gdf))
+    if farms_with_preds == 0:
+        logger.warning("No farm has monitoring_prediction; all crop columns will be null.")
+
+    if not records:
+        return pd.DataFrame(columns=empty_cols)
+
+    candidates = pd.DataFrame(records)
+    # Sort so drop_duplicates keeps the deterministic winner for each
+    # farm/year.  For equal overlap/confidence, earliest prediction wins.
+    candidates = candidates.sort_values(
+        ["farm_id", "year", "overlap_seconds", "conf1", "prediction_start"],
+        ascending=[True, True, False, False, True],
+        na_position="last",
     )
+    result = candidates.drop_duplicates(subset=["farm_id", "year"], keep="first")
+    result = result[empty_cols].reset_index(drop=True)
 
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    static.to_parquet(out_path, index=False)
-    logger.info("farm_static.parquet saved → %s  (%d farms)", out_path, len(static))
-    return out_path
+    for col in CROP_CONF_COLUMNS:
+        result[col] = pd.to_numeric(result[col], errors="coerce").astype("float64")
+    for col in CROP_NAME_COLUMNS:
+        result[col] = result[col].astype("string")
 
+    logger.info(
+        "Crop-year mapping: %d farm/year rows from %d predictions.",
+        len(result), len(candidates),
+    )
+    return result
+
+
+def _add_crop_years_to_annual(annual, gdf, year):
+    """Left-merge crop fields for one agricultural year into annual ET rows."""
+    crop_table = _build_crop_year_table(gdf)
+    crop_table = crop_table[crop_table["year"] == int(year)].copy()
+
+    annual = annual.drop(columns=CROP_RANK_OUTPUT_COLUMNS, errors="ignore")
+    if crop_table.empty:
+        for col in CROP_RANK_OUTPUT_COLUMNS:
+            annual[col] = np.nan if col.startswith("conf") else None
+        return annual
+
+    annual = annual.merge(
+        crop_table[["farm_id", "year"] + CROP_RANK_OUTPUT_COLUMNS],
+        on=["farm_id", "year"],
+        how="left",
+        validate="one_to_one",
+    )
+    return annual
+
+
+# ── crop-column schema enforcement ──────────────────────────────────────────────
+# Ensures crop1/crop2/crop3 are always written as strings and conf1/conf2/conf3
+# as floats — even when a column is entirely null for a given write, which
+# pandas/pyarrow would otherwise infer as an integer/null type.
+
+def _enforce_crop_schema(df):
+    """Crop-name columns -> string, confidence columns -> float64."""
+    df = df.copy()
+    for col in CROP_NAME_COLUMNS:
+        if col not in df.columns:
+            df[col] = None
+        elif pd.api.types.is_numeric_dtype(df[col]):
+            # Legacy int-coded (or all-null) column: names are unrecoverable.
+            if df[col].notna().any():
+                logger.warning(
+                    "Column %s held numeric codes; nulling it (reprocess to restore names).",
+                    col,
+                )
+            df[col] = None
+        df[col] = df[col].astype("string")
+    for col in CROP_CONF_COLUMNS:
+        if col not in df.columns:
+            df[col] = np.nan
+        df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
+    return df
+
+
+def _write_annual_parquet(df, path):
+    """Write annual parquet with an explicit crop schema, even if a column is all-null."""
+    df = _enforce_crop_schema(df)
+    table = pa.Table.from_pandas(df, preserve_index=False)
+    targets = {c: pa.string() for c in CROP_NAME_COLUMNS}
+    targets.update({c: pa.float64() for c in CROP_CONF_COLUMNS})
+    for col, typ in targets.items():
+        i = table.schema.get_field_index(col)
+        if table.schema.field(i).type != typ:
+            table = table.set_column(i, pa.field(col, typ), table.column(i).cast(typ))
+    pq.write_table(table, path)
+
+
+def _annual_crop_schema_ok(path):
+    """True only if all crop-name columns are stored as strings."""
+    schema = pq.read_schema(path)
+    for col in CROP_NAME_COLUMNS:
+        i = schema.get_field_index(col)
+        if i < 0:
+            return False
+        t = schema.field(i).type
+        if not (pa.types.is_string(t) or pa.types.is_large_string(t)):
+            return False
+    return True
+
+
+# ── output writers ─────────────────────────────────────────────────────────────
 
 def _save_annual_parquet(gdf, state, district, block, year):
     """
     Append one year of annual ET metrics to farm_annual.parquet.
     Replaces any existing rows for the same year (idempotent).
+
+    gdf must already carry `monitoring_prediction` (via _attach_crop_metadata)
+    for the crop columns to be populated.
     """
     out_path = _annual_parquet_path(state, district, block)
 
@@ -645,20 +1106,24 @@ def _save_annual_parquet(gdf, state, district, block, year):
     if "area_m2" in gdf.columns:
         annual["area_in_ha"] = (gdf["area_m2"] / 10_000).round(4)
 
+    # Crop metadata is derived from monitoring_prediction and joined by
+    # farm_id + agricultural year.  It does not touch farm_static.parquet.
+    annual = _add_crop_years_to_annual(annual, gdf, year)
+
     col_order = ["farm_id", "tehsil", "district", "state", "area_in_ha", "year",
                  "aet_annual", "pet_annual", "mai_annual", "kharif_mai",
-                 "kharif_water_stress", "kharif_severe_stress"]
+                 "kharif_water_stress", "kharif_severe_stress"] + CROP_RANK_OUTPUT_COLUMNS
     annual = annual[[c for c in col_order if c in annual.columns]]
 
     if os.path.exists(out_path):
-        existing = pd.read_parquet(out_path)
+        existing = _enforce_crop_schema(pd.read_parquet(out_path))
         existing = existing[existing["year"] != int(year)]
         combined = pd.concat([existing, annual], ignore_index=True)
     else:
         combined = annual
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    combined.to_parquet(out_path, index=False)
+    _write_annual_parquet(combined, out_path)
     logger.info(
         "farm_annual.parquet updated → %s  (%d total rows)", out_path, len(combined)
     )
@@ -727,8 +1192,9 @@ def intersect_et_with_farms(
     Phase 3: intersect local AET/PET COG rasters with farm polygons.
 
     Reads local rasters from LOCAL_ET_RASTERS_PATH, runs per-farm geometric
-    zonal statistics, computes MAI, and writes/updates the three core-lens parquets:
-        farm_static.parquet, farm_annual.parquet, farm_monthly.parquet
+    zonal statistics, computes MAI, attaches crop metadata, and writes/updates
+    the core-lens parquets:
+        farm_annual.parquet, farm_monthly.parquet
 
     Parameters
     ----------
@@ -748,8 +1214,18 @@ def intersect_et_with_farms(
     if not overwrite and os.path.exists(annual_path):
         existing = pd.read_parquet(annual_path)
         if "year" in existing.columns and int(year) in existing["year"].values:
-            logger.info("Year %d already processed — skipping Phase 3.", year)
-            return {"skipped": True, "year": year, "path": annual_path}
+            # Re-run once for older annual files that predate the crop columns,
+            # or that stored them with the wrong (int/null) dtype; once the
+            # columns exist with the correct string schema, preserve the
+            # normal skip behavior.
+            crop_cols_present = _annual_crop_schema_ok(annual_path)
+            if crop_cols_present:
+                logger.info("Year %d already processed — skipping Phase 3.", year)
+                return {"skipped": True, "year": year, "path": annual_path}
+            logger.info(
+                "Year %d exists but crop columns are missing or wrongly typed — reprocessing Phase 3.",
+                year,
+            )
 
     logger.info(
         "Phase 3 — ET intersection: %s/%s/%s  year=%d", state, district, block, year
@@ -796,8 +1272,9 @@ def intersect_et_with_farms(
     # 4. Zonal statistics
     gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
 
-    # 5. Write 3-file schema
-    static_path  = _save_static_parquet(gdf, state, district, block)
+    # 5. Attach crop metadata (farm_id + monitoring_prediction), then write
+    gdf = _attach_crop_metadata(gdf, state, district, block)
+
     annual_path  = _save_annual_parquet(gdf, state, district, block, year)
     monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
 
@@ -805,7 +1282,7 @@ def intersect_et_with_farms(
         "state": state, "district": district, "block": block, "year": year,
         "farm_count": len(gdf),
         "paths": {
-            "static":  static_path,
+            "static":  _static_parquet_path(state, district, block),
             "annual":  annual_path,
             "monthly": monthly_path,
         },
@@ -819,7 +1296,6 @@ def intersect_et_with_farms(
 
     logger.info("Phase 3 complete: %s", summary)
     return summary
-    return {"task" : "done"}
 
 
 # ── multi-year analysis ────────────────────────────────────────────────────────
@@ -828,8 +1304,8 @@ def compute_multi_year_water_stress(
     state: str,
     district: str,
     block: str,
-    start_year: int = 2017,
-    end_year: int = 2024,
+    start_year: int = 2021,
+    end_year: int = 2023,
 ) -> dict:
     """
     Run Phase 3 for each year in [start_year, end_year] and compute
@@ -857,6 +1333,9 @@ def compute_multi_year_water_stress(
         raise FileNotFoundError(f"Farm parquet not found: {farm_path}")
 
     base_gdf  = gpd.read_parquet(farm_path)
+    # Crop metadata is farm-level, not year-level — attach once here and
+    # every per-year year_gdf.copy() below carries it automatically.
+    base_gdf  = _attach_crop_metadata(base_gdf, state, district, block)
     num_farms = len(base_gdf)
     bbox      = base_gdf.total_bounds
     aez_zones = _get_aez_zones(state, district, block)

@@ -60,25 +60,30 @@ REQUIRED_BINARIES = ["tippecanoe", "pmtiles"]
 
 # Same AWS account/credentials as DPR's S3 upload (dpr/utils.py), separate
 # bucket dedicated to farm boundary tilesets.
-FARM_DATA_S3_BUCKET = "corestack-farm-data"
+FARM_DATA_S3_BUCKET = "corestack-farm-dataset"
 
 
 # ── path helpers ───────────────────────────────────────────────────────────────
 
+
 def _output_dir(state, district, block):
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block)
 
+
 def _farm_parquet_path(state, district, block):
-    return os.path.join(_output_dir(state, district, block), "farm_boundaries.parquet")
+    return os.path.join(_output_dir(state, district, block), "farms/static.parquet")
+
 
 def _s3_key(state, district, block):
     return f"{state}/{district}/{block}.pmtiles"
+
 
 def _s3_url(state, district, block):
     return f"https://{FARM_DATA_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{_s3_key(state, district, block)}"
 
 
 # ── environment check ────────────────────────────────────────────────────────
+
 
 def _check_binaries_available():
     missing = [b for b in REQUIRED_BINARIES if shutil.which(b) is None]
@@ -100,6 +105,7 @@ def _s3_client():
 
 
 # ── pipeline steps ───────────────────────────────────────────────────────────
+
 
 def _export_geojsonseq(gdf, out_path):
     """
@@ -125,10 +131,14 @@ def _run_tippecanoe(geojsonseq_path, mbtiles_path, layer_name, min_zoom, max_zoo
     cmd = [
         "tippecanoe",
         "--force",
-        "-o", mbtiles_path,
-        "-l", layer_name,
-        "-Z", str(min_zoom),
-        "-z", str(max_zoom),
+        "-o",
+        mbtiles_path,
+        "-l",
+        layer_name,
+        "-Z",
+        str(min_zoom),
+        "-z",
+        str(max_zoom),
         "--read-parallel",
         "--extend-zooms-if-still-dropping",
         geojsonseq_path,
@@ -176,6 +186,7 @@ def _upload_pmtiles_to_s3(local_path, state, district, block):
 
 # ── public entry point ───────────────────────────────────────────────────────
 
+
 def convert_boundaries_to_pmtiles(
     state: str,
     district: str,
@@ -207,8 +218,7 @@ def convert_boundaries_to_pmtiles(
     farm_path = _farm_parquet_path(state, district, block)
     if not os.path.exists(farm_path):
         raise FileNotFoundError(
-            f"Farm boundaries parquet not found at {farm_path}. "
-            "Run Phases 1 & 2 first."
+            f"Farm boundaries parquet not found at {farm_path}. Run Phases 1 & 2 first."
         )
 
     logger.info("Phase 4 — PMTiles conversion: %s/%s/%s", state, district, block)
@@ -244,7 +254,9 @@ def convert_boundaries_to_pmtiles(
         # the S3 copy is the only one that persists.
 
     summary = {
-        "state": state, "district": district, "block": block,
+        "state": state,
+        "district": district,
+        "block": block,
         "farm_count": len(gdf),
         "s3_url": s3_url,
         "size_bytes": size_bytes,

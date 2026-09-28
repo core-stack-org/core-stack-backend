@@ -40,12 +40,21 @@ from nrm_app.celery import app
 
 from .convert import convert_to_geoparquet
 from .fetch_raw import fetch_raw_boundaries
+from .fetch_metadata import fetch_farm_metadata
 
 logger = logging.getLogger(__name__)
 
 
 @app.task(bind=True, max_retries=3, default_retry_delay=60)
-def build_farm_boundary_map(self, state: str, district: str, block: str, api_key: str, year: int = None, overwrite = False):
+def build_farm_boundary_map(
+    self,
+    state: str,
+    district: str,
+    block: str,
+    api_key: str,
+    year: int = None,
+    overwrite=False,
+):
     """
     Celery task: runs Phase 1, Phase 2, and optionally Phase 3.
 
@@ -66,7 +75,9 @@ def build_farm_boundary_map(self, state: str, district: str, block: str, api_key
     """
     logger.info(
         "Farm boundary pipeline started — state=%s district=%s block=%s",
-        state, district, block,
+        state,
+        district,
+        block,
     )
 
     try:
@@ -76,56 +87,77 @@ def build_farm_boundary_map(self, state: str, district: str, block: str, api_key
             district=district,
             block=block,
             api_key=api_key,
-            resume=True,   # safe to retry; already-fetched cells are skipped
+            resume=True,  # safe to retry; already-fetched cells are skipped
         )
         logger.info("Phase 1 done: %s", phase1_summary)
 
-        # ── Phase 2: Convert ────────────────────────────────────────────────
-        phase2_summary = convert_to_geoparquet(
+        phase2_summary = fetch_farm_metadata(
+            state=state,
+            district=district,
+            block=block,
+            api_key=api_key,
+            resume=True,  # safe to retry; already-fetched cells are skipped
+        )
+        logger.info("Phase 2 done: %s", phase2_summary)
+
+        # ── Phase 3: Convert ────────────────────────────────────────────────
+        phase3_summary = convert_to_geoparquet(
             state=state,
             district=district,
             block=block,
             overwrite=False,  # skip if parquet already exists
         )
-        logger.info("Phase 2 done: %s", phase2_summary)
+        logger.info("Phase 3 done: %s", phase2_summary)
 
         # ── Phase 3: ET Intersection (optional) ─────────────────────────────
-        phase3_summary = None
+        phase4_summary = None
         if year is not None:
-            from .et_intersection import intersect_et_with_farms
+            from .et_intersection import (
+                 compute_multi_year_water_stress,
+                 intersect_et_with_farms,
+            )
 
             logger.info("Phase 3 — ET intersection for year %d", year)
-            phase3_summary = intersect_et_with_farms(
-                state=state,
-                district=district,
-                block=block,
-                year=year,
+            # phase3_summary = intersect_et_with_farms(
+            #       state=state,
+            #       district=district,
+            #       block=block,
+            #       year=year,
+            # )
+            phase3_summary = compute_multi_year_water_stress(
+                state=state, district=district, block=block
             )
             logger.info("Phase 3 done: %s", phase3_summary)
 
     except Exception as exc:
         logger.exception(
             "Farm boundary pipeline failed for %s/%s/%s: %s",
-            state, district, block, exc,
+            state,
+            district,
+            block,
+            exc,
         )
         raise self.retry(exc=exc)
 
-    # ── Phase 4: PMTiles conversion ───────────────────────────────────────────
-    phase4_summary = None
+    # ── Phase 5: PMTiles conversion ───────────────────────────────────────────
+    phase5_summary = None
     try:
         from .pmtiles import convert_boundaries_to_pmtiles
 
-        logger.info("Phase 4 — PMTiles conversion")
-        phase4_summary = convert_boundaries_to_pmtiles(
+        logger.info("Phase 5 — PMTiles conversion")
+        phase5_summary = convert_boundaries_to_pmtiles(
             state=state,
             district=district,
             block=block,
         )
-        logger.info("Phase 4 done: %s", phase4_summary)
+        logger.info("Phase 5 done: %s", phase4_summary)
     except Exception as exc:
         logger.exception(
-            "Phase 4 (PMTiles) failed for %s/%s/%s: %s",
-            state, district, block, exc,
+            "Phase 5 (PMTiles) failed for %s/%s/%s: %s",
+            state,
+            district,
+            block,
+            exc,
         )
         phase4_summary = {"error": str(exc)}
 
@@ -134,6 +166,7 @@ def build_farm_boundary_map(self, state: str, district: str, block: str, api_key
         "phase2": phase2_summary,
         "phase3": phase3_summary,
         "phase4": phase4_summary,
+        "phase5": phase5_summary,
     }
     logger.info("Farm boundary pipeline completed successfully: %s", result)
     return result

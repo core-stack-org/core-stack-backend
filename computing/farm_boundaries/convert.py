@@ -39,7 +39,7 @@ CRS = "EPSG:4326"
 
 # Map from alu_type value in the API response to output parquet filename
 ALU_TYPE_TO_PARQUET = {
-    "field":      "farm_static.parquet",
+    "field":      "static.parquet",
     "trees":      "trees.parquet",
     "dug_well":   "dug_wells.parquet",
     "farm_pond":  "farm_ponds.parquet",
@@ -69,13 +69,16 @@ def _get_tehsil_polygon(state: str, district: str, block: str):
 def _raw_dir(state: str, district: str, block: str) -> str:
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "raw")
 
+def _metadata_dir(state: str, district: str, block: str) -> str:
+    return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "raw_metadata")
+
 
 def _manifest_path(state: str, district: str, block: str) -> str:
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "manifest.json")
 
 
 def _output_dir(state: str, district: str, block: str) -> str:
-    return os.path.join(FARM_BOUNDARIES_PATH, state, district, block)
+    return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "farms/")
 
 
 def _load_fetched_tokens(manifest_file: str) -> list:
@@ -163,7 +166,7 @@ def _build_geodataframe(records: list) -> gpd.GeoDataFrame:
     """
     if not records:
         return gpd.GeoDataFrame(
-            columns=["farm_uid", "cell_token", "alu_type", "geometry"],
+            columns=["farm_id", "cell_token", "alu_type", "geometry"],
             geometry="geometry",
             crs=CRS,
         )
@@ -195,7 +198,7 @@ def _build_geodataframe(records: list) -> gpd.GeoDataFrame:
 
         rows.append(
             {
-                "farm_uid": rec.get("farm_uid", "") or rec.get("plus_code", ""),
+                "farm_id": rec.get("farm_uid", "") or rec.get("plus_code", ""),
                 "cell_token": rec.get("cell_token", ""),
                 "alu_type": rec.get("alu_type") or props.get("alu_type", "field"),
                 "plus_code": rec.get("plus_code", ""),       # from feature-level id
@@ -213,17 +216,48 @@ def _build_geodataframe(records: list) -> gpd.GeoDataFrame:
     return gdf
 
 
-def _assign_farm_ids(
-    gdf: gpd.GeoDataFrame, state: str, district: str, block: str
-) -> gpd.GeoDataFrame:
-    """
-    Assign a unique, human-readable farm_id to every row.
-    Format: <state>_<district>_<block>_<zero-padded index>
-    """
-    prefix = f"{state}_{district}_{block}"
-    gdf = gdf.reset_index(drop=True)
-    gdf["farm_id"] = [f"{prefix}_{i:06d}" for i in gdf.index]
-    return gdf
+def _build_metadata_geodataframe(records: list) -> gpd.GeoDataFrame:
+
+    if not records:
+        return pd.DataFrame(
+            columns=[
+                "farm_id",
+                "monitoring_prediction",
+            ]
+        )
+
+    rows = []
+
+    for rec in records:
+        try:
+            props = (
+                json.loads(rec["properties_json"])
+                if rec.get("properties_json")
+                else {}
+            )
+
+        except Exception as e:
+            logger.debug("Could not parse metadata properties: %s", e)
+            continue
+
+        farm_id = (
+            rec.get("farm_uid","")
+            or rec.get("plus_code", "")
+        )
+
+        if not farm_id:
+            continue
+
+        rows.append(
+            {
+                "farm_id" : farm_id,
+                "monitoring_prediction" : props.get(
+                    "monitoring_prediction"
+                ),
+            }
+        )
+
+    return pd.DataFrame(rows)
 
 
 # ── public entry point ───────────────────────────────────────────────────────
@@ -265,13 +299,14 @@ def convert_to_geoparquet(
     os.makedirs(out_dir, exist_ok=True)
 
     logger.info(
-        "Phase 2 — converting raw JSON to GeoParquets for %s/%s/%s",
+        "Phase 3 — converting raw JSON to GeoParquets for %s/%s/%s",
         state, district, block,
     )
 
     # 1. Load manifest --------------------------------------------------------
     manifest_file = _manifest_path(state, district, block)
     fetched_tokens = _load_fetched_tokens(manifest_file)
+
     logger.info("%d cells with landscape data to process.", len(fetched_tokens))
 
     if not fetched_tokens:
@@ -297,8 +332,11 @@ def convert_to_geoparquet(
 
     # 3. Extract ALL features from raw JSON -----------------------------------
     raw_dir = _raw_dir(state, district, block)
+    metadata_dir = _metadata_dir(state, district, block)
     logger.info("Extracting all features from %d cells...", len(fetched_tokens))
+
     all_records = _extract_all_features_with_duckdb(raw_dir, fetched_tokens)
+    all_metadata = _extract_all_features_with_duckdb(metadata_dir, fetched_tokens)
     logger.info("Total features extracted across all types: %d", len(all_records))
 
     # 4. Load tehsil boundary once (shared for all structure clips) -----------
@@ -307,6 +345,16 @@ def convert_to_geoparquet(
 
     # 5. Build GeoDataFrame for ALL records -----------------------------------
     full_gdf = _build_geodataframe(all_records)
+    #metadata_df = _build_metadata_geodataframe(all_metadata)
+
+    # if not metadata_df.empty:
+    #     full_gdf = full_gdf.merge(
+    #         metadata_df,
+    #         on="farm_id",
+    #         how="left",
+    #         validate="one_to_one"
+    #     )
+
     logger.info("Built GeoDataFrame: %d total features.", len(full_gdf))
 
     # 6. Per-structure-type: filter, clip, assign IDs, save -------------------
@@ -327,23 +375,14 @@ def convert_to_geoparquet(
         subset = gpd.clip(subset, tehsil_gdf)
         logger.info("  [%s] %d features after clipping.", alu_type, len(subset))
 
-        # Assign unique IDs (prefix differs per type)
-        prefix_map = {
-            "field": f"{state}_{district}_{block}",
-            "trees": f"{state}_{district}_{block}_tree",
-            "dug_well": f"{state}_{district}_{block}_well",
-            "farm_pond": f"{state}_{district}_{block}_pond",
-            "other_water": f"{state}_{district}_{block}_water",
-        }
-        prefix = prefix_map.get(alu_type, f"{state}_{district}_{block}_{alu_type}")
-        subset = subset.reset_index(drop=True)
-        subset["feature_id"] = [f"{prefix}_{i:06d}" for i in subset.index]
-        # Keep farm_id alias for fields (backward compatibility)
-        if alu_type == "field":
-            subset["farm_id"] = subset["feature_id"]
+        # # --- debug check ---
+        # logger.info("[%s] geometry types after clip:\n%s", alu_type, subset.geom_type.value_counts())
+        # dup_count = subset["farm_id"].duplicated().sum()
+        # logger.info("[%s] duplicated farm_id count: %d", alu_type, dup_count)
+        # ------------------------------------
 
         # Reorder columns
-        priority_cols = ["feature_id", "farm_id", "farm_uid", "cell_token",
+        priority_cols = ["farm_id", "cell_token",
                          "alu_type", "plus_code", "area_m2", "class_confidence",
                          "capture_date", "geometry"]
         existing = [c for c in priority_cols if c in subset.columns]
