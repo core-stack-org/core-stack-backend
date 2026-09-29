@@ -4,6 +4,9 @@ from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
 from computing.mws.mws import mws_layer
 from computing.mws.generate_hydrology import generate_hydrology
+from computing.mws.generate_hydrology_local import (
+    generate_hydrology as generate_hydrology_local,
+)
 from computing.lulc.lulc_v3 import clip_lulc_v3
 from computing.lulc.lulc_vector import vectorise_lulc
 from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
@@ -320,6 +323,9 @@ LOCAL_TASK_REGISTRY = {
     "soil_type": generate_soil_type_local,
     "generate_zoi": generate_zoi,
     "generate_zoi_data": generate_zoi,
+    "generate_hydrology": generate_hydrology_local,
+    "hydrology_fortnightly": generate_hydrology_local,
+    "hydrology_annual": generate_hydrology_local,
     "forest_fringe": generate_forest_fringe_local,
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,

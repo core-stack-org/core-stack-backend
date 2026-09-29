@@ -306,7 +306,7 @@ PAN_INDIA_LOCATION_FIELDS = ("state", "district", "block", "tehsil", "year")
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_admin_boundary(request):
-    print("Inside generate_block_layer API.")
+    logger.info("Inside generate_block_layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -319,7 +319,7 @@ def generate_admin_boundary(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_block_layer api :: ", e)
+        logger.exception("Exception in generate_block_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -327,7 +327,7 @@ def generate_admin_boundary(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_nrega_layer(request):
-    print("Inside generate_nrega_layer API.")
+    logger.info("Inside generate_nrega_layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -352,7 +352,7 @@ def generate_nrega_layer(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_nrega_layer api :: ", e)
+        logger.exception("Exception in generate_nrega_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -360,7 +360,7 @@ def generate_nrega_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_drainage_layer(request):
-    print("Inside generate_drainage_layer API.")
+    logger.info("Inside generate_drainage_layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -385,49 +385,49 @@ def generate_drainage_layer(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        print("Invalid request in generate_drainage_layer api :: ", e)
+        logger.warning("Invalid request in generate_drainage_layer api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_drainage_layer api :: ", e)
+        logger.exception("Exception in generate_drainage_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def create_workspace(request):
-    print("Inside create_workspace API.")
+    logger.info("Inside create_workspace API.")
     try:
         workspace = request.data.get("workspace_name")
-        print("workspace :: ", workspace)
+        logger.info("workspace: %s", workspace)
         geo = Geoserver()
         response = geo.create_workspace(workspace)
-        print(response)
+        logger.info("Response: %s", response)
         return Response({"Success": response}, status=status.HTTP_201_CREATED)
     except Exception as e:
-        print("Exception in create_workspace api :: ", e)
+        logger.exception("Exception in create_workspace api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def delete_layer(request):
-    print("Inside delete_layer API.")
+    logger.info("Inside delete_layer API.")
     try:
         workspace = request.data.get("workspace")
         layer_name = request.data.get("layer_name")
         geo = Geoserver()
         response = geo.delete_layer(layer_name, workspace)
-        print(response)
+        logger.info("Response: %s", response)
         return Response({"Success": response}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in delete_layer api :: ", e)
+        logger.exception("Exception in delete_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def upload_kml(request):
-    print("Inside upload_kml API.")
+    logger.info("Inside upload_kml API.")
     try:
         req_body = request.POST.dict()
         state = req_body.get("state").lower()
@@ -444,7 +444,7 @@ def upload_kml(request):
             {"Success": "Successfully uploaded"}, status=status.HTTP_201_CREATED
         )
     except Exception as e:
-        print("Exception in upload_kml api :: ", e)
+        logger.exception("Exception in upload_kml api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -452,7 +452,7 @@ def upload_kml(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_mws_layer(request):
-    print("Inside generate_mws_layer")
+    logger.info("Inside generate_mws_layer")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -465,7 +465,7 @@ def generate_mws_layer(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_mws_layer api :: ", e)
+        logger.exception("Exception in generate_mws_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -474,14 +474,14 @@ def generate_mws_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_fortnightly_hydrology(request):
-    print("Inside generate_fortnightly_hydrology")
+    logger.info("Inside generate_fortnightly_hydrology")
     try:
         return _generate_tehsil_hydrology(request, is_annual=False)
     except ValueError as e:
-        print("Invalid request in generate_fortnightly_hydrology api :: ", e)
+        logger.warning("Invalid request in generate_fortnightly_hydrology api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_fortnightly_hydrology api :: ", e)
+        logger.exception("Exception in generate_fortnightly_hydrology api")
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -492,14 +492,14 @@ def generate_fortnightly_hydrology(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_annual_hydrology(request):
-    print("Inside generate_annual_hydrology")
+    logger.info("Inside generate_annual_hydrology")
     try:
         return _generate_tehsil_hydrology(request, is_annual=True)
     except ValueError as e:
-        print("Invalid request in generate_annual_hydrology api :: ", e)
+        logger.warning("Invalid request in generate_annual_hydrology api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_annual_hydrology api :: ", e)
+        logger.exception("Exception in generate_annual_hydrology api")
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -605,7 +605,7 @@ def _ensure_local_hydrology_base_layers(start_year, end_year, is_annual):
 
 
 def _generate_pan_india_hydrology_base_layer(request, is_annual):
-    compute = _get_compute_mode(request)
+    compute = _get_compute_mode(request, default="local")
     if compute != "local":
         raise ValueError(
             "Pan-India hydrology generation supports compute='local' only"
@@ -663,26 +663,20 @@ def _generate_pan_india_hydrology_base_layer(request, is_annual):
 @api_view(["POST"])
 @schema(None)
 def generate_pan_india_fortnightly_hydrology(request):
-    print("Inside generate_pan_india_fortnightly_hydrology")
+    logger.info("Inside generate_pan_india_fortnightly_hydrology")
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=False)
     except HeavyWorkerUnavailable as e:
-        print("Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api :: ", e)
+        logger.warning("Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api: %s", e)
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        print(
-            "Invalid request in generate_pan_india_fortnightly_hydrology api :: ",
-            e,
-        )
+        logger.warning("Invalid request in generate_pan_india_fortnightly_hydrology api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print(
-            "Exception in generate_pan_india_fortnightly_hydrology api :: ",
-            e,
-        )
+        logger.exception("Exception in generate_pan_india_fortnightly_hydrology api")
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -692,20 +686,20 @@ def generate_pan_india_fortnightly_hydrology(request):
 @api_view(["POST"])
 @schema(None)
 def generate_pan_india_annual_hydrology(request):
-    print("Inside generate_pan_india_annual_hydrology")
+    logger.info("Inside generate_pan_india_annual_hydrology")
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=True)
     except HeavyWorkerUnavailable as e:
-        print("Heavy worker unavailable in generate_pan_india_annual_hydrology api :: ", e)
+        logger.warning("Heavy worker unavailable in generate_pan_india_annual_hydrology api: %s", e)
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        print("Invalid request in generate_pan_india_annual_hydrology api :: ", e)
+        logger.warning("Invalid request in generate_pan_india_annual_hydrology api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_pan_india_annual_hydrology api :: ", e)
+        logger.exception("Exception in generate_pan_india_annual_hydrology api")
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -715,9 +709,8 @@ def generate_pan_india_annual_hydrology(request):
 @api_view(["POST"])
 @schema(None)
 def generate_runoff_gpu(request):
-    print("Inside generate_runoff_gpu")
     try:
-        compute = _get_compute_mode(request)
+        compute = _get_compute_mode(request, default="local")
         if compute != "local":
             raise ValueError("runoff_gpu currently supports compute='local' only")
 
@@ -744,16 +737,16 @@ def generate_runoff_gpu(request):
             status=status.HTTP_200_OK,
         )
     except HeavyWorkerUnavailable as e:
-        print("Heavy worker unavailable in generate_runoff_gpu api :: ", e)
+        logger.warning("Heavy worker unavailable in generate_runoff_gpu api: %s", e)
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        print("Invalid request in generate_runoff_gpu api :: ", e)
+        logger.warning("Invalid request in generate_runoff_gpu api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_runoff_gpu api :: ", e)
+        logger.exception("Exception in generate_runoff_gpu api")
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -762,9 +755,8 @@ def generate_runoff_gpu(request):
 @api_view(["POST"])
 @schema(None)
 def et_download(request):
-    print("Inside et_download")
     try:
-        compute = _get_compute_mode(request)
+        compute = _get_compute_mode(request, default="local")
         if compute != "local":
             raise ValueError("et_download currently supports compute='local' only")
 
@@ -789,16 +781,16 @@ def et_download(request):
             status=status.HTTP_200_OK,
         )
     except HeavyWorkerUnavailable as e:
-        print("Heavy worker unavailable in et_download api :: ", e)
+        logger.warning("Heavy worker unavailable in et_download api: %s", e)
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        print("Invalid request in et_download api :: ", e)
+        logger.warning("Invalid request in et_download api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in et_download api :: ", e)
+        logger.exception("Exception in et_download api")
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -809,7 +801,7 @@ def et_download(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def lulc_for_tehsil(request):
-    print("Inside lulc_v3 api.")
+    logger.info("Inside lulc_v3 api.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -837,7 +829,7 @@ def lulc_for_tehsil(request):
                 status=status.HTTP_200_OK,
             )
     except Exception as e:
-        print("Exception in lulc_for_tehsil api :: ", e)
+        logger.exception("Exception in lulc_for_tehsil api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -855,7 +847,7 @@ def lulc_v2_river_basin(request):
     Returns:
         Response: Success/Exception
     """
-    print("Inside lulc_v2_river_basin")
+    logger.info("Inside lulc_v2_river_basin")
     try:
         basin_object_id = request.data.get("basin_object_id")
         start_year = request.data.get("start_year")
@@ -865,7 +857,7 @@ def lulc_v2_river_basin(request):
         )
         return Response({"Success": "lulc_v2_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in lulc_v2_river_basin api :: ", e)
+        logger.exception("Exception in lulc_v2_river_basin api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -883,7 +875,7 @@ def lulc_v3_river_basin(request):
     Returns:
         Response: Success/Exception
     """
-    print("Inside lulc_v3_river_basin")
+    logger.info("Inside lulc_v3_river_basin")
     try:
         basin_object_id = request.data.get("basin_object_id")
         start_year = request.data.get("start_year")
@@ -894,7 +886,7 @@ def lulc_v3_river_basin(request):
         )
         return Response({"Success": "lulc_v3_river_basin"}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in lulc_v3_river_basin api :: ", e)
+        logger.exception("Exception in lulc_v3_river_basin api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -902,7 +894,7 @@ def lulc_v3_river_basin(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def lulc_v3(request):
-    print("Inside lulc_v3 api.")
+    logger.info("Inside lulc_v3 api.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -924,10 +916,10 @@ def lulc_v3(request):
             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        print("Invalid request in lulc_v3 api :: ", e)
+        logger.warning("Invalid request in lulc_v3 api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in lulc_v3 api :: ", e)
+        logger.exception("Exception in lulc_v3 api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -935,7 +927,7 @@ def lulc_v3(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def lulc_vector(request):
-    print("Inside lulc_vector")
+    logger.info("Inside lulc_vector")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -958,10 +950,10 @@ def lulc_vector(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in lulc_vector api :: ", e)
+        logger.warning("Invalid request in lulc_vector api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in lulc_vector api :: ", e)
+        logger.exception("Exception in lulc_vector api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -969,7 +961,7 @@ def lulc_vector(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def lulc_v4(request):
-    print("Inside lulc_time_series")
+    logger.info("Inside lulc_time_series")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -986,14 +978,14 @@ def lulc_v4(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in lulc_time_series api :: ", e)
+        logger.exception("Exception in lulc_time_series api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def get_gee_layer(request):
-    print("Inside get_gee_layer")
+    logger.info("Inside get_gee_layer")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1002,7 +994,7 @@ def get_gee_layer(request):
 
         return Response({"Success": response}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in get_gee_layer api :: ", e)
+        logger.exception("Exception in get_gee_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1010,7 +1002,7 @@ def get_gee_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_ci_layer(request):
-    print("Inside generate_cropping_intensity_layer")
+    logger.info("Inside generate_cropping_intensity_layer")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1040,10 +1032,10 @@ def generate_ci_layer(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in generate_cropping_intensity_layer api :: ", e)
+        logger.warning("Invalid request in generate_cropping_intensity_layer api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_cropping_intensity_layer api :: ", e)
+        logger.exception("Exception in generate_cropping_intensity_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1051,7 +1043,7 @@ def generate_ci_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_swb(request):
-    print("Inside generate_swf")
+    logger.info("Inside generate_swf")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1089,10 +1081,10 @@ def generate_swb(request):
             {"Success": "Generate swb task initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        print("Invalid request in generate_swf api :: ", e)
+        logger.warning("Invalid request in generate_swf api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_swf api :: ", e)
+        logger.exception("Exception in generate_swf api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1100,7 +1092,7 @@ def generate_swb(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_drought_layer(request):
-    print("Inside generate_drought_layer")
+    logger.info("Inside generate_drought_layer")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1124,7 +1116,7 @@ def generate_drought_layer(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_drought_layer api :: ", e)
+        logger.exception("Exception in generate_drought_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1132,7 +1124,7 @@ def generate_drought_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_terrain_descriptor(request):
-    print("Inside generate_terrain_descriptor")
+    logger.info("Inside generate_terrain_descriptor")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1150,10 +1142,10 @@ def generate_terrain_descriptor(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in generate_terrain_descriptor api :: ", e)
+        logger.warning("Invalid request in generate_terrain_descriptor api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_terrain_descriptor api :: ", e)
+        logger.exception("Exception in generate_terrain_descriptor api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1161,7 +1153,7 @@ def generate_terrain_descriptor(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_terrain_compute_all(request):
-    print("Inside generate_terrain_compute_all")
+    logger.info("Inside generate_terrain_compute_all")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1182,10 +1174,10 @@ def generate_terrain_compute_all(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in generate_terrain_compute_all api :: ", e)
+        logger.warning("Invalid request in generate_terrain_compute_all api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_terrain_compute_all api :: ", e)
+        logger.exception("Exception in generate_terrain_compute_all api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1193,7 +1185,7 @@ def generate_terrain_compute_all(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_terrain_raster(request):
-    print("Inside generate_terrain_raster")
+    logger.info("Inside generate_terrain_raster")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1220,10 +1212,10 @@ def generate_terrain_raster(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in generate_terrain_raster api :: ", e)
+        logger.warning("Invalid request in generate_terrain_raster api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_terrain_raster api :: ", e)
+        logger.exception("Exception in generate_terrain_raster api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1231,7 +1223,7 @@ def generate_terrain_raster(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def terrain_lulc_slope_cluster(request):
-    print("Inside terrain_lulc_slope_cluster")
+    logger.info("Inside terrain_lulc_slope_cluster")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1254,10 +1246,10 @@ def terrain_lulc_slope_cluster(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in terrain_lulc_slope_cluster api :: ", e)
+        logger.warning("Invalid request in terrain_lulc_slope_cluster api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in terrain_lulc_slope_cluster api :: ", e)
+        logger.exception("Exception in terrain_lulc_slope_cluster api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1265,7 +1257,7 @@ def terrain_lulc_slope_cluster(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def terrain_lulc_plain_cluster(request):
-    print("Inside terrain_lulc_plain_cluster")
+    logger.info("Inside terrain_lulc_plain_cluster")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -1288,10 +1280,10 @@ def terrain_lulc_plain_cluster(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in terrain_lulc_plain_cluster api :: ", e)
+        logger.warning("Invalid request in terrain_lulc_plain_cluster api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in terrain_lulc_plain_cluster api :: ", e)
+        logger.exception("Exception in terrain_lulc_plain_cluster api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1299,7 +1291,7 @@ def terrain_lulc_plain_cluster(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_clart(request):
-    print("Inside generate_clart")
+    logger.info("Inside generate_clart")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1313,7 +1305,7 @@ def generate_clart(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_clart api :: ", e)
+        logger.exception("Exception in generate_clart api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1321,7 +1313,7 @@ def generate_clart(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def change_detection(request):
-    print("Inside change_detection")
+    logger.info("Inside change_detection")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1344,10 +1336,10 @@ def change_detection(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in change_detection api :: ", e)
+        logger.warning("Invalid request in change_detection api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in change_detection api :: ", e)
+        logger.exception("Exception in change_detection api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1355,7 +1347,7 @@ def change_detection(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def change_detection_vector(request):
-    print("Inside change_detection_vector")
+    logger.info("Inside change_detection_vector")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1369,7 +1361,7 @@ def change_detection_vector(request):
             vectorise_change_detection_gee_task,
             vectorise_change_detection_local_task,
         )
-        print("What is task? ", task)
+        logger.info("Selected task: %s", task)
         task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
             queue="nrm",
@@ -1379,10 +1371,10 @@ def change_detection_vector(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in change_detection_vector api :: ", e)
+        logger.warning("Invalid request in change_detection_vector api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in change_detection_vector api :: ", e)
+        logger.exception("Exception in change_detection_vector api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1390,7 +1382,7 @@ def change_detection_vector(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def crop_grid(request):
-    print("Inside crop_grid api")
+    logger.info("Inside crop_grid api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1404,7 +1396,7 @@ def crop_grid(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in crop_grid api :: ", e)
+        logger.exception("Exception in crop_grid api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1412,7 +1404,7 @@ def crop_grid(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def mws_drought_causality(request):
-    print("Inside Drought Causality API")
+    logger.info("Inside Drought Causality API")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1429,7 +1421,7 @@ def mws_drought_causality(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in Drought Causality api :: ", e)
+        logger.exception("Exception in Drought Causality api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1437,7 +1429,7 @@ def mws_drought_causality(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def tree_health_raster(request):
-    print("Inside tree_health_change API")
+    logger.info("Inside tree_health_change API")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1495,7 +1487,7 @@ def tree_health_raster(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in change_detection api :: ", e)
+        logger.exception("Exception in change_detection api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1503,7 +1495,7 @@ def tree_health_raster(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def tree_health_vector(request):
-    print("Inside Overall_change_vector")
+    logger.info("Inside Overall_change_vector")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1533,7 +1525,7 @@ def tree_health_vector(request):
             tree_health_ccd_vector,
             tree_health_ccd_vector_local,
         )
-        print("What is task? ", ccd_task)
+        logger.info("Selected task: %s", ccd_task)
 
         ccd_task.apply_async(
             kwargs=task_kwargs,
@@ -1545,7 +1537,7 @@ def tree_health_vector(request):
             tree_health_ch_vector,
             tree_health_ch_vector_local,
         )
-        print("What is task? ", ch_task)
+        logger.info("Selected task: %s", ch_task)
 
         ch_task.apply_async(
             kwargs=task_kwargs,
@@ -1557,7 +1549,7 @@ def tree_health_vector(request):
             tree_health_overall_change_vector,
             tree_health_overall_change_vector_local,
         )
-        print("What is task? ", overall_task)
+        logger.info("Selected task: %s", overall_task)
 
         task_kwargs = {"state": state, "district": district, "block": block}
         if not compute == "local":
@@ -1577,20 +1569,20 @@ def tree_health_vector(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in Overall_change_vector api :: ", e)
+        logger.exception("Exception in Overall_change_vector api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def gee_task_status(request):
-    print("Inside gee_task_status API.")
+    logger.info("Inside gee_task_status API.")
     try:
         task_id = request.data.get("task_id")
         response = check_gee_task_status(task_id)
         return Response({"Response": response}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in gee_task_status api :: ", e)
+        logger.exception("Exception in gee_task_status api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1598,7 +1590,7 @@ def gee_task_status(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def stream_order(request):
-    print("Inside stream_order_vector api")
+    logger.info("Inside stream_order_vector api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1612,7 +1604,7 @@ def stream_order(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in stream_order_vector api :: ", e)
+        logger.exception("Exception in stream_order_vector api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1620,7 +1612,7 @@ def stream_order(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def restoration_opportunity(request):
-    print("Inside restoration_opportunity api")
+    logger.info("Inside restoration_opportunity api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1638,7 +1630,7 @@ def restoration_opportunity(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in restoration_opportunity api :: ", e)
+        logger.exception("Exception in restoration_opportunity api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1646,7 +1638,7 @@ def restoration_opportunity(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def plantation_site_suitability(request):
-    print("Inside plantation_site_suitability API")
+    logger.info("Inside plantation_site_suitability API")
     try:
         project_id = request.data.get("project_id")
         state = request.data.get("state").lower() if request.data.get("state") else None
@@ -1680,7 +1672,7 @@ def plantation_site_suitability(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in Plantation_site_suitability api :: ", e)
+        logger.exception("Exception in Plantation_site_suitability api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1688,7 +1680,7 @@ def plantation_site_suitability(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def aquifer_vector(request):
-    print("Inside Aquifer vector layer api")
+    logger.info("Inside Aquifer vector layer api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1706,10 +1698,10 @@ def aquifer_vector(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        print("Invalid request in aquifer vector api :: ", e)
+        logger.warning("Invalid request in aquifer vector api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in aquifer vector api :: ", e)
+        logger.exception("Exception in aquifer vector api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1717,7 +1709,7 @@ def aquifer_vector(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def soge_vector(request):
-    print("Inside soge vector layer api")
+    logger.info("Inside soge vector layer api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1735,7 +1727,7 @@ def soge_vector(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in SOGE vector api :: ", e)
+        logger.exception("Exception in SOGE vector api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1745,7 +1737,7 @@ def soge_vector(request):
 @sync_layer_generation_if_enabled
 def fes_clart_upload_layer(request):
     try:
-        print("Inside upload_fes_clart_layer API")
+        logger.info("Inside upload_fes_clart_layer API")
         state = request.data.get("state", "").lower()
         district = request.data.get("district", "").lower()
         block = request.data.get("block", "").lower()
@@ -1786,7 +1778,7 @@ def fes_clart_upload_layer(request):
         )
 
     except Exception as e:
-        print("Exception in clart upload_geoserver_layer API:", e)
+        logger.exception("Exception in clart upload_geoserver_layer API")
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1794,7 +1786,7 @@ def fes_clart_upload_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def swb_pond_merging(request):
-    print("Inside merge_swb_ponds API.")
+    logger.info("Inside merge_swb_ponds API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1807,14 +1799,14 @@ def swb_pond_merging(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in merge_swb_ponds api :: ", e)
+        logger.exception("Exception in merge_swb_ponds api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
 def lulc_farm_boundary(request):
-    print("Inside lulc_farm_boundary api")
+    logger.info("Inside lulc_farm_boundary api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1830,7 +1822,7 @@ def lulc_farm_boundary(request):
         )
         response.raise_for_status()
         data = response.json()
-        print(data)
+        logger.info("Request data: %s", data)
 
         return Response({"Success": "lulc_farm_boundary task initiated"}, status=200)
 
@@ -1856,7 +1848,7 @@ def lulc_farm_boundary(request):
 @api_view(["POST"])
 @schema(None)
 def ponds_compute(request):
-    print("Inside ponds_compute api")
+    logger.info("Inside ponds_compute api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1872,7 +1864,7 @@ def ponds_compute(request):
         )
         response.raise_for_status()
         data = response.json()
-        print(data)
+        logger.info("Request data: %s", data)
 
         return Response({"Success": "ponds_compute task initiated"}, status=200)
 
@@ -1898,7 +1890,7 @@ def ponds_compute(request):
 @api_view(["POST"])
 @schema(None)
 def wells_compute(request):
-    print("Inside wells_compute api")
+    logger.info("Inside wells_compute api")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1914,7 +1906,7 @@ def wells_compute(request):
         )
         response.raise_for_status()
         data = response.json()
-        print(data)
+        logger.info("Request data: %s", data)
 
         return Response({"Success": "wells_compute task initiated"}, status=200)
 
@@ -1941,7 +1933,7 @@ def wells_compute(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_layer_in_order(request):
-    print("inside generate_layer_order_first")
+    logger.info("inside generate_layer_order_first")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1999,7 +1991,7 @@ def generate_layer_in_order(request):
 @api_view(["POST"])
 @schema(None)
 def layer_status_dashboard(request):
-    print("inside layer_staus_dashboard")
+    logger.info("inside layer_staus_dashboard")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2020,7 +2012,7 @@ def layer_status_dashboard(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_lcw(request):
-    print("Inside generate_lcw_conflict_data API.")
+    logger.info("Inside generate_lcw_conflict_data API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2037,7 +2029,7 @@ def generate_lcw(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_lcw_conflict_data api :: ", e)
+        logger.exception("Exception in generate_lcw_conflict_data api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2045,7 +2037,7 @@ def generate_lcw(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_agroecological(request):
-    print("Inside generate_agroecological_data API.")
+    logger.info("Inside generate_agroecological_data API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2062,7 +2054,7 @@ def generate_agroecological(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_agroecological_data api :: ", e)
+        logger.exception("Exception in generate_agroecological_data api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2070,7 +2062,7 @@ def generate_agroecological(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_factory_csr(request):
-    print("Inside generate_factory_csr_to_gee API.")
+    logger.info("Inside generate_factory_csr_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2087,7 +2079,7 @@ def generate_factory_csr(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_factory_csr_to_gee api :: ", e)
+        logger.exception("Exception in generate_factory_csr_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2095,7 +2087,7 @@ def generate_factory_csr(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_green_credit(request):
-    print("Inside generate_green_credit_to_gee API.")
+    logger.info("Inside generate_green_credit_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2112,7 +2104,7 @@ def generate_green_credit(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_green_credit_to_gee api :: ", e)
+        logger.exception("Exception in generate_green_credit_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2120,7 +2112,7 @@ def generate_green_credit(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_mining(request):
-    print("Inside generate_mining_to_gee API.")
+    logger.info("Inside generate_mining_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2137,20 +2129,20 @@ def generate_mining(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_mining_to_gee api :: ", e)
+        logger.exception("Exception in generate_mining_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
 @schema(None)
 def get_layers_for_workspace(request):
-    print("inside get_layers_of_workspace API")
+    logger.info("inside get_layers_of_workspace API")
     try:
         workspace = request.query_params.get("workspace").lower()
         result = get_layers_of_workspace(workspace)
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in get_layers_for_workspace api :: ", e)
+        logger.exception("Exception in get_layers_for_workspace api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2158,7 +2150,7 @@ def get_layers_for_workspace(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_natural_depression(request):
-    print("Inside generate_natural_depression_to_gee API.")
+    logger.info("Inside generate_natural_depression_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2175,7 +2167,7 @@ def generate_natural_depression(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_natural_depression_to_gee api :: ", e)
+        logger.exception("Exception in generate_natural_depression_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2183,7 +2175,7 @@ def generate_natural_depression(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_distance_nearest_upstream_DL(request):
-    print("Inside generate_distance_nearest_upstream_DL_to_gee API.")
+    logger.info("Inside generate_distance_nearest_upstream_DL_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2200,7 +2192,7 @@ def generate_distance_nearest_upstream_DL(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_distance_nearest_upstream_DL_to_gee api :: ", e)
+        logger.exception("Exception in generate_distance_nearest_upstream_DL_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2208,7 +2200,7 @@ def generate_distance_nearest_upstream_DL(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_catchment_area_SF(request):
-    print("Inside generate_catchment_area_SF_to_gee API.")
+    logger.info("Inside generate_catchment_area_SF_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2225,7 +2217,7 @@ def generate_catchment_area_SF(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_catchment_area_SF_to_gee api :: ", e)
+        logger.exception("Exception in generate_catchment_area_SF_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2233,7 +2225,7 @@ def generate_catchment_area_SF(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_slope_percentage(request):
-    print("Inside generate_slope_percentage_to_gee API.")
+    logger.info("Inside generate_slope_percentage_to_gee API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2250,7 +2242,7 @@ def generate_slope_percentage(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_slope_percentage_to_gee api :: ", e)
+        logger.exception("Exception in generate_slope_percentage_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2258,7 +2250,7 @@ def generate_slope_percentage(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_ndvi_timeseries(request):
-    print("Inside generate_ndvi_timeseries API.")
+    logger.info("Inside generate_ndvi_timeseries API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2287,7 +2279,7 @@ def generate_ndvi_timeseries(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_ndvi_timeseries api :: ", e)
+        logger.exception("Exception in generate_ndvi_timeseries api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2295,7 +2287,7 @@ def generate_ndvi_timeseries(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_zoi_to_gee(request):
-    print("Inside generate zoi layers")
+    logger.info("Inside generate zoi layers")
     try:
         state = request.data.get("state")
         district = request.data.get("district")
@@ -2361,7 +2353,7 @@ def generate_zoi_to_gee(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_zoi_to_gee api :: ", e)
+        logger.exception("Exception in generate_zoi_to_gee api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2369,7 +2361,7 @@ def generate_zoi_to_gee(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_mws_connectivity(request):
-    print("Inside generate_mws_connectivity API.")
+    logger.info("Inside generate_mws_connectivity API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2395,10 +2387,10 @@ def generate_mws_connectivity(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        print("Invalid request in generate_mws_connectivity api :: ", e)
+        logger.warning("Invalid request in generate_mws_connectivity api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_mws_connectivity api :: ", e)
+        logger.exception("Exception in generate_mws_connectivity api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2406,7 +2398,7 @@ def generate_mws_connectivity(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_mws_centroid(request):
-    print("Inside generate_mws_centroid API.")
+    logger.info("Inside generate_mws_centroid API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2423,7 +2415,7 @@ def generate_mws_centroid(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_mws_centroid api :: ", e)
+        logger.exception("Exception in generate_mws_centroid api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2431,7 +2423,7 @@ def generate_mws_centroid(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_facilities_proximity(request):
-    print("Inside generate_facilities_proximity API.")
+    logger.info("Inside generate_facilities_proximity API.")
     try:
         payload = api_request_payload(
             (
@@ -2452,7 +2444,7 @@ def generate_facilities_proximity(request):
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_facilities_proximity api :: ", e)
+        logger.exception("Exception in generate_facilities_proximity api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2460,7 +2452,7 @@ def generate_facilities_proximity(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_antyodaya(request):
-    print("Inside generate_antyodaya API.")
+    logger.info("Inside generate_antyodaya API.")
     try:
         payload = api_request_payload(
             (
@@ -2481,7 +2473,7 @@ def generate_antyodaya(request):
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_antyodaya api :: ", e)
+        logger.exception("Exception in generate_antyodaya api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2489,7 +2481,7 @@ def generate_antyodaya(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_livestocks(request):
-    print("Inside generate_livestocks API.")
+    logger.info("Inside generate_livestocks API.")
     try:
         payload = api_request_payload(
             (
@@ -2510,7 +2502,7 @@ def generate_livestocks(request):
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        print("Exception in generate_livestocks api :: ", e)
+        logger.exception("Exception in generate_livestocks api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2518,7 +2510,7 @@ def generate_livestocks(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def et_downscale(request):
-    print("Inside generate_et_downscale API.")
+    logger.info("Inside generate_et_downscale API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2544,7 +2536,7 @@ def et_downscale(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print("Exception in generate_et_downscale api :: ", e)
+        logger.exception("Exception in generate_et_downscale api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2598,7 +2590,7 @@ def generate_stac_collection(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_stac_collection api :: ", e)
+        logger.exception("Exception in generate_stac_collection api")
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -2773,38 +2765,6 @@ def update_layer_sync_remote(request):
 
 
 @api_view(["POST"])
-@authentication_classes([])
-@permission_classes([AllowAny])
-@schema(None)
-def update_layer_sync_remote(request):
-    """
-    Called by a local compute instance to update sync/STAC flags on a layer
-    record in this (prod) backend.
-    """
-
-    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
-    if api_key and request.headers.get("X-Api-Key") != api_key:
-        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
-
-    try:
-        d = request.data
-        layer_id = d.get("layer_id")
-        if layer_id is None:
-            return Response(
-                {"error": "layer_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        result = update_layer_sync_status(
-            layer_id=layer_id,
-            sync_to_geoserver=d.get("sync_to_geoserver"),
-            is_stac_specs_generated=d.get("is_stac_specs_generated"),
-        )
-        return Response({"layer_id": result}, status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
 @schema(None)
 def sync_layer_remote(request):
     """
@@ -2854,7 +2814,7 @@ def missing_layers(request):
         result = missing_layer_for_all_workspace()
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in get_layers_for_workspace api :: ", e)
+        logger.exception("Exception in get_layers_for_workspace api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2869,7 +2829,7 @@ def refresh_layer_cache(request, workspace=None):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_fabdem_layer(request):
-    print("Inside generate DEM raster and vector layer API.")
+    logger.info("Inside generate DEM raster and vector layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2882,7 +2842,7 @@ def generate_fabdem_layer(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(f"Exception in generate DEM raster and vector layer:", e)
+        logger.exception("Exception in generate DEM raster and vector layer")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2890,7 +2850,7 @@ def generate_fabdem_layer(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_spei(request):
-    print("Inside generate_spei API.")
+    logger.info("Inside generate_spei API.")
     try:
         aez = request.data.get("aez")
         start_year = request.data.get("start_year")
@@ -2906,7 +2866,7 @@ def generate_spei(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_spei api :: ", e)
+        logger.exception("Exception in generate_spei api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2914,7 +2874,7 @@ def generate_spei(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_canal_vector(request):
-    print("Inside generate canal vector layer API.")
+    logger.info("Inside generate canal vector layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -2927,7 +2887,7 @@ def generate_canal_vector(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(f"Exception in generate canal vector layer: ", e)
+        logger.exception("Exception in generate canal vector layer")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2935,7 +2895,7 @@ def generate_canal_vector(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def drought_resilience_resistance(request):
-    print("Inside drought_resilience_resistance API.")
+    logger.info("Inside drought_resilience_resistance API.")
     try:
         aez = request.data.get("aez")
         start_year = request.data.get("start_year")
@@ -2952,7 +2912,7 @@ def drought_resilience_resistance(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in drought_resilience_resistance api :: ", e)
+        logger.exception("Exception in drought_resilience_resistance api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2960,7 +2920,7 @@ def drought_resilience_resistance(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def rainfall_resilience_resistance(request):
-    print("Inside rainfall_resilience_resistance API.")
+    logger.info("Inside rainfall_resilience_resistance API.")
     try:
         aez = request.data.get("aez")
         start_year = request.data.get("start_year")
@@ -2977,7 +2937,7 @@ def rainfall_resilience_resistance(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in rainfall_resilience_resistance api :: ", e)
+        logger.exception("Exception in rainfall_resilience_resistance api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2985,7 +2945,7 @@ def rainfall_resilience_resistance(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def forest_fire_resilience_resistance(request):
-    print("Inside forest_fire_resilience_resistance API.")
+    logger.info("Inside forest_fire_resilience_resistance API.")
     try:
         aez = request.data.get("aez")
         start_year = request.data.get("start_year")
@@ -3000,7 +2960,7 @@ def forest_fire_resilience_resistance(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in forest_fire_resilience_resistance api :: ", e)
+        logger.exception("Exception in forest_fire_resilience_resistance api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3008,7 +2968,7 @@ def forest_fire_resilience_resistance(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def high_wind_resilience_resistance(request):
-    print("Inside run_high_wind_resistance_resilience API.")
+    logger.info("Inside run_high_wind_resistance_resilience API.")
     try:
         aez = request.data.get("aez")
         start_year = request.data.get("start_year")
@@ -3023,7 +2983,7 @@ def high_wind_resilience_resistance(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in run_high_wind_resistance_resilience api :: ", e)
+        logger.exception("Exception in run_high_wind_resistance_resilience api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3031,7 +2991,7 @@ def high_wind_resilience_resistance(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_fabdem_raster_vector(request):
-    print("Inside generate DEM raster layer API.")
+    logger.info("Inside generate DEM raster layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3053,7 +3013,7 @@ def generate_fabdem_raster_vector(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        print(f"Exception in generate DEM raster layer:", e)
+        logger.exception("Exception in generate DEM raster layer")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3061,7 +3021,7 @@ def generate_fabdem_raster_vector(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_canal_vector(request):
-    print("Inside generate canal vector layer API.")
+    logger.info("Inside generate canal vector layer API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3084,7 +3044,7 @@ def generate_canal_vector(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print(f"Exception in generate canal vector layer: ", e)
+        logger.exception("Exception in generate canal vector layer")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3092,7 +3052,7 @@ def generate_canal_vector(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_river_data(request):
-    print("Inside river data API.")
+    logger.info("Inside river data API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3115,7 +3075,7 @@ def generate_river_data(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in river data api :: ", e)
+        logger.exception("Exception in river data api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3123,7 +3083,7 @@ def generate_river_data(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_drainage_density_data(request):
-    print("Inside river data API.")
+    logger.info("Inside river data API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3146,7 +3106,7 @@ def generate_drainage_density_data(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in river data api :: ", e)
+        logger.exception("Exception in river data api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3154,7 +3114,7 @@ def generate_drainage_density_data(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_tree_in_grassland(request):
-    print("Inside generate_tree_in_grassland API.")
+    logger.info("Inside generate_tree_in_grassland API.")
     try:
         location = {
             field: request.data.get(field) for field in ("state", "district", "block")
@@ -3167,7 +3127,7 @@ def generate_tree_in_grassland(request):
             )
 
         compute = _normalize_layer_order_compute(
-            request.data.get("compute") or "local"
+            request.data.get("compute") or "gee"
         )
         task = (
             generate_tree_in_grassland_local
@@ -3199,7 +3159,7 @@ def generate_tree_in_grassland(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def forest_fringe_degradation(request):
-    print("Inside forest_fringe_degradation API.")
+    logger.info("Inside forest_fringe_degradation API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3219,7 +3179,7 @@ def forest_fringe_degradation(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_forest_fringe api :: ", e)
+        logger.exception("Exception in generate_forest_fringe api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3227,7 +3187,7 @@ def forest_fringe_degradation(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_forest_fire(request):
-    print("Inside generate_forest_fire API.")
+    logger.info("Inside generate_forest_fire API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3251,7 +3211,7 @@ def generate_forest_fire(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_forest_fire api :: ", e)
+        logger.exception("Exception in generate_forest_fire api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3262,7 +3222,7 @@ def missing_excel(request):
         result = check_missing_excel_files()
         return Response({"result": result}, status=status.HTTP_200_OK)
     except Exception as e:
-        print("Exception in missing_excel api :: ", e)
+        logger.exception("Exception in missing_excel api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3270,7 +3230,7 @@ def missing_excel(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_soil_health(request):
-    print("Inside generate_soil_health API.")
+    logger.info("Inside generate_soil_health API.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -3282,7 +3242,7 @@ def generate_soil_health(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_soil_health api :: ", e)
+        logger.exception("Exception in generate_soil_health api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3329,7 +3289,7 @@ def generate_soil_type(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_ltp_stp(request):
-    print("Inside generate_ltp_stp API.")
+    logger.info("Inside generate_ltp_stp API.")
     try:
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
@@ -3340,7 +3300,7 @@ def generate_ltp_stp(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_ltp_stp api :: ", e)
+        logger.exception("Exception in generate_ltp_stp api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3348,7 +3308,7 @@ def generate_ltp_stp(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_ltp_stp_change(request):
-    print("Inside generate_ltp_stp API.")
+    logger.info("Inside generate_ltp_stp API.")
     try:
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
@@ -3361,7 +3321,7 @@ def generate_ltp_stp_change(request):
             status=status.HTTP_200_OK,
         )
     except Exception as e:
-        print("Exception in generate_ltp_stp api :: ", e)
+        logger.exception("Exception in generate_ltp_stp api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -3369,7 +3329,7 @@ def generate_ltp_stp_change(request):
 @schema(None)
 @sync_layer_generation_if_enabled
 def generate_forest_fringe(request):
-    print("Inside generate_forest_fringe API.")
+    logger.info("Inside generate_forest_fringe API.")
     try:
         location = {
             field: request.data.get(field) for field in ("state", "district", "block")

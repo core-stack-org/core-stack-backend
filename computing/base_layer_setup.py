@@ -1,3 +1,4 @@
+import fcntl
 import logging
 import subprocess
 from functools import wraps
@@ -446,13 +447,29 @@ def _tehsil_watershed_details(state, district, tehsil):
 
 
 def ensure_tehsil_watershed(state, district, tehsil, force=False):
-    import geopandas as gpd
-
-    from utilities.constants import GEOSERVER_BASE
-
+    """
+    Returns the local tehsil watershed GPKG, downloading it from the mws
+    GeoServer workspace if it is missing. Safe to call from concurrent tasks:
+    a per-file lock makes one caller download while the others wait and reuse
+    the result.
+    """
     destination, layer_name = _tehsil_watershed_details(state, district, tehsil)
     if destination.exists() and not force:
         return destination
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with open(destination.with_suffix(".lock"), "w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        if destination.exists() and not force:
+            return destination
+        _download_tehsil_watershed(destination, layer_name)
+    return destination
+
+
+def _download_tehsil_watershed(destination, layer_name):
+    import geopandas as gpd
+
+    from utilities.constants import GEOSERVER_BASE
 
     wfs_url = f"{GEOSERVER_BASE}mws/ows"
     params = {
@@ -468,7 +485,14 @@ def ensure_tehsil_watershed(state, district, tehsil, force=False):
     try:
         response = requests.get(wfs_url, params=params, timeout=600)
         response.raise_for_status()
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ValueError(
+                f"GeoServer layer {layer_name} is not available (non-JSON "
+                "response). Generate and publish the MWS layer for this "
+                "location first."
+            ) from exc
         if (
             not isinstance(payload, dict)
             or payload.get("type") != "FeatureCollection"
@@ -480,9 +504,8 @@ def ensure_tehsil_watershed(state, district, tehsil, force=False):
             crs="EPSG:4326",
         )
         if watersheds.empty:
-            raise ValueError("GeoServer layer is empty")
+            raise ValueError(f"GeoServer layer {layer_name} is empty")
 
-        destination.parent.mkdir(parents=True, exist_ok=True)
         if temp_destination.exists():
             temp_destination.unlink()
         watersheds.to_file(
@@ -497,7 +520,6 @@ def ensure_tehsil_watershed(state, district, tehsil, force=False):
         raise
 
     logger.info("Saved %s to %s", layer_name, destination)
-    return destination
 
 
 def _download_active_tehsil_watersheds(force=False):
@@ -564,55 +586,14 @@ def with_tehsil_watershed(func):
     return wrapper
 
 
-def ensure_tehsil_watersheds(geoserver=False, force=False):
+def ensure_tehsil_watersheds(force=False):
     """
-    Generates per-tehsil watershed .gpkg files by spatially intersecting the
-    microwatershed dataset against SOI tehsil boundaries.
-    Existing files are skipped unless force is true. When geoserver is true,
-    only active tehsils are downloaded from the mws workspace.
-    Both source files (SOI tehsil + microwatershed) must exist first.
+    Downloads per-tehsil watershed .gpkg files for all active tehsils from the
+    mws GeoServer workspace. GeoServer is the single source of truth; there is
+    no fallback that derives watersheds from the pan-India microwatershed file.
+    Existing files are skipped unless force is true.
     """
-    if geoserver:
-        _download_active_tehsil_watersheds(force=force)
-        return
-
-    if _is_dir_populated(TEHSIL_WATERSHEDS_DIR) and not force:
-        logger.info(
-            "Tehsil watershed files already present at %s, skipping.",
-            TEHSIL_WATERSHEDS_DIR,
-        )
-        return
-
-    if not SOI_TEHSIL_PATH.exists():
-        logger.warning(
-            "Cannot generate tehsil watersheds: SOI tehsil file missing at %s.",
-            SOI_TEHSIL_PATH,
-        )
-        return
-
-    if not MICROWATERSHED_PATH.exists():
-        logger.warning(
-            "Cannot generate tehsil watersheds: microwatershed file missing at %s.",
-            MICROWATERSHED_PATH,
-        )
-        return
-
-    TEHSIL_WATERSHEDS_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info("Generating tehsil watershed files (this may take a while)...")
-
-    from computing.terrain_descriptor.store_watersheds_for_tehsils import (
-        generate_tehsil_watershed_copies,
-    )
-
-    generate_tehsil_watershed_copies(
-        microwatershed_path=str(MICROWATERSHED_PATH),
-        tehsil_path=str(SOI_TEHSIL_PATH),
-        output_dir=str(TEHSIL_WATERSHEDS_DIR),
-        output_format="gpkg",
-        overwrite=force,
-        clip_to_tehsil=False,
-    )
-    logger.info("Tehsil watershed files ready at %s", TEHSIL_WATERSHEDS_DIR)
+    _download_active_tehsil_watersheds(force=force)
 
 
 def ensure_village_boundaries_dir():
@@ -638,14 +619,14 @@ DEFAULT_BASE_LAYERS = (
 )
 
 
-def setup_base_layers(*layers, geoserver=False, force=False):
+def setup_base_layers(*layers, force=False):
     selected_layers = layers or DEFAULT_BASE_LAYERS
     manifest_index = _manifest_layer_index()
 
     for layer in selected_layers:
         if layer in _BASE_LAYER_ENSURERS:
             if layer == "tehsil_watersheds":
-                ensure_tehsil_watersheds(geoserver=geoserver, force=force)
+                ensure_tehsil_watersheds(force=force)
             else:
                 _BASE_LAYER_ENSURERS[layer]()
             continue

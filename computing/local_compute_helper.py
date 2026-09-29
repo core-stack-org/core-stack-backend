@@ -1108,7 +1108,7 @@ def compute_mode_lulc_array(reprojected_arrays, lulc_classes=LULC_CLASSES):
     return mode_values
 
 
-def get_compute_mode(request, default="local"):
+def get_compute_mode(request, default="gee"):
     compute = str(request.data.get("compute") or default).strip().lower()
     if compute not in VALID_COMPUTE_TYPES:
         raise ValueError("compute must be either 'gee' or 'local'")

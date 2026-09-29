@@ -79,7 +79,7 @@ python manage.py local_compute_layer_setup terrain mws lulc_v3
 python manage.py local_compute_layer_setup static_layers
 python manage.py local_compute_layer_setup tehsil_level
 python manage.py local_compute_layer_setup --ensure-soi-tehsil 
-python manage.py local_compute_layer_setup --ensure-tehsil-watersheds geoserver
+python manage.py local_compute_layer_setup --ensure-tehsil-watersheds
 ```
 
 - **Running celery:**
