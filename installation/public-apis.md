@@ -23,7 +23,9 @@ If you need place names before you use the public routes, start with [GeoAdmin (
 Two direct tools are useful here:
 
 - [Swagger](https://geoserver.core-stack.org/swagger/): better for trying requests quickly.
-- [ReDoc](https://api-doc.core-stack.org/): public docs grouped as **Dataset APIs v1**, **Dataset APIs v2**, **Waterbody APIs v1**, and **Waterbody APIs v2**.
+- [ReDoc](https://api-doc.core-stack.org/): public docs grouped as **Dataset APIs v1**, **Dataset APIs v2**, **Waterbody APIs v1**, **Waterbody APIs v2**, and **Catalog**.
+
+Agents can also fetch the IETF catalog at `/.well-known/api-catalog` (RFC 9727). It points at `/swagger.json`. `GET /api/v2/catalog/` lists v2 routes and properties for `fields=` / `data=`.
 
 ---
 
@@ -43,6 +45,9 @@ This is the practical pattern for moving from discovery to analysis with the pub
 | `GET /api/v1/get_active_locations/` | activated location inventory | [generate_active_locations()](https://github.com/core-stack-org/core-stack-backend/blob/main/public_api/api.py#L404-L423) |
 | `GET /api/v1/get_mws_geometries/` | MWS geometries via GeoServer | [get_mws_geometries()](https://github.com/core-stack-org/core-stack-backend/blob/main/public_api/api.py#L428-L455) |
 | `GET /api/v1/get_village_geometries/` | village geometries via GeoServer | [get_village_geometries()](https://github.com/core-stack-org/core-stack-backend/blob/main/public_api/api.py#L460-L487) |
+| `GET /.well-known/api-catalog` | RFC 9727 linkset pointing at OpenAPI and ReDoc (no API key) | [get_rfc9727_api_catalog()](https://github.com/core-stack-org/core-stack-backend/blob/main/public_api/catalog_api.py) |
+| `GET /api/v2/catalog/` | v2 routes and property counts | [get_public_api_catalog()](https://github.com/core-stack-org/core-stack-backend/blob/main/public_api/catalog_api.py) |
+| `GET /api/v2/catalog/{api_id}/` | parameters and selectable properties for one v2 API | [get_public_api_catalog_item()](https://github.com/core-stack-org/core-stack-backend/blob/main/public_api/catalog_api.py) |
 
 ---
 

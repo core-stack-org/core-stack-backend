@@ -49,6 +49,7 @@ V2_NAMED_URLS = (
     "get_mws_geometries_v2",
     "get_village_geometries_v2",
     "get_active_locations_v2",
+    "get_public_api_catalog_v2",
     "generate_waterbodies_data_v2",
     "generate_waterbody_data_v2",
 )

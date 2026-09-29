@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "core-stack-public-api": {
+      "command": "/absolute/path/sample_mcp/.venv/bin/python",
+      "args": ["/absolute/path/sample_mcp/server.py"],
+      "env": {
+        "CORE_STACK_BASE_URL": "http://127.0.0.1:8000",
+        "CORE_STACK_API_KEY": "your-key"
+      }
+    }
+  }
+}

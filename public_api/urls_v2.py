@@ -1,5 +1,6 @@
 from django.urls import path
 from . import api
+from . import catalog_api
 
 urlpatterns = [
     path(
@@ -35,5 +36,11 @@ urlpatterns = [
         "get_active_locations/",
         api.generate_active_locations_v2,
         name="get_active_locations_v2",
+    ),
+    path("catalog/", catalog_api.get_public_api_catalog, name="get_public_api_catalog_v2"),
+    path(
+        "catalog/<str:api_id>/",
+        catalog_api.get_public_api_catalog_item,
+        name="get_public_api_catalog_item_v2",
     ),
 ]

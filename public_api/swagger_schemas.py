@@ -85,6 +85,44 @@ tehsil_data_filter_param = openapi.Parameter(
     required=False,
 )
 
+mws_fields_filter_param = openapi.Parameter(
+    "fields",
+    openapi.IN_QUERY,
+    description=(
+        "Optional v2 fortnight metrics. Omit for every metric. Pass one or "
+        "more of `et`, `runoff`, `precipitation`: `fields=et,runoff`."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+kyl_fields_filter_param = openapi.Parameter(
+    "fields",
+    openapi.IN_QUERY,
+    description=(
+        "Optional v2 indicator filter. Omit for every indicator. Pass names "
+        "from GET /api/v2/catalog/get_mws_kyl_indicators/."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+catalog_group_param = openapi.Parameter(
+    "group",
+    openapi.IN_QUERY,
+    description="Optional group filter: `dataset` or `waterbody`.",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+catalog_api_id_param = openapi.Parameter(
+    "api_id",
+    openapi.IN_PATH,
+    description="Catalog id such as `get_mws_data`. List ids with GET /api/v2/catalog/.",
+    type=openapi.TYPE_STRING,
+    required=True,
+)
+
 active_locations_state_filter_param = openapi.Parameter(
     "state",
     openapi.IN_QUERY,
@@ -378,6 +416,7 @@ V2_MWS_FORTNIGHT_DESCRIPTION = """
 }
 ```
 
+Query ``fields=et,runoff`` keeps only those metrics (``time`` is always returned).
 Query ``regenerate=true`` bypasses MongoDB cache. ``/api/v1/get_mws_data/`` returns legacy ``data.time_series`` rows instead.
 """
 
@@ -537,6 +576,8 @@ get_mws_data_v2_schema = {
 
     Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
     Optional ``regenerate=true`` skips the MongoDB cache and rereads GeoServer.
+    Optional ``fields=et,runoff`` keeps only those fortnight metrics
+    (``time`` is always returned). See GET /api/v2/catalog/get_mws_data/.
 
     v2 returns ``{status, error_message, data}``. ``data`` has ``metadata``,
     aligned ``fortnight`` arrays (~15-day steps), and ``fortnight_units``.
@@ -555,11 +596,79 @@ get_mws_data_v2_schema = {
             type=openapi.TYPE_STRING,
             required=False,
         ),
+        mws_fields_filter_param,
         authorization_param,
     ],
     "responses": {
         200: openapi.Response(
             description="Success - fortnight-aligned MWS time series in v2 envelope",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "status": openapi.Schema(type=openapi.TYPE_STRING, example="success"),
+                    "error_message": openapi.Schema(type=openapi.TYPE_STRING),
+                    "data": openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        required=["metadata", "fortnight", "fortnight_units"],
+                        properties={
+                            "metadata": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "mws_id": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="Micro-watershed identifier",
+                                    )
+                                },
+                            ),
+                            "fortnight": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "time": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(type=openapi.TYPE_STRING),
+                                        description="Period start date for each ~15-day step",
+                                    ),
+                                    "et": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(type=openapi.TYPE_NUMBER),
+                                        description="Evapotranspiration (mm)",
+                                    ),
+                                    "runoff": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(type=openapi.TYPE_NUMBER),
+                                        description="Runoff (mm)",
+                                    ),
+                                    "precipitation": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(type=openapi.TYPE_NUMBER),
+                                        description="Precipitation (mm)",
+                                    ),
+                                },
+                            ),
+                            "fortnight_units": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "time": openapi.Schema(
+                                        type=openapi.TYPE_STRING, example="iso8601"
+                                    ),
+                                    "time_step": openapi.Schema(
+                                        type=openapi.TYPE_STRING, example="15_days"
+                                    ),
+                                    "et": openapi.Schema(
+                                        type=openapi.TYPE_STRING, example="mm"
+                                    ),
+                                    "runoff": openapi.Schema(
+                                        type=openapi.TYPE_STRING, example="mm"
+                                    ),
+                                    "precipitation": openapi.Schema(
+                                        type=openapi.TYPE_STRING, example="mm"
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
             examples={
                 "application/json": success_example(
                     {
@@ -1287,10 +1396,15 @@ Return a single-row KYL indicator snapshot for one micro-watershed.
 
 Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
 This is a flat table, not a time series.
+Optional ``fields=avg_runoff,drought_category`` keeps only those indicators
+(``mws_id`` is always returned). See GET /api/v2/catalog/get_mws_kyl_indicators/.
 
 v2 returns ``{status, error_message, data}``. ``data`` has ``indicators``
 and ``indicator_units`` (mm, ha, count, and similar).
 """
+kyl_indicators_schema_v2["manual_parameters"] = list(
+    kyl_indicators_schema_v2["manual_parameters"]
+) + [kyl_fields_filter_param]
 _set_json_example(
     kyl_indicators_schema_v2,
     200,
@@ -1408,3 +1522,306 @@ _set_json_example(
     ),
     "Internal Server Error",
 )
+
+CATALOG_PROPERTY_ITEM_SCHEMA = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    properties={
+        "name": openapi.Schema(type=openapi.TYPE_STRING, example="et"),
+        "type": openapi.Schema(type=openapi.TYPE_STRING, example="number[]"),
+        "unit": openapi.Schema(
+            description=(
+                "Measurement unit, such as mm. For get_tehsil_data this is an "
+                "object of column name to unit, matching tehsil_units."
+            ),
+            type=openapi.TYPE_STRING,
+            example="mm",
+        ),
+        "description": openapi.Schema(
+            type=openapi.TYPE_STRING,
+            example="Evapotranspiration for each ~15-day step",
+        ),
+        "selectable": openapi.Schema(
+            type=openapi.TYPE_BOOLEAN,
+            description="If true, pass this name to fields= or data=",
+        ),
+    },
+)
+
+CATALOG_API_SUMMARY_SCHEMA = openapi.Schema(
+    type=openapi.TYPE_OBJECT,
+    properties={
+        "id": openapi.Schema(type=openapi.TYPE_STRING, example="get_mws_data"),
+        "group": openapi.Schema(type=openapi.TYPE_STRING, example="dataset"),
+        "path": openapi.Schema(type=openapi.TYPE_STRING, example="/api/v2/get_mws_data/"),
+        "method": openapi.Schema(type=openapi.TYPE_STRING, example="GET"),
+        "title": openapi.Schema(type=openapi.TYPE_STRING),
+        "description": openapi.Schema(type=openapi.TYPE_STRING),
+        "select_param": openapi.Schema(
+            type=openapi.TYPE_STRING,
+            description="Query param used to pick properties: fields or data",
+        ),
+        "property_count": openapi.Schema(type=openapi.TYPE_INTEGER, example=6),
+        "properties_url": openapi.Schema(
+            type=openapi.TYPE_STRING,
+            example="/api/v2/catalog/get_mws_data/",
+        ),
+        "href": openapi.Schema(type=openapi.TYPE_STRING),
+    },
+)
+
+CATALOG_LIST_EXAMPLE = {
+    "catalog": {
+        "version": "1.0",
+        "standards": ["openapi", "rfc9727"],
+        "service_desc": "https://geoserver.core-stack.org/swagger.json",
+        "service_doc": "https://geoserver.core-stack.org/redoc/",
+        "api_catalog": "https://geoserver.core-stack.org/.well-known/api-catalog",
+    },
+    "apis": [
+        {
+            "id": "get_mws_data",
+            "group": "dataset",
+            "path": "/api/v2/get_mws_data/",
+            "method": "GET",
+            "title": "Get MWS Time Series Data",
+            "description": "Fortnight hydrology time series. Filter metrics with fields=et,runoff.",
+            "select_param": "fields",
+            "property_count": 6,
+            "properties_url": "/api/v2/catalog/get_mws_data/",
+        }
+    ],
+}
+
+CATALOG_ITEM_EXAMPLE = {
+    "id": "get_mws_data",
+    "group": "dataset",
+    "path": "/api/v2/get_mws_data/",
+    "method": "GET",
+    "title": "Get MWS Time Series Data",
+    "description": "Fortnight hydrology time series. Filter metrics with fields=et,runoff.",
+    "select_param": "fields",
+    "property_count": 6,
+    "properties_url": "/api/v2/catalog/get_mws_data/",
+    "parameters": [
+        {
+            "name": "state",
+            "in": "query",
+            "type": "string",
+            "required": True,
+            "description": "State name from Get Active Locations",
+        }
+    ],
+    "properties": [
+        {
+            "name": "et",
+            "type": "number[]",
+            "unit": "mm",
+            "description": "Evapotranspiration for each ~15-day step",
+            "selectable": True,
+        },
+        {
+            "name": "runoff",
+            "type": "number[]",
+            "unit": "mm",
+            "description": "Runoff for each ~15-day step",
+            "selectable": True,
+        },
+        {
+            "name": "precipitation",
+            "type": "number[]",
+            "unit": "mm",
+            "description": "Precipitation for each ~15-day step",
+            "selectable": True,
+        },
+    ],
+}
+
+RFC9727_EXAMPLE = {
+    "linkset": [
+        {
+            "anchor": "https://geoserver.core-stack.org/api/v2/",
+            "service-desc": [
+                {
+                    "href": "https://geoserver.core-stack.org/swagger.json",
+                    "type": "application/json",
+                    "title": "OpenAPI",
+                }
+            ],
+            "service-doc": [
+                {
+                    "href": "https://geoserver.core-stack.org/redoc/",
+                    "type": "text/html",
+                    "title": "ReDoc",
+                }
+            ],
+        }
+    ]
+}
+
+rfc9727_api_catalog_schema = {
+    "method": "get",
+    "operation_id": "get_rfc9727_api_catalog",
+    "operation_summary": "Get RFC 9727 API Catalog",
+    "operation_description": """
+    Return the IETF RFC 9727 API catalog for this host.
+
+    Agents fetch ``/.well-known/api-catalog`` first. The body is a linkset
+    whose ``service-desc`` points at ``/swagger.json`` and whose
+    ``service-doc`` points at ReDoc. No API key is required.
+
+    For the property list used with ``fields=`` / ``data=``, call
+    GET /api/v2/catalog/ after you have a key.
+    """,
+    "manual_parameters": [],
+    "responses": {
+        200: openapi.Response(
+            description="RFC 9727 linkset pointing at OpenAPI and ReDoc",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "linkset": openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Schema(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "anchor": openapi.Schema(type=openapi.TYPE_STRING),
+                                "service-desc": openapi.Schema(
+                                    type=openapi.TYPE_ARRAY,
+                                    items=openapi.Schema(type=openapi.TYPE_OBJECT),
+                                ),
+                                "service-doc": openapi.Schema(
+                                    type=openapi.TYPE_ARRAY,
+                                    items=openapi.Schema(type=openapi.TYPE_OBJECT),
+                                ),
+                            },
+                        ),
+                    )
+                },
+            ),
+            examples={"application/json": RFC9727_EXAMPLE},
+        ),
+    },
+    "tags": ["Catalog"],
+}
+
+catalog_list_schema_v2 = {
+    "method": "get",
+    "operation_id": "get_public_api_catalog_v2",
+    "operation_summary": "Get Public API Catalog",
+    "operation_description": """
+    List every public v2 dataset and waterbody route, with a pointer to the
+    properties each one can return.
+
+    Use this after RFC 9727 / OpenAPI discovery when you need the actual
+    field names for ``fields=`` (MWS, KYL) or ``data=`` (tehsil sheets).
+    Requires ``X-API-Key``. Optional ``group=dataset`` or ``group=waterbody``.
+
+    Then call GET /api/v2/catalog/{api_id}/ for the full property list.
+    """,
+    "manual_parameters": [catalog_group_param, authorization_param],
+    "responses": {
+        200: openapi.Response(
+            description="Success - catalog index in the v2 envelope",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "status": openapi.Schema(type=openapi.TYPE_STRING, example="success"),
+                    "error_message": openapi.Schema(type=openapi.TYPE_STRING),
+                    "data": openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "catalog": openapi.Schema(
+                                type=openapi.TYPE_OBJECT,
+                                properties={
+                                    "version": openapi.Schema(type=openapi.TYPE_STRING),
+                                    "standards": openapi.Schema(
+                                        type=openapi.TYPE_ARRAY,
+                                        items=openapi.Schema(type=openapi.TYPE_STRING),
+                                    ),
+                                    "service_desc": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="OpenAPI URL",
+                                    ),
+                                    "service_doc": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="ReDoc URL",
+                                    ),
+                                    "api_catalog": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="RFC 9727 well-known URL",
+                                    ),
+                                },
+                            ),
+                            "apis": openapi.Schema(
+                                type=openapi.TYPE_ARRAY,
+                                items=CATALOG_API_SUMMARY_SCHEMA,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            examples={"application/json": success_example(CATALOG_LIST_EXAMPLE)},
+        ),
+        400: openapi.Response(
+            description="Bad Request - invalid group filter",
+            examples={
+                "application/json": error_example("group must be dataset or waterbody.")
+            },
+        ),
+        401: unauthorized_response,
+        500: internal_error_response,
+    },
+    "tags": ["Catalog"],
+}
+
+catalog_item_schema_v2 = {
+    "method": "get",
+    "operation_id": "get_public_api_catalog_item_v2",
+    "operation_summary": "Get Public API Catalog Item",
+    "operation_description": """
+    Return parameters and properties for one public v2 API.
+
+    ``api_id`` is the catalog id from GET /api/v2/catalog/, for example
+    ``get_mws_data``. Properties with ``selectable: true`` can be passed to
+    ``fields=`` or ``data=`` on that route. Requires ``X-API-Key``.
+    """,
+    "manual_parameters": [catalog_api_id_param, authorization_param],
+    "responses": {
+        200: openapi.Response(
+            description="Success - catalog item with properties in the v2 envelope",
+            schema=openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "status": openapi.Schema(type=openapi.TYPE_STRING, example="success"),
+                    "error_message": openapi.Schema(type=openapi.TYPE_STRING),
+                    "data": openapi.Schema(
+                        type=openapi.TYPE_OBJECT,
+                        properties={
+                            "id": openapi.Schema(type=openapi.TYPE_STRING),
+                            "path": openapi.Schema(type=openapi.TYPE_STRING),
+                            "method": openapi.Schema(type=openapi.TYPE_STRING),
+                            "parameters": openapi.Schema(
+                                type=openapi.TYPE_ARRAY,
+                                items=openapi.Schema(type=openapi.TYPE_OBJECT),
+                            ),
+                            "properties": openapi.Schema(
+                                type=openapi.TYPE_ARRAY,
+                                items=CATALOG_PROPERTY_ITEM_SCHEMA,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            examples={"application/json": success_example(CATALOG_ITEM_EXAMPLE)},
+        ),
+        401: unauthorized_response,
+        404: openapi.Response(
+            description="Not Found - unknown catalog id",
+            examples={
+                "application/json": error_example("Unknown catalog id 'not_an_api'.")
+            },
+        ),
+        500: internal_error_response,
+    },
+    "tags": ["Catalog"],
+}

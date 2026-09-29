@@ -17,8 +17,8 @@ PUBLIC_API_TAGS = [
             "Same dataset routes under `/api/v2/`, wrapped as "
             "`{status, error_message, data}`. Geometry `data` is a "
             "FeatureCollection with unrounded vertices. Filter tehsil sheets "
-            "with `data=all` or sheet names, and active locations with "
-            "optional `state`, `district`, and `tehsil`."
+            "with `data=all` or sheet names, MWS/KYL metrics with `fields=`, "
+            "and active locations with optional `state`, `district`, and `tehsil`."
         ),
     },
     {
@@ -38,6 +38,15 @@ PUBLIC_API_TAGS = [
             "and leave `data` empty."
         ),
     },
+    {
+        "name": "Catalog",
+        "description": (
+            "RFC 9727 `/.well-known/api-catalog` points agents at OpenAPI "
+            "and ReDoc. `GET /api/v2/catalog/` lists public v2 routes and "
+            "the properties each can return. Use `fields=` on MWS and KYL, "
+            "and `data=` on tehsil sheets, to fetch only those properties."
+        ),
+    },
 ]
 
 _ALLOWED_TAGS = {tag["name"] for tag in PUBLIC_API_TAGS}
@@ -52,7 +61,7 @@ def _operation_tags(operation):
 
 
 class PublicAPISchemaGenerator(OpenAPISchemaGenerator):
-    """Keep ReDoc limited to the four public API groups."""
+    """Keep ReDoc limited to the public API groups."""
 
     def get_schema(self, request=None, public=False):
         schema = super().get_schema(request=request, public=public)

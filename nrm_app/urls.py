@@ -22,14 +22,19 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from bot_interface.api import whatsapp_webhook
 from public_api.schema import PublicAPISchemaGenerator
+from public_api.catalog_api import get_rfc9727_api_catalog
+from django.contrib.staticfiles.urls import staticfiles_urlpatterns
+
 
 
 _PUBLIC_API_REDOC_DESCRIPTION = """
-Send **`X-API-Key: <your-api-key>`** on every request. Create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
+Send **`X-API-Key: <your-api-key>`** on every dataset, waterbody, and catalog request. Create a key at [dashboard.core-stack.org](https://dashboard.core-stack.org/).
 
 **v1** (`/api/v1/`) is the original public surface. Responses are the raw payload: GeoJSON FeatureCollections, location trees, or sheet tables. Errors look like `{"error": "..."}`. Geometry routes return actual polygon rings that QGIS can open. There are no sheet or place query filters.
 
-**v2** (`/api/v2/`) uses the same paths with a stable envelope: `{"status", "error_message", "data"}`. On success, `data` holds the payload; geometry `data` is a FeatureCollection with unrounded vertices. Tehsil sheets accept `data=drought,stream_order`. Active locations accept optional `state`, `district`, and `tehsil`. Time series use fortnight arrays plus unit maps.
+**v2** (`/api/v2/`) uses the same paths with a stable envelope: `{"status", "error_message", "data"}`. On success, `data` holds the payload; geometry `data` is a FeatureCollection with unrounded vertices. Tehsil sheets accept `data=drought,stream_order`. MWS fortnight metrics and KYL indicators accept `fields=et,runoff`. Active locations accept optional `state`, `district`, and `tehsil`. Time series use fortnight arrays plus unit maps.
+
+**Catalog.** Agents start at `GET /.well-known/api-catalog` (RFC 9727, no key). That linkset points at `/swagger.json` and ReDoc. `GET /api/v2/catalog/` lists v2 routes; `GET /api/v2/catalog/{api_id}/` lists the properties each one can return. Properties with `selectable: true` are the names you pass to `fields=` or `data=`.
 """
 
 schema_view = get_schema_view(
@@ -77,5 +82,8 @@ urlpatterns = [
         name="schema-swagger-ui",
     ),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
+    path(".well-known/api-catalog", get_rfc9727_api_catalog, name="rfc9727-api-catalog"),
     path("", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
 ]
+
+urlpatterns += staticfiles_urlpatterns()

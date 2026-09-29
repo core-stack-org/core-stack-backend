@@ -60,6 +60,12 @@ from .dataset_filters import (
     filter_tehsil_payload,
     parse_tehsil_data_filter,
 )
+from .catalog import (
+    filter_kyl_fields,
+    filter_mws_fortnight_fields,
+    parse_kyl_fields_filter,
+    parse_mws_fields_filter,
+)
 from utilities.openmeteo_format import (
     error_envelope,
     flat_active_locations_payload,
@@ -160,6 +166,22 @@ def _save_mws_v2_to_mongo(state_norm, district_l, tehsil_l, mws_id, payload):
     finally:
         if client is not None:
             client.close()
+
+
+def _apply_mws_fields_filter(request, payload):
+    try:
+        fields = parse_mws_fields_filter(request.query_params.getlist("fields"))
+    except ValueError as exc:
+        return None, str(exc)
+    return filter_mws_fortnight_fields(payload, fields), None
+
+
+def _apply_kyl_fields_filter(request, payload):
+    try:
+        fields = parse_kyl_fields_filter(request.query_params.getlist("fields"))
+    except ValueError as exc:
+        return None, str(exc)
+    return filter_kyl_fields(payload, fields), None
 
 
 def _success_response(data, http_status=status.HTTP_200_OK):
@@ -394,11 +416,20 @@ def get_mws_data_v2(request):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        try:
+            parse_mws_fields_filter(request.query_params.getlist("fields"))
+        except ValueError as exc:
+            return _error_response_v2(str(exc), status.HTTP_400_BAD_REQUEST)
+
         state_norm = state.upper()
         if not regenerate:
             cached = _load_mws_v2_from_mongo(state_norm, district, tehsil, mws_id)
             if cached is not None:
-                return _success_response_v2(cached, http_status=status.HTTP_200_OK)
+                inner = legacy_hourly_to_fortnight_inner_block(cached)
+                filtered, error = _apply_mws_fields_filter(request, inner)
+                if error:
+                    return _error_response_v2(error, status.HTTP_400_BAD_REQUEST)
+                return Response(success_envelope(filtered), status=status.HTTP_200_OK)
 
         data = get_mws_time_series_data(state, district, tehsil, mws_id)
         if not data:
@@ -420,8 +451,11 @@ def get_mws_data_v2(request):
 
         v2_payload = fortnight_structure_from_mws(data)
         _save_mws_v2_to_mongo(state_norm, district, tehsil, mws_id, v2_payload)
+        filtered, error = _apply_mws_fields_filter(request, v2_payload)
+        if error:
+            return _error_response_v2(error, status.HTTP_400_BAD_REQUEST)
 
-        return _success_response_v2(v2_payload, http_status=status.HTTP_200_OK)
+        return _success_response_v2(filtered, http_status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json v2 :: ", e)
         return _error_response_v2(
@@ -908,6 +942,11 @@ def get_mws_json_by_kyl_indicator_v2(request):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        try:
+            parse_kyl_fields_filter(request.query_params.getlist("fields"))
+        except ValueError as exc:
+            return _error_response(str(exc), status.HTTP_400_BAD_REQUEST)
+
         if not excel_file_exists(state, district, tehsil):
             return _error_response(
                 "Data not found for this state, district, tehsil.",
@@ -927,6 +966,9 @@ def get_mws_json_by_kyl_indicator_v2(request):
             )
         rows = data if isinstance(data, list) else []
         payload = flat_kyl_indicator_payload(rows)
+        payload, error = _apply_kyl_fields_filter(request, payload)
+        if error:
+            return _error_response(error, status.HTTP_400_BAD_REQUEST)
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
