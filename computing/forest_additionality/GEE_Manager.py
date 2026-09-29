@@ -15,6 +15,7 @@ from osgeo import gdal
 import numpy as np
 from scipy.ndimage import distance_transform_edt
 
+from utilities.constants import SOI_DISTRICT
 from utilities.gee_utils import (
     sync_raster_to_gcs,
     check_task_status,
@@ -61,13 +62,18 @@ class GEEManager:
         Args:
             district_name (str): The name of the district to get the image for.
         """
-        if state_name == "Odisha":
-            state_name = "Orissa"
+        # if state_name == "Odisha":
+        #     state_name = "Orissa"
+        # return (
+        #     ee.FeatureCollection("FAO/GAUL/2015/level2")
+        #     .filter(ee.Filter.eq("ADM0_NAME", "India"))
+        #     .filter(ee.Filter.eq("ADM1_NAME", state_name))
+        #     .filter(ee.Filter.eq("ADM2_NAME", district_name))
+        # )
         return (
-            ee.FeatureCollection("FAO/GAUL/2015/level2")
-            .filter(ee.Filter.eq("ADM0_NAME", "India"))
-            .filter(ee.Filter.eq("ADM1_NAME", state_name))
-            .filter(ee.Filter.eq("ADM2_NAME", district_name))
+            ee.FeatureCollection(SOI_DISTRICT)
+            .filter(ee.Filter.eq("STATE", state_name.upper()))
+            .filter(ee.Filter.eq("District", district_name.upper()))
         )
 
     def get_aoi_from_kmz(self, asset_name):
@@ -342,9 +348,13 @@ class GEEManager:
             # )
             districts = self.get_district_roi(state_name, district_name)
 
+            district_numeric = districts.map(
+                lambda feature: feature.set("mask_value", 1)
+            )
+
             # Rasterize the feature collection
-            rasterized_districts = districts.reduceToImage(
-                properties=["ADM2_CODE"], reducer=ee.Reducer.first()
+            rasterized_districts = district_numeric.reduceToImage(
+                properties=["mask_value"], reducer=ee.Reducer.first()  # ADM2_CODE
             ).rename("district_codes")
 
             if not gcs_file_exists(f"nrm_raster/{district_name}_districts"):
@@ -381,10 +391,12 @@ class GEEManager:
 
         district = self.get_district_roi(state_name, district_name)
 
+        district_numeric = district.map(lambda feature: feature.set("mask_value", 1))
+
         # Rasterize the district boundary to create a mask
         mask = (
-            district.reduceToImage(
-                properties=["ADM2_CODE"],  # Use any property to rasterize
+            district_numeric.reduceToImage(
+                properties=["mask_value"],  # ADM2_CODE  # Use any property to rasterize
                 reducer=ee.Reducer.first(),
             )
             .gt(0)
@@ -598,7 +610,7 @@ class GEEManager:
             num_bands = src.count
 
             if src_crs.is_geographic:
-                dst_crs = "EPSG:32644"  # 32633 Adjust for correct UTM zone
+                dst_crs = "EPSG:6933"  # 32633 Adjust for correct UTM zone
             else:
                 dst_crs = src_crs
 
@@ -682,21 +694,26 @@ class GEEManager:
                 # Loop through the raster in blocks
                 for i in range(0, src.height, block_size):
                     for j in range(0, src.width, block_size):
-                        # Define the window (block) to read, including a buffer
-                        window_height = min(
-                            block_size + 2 * buffer_size,
-                            src.width - max(j - buffer_size, 0),
-                        )
-                        window_width = min(
-                            block_size + 2 * buffer_size,
-                            src.height - max(i - buffer_size, 0),
-                        )
+                        # Define the output block first. Rasterio windows use
+                        # (column offset, row offset, width, height), so derive
+                        # every horizontal quantity from src.width and every
+                        # vertical quantity from src.height.
+                        write_width = min(block_size, src.width - j)
+                        write_height = min(block_size, src.height - i)
+                        write_window = Window(j, i, write_width, write_height)
 
+                        # Read the output block with a buffer on every side.
+                        # Explicit start/stop coordinates avoid swapping width
+                        # and height for non-square rasters such as Kendrapara.
+                        col_start = max(j - buffer_size, 0)
+                        row_start = max(i - buffer_size, 0)
+                        col_stop = min(j + write_width + buffer_size, src.width)
+                        row_stop = min(i + write_height + buffer_size, src.height)
                         window = Window(
-                            max(j - buffer_size, 0),
-                            max(i - buffer_size, 0),
-                            window_width,
-                            window_height,
+                            col_start,
+                            row_start,
+                            col_stop - col_start,
+                            row_stop - row_start,
                         )
 
                         # Read the data for the current block (including buffer)
@@ -714,31 +731,24 @@ class GEEManager:
                             distances = distance_transform_edt(binary_data)
                             distances_meters = (distances * pixel_size).astype(np.int32)
 
-                        # Dynamically crop buffer region
-                        crop_top = buffer_size if i >= buffer_size else 0
-                        crop_left = buffer_size if j >= buffer_size else 0
-                        crop_bottom = distances_meters.shape[0] - (
-                            buffer_size
-                            if i + block_size + buffer_size < src.height
-                            else 0
-                        )
-                        crop_right = distances_meters.shape[1] - (
-                            buffer_size
-                            if j + block_size + buffer_size < src.width
-                            else 0
-                        )
+                        # Crop exactly to the output block. The crop offsets are
+                        # measured from the buffered read window, so the result
+                        # has the same rows and columns as write_window.
+                        crop_top = i - row_start
+                        crop_left = j - col_start
+                        crop_bottom = crop_top + write_height
+                        crop_right = crop_left + write_width
 
                         distances_meters = distances_meters[
                             crop_top:crop_bottom, crop_left:crop_right
                         ]
 
-                        # Define the window for writing (without buffer)
-                        write_window = Window(
-                            j,
-                            i,
-                            min(block_size, src.width - j),
-                            min(block_size, src.height - i),
-                        )
+                        expected_shape = (write_height, write_width)
+                        if distances_meters.shape != expected_shape:
+                            raise RuntimeError(
+                                "Distance block shape does not match its output "
+                                f"window: {distances_meters.shape} != {expected_shape}."
+                            )
 
                         # Write the processed block to the output raster
                         dst.write(distances_meters, window=write_window, indexes=1)
