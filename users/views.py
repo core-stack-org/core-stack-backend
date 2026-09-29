@@ -17,6 +17,9 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from drf_yasg.utils import swagger_auto_schema
+
+from public_api.swagger_schemas import login_schema
 
 from organization.models import Organization
 from projects.models import Project
@@ -203,8 +206,7 @@ class LoginView(TokenObtainPairView):
     Extends SimpleJWT's TokenObtainPairView to customize the response.
     """
 
-    schema = None
-
+    @swagger_auto_schema(**login_schema)
     def post(self, request, *args, **kwargs):
         # Call parent class method to validate credentials and get tokens
         response = super().post(request, *args, **kwargs)

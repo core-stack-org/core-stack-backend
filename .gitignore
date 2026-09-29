@@ -31,6 +31,7 @@ ENV/
 env.bak/
 venv.bak/
 home
+.zed/
 
 # ignored apps
 dashboard/

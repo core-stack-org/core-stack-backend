@@ -1,35 +1,39 @@
 # Public APIs
 
-This page is a one-stop path if you simply want to access and use CoRE Stack public data:
+The Core Stack API is organized around REST. Authenticate with an API key, then call Dataset or Waterbody routes.
 
 ---
 
-## 1. Generate An API Key
+## Get started
 
-For public dataset access:
+1. Create a session: `POST /api/v1/auth/login/` with username and password, **or** sign in at [dashboard.core-stack.org](https://dashboard.core-stack.org/)
+2. Create an API key: `POST /api/v1/generate_api_key/` with `Authorization: Bearer <access>`, **or** mint one in the dashboard
+3. Authenticate every request:
 
-1. Register or sign in at [dashboard.core-stack.org](https://dashboard.core-stack.org/)
-2. Generate an API key from the dashboard
-3. Send it as the `X-API-Key` header on `public_api` routes
+```
+X-API-Key: <your-api-key>
+```
 
-[Register or sign in at dashboard.core-stack.org](https://dashboard.core-stack.org/){ .md-button .md-button--primary }
+[Create a key at dashboard.core-stack.org](https://dashboard.core-stack.org/){ .md-button .md-button--primary }
 
-If you need place names before you use the public routes, start with [GeoAdmin (NoAuth) APIs](geoadmin-noauth.md).
+**Base URL:** `https://geoserver.core-stack.org` — v1 is raw JSON, v2 is `{status, error_message, data}`. Prefer v2 for new integrations.
 
----
+**First request:** List active locations, then List tehsil datasets or List MWS geometries using those exact place names.
 
-## 2. Inspect The Public Surface
-
-Two direct tools are useful here:
-
-- [Swagger](https://geoserver.core-stack.org/swagger/): better for trying requests quickly.
-- [ReDoc](https://api-doc.core-stack.org/): public docs grouped as **Dataset APIs v1**, **Dataset APIs v2**, **Waterbody APIs v1**, and **Waterbody APIs v2**.
+If you only need place names, start with [GeoAdmin (NoAuth) APIs](geoadmin-noauth.md).
 
 ---
 
-## 3. Public API Endpoints
+## API reference
 
-This is the practical pattern for moving from discovery to analysis with the public data APIs.
+- [ReDoc](https://api-doc.core-stack.org/) — Auth, Dataset v1/v2, Waterbody v1/v2
+- [Swagger](https://geoserver.core-stack.org/swagger/) — try a request
+
+---
+
+## Endpoints
+
+This is the practical pattern for moving from discovery to analysis.
 
 | Route | What it does | Source |
 |------|---------------|--------|
@@ -46,7 +50,7 @@ This is the practical pattern for moving from discovery to analysis with the pub
 
 ---
 
-## 4. Recommended API Workflow
+## Recommended workflow
 
 ### Discover a real place
 
@@ -136,7 +140,7 @@ In other words:
 
 ---
 
-## 5. CLI Helper For Validation And Bulk Download
+## CLI helper for validation and bulk download
 
 The repository also ships a local helper at [`installation/public_api_client.py`](/mnt/y/core-stack-org/backend-test-2/installation/public_api_client.py). It is useful when you want a guided workflow instead of composing each raw request yourself.
 

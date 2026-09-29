@@ -48,14 +48,17 @@ class Command(BaseCommand):
         parser.add_argument(
             "--ensure-tehsil-watersheds",
             action="store_true",
-            help="Generate per-tehsil watershed files if they are missing.",
+            help=(
+                "Download per-tehsil watershed files for active tehsils from "
+                "the mws GeoServer workspace if they are missing."
+            ),
         )
         parser.add_argument(
             "--geoserver",
             action="store_true",
             help=(
-                "Download watershed GPKGs from the mws GeoServer workspace for "
-                "active tehsils only."
+                "Deprecated no-op: tehsil watersheds are always downloaded "
+                "from GeoServer."
             ),
         )
         parser.add_argument(
@@ -81,10 +84,6 @@ class Command(BaseCommand):
             self._print_available_layers()
             return
 
-        if options["geoserver"] and not options["ensure_tehsil_watersheds"]:
-            raise CommandError(
-                "--geoserver requires --ensure-tehsil-watersheds."
-            )
         if options["force"] and not options["ensure_tehsil_watersheds"]:
             raise CommandError("--force requires --ensure-tehsil-watersheds.")
 
@@ -92,11 +91,7 @@ class Command(BaseCommand):
         self.stdout.write(f"Setting up local compute layers: {', '.join(layers)}")
 
         try:
-            setup_base_layers(
-                *layers,
-                geoserver=options["geoserver"],
-                force=options["force"],
-            )
+            setup_base_layers(*layers, force=options["force"])
         except (RuntimeError, ValueError) as exc:
             raise CommandError(str(exc)) from exc
 
