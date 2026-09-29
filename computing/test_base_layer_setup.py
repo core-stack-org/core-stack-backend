@@ -6,6 +6,7 @@ from django.test import SimpleTestCase
 
 from computing.base_layer_setup import (
     _download_active_tehsil_watersheds,
+    ensure_tehsil_watershed,
     with_tehsil_watershed,
 )
 
@@ -106,3 +107,68 @@ class GeoServerTehsilWatershedSetupTests(SimpleTestCase):
         generate("Bihar", "Banka", "Banka")
 
         ensure.assert_not_called()
+
+
+class EnsureTehsilWatershedTests(SimpleTestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.output_dir = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    @patch("computing.base_layer_setup.requests.get")
+    def test_unpublished_layer_raises_clear_error(self, get):
+        response = Mock()
+        response.json.side_effect = ValueError("not json")
+        get.return_value = response
+
+        with patch(
+            "computing.base_layer_setup.TEHSIL_WATERSHEDS_DIR",
+            self.output_dir,
+        ):
+            with self.assertRaisesRegex(ValueError, "mws:mws_banka_banka.*not available"):
+                ensure_tehsil_watershed("Bihar", "Banka", "Banka")
+
+        self.assertFalse((self.output_dir / "bihar" / "banka" / "banka.gpkg").exists())
+
+    @patch("computing.base_layer_setup._download_tehsil_watershed")
+    def test_existing_file_is_not_downloaded(self, download):
+        destination = self.output_dir / "bihar" / "banka" / "banka.gpkg"
+        destination.parent.mkdir(parents=True)
+        destination.write_bytes(b"existing")
+
+        with patch(
+            "computing.base_layer_setup.TEHSIL_WATERSHEDS_DIR",
+            self.output_dir,
+        ):
+            result = ensure_tehsil_watershed("Bihar", "Banka", "Banka")
+
+        self.assertEqual(result, destination)
+        download.assert_not_called()
+
+    def test_concurrent_callers_download_once(self):
+        from concurrent.futures import ThreadPoolExecutor
+
+        calls = []
+
+        def fake_download(destination, layer_name):
+            calls.append(layer_name)
+            destination.write_bytes(b"downloaded")
+
+        with patch(
+            "computing.base_layer_setup.TEHSIL_WATERSHEDS_DIR",
+            self.output_dir,
+        ), patch(
+            "computing.base_layer_setup._download_tehsil_watershed",
+            side_effect=fake_download,
+        ):
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(
+                    pool.map(
+                        lambda _: ensure_tehsil_watershed("Bihar", "Banka", "Banka"),
+                        range(4),
+                    )
+                )
+
+        self.assertEqual(calls, ["mws:mws_banka_banka"])
