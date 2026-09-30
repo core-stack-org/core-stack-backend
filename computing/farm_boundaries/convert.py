@@ -27,6 +27,7 @@ import logging
 import os
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 from shapely.geometry import shape
 from shapely.validation import make_valid
@@ -45,6 +46,9 @@ ALU_TYPE_TO_PARQUET = {
     "farm_pond":  "farm_ponds.parquet",
     "other_water": "other_water.parquet",
 }
+
+# Placeholders filled in later by et_intersection (Phase 3) from monthly MAI.
+STRESS_MONTH_COLUMNS = ["mild_stress_months", "moderate_stress_months", "severe_stress_months"]
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -381,10 +385,14 @@ def convert_to_geoparquet(
         # logger.info("[%s] duplicated farm_id count: %d", alu_type, dup_count)
         # ------------------------------------
 
+        if alu_type == "field":
+            for col in STRESS_MONTH_COLUMNS:
+                subset[col] = np.nan
+
         # Reorder columns
         priority_cols = ["farm_id", "cell_token",
                          "alu_type", "plus_code", "area_m2", "class_confidence",
-                         "capture_date", "geometry"]
+                         "capture_date"] + STRESS_MONTH_COLUMNS + ["geometry"]
         existing = [c for c in priority_cols if c in subset.columns]
         subset = subset[existing]
 

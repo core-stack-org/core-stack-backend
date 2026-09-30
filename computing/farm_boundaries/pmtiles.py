@@ -1,33 +1,3 @@
-"""
-Phase 4 — Convert farm_boundaries.parquet into a PMTiles vector tile archive
-and upload it to S3.
-
-Pipeline:
-    farm_boundaries.parquet
-        -> newline-delimited GeoJSON (GeoJSONSeq), via GeoPandas/Fiona
-        -> tippecanoe                                  -> intermediate .mbtiles
-        -> `pmtiles convert` (go-pmtiles CLI)           -> farm_boundaries.pmtiles
-        -> boto3 upload                                -> S3
-
-Everything is built inside a temp directory — no .pmtiles (or intermediate
-.geojsonl/.mbtiles) file is kept on local disk; the only persistent copy
-lives in S3.
-
-Both `tippecanoe` and the `pmtiles` CLI are external binaries, not Python
-packages. `tippecanoe` is installed into the project's conda env
-(corestackenv); `pmtiles` is a standalone system binary. Both must be
-reachable on PATH wherever this runs.
-
-S3 destination (same credentials/region as dpr/utils.py's upload_dpr_to_s3,
-different bucket):
-    corestack-farm-data/<state>/<district>/<block>.pmtiles
-
-Usage (standalone / debug):
-    from computing.farm_boundaries.pmtiles import convert_boundaries_to_pmtiles
-    result = convert_boundaries_to_pmtiles("rajasthan", "jaipur", "sanganer")
-    print(result)
-"""
-
 import logging
 import os
 import shutil
@@ -49,12 +19,6 @@ LAYER_NAME = "farm_boundaries"
 # parquets, so consumers can look up everything else from there instead of
 # duplicating it into the tileset.
 TILE_PROPERTY_COLUMNS = ["farm_id", "area_m2"]
-
-# Zoom range for the generated tileset. Farms are small polygons (often
-# sub-hectare), so the max zoom is kept high enough to render individual
-# boundaries clearly; adjustable per call via convert_boundaries_to_pmtiles().
-DEFAULT_MIN_ZOOM = 8
-DEFAULT_MAX_ZOOM = 16
 
 REQUIRED_BINARIES = ["tippecanoe", "pmtiles"]
 
@@ -116,7 +80,7 @@ def _export_geojsonseq(gdf, out_path):
     gdf.to_file(out_path, driver="GeoJSONSeq")
 
 
-def _run_tippecanoe(geojsonseq_path, mbtiles_path, layer_name, min_zoom, max_zoom):
+def _run_tippecanoe(geojsonseq_path, mbtiles_path, layer_name):
     """
     Build an .mbtiles archive from a GeoJSONSeq file via tippecanoe.
 
@@ -136,9 +100,13 @@ def _run_tippecanoe(geojsonseq_path, mbtiles_path, layer_name, min_zoom, max_zoo
         "-l",
         layer_name,
         "-Z",
-        str(min_zoom),
+        "8",
         "-z",
-        str(max_zoom),
+        "16",
+        "-D",
+        "6",
+        "-d",
+        "16",
         "--read-parallel",
         "--extend-zooms-if-still-dropping",
         geojsonseq_path,
@@ -191,8 +159,6 @@ def convert_boundaries_to_pmtiles(
     state: str,
     district: str,
     block: str,
-    min_zoom: int = DEFAULT_MIN_ZOOM,
-    max_zoom: int = DEFAULT_MAX_ZOOM,
 ) -> dict:
     """
     Phase 4: convert farm_boundaries.parquet into a PMTiles vector tile
@@ -221,7 +187,7 @@ def convert_boundaries_to_pmtiles(
             f"Farm boundaries parquet not found at {farm_path}. Run Phases 1 & 2 first."
         )
 
-    logger.info("Phase 4 — PMTiles conversion: %s/%s/%s", state, district, block)
+    logger.info("Phase 5 — PMTiles conversion: %s/%s/%s", state, district, block)
 
     gdf = gpd.read_parquet(farm_path)
     logger.info("Loaded %d farm polygons.", len(gdf))
@@ -245,7 +211,7 @@ def convert_boundaries_to_pmtiles(
         logger.info("Exporting %d farms to GeoJSONSeq...", len(gdf))
         _export_geojsonseq(gdf, geojsonseq_path)
 
-        _run_tippecanoe(geojsonseq_path, mbtiles_path, LAYER_NAME, min_zoom, max_zoom)
+        _run_tippecanoe(geojsonseq_path, mbtiles_path, LAYER_NAME)
         _convert_mbtiles_to_pmtiles(mbtiles_path, pmtiles_path)
 
         size_bytes = os.path.getsize(pmtiles_path)
@@ -260,8 +226,6 @@ def convert_boundaries_to_pmtiles(
         "farm_count": len(gdf),
         "s3_url": s3_url,
         "size_bytes": size_bytes,
-        "min_zoom": min_zoom,
-        "max_zoom": max_zoom,
     }
     logger.info("Phase 4 complete: %s", summary)
     return summary

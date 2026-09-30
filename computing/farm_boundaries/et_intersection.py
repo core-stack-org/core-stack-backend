@@ -781,7 +781,7 @@ CROP_RANKS = (1, 2, 3)
 CROP_RANK_OUTPUT_COLUMNS = ["crop1", "conf1", "crop2", "conf2", "crop3", "conf3"]
 CROP_NAME_COLUMNS = ["crop1", "crop2", "crop3"]
 CROP_CONF_COLUMNS = ["conf1", "conf2", "conf3"]
-
+CROP_DATE_COLUMNS = ["crop_start_date", "crop_end_date"]
 
 def _normalise_crop_name(value):
     """Return a stable crop label, or None if missing/blank."""
@@ -933,7 +933,7 @@ def _build_crop_year_table(gdf):
     same farm/year, the one with the greatest overlap wins, then the higher
     conf_1, then the earliest prediction start.
     """
-    empty_cols = ["farm_id", "year"] + CROP_RANK_OUTPUT_COLUMNS
+    empty_cols = ["farm_id", "year"] + CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS
     records = []
     farms_with_preds = 0
 
@@ -951,7 +951,7 @@ def _build_crop_year_table(gdf):
             if interval is None:
                 logger.warning("Farm %s: invalid monitoring_prediction interval skipped.", farm_id)
                 continue
-            pred_start, _ = interval
+            pred_start, pred_end = interval
 
             crop_fields = {}
             for rank in CROP_RANKS:
@@ -978,6 +978,8 @@ def _build_crop_year_table(gdf):
                 "year": int(best["year"]),
                 "overlap_seconds": best["overlap_seconds"],
                 "prediction_start": pred_start,
+                "crop_start_date": pred_start.strftime("%d/%m/%Y"),
+                "crop_end_date": pred_end.strftime("%d/%m/%Y"),
                 **crop_fields,
             })
 
@@ -1003,6 +1005,8 @@ def _build_crop_year_table(gdf):
         result[col] = pd.to_numeric(result[col], errors="coerce").astype("float64")
     for col in CROP_NAME_COLUMNS:
         result[col] = result[col].astype("string")
+    for col in CROP_DATE_COLUMNS:
+        result[col] = result[col].astype("string")
 
     logger.info(
         "Crop-year mapping: %d farm/year rows from %d predictions.",
@@ -1016,14 +1020,17 @@ def _add_crop_years_to_annual(annual, gdf, year):
     crop_table = _build_crop_year_table(gdf)
     crop_table = crop_table[crop_table["year"] == int(year)].copy()
 
-    annual = annual.drop(columns=CROP_RANK_OUTPUT_COLUMNS, errors="ignore")
+    all_crop_cols = CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS
+    annual = annual.drop(columns=all_crop_cols, errors="ignore")
     if crop_table.empty:
         for col in CROP_RANK_OUTPUT_COLUMNS:
             annual[col] = np.nan if col.startswith("conf") else None
+        for col in CROP_DATE_COLUMNS:
+            annual[col] = None
         return annual
 
     annual = annual.merge(
-        crop_table[["farm_id", "year"] + CROP_RANK_OUTPUT_COLUMNS],
+        crop_table[["farm_id", "year"] + all_crop_cols],
         on=["farm_id", "year"],
         how="left",
         validate="one_to_one",
@@ -1037,13 +1044,12 @@ def _add_crop_years_to_annual(annual, gdf, year):
 # pandas/pyarrow would otherwise infer as an integer/null type.
 
 def _enforce_crop_schema(df):
-    """Crop-name columns -> string, confidence columns -> float64."""
+    """Crop-name columns -> string, confidence columns -> float64, date columns -> dd/mm/yyyy string."""
     df = df.copy()
-    for col in CROP_NAME_COLUMNS:
+    for col in CROP_NAME_COLUMNS + CROP_DATE_COLUMNS:
         if col not in df.columns:
             df[col] = None
         elif pd.api.types.is_numeric_dtype(df[col]):
-            # Legacy int-coded (or all-null) column: names are unrecoverable.
             if df[col].notna().any():
                 logger.warning(
                     "Column %s held numeric codes; nulling it (reprocess to restore names).",
@@ -1062,7 +1068,7 @@ def _write_annual_parquet(df, path):
     """Write annual parquet with an explicit crop schema, even if a column is all-null."""
     df = _enforce_crop_schema(df)
     table = pa.Table.from_pandas(df, preserve_index=False)
-    targets = {c: pa.string() for c in CROP_NAME_COLUMNS}
+    targets = {c: pa.string() for c in CROP_NAME_COLUMNS + CROP_DATE_COLUMNS}
     targets.update({c: pa.float64() for c in CROP_CONF_COLUMNS})
     for col, typ in targets.items():
         i = table.schema.get_field_index(col)
@@ -1072,9 +1078,9 @@ def _write_annual_parquet(df, path):
 
 
 def _annual_crop_schema_ok(path):
-    """True only if all crop-name columns are stored as strings."""
+    """True only if all crop-name and crop-date columns are stored as strings."""
     schema = pq.read_schema(path)
-    for col in CROP_NAME_COLUMNS:
+    for col in CROP_NAME_COLUMNS + CROP_DATE_COLUMNS:
         i = schema.get_field_index(col)
         if i < 0:
             return False
@@ -1111,8 +1117,8 @@ def _save_annual_parquet(gdf, state, district, block, year):
     annual = _add_crop_years_to_annual(annual, gdf, year)
 
     col_order = ["farm_id", "tehsil", "district", "state", "area_in_ha", "year",
-                 "aet_annual", "pet_annual", "mai_annual", "kharif_mai",
-                 "kharif_water_stress", "kharif_severe_stress"] + CROP_RANK_OUTPUT_COLUMNS
+         "aet_annual", "pet_annual", "mai_annual", "kharif_mai",
+         "kharif_water_stress", "kharif_severe_stress"] + CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS
     annual = annual[[c for c in col_order if c in annual.columns]]
 
     if os.path.exists(out_path):
@@ -1177,6 +1183,52 @@ def _save_monthly_parquet(gdf, state, district, block, year):
         "farm_monthly.parquet updated → %s  (%d total rows)", out_path, len(combined)
     )
     return out_path
+
+
+# ── stress-month columns (static.parquet) ─────────────────────────────────────
+
+MONTHS_PER_YEAR = 12
+
+# Bands applied to MAI rounded to 2 dp (rounding makes the bands contiguous).
+STRESS_BANDS = {
+    "mild_stress_months":     (0.51, 0.75),
+    "moderate_stress_months": (0.26, 0.50),
+    "severe_stress_months":   (0.00, 0.25),
+}
+
+
+def _update_static_stress_months(state, district, block):
+    """
+    Populate mild/moderate/severe_stress_months in farms/static.parquet.
+
+    Per farm: stress months per 12-month year, pooled over all years in
+    farms/sub_annual.parquet and weighted by valid MAI months:
+        total stress months / total valid MAI months * 12
+    so years with missing (NaN) months are not under-counted. Farms with no
+    valid MAI month in any year get NaN. Values are rounded to 2 dp.
+    """
+    monthly_path = _monthly_parquet_path(state, district, block)
+    static_path  = _static_parquet_path(state, district, block)
+    if not (os.path.exists(monthly_path) and os.path.exists(static_path)):
+        logger.warning("Cannot update stress-month columns — monthly/static parquet missing.")
+        return None
+
+    monthly = pd.read_parquet(monthly_path, columns=["farm_id", "mai"])
+    mai = monthly["mai"].round(2)
+    for col, (lo, hi) in STRESS_BANDS.items():
+        monthly[col] = (mai >= lo) & (mai <= hi)          # NaN compares False → in no band
+    monthly["n_valid"] = mai.notna()
+
+    totals = monthly.groupby("farm_id")[list(STRESS_BANDS) + ["n_valid"]].sum()
+    valid_months = totals["n_valid"].where(totals["n_valid"] > 0)   # 0 valid months → NaN
+    avg = totals[list(STRESS_BANDS)].div(valid_months, axis=0).mul(MONTHS_PER_YEAR).round(2)
+
+    static = gpd.read_parquet(static_path)
+    for col in STRESS_BANDS:
+        static[col] = static["farm_id"].map(avg[col])      # farms with no valid month → NaN
+    static.to_parquet(static_path, index=False)
+    logger.info("Stress-month columns updated in %s", static_path)
+    return static_path
 
 
 # ── main entry point ───────────────────────────────────────────────────────────
@@ -1277,6 +1329,7 @@ def intersect_et_with_farms(
 
     annual_path  = _save_annual_parquet(gdf, state, district, block, year)
     monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
+    _update_static_stress_months(state, district, block)
 
     summary = {
         "state": state, "district": district, "block": block, "year": year,
@@ -1304,8 +1357,8 @@ def compute_multi_year_water_stress(
     state: str,
     district: str,
     block: str,
-    start_year: int = 2021,
-    end_year: int = 2023,
+    start_year: int = 2017,
+    end_year: int = 2024,
 ) -> dict:
     """
     Run Phase 3 for each year in [start_year, end_year] and compute
@@ -1383,6 +1436,8 @@ def compute_multi_year_water_stress(
         kharif_stress_count += is_stress.astype(int)
         stress_mask = is_stress & np.isfinite(kharif_mai_values)
         kharif_mai_sum_stress[stress_mask] += kharif_mai_values[stress_mask]
+
+    _update_static_stress_months(state, district, block)
 
     # Cross-year indicators
     result_gdf = base_gdf.copy()
