@@ -2053,6 +2053,9 @@ def get_agri_low_yield_data(state, district, block):
         total_to_barren = 0.0
         total_to_scrub = 0.0
 
+        total_all_area = 0.0
+        #float(df_cropIntensity["total_change_crop_intensity_area_in_ha"].sum())
+
         for uid in matched_uids:
 
             area_row = df_area[df_area["UID"] == uid]
@@ -2060,6 +2063,20 @@ def get_agri_low_yield_data(state, district, block):
                 farmland_area = area_row.iloc[0]["sum_area_in_ha"]
                 if pd.notna(farmland_area):
                     total_farmland_area += float(farmland_area)
+
+            intensity_row = df_cropIntensity[df_cropIntensity["UID"] == uid]
+            if not intensity_row.empty:
+                intensity_d_t_s = intensity_row.iloc[0]["double_to_single_area_in_ha"]
+                intensity_t_t_s = intensity_row.iloc[0]["triple_to_single_area_in_ha"]
+                intensity_t_t_d = intensity_row.iloc[0]["triple_to_double_area_in_ha"]
+                if pd.notna(intensity_d_t_s):
+                    total_all_area += float(intensity_d_t_s)
+                
+                if pd.notna(intensity_t_t_s):
+                    total_all_area += float(intensity_t_t_s)
+
+                if pd.notna(intensity_t_t_d):
+                    total_all_area += float(intensity_t_t_d)
 
             degrade_row = df_degrade[df_degrade["UID"] == uid]
             if not degrade_row.empty:
@@ -2095,7 +2112,7 @@ def get_agri_low_yield_data(state, district, block):
         }
 
         # Calculate total area of ALL MWS (more concise)
-        total_all_area = float(df_area["sum_area_in_ha"].sum())
+        
 
         result = {
             "mws_pattern": mws_pattern,
@@ -2251,7 +2268,7 @@ def get_forest_degrad_data(state, district, block):
         }
 
         # Calculate total area of ALL MWS (more concise)
-        total_all_area = float(df_degrade["total_deforestation_area_in_ha"].sum())
+        total_all_area = float(df_degrade["total_deforestation_area_in_ha"].sum() + df_degrade["forest_to_forest_area_in_ha"].sum())
 
         result = {
             "mws_pattern": mws_pattern,
