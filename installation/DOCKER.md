@@ -29,6 +29,9 @@ docker run --rm --gpus all nvidia/cuda:12.9.0-base-ubuntu22.04 nvidia-smi
 On a network that only reaches the internet through a proxy (for example a
 campus network), read [Behind a proxy](#behind-a-proxy) first.
 
+If this machine already has CoRE Stack containers or images from an earlier
+installation, [remove them](#remove-an-earlier-installation) first.
+
 ## 2. Install
 
 **1. Get the code**
@@ -337,6 +340,38 @@ docker compose --env-file nrm_app/.env exec --user "$(id -u):$(id -g)" backend p
 
 `docker compose --env-file nrm_app/.env down -v` deletes the database,
 GeoServer and Redis data. `data/` on the host is kept.
+
+## Remove an earlier installation
+
+This deletes the containers, the database, GeoServer and Redis data, the
+images and the build cache. `data/` on the host is kept.
+
+```bash
+docker compose -p core-stack down --volumes --remove-orphans
+docker rmi corestack-backend-local:latest postgres:16-bookworm redis:7-alpine kartoza/geoserver:2.24.4 alpine:3.20
+docker builder prune -af
+```
+
+`No such image` for one of the images is fine. Check that nothing is left;
+each command prints only its header, and the last prints nothing:
+
+```bash
+docker ps -a --filter name=core-stack
+docker volume ls --filter name=core-stack
+docker network ls --filter name=corestack
+docker images | grep -E 'corestack|postgres|redis|geoserver|alpine'
+```
+
+To also delete the downloaded and computed data, remove `data/` in the
+repository, or under `CORESTACK_HOST_DATA_DIR` if you set it:
+
+```bash
+rm -rf data
+```
+
+Use `sudo` if an older installation left files owned by root. The next start
+downloads the admin boundaries again; see [step 4](#2-install) to use your own
+copy.
 
 ## Troubleshooting
 
