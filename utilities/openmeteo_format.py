@@ -5,6 +5,7 @@ import ast
 import json
 import re
 
+from public_api.catalog_document import response_unit_map
 from utilities.renderers import round_floats
 
 YEAR_SUFFIX_RE = re.compile(
@@ -164,45 +165,8 @@ def _metadata_key_without_unit(key):
     return original, unit, False
 
 
-# Exact column names from KYL JSON (lowercase); anything else falls back to _infer_unit().
-KYL_INDICATOR_UNIT_OVERRIDES = {
-    "mws_id": "id",
-    "terraincluster_id": "id",
-    "avg_precipitation": "mm",
-    "cropping_intensity_trend": "code",
-    "cropping_intensity_avg": "ratio",
-    "avg_single_cropped": "ha",
-    "avg_double_cropped": "ha",
-    "avg_triple_cropped": "ha",
-    "avg_wsr_ratio_kharif": "ratio",
-    "avg_wsr_ratio_rabi": "ratio",
-    "avg_wsr_ratio_zaid": "ratio",
-    "avg_kharif_surface_water_mws": "mm",
-    "avg_rabi_surface_water_mws": "mm",
-    "avg_zaid_surface_water_mws": "mm",
-    "trend_swb": "code",
-    "trend_g": "code",
-    "drought_category": "category",
-    "avg_number_dry_spell": "count",
-    "avg_runoff": "mm",
-    "total_nrega_assets": "count",
-    "mws_intersect_villages": "list",
-    "degradation_land_area": "ha",
-    "increase_in_tree_cover": "ha",
-    "decrease_in_tree_cover": "ha",
-    "degradation_cropping_intensity": "ratio",
-    "urbanization_area": "ha",
-    "lulc_slope_category": "category",
-    "lulc_plain_category": "category",
-    "area_wide_scale_restoration": "ha",
-    "area_protection": "ha",
-    "aquifer_class": "class",
-    "soge_class": "class",
-    "lcw_conflict": "flag",
-    "mining": "flag",
-    "green_credit": "flag",
-    "factory_csr": "flag",
-}
+# Exact column names from catalog.json; anything else falls back to _infer_unit().
+KYL_INDICATOR_UNIT_OVERRIDES = response_unit_map("get_mws_kyl_indicators")
 
 
 def indicator_unit_for_key(key):
@@ -272,15 +236,7 @@ def flat_kyl_indicator_payload(rows):
 
 
 # get_generated_layer_urls: list of GeoServer layers (no time-series axes).
-GENERATED_LAYER_FIELD_UNITS = {
-    "layer_name": "name",
-    "dataset_name": "name",
-    "layer_type": "vector|raster|point|custom",
-    "layer_url": "geoserver_wfs_or_wcs_url",
-    "layer_version": "version_label",
-    "style_url": "style_url_or_empty",
-    "gee_asset_path": "earth_engine_asset_id_or_null",
-}
+GENERATED_LAYER_FIELD_UNITS = response_unit_map("get_generated_layer_urls")
 
 
 def flat_generated_layers_payload(layers):
@@ -297,15 +253,7 @@ def flat_generated_layers_payload(layers):
 
 
 # get_active_locations: hierarchical state → district → block/tehsil (not time series).
-ACTIVE_LOCATION_FIELD_HINTS = {
-    "label": "display_name",
-    "value": "ordinal_code_in_ui_list",
-    "state_id": "state_identifier",
-    "district_id": "district_identifier",
-    "block_id": "block_tehsil_identifier",
-    "district": "districts_under_state",
-    "blocks": "blocks_tehsils_under_district",
-}
+ACTIVE_LOCATION_FIELD_HINTS = response_unit_map("get_active_locations")
 
 
 def flat_active_locations_payload(locations):
@@ -323,11 +271,7 @@ def flat_active_locations_payload(locations):
     )
 
 
-ADMIN_DETAIL_FIELD_HINTS = {
-    "State": "state_name",
-    "District": "district_name",
-    "Tehsil": "tehsil_or_block_name",
-}
+ADMIN_DETAIL_FIELD_HINTS = response_unit_map("get_admin_details_by_latlon")
 
 
 def flat_admin_detail_payload(data):
@@ -350,12 +294,7 @@ def flat_admin_detail_payload(data):
     )
 
 
-MWS_BY_LATLON_FIELD_HINTS = {
-    "uid": "mws_identifier",
-    "State": "state_name",
-    "District": "district_name",
-    "Tehsil": "tehsil_or_block_name",
-}
+MWS_BY_LATLON_FIELD_HINTS = response_unit_map("get_mwsid_by_latlon")
 
 
 def flat_mws_by_latlon_payload(data):
@@ -382,9 +321,7 @@ def flat_mws_by_latlon_payload(data):
     )
 
 
-MWS_REPORT_FIELD_HINTS = {
-    "Mws_report_url": "mws_pdf_or_html_report_url",
-}
+MWS_REPORT_FIELD_HINTS = response_unit_map("get_mws_report")
 
 
 def flat_mws_report_url_payload(data):
@@ -403,13 +340,7 @@ def flat_mws_report_url_payload(data):
     )
 
 
-MWS_GEOMETRY_FIELD_HINTS = {
-    "uid": "mws_identifier",
-    "state": "normalized_state_name",
-    "district": "normalized_district_name",
-    "tehsil": "normalized_tehsil_name",
-    "geometry": "geojson_geometry_object",
-}
+MWS_GEOMETRY_FIELD_HINTS = response_unit_map("get_mws_geometries")
 
 
 def flat_mws_geometry_payload(data):
@@ -437,14 +368,7 @@ def flat_mws_geometry_payload(data):
     )
 
 
-VILLAGE_GEOMETRY_FIELD_HINTS = {
-    "village_id": "vill_ID_from_layer",
-    "village_name": "vill_name_from_layer",
-    "state": "normalized_state_name",
-    "district": "normalized_district_name",
-    "tehsil": "normalized_tehsil_name",
-    "geometry": "geojson_geometry_object",
-}
+VILLAGE_GEOMETRY_FIELD_HINTS = response_unit_map("get_village_geometries")
 
 
 def flat_village_geometries_payload(rows):

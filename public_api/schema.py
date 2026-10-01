@@ -42,9 +42,12 @@ PUBLIC_API_TAGS = [
         "name": "Catalog",
         "description": (
             "RFC 9727 `/.well-known/api-catalog` points agents at OpenAPI "
-            "and ReDoc. `GET /api/v2/catalog/` lists public v2 routes and "
-            "the properties each can return. Use `fields=` on MWS and KYL, "
-            "and `data=` on tehsil sheets, to fetch only those properties."
+            "and ReDoc. `GET /api/v2/catalog/` lists public v2 routes. "
+            "`data.catalog.description` explains the list. "
+            "`GET /api/v2/catalog/{api_id}/` returns parameters and properties. "
+            "Each property has a name, type, unit, and description. "
+            "Use `fields=` on MWS and KYL, and `data=` on tehsil sheets, "
+            "to fetch only the selectable properties."
         ),
     },
 ]

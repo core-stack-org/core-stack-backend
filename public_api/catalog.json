@@ -1,0 +1,2194 @@
+{
+  "description": "Units, property descriptions, and route text are loaded from one catalog document. This list is not built by scanning one tehsil file. apis is one summary per route: id, group (dataset or waterbody), path, method, title, description, select_param, property_count, properties_url, and href. GET /api/v2/catalog/{api_id}/ adds parameters and properties. Each property has name, type, unit, description, and selectable. Names with selectable true are what you pass to fields= on MWS fortnight metrics and KYL indicators, or to data= on tehsil sheets. For get_tehsil_data, unit is a map of column name to measurement unit, the same map returned as tehsil_units. Omit data, or pass data=all, to receive every sheet present in that tehsil's file. The catalog lists sheets the platform can produce; a given tehsil file may include only some of them.",
+  "tehsil_data_all": {
+    "name": "all",
+    "description": "Every CoRE Stack dataset generated for this tehsil. This is the default when data is omitted. The response includes the sheets that are actually present in that tehsil's file."
+  },
+  "apis": [
+    {
+      "id": "get_admin_details_by_latlon",
+      "group": "dataset",
+      "path": "/api/v2/get_admin_details_by_latlon/",
+      "method": "GET",
+      "title": "Get Admin Details by Lat Lon",
+      "description": "Resolve a latitude and longitude to the State, District, and Tehsil names CoRE Stack uses to store datasets. Copy those three names into the other dataset APIs, such as tehsil data, micro-watershed geometries, generated layers, and waterbodies. latitude and longitude are required WGS84 coordinates, and the point must fall inside the Survey of India boundary. Confirm the tehsil is listed by Get Active Locations before you request its datasets.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "latitude",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "WGS84 latitude (-90 to 90)"
+        },
+        {
+          "name": "longitude",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "WGS84 longitude (-180 to 180)"
+        }
+      ],
+      "properties": [
+        {
+          "name": "State",
+          "type": "string",
+          "unit": "state_name",
+          "description": "state name",
+          "selectable": false
+        },
+        {
+          "name": "District",
+          "type": "string",
+          "unit": "district_name",
+          "description": "district name",
+          "selectable": false
+        },
+        {
+          "name": "Tehsil",
+          "type": "string",
+          "unit": "tehsil_or_block_name",
+          "description": "tehsil or block name",
+          "selectable": false
+        }
+      ]
+    },
+    {
+      "id": "get_mwsid_by_latlon",
+      "group": "dataset",
+      "path": "/api/v2/get_mwsid_by_latlon/",
+      "method": "GET",
+      "title": "Get MWSID by Lat Lon",
+      "description": "Resolve a latitude and longitude to the micro-watershed that contains that point. It returns uid, which you pass as mws_id to the time series, KYL indicators, geometry, and watershed report, together with the State, District, and Tehsil names for that watershed. latitude and longitude are required WGS84 coordinates.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "latitude",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "WGS84 latitude (-90 to 90)"
+        },
+        {
+          "name": "longitude",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "WGS84 longitude (-180 to 180)"
+        }
+      ],
+      "properties": [
+        {
+          "name": "uid",
+          "type": "string",
+          "unit": "mws_identifier",
+          "description": "mws identifier",
+          "selectable": false
+        },
+        {
+          "name": "State",
+          "type": "string",
+          "unit": "state_name",
+          "description": "state name",
+          "selectable": false
+        },
+        {
+          "name": "District",
+          "type": "string",
+          "unit": "district_name",
+          "description": "district name",
+          "selectable": false
+        },
+        {
+          "name": "Tehsil",
+          "type": "string",
+          "unit": "tehsil_or_block_name",
+          "description": "tehsil or block name",
+          "selectable": false
+        }
+      ]
+    },
+    {
+      "id": "get_tehsil_data",
+      "group": "dataset",
+      "path": "/api/v2/get_tehsil_data/",
+      "method": "GET",
+      "title": "Get Tehsil Data",
+      "description": "Return the analytical datasets CoRE Stack has generated for one tehsil, including drought, hydrology, land use, MGNREGA, and the other sheets listed here. state, district, and tehsil must be the names from Get Active Locations or Get Admin Details by Lat Lon. Omit data, or pass data=all, for every sheet in that tehsil's file. Pass data=drought,stream_order to keep named sheets. Each sheet is one row per micro-watershed. Each property unit is that sheet's column units, the same map returned as tehsil_units. A tehsil file may contain only some of the sheets listed in this catalog.",
+      "select_param": "data",
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "data",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Omit or all for every dataset in this tehsil's file. Or sheet names such as drought,stream_order"
+        }
+      ],
+      "properties": [
+        {
+          "name": "agroecological",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "organization_name": "value",
+            "organization_type": "value",
+            "created_at": "value",
+            "contact_person": "value",
+            "email": "value",
+            "domains": "value"
+          },
+          "description": "Agroecological zone attributes per MWS",
+          "selectable": true
+        },
+        {
+          "name": "antyodaya",
+          "type": "object[]",
+          "unit": {
+            "village_id": "id",
+            "village_name": "name",
+            "state_name": "value",
+            "district_name": "value",
+            "tehsil": "value",
+            "pc11_state_id": "value",
+            "pc11_district_id": "value",
+            "pc11_subdistrict_id": "value",
+            "institutionalization_cat_cluster": "value",
+            "institutionalization_cat_value": "value",
+            "shg_pen_feat_cluster": "value",
+            "shg_pen_feat_value": "value",
+            "total_hhd": "number",
+            "total_hhd_mobilized_into_shg": "number",
+            "shg_fed_feat_cluster": "value",
+            "shg_fed_feat_value": "value",
+            "total_no_of_shg_promoted": "number",
+            "total_shg": "number",
+            "pg_pen_feat_cluster": "value",
+            "pg_pen_feat_value": "value",
+            "total_hhd_mobilized_into_pg": "number",
+            "fpo_feat_cluster": "value",
+            "fpo_feat_value": "value",
+            "availability_of_fpos_pacs": "value",
+            "social_protection_cat_cluster": "value",
+            "social_protection_cat_value": "value",
+            "pds_util_feat_cluster": "value",
+            "pds_util_feat_value": "value",
+            "gp_total_hhd_eligible_under_nfsa": "number",
+            "gp_total_hhd_receiving_food_grains_from_fps": "number",
+            "bpl_cov_feat_cluster": "value",
+            "bpl_cov_feat_value": "value",
+            "total_hhd_having_bpl_cards": "number",
+            "nfsa_cov_feat_cluster": "value",
+            "nfsa_cov_feat_value": "value",
+            "pension_cov_feat_cluster": "value",
+            "pension_cov_feat_value": "value",
+            "total_hhd_availing_pension_under_nsap": "number",
+            "civic_infrastructure_cat_cluster": "value",
+            "civic_infrastructure_cat_value": "value",
+            "panchayat_bhawan_feat_cluster": "value",
+            "panchayat_bhawan_feat_value": "value",
+            "availability_of_panchayat_bhawan": "value",
+            "post_office_feat_cluster": "value",
+            "post_office_feat_value": "value",
+            "is_post_office_available": "value",
+            "rep_training_feat_cluster": "value",
+            "rep_training_feat_value": "value",
+            "total_no_of_elect_rep_undergone_training_under_rgsa": "number",
+            "total_no_of_elected_representatives": "number",
+            "rep_orientation_feat_cluster": "value",
+            "rep_orientation_feat_value": "value",
+            "total_no_of_elect_rep_oriented_under_rgsa": "number",
+            "info_board_feat_cluster": "value",
+            "info_board_feat_value": "value",
+            "availability_of_public_information_board": "value",
+            "public_library_feat_cluster": "value",
+            "public_library_feat_value": "value",
+            "availability_of_public_library": "value",
+            "financial_inclusion_cat_cluster": "value",
+            "financial_inclusion_cat_value": "value",
+            "bank_feat_cluster": "value",
+            "bank_feat_value": "value",
+            "is_bank_available": "value",
+            "atm_feat_cluster": "value",
+            "atm_feat_value": "value",
+            "is_atm_available": "value",
+            "bank_correspondent_feat_cluster": "value",
+            "bank_correspondent_feat_value": "value",
+            "is_bank_buss_correspondent_with_internet": "value",
+            "shg_credit_feat_cluster": "value",
+            "shg_credit_feat_value": "value",
+            "total_shg_accessed_bank_loans": "number",
+            "jan_dhan_pen_feat_cluster": "value",
+            "jan_dhan_pen_feat_value": "value",
+            "total_hhd_availing_pmjdy_bank_ac": "number",
+            "energy_access_cat_cluster": "value",
+            "energy_access_cat_value": "value",
+            "electrification_rate_feat_cluster": "value",
+            "electrification_rate_feat_value": "value",
+            "availablility_hours_of_domestic_electricity": "value",
+            "electricity_supply_to_msme_feat_cluster": "value",
+            "electricity_supply_to_msme_feat_value": "value",
+            "availability_of_elect_supply_to_msme": "value",
+            "clean_energy_penetration_feat_cluster": "value",
+            "clean_energy_penetration_feat_value": "value",
+            "total_hhd_with_clean_energy": "number",
+            "road_connectivity_cat_cluster": "value",
+            "road_connectivity_cat_value": "value",
+            "all_weather_road_feat_cluster": "value",
+            "all_weather_road_feat_value": "value",
+            "is_village_connected_to_all_weather_road": "value",
+            "internal_pucca_road_feat_cluster": "value",
+            "internal_pucca_road_feat_value": "value",
+            "availability_of_internal_pucca_road": "value",
+            "public_transport_feat_cluster": "value",
+            "public_transport_feat_value": "value",
+            "availability_of_public_transport": "value",
+            "railway_station_feat_cluster": "value",
+            "railway_station_feat_value": "value",
+            "availability_of_railway_station": "value",
+            "housing_quality_cat_cluster": "value",
+            "housing_quality_cat_value": "value",
+            "pucca_housing_rate_feat_cluster": "value",
+            "pucca_housing_rate_feat_value": "value",
+            "total_hhd_with_kuccha_wall_kuccha_roof": "number",
+            "housing_scheme_coverage_feat_cluster": "value",
+            "housing_scheme_coverage_feat_value": "value",
+            "total_hhd_got_benefit_under_state_housing_scheme": "number",
+            "pmay_demand_met_feat_cluster": "value",
+            "pmay_demand_met_feat_value": "value",
+            "total_hhd_have_got_pmay_house": "number",
+            "total_hhd_in_pmay_permanent_wait_list": "number",
+            "ujjwala_coverage_feat_cluster": "value",
+            "ujjwala_coverage_feat_value": "value",
+            "total_hhd_availing_pmuy_benefits": "number",
+            "maternal_child_health_cat_cluster": "value",
+            "maternal_child_health_cat_value": "value",
+            "awc_infra_enrollment_coverage_feat_cluster": "value",
+            "awc_infra_enrollment_coverage_feat_value": "value",
+            "availability_of_mother_child_health_facilities": "value",
+            "is_aanganwadi_centre_available": "value",
+            "is_early_childhood_edu_provided_in_anganwadi": "value",
+            "total_childs_aged_0_to_3_years": "number",
+            "total_childs_aged_0_to_3_years_reg_under_aanganwadi": "number",
+            "total_childs_aged_3_to_6_years_reg_under_aanganwadi": "number",
+            "total_female_child_age_bw_0_6": "number",
+            "total_male_child_age_bw_0_6": "number",
+            "total_no_of_children_in_icds_cas": "number",
+            "total_no_of_registered_children_in_anganwadi": "number",
+            "maternal_health_care_access_feat_cluster": "value",
+            "maternal_health_care_access_feat_value": "value",
+            "total_anemic_pregnant_women": "number",
+            "total_no_of_lactating_mothers": "number",
+            "total_no_of_lactating_mothers_receiving_services_under_icds": "number",
+            "total_no_of_pregnant_women": "number",
+            "total_no_of_pregnant_women_receiving_services_under_icds": "number",
+            "total_no_of_women_delivered_babies_at_hospitals_registered_asha": "number",
+            "child_nutrition_development_feat_cluster": "value",
+            "child_nutrition_development_feat_value": "value",
+            "total_childs_aged_0_to_3_years_immunized": "number",
+            "total_childs_categorized_non_stunted_as_per_icds": "number",
+            "total_no_of_young_anemic_children_6_59_months_in_icds_cas": "number",
+            "total_underweight_child_age_under_6_years": "number",
+            "newborn_health_outcomes_feat_cluster": "value",
+            "newborn_health_outcomes_feat_value": "value",
+            "total_no_of_newly_born_children": "number",
+            "total_no_of_newly_born_underweight_children": "number",
+            "health_schemes_utilization_feat_cluster": "value",
+            "health_schemes_utilization_feat_value": "value",
+            "gp_total_no_of_beneficiaries_receiving_benefits_under_pmjay": "number",
+            "gp_total_no_of_eligible_beneficiaries_under_pmjay": "number",
+            "total_hhd_registered_under_pmjay": "number",
+            "total_no_of_beneficiaries_receiving_benefits_under_pmmvy": "number",
+            "total_no_of_eligible_beneficiaries_under_pmmvy": "number",
+            "water_sanitation_cat_cluster": "value",
+            "water_sanitation_cat_value": "value",
+            "piped_water_coverage_feat_cluster": "value",
+            "piped_water_coverage_feat_value": "value",
+            "availability_of_piped_tap_water": "value",
+            "total_hhd_having_piped_water_connection": "number",
+            "sanitation_coverage_feat_cluster": "value",
+            "sanitation_coverage_feat_value": "value",
+            "total_hhd_not_having_sanitary_latrines": "number",
+            "drainage_quality_feat_cluster": "value",
+            "drainage_quality_feat_value": "value",
+            "availability_of_drainage_system": "value",
+            "waste_disposal_feat_cluster": "value",
+            "waste_disposal_feat_value": "value",
+            "is_community_waste_disposal_system": "value",
+            "biogas_waste_recycling_feat_cluster": "value",
+            "biogas_waste_recycling_feat_value": "value",
+            "is_community_biogas_waste_recycle_for_production": "value",
+            "livelihoods_cottage_traditional_industry_cat_cluster": "value",
+            "livelihoods_cottage_traditional_industry_cat_value": "value",
+            "cottage_units_available_feat_cluster": "value",
+            "cottage_units_available_feat_value": "value",
+            "availability_of_cottage_small_scale_units": "value",
+            "cottage_industry_participation_feat_cluster": "value",
+            "cottage_industry_participation_feat_value": "value",
+            "total_hhd_engaged_cottage_small_scale_units": "number",
+            "handloom_feat_cluster": "value",
+            "handloom_feat_value": "value",
+            "is_handloom": "value",
+            "handicrafts_feat_cluster": "value",
+            "handicrafts_feat_value": "value",
+            "is_handicrafts": "value",
+            "livelihoods_employment_cat_cluster": "value",
+            "livelihoods_employment_cat_value": "value",
+            "farm_employment_feat_cluster": "value",
+            "farm_employment_feat_value": "value",
+            "total_hhd_engaged_in_farm_activities": "number",
+            "livelihoods_forest_resources_cat_cluster": "value",
+            "livelihoods_forest_resources_cat_value": "value",
+            "community_forest_feat_cluster": "value",
+            "community_forest_feat_value": "value",
+            "availability_of_community_forest": "value",
+            "minor_forest_production_feat_cluster": "value",
+            "minor_forest_production_feat_value": "value",
+            "availability_of_minor_forest_production": "value",
+            "forest_dependence_feat_cluster": "value",
+            "forest_dependence_feat_value": "value",
+            "total_hhd_source_of_minor_forest_production": "number",
+            "livelihoods_common_resources_cat_cluster": "value",
+            "livelihoods_common_resources_cat_value": "value",
+            "common_pastures_feat_cluster": "value",
+            "common_pastures_feat_value": "value",
+            "is_common_pastures_available": "value",
+            "livelihoods_alternative_farming_cat_cluster": "value",
+            "livelihoods_alternative_farming_cat_value": "value",
+            "alternative_farming_feat_cluster": "value",
+            "alternative_farming_feat_value": "value",
+            "is_bee_farming": "value",
+            "is_sericulture": "value",
+            "livelihoods_fisheries_cat_cluster": "value",
+            "livelihoods_fisheries_cat_value": "value",
+            "fisheries_aquaculture_feat_cluster": "value",
+            "fisheries_aquaculture_feat_value": "value",
+            "availability_of_aquaculture_ext_facility": "value",
+            "availability_of_fish_community_ponds": "value",
+            "availability_of_fish_farming": "value",
+            "livestock_veterinary_cat_cluster": "value",
+            "livestock_veterinary_cat_value": "value",
+            "veterinary_services_feat_cluster": "value",
+            "veterinary_services_feat_value": "value",
+            "availability_of_livestock_extension_services": "value",
+            "is_veterinary_hospital_available": "value",
+            "development_projects_feat_cluster": "value",
+            "development_projects_feat_value": "value",
+            "availability_of_goatary_dev_project": "value",
+            "availability_of_pigery_development": "value",
+            "availability_of_poultry_dev_project": "value",
+            "milk_routes_feat_cluster": "value",
+            "milk_routes_feat_value": "value",
+            "availability_of_milk_routes": "value",
+            "agriculture_land_cultivation_cat_cluster": "value",
+            "agriculture_land_cultivation_cat_value": "value",
+            "land_utilization_feat_cluster": "value",
+            "land_utilization_feat_value": "value",
+            "area_irrigated": "ha",
+            "net_sown_area": "ha",
+            "net_sown_area_kharif": "ha",
+            "net_sown_area_other": "ha",
+            "net_sown_area_rabi": "ha",
+            "total_cultivable_area": "ha",
+            "agriculture_irrigation_watershed_cat_cluster": "value",
+            "agriculture_irrigation_watershed_cat_value": "value",
+            "irrigation_infra_watershed_dev_feat_cluster": "value",
+            "irrigation_infra_watershed_dev_feat_value": "value",
+            "availability_of_major_source_of_irrigation": "value",
+            "availability_of_rain_harvest_system": "value",
+            "availability_of_watershed_dev_project": "value",
+            "nrega_nrm_exp_feat_cluster": "value",
+            "nrega_nrm_exp_feat_value": "value",
+            "total_approved_labour_budget_for_year": "number",
+            "total_expenditure_approved_under_nrm_labour_budget_during_yr": "number",
+            "modern_irrigation_feat_cluster": "value",
+            "modern_irrigation_feat_value": "value",
+            "no_of_farmers_using_drip_sprinkler": "value",
+            "total_no_of_farmers": "number",
+            "agriculture_organic_farming_cat_cluster": "value",
+            "agriculture_organic_farming_cat_value": "value",
+            "organic_farming_feat_cluster": "value",
+            "organic_farming_feat_value": "value",
+            "total_no_farmers_adopted_organic_farming": "number",
+            "agriculture_support_services_cat_cluster": "value",
+            "agriculture_support_services_cat_value": "value",
+            "agri_inputs_availability_feat_cluster": "value",
+            "agri_inputs_availability_feat_value": "value",
+            "is_fertilizer_shop_available": "value",
+            "is_govt_seed_centre_available": "value",
+            "is_soil_testing_centre_available": "value",
+            "agri_risk_support_feat_cluster": "value",
+            "agri_risk_support_feat_value": "value",
+            "total_no_of_farmers_received_benefit_under_pmfby": "number",
+            "total_no_of_farmers_registered_under_pmkpy": "number",
+            "soil_testing_adoption_feat_cluster": "value",
+            "soil_testing_adoption_feat_value": "value",
+            "total_no_of_farmers_add_fert_in_soil_as_per_report": "number",
+            "agricultural_markets_cat_cluster": "value",
+            "agricultural_markets_cat_value": "value",
+            "market_access_feat_cluster": "value",
+            "market_access_feat_value": "value",
+            "availability_of_market": "value",
+            "food_storage_feat_cluster": "value",
+            "food_storage_feat_value": "value",
+            "availability_of_food_storage_warehouse": "value"
+          },
+          "description": "Antyodaya / SECC socio-economic indicators",
+          "selectable": true
+        },
+        {
+          "name": "aquifer_vector",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "aquifer_class": "value",
+            "aquifer_classes": "class",
+            "aquifer_percentages": "%"
+          },
+          "description": "Aquifer class and area share per MWS",
+          "selectable": true
+        },
+        {
+          "name": "canal",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "project_name": "value",
+            "canal_code": "value",
+            "canal_name": "value"
+          },
+          "description": "Canal network intersection with the MWS",
+          "selectable": true
+        },
+        {
+          "name": "canopy_cover_density",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "high_density_area": "ha",
+            "low_density_area": "ha",
+            "missing_data_area": "ha",
+            "area": "ha",
+            "uid": "id"
+          },
+          "description": "Tree canopy cover density",
+          "selectable": true
+        },
+        {
+          "name": "canopy_height",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "short_trees_area": "ha",
+            "medium_trees_area": "ha",
+            "tall_trees_area": "ha",
+            "missing_data_area": "ha",
+            "area": "ha",
+            "uid": "id"
+          },
+          "description": "Tree canopy height",
+          "selectable": true
+        },
+        {
+          "name": "change_detection_cropintensity",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "single_to_single_area": "ha",
+            "single_to_double_area": "ha",
+            "single_to_triple_area": "ha",
+            "double_to_single_area": "ha",
+            "double_to_double_area": "ha",
+            "double_to_triple_area": "ha",
+            "triple_to_single_area": "ha",
+            "triple_to_double_area": "ha",
+            "triple_to_triple_area": "ha",
+            "total_change_crop_intensity_area": "ha"
+          },
+          "description": "Change detection: cropping intensity",
+          "selectable": true
+        },
+        {
+          "name": "change_detection_degradation",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "farm_to_barren_area": "ha",
+            "farm_to_built_up_area": "ha",
+            "farm_to_farm_area": "ha",
+            "farm_to_scrub_land_area": "ha",
+            "total_degradation_area": "ha"
+          },
+          "description": "Change detection: land degradation",
+          "selectable": true
+        },
+        {
+          "name": "change_detection_shrubchange",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "shrub_to_shrub_area": "ha",
+            "shrub_to_farm_area": "ha",
+            "shrub_to_tree_area": "ha",
+            "shrub_to_built_up_area": "ha",
+            "shrub_to_water_area": "ha",
+            "shrub_to_barren_area": "ha",
+            "total_change_area": "ha"
+          },
+          "description": "Change detection: shrub change",
+          "selectable": true
+        },
+        {
+          "name": "change_detection_tree_cover_decrease",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "forest_to_barren_area": "ha",
+            "forest_to_built_up_area": "ha",
+            "forest_to_farm_area": "ha",
+            "forest_to_forest_area": "ha",
+            "forest_to_scrub_land_area": "ha",
+            "total_tree_cover_decrease_area": "ha"
+          },
+          "description": "Change detection: tree-cover decrease (deforestation)",
+          "selectable": true
+        },
+        {
+          "name": "change_detection_tree_cover_increase",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "barren_to_forest_area": "ha",
+            "built_up_to_forest_area": "ha",
+            "farm_to_forest_area": "ha",
+            "forest_to_forest_area": "ha",
+            "scrub_land_to_forest_area": "ha",
+            "total_tree_cover_increase_area": "ha"
+          },
+          "description": "Change detection: tree-cover increase (afforestation)",
+          "selectable": true
+        },
+        {
+          "name": "change_detection_urbanization",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "barren_shrub_to_built_up_area": "ha",
+            "built_up_to_built_up_area": "ha",
+            "tree_farm_to_built_up_area": "ha",
+            "water_to_built_up_area": "ha",
+            "total_urbanization_area": "ha"
+          },
+          "description": "Change detection: urbanization",
+          "selectable": true
+        },
+        {
+          "name": "croppingdrought_kharif",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "no_drought": "weeks",
+            "mild": "weeks",
+            "moderate": "weeks",
+            "severe": "weeks",
+            "dry_spell": "weeks",
+            "kharif_cropped": "sqkm",
+            "monsoon_onset": "iso8601",
+            "kharif_cropped_area": "%",
+            "total_weeks": "weeks",
+            "uid": "id"
+          },
+          "description": "Kharif cropping vs drought years",
+          "selectable": true
+        },
+        {
+          "name": "croppingintensity_annual",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "cropping_intensity": "ratio",
+            "single_cropped_area": "ha",
+            "single_kharif_cropped_area": "ha",
+            "single_non_kharif_cropped_area": "ha",
+            "doubly_cropped_area": "ha",
+            "triply_cropped_area": "ha",
+            "area": "ha",
+            "sum_area": "ha",
+            "uid": "id"
+          },
+          "description": "Annual cropping intensity",
+          "selectable": true
+        },
+        {
+          "name": "dem",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "min_elevation": "m",
+            "max_elevation": "m",
+            "mean_elevation": "m"
+          },
+          "description": "Elevation / DEM summary per MWS",
+          "selectable": true
+        },
+        {
+          "name": "drainage_density",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "drainage_density_weighted": "km/km2",
+            "drainage_density_std": "km/km2",
+            "stream_order_length": "km"
+          },
+          "description": "Drainage density",
+          "selectable": true
+        },
+        {
+          "name": "drought",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "no_drought": "weeks",
+            "mild": "weeks",
+            "moderate": "weeks",
+            "severe": "weeks",
+            "dry_spell": "weeks",
+            "total_weeks": "weeks",
+            "area": "ha",
+            "uid": "id"
+          },
+          "description": "Drought frequency / weeks (if present as a sheet)",
+          "selectable": true
+        },
+        {
+          "name": "drought_causality",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "severe_moderate_drought_causality.keys": "label",
+            "severe_moderate_drought_causality.values": "category",
+            "severe_moderate_drought_causality": "category",
+            "mild_drought_causality.keys": "label",
+            "mild_drought_causality.values": "category",
+            "mild_drought_causality": "category",
+            "area": "ha",
+            "uid": "id"
+          },
+          "description": "Drought causality classes",
+          "selectable": true
+        },
+        {
+          "name": "facilities_proximity",
+          "type": "object[]",
+          "unit": {
+            "censuscode2011": "id",
+            "censusname": "value",
+            "agri_industry_agri_processing_distance": "km",
+            "agri_industry_agri_support_infrastructure_distance": "km",
+            "agri_industry_co_operatives_societies_distance": "km",
+            "agri_industry_dairy_animal_husbandry_distance": "km",
+            "agri_industry_distribution_utilities_distance": "km",
+            "agri_industry_industrial_manufacturing_distance": "km",
+            "agri_industry_markets_trading_distance": "km",
+            "agri_industry_storage_warehousing_distance": "km",
+            "apmc_distance": "km",
+            "bank_atm_distance": "km",
+            "bank_branch_distance": "km",
+            "bank_mitra_distance": "km",
+            "college_distance": "km",
+            "core_admin_uid": "value",
+            "csc_distance": "km",
+            "district": "value",
+            "health_chc_distance": "km",
+            "health_dis_h_distance": "km",
+            "health_phc_distance": "km",
+            "health_s_t_h_distance": "km",
+            "health_sub_cen_distance": "km",
+            "pds_distance": "km",
+            "school_higher_secondary_distance": "km",
+            "school_primary_distance": "km",
+            "school_secondary_distance": "km",
+            "school_upper_primary_distance": "km",
+            "shrid2": "value",
+            "state": "value",
+            "tehsil": "value",
+            "universities_distance": "km"
+          },
+          "description": "Distance to facilities (km)",
+          "selectable": true
+        },
+        {
+          "name": "factory_csr",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "company_name": "value",
+            "address": "value",
+            "location_t": "value"
+          },
+          "description": "Factory / CSR sites intersecting the MWS",
+          "selectable": true
+        },
+        {
+          "name": "green_credit",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "division": "value",
+            "land_info": "value",
+            "kml_url": "value"
+          },
+          "description": "Green credit / restoration opportunity",
+          "selectable": true
+        },
+        {
+          "name": "hydrological_annual",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "et": "mm",
+            "runoff": "mm",
+            "g": "mm",
+            "delta_g": "mm",
+            "precipitation": "mm",
+            "welldepth": "m",
+            "uid": "id"
+          },
+          "description": "Annual hydrology (ET, runoff, precipitation, …)",
+          "selectable": true
+        },
+        {
+          "name": "hydrological_seasonal",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "precipitation_kharif": "mm",
+            "precipitation_rabi": "mm",
+            "precipitation_zaid": "mm",
+            "et_kharif": "mm",
+            "et_rabi": "mm",
+            "et_zaid": "mm",
+            "runoff_kharif": "mm",
+            "runoff_rabi": "mm",
+            "runoff_zaid": "mm",
+            "delta_g_kharif": "mm",
+            "delta_g_rabi": "mm",
+            "delta_g_zaid": "mm",
+            "g_kharif": "mm",
+            "g_rabi": "mm",
+            "g_zaid": "mm",
+            "uid": "id"
+          },
+          "description": "Seasonal hydrology",
+          "selectable": true
+        },
+        {
+          "name": "lcw_conflict",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "title_of_conflict": "value",
+            "link_to_conflict": "value"
+          },
+          "description": "Land conflict watch overlay",
+          "selectable": true
+        },
+        {
+          "name": "livestock",
+          "type": "object[]",
+          "unit": {
+            "pc11_village_id": "value",
+            "name": "value",
+            "pc11_state_id": "value",
+            "pc11_district_id": "value",
+            "pc11_subdistrict_id": "value",
+            "cattle_male": "value",
+            "cattle_female": "value",
+            "cattle_total": "number",
+            "buffalo_male": "value",
+            "buffalo_female": "value",
+            "buffalo_total": "number",
+            "sheep_male": "value",
+            "sheep_female": "value",
+            "sheep_total": "number",
+            "goat_male": "value",
+            "goat_female": "value",
+            "goat_total": "number",
+            "pig_male": "value",
+            "pig_female": "value",
+            "pig_total": "number"
+          },
+          "description": "Livestock census indicators",
+          "selectable": true
+        },
+        {
+          "name": "lulc_vector",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "barrenland": "ha",
+            "built_up_area": "ha",
+            "cropland": "ha",
+            "double_crop": "ha",
+            "triple_crop": "ha",
+            "tree_forest": "ha",
+            "shrub_scrub": "ha",
+            "single_kharif": "ha",
+            "single_non_kharif": "ha",
+            "k_water": "ha",
+            "kr_water": "ha",
+            "krz_water": "ha",
+            "area": "ha",
+            "sum": "ha",
+            "uid": "id"
+          },
+          "description": "Land use / land cover class shares",
+          "selectable": true
+        },
+        {
+          "name": "mining",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "division": "value",
+            "proposal": "value",
+            "sector_moefcc": "value",
+            "village": "value"
+          },
+          "description": "Mining overlay",
+          "selectable": true
+        },
+        {
+          "name": "mws",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "watershed_code": "value",
+            "basin_code": "value",
+            "sub_basin_code": "value"
+          },
+          "description": "Micro-watershed identity and area",
+          "selectable": true
+        },
+        {
+          "name": "mws_connectivity",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "direction": "value",
+            "downstream_mws": "value",
+            "upstream_mws": "value"
+          },
+          "description": "MWS drainage connectivity",
+          "selectable": true
+        },
+        {
+          "name": "mws_intersect_swb",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "swb_uid": "value",
+            "waterbodies_name": "value",
+            "latitude": "value",
+            "longitude": "value"
+          },
+          "description": "Surface water bodies intersecting the MWS",
+          "selectable": true
+        },
+        {
+          "name": "mws_intersect_villages",
+          "type": "object[]",
+          "unit": {
+            "mws_uid": "value",
+            "area": "ha",
+            "village_ids": "value",
+            "village_details.keys": "label",
+            "village_details.values": "value",
+            "village_details": "value"
+          },
+          "description": "Villages intersecting the MWS",
+          "selectable": true
+        },
+        {
+          "name": "ndvi_shrub",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "shrub_trend": "value",
+            "shrub_slope": "value",
+            "shrub_mean": "value"
+          },
+          "description": "Shrub NDVI",
+          "selectable": true
+        },
+        {
+          "name": "nrega_annual",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "soil_and_water_conservation": "count",
+            "land_restoration": "count",
+            "plantations": "count",
+            "irrigation_on_farms": "count",
+            "other_farm_works": "count",
+            "off-farm_livelihood_assets": "count",
+            "community_assets": "count",
+            "mws_id": "id"
+          },
+          "description": "Annual MGNREGA works",
+          "selectable": true
+        },
+        {
+          "name": "nrega_assets_village",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "community_assets": "count",
+            "irrigation_on_farms": "count",
+            "land_restoration": "count",
+            "off-farm_livelihood_assets": "count",
+            "other_farm_works": "count",
+            "plantations": "count",
+            "soil_and_water_conservation": "count",
+            "vill_id": "id",
+            "vill_name": "name"
+          },
+          "description": "Village-level MGNREGA assets",
+          "selectable": true
+        },
+        {
+          "name": "overall_tree_change",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "tree_cover_increase_area": "ha",
+            "tree_cover_decrease_area": "ha",
+            "degradation_area": "ha",
+            "improvement_area": "ha",
+            "missing_data": "ha",
+            "no_change_area": "ha",
+            "partially_degraded_area": "ha"
+          },
+          "description": "Overall tree-cover change",
+          "selectable": true
+        },
+        {
+          "name": "restoration_vector",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "wide_scale_restoration_area": "ha",
+            "protection_area": "ha",
+            "mosaic_restoration_area": "ha",
+            "excluded_areas": "ha"
+          },
+          "description": "Restoration opportunity classes",
+          "selectable": true
+        },
+        {
+          "name": "river",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "river_name": "value"
+          },
+          "description": "River network intersection",
+          "selectable": true
+        },
+        {
+          "name": "social_economic_indicator",
+          "type": "object[]",
+          "unit": {
+            "state_census_id": "value",
+            "dist_census_id": "value",
+            "tehsil_census_id": "value",
+            "village_id": "id",
+            "village_name": "name",
+            "total_population": "count",
+            "total_sc_population": "count",
+            "total_st_population": "count",
+            "literacy_rate": "%",
+            "sc": "%",
+            "st": "%"
+          },
+          "description": "Social-economic indicator table",
+          "selectable": true
+        },
+        {
+          "name": "soge_vector",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "soge_dev": "%",
+            "class_code": "value",
+            "class_name": "value"
+          },
+          "description": "Stage of groundwater extraction (SOGE)",
+          "selectable": true
+        },
+        {
+          "name": "soil_health",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "area_under_cropping": "ha",
+            "area_under_tree_cover": "ha",
+            "n_mean_in_kg_per_ha": "value",
+            "p_mean_in_kg_per_ha": "value",
+            "k_mean_in_kg_per_ha": "value",
+            "oc_mean": "%"
+          },
+          "description": "Soil health parameters",
+          "selectable": true
+        },
+        {
+          "name": "soil_type",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "available_water_capacity_in_mm_per_m": "value",
+            "subsoil_bulk_density_in_kg_per_dm3": "value",
+            "subsoil_exchange_capacity_in_cmol_per_kg": "value",
+            "topsoil_bulk_density_in_kg_per_dm3": "value",
+            "topsoil_exchange_capacity_in_cmol_per_kg": "value"
+          },
+          "description": "Soil type",
+          "selectable": true
+        },
+        {
+          "name": "stream_order",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "order": "order",
+            "value": "%"
+          },
+          "description": "Stream-order length / density",
+          "selectable": true
+        },
+        {
+          "name": "surfacewaterbodies_annual",
+          "type": "object[]",
+          "unit": {
+            "time": "agricultural_year",
+            "total_area": "ha",
+            "kharif_area": "ha",
+            "rabi_area": "ha",
+            "zaid_area": "ha",
+            "total_swb_area": "ha",
+            "uid": "id"
+          },
+          "description": "Annual surface water body extent",
+          "selectable": true
+        },
+        {
+          "name": "terrain",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "terrain_cluster_id": "value",
+            "terrain_description": "value",
+            "hill_slope_area": "%",
+            "plain_area": "%",
+            "ridge_area": "%",
+            "slopy_area": "%",
+            "valley_area": "%"
+          },
+          "description": "Terrain cluster / morphometry",
+          "selectable": true
+        },
+        {
+          "name": "terrain_lulc_plain",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "terrain_cluster_id": "value",
+            "terrain_description": "value",
+            "cluster_name": "value",
+            "barren_area": "%",
+            "forests_area": "%",
+            "shrub_scrubs_area": "%",
+            "single_non_kharif_area": "%",
+            "single_kharif_area": "%",
+            "double_cropping_area": "%",
+            "triple_cropping_area": "%"
+          },
+          "description": "Terrain × LULC on plains",
+          "selectable": true
+        },
+        {
+          "name": "terrain_lulc_slope",
+          "type": "object[]",
+          "unit": {
+            "uid": "id",
+            "area": "ha",
+            "terrain_cluster_id": "value",
+            "terrain_description": "value",
+            "cluster_name": "value",
+            "barren_area": "%",
+            "forests_area": "%",
+            "shrub_scrubs_area": "%",
+            "single_kharif_area": "%",
+            "single_non_kharif_area": "%",
+            "double_cropping_area": "%",
+            "triple_cropping_area": "%"
+          },
+          "description": "Terrain × LULC on slopes",
+          "selectable": true
+        }
+      ]
+    },
+    {
+      "id": "get_mws_data",
+      "group": "dataset",
+      "path": "/api/v2/get_mws_data/",
+      "method": "GET",
+      "title": "Get MWS Time Series Data",
+      "description": "Fortnight hydrology time series for one micro-watershed: evapotranspiration, runoff, and precipitation, in steps of about 15 days. Requires state, district, tehsil, and mws_id, the uid from Get MWSID by Lat Lon. Pass fields=et,runoff to keep only those metrics. time is always returned. Values are in millimetres.",
+      "select_param": "fields",
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "mws_id",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Micro-watershed identifier, e.g. 12_208104"
+        },
+        {
+          "name": "fields",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Comma-separated fortnight metrics: et, runoff, precipitation"
+        }
+      ],
+      "properties": [
+        {
+          "name": "time",
+          "type": "string[]",
+          "unit": "iso8601",
+          "description": "Period start date for each ~15-day step",
+          "selectable": false
+        },
+        {
+          "name": "time_step",
+          "type": "string",
+          "unit": "15_days",
+          "description": "Fortnight length",
+          "selectable": false
+        },
+        {
+          "name": "mws_id",
+          "type": "string",
+          "unit": "id",
+          "description": "Micro-watershed identifier in metadata",
+          "selectable": false
+        },
+        {
+          "name": "et",
+          "type": "number[]",
+          "unit": "mm",
+          "description": "Evapotranspiration for each ~15-day step",
+          "selectable": true
+        },
+        {
+          "name": "runoff",
+          "type": "number[]",
+          "unit": "mm",
+          "description": "Runoff for each ~15-day step",
+          "selectable": true
+        },
+        {
+          "name": "precipitation",
+          "type": "number[]",
+          "unit": "mm",
+          "description": "Precipitation for each ~15-day step",
+          "selectable": true
+        }
+      ]
+    },
+    {
+      "id": "get_mws_kyl_indicators",
+      "group": "dataset",
+      "path": "/api/v2/get_mws_kyl_indicators/",
+      "method": "GET",
+      "title": "Get MWS KYL Indicators",
+      "description": "Single-row Know Your Landscape snapshot for one micro-watershed. This is not a time series. It includes terrain class, average rainfall, drought category, cropping, and asset counts. Requires state, district, tehsil, and mws_id. Pass fields=avg_runoff,drought_category to keep named indicators. mws_id is always returned. Each property unit is mm, ha, count, or a class label.",
+      "select_param": "fields",
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "mws_id",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Micro-watershed identifier, e.g. 12_208104"
+        },
+        {
+          "name": "fields",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Comma-separated indicator names from this catalog"
+        }
+      ],
+      "properties": [
+        {
+          "name": "mws_id",
+          "type": "string",
+          "unit": "id",
+          "description": "Micro-watershed identifier",
+          "selectable": false
+        },
+        {
+          "name": "terraincluster_id",
+          "type": "string",
+          "unit": "id",
+          "description": "Terrain cluster class",
+          "selectable": true
+        },
+        {
+          "name": "avg_precipitation",
+          "type": "number",
+          "unit": "mm",
+          "description": "Average precipitation",
+          "selectable": true
+        },
+        {
+          "name": "cropping_intensity_trend",
+          "type": "string",
+          "unit": "code",
+          "description": "Cropping-intensity trend code",
+          "selectable": true
+        },
+        {
+          "name": "cropping_intensity_avg",
+          "type": "number",
+          "unit": "ratio",
+          "description": "Average cropping intensity",
+          "selectable": true
+        },
+        {
+          "name": "avg_single_cropped",
+          "type": "number",
+          "unit": "ha",
+          "description": "Average single-cropped area",
+          "selectable": true
+        },
+        {
+          "name": "avg_double_cropped",
+          "type": "number",
+          "unit": "ha",
+          "description": "Average double-cropped area",
+          "selectable": true
+        },
+        {
+          "name": "avg_triple_cropped",
+          "type": "number",
+          "unit": "ha",
+          "description": "Average triple-cropped area",
+          "selectable": true
+        },
+        {
+          "name": "avg_wsr_ratio_kharif",
+          "type": "number",
+          "unit": "ratio",
+          "description": "Kharif water-stress ratio",
+          "selectable": true
+        },
+        {
+          "name": "avg_wsr_ratio_rabi",
+          "type": "number",
+          "unit": "ratio",
+          "description": "Rabi water-stress ratio",
+          "selectable": true
+        },
+        {
+          "name": "avg_wsr_ratio_zaid",
+          "type": "number",
+          "unit": "ratio",
+          "description": "Zaid water-stress ratio",
+          "selectable": true
+        },
+        {
+          "name": "avg_kharif_surface_water_mws",
+          "type": "number",
+          "unit": "mm",
+          "description": "Kharif surface-water extent",
+          "selectable": true
+        },
+        {
+          "name": "avg_rabi_surface_water_mws",
+          "type": "number",
+          "unit": "mm",
+          "description": "Rabi surface-water extent",
+          "selectable": true
+        },
+        {
+          "name": "avg_zaid_surface_water_mws",
+          "type": "number",
+          "unit": "mm",
+          "description": "Zaid surface-water extent",
+          "selectable": true
+        },
+        {
+          "name": "trend_swb",
+          "type": "string",
+          "unit": "code",
+          "description": "Surface-water-body trend code",
+          "selectable": true
+        },
+        {
+          "name": "trend_g",
+          "type": "string",
+          "unit": "code",
+          "description": "Groundwater trend code",
+          "selectable": true
+        },
+        {
+          "name": "drought_category",
+          "type": "string",
+          "unit": "category",
+          "description": "Drought category",
+          "selectable": true
+        },
+        {
+          "name": "avg_number_dry_spell",
+          "type": "number",
+          "unit": "count",
+          "description": "Average dry-spell count",
+          "selectable": true
+        },
+        {
+          "name": "avg_runoff",
+          "type": "number",
+          "unit": "mm",
+          "description": "Average runoff",
+          "selectable": true
+        },
+        {
+          "name": "total_nrega_assets",
+          "type": "number",
+          "unit": "count",
+          "description": "MGNREGA asset count",
+          "selectable": true
+        },
+        {
+          "name": "mws_intersect_villages",
+          "type": "string",
+          "unit": "list",
+          "description": "Villages intersecting this MWS",
+          "selectable": true
+        },
+        {
+          "name": "degradation_land_area",
+          "type": "number",
+          "unit": "ha",
+          "description": "Degraded land area",
+          "selectable": true
+        },
+        {
+          "name": "increase_in_tree_cover",
+          "type": "number",
+          "unit": "ha",
+          "description": "Tree-cover increase",
+          "selectable": true
+        },
+        {
+          "name": "decrease_in_tree_cover",
+          "type": "number",
+          "unit": "ha",
+          "description": "Tree-cover decrease",
+          "selectable": true
+        },
+        {
+          "name": "degradation_cropping_intensity",
+          "type": "number",
+          "unit": "ratio",
+          "description": "Cropping-intensity degradation",
+          "selectable": true
+        },
+        {
+          "name": "urbanization_area",
+          "type": "number",
+          "unit": "ha",
+          "description": "Urbanization area",
+          "selectable": true
+        },
+        {
+          "name": "lulc_slope_category",
+          "type": "string",
+          "unit": "category",
+          "description": "Slope LULC category",
+          "selectable": true
+        },
+        {
+          "name": "lulc_plain_category",
+          "type": "string",
+          "unit": "category",
+          "description": "Plain LULC category",
+          "selectable": true
+        },
+        {
+          "name": "area_wide_scale_restoration",
+          "type": "number",
+          "unit": "ha",
+          "description": "Wide-scale restoration area",
+          "selectable": true
+        },
+        {
+          "name": "area_protection",
+          "type": "number",
+          "unit": "ha",
+          "description": "Protection area",
+          "selectable": true
+        },
+        {
+          "name": "aquifer_class",
+          "type": "string",
+          "unit": "class",
+          "description": "Aquifer class",
+          "selectable": true
+        },
+        {
+          "name": "soge_class",
+          "type": "string",
+          "unit": "class",
+          "description": "Stage of groundwater extraction class",
+          "selectable": true
+        },
+        {
+          "name": "lcw_conflict",
+          "type": "string",
+          "unit": "flag",
+          "description": "Land-conflict flag",
+          "selectable": true
+        },
+        {
+          "name": "mining",
+          "type": "string",
+          "unit": "flag",
+          "description": "Mining overlay flag",
+          "selectable": true
+        },
+        {
+          "name": "green_credit",
+          "type": "string",
+          "unit": "flag",
+          "description": "Green-credit flag",
+          "selectable": true
+        },
+        {
+          "name": "factory_csr",
+          "type": "string",
+          "unit": "flag",
+          "description": "Factory / CSR flag",
+          "selectable": true
+        }
+      ]
+    },
+    {
+      "id": "get_generated_layer_urls",
+      "group": "dataset",
+      "path": "/api/v2/get_generated_layer_urls/",
+      "method": "GET",
+      "title": "Get Generated Layer URL",
+      "description": "GeoServer URLs for every generated layer in a tehsil. Requires the same state, district, and tehsil names as Get Active Locations. Each record has a layer_url: WFS for vectors and WCS for rasters. Open that URL to read the raw layer in QGIS or any WFS or WCS client.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        }
+      ],
+      "properties": [
+        {
+          "name": "layer_name",
+          "type": "string",
+          "unit": "name",
+          "description": "name",
+          "selectable": false
+        },
+        {
+          "name": "dataset_name",
+          "type": "string",
+          "unit": "name",
+          "description": "name",
+          "selectable": false
+        },
+        {
+          "name": "layer_type",
+          "type": "string",
+          "unit": "vector|raster|point|custom",
+          "description": "vector|raster|point|custom",
+          "selectable": false
+        },
+        {
+          "name": "layer_url",
+          "type": "string",
+          "unit": "geoserver_wfs_or_wcs_url",
+          "description": "geoserver wfs or wcs url",
+          "selectable": false
+        },
+        {
+          "name": "layer_version",
+          "type": "string",
+          "unit": "version_label",
+          "description": "version label",
+          "selectable": false
+        },
+        {
+          "name": "style_url",
+          "type": "string",
+          "unit": "style_url_or_empty",
+          "description": "style url or empty",
+          "selectable": false
+        },
+        {
+          "name": "gee_asset_path",
+          "type": "string",
+          "unit": "earth_engine_asset_id_or_null",
+          "description": "earth engine asset id or null",
+          "selectable": false
+        }
+      ]
+    },
+    {
+      "id": "get_mws_report",
+      "group": "dataset",
+      "path": "/api/v2/get_mws_report/",
+      "method": "GET",
+      "title": "Get MWS Report URL",
+      "description": "URL of the PDF or HTML report for one micro-watershed. Requires state, district, tehsil, and mws_id. The tehsil stats file and the micro-watershed layer must already exist. Open Mws_report_url to read the report.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "mws_id",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Micro-watershed identifier, e.g. 12_208104"
+        }
+      ],
+      "properties": [
+        {
+          "name": "Mws_report_url",
+          "type": "string",
+          "unit": "mws_pdf_or_html_report_url",
+          "description": "mws pdf or html report url",
+          "selectable": false
+        }
+      ]
+    },
+    {
+      "id": "get_mws_geometries",
+      "group": "dataset",
+      "path": "/api/v2/get_mws_geometries/",
+      "method": "GET",
+      "title": "Get MWS Geometry",
+      "description": "Micro-watershed polygons for a tehsil as a GeoJSON FeatureCollection. Requires state, district, and tehsil. Omit mws_id to return every watershed in the tehsil. Pass mws_id for one feature. Coordinates are longitude, latitude in degrees. Save the collection to open it in QGIS.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "mws_id",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional; omit to return every MWS in the tehsil"
+        }
+      ],
+      "properties": [
+        {
+          "name": "uid",
+          "type": "string",
+          "unit": "mws_identifier",
+          "description": "mws identifier",
+          "selectable": false
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "unit": "normalized_state_name",
+          "description": "normalized state name",
+          "selectable": false
+        },
+        {
+          "name": "district",
+          "type": "string",
+          "unit": "normalized_district_name",
+          "description": "normalized district name",
+          "selectable": false
+        },
+        {
+          "name": "tehsil",
+          "type": "string",
+          "unit": "normalized_tehsil_name",
+          "description": "normalized tehsil name",
+          "selectable": false
+        },
+        {
+          "name": "geometry",
+          "type": "string",
+          "unit": "geojson_geometry_object",
+          "description": "geojson geometry object",
+          "selectable": false
+        },
+        {
+          "name": "coordinates",
+          "type": "number[][][]",
+          "unit": "degrees",
+          "description": "Polygon rings (lon, lat)",
+          "selectable": false,
+          "response_unit": false
+        }
+      ]
+    },
+    {
+      "id": "get_village_geometries",
+      "group": "dataset",
+      "path": "/api/v2/get_village_geometries/",
+      "method": "GET",
+      "title": "Get Village Geometries",
+      "description": "Village and panchayat polygons for a tehsil as a GeoJSON FeatureCollection. Requires state, district, and tehsil. Omit village_id for the whole tehsil. Pass village_id (vill_ID) for one village. Coordinates are longitude, latitude in degrees. Save the collection to open it in QGIS.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "village_id",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional vill_ID; omit for the whole tehsil"
+        }
+      ],
+      "properties": [
+        {
+          "name": "village_id",
+          "type": "string",
+          "unit": "vill_ID_from_layer",
+          "description": "vill ID from layer",
+          "selectable": false
+        },
+        {
+          "name": "village_name",
+          "type": "string",
+          "unit": "vill_name_from_layer",
+          "description": "vill name from layer",
+          "selectable": false
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "unit": "normalized_state_name",
+          "description": "normalized state name",
+          "selectable": false
+        },
+        {
+          "name": "district",
+          "type": "string",
+          "unit": "normalized_district_name",
+          "description": "normalized district name",
+          "selectable": false
+        },
+        {
+          "name": "tehsil",
+          "type": "string",
+          "unit": "normalized_tehsil_name",
+          "description": "normalized tehsil name",
+          "selectable": false
+        },
+        {
+          "name": "geometry",
+          "type": "string",
+          "unit": "geojson_geometry_object",
+          "description": "geojson geometry object",
+          "selectable": false
+        },
+        {
+          "name": "coordinates",
+          "type": "number[][][][]",
+          "unit": "degrees",
+          "description": "MultiPolygon rings (lon, lat)",
+          "selectable": false,
+          "response_unit": false
+        }
+      ]
+    },
+    {
+      "id": "get_active_locations",
+      "group": "dataset",
+      "path": "/api/v2/get_active_locations/",
+      "method": "GET",
+      "title": "Get Active Locations",
+      "description": "State, district, and tehsil names where the full public dataset is already generated. This list is not every tehsil in India. Use the returned names as the exact state, district, and tehsil values on the other dataset APIs. Optional filters state, district, and tehsil (alias block) are case-insensitive. If a tehsil is missing, request it with the Geospatial Data Request Form.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional state filter"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional district filter"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional tehsil filter (alias: block)"
+        },
+        {
+          "name": "block",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Optional block filter (same as tehsil)"
+        }
+      ],
+      "properties": [
+        {
+          "name": "label",
+          "type": "string",
+          "unit": "display_name",
+          "description": "display name",
+          "selectable": false
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "unit": "ordinal_code_in_ui_list",
+          "description": "ordinal code in ui list",
+          "selectable": false
+        },
+        {
+          "name": "state_id",
+          "type": "string",
+          "unit": "state_identifier",
+          "description": "state identifier",
+          "selectable": false
+        },
+        {
+          "name": "district_id",
+          "type": "string",
+          "unit": "district_identifier",
+          "description": "district identifier",
+          "selectable": false
+        },
+        {
+          "name": "block_id",
+          "type": "string",
+          "unit": "block_tehsil_identifier",
+          "description": "block tehsil identifier",
+          "selectable": false
+        },
+        {
+          "name": "district",
+          "type": "string",
+          "unit": "districts_under_state",
+          "description": "districts under state",
+          "selectable": false
+        },
+        {
+          "name": "blocks",
+          "type": "string",
+          "unit": "blocks_tehsils_under_district",
+          "description": "blocks tehsils under district",
+          "selectable": false
+        }
+      ]
+    },
+    {
+      "id": "get_waterbodies_data_by_admin",
+      "group": "waterbody",
+      "path": "/api/v2/get_waterbodies_data_by_admin/",
+      "method": "GET",
+      "title": "Get Waterbodies by admin data",
+      "description": "Merged remotely sensed waterbodies for a tehsil, detected by the IIT Delhi method and implemented by the CoRE Stack team. Requires state, district, and tehsil. The response is the full inventory for that tehsil, including area in hectares, zone of influence, and cropping intensity. Pass regenerate=true to rebuild the merge.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "regenerate",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Set true to rebuild the merge"
+        }
+      ],
+      "properties": [
+        {
+          "name": "UID",
+          "type": "string",
+          "unit": "id",
+          "description": "Waterbody identifier",
+          "selectable": false
+        },
+        {
+          "name": "MWS_UID",
+          "type": "string",
+          "unit": "id",
+          "description": "Parent micro-watershed identifier",
+          "selectable": false
+        },
+        {
+          "name": "water",
+          "type": "number",
+          "unit": "flag",
+          "description": "Detected surface water",
+          "selectable": false
+        },
+        {
+          "name": "sum",
+          "type": "number",
+          "unit": "ha",
+          "description": "Waterbody area",
+          "selectable": false
+        },
+        {
+          "name": "zoi",
+          "type": "number",
+          "unit": "count",
+          "description": "Zone-of-influence count",
+          "selectable": false
+        },
+        {
+          "name": "zoi_area",
+          "type": "number",
+          "unit": "ha",
+          "description": "Zone-of-influence area",
+          "selectable": false
+        },
+        {
+          "name": "total_cropable_area_ever_hydroyear",
+          "type": "number",
+          "unit": "ha",
+          "description": "Cumulative cropable area",
+          "selectable": false
+        },
+        {
+          "name": "cropping_intensity",
+          "type": "number[]",
+          "unit": "ratio",
+          "description": "Annual cropping intensity",
+          "selectable": false
+        },
+        {
+          "name": "single_cropped_area",
+          "type": "number[]",
+          "unit": "ha",
+          "description": "Annual single-cropped area",
+          "selectable": false
+        },
+        {
+          "name": "doubly_cropped_area",
+          "type": "number[]",
+          "unit": "ha",
+          "description": "Annual double-cropped area",
+          "selectable": false
+        }
+      ]
+    },
+    {
+      "id": "get_waterbody_data",
+      "group": "waterbody",
+      "path": "/api/v2/get_waterbody_data/",
+      "method": "GET",
+      "title": "Get Waterbodies by uid",
+      "description": "One waterbody from the merged remotely sensed dataset, keyed by UID. Requires state, district, tehsil, and uid, for example 12_100174_104. Call Get Waterbodies by admin data first when you need the list of UIDs. Pass regenerate=true to rebuild the merge.",
+      "select_param": null,
+      "parameters": [
+        {
+          "name": "state",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "State name from Get Active Locations"
+        },
+        {
+          "name": "district",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "District name from Get Active Locations"
+        },
+        {
+          "name": "tehsil",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Tehsil / block name from Get Active Locations"
+        },
+        {
+          "name": "uid",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "Waterbody UID, e.g. 12_100174_104"
+        },
+        {
+          "name": "regenerate",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Set true to rebuild the merge"
+        }
+      ],
+      "properties": [
+        {
+          "name": "UID",
+          "type": "string",
+          "unit": "id",
+          "description": "Waterbody identifier",
+          "selectable": false
+        },
+        {
+          "name": "MWS_UID",
+          "type": "string",
+          "unit": "id",
+          "description": "Parent micro-watershed identifier",
+          "selectable": false
+        },
+        {
+          "name": "water",
+          "type": "number",
+          "unit": "flag",
+          "description": "Detected surface water",
+          "selectable": false
+        },
+        {
+          "name": "sum",
+          "type": "number",
+          "unit": "ha",
+          "description": "Waterbody area",
+          "selectable": false
+        },
+        {
+          "name": "zoi",
+          "type": "number",
+          "unit": "count",
+          "description": "Zone-of-influence count",
+          "selectable": false
+        },
+        {
+          "name": "zoi_area",
+          "type": "number",
+          "unit": "ha",
+          "description": "Zone-of-influence area",
+          "selectable": false
+        },
+        {
+          "name": "total_cropable_area_ever_hydroyear",
+          "type": "number",
+          "unit": "ha",
+          "description": "Cumulative cropable area",
+          "selectable": false
+        },
+        {
+          "name": "cropping_intensity",
+          "type": "number[]",
+          "unit": "ratio",
+          "description": "Annual cropping intensity",
+          "selectable": false
+        },
+        {
+          "name": "single_cropped_area",
+          "type": "number[]",
+          "unit": "ha",
+          "description": "Annual single-cropped area",
+          "selectable": false
+        },
+        {
+          "name": "doubly_cropped_area",
+          "type": "number[]",
+          "unit": "ha",
+          "description": "Annual double-cropped area",
+          "selectable": false
+        }
+      ]
+    }
+  ]
+}

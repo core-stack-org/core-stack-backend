@@ -175,7 +175,7 @@ def describe_public_api(api_id: str, property_name: str = "") -> dict:
 
 @mcp.tool()
 def call_public_api(api_id: str, query: dict[str, str] | None = None) -> dict:
-    """Call one catalogued public API.
+    """Call one cataloged public API.
 
     query is the URL query string as an object, for example
     {"state": "Rajasthan", "district": "Sirohi", "tehsil": "Abu Road", "data": "mws"}.

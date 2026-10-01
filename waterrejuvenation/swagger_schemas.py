@@ -278,10 +278,13 @@ waterbodies_by_admin_schema_v2 = v2_waterbodies_schema_from(
     "get_waterbodies_data_by_admin/",
 )
 waterbodies_by_admin_schema_v2["operation_description"] = """
-Return the merged waterbody dataset for a state, district, and tehsil or block.
+Merged remotely sensed waterbodies for a tehsil, detected by the IIT Delhi
+method and implemented by the CoRE Stack team.
 
 ``state``, ``district``, and ``tehsil`` (or ``block``) are required.
-Optional ``regenerate`` rebuilds the merge from source layers.
+The response is the full inventory for that tehsil, including area in
+hectares, zone of influence, and cropping intensity.
+Optional ``regenerate=true`` rebuilds the merge from source layers.
 
 v2 returns ``{status, error_message, data}``. On success, ``data`` holds
 the merged inventory with field units.
@@ -292,10 +295,11 @@ waterbodies_by_uuid_schema_v2 = v2_waterbodies_schema_from(
     "get_waterbody_data/",
 )
 waterbodies_by_uuid_schema_v2["operation_description"] = """
-Return one waterbody from the merged dataset, keyed by UID.
+One waterbody from the merged remotely sensed dataset, keyed by UID.
 
-Requires ``state``, ``district``, ``tehsil`` (or ``block``), and ``uid``.
-Optional ``regenerate`` refreshes the merge from source layers.
+Requires ``state``, ``district``, ``tehsil`` (or ``block``), and ``uid``
+(for example ``12_100174_104``). Call Get Waterbodies by admin data first
+when you need the list of UIDs. Optional ``regenerate=true`` rebuilds the merge.
 
 v2 returns ``{status, error_message, data}`` for that UID. A missing UID
 sets ``error_message`` and a 404 status.

@@ -2,6 +2,7 @@ import copy
 
 from drf_yasg import openapi
 
+from .catalog import CATALOG_OUTPUT_DESCRIPTION
 from .dataset_filters import tehsil_data_type_help_markdown
 
 # ============= COMMON PARAMETERS =============
@@ -77,7 +78,7 @@ tehsil_data_filter_param = openapi.Parameter(
     "data",
     openapi.IN_QUERY,
     description=(
-        "Optional v2 sheet filter. Omit or pass `all` for every sheet. "
+        "Omit or pass `all` to return every dataset generated for this tehsil. "
         "Pass one or more sheet names: `data=drought,stream_order` or "
         "`data=drought&data=stream_order`."
     ),
@@ -440,16 +441,17 @@ admin_by_latlon_schema = {
     "operation_id": "get_admin_details_by_latlon",
     "operation_summary": "Get Admin Details by Lat Lon",
     "operation_description": """
-    Resolve a WGS84 coordinate to the same ``State``, ``District``, and
-    ``Tehsil`` strings used by Get Active Locations.
+    Resolve a latitude and longitude to the ``State``, ``District``, and
+    ``Tehsil`` names CoRE Stack uses to store datasets.
 
-    Core Stack datasets are generated at tehsil level. Copy these three
-    strings into the other dataset APIs (tehsil data, MWS geometries,
-    layers, and so on). Confirm the tehsil is listed in Get Active Locations
-    before you call those routes; if it is missing, request it with the
+    Copy those three names into the other dataset APIs (tehsil data,
+    micro-watershed geometries, generated layers, and waterbodies).
+    Confirm the tehsil is listed in Get Active Locations before you call
+    those routes. If it is missing, request it with the
     [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 
-    ``latitude`` and ``longitude`` are required. v1 returns the raw admin
+    ``latitude`` and ``longitude`` are required WGS84 coordinates. The point
+    must fall inside the Survey of India boundary. v1 returns the raw admin
     object. Out-of-boundary points return ``{"error": "..."}``.
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
@@ -486,13 +488,14 @@ mws_by_latlon_schema = {
     "operation_id": "get_mwsid_by_latlon",
     "operation_summary": "Get MWSID by Lat Lon",
     "operation_description": """
-    Resolve the micro-watershed that contains a WGS84 coordinate, plus its admin names.
+    Resolve a latitude and longitude to the micro-watershed that contains that point.
 
-    ``latitude`` and ``longitude`` are required. The ``uid`` (also called ``mws_id``)
-    is the join key for tehsil tables, KYL indicators, and geometry routes.
+    ``latitude`` and ``longitude`` are required WGS84 coordinates.
+    ``uid`` (also called ``mws_id``) is the join key for the time series,
+    KYL indicators, geometry, and the watershed report. The response also
+    includes the State, District, and Tehsil names for that watershed.
 
-    v1 returns the raw object with ``mws_id`` / ``uid`` and admin fields.
-    There is no status envelope.
+    v1 returns the raw object. There is no status envelope.
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
     "responses": {
@@ -572,15 +575,16 @@ get_mws_data_v2_schema = {
     "operation_id": "get_mws_data_v2",
     "operation_summary": "Get MWS Time Series Data (v2 fortnight format)",
     "operation_description": """
-    Fetch hydrology time series for one micro-watershed in Open-Meteo-style fortnight arrays.
+    Fortnight hydrology for one micro-watershed: evapotranspiration, runoff,
+    and precipitation, in steps of about 15 days. Values are in millimetres.
 
-    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
-    Optional ``regenerate=true`` skips the MongoDB cache and rereads GeoServer.
-    Optional ``fields=et,runoff`` keeps only those fortnight metrics
-    (``time`` is always returned). See GET /api/v2/catalog/get_mws_data/.
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id`` (the ``uid``
+    from Get MWSID by Lat Lon). Optional ``regenerate=true`` skips the cache
+    and rereads GeoServer. Optional ``fields=et,runoff`` keeps only those
+    metrics. ``time`` is always returned.
 
     v2 returns ``{status, error_message, data}``. ``data`` has ``metadata``,
-    aligned ``fortnight`` arrays (~15-day steps), and ``fortnight_units``.
+    aligned ``fortnight`` arrays, and ``fortnight_units``.
     """
     + "\n\n"
     + V2_MWS_FORTNIGHT_DESCRIPTION.strip(),
@@ -725,13 +729,14 @@ tehsil_data_schema = {
     "operation_id": "get_tehsil_data",
     "operation_summary": "Get Tehsil Data",
     "operation_description": """
-    Download every analytical sheet for a tehsil (drought, hydrology, LULC, NREGA, and others).
+    Return the analytical datasets CoRE Stack has generated for one tehsil.
 
-    Requires ``state``, ``district``, and ``tehsil``. Stats must already exist
-    for that location.
+    Requires ``state``, ``district``, and ``tehsil`` — the same names from
+    Get Active Locations or Get Admin Details by Lat Lon. The body is every
+    sheet in that tehsil's file (drought, hydrology, land use, MGNREGA, and
+    others), keyed by sheet name, with one row per micro-watershed.
 
-    v1 returns a raw object keyed by sheet name, with one row per MWS.
-    There is no ``data=`` sheet filter and no status envelope.
+    v1 returns that raw object. There is no ``data=`` filter and no status envelope.
     """,
     "manual_parameters": [
         state_param,
@@ -799,7 +804,7 @@ kyl_indicators_schema = {
 generated_layer_urls_schema = {
     "method": "get",
     "operation_id": "get_generated_layer_urls",
-    "operation_summary": "Get Generated Layer Url",
+    "operation_summary": "Get Generated Layer URL",
     "operation_description": """
     Return every generated dataset layer for one tehsil.
 
@@ -839,7 +844,7 @@ generated_layer_urls_schema = {
 mws_report_urls_schema = {
     "method": "get",  # ✅ Changed = to :
     "operation_id": "get_mws_report",
-    "operation_summary": "Get MWS Report url",
+    "operation_summary": "Get MWS Report URL",
     "operation_description": """
     Get a URL that opens or generates the MWS PDF/HTML report.
 
@@ -1328,16 +1333,17 @@ _set_json_example(
     "Not Found - Latitude and longitude is not in SOI boundary.",
 )
 admin_by_latlon_schema_v2["operation_description"] = """
-Resolve a WGS84 coordinate to the same ``State``, ``District``, and
-``Tehsil`` strings used by Get Active Locations.
+Resolve a latitude and longitude to the ``State``, ``District``, and
+``Tehsil`` names CoRE Stack uses to store datasets.
 
-Core Stack datasets are generated at tehsil level. Copy these three
-strings into the other dataset APIs (tehsil data, MWS geometries,
-layers, and so on). Confirm the tehsil is listed in Get Active Locations
-before you call those routes; if it is missing, request it with the
+Copy those three names into the other dataset APIs (tehsil data,
+micro-watershed geometries, generated layers, and waterbodies).
+Confirm the tehsil is listed in Get Active Locations before you call
+those routes. If it is missing, request it with the
 [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 
-``latitude`` and ``longitude`` are required. v2 returns
+``latitude`` and ``longitude`` are required WGS84 coordinates. The point
+must fall inside the Survey of India boundary. v2 returns
 ``{status, error_message, data}`` with ``admin_details`` and
 ``admin_field_hints``.
 """
@@ -1353,10 +1359,12 @@ _set_json_example(
     "Success - MWS id and admin details in the v2 envelope",
 )
 mws_by_latlon_schema_v2["operation_description"] = """
-Resolve the micro-watershed ``uid`` and admin names for a WGS84 coordinate.
+Resolve a latitude and longitude to the micro-watershed that contains that point.
 
-``latitude`` and ``longitude`` are required. Use the ``uid`` as ``mws_id``
-on other v2 dataset routes.
+``latitude`` and ``longitude`` are required WGS84 coordinates.
+Use ``uid`` as ``mws_id`` on the time series, KYL indicators, geometry,
+and watershed report. The response also includes the State, District,
+and Tehsil names for that watershed.
 
 v2 returns ``{status, error_message, data}`` with ``mws_details`` and
 ``mws_field_hints`` inside ``data``.
@@ -1367,13 +1375,19 @@ tehsil_data_schema_v2 = v2_schema_from(
     "get_tehsil_data/",
 )
 tehsil_data_schema_v2["operation_description"] = f"""
-Download analytical sheets for a tehsil (drought, hydrology, LULC, NREGA, and others).
+Return the analytical datasets CoRE Stack has generated for one tehsil.
 
-Requires ``state``, ``district``, and ``tehsil``. v2 returns
-``{{status, error_message, data}}`` with ``tehsil_data`` and ``tehsil_units``.
+Requires ``state``, ``district``, and ``tehsil`` — the same names from
+Get Active Locations or Get Admin Details by Lat Lon. Omit ``data``, or
+pass ``data=all``, for every sheet in that tehsil's file (drought,
+hydrology, land use, MGNREGA, and others). Each sheet is one row per
+micro-watershed. ``tehsil_units`` gives the measurement unit of each column.
 
-Filter sheets with ``data=all`` (default) or one or more sheet names:
-``data=drought,stream_order`` or ``data=drought&data=stream_order``.
+To fetch fewer sheets, pass names such as ``data=drought,stream_order``.
+A tehsil file may contain only some of the sheets listed below.
+
+v2 returns ``{{status, error_message, data}}`` with ``tehsil_data`` and
+``tehsil_units``.
 
 {tehsil_data_type_help_markdown()}
 """
@@ -1392,15 +1406,16 @@ kyl_indicators_schema_v2 = v2_schema_from(
     "get_mws_kyl_indicators/",
 )
 kyl_indicators_schema_v2["operation_description"] = """
-Return a single-row KYL indicator snapshot for one micro-watershed.
+Single-row Know Your Landscape snapshot for one micro-watershed.
+This is not a time series. It includes terrain class, average rainfall,
+drought category, cropping, and asset counts.
 
 Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
-This is a flat table, not a time series.
-Optional ``fields=avg_runoff,drought_category`` keeps only those indicators
-(``mws_id`` is always returned). See GET /api/v2/catalog/get_mws_kyl_indicators/.
+Optional ``fields=avg_runoff,drought_category`` keeps only those indicators.
+``mws_id`` is always returned.
 
 v2 returns ``{status, error_message, data}``. ``data`` has ``indicators``
-and ``indicator_units`` (mm, ha, count, and similar).
+and ``indicator_units`` (mm, ha, count, or a class label).
 """
 kyl_indicators_schema_v2["manual_parameters"] = list(
     kyl_indicators_schema_v2["manual_parameters"]
@@ -1440,10 +1455,11 @@ mws_report_urls_schema_v2 = v2_schema_from(
     "get_mws_report/",
 )
 mws_report_urls_schema_v2["operation_description"] = """
-Get the report URL for one micro-watershed.
+URL of the PDF or HTML report for one micro-watershed.
 
 Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
-The stats file and MWS layer must already exist.
+The tehsil stats file and the micro-watershed layer must already exist.
+Open ``Mws_report_url`` to read the report.
 
 v2 returns ``{status, error_message, data}``. ``data`` has
 ``report.Mws_report_url`` and ``report_field_hints``.
@@ -1572,6 +1588,7 @@ CATALOG_API_SUMMARY_SCHEMA = openapi.Schema(
 CATALOG_LIST_EXAMPLE = {
     "catalog": {
         "version": "1.0",
+        "description": CATALOG_OUTPUT_DESCRIPTION,
         "standards": ["openapi", "rfc9727"],
         "service_desc": "https://geoserver.core-stack.org/swagger.json",
         "service_doc": "https://geoserver.core-stack.org/redoc/",
@@ -1708,15 +1725,16 @@ catalog_list_schema_v2 = {
     "method": "get",
     "operation_id": "get_public_api_catalog_v2",
     "operation_summary": "Get Public API Catalog",
-    "operation_description": """
+    "operation_description": f"""
     List every public v2 dataset and waterbody route, with a pointer to the
     properties each one can return.
 
-    Use this after RFC 9727 / OpenAPI discovery when you need the actual
-    field names for ``fields=`` (MWS, KYL) or ``data=`` (tehsil sheets).
-    Requires ``X-API-Key``. Optional ``group=dataset`` or ``group=waterbody``.
+    {CATALOG_OUTPUT_DESCRIPTION}
 
-    Then call GET /api/v2/catalog/{api_id}/ for the full property list.
+    Requires ``X-API-Key``. Optional ``group=dataset`` or ``group=waterbody``.
+    v2 returns ``{{status, error_message, data}}``. ``data.catalog`` holds
+    version, this description, standards, and links to OpenAPI, ReDoc, and
+    the RFC 9727 catalog. ``data.apis`` is the route list.
     """,
     "manual_parameters": [catalog_group_param, authorization_param],
     "responses": {
@@ -1734,6 +1752,10 @@ catalog_list_schema_v2 = {
                                 type=openapi.TYPE_OBJECT,
                                 properties={
                                     "version": openapi.Schema(type=openapi.TYPE_STRING),
+                                    "description": openapi.Schema(
+                                        type=openapi.TYPE_STRING,
+                                        description="What this catalog lists and how to read each route",
+                                    ),
                                     "standards": openapi.Schema(
                                         type=openapi.TYPE_ARRAY,
                                         items=openapi.Schema(type=openapi.TYPE_STRING),
@@ -1782,8 +1804,18 @@ catalog_item_schema_v2 = {
     Return parameters and properties for one public v2 API.
 
     ``api_id`` is the catalog id from GET /api/v2/catalog/, for example
-    ``get_mws_data``. Properties with ``selectable: true`` can be passed to
-    ``fields=`` or ``data=`` on that route. Requires ``X-API-Key``.
+    ``get_mws_data`` or ``get_tehsil_data``. Requires ``X-API-Key``.
+
+    ``parameters`` lists query arguments (name, type, required, description).
+    ``properties`` lists each returned field: ``name``, ``type``, ``unit``,
+    ``description``, and ``selectable``. Pass selectable names to ``fields=``
+    on MWS fortnight metrics and KYL indicators, or to ``data=`` on tehsil
+    sheets. For ``get_tehsil_data``, ``unit`` is an object of column name to
+    measurement unit, matching ``tehsil_units`` on that route. A wide sheet
+    such as ``antyodaya`` can have hundreds of columns in that object.
+
+    v2 returns ``{status, error_message, data}`` with the route summary plus
+    ``parameters`` and ``properties``.
     """,
     "manual_parameters": [catalog_api_id_param, authorization_param],
     "responses": {

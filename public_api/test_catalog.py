@@ -116,6 +116,8 @@ class CatalogApiTests(TestCase):
         self.assertEqual(body["status"], "success")
         data = body["data"]
         self.assertEqual(data["catalog"]["standards"], ["openapi", "rfc9727"])
+        self.assertIn("selectable", data["catalog"]["description"])
+        self.assertIn("tehsil_units", data["catalog"]["description"])
         ids = [item["id"] for item in data["apis"]]
         self.assertIn("get_mws_data", ids)
         self.assertIn("get_waterbody_data", ids)

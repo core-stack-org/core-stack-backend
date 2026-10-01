@@ -34,7 +34,7 @@ Send **`X-API-Key: <your-api-key>`** on every dataset, waterbody, and catalog re
 
 **v2** (`/api/v2/`) uses the same paths with a stable envelope: `{"status", "error_message", "data"}`. On success, `data` holds the payload; geometry `data` is a FeatureCollection with unrounded vertices. Tehsil sheets accept `data=drought,stream_order`. MWS fortnight metrics and KYL indicators accept `fields=et,runoff`. Active locations accept optional `state`, `district`, and `tehsil`. Time series use fortnight arrays plus unit maps.
 
-**Catalog.** Agents start at `GET /.well-known/api-catalog` (RFC 9727, no key). That linkset points at `/swagger.json` and ReDoc. `GET /api/v2/catalog/` lists v2 routes; `GET /api/v2/catalog/{api_id}/` lists the properties each one can return. Properties with `selectable: true` are the names you pass to `fields=` or `data=`.
+**Catalog.** Agents start at `GET /.well-known/api-catalog` (RFC 9727, no key). That linkset points at `/swagger.json` and ReDoc. `GET /api/v2/catalog/` lists v2 routes. `data.catalog.description` explains the list: each route summary, then `GET /api/v2/catalog/{api_id}/` for parameters and properties (`name`, `type`, `unit`, `description`, `selectable`). Names with `selectable: true` are what you pass to `fields=` or `data=`. For tehsil sheets, `unit` is the column-to-unit map. The list is the set of sheets and columns the platform can return; one tehsil file may contain only some of them.
 """
 
 schema_view = get_schema_view(

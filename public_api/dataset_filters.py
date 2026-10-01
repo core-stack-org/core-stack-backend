@@ -2,6 +2,8 @@
 
 import re
 
+from .catalog_document import tehsil_data_type_docs
+
 
 def _canonical_sheet_name(key):
     """Match ``utilities.openmeteo_format._normalize_key_name`` for tehsil sheets."""
@@ -13,57 +15,10 @@ def _canonical_sheet_name(key):
         k = k.replace("deltag", "delta_g", 1)
     return k
 
-# Canonical tehsil Excel / JSON sheet keys people can pass to ``data=``.
+# Canonical tehsil sheet keys people can pass to ``data=``.
+# Names and descriptions are read from catalog.json.
 # ``all`` returns every sheet present for that tehsil (default when omitted).
-TEHSIL_DATA_TYPE_DOCS = [
-    ("all", "Every dataset available for this tehsil (default if ``data`` is omitted)"),
-    ("agroecological", "Agroecological zone attributes per MWS"),
-    ("antyodaya", "Antyodaya / SECC socio-economic indicators"),
-    ("aquifer_vector", "Aquifer class and area share per MWS"),
-    ("canal", "Canal network intersection with the MWS"),
-    ("canopy_cover_density", "Tree canopy cover density"),
-    ("canopy_height", "Tree canopy height"),
-    ("change_detection_cropintensity", "Change detection: cropping intensity"),
-    ("change_detection_degradation", "Change detection: land degradation"),
-    ("change_detection_shrubchange", "Change detection: shrub change"),
-    ("change_detection_tree_cover_decrease", "Change detection: tree-cover decrease (deforestation)"),
-    ("change_detection_tree_cover_increase", "Change detection: tree-cover increase (afforestation)"),
-    ("change_detection_urbanization", "Change detection: urbanization"),
-    ("croppingdrought_kharif", "Kharif cropping vs drought years"),
-    ("croppingintensity_annual", "Annual cropping intensity"),
-    ("dem", "Elevation / DEM summary per MWS"),
-    ("drainage_density", "Drainage density"),
-    ("drought", "Drought frequency / weeks (if present as a sheet)"),
-    ("drought_causality", "Drought causality classes"),
-    ("facilities_proximity", "Distance to facilities (km)"),
-    ("factory_csr", "Factory / CSR sites intersecting the MWS"),
-    ("green_credit", "Green credit / restoration opportunity"),
-    ("hydrological_annual", "Annual hydrology (ET, runoff, precipitation, …)"),
-    ("hydrological_seasonal", "Seasonal hydrology"),
-    ("lcw_conflict", "Land conflict watch overlay"),
-    ("livestock", "Livestock census indicators"),
-    ("lulc_vector", "Land use / land cover class shares"),
-    ("mining", "Mining overlay"),
-    ("mws", "Micro-watershed identity and area"),
-    ("mws_connectivity", "MWS drainage connectivity"),
-    ("mws_intersect_swb", "Surface water bodies intersecting the MWS"),
-    ("mws_intersect_villages", "Villages intersecting the MWS"),
-    ("ndvi_shrub", "Shrub NDVI"),
-    ("nrega_annual", "Annual MGNREGA works"),
-    ("nrega_assets_village", "Village-level MGNREGA assets"),
-    ("overall_tree_change", "Overall tree-cover change"),
-    ("restoration_vector", "Restoration opportunity classes"),
-    ("river", "River network intersection"),
-    ("social_economic_indicator", "Social-economic indicator table"),
-    ("soge_vector", "Stage of groundwater extraction (SOGE)"),
-    ("soil_health", "Soil health parameters"),
-    ("soil_type", "Soil type"),
-    ("stream_order", "Stream-order length / density"),
-    ("surfacewaterbodies_annual", "Annual surface water body extent"),
-    ("terrain", "Terrain cluster / morphometry"),
-    ("terrain_lulc_plain", "Terrain × LULC on plains"),
-    ("terrain_lulc_slope", "Terrain × LULC on slopes"),
-]
+TEHSIL_DATA_TYPE_DOCS = tehsil_data_type_docs()
 
 # Extra aliases after ``_normalize_key_name`` (Excel sheet names that differ).
 TEHSIL_DATA_ALIASES = {
@@ -76,8 +31,10 @@ TEHSIL_DATA_TYPE_VALUES = ["all"] + [item[0] for item in TEHSIL_DATA_TYPE_DOCS i
 
 def tehsil_data_type_help_markdown():
     lines = [
-        "Pass ``data=all`` (or omit ``data``) for every sheet. Pass one or more sheet names to filter.",
-        "Multiple values: ``data=drought,stream_order`` or ``data=drought&data=stream_order``.",
+        "Omit ``data``, or pass ``data=all``, to return every dataset generated for that tehsil.",
+        "The response includes the sheets present in that tehsil's file, one row per micro-watershed.",
+        "Pass one or more sheet names to keep only those sheets:",
+        "``data=drought,stream_order`` or ``data=drought&data=stream_order``.",
         "",
         "| ``data`` value | What you get |",
         "| --- | --- |",
