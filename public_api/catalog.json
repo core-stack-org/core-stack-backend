@@ -143,7 +143,7 @@
           "in": "query",
           "type": "string",
           "required": false,
-          "description": "Omit or all for every dataset in this tehsil's file. Or sheet names such as drought,stream_order"
+          "description": "Omit or all for every dataset in this tehsil's file. Or dataset names such as drought,stream_order"
         }
       ],
       "properties": [
@@ -159,7 +159,7 @@
             "email": "value",
             "domains": "value"
           },
-          "description": "Agroecological zone attributes per MWS",
+          "description": "Natural farming organizations from the Consortium for Agroecological Transformations that intersect the micro-watershed, with organization type, contact, email, and domains.",
           "selectable": true
         },
         {
@@ -454,7 +454,7 @@
             "food_storage_feat_value": "value",
             "availability_of_food_storage_warehouse": "value"
           },
-          "description": "Antyodaya / SECC socio-economic indicators",
+          "description": "Mission Antyodaya indicators for villages in this tehsil, covering self-help groups, social protection, civic infrastructure, financial inclusion, energy, roads, housing, and maternal and child health.",
           "selectable": true
         },
         {
@@ -467,7 +467,7 @@
             "aquifer_classes": "class",
             "aquifer_percentages": "%"
           },
-          "description": "Aquifer class and area share per MWS",
+          "description": "Principal aquifer under each micro-watershed, from the India WRIS aquifer map, with the area share of each class. India is divided into 14 principal aquifers, including alluvium, laterite, basalt, sandstone, shale, limestone, and granite.",
           "selectable": true
         },
         {
@@ -479,7 +479,7 @@
             "canal_code": "value",
             "canal_name": "value"
           },
-          "description": "Canal network intersection with the MWS",
+          "description": "Irrigation canals that intersect the micro-watershed, with the project name, canal code, and canal name.",
           "selectable": true
         },
         {
@@ -493,7 +493,7 @@
             "area": "ha",
             "uid": "id"
           },
-          "description": "Tree canopy cover density",
+          "description": "Tree canopy cover density for each micro-watershed and year: area under high density, low density, and missing data. CoRE Stack computes this from Sentinel-1, Sentinel-2, and GEDI at 25 m from 2017, except agro-climatic zones 12 to 15.",
           "selectable": true
         },
         {
@@ -508,7 +508,7 @@
             "area": "ha",
             "uid": "id"
           },
-          "description": "Tree canopy height",
+          "description": "Tree canopy height for each micro-watershed and year: area under short, medium, and tall trees. CoRE Stack computes this from Sentinel-1, Sentinel-2, and GEDI at 25 m from 2017, except agro-climatic zones 12 to 15.",
           "selectable": true
         },
         {
@@ -528,7 +528,7 @@
             "triple_to_triple_area": "ha",
             "total_change_crop_intensity_area": "ha"
           },
-          "description": "Change detection: cropping intensity",
+          "description": "Change in cropping intensity for each micro-watershed, from IndiaSAT land use, comparing a 2017-2019 composite with a 2022-2024 composite. Area that stayed single, double, or triple cropped, and area that moved between those classes.",
           "selectable": true
         },
         {
@@ -543,7 +543,7 @@
             "farm_to_scrub_land_area": "ha",
             "total_degradation_area": "ha"
           },
-          "description": "Change detection: land degradation",
+          "description": "Cropping reduction for each micro-watershed, from IndiaSAT land use, comparing a 2017-2019 composite with a 2022-2024 composite. Cropland that stayed cropland, and cropland that changed to built-up, barren, or shrub and scrub.",
           "selectable": true
         },
         {
@@ -560,7 +560,7 @@
             "shrub_to_barren_area": "ha",
             "total_change_area": "ha"
           },
-          "description": "Change detection: shrub change",
+          "description": "Change in shrub and scrub for each micro-watershed, from IndiaSAT land use, comparing a 2017-2019 composite with a 2022-2024 composite. Shrub that stayed shrub, and shrub that changed to farm, tree, built-up, water, or barren.",
           "selectable": true
         },
         {
@@ -576,7 +576,7 @@
             "forest_to_scrub_land_area": "ha",
             "total_tree_cover_decrease_area": "ha"
           },
-          "description": "Change detection: tree-cover decrease (deforestation)",
+          "description": "Tree cover loss for each micro-watershed, from IndiaSAT land use, comparing a 2017-2019 composite with a 2022-2024 composite. Trees that stayed trees, and trees that changed to built-up, cropland, barren, or shrub and scrub.",
           "selectable": true
         },
         {
@@ -592,7 +592,7 @@
             "scrub_land_to_forest_area": "ha",
             "total_tree_cover_increase_area": "ha"
           },
-          "description": "Change detection: tree-cover increase (afforestation)",
+          "description": "Tree cover gain for each micro-watershed, from IndiaSAT land use, comparing a 2017-2019 composite with a 2022-2024 composite. Area that stayed trees, and built-up, cropland, barren, or shrub and scrub that changed to trees.",
           "selectable": true
         },
         {
@@ -607,7 +607,7 @@
             "water_to_built_up_area": "ha",
             "total_urbanization_area": "ha"
           },
-          "description": "Change detection: urbanization",
+          "description": "Urbanization for each micro-watershed, from IndiaSAT land use, comparing a 2017-2019 composite with a 2022-2024 composite. Area that stayed built-up, and water, trees or crops, and barren or shrub that changed to built-up.",
           "selectable": true
         },
         {
@@ -626,7 +626,7 @@
             "total_weeks": "weeks",
             "uid": "id"
           },
-          "description": "Kharif cropping vs drought years",
+          "description": "Kharif drought and cropped area for each micro-watershed and year: weeks of no, mild, moderate, and severe drought, dry spells, monsoon onset, and area cropped in kharif. Drought classes follow the 2016 Manual for Drought Management.",
           "selectable": true
         },
         {
@@ -644,7 +644,7 @@
             "sum_area": "ha",
             "uid": "id"
           },
-          "description": "Annual cropping intensity",
+          "description": "Annual cropping intensity for each micro-watershed from 2017, computed by CoRE Stack from IndiaSAT land use as the weighted share of single, double, and triple or perennial cropping, with the area in each class.",
           "selectable": true
         },
         {
@@ -656,7 +656,7 @@
             "max_elevation": "m",
             "mean_elevation": "m"
           },
-          "description": "Elevation / DEM summary per MWS",
+          "description": "Elevation of each micro-watershed from SRTM digital elevation data: minimum, maximum, and mean elevation.",
           "selectable": true
         },
         {
@@ -669,7 +669,7 @@
             "drainage_density_std": "km/km2",
             "stream_order_length": "km"
           },
-          "description": "Drainage density",
+          "description": "Drainage density of each micro-watershed. Drainage lines are the channels extracted from SRTM DEM and labeled by Strahler stream order. The dataset gives weighted drainage density, its spread, and stream-order length.",
           "selectable": true
         },
         {
@@ -686,7 +686,7 @@
             "area": "ha",
             "uid": "id"
           },
-          "description": "Drought frequency / weeks (if present as a sheet)",
+          "description": "Drought frequency for each micro-watershed and year from 2017: weeks of no, mild, moderate, and severe drought, and dry spells. CoRE Stack follows the 2016 Manual for Drought Management, using CHIRPS rainfall, Landsat vegetation, MODIS crop data, and IndiaSAT land use.",
           "selectable": true
         },
         {
@@ -703,7 +703,7 @@
             "area": "ha",
             "uid": "id"
           },
-          "description": "Drought causality classes",
+          "description": "Main contributors to mild drought and to severe or moderate drought for each micro-watershed and year. Contributors include rainfall deviation, the standardized precipitation index, dry spells, vegetation condition, moisture adequacy, and kharif area sown.",
           "selectable": true
         },
         {
@@ -743,7 +743,7 @@
             "tehsil": "value",
             "universities_distance": "km"
           },
-          "description": "Distance to facilities (km)",
+          "description": "Distance from each census village to nearby facilities, including schools, colleges, health centres, banks, the public distribution system, markets, and agricultural infrastructure.",
           "selectable": true
         },
         {
@@ -755,7 +755,7 @@
             "address": "value",
             "location_t": "value"
           },
-          "description": "Factory / CSR sites intersecting the MWS",
+          "description": "Industrial units from the Annual Survey of Industries that intersect the micro-watershed, geolocated from the 2018 survey frame, with company name and address.",
           "selectable": true
         },
         {
@@ -767,7 +767,7 @@
             "land_info": "value",
             "kml_url": "value"
           },
-          "description": "Green credit / restoration opportunity",
+          "description": "Degraded land registered under the Government of India Green Credit Rules that intersects the micro-watershed, with the forest division, land information, and a link to the boundary.",
           "selectable": true
         },
         {
@@ -783,7 +783,7 @@
             "welldepth": "m",
             "uid": "id"
           },
-          "description": "Annual hydrology (ET, runoff, precipitation, …)",
+          "description": "Annual water balance of each micro-watershed: precipitation, evapotranspiration, and runoff in mm, the water balance and its cumulative value in mm, and estimated well depth in metres. Water balance is precipitation minus evapotranspiration minus runoff, the vertical flux only.",
           "selectable": true
         },
         {
@@ -808,7 +808,7 @@
             "g_zaid": "mm",
             "uid": "id"
           },
-          "description": "Seasonal hydrology",
+          "description": "Seasonal water balance of each micro-watershed for kharif, rabi, and zaid: precipitation, evapotranspiration, runoff, and groundwater balance in mm. This is the same vertical water balance as the annual dataset, split by agricultural season.",
           "selectable": true
         },
         {
@@ -819,7 +819,7 @@
             "title_of_conflict": "value",
             "link_to_conflict": "value"
           },
-          "description": "Land conflict watch overlay",
+          "description": "Land and natural-resource conflicts recorded by Land Conflict Watch that intersect the micro-watershed, with the conflict title and a link, from data accessed in August 2025.",
           "selectable": true
         },
         {
@@ -847,7 +847,7 @@
             "pig_female": "value",
             "pig_total": "number"
           },
-          "description": "Livestock census indicators",
+          "description": "Livestock census counts for each village: male, female, and total cattle, buffalo, sheep, goat, and pig.",
           "selectable": true
         },
         {
@@ -871,7 +871,7 @@
             "sum": "ha",
             "uid": "id"
           },
-          "description": "Land use / land cover class shares",
+          "description": "IndiaSAT land use and land cover for each micro-watershed and year from 2017, as area under built-up, barren, trees, shrub and scrub, single kharif, single non-kharif, double, and triple cropping, and water in kharif, rabi, and zaid. CoRE Stack builds this at 10 m from Landsat, Sentinel, MODIS, and Dynamic World.",
           "selectable": true
         },
         {
@@ -884,7 +884,7 @@
             "sector_moefcc": "value",
             "village": "value"
           },
-          "description": "Mining overlay",
+          "description": "Mineral mining proposals that intersect the micro-watershed, from the environmental-clearance compilation in Pande et al. (2019), with proposal, sector, and village.",
           "selectable": true
         },
         {
@@ -897,7 +897,7 @@
             "basin_code": "value",
             "sub_basin_code": "value"
           },
-          "description": "Micro-watershed identity and area",
+          "description": "Identity of each CoRE Stack micro-watershed: uid, area in hectares, and the watershed, sub-basin, and basin codes. Micro-watersheds are delineated from a digital elevation model and the WRIS watershed boundaries.",
           "selectable": true
         },
         {
@@ -909,7 +909,7 @@
             "downstream_mws": "value",
             "upstream_mws": "value"
           },
-          "description": "MWS drainage connectivity",
+          "description": "Upstream and downstream neighbours of each micro-watershed. Each watershed has one outlet into a downstream watershed and can receive flow from several upstream watersheds, mapped from flow accumulation.",
           "selectable": true
         },
         {
@@ -922,7 +922,7 @@
             "latitude": "value",
             "longitude": "value"
           },
-          "description": "Surface water bodies intersecting the MWS",
+          "description": "Surface water bodies that intersect each micro-watershed, with the waterbody uid, name, and location. Waterbodies are detected from IndiaSAT land use and combined with the waterbody census.",
           "selectable": true
         },
         {
@@ -936,7 +936,7 @@
             "village_details.values": "value",
             "village_details": "value"
           },
-          "description": "Villages intersecting the MWS",
+          "description": "Census villages that intersect each micro-watershed, with village ids and the share of the watershed they cover.",
           "selectable": true
         },
         {
@@ -948,7 +948,7 @@
             "shrub_slope": "value",
             "shrub_mean": "value"
           },
-          "description": "Shrub NDVI",
+          "description": "Shrub condition for each micro-watershed: mean shrub NDVI, its slope, and the trend.",
           "selectable": true
         },
         {
@@ -965,7 +965,7 @@
             "community_assets": "count",
             "mws_id": "id"
           },
-          "description": "Annual MGNREGA works",
+          "description": "MGNREGA works in each micro-watershed and year from 2017, categorized by CoRE Stack into soil and water conservation, irrigation on farms, other on-farm works, plantations, land restoration, off-farm livelihood assets, and community assets.",
           "selectable": true
         },
         {
@@ -983,7 +983,7 @@
             "vill_id": "id",
             "vill_name": "name"
           },
-          "description": "Village-level MGNREGA assets",
+          "description": "MGNREGA works in each village and year from 2017, in the same CoRE Stack categories as the micro-watershed MGNREGA dataset: soil and water conservation, irrigation on farms, other on-farm works, plantations, land restoration, off-farm livelihood assets, and community assets.",
           "selectable": true
         },
         {
@@ -1000,7 +1000,7 @@
             "no_change_area": "ha",
             "partially_degraded_area": "ha"
           },
-          "description": "Overall tree-cover change",
+          "description": "Tree cover change for each micro-watershed from canopy density and canopy height: area where tree cover was lost or gained, degraded, improved, partially degraded, or unchanged, plus missing data.",
           "selectable": true
         },
         {
@@ -1014,7 +1014,7 @@
             "mosaic_restoration_area": "ha",
             "excluded_areas": "ha"
           },
-          "description": "Restoration opportunity classes",
+          "description": "Landscape restoration opportunity for each micro-watershed, from the World Resources Institute restoration atlas: area for protection (forest density above 40 percent), wide-scale restoration, and mosaic restoration.",
           "selectable": true
         },
         {
@@ -1024,7 +1024,7 @@
             "uid": "id",
             "river_name": "value"
           },
-          "description": "River network intersection",
+          "description": "Rivers that intersect the micro-watershed, with the river name.",
           "selectable": true
         },
         {
@@ -1043,7 +1043,7 @@
             "sc": "%",
             "st": "%"
           },
-          "description": "Social-economic indicator table",
+          "description": "Census village indicators compiled with the CoRE Stack village boundaries: total population, Scheduled Caste and Scheduled Tribe population, and literacy rate.",
           "selectable": true
         },
         {
@@ -1056,7 +1056,7 @@
             "class_code": "value",
             "class_name": "value"
           },
-          "description": "Stage of groundwater extraction (SOGE)",
+          "description": "Stage of groundwater extraction for each micro-watershed, from the Central Ground Water Board compilation for 2011, 2013, 2017, and 2020. It is annual extraction divided by annual extractable groundwater, classed as Safe, Semi-critical, Critical, or Over-exploited.",
           "selectable": true
         },
         {
@@ -1072,7 +1072,7 @@
             "k_mean_in_kg_per_ha": "value",
             "oc_mean": "%"
           },
-          "description": "Soil health parameters",
+          "description": "Soil nutrients for each micro-watershed: mean nitrogen, phosphorus, and potassium, and mean organic carbon, with the area under cropping and under tree cover.",
           "selectable": true
         },
         {
@@ -1087,7 +1087,7 @@
             "topsoil_bulk_density_in_kg_per_dm3": "value",
             "topsoil_exchange_capacity_in_cmol_per_kg": "value"
           },
-          "description": "Soil type",
+          "description": "Soil physical properties of each micro-watershed: available water capacity, and bulk density and cation exchange capacity of the topsoil and subsoil.",
           "selectable": true
         },
         {
@@ -1098,7 +1098,7 @@
             "order": "order",
             "value": "%"
           },
-          "description": "Stream-order length / density",
+          "description": "Share of each micro-watershed under each Strahler stream order. CoRE Stack computes stream order from SRTM elevation and drainage lines so downstream areas can be distinguished from upland areas.",
           "selectable": true
         },
         {
@@ -1113,7 +1113,7 @@
             "total_swb_area": "ha",
             "uid": "id"
           },
-          "description": "Annual surface water body extent",
+          "description": "Seasonal surface-water area of each micro-watershed and year from 2017, from IndiaSAT land use: total water, and water present in kharif, rabi, and zaid.",
           "selectable": true
         },
         {
@@ -1130,7 +1130,7 @@
             "slopy_area": "%",
             "valley_area": "%"
           },
-          "description": "Terrain cluster / morphometry",
+          "description": "Terrain cluster of each micro-watershed. Eleven landform classes from slope and topographic position are grouped into plains, broad slopes, steep slopes, valleys, and ridges, then labeled Mostly plains, Broad plains and slopes, Broad sloppy and hilly, or Mostly hills and valleys.",
           "selectable": true
         },
         {
@@ -1150,7 +1150,7 @@
             "double_cropping_area": "%",
             "triple_cropping_area": "%"
           },
-          "description": "Terrain × LULC on plains",
+          "description": "IndiaSAT land use on the plain part of each micro-watershed: area of barren land, forest, shrub and scrub, and single, double, and triple cropping, with the terrain cluster of that watershed.",
           "selectable": true
         },
         {
@@ -1170,7 +1170,7 @@
             "double_cropping_area": "%",
             "triple_cropping_area": "%"
           },
-          "description": "Terrain × LULC on slopes",
+          "description": "IndiaSAT land use on the sloping part of each micro-watershed: area of barren land, forest, shrub and scrub, and single, double, and triple cropping, with the terrain cluster of that watershed.",
           "selectable": true
         }
       ]
