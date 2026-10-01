@@ -32,8 +32,8 @@ TEHSIL_DATA_TYPE_VALUES = ["all"] + [item[0] for item in TEHSIL_DATA_TYPE_DOCS i
 def tehsil_data_type_help_markdown():
     lines = [
         "Omit ``data``, or pass ``data=all``, to return every dataset generated for that tehsil.",
-        "The response includes the sheets present in that tehsil's file, one row per micro-watershed.",
-        "Pass one or more sheet names to keep only those sheets:",
+        "The response includes the datasets present in that tehsil's file, one row per micro-watershed.",
+        "Pass one or more dataset names to keep only those datasets:",
         "``data=drought,stream_order`` or ``data=drought&data=stream_order``.",
         "",
         "| ``data`` value | What you get |",
