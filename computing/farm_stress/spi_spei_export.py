@@ -309,16 +309,25 @@ def export_gsmap_500m_archive(
     output_dir=LOCAL_DIR_GSMAP_500M,
     overwrite=False,
     poll_seconds=30,
+    keep_banded=True,
 ):
     """Download the historical GSMaP rainfall archive resampled to 500m
-    (bilinear), as yearly multi-band GCS exports later split into the
-    per-period files the rest of the pipeline expects (see module
-    comment above) - the 500m companion to export_gsmap_historical_archive.
+    (bilinear), as yearly multi-band GCS exports - the 500m companion to
+    export_gsmap_historical_archive.
+
+    keep_banded (default True): keep each year's mosaicked file as-is
+    (precip_500m_{year}.tif, one band per period) rather than splitting
+    it into per-period files - same flag and same reason as
+    export_modis_pet_500m_archive. The banded 500m pipeline
+    (compute_water_balance_archive_banded, fit_spi1_archive_banded_tiled)
+    reads yearly files, so splitting here would break the hand-off.
+    keep_banded=False restores the older per-period layout.
 
     gee_account_id: required, no default - see export_gsmap_period.
 
-    Safe to interrupt and re-run: years whose split-out period files are
-    all already on disk are skipped unless overwrite=True.
+    Safe to interrupt and re-run: years already on disk (banded file, or
+    all split-out period files, matching keep_banded) are skipped unless
+    overwrite=True.
     """
     ee_initialize(gee_account_id)
     region = ee.Geometry.Rectangle(INDIA_BBOX_COORDS)
@@ -332,9 +341,12 @@ def export_gsmap_500m_archive(
     skipped = []
     for year in sorted(by_year):
         periods = by_year[year]
-        if not overwrite and all(
-            os.path.exists(f"{output_dir}/precip_{p['label']}.tif") for p in periods
-        ):
+        already_done = (
+            os.path.exists(f"{output_dir}/precip_500m_{year}.tif")
+            if keep_banded
+            else all(os.path.exists(f"{output_dir}/precip_{p['label']}.tif") for p in periods)
+        )
+        if not overwrite and already_done:
             skipped.append(year)
             continue
 
@@ -374,13 +386,19 @@ def export_gsmap_500m_archive(
     downloaded = []
     for year, periods, task_id, layer_name in pending:
         yearly_path = _download_and_mosaic_year(bucket, GCS_PATH_GSMAP_500M, layer_name, output_dir)
-        print(f"Downloaded/mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
-        split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "precip")
-        os.remove(yearly_path)
-        downloaded.extend(split_paths)
+        if keep_banded:
+            final_path = f"{output_dir}/precip_500m_{year}.tif"
+            os.replace(yearly_path, final_path)
+            print(f"Downloaded/mosaicked -> {final_path} ({len(periods)} bands, kept banded)")
+            downloaded.append(final_path)
+        else:
+            print(f"Downloaded/mosaicked -> {yearly_path}, splitting into {len(periods)} period file(s) ...")
+            split_paths = _split_yearly_bands_to_periods(yearly_path, periods, output_dir, "precip")
+            os.remove(yearly_path)
+            downloaded.extend(split_paths)
 
     print(
-        f"Done. Downloaded/split {len(downloaded)} period file(s) across "
+        f"Done. Downloaded {len(downloaded)} file(s) across "
         f"{len(pending)} year(s), skipped {len(skipped)} year(s) already on disk."
     )
     return {"downloaded": downloaded, "skipped_years": skipped}
@@ -679,7 +697,11 @@ def merge_local_500m_shards(dataset, start_year=2000, end_year=2025, local_dir=N
             skipped.append(year)
             continue
 
-        shard_names = [f for f in all_files if f.startswith(f"{layer_prefix}_{year}")]
+        # substring, not startswith: files pulled down by hand from the GCS
+        # console carry the bucket folder path flattened into the name
+        # ("ksheetiz_farm_stress_gsmap_500m_precip_500m_2000...tif"), so
+        # the layer name isn't at the start of the filename.
+        shard_names = [f for f in all_files if f"{layer_prefix}_{year}" in f]
         if not shard_names:
             print(f"{year}: no local files matching {layer_prefix}_{year}* found, skipping")
             missing_locally.append(year)
