@@ -41,6 +41,12 @@ def _clean_csv_value(v, default=None):
     return v
 
 
+def _clean_style_url(v):
+    """Return the style URL, or "" for blanks and placeholders like "No style file"."""
+    url = str(_clean_csv_value(v, "")).strip()
+    return url if url.lower().startswith(("http://", "https://")) else ""
+
+
 _STAC_DATA = os.path.join(BASE_DIR, "data", "STAC_specs")
 
 JAVA_TYPE_MAP = {
@@ -365,7 +371,7 @@ class MetadataProvider:
         return {
             "workspace": _clean_csv_value(row["geoserver_workspace_name"], ""),
             "layer_name": gs_layer,
-            "style_file_url": _clean_csv_value(row["style_file_url"], ""),
+            "style_file_url": _clean_style_url(row["style_file_url"]),
             "display_name": _clean_csv_value(row["display_name"], ""),
             "ee_layer_name": _clean_csv_value(row["ee_layer_name"], ""),
             "gsd": _clean_csv_value(row["spatial_resolution_in_meters"]),
@@ -913,10 +919,14 @@ class BaseSTACItemBuilder(ABC):
 
     @staticmethod
     def _add_style_asset(item, layer_map):
+        style_url = (layer_map.get("style_file_url") or "").strip()
+        if not style_url:
+            log.info("No style_file_url for item=%s; skipping style asset", item.id)
+            return item
         item.add_asset(
             "style",
             pystac.Asset(
-                href=layer_map["style_file_url"],
+                href=style_url,
                 media_type=pystac.MediaType.XML,
                 roles=["metadata"],
                 title="QGIS Style file",
@@ -1032,9 +1042,14 @@ class RasterSTACItemBuilder(BaseSTACItemBuilder):
         return item
 
     def _add_extensions(self, item, layer_map, **kw):
-        style_classes = self.style_parser.parse_raster_style(
-            layer_map["style_file_url"]
-        )
+        style_url = (layer_map.get("style_file_url") or "").strip()
+        if not style_url:
+            log.warning(
+                "No style_file_url for item=%s; skipping classification extension",
+                item.id,
+            )
+            return item
+        style_classes = self.style_parser.parse_raster_style(style_url)
         cls_ext = pystac.extensions.classification.ClassificationExtension.ext(
             item.assets["data"], add_if_missing=True
         )
