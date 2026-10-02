@@ -33,7 +33,7 @@ def generate_slope_percentage_data_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name_base = f"slope_percentage_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
+        layer_name_base = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_slope_percentage"
         watersheds_gdf, watershed_source = load_precomputed_watersheds(
             state=state,
             district=district,
@@ -44,14 +44,14 @@ def generate_slope_percentage_data_local(
     else:
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name_base = f"slope_percentage_{valid_gee_text(asset_suffix).lower()}"
+        layer_name_base = f"{valid_gee_text(asset_suffix).lower()}_slope_percentage"
         watersheds_gdf = read_validated_vector_file(
             roi_path, f"Invalid ROI file: {roi_path}"
         )
         print(f"ROI source: {roi_path}")
 
     # Raster Processing
-    raster_layer_name = f"{layer_name_base}"
+    raster_layer_name = f"{layer_name_base}_raster"
     output_raster_path = build_output_raster_path(
         layer_name=raster_layer_name,
         output_base_dir=LOCAL_SLOPE_PERCENTAGE_OUTPUT,
