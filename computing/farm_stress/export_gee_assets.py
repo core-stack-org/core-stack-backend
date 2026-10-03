@@ -1,18 +1,39 @@
-"""Historical SPI-1/SPEI-3 input rasters (plan.md Step 1 / Script 01a).
+"""Central module for every Google Earth Engine -> local data export in the
+Farm Stress pipeline (formerly spi_spei_export.py, which only held the
+SPI/SPEI inputs; renamed once ET for MAI joined the list).
 
-Builds the GSMaP rainfall accumulation in Earth Engine, then pulls the
-result straight to local disk via getDownloadURL (see local_download.py)
-rather than an async GCS export - these rasters are small enough (single
-band, ~11km resolution) that a direct download is simpler than submitting
-and polling a batch export task.
+Everything that pulls a raw dataset OUT of GEE onto local disk lives here,
+so drivers in data/ call one module rather than hunting across several.
+Derived GEE-side products (the MAI climatology, VCI percentiles/timeseries,
+the agricultural mask) are analysis steps that write GEE assets, not raw
+data exports, and stay in mai_climatology.py / vci_climatology.py.
 
-The local gamma/log-logistic fitting and monsoon onset detection run
-separately (spi_spei_fit.py, monsoon_onset.py, added in a later pass) once
-these rasters are on disk.
+Exports (by dataset)
+  Rainfall - GSMaP
+    export_gsmap_period / export_gsmap_historical_archive   28-day, ~11km (legacy)
+    export_gsmap_500m_archive                               28-day, bilinear to 500m, yearly-banded
+    export_gsmap_daily_archive                              daily May-Sep, ~11km (monsoon onset)
+  PET - MOD16A2GF, prorated onto the 28-day SPEI periods
+    export_modis_pet_historical_archive                     ~11km (legacy)
+    export_modis_pet_500m_archive                           native 500m, yearly-banded
+  ET / PET - MOD16A2GF, raw 8-day composites (inputs for local MAI = ET/PET)
+    export_modis_8day_500m_archive(band="ET"|"PET")         native 500m, 46 bands/year
+  Recovery / local helpers
+    download_500m_archive_from_gcs, merge_local_500m_shards, plus the shard
+    mosaic helpers they share.
 
-Datasets are implemented one at a time, per the phased rollout:
-rainfall (export_gsmap_*) first, then PET (export_modis_pet_*, prorated
-from MOD16A2GF). Water balance (P - PET) follows once PET is validated.
+Two delivery paths are used. Small ~11km rasters come straight down via
+getDownloadURL (see local_download.py). Full-India 500m rasters exceed that
+route's ~48MB cap, so they go through an async GCS export and are then
+downloaded and mosaicked (GEE splits each large export into several spatial
+shards).
+
+GCS exports use this module's own _export_image_to_gcs rather than
+utilities.gee_utils.sync_raster_to_gcs. That shared function was changed
+upstream (a "merged with dev" commit) to take (image, scale, layer_name,
+region) and write under a hardcoded "nrm_raster/" prefix - it no longer
+accepts the destination folder this pipeline needs (everything under
+ksheetiz/), so depending on it broke every farm_stress GCS export.
 """
 
 import os
@@ -21,15 +42,20 @@ from datetime import datetime, timedelta
 
 import ee
 
-from utilities.gee_utils import ee_initialize, sync_raster_to_gcs, check_task_status, gcs_config
+from nrm_app.settings import GCS_BUCKET_NAME
+from utilities.gee_utils import ee_initialize, check_task_status, gcs_config
 from computing.farm_stress.local_download import download_image
 from computing.farm_stress.helper import generate_28day_periods
+from computing.farm_stress.mai_climatology import AGRI_MASK_ASSET_ID
 from computing.farm_stress.config import (
     GSMAP_COLLECTION,
     GSMAP_BAND,
     MODIS_ET_COLLECTION,
     MODIS_PET_BAND,
     MODIS_PET_SCALE_FACTOR,
+    MODIS_ET_BAND,
+    MODIS_ET_SCALE_FACTOR,
+    N_8DAY_PERIODS,
     SPI_SCALE_M,
     EXPORT_SCALE_M,
     INDIA_BBOX_COORDS,
@@ -41,7 +67,48 @@ from computing.farm_stress.config import (
     LOCAL_DIR_MODIS_PET_500M,
     GCS_PATH_GSMAP_500M,
     GCS_PATH_MODIS_PET_500M,
+    LOCAL_DIR_MODIS_ET_500M,
+    LOCAL_DIR_MODIS_PET_8DAY_500M,
+    GCS_PATH_MODIS_ET_500M,
+    GCS_PATH_MODIS_PET_8DAY_500M,
 )
+
+
+def _export_image_to_gcs(image, scale, layer_name, gcs_path, region=None):
+    """Start a GCS GeoTIFF export of `image` and return its task id.
+
+    Lands at gs://{GCS_BUCKET_NAME}/{gcs_path}/{layer_name}*.tif - GEE
+    appends a tile-offset suffix per spatial shard when the image is large
+    (e.g. "precip_500m_20000000000000-0000000000.tif"), which is why the
+    download side matches by prefix. EPSG:4326 at `scale` metres, matching
+    the rest of the 500m archive so every raster shares one grid.
+
+    region: export extent. Leave None when the image was already clipped
+    to the India bbox (rainfall - GSMaP is natively EPSG:4326). MODIS
+    images must NOT be .clip()ed: their native sinusoidal footprint is the
+    whole globe and GEE can't transform its edge into EPSG:4326
+    ("Image.clip: Unable to transform edge"), so pass the bbox here and
+    let the export set the extent instead - same approach the VCI export
+    uses.
+    """
+    prefix = gcs_path.rstrip("/") + "/" + layer_name
+    export_args = dict(
+        image=image,
+        description="gcs_" + layer_name,
+        bucket=GCS_BUCKET_NAME,
+        fileNamePrefix=prefix,
+        scale=scale,
+        fileFormat="GeoTIFF",
+        crs="EPSG:4326",
+        maxPixels=1e13,
+    )
+    if region is not None:
+        export_args["region"] = region
+    task = ee.batch.Export.image.toCloudStorage(**export_args)
+    task.start()
+    task_id = task.status()["id"]
+    print(f"Submitted export -> gs://{GCS_BUCKET_NAME}/{prefix} (task {task_id})")
+    return task_id
 
 
 def export_gsmap_period(
@@ -240,19 +307,40 @@ def _periods_by_year(start_year, end_year):
     return by_year
 
 
+def _to_cog(path):
+    """Rewrite the GeoTIFF at `path` in place as a Cloud Optimized GeoTIFF
+    (DEFLATE, tiled, with overviews; BIGTIFF because a yearly 500m stack
+    can pass the 4GB classic-TIFF limit). Writes to a temp file first, so
+    an interrupted conversion never leaves a half-written file at `path`.
+    """
+    import rasterio.shutil
+
+    tmp = path + ".cog.tmp"
+    try:
+        rasterio.shutil.copy(
+            path, tmp, driver="COG", compress="DEFLATE", BIGTIFF="YES", overview_resampling="average"
+        )
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return path
+
+
 def _mosaic_shard_paths(shard_paths, yearly_path):
     """Mosaic local shard files (already on disk, however they got
     there - downloaded from GCS or placed manually) into one merged
     multi-band file at yearly_path via rasterio.merge. A single shard is
     just renamed, not passed through the merge machinery. Deletes the
-    input shard files on success - they're redundant once merged.
+    input shard files on success - they're redundant once merged. The
+    result is always a COG (see _to_cog).
     """
     import rasterio
     from rasterio.merge import merge as rasterio_merge
 
     if len(shard_paths) == 1:
         os.rename(shard_paths[0], yearly_path)
-        return yearly_path
+        return _to_cog(yearly_path)
 
     print(f"  {len(shard_paths)} shards, mosaicking ...")
     srcs = [rasterio.open(p) for p in shard_paths]
@@ -267,7 +355,7 @@ def _mosaic_shard_paths(shard_paths, yearly_path):
         dst.write(mosaic)
     for p in shard_paths:
         os.remove(p)
-    return yearly_path
+    return _to_cog(yearly_path)
 
 
 def _download_and_mosaic_year(bucket, gcs_path, layer_name, output_dir):
@@ -374,7 +462,7 @@ def export_gsmap_500m_archive(
 
         combined = ee.Image.cat(band_images).clip(region)
         layer_name = f"precip_500m_{year}"
-        task_id = sync_raster_to_gcs(combined, EXPORT_SCALE_M, layer_name, gcs_path=GCS_PATH_GSMAP_500M)
+        task_id = _export_image_to_gcs(combined, EXPORT_SCALE_M, layer_name, gcs_path=GCS_PATH_GSMAP_500M)
         print(f"Submitted {year} ({len(periods)} bands) -> task {task_id}")
         pending.append((year, periods, task_id, layer_name))
 
@@ -503,7 +591,7 @@ def export_modis_pet_500m_archive(
 
         combined = ee.Image.cat(band_images).clip(region)
         layer_name = f"pet_500m_{year}"
-        task_id = sync_raster_to_gcs(combined, EXPORT_SCALE_M, layer_name, gcs_path=GCS_PATH_MODIS_PET_500M)
+        task_id = _export_image_to_gcs(combined, EXPORT_SCALE_M, layer_name, gcs_path=GCS_PATH_MODIS_PET_500M)
         print(f"Submitted {year} ({len(periods)} bands) -> task {task_id}")
         pending.append((year, periods, task_id, layer_name))
 
@@ -533,6 +621,144 @@ def export_modis_pet_500m_archive(
     return {"downloaded": downloaded, "skipped_years": skipped}
 
 
+# ── raw 8-day MOD16A2GF ET / PET at 500m (inputs for local MAI) ─────────────
+# MAI = ET / PET is built locally, so each band is exported as-is per 8-day
+# composite - no proration onto 28-day periods (that is the SPEI-side PET
+# above) and no ratio computed on GEE. One image per calendar year with 46
+# bands, band i = the i-th composite (DOY 1, 9, ..., 361). Band position is
+# the only link to the composite once the file leaves GEE (band names do not
+# survive a GCS GeoTIFF export), so _build_modis_8day_year_image refuses to
+# export any year that doesn't have exactly 46 composites: verified true for
+# all 26 years 2000-2025 (1,196 = 26 x 46), but a gap would silently shift
+# every later band by one.
+
+_MOD16_8DAY = {
+    # band -> (scale factor to mm per 8-day, GCS folder, local folder, file stem)
+    MODIS_ET_BAND: (MODIS_ET_SCALE_FACTOR, GCS_PATH_MODIS_ET_500M, LOCAL_DIR_MODIS_ET_500M, "et_500m"),
+    MODIS_PET_BAND: (
+        MODIS_PET_SCALE_FACTOR,
+        GCS_PATH_MODIS_PET_8DAY_500M,
+        LOCAL_DIR_MODIS_PET_8DAY_500M,
+        "pet8day_500m",
+    ),
+}
+
+
+def _build_modis_8day_year_image(band, year, agri_masked):
+    """One 46-band float32 image of every 8-day MOD16A2GF composite of
+    `year` for `band` ("ET" or "PET"), scaled to mm per 8-day.
+
+    Chronological order is fixed by an explicit sort before the map, so
+    band i is always the i-th composite regardless of how GEE orders the
+    collection internally. Raises (before anything is exported) if the
+    year doesn't have exactly N_8DAY_PERIODS composites. Deliberately not
+    clipped - see _export_image_to_gcs; the export's region sets the extent.
+    """
+    if band not in _MOD16_8DAY:
+        raise ValueError(f"band must be one of {sorted(_MOD16_8DAY)}, got {band!r}")
+    scale_factor = _MOD16_8DAY[band][0]
+
+    col = (
+        ee.ImageCollection(MODIS_ET_COLLECTION)
+        .select(band)
+        .filterDate(f"{year}-01-01", f"{year + 1}-01-01")
+        .sort("system:time_start")
+    )
+    n = col.size().getInfo()
+    if n != N_8DAY_PERIODS:
+        raise ValueError(
+            f"{year}: found {n} {band} composites, expected {N_8DAY_PERIODS} - refusing to export, "
+            "band position would no longer map to composite"
+        )
+
+    agri_mask = ee.Image(AGRI_MASK_ASSET_ID) if agri_masked else None
+
+    def prep(img):
+        out = img.multiply(scale_factor)
+        if agri_mask is not None:
+            out = out.updateMask(agri_mask)
+        return out.toFloat()
+
+    names = [f"period_{i:02d}" for i in range(N_8DAY_PERIODS)]
+    return col.map(prep).toBands().rename(names)
+
+
+def export_modis_8day_500m_archive(
+    gee_account_id,
+    band=MODIS_ET_BAND,
+    start_year=2000,
+    end_year=2025,
+    years=None,
+    output_dir=None,
+    overwrite=False,
+    poll_seconds=30,
+    agri_masked=True,
+):
+    """Export the raw 8-day MOD16A2GF `band` ("ET" or "PET") at native 500m,
+    one yearly 46-band file per year, as the input to a local MAI = ET/PET.
+
+    Values are the product's documented x0.1 scaling applied (mm per 8-day
+    composite), float32. MAI itself is a ratio, so the scale factor cancels.
+    Pixels are masked by the same agricultural mask the MAI climatology and
+    VCI use (agri_masked=True): ET outside cropland isn't used by MAI, and
+    unmasked float32 for 1,196 bands would be several times larger on disk
+    for no consumer. Set agri_masked=False only if ET is wanted for other
+    land cover - and don't mix masked and unmasked years in one folder,
+    nothing downstream could tell them apart.
+
+    years: explicit list of years to export; overrides start/end. Years
+    are calendar-aligned (46 composites each), so exporting a subset - e.g.
+    one pilot year - never touches a neighbouring year, unlike the 28-day
+    period archives.
+
+    Output: {output_dir}/{stem}_{year}.tif (et_500m_ / pet8day_500m_).
+    Safe to interrupt and re-run: years already on disk are skipped unless
+    overwrite=True. Files placed by hand under merged/ are NOT seen here -
+    callers that use that layout should pass only the missing years.
+
+    gee_account_id: required, no default - see export_gsmap_period.
+    """
+    if band not in _MOD16_8DAY:
+        raise ValueError(f"band must be one of {sorted(_MOD16_8DAY)}, got {band!r}")
+    _, gcs_path, default_dir, stem = _MOD16_8DAY[band]
+    output_dir = (output_dir or default_dir).rstrip("/")
+
+    ee_initialize(gee_account_id)
+    region = ee.Geometry.Rectangle(INDIA_BBOX_COORDS)
+    year_list = sorted(set(years)) if years else list(range(start_year, end_year + 1))
+    print(f"{band}: {len(year_list)} year(s) to consider: {year_list[0]}-{year_list[-1]}")
+
+    pending, skipped = [], []  # pending: (year, task_id, layer_name)
+    for year in year_list:
+        if not overwrite and os.path.exists(f"{output_dir}/{stem}_{year}.tif"):
+            skipped.append(year)
+            continue
+        image = _build_modis_8day_year_image(band, year, agri_masked)
+        layer_name = f"{stem}_{year}"
+        task_id = _export_image_to_gcs(image, EXPORT_SCALE_M, layer_name, gcs_path, region=region)
+        pending.append((year, task_id, layer_name))
+
+    if not pending:
+        print(f"Nothing to export (skipped {len(skipped)} year(s) already on disk).")
+        return {"downloaded": [], "skipped_years": skipped}
+
+    print(f"Submitted {len(pending)} year(s), waiting for the batch to finish...")
+    check_task_status([task_id for _, task_id, _ in pending], sleep_time=poll_seconds)
+
+    bucket = gcs_config(gee_account_id)
+    os.makedirs(output_dir, exist_ok=True)
+    downloaded = []
+    for year, _task_id, layer_name in pending:
+        yearly_path = _download_and_mosaic_year(bucket, gcs_path, layer_name, output_dir)
+        final_path = f"{output_dir}/{stem}_{year}.tif"
+        os.replace(yearly_path, final_path)
+        print(f"Downloaded/mosaicked -> {final_path} ({N_8DAY_PERIODS} bands)")
+        downloaded.append(final_path)
+
+    print(f"Done. Downloaded {len(downloaded)} file(s), skipped {len(skipped)} year(s) already on disk.")
+    return {"downloaded": downloaded, "skipped_years": skipped}
+
+
 def _split_yearly_bands_to_periods(yearly_path, periods, output_dir, file_prefix):
     """Split one yearly multi-band GeoTIFF (bands in the same order as
     `periods`, sorted chronologically - see _periods_by_year) into
@@ -557,6 +783,7 @@ def _split_yearly_bands_to_periods(yearly_path, periods, output_dir, file_prefix
             out_path = f"{output_dir}/{file_prefix}_{period['label']}.tif"
             with rasterio.open(out_path, "w", **profile) as dst:
                 dst.write(src.read(band_index), 1)
+            _to_cog(out_path)
             written.append(out_path)
     return written
 
@@ -847,7 +1074,7 @@ def export_modis_pet_historical_archive(
         )
 
         layer_name = f"pet_{period['label']}"
-        task_id = sync_raster_to_gcs(
+        task_id = _export_image_to_gcs(
             pet_28d_11km, SPI_SCALE_M, layer_name, gcs_path=GCS_PATH_MODIS_PET_MONTHLY
         )
         print(f"[{i}/{len(periods)}] submitted {period['label']} -> task {task_id}")

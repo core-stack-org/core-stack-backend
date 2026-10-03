@@ -1,6 +1,6 @@
 """Water balance (P - PET) for SPEI-3 (plan.md Step 1 / Script 01a Part C).
 
-Pure local computation - no GEE involved. Rainfall (spi_spei_export.py's
+Pure local computation - no GEE involved. Rainfall (export_gee_assets.py's
 export_gsmap_*) and PET (export_modis_pet_*) are both already downloaded
 locally on the same 11km grid (same India bbox, same scale, same period
 labels), verified by direct comparison of their rasterio transforms.
@@ -123,7 +123,7 @@ def compute_water_balance_archive_banded(
     silent-mismatch bug like the last two.
 
     Band order within each year's file must match
-    spi_spei_export._periods_by_year's chronological ordering for that
+    export_gee_assets._periods_by_year's chronological ordering for that
     year - true for anything produced by this project's export/merge
     path, since both sides derive from the same
     generate_28day_periods() call.
@@ -137,7 +137,7 @@ def compute_water_balance_archive_banded(
     from rasterio.windows import Window
 
     from computing.farm_stress.config import LOCAL_DIR_WATER_BALANCE_500M
-    from computing.farm_stress.spi_spei_export import _periods_by_year
+    from computing.farm_stress.export_gee_assets import _periods_by_year
 
     output_dir = (output_dir or LOCAL_DIR_WATER_BALANCE_500M).rstrip("/")
     os.makedirs(output_dir, exist_ok=True)

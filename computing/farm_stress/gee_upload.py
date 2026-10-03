@@ -61,7 +61,7 @@ def upload_local_tif_to_gee_asset(
 ):
     """Upload one local GeoTIFF to GCS, then ingest it as a GEE image asset.
 
-    gee_account_id: required, no default - see spi_spei_export.export_gsmap_period.
+    gee_account_id: required, no default - see export_gee_assets.export_gsmap_period.
     Returns the export task id (submitted, not waited on - see
     upload_archive_batch for the submit-all/wait-all/download-all pattern).
     """

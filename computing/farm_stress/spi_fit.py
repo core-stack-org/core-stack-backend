@@ -236,7 +236,7 @@ def fit_spi1_archive_banded_tiled(
     """
     from rasterio.windows import Window
 
-    from computing.farm_stress.spi_spei_export import _periods_by_year
+    from computing.farm_stress.export_gee_assets import _periods_by_year
 
     by_year = _periods_by_year(start_year, end_year)
     periods = []

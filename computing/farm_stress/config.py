@@ -97,6 +97,15 @@ GCS_PATH_MODIS_PET_500M = "ksheetiz/farm_stress/modis_pet_500m/"
 LOCAL_DIR_SPI1_PARAMS_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_params_500m")
 LOCAL_DIR_SPI1_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_timeseries_500m")
 
+# MAI inputs (Step 2) - raw 8-day MOD16A2GF ET and PET at 500m, exported
+# yearly-banded (46 bands/year, one per 8-day composite) so MAI = ET/PET
+# can be built locally. Distinct from LOCAL_DIR_MODIS_PET_500M above,
+# which is PET prorated onto the 28-day SPEI periods, not 8-day composites.
+LOCAL_DIR_MODIS_ET_500M = os.path.join(LOCAL_EXPORT_ROOT, "modis_et_500m")
+LOCAL_DIR_MODIS_PET_8DAY_500M = os.path.join(LOCAL_EXPORT_ROOT, "modis_pet_8day_500m")
+GCS_PATH_MODIS_ET_500M = "ksheetiz/farm_stress/modis_et_500m/"
+GCS_PATH_MODIS_PET_8DAY_500M = "ksheetiz/farm_stress/modis_pet_8day_500m/"
+
 # VCI (Script 03a) - the 26 yearly multi-band VCI COGs (one file per year,
 # up to 23 bands = 16-day periods) were exported to GEE, downloaded via
 # Drive, merged, and converted to COG manually (not via this repo's
@@ -143,6 +152,9 @@ SPEI3_WINDOW = 3  # 84 days total
 
 MODIS_PET_BAND = "PET"
 MODIS_PET_SCALE_FACTOR = 0.1  # stored as integer x 0.1 -> mm/8day
+MODIS_ET_BAND = "ET"
+MODIS_ET_SCALE_FACTOR = 0.1  # same scale as PET - ET is also stored as integer x 0.1 -> mm/8day
+N_8DAY_PERIODS = 46  # MOD16A2GF composites per year (DOY 1, 9, ..., 361) - verified on all 26 years
 MODIS_COMPOSITE_DAYS = 8  # standard composite length; period 46 is 5-6 days,
 # use the composite's actual system:time_end - system:time_start instead
 

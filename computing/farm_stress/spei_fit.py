@@ -235,7 +235,7 @@ def fit_spei3_archive_banded_tiled(
     Doesn't support resuming a partial run, same reason as
     fit_spei3_archive_tiled - re-run from scratch if interrupted.
     """
-    from computing.farm_stress.spi_spei_export import _periods_by_year
+    from computing.farm_stress.export_gee_assets import _periods_by_year
 
     by_year = _periods_by_year(start_year, end_year)
     periods = []
