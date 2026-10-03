@@ -1185,49 +1185,41 @@ def _save_monthly_parquet(gdf, state, district, block, year):
     return out_path
 
 
-# ── stress-month columns (static.parquet) ─────────────────────────────────────
+# ── frequency column (static.parquet) ─────────────────────────────────────────
 
-MONTHS_PER_YEAR = 12
-
-# Bands applied to MAI rounded to 2 dp (rounding makes the bands contiguous).
-STRESS_BANDS = {
-    "mild_stress_months":     (0.51, 0.75),
-    "moderate_stress_months": (0.26, 0.50),
-    "severe_stress_months":   (0.00, 0.25),
-}
+KHARIF_MONTH_NUMBERS = (7, 8, 9, 10)   # Jul–Oct
+# Moderate (0.26–0.50) + severe (0.00–0.25) combined: any MAI in this range = drought month.
+DROUGHT_MAI_RANGE = (0.0, MAI_MODERATE_THRESHOLD)
 
 
-def _update_static_stress_months(state, district, block):
+def _update_static_frequency(state, district, block):
     """
-    Populate mild/moderate/severe_stress_months in farms/static.parquet.
-
-    Per farm: stress months per 12-month year, pooled over all years in
-    farms/sub_annual.parquet and weighted by valid MAI months:
-        total stress months / total valid MAI months * 12
-    so years with missing (NaN) months are not under-counted. Farms with no
-    valid MAI month in any year get NaN. Values are rounded to 2 dp.
+    Populate `frequency` in farms/static.parquet: return period in years =
+    N / #kharif-drought years, per farm.
+      N            = years in sub_annual.parquet where the farm has a valid
+                     (non-NaN) MAI in at least one of Jul–Oct
+      drought year = any valid Jul–Oct MAI within DROUGHT_MAI_RANGE (0–0.50)
+    Farms with zero drought years (or no data) get NaN. Rounded to 2 dp.
     """
     monthly_path = _monthly_parquet_path(state, district, block)
     static_path  = _static_parquet_path(state, district, block)
     if not (os.path.exists(monthly_path) and os.path.exists(static_path)):
-        logger.warning("Cannot update stress-month columns — monthly/static parquet missing.")
+        logger.warning("Cannot update frequency — monthly/static parquet missing.")
         return None
 
-    monthly = pd.read_parquet(monthly_path, columns=["farm_id", "mai"])
-    mai = monthly["mai"].round(2)
-    for col, (lo, hi) in STRESS_BANDS.items():
-        monthly[col] = (mai >= lo) & (mai <= hi)          # NaN compares False → in no band
-    monthly["n_valid"] = mai.notna()
+    monthly = pd.read_parquet(monthly_path, columns=["farm_id", "year", "date", "mai"])
+    kharif = monthly[monthly["date"].dt.month.isin(KHARIF_MONTH_NUMBERS) & monthly["mai"].notna()]
 
-    totals = monthly.groupby("farm_id")[list(STRESS_BANDS) + ["n_valid"]].sum()
-    valid_months = totals["n_valid"].where(totals["n_valid"] > 0)   # 0 valid months → NaN
-    avg = totals[list(STRESS_BANDS)].div(valid_months, axis=0).mul(MONTHS_PER_YEAR).round(2)
+    in_drought = kharif["mai"].between(*DROUGHT_MAI_RANGE)          # inclusive on both ends
+    is_drought = in_drought.groupby([kharif["farm_id"], kharif["year"]]).any()   # any Jul–Oct month in range
+    n_years       = is_drought.groupby("farm_id").size()            # years with valid kharif MAI
+    drought_years = is_drought.groupby("farm_id").sum()
+    frequency = (n_years / drought_years.where(drought_years > 0)).round(2)
 
     static = gpd.read_parquet(static_path)
-    for col in STRESS_BANDS:
-        static[col] = static["farm_id"].map(avg[col])      # farms with no valid month → NaN
+    static["frequency"] = static["farm_id"].map(frequency)          # no data / zero drought → NaN
     static.to_parquet(static_path, index=False)
-    logger.info("Stress-month columns updated in %s", static_path)
+    logger.info("frequency column updated in %s", static_path)
     return static_path
 
 
@@ -1329,7 +1321,7 @@ def intersect_et_with_farms(
 
     annual_path  = _save_annual_parquet(gdf, state, district, block, year)
     monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
-    _update_static_stress_months(state, district, block)
+    _update_static_frequency(state, district, block)
 
     summary = {
         "state": state, "district": district, "block": block, "year": year,
@@ -1437,7 +1429,7 @@ def compute_multi_year_water_stress(
         stress_mask = is_stress & np.isfinite(kharif_mai_values)
         kharif_mai_sum_stress[stress_mask] += kharif_mai_values[stress_mask]
 
-    _update_static_stress_months(state, district, block)
+    _update_static_frequency(state, district, block)
 
     # Cross-year indicators
     result_gdf = base_gdf.copy()
