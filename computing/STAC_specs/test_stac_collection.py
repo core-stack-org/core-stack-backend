@@ -170,6 +170,27 @@ class TestGeoServerClient(unittest.TestCase):
         self.assertIsNone(self.client.fetch_vector_metadata("ws", "missing"))
 
     @patch("computing.STAC_specs.stac_collection.requests.get")
+    def test_fetch_raster_metadata_rest_success(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=200)
+        mock_get.return_value.json.return_value = {
+            "coverage": {
+                "latLonBoundingBox": {
+                    "minx": 85.0, "maxx": 86.0, "miny": 25.0, "maxy": 26.0,
+                },
+                "grid": {"range": {"low": "0 0", "high": "100 200"}},
+            }
+        }
+        bbox, footprint, crs, shape = self.client.fetch_raster_metadata_rest("ws", "layer")
+        self.assertEqual(bbox, [85.0, 25.0, 86.0, 26.0])
+        self.assertEqual(shape, [200, 100])
+        self.assertIn("/rest/workspaces/ws/coverages/layer.json", mock_get.call_args[0][0])
+
+    @patch("computing.STAC_specs.stac_collection.requests.get")
+    def test_fetch_raster_metadata_rest_failure(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=404, text="not found")
+        self.assertIsNone(self.client.fetch_raster_metadata_rest("ws", "missing"))
+
+    @patch("computing.STAC_specs.stac_collection.requests.get")
     def test_fetch_raster_metadata_success(self, mock_get):
         xml_body = b"""<?xml version="1.0" encoding="UTF-8"?>
         <wcs:CoverageDescriptions xmlns:gml="http://www.opengis.net/gml/3.2"
@@ -306,9 +327,20 @@ class TestRasterSTACItemBuilder(unittest.TestCase):
 
     def test_returns_none_when_metadata_fails(self):
         self.gs.fetch_raster_metadata.return_value = None
+        self.gs.fetch_raster_metadata_rest.return_value = None
         builder = RasterSTACItemBuilder(self.config, self.gs, self.meta, _mock_style_parser())
         item = builder.build("bihar", "nalanda", "hilsa", "test_raster")
         self.assertIsNone(item)
+
+    def test_falls_back_to_rest_when_describe_coverage_fails(self):
+        self.gs.fetch_raster_metadata.return_value = None
+        self.gs.fetch_raster_metadata_rest.return_value = (
+            FAKE_BBOX, FAKE_FOOTPRINT, 4326, [100, 200]
+        )
+        builder = RasterSTACItemBuilder(self.config, self.gs, self.meta, _mock_style_parser())
+        item = builder.build("bihar", "nalanda", "hilsa", "test_raster")
+        self.assertIsNotNone(item)
+        self.gs.fetch_raster_metadata_rest.assert_called_once()
 
 
 class TestCatalogManager(unittest.TestCase):
