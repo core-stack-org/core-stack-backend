@@ -198,6 +198,56 @@ class GeoServerClient:
 
         return bbox, mapping(footprint), 4326, shape
 
+    # -- raster metadata via REST API (fallback) ------------------------------
+    # WCS 2.0 DescribeCoverage returns 500 when the GeoTIFF's native CRS has no
+    # EPSG match (e.g. "GCS Name = WGS 84" from GEE exports); REST still works.
+
+    def fetch_raster_metadata_rest(self, workspace, layer_name):
+        url = (
+            f"{self.base_url}/rest/workspaces/{workspace}"
+            f"/coverages/{layer_name}.json"
+        )
+        log.info("Fetching raster metadata via REST: %s", url)
+        response = self._get(url)
+        if response.status_code != 200:
+            log.error(
+                "Raster coverage REST fetch failed [status=%s] url=%s body=%s",
+                response.status_code,
+                url,
+                response.text[:300],
+            )
+            return None
+
+        cov = response.json()["coverage"]
+        ll = cov["latLonBoundingBox"]
+        bbox = [
+            float(ll["minx"]),
+            float(ll["miny"]),
+            float(ll["maxx"]),
+            float(ll["maxy"]),
+        ]
+        footprint = Polygon(
+            [
+                [bbox[0], bbox[1]],
+                [bbox[0], bbox[3]],
+                [bbox[2], bbox[3]],
+                [bbox[2], bbox[1]],
+            ]
+        )
+
+        grid_range = (cov.get("grid") or {}).get("range") or {}
+        if grid_range.get("low") and grid_range.get("high"):
+            low_c = grid_range["low"].split()
+            high_c = grid_range["high"].split()
+            shape = [
+                int(high_c[1]) - int(low_c[1]),
+                int(high_c[0]) - int(low_c[0]),
+            ]
+        else:
+            shape = [0, 0]
+
+        return bbox, mapping(footprint), 4326, shape
+
     # -- vector metadata via REST API ----------------------------------------
     # Single lightweight JSON call replaces downloading the full GeoJSON.
 
@@ -979,6 +1029,8 @@ class RasterSTACItemBuilder(BaseSTACItemBuilder):
 
         desc_url = self.geoserver.raster_describe_url(ws, gs_layer)
         meta = self.geoserver.fetch_raster_metadata(desc_url)
+        if meta is None:
+            meta = self.geoserver.fetch_raster_metadata_rest(ws, gs_layer)
         if meta is None:
             log.error(
                 "Could not fetch raster metadata for layer=%s ws=%s gs_layer=%s",
