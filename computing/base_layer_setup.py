@@ -1,4 +1,3 @@
-import fcntl
 import logging
 import subprocess
 from functools import wraps
@@ -436,135 +435,25 @@ def _tehsil_watershed_details(state, district, tehsil):
     state_slug = valid_gee_text(state.strip().lower())
     district_slug = valid_gee_text(district.strip().lower())
     tehsil_slug = valid_gee_text(tehsil.strip().lower())
-    destination = (
-        TEHSIL_WATERSHEDS_DIR
-        / state_slug
-        / district_slug
-        / f"{tehsil_slug}.gpkg"
-    )
-    layer_name = f"mws:mws_{district_slug}_{tehsil_slug}"
-    return destination, layer_name
+    base = TEHSIL_WATERSHEDS_DIR / state_slug / district_slug / tehsil_slug
+    return base, f"mws:mws_{district_slug}_{tehsil_slug}"
 
 
 def ensure_tehsil_watershed(state, district, tehsil, force=False):
     """
-    Returns the local tehsil watershed GPKG, downloading it from the mws
-    GeoServer workspace if it is missing. Safe to call from concurrent tasks:
-    a per-file lock makes one caller download while the others wait and reuse
-    the result.
+    Returns the local tehsil MWS boundary file (gpkg preferred, else geojson)
+    from DATA_DIR/base_layers/tehsil_mws. The boundaries are provisioned
+    locally beforehand, so nothing is downloaded; raises if the file is absent.
     """
-    destination, layer_name = _tehsil_watershed_details(state, district, tehsil)
-    if destination.exists() and not force:
-        return destination
-
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    with open(destination.with_suffix(".lock"), "w") as lock_file:
-        fcntl.flock(lock_file, fcntl.LOCK_EX)
-        if destination.exists() and not force:
-            return destination
-        _download_tehsil_watershed(destination, layer_name)
-    return destination
-
-
-def _download_tehsil_watershed(destination, layer_name):
-    import geopandas as gpd
-
-    from utilities.constants import GEOSERVER_BASE
-
-    wfs_url = f"{GEOSERVER_BASE}mws/ows"
-    params = {
-        "service": "WFS",
-        "version": "1.0.0",
-        "request": "GetFeature",
-        "typeName": layer_name,
-        "outputFormat": "application/json",
-        "srsName": "EPSG:4326",
-    }
-    temp_destination = destination.with_suffix(".tmp.gpkg")
-
-    try:
-        response = requests.get(wfs_url, params=params, timeout=600)
-        response.raise_for_status()
-        try:
-            payload = response.json()
-        except ValueError as exc:
-            raise ValueError(
-                f"GeoServer layer {layer_name} is not available (non-JSON "
-                "response). Generate and publish the MWS layer for this "
-                "location first."
-            ) from exc
-        if (
-            not isinstance(payload, dict)
-            or payload.get("type") != "FeatureCollection"
-        ):
-            raise ValueError("GeoServer did not return a FeatureCollection")
-
-        watersheds = gpd.GeoDataFrame.from_features(
-            payload.get("features", []),
-            crs="EPSG:4326",
-        )
-        if watersheds.empty:
-            raise ValueError(f"GeoServer layer {layer_name} is empty")
-
-        if temp_destination.exists():
-            temp_destination.unlink()
-        watersheds.to_file(
-            temp_destination,
-            layer="watersheds",
-            driver="GPKG",
-        )
-        temp_destination.replace(destination)
-    except Exception:
-        if temp_destination.exists():
-            temp_destination.unlink()
-        raise
-
-    logger.info("Saved %s to %s", layer_name, destination)
-
-
-def _download_active_tehsil_watersheds(force=False):
-    locations = list(_active_tehsil_locations())
-    if not locations:
-        logger.warning("No active tehsils found; no watershed files downloaded.")
-        return
-
-    written = 0
-    skipped = 0
-    failures = []
-
-    for state, district, tehsil in locations:
-        destination, layer_name = _tehsil_watershed_details(
-            state,
-            district,
-            tehsil,
-        )
-        if destination.exists() and not force:
-            skipped += 1
-            continue
-
-        try:
-            ensure_tehsil_watershed(
-                state=state,
-                district=district,
-                tehsil=tehsil,
-                force=force,
-            )
-            written += 1
-        except Exception as exc:
-            failures.append(f"{layer_name}: {exc}")
-            logger.error("Failed to download %s: %s", layer_name, exc)
-
-    logger.info(
-        "GeoServer tehsil watersheds complete: %d written, %d skipped, %d failed.",
-        written,
-        skipped,
-        len(failures),
+    base, _ = _tehsil_watershed_details(state, district, tehsil)
+    candidates = [base.with_suffix(ext) for ext in (".gpkg", ".geojson")]
+    for path in candidates:
+        if path.exists():
+            return path
+    raise FileNotFoundError(
+        f"Tehsil MWS boundary not found for {state}/{district}/{tehsil}. "
+        f"Expected one of: {[str(p) for p in candidates]}"
     )
-    if failures:
-        raise RuntimeError(
-            "Failed to download watershed layers for active tehsils: "
-            + "; ".join(failures)
-        )
 
 
 def with_tehsil_watershed(func):
@@ -588,12 +477,21 @@ def with_tehsil_watershed(func):
 
 def ensure_tehsil_watersheds(force=False):
     """
-    Downloads per-tehsil watershed .gpkg files for all active tehsils from the
-    mws GeoServer workspace. GeoServer is the single source of truth; there is
-    no fallback that derives watersheds from the pan-India microwatershed file.
-    Existing files are skipped unless force is true.
+    Checks that a local MWS boundary exists for every active tehsil and raises
+    listing the missing ones. Nothing is downloaded.
     """
-    _download_active_tehsil_watersheds(force=force)
+    locations = list(_active_tehsil_locations())
+    missing = []
+    for state, district, tehsil in locations:
+        try:
+            ensure_tehsil_watershed(state, district, tehsil)
+        except FileNotFoundError:
+            missing.append(f"{state}/{district}/{tehsil}")
+    if missing:
+        raise FileNotFoundError(
+            f"Missing local MWS boundaries under {TEHSIL_WATERSHEDS_DIR} for: "
+            + "; ".join(missing)
+        )
 
 
 def ensure_village_boundaries_dir():

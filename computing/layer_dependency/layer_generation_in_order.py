@@ -378,6 +378,17 @@ def layer_generate_map(
         logger.exception(f"Exception while checking mws layer ({log_ctx})")
         return f"exception occur while checking mws for {district}_{block} as: {e}"
 
+    if compute == "local":
+        try:
+            from computing.local_compute_helper import (
+                sync_tehsil_boundaries_to_geoserver,
+            )
+
+            sync_tehsil_boundaries_to_geoserver(state, district, block)
+        except Exception as e:
+            logger.exception(f"Boundary sync to GeoServer failed ({log_ctx})")
+            return f"boundary sync to geoserver failed for {district}_{block} as: {e}"
+
     global_args = {}
     if start_year:
         global_args["start_year"] = start_year

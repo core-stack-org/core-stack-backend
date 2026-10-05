@@ -157,7 +157,8 @@ SOIL_RASTER_PATH: Path = _base_layer_path(
 
 AEZ_VECTOR_PATH: Path = _base_layer_path("aez")
 
-PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_watersheds"
+PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_mws"
+LOCAL_ADMIN_BOUNDARY_DIR: Path = DATA_DIR / "base_layers/admin_boundaries/output"
 
 MICROWATERSHED_PATH: Path = _base_layer_path("mws")
 

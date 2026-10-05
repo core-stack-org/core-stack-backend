@@ -295,6 +295,17 @@ def validate_pipeline(
     overwrite: bool = True,
 ) -> None:
     runner = get_pipeline(name, compute)
+    if str(compute).strip().lower() == "local":
+        from computing.local_compute_helper import (
+            sync_tehsil_boundaries_to_geoserver,
+        )
+
+        sync_tehsil_boundaries_to_geoserver(
+            location["state"],
+            location["district"],
+            location["block"],
+            overwrite=False,
+        )
     if isinstance(runner, PipelineSpec):
         return
     _legacy_runner_kwargs(
