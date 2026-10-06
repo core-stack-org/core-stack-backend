@@ -2773,7 +2773,7 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
         unmatched_df = (
             village_props[village_props["village_id"].isin(unmatched_village_ids)]
             .drop_duplicates(subset=["village_id"])
-            .assign(gp_id=pd.NA, gp_name=pd.NA)
+            .assign(gp_id="Unknown", gp_name="Unknown")
         )
 
         output_cols = ["village_id", "village_name", "gp_id", "gp_name"]
@@ -2790,10 +2790,11 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
         expanded_villages = final_village_ids - indicator_village_ids
 
         # Write IDs as integers to match social_economic_indicator
-        for col in ["village_id", "gp_id"]:
-            mapping_df[col] = pd.to_numeric(mapping_df[col], errors="coerce").astype(
-                "Int64"
-            )
+        mapping_df["village_id"] = pd.to_numeric(
+            mapping_df["village_id"], errors="coerce"
+        ).astype("Int64")
+        mapping_df["gp_id"] = mapping_df["gp_id"].fillna("Unknown").astype(str)
+
         mapping_df = mapping_df.sort_values(
             by=["gp_id", "village_id"], na_position="last"
         ).reset_index(drop=True)
