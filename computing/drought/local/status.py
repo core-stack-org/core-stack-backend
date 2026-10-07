@@ -31,7 +31,8 @@ DONE, OUTDATED, READY, WAITING = "done", "outdated", "ready", "waiting"
 MODIS_LAYERS = {"mod09a1": MOD09A1_LAYERS, "mod16a2gf": MOD16A2GF_LAYERS}
 
 # Which inputs each stage needs.
-STAGE_INPUTS = {"rain": {"chirps"}, "cropland": {"lulc"}, "vegetation": {"mod09a1"}, "mai": {"mod16a2gf"}}
+STAGE_INPUTS = {"rain": {"chirps"}, "cropland": {"lulc"}, "vegetation": {"mod09a1"}, "mai": {"mod16a2gf"},
+                "classify": {"chirps", "lulc", "mod09a1", "mod16a2gf"}}
 
 
 def read_json(path):

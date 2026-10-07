@@ -14,6 +14,8 @@ Stages so far:
   vegetation  on the 500 m grid of the region: each window's highest NDVI and NDWI per
             year from 2000 (cloud-flagged images only as a fallback), and VCI per season
   mai       on the 500 m grid of the region: ET / PET per window from MOD16A2GF
+  classify  weekly drought labels with the 2020 rules, the season summary, and an
+            EPSG:4326 copy of the summary for publishing
 
 Each stage skips what is already done, so running again continues an
 interrupted run or adds seasons whose inputs have arrived.
@@ -34,13 +36,13 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_DIR))
 
-from computing.drought.local import cropland, moisture, rainfall, vegetation  # noqa: E402
+from computing.drought.local import classify, cropland, moisture, rainfall, vegetation  # noqa: E402
 from computing.drought.local.config import FIRST_SEASON, MANUAL_EDITION, METHOD_VERSION, Paths  # noqa: E402
 from computing.drought.local.grid import load_grid, tile_window, window_mask  # noqa: E402
 from computing.drought.local.status import season_states, stage_can_run  # noqa: E402
 from computing.drought.local.store import run_lock, update_status  # noqa: E402
 
-STAGES = ["rain", "cropland", "vegetation", "mai"]
+STAGES = ["rain", "cropland", "vegetation", "mai", "classify"]
 log = logging.getLogger("drought_layer")
 
 
@@ -141,6 +143,22 @@ def run_region_stage(name, module, paths, seasons, workers, region):
     update_status(paths, record)
 
 
+def run_classify(paths, seasons, workers, region):
+    runnable = [s for s in seasons if stage_can_run(paths, "classify", s)]
+    if not runnable:
+        return
+    written = classify.run(paths, runnable, region, workers)
+
+    def record(status):
+        done = status.setdefault("regions", {}).setdefault(paths.region_key, {}).setdefault("seasons", {})
+        for season in runnable:
+            if classify.summary_file(paths, season).is_file() and (season in written or str(season) not in done):
+                done[str(season)] = {"state": "done", "method_version": METHOD_VERSION, "finished_at": now(),
+                                     "published": str(classify.published_file(paths, season))}
+
+    update_status(paths, record)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--status", action="store_true", help="show the state of each season and exit")
@@ -180,6 +198,8 @@ def main():
                 run_region_stage("vegetation", vegetation, paths, seasons, args.workers, region)
             if "mai" in args.stages:
                 run_region_stage("mai", moisture, paths, seasons, args.workers, region)
+            if "classify" in args.stages:
+                run_classify(paths, seasons, args.workers, region)
         print()
 
     print_status(paths, seasons)
