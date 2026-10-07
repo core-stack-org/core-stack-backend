@@ -6,7 +6,8 @@ import pandas as pd
 import geopandas as gpd
 from collections import defaultdict
 from datetime import datetime
-from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
+from functools import lru_cache
+from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH, BASE_DIR
 import numpy as np
 from shapely.geometry import Point, shape
 from .models import LayerInfo
@@ -166,6 +167,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 )
             elif workspace == "panchayat_boundaries":
                 create_excel_for_village_boun(geojson_data, writer)
+                create_excel_for_village_gp_mapping(geojson_data, writer)
+
             elif workspace == "drought_causality":
                 create_excel_for_drought_causality(
                     geojson_data, xlsx_file, writer, start_year, end_year
@@ -2696,6 +2699,124 @@ def create_excel_for_village_boun(old_geojson, writer):
     results_df.to_excel(writer, sheet_name="social_economic_indicator", index=False)
 
     print(f"Excel file created for social_economic_indicator")
+
+
+VILLAGE_GP_MAPPING_CSV = os.path.join(
+    BASE_DIR, "data/village_gp", "core_stack_gp_village_mapping.csv"
+)
+
+
+def _normalize_id_series(series):
+    """Normalize ID columns to clean strings so CSV and GeoJSON IDs match
+    (e.g. 645200, 645200.0 and " 645200 " all become "645200")."""
+    series = series.astype("string").str.strip().str.replace(r"\.0+$", "", regex=True)
+    return series.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
+
+
+@lru_cache(maxsize=1)
+def _load_village_gp_source():
+    """Read the Pan-India village-GP mapping once"""
+    source_df = pd.read_csv(
+        VILLAGE_GP_MAPPING_CSV,
+        usecols=["village_id", "village_name", "gp_id", "gp_name"],
+        dtype=str,
+    )
+    source_df["village_id"] = _normalize_id_series(source_df["village_id"])
+    source_df["gp_id"] = _normalize_id_series(source_df["gp_id"])
+
+    # If a village is mapped to multiple GPs, retain only the first one
+    # (in source file order). Rows without a GP are ignored.
+    source_df = source_df.dropna(subset=["village_id", "gp_id"])
+    source_df = source_df.drop_duplicates(subset=["village_id"], keep="first")
+    return source_df
+
+
+def create_excel_for_village_gp_mapping(geojson_data, writer):
+    """
+    Scenarios covered (our villages = villages in social_economic_indicator or panchayat boundary):
+          1. Our village with a known GP in source      -> village + GP row
+             (if mapped to multiple GPs, only the first GP is retained)
+          2. Our village with no known GP in source     -> village row, GP empty
+             (village absent from source OR present with an empty gp_id)
+          3. Village NOT in our data but in one of our GPs (GP expansion)-> village + GP row
+    """
+    print("Inside excel generation of village_gp_mapping")
+    try:
+        source_df = _load_village_gp_source()
+        village_props = pd.DataFrame(
+            [
+                {
+                    "village_id": feature.get("properties", {}).get("vill_ID"),
+                    "village_name": feature.get("properties", {}).get("vill_name"),
+                }
+                for feature in geojson_data["features"]
+            ],
+            columns=["village_id", "village_name"],
+        )
+        village_props["village_id"] = _normalize_id_series(village_props["village_id"])
+        village_props = village_props.dropna(subset=["village_id"])
+        indicator_village_ids = set(village_props["village_id"])
+
+        # Scenario 1: source records for our villages that have a GP.
+        matched_villages = source_df[
+            source_df["village_id"].isin(indicator_village_ids)
+            & source_df["gp_id"].notna()
+        ]
+        matched_village_ids = set(matched_villages["village_id"])
+        unmatched_village_ids = indicator_village_ids - matched_village_ids
+        known_gp_ids = set(matched_villages["gp_id"])
+
+        # Scenario 1 + 3: expand to ALL villages belonging to the identified GPs
+        gp_villages = source_df[source_df["gp_id"].isin(known_gp_ids)]
+
+        # Scenario 2: villages from our data that don't have a GP in the source
+        unmatched_df = (
+            village_props[village_props["village_id"].isin(unmatched_village_ids)]
+            .drop_duplicates(subset=["village_id"])
+            .assign(gp_id="Unknown", gp_name="Unknown")
+        )
+
+        output_cols = ["village_id", "village_name", "gp_id", "gp_name"]
+        mapping_df = pd.concat(
+            [gp_villages[output_cols], unmatched_df[output_cols]], ignore_index=True
+        )
+
+        # One row per village (source is already one GP per village).
+        mapping_df = mapping_df.drop_duplicates(subset=["village_id"], keep="first")
+
+        # Validation summary (computed on normalized string IDs)
+        final_village_ids = set(mapping_df["village_id"].dropna())
+        missing_original_villages = indicator_village_ids - final_village_ids
+        expanded_villages = final_village_ids - indicator_village_ids
+
+        # Write IDs as integers to match social_economic_indicator
+        mapping_df["village_id"] = pd.to_numeric(
+            mapping_df["village_id"], errors="coerce"
+        ).astype("Int64")
+        mapping_df["gp_id"] = mapping_df["gp_id"].fillna("Unknown").astype(str)
+
+        mapping_df = mapping_df.sort_values(
+            by=["gp_id", "village_id"], na_position="last"
+        ).reset_index(drop=True)
+
+        mapping_df.to_excel(writer, sheet_name="village_GP", index=False)
+
+        print(
+            f"village_gp_mapping summary: original villages={len(indicator_village_ids)}, "
+            f"found in source={len(matched_village_ids)}, "
+            f"not found in source={len(unmatched_village_ids)}, "
+            f"relevant GPs={len(known_gp_ids)}, "
+            f"added through GP expansion={len(expanded_villages)}, "
+            f"final rows={len(mapping_df)}"
+        )
+        if missing_original_villages:
+            print(
+                "WARNING: villages missing from village_gp_mapping: "
+                f"{sorted(missing_original_villages)}"
+            )
+        print("Excel file created for village_gp_mapping")
+    except Exception as e:
+        print(f"Error occurred while generating excel for village_gp_mapping {e}")
 
 
 def download_layers_excel_file(state, district, block):
