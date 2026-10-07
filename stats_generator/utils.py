@@ -570,7 +570,7 @@ def create_excel_for_antyodaya_20(data, writer):
             ]
 
         exclude_cols = [
-            "shg_pen_feat_value",
+            # "shg_pen_feat_value",
             "shg_fed_feat_value",
             "pg_pen_feat_value",
             "fpo_feat_value",
