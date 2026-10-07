@@ -107,6 +107,18 @@ def dry_spell_weeks(dry):
     return covered.sum(axis=0).astype(np.uint8)
 
 
+def longest_dry_spell(dry):
+    """Length in weeks of the longest run of dry weeks, if it is a dry spell (4 or more), else 0.
+    Same meaning as GEE's dryspell_length (longest run of dry-spell windows + 3)."""
+    dry = np.asarray(dry, dtype=bool)
+    run = np.zeros(dry.shape[1:], dtype=np.int16)
+    best = np.zeros(dry.shape[1:], dtype=np.int16)
+    for week in dry:
+        run = np.where(week, run + 1, 0)
+        best = np.maximum(best, run)
+    return np.where(best >= DRY_SPELL_WEEKS, best, 0).astype(np.uint8)
+
+
 def season_counts(labels):
     """Weeks per class over the season: arrays for none, mild, moderate, severe."""
     labels = np.asarray(labels)

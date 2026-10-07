@@ -297,11 +297,12 @@ def season_rain(paths, year):
     after_onset = dry & (week_numbers >= onset)
     season = slice(ONSET_FIRST_WEEK - 1, SEASON_LAST_WEEK)
     dry_spell_weeks = rules.dry_spell_weeks(after_onset[season])
+    longest_dry_spell = rules.longest_dry_spell(after_onset[season])
 
     totals = window_totals(weekly)
     normal_totals = window_totals(normals)
-    bands = [onset, doy, source, dry_spell_weeks.astype(np.int16)]
-    names = ["onset_week", "onset_day_of_year", "onset_source", "dry_spell_weeks"]
+    bands = [onset, doy, source, dry_spell_weeks.astype(np.int16), longest_dry_spell.astype(np.int16)]
+    names = ["onset_week", "onset_day_of_year", "onset_source", "dry_spell_weeks", "longest_dry_spell_weeks"]
     for i, w in enumerate(WINDOW_STARTS):
         with np.errstate(divide="ignore", invalid="ignore"):
             deviation = np.where(normal_totals[i] > 0, (totals[i] - normal_totals[i]) / normal_totals[i] * 100, np.nan)

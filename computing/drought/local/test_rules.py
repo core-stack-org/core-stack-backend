@@ -148,6 +148,13 @@ class SeasonTests(unittest.TestCase):
         self.assertTrue(bool(r.dry_spell_in_window([T, T, T, T])))
         self.assertFalse(bool(r.dry_spell_in_window([T, F, T, T])))
 
+    def test_longest_dry_spell(self):
+        T, F = True, False
+        self.assertEqual(int(r.longest_dry_spell([T, T, T, T, T, F, T, T, T, T])), 5)  # total would be 9
+        self.assertEqual(int(r.longest_dry_spell([T, T, T, F, T, T, T])), 0)  # no run reaches 4
+        got = r.longest_dry_spell(np.array([[T, F], [T, T], [T, T], [T, T]]))
+        self.assertEqual(got.tolist(), [4, 0])
+
     def test_season_counts(self):
         counts = r.season_counts(np.array([0, 1, 1, 3, 2, 0, 0]))
         self.assertEqual([int(c) for c in counts], [3, 2, 1, 1])
