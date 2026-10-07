@@ -98,9 +98,10 @@ def pixel_lonlat(grid, window):
 def lookup_index(lon, lat, transform, shape):
     """Row and column of the pixel of a lon/lat raster (e.g. CHIRPS) under each point.
     Points outside it get -1. This is nearest neighbour, as in GEE."""
-    inv = ~transform
-    col, row = inv * (lon, lat)
-    col, row = np.floor(col).astype(np.int64), np.floor(row).astype(np.int64)
+    if transform.b or transform.d:
+        raise ValueError("rotated rasters are not supported")
+    col = np.floor((np.asarray(lon) - transform.c) / transform.a).astype(np.int64)
+    row = np.floor((np.asarray(lat) - transform.f) / transform.e).astype(np.int64)
     outside = (col < 0) | (row < 0) | (col >= shape[1]) | (row >= shape[0])
     col[outside], row[outside] = -1, -1
     return row, col

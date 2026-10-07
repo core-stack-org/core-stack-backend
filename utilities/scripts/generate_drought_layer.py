@@ -6,24 +6,37 @@ download_drought_inputs.py stores, into <data-dir>/base_layers/drought/.
 The method is the CoRE v3 writeup (section 3.2.2.1) with the thresholds and
 severity rule of the Manual for Drought Management, updated to December 2020.
 
-The stages are being added one at a time. For now the script shows which
-seasons are done, which can run, and what the others are waiting for.
+Stages so far:
+  rain   on the CHIRPS grid: weekly totals, 1991-2020 normals, SPI fits, monsoon
+         onset, dry-spell weeks and each window's rainfall trigger
+
+Each stage skips what is already done, so running again continues an
+interrupted run or adds seasons whose inputs have arrived.
 
 Examples:
     python utilities/scripts/generate_drought_layer.py --status
-    python utilities/scripts/generate_drought_layer.py --status --tile h25v07
+    python utilities/scripts/generate_drought_layer.py --seasons 2017-2024
+    python utilities/scripts/generate_drought_layer.py --tile h25v07 --seasons 2023
 """
 
 import argparse
+import datetime as dt
+import logging
+import os
 import sys
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_DIR))
 
-from computing.drought.local.config import MANUAL_EDITION, METHOD_VERSION, Paths  # noqa: E402
+from computing.drought.local import rainfall  # noqa: E402
+from computing.drought.local.config import FIRST_SEASON, MANUAL_EDITION, METHOD_VERSION, Paths  # noqa: E402
 from computing.drought.local.grid import load_grid, tile_window, window_mask  # noqa: E402
-from computing.drought.local.status import season_states  # noqa: E402
+from computing.drought.local.status import season_states, stage_can_run  # noqa: E402
+from computing.drought.local.store import run_lock, update_status  # noqa: E402
+
+STAGES = ["rain"]
+log = logging.getLogger("drought_layer")
 
 
 def parse_seasons(text):
@@ -39,6 +52,14 @@ def parse_seasons(text):
     return sorted(set(seasons))
 
 
+def parse_stages(text):
+    stages = [s.strip() for s in text.split(",") if s.strip()]
+    unknown = sorted(set(stages) - set(STAGES))
+    if unknown:
+        raise argparse.ArgumentTypeError(f"unknown stage(s): {', '.join(unknown)}; available: {', '.join(STAGES)}")
+    return stages
+
+
 def print_status(paths, seasons):
     print(f"Drought layer {METHOD_VERSION} ({MANUAL_EDITION})")
     print(f"Output: {paths.root}")
@@ -51,18 +72,49 @@ def print_status(paths, seasons):
         print(f"{season:<8}{state:<{width + 2}}{detail}")
 
 
+def now():
+    return dt.datetime.now().isoformat(timespec="seconds")
+
+
+def run_rain(paths, seasons, workers):
+    runnable = [s for s in seasons if stage_can_run(paths, "rain", s)]
+    skipped = sorted(set(seasons) - set(runnable))
+    if skipped:
+        log.info("Rain stage: inputs incomplete for %s; skipped", ", ".join(map(str, skipped)))
+    if not runnable:
+        return
+    summaries = rainfall.run(paths, runnable, workers)
+
+    def record(status):
+        rain = status.setdefault("shared", {}).setdefault("rain", {})
+        rain["baselines"] = {"finished_at": rain.get("baselines", {}).get("finished_at") or now(),
+                             "normal_years": "1991-2020"}
+        seasons_done = rain.setdefault("seasons", {})
+        for season in runnable:
+            if str(season) not in seasons_done or season in summaries:
+                seasons_done[str(season)] = {"finished_at": now(), **summaries.get(season, {})}
+
+    update_status(paths, record)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--status", action="store_true", help="show the state of each season and exit")
-    parser.add_argument("--seasons", type=parse_seasons, help="e.g. 2017-2024 or 2023 (default: 2017 to this year)")
+    parser.add_argument("--seasons", type=parse_seasons,
+                        help=f"e.g. 2017-2024 or 2023 (default: {FIRST_SEASON} to this year)")
+    parser.add_argument("--stages", type=parse_stages, default=STAGES,
+                        help=f"comma-separated, any of {', '.join(STAGES)} (default: all)")
     parser.add_argument("--tile", help="limit the run to one MODIS tile, e.g. h25v07; outputs go to drought/tiles/<tile>/")
+    parser.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 1), help="parallel processes")
     parser.add_argument("--data-dir", help="data folder (default: $DATA_DIR or ./data)")
     parser.add_argument("--lulc-dir", help="folder with lulc_v3_<year>_<year+1>.tif (default: the LULC folder in config.yaml)")
     args = parser.parse_args()
 
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     paths = Paths.build(args.data_dir, args.lulc_dir, args.tile)
     if not paths.data_dir.is_dir():
         parser.error(f"data folder not found: {paths.data_dir}")
+    seasons = args.seasons or list(range(FIRST_SEASON, dt.date.today().year + 1))
 
     if args.tile:
         grid = load_grid(paths)
@@ -73,9 +125,13 @@ def main():
         inside = int(window_mask(grid, region).sum())
         print(f"Region: tile {args.tile}, {region.width} x {region.height} pixels, {inside:,} inside India")
 
-    print_status(paths, args.seasons)
     if not args.status:
-        print("\nNo stages are implemented yet; nothing was computed.")
+        with run_lock(paths):
+            if "rain" in args.stages:
+                run_rain(paths, seasons, args.workers)
+        print()
+
+    print_status(paths, seasons)
     return 0
 
 

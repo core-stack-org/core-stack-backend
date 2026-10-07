@@ -60,17 +60,34 @@ class Paths:
         return self.periodic / product
 
     @property
+    def base(self):
+        return self.data_dir / "base_layers" / "drought"
+
+    @property
     def root(self):
-        base = self.data_dir / "base_layers" / "drought"
-        return base / "tiles" / self.region if self.region else base
+        """Outputs of this run's region: all of India, or drought/tiles/<tile>/ for a test run."""
+        return self.base / "tiles" / self.region if self.region else self.base
 
     @property
     def version_dir(self):
         return self.root / METHOD_VERSION
 
     @property
+    def shared_dir(self):
+        """Pan-India products every region uses, such as the rainfall stage on the CHIRPS grid."""
+        return self.base / METHOD_VERSION
+
+    @property
+    def region_key(self):
+        return self.region or "india"
+
+    @property
     def status_file(self):
-        return self.root / "status.json"
+        return self.base / "status.json"
+
+    @property
+    def lock_file(self):
+        return self.base / ".lock"
 
     def lulc_file(self, year):
         return self.lulc_dir / f"lulc_v3_{year}_{year + 1}.tif"

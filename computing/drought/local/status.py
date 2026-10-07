@@ -1,7 +1,12 @@
 """Which seasons are done, which can run, and what the others are waiting for.
 
 Readiness comes from the files and manifests that download_drought_inputs.py
-writes; "done" comes from status.json, which the stages write as they finish.
+writes. Progress comes from drought/status.json, which the stages update as they
+finish:
+
+    {"method_version": "v1",
+     "shared":  {"rain": {"baselines": {...}, "seasons": {"2023": {...}}}},
+     "regions": {"india": {"seasons": {"2023": {"state": "done", ...}}}, "h25v07": {...}}}
 """
 
 import datetime as dt
@@ -19,10 +24,14 @@ from computing.drought.local.config import (
     SEASON_LAST_WEEK,
     SOWN_NORMAL_YEARS,
 )
+from computing.drought.local.store import read_status
 from computing.drought.local.weeks import season_composites, vci_history_years, week_end, week_start
 
 DONE, OUTDATED, READY, WAITING = "done", "outdated", "ready", "waiting"
 MODIS_LAYERS = {"mod09a1": MOD09A1_LAYERS, "mod16a2gf": MOD16A2GF_LAYERS}
+
+# Which inputs each stage needs.
+STAGE_INPUTS = {"rain": {"chirps"}}
 
 
 def read_json(path):
@@ -60,52 +69,67 @@ def missing_composites(paths, product, year):
     return missing
 
 
+def _plural(n, word):
+    return f"{n} {word}{'s' if n != 1 else ''}"
+
+
 def baseline_gaps(paths):
-    """Inputs every season shares: rainfall normal years and the area-sown normal years."""
-    reasons = []
+    """[(input, reason)] for inputs every season shares."""
+    gaps = []
     first, last = RAIN_NORMAL_YEARS
     missing = missing_chirps_days(paths, dt.date(first, 1, 1), dt.date(last, 12, 31))
     if missing:
-        reasons.append(f"CHIRPS {first}-{last} normals: {len(missing)} days missing")
+        gaps.append(("chirps", f"CHIRPS {first}-{last} normals: {_plural(len(missing), 'day')} missing"))
     lulc = [y for y in range(SOWN_NORMAL_YEARS[0], SOWN_NORMAL_YEARS[1] + 1) if not paths.lulc_file(y).is_file()]
     if lulc:
-        reasons.append("area-sown normal: " + ", ".join(paths.lulc_file(y).name for y in lulc) + " not found")
-    return reasons
+        gaps.append(("lulc", "area-sown normal: " + ", ".join(paths.lulc_file(y).name for y in lulc) + " not found"))
+    return gaps
 
 
 def season_gaps(paths, season):
-    """What a season still needs, in words; empty when it can run."""
-    reasons = []
+    """[(input, reason)] for what a season still needs; empty when it can run."""
+    gaps = []
     first, last = week_start(season, ONSET_FIRST_WEEK), week_end(season, SEASON_LAST_WEEK)
     days = missing_chirps_days(paths, first, last)
     if days:
-        reasons.append(f"CHIRPS: {len(days)} days missing up to {last}")
+        gaps.append(("chirps", f"CHIRPS: {_plural(len(days), 'day')} missing up to {last}"))
 
     history = {y: missing_composites(paths, "mod09a1", y) for y in vci_history_years(season)}
     short = {y: len(m) for y, m in history.items() if m}
     if short:
-        parts = ", ".join(f"{n} composite{'s' if n > 1 else ''} in {y}" for y, n in short.items())
-        reasons.append(f"MOD09A1: {parts} missing")
+        parts = ", ".join(f"{_plural(n, 'composite')} in {y}" for y, n in short.items())
+        gaps.append(("mod09a1", f"MOD09A1: {parts} missing"))
 
     et = missing_composites(paths, "mod16a2gf", season)
     if len(et) == len(season_composites(season)):
-        reasons.append(f"MOD16A2GF {season}: not published yet (NASA releases a year in Jan-Feb of the next)")
+        gaps.append(("mod16a2gf", f"MOD16A2GF {season}: not published yet (NASA releases a year in Jan-Feb of the next)"))
     elif et:
-        reasons.append(f"MOD16A2GF {season}: {len(et)} composite{'s' if len(et) > 1 else ''} missing")
+        gaps.append(("mod16a2gf", f"MOD16A2GF {season}: {_plural(len(et), 'composite')} missing"))
 
     if not paths.lulc_file(season).is_file():
-        reasons.append(f"LULC: {paths.lulc_file(season).name} not found")
-    return reasons
+        gaps.append(("lulc", f"LULC: {paths.lulc_file(season).name} not found"))
+    return gaps
 
 
-def read_status(paths):
-    return read_json(paths.status_file)
+def stage_can_run(paths, stage, season):
+    needs = STAGE_INPUTS[stage]
+    return not any(inp in needs for inp, _ in baseline_gaps(paths) + season_gaps(paths, season))
+
+
+def stages_done(status, season):
+    done = []
+    if str(season) in status.get("shared", {}).get("rain", {}).get("seasons", {}):
+        done.append("rain")
+    return done
 
 
 def season_states(paths, seasons=None):
     """[(season, state, detail)] for the given seasons (default: FIRST_SEASON to this year)."""
     seasons = seasons or range(FIRST_SEASON, dt.date.today().year + 1)
-    record = read_status(paths).get("seasons", {})
+    status = read_status(paths)
+    if status.get("method_version", METHOD_VERSION) != METHOD_VERSION:
+        status = {}  # made by another method version: nothing counts as done
+    record = status.get("regions", {}).get(paths.region_key, {}).get("seasons", {})
     shared = baseline_gaps(paths)
     rows = []
     for season in seasons:
@@ -117,5 +141,10 @@ def season_states(paths, seasons=None):
                 rows.append((season, OUTDATED, f"made with {done.get('method_version')}, now {METHOD_VERSION}"))
             continue
         gaps = shared + season_gaps(paths, season)
-        rows.append((season, WAITING, "; ".join(gaps)) if gaps else (season, READY, "all inputs present"))
+        stages = stages_done(status, season)
+        progress = f"; stages done: {', '.join(stages)}" if stages else ""
+        if gaps:
+            rows.append((season, WAITING, "; ".join(text for _, text in gaps) + progress))
+        else:
+            rows.append((season, READY, "all inputs present" + progress))
     return rows
