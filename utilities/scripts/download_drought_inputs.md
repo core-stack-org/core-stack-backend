@@ -81,7 +81,7 @@ data/base_layers/periodic/
 | Date in the name | the day | the first day of the 8-day composite (the same date GEE uses) |
 
 The values are the same as the source files. A day or composite counts as done when all its files exist.
-`manifest.json` lists what each folder holds, the latest date, and anything that failed.
+`manifest.json` lists what each folder holds, the latest date, anything that failed, and the MODIS composites NASA itself does not have (`missing_at_source`, e.g. 18 and 26 June 2001).
 
 Keep `modis_india_mask.tif`. If it is deleted, the next run builds it again from the boundary file, and if that
 file has changed, new MODIS files land on a different grid. Delete it only together with `mod09a1/` and `mod16a2gf/`.

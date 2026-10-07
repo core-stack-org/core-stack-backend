@@ -663,6 +663,7 @@ def run_modis(key, periodic_dir, http, auth, args):
     manifest = read_json(manifest_path)
     failed = manifest.setdefault("failed", {})
     partial = manifest.setdefault("partial", {})
+    missing_at_source = manifest.setdefault("missing_at_source", {})
     years = manifest.setdefault("years", {})
     today = dt.date.today()
     to_fetch, to_fetch_mb = 0, 0.0
@@ -698,7 +699,15 @@ def run_modis(key, periodic_dir, http, auth, args):
                 for day in todo:
                     granules = found.get(day.timetuple().tm_yday)
                     if not granules:
+                        # NASA has the year but not this composite, long after it should have
+                        # appeared: a gap at the source, not a file still to come.
+                        if found and (today - day).days >= WAIT_FOR_TILES_DAYS:
+                            if day.isoformat() not in missing_at_source:
+                                log.info("%s %s: NASA has no data for this composite",
+                                         spec["short_name"], day)
+                            missing_at_source[day.isoformat()] = "no granules in CMR"
                         continue  # not published yet
+                    missing_at_source.pop(day.isoformat(), None)
                     missing = sorted(year_tiles - set(granules))
                     if missing and (today - day).days < WAIT_FOR_TILES_DAYS:
                         log.info("%s %s: waiting for tiles %s", spec["short_name"], day, missing)
@@ -726,7 +735,8 @@ def run_modis(key, periodic_dir, http, auth, args):
                     write_json(manifest_path, manifest)
                 if not args.dry_run:
                     done = sum(composite_done(product_dir, spec, d) for d in days)
-                    years[str(year)] = {"composites": done, "of": len(days)}
+                    gaps = sum(d.isoformat() in missing_at_source for d in days)
+                    years[str(year)] = {"composites": done, "missing_at_source": gaps, "of": len(days)}
         finally:
             if not args.dry_run:
                 finished = sorted(product_dir.glob(f"*/{spec['short_name']}_*_{next(iter(spec['layers']))}.tif"))
