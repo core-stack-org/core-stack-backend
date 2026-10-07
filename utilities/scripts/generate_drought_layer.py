@@ -11,6 +11,8 @@ Stages so far:
             SPI fits, monsoon onset, dry-spell weeks and each window's rainfall trigger
   cropland  on the 500 m grid of the region: each pixel's kharif-sown share from the
             10 m LULC, the 2017-2024 normal, the cropland mask, and area sown per season
+  vegetation  on the 500 m grid of the region: each window's highest NDVI and NDWI per
+            year from 2000 (cloud-flagged images only as a fallback), and VCI per season
 
 Each stage skips what is already done, so running again continues an
 interrupted run or adds seasons whose inputs have arrived.
@@ -31,13 +33,13 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_DIR))
 
-from computing.drought.local import cropland, rainfall  # noqa: E402
+from computing.drought.local import cropland, rainfall, vegetation  # noqa: E402
 from computing.drought.local.config import FIRST_SEASON, MANUAL_EDITION, METHOD_VERSION, Paths  # noqa: E402
 from computing.drought.local.grid import load_grid, tile_window, window_mask  # noqa: E402
 from computing.drought.local.status import season_states, stage_can_run  # noqa: E402
 from computing.drought.local.store import run_lock, update_status  # noqa: E402
 
-STAGES = ["rain", "cropland"]
+STAGES = ["rain", "cropland", "vegetation"]
 log = logging.getLogger("drought_layer")
 
 
@@ -119,6 +121,25 @@ def run_cropland(paths, seasons, workers, region):
     update_status(paths, record)
 
 
+def run_region_stage(name, module, paths, seasons, workers, region):
+    """Run a stage that works on the region's 500 m grid and record the seasons it finished."""
+    runnable = [s for s in seasons if stage_can_run(paths, name, s)]
+    skipped = sorted(set(seasons) - set(runnable))
+    if skipped:
+        log.info("%s stage: inputs incomplete for %s; skipped", name.capitalize(), ", ".join(map(str, skipped)))
+    if not runnable:
+        return
+    written = module.run(paths, runnable, region, workers)
+
+    def record(status):
+        done = status.setdefault("regions", {}).setdefault(paths.region_key, {}).setdefault(name, {}).setdefault("seasons", {})
+        for season in runnable:
+            if season in written or str(season) not in done:
+                done[str(season)] = {"finished_at": now()}
+
+    update_status(paths, record)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--status", action="store_true", help="show the state of each season and exit")
@@ -154,6 +175,8 @@ def main():
                 run_rain(paths, seasons, args.workers)
             if "cropland" in args.stages:
                 run_cropland(paths, seasons, args.workers, region)
+            if "vegetation" in args.stages:
+                run_region_stage("vegetation", vegetation, paths, seasons, args.workers, region)
         print()
 
     print_status(paths, seasons)
