@@ -250,7 +250,9 @@ DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
 GLOBAL_DRAINAGE_EPS_M = 10.0
-GEOSERVER_BASE = (GEOSERVER_URL or "https://geoserver.core-stack.org:8443/geoserver/").rstrip("/") + "/"
+GEOSERVER_BASE = (
+    GEOSERVER_URL or "https://geoserver.core-stack.org:8443/geoserver/"
+).rstrip("/") + "/"
 WORKSPACE_URL_END = "wms?service=WMS&request=GetCapabilities"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
@@ -382,3 +384,4 @@ LTP_STP_CHANGE = (
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
+SOI_DISTRICT = "projects/ext-datasets/assets/datasets/SOI_districts"
