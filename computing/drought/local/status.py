@@ -31,7 +31,7 @@ DONE, OUTDATED, READY, WAITING = "done", "outdated", "ready", "waiting"
 MODIS_LAYERS = {"mod09a1": MOD09A1_LAYERS, "mod16a2gf": MOD16A2GF_LAYERS}
 
 # Which inputs each stage needs.
-STAGE_INPUTS = {"rain": {"chirps"}, "cropland": {"lulc"}, "vegetation": {"mod09a1"}}
+STAGE_INPUTS = {"rain": {"chirps"}, "cropland": {"lulc"}, "vegetation": {"mod09a1"}, "mai": {"mod16a2gf"}}
 
 
 def read_json(path):
@@ -121,7 +121,7 @@ def stages_done(status, paths, season):
     if str(season) in status.get("shared", {}).get("rain", {}).get("seasons", {}):
         done.append("rain")
     region = status.get("regions", {}).get(paths.region_key, {})
-    for stage in ("cropland", "vegetation"):
+    for stage in ("cropland", "vegetation", "mai"):
         if str(season) in region.get(stage, {}).get("seasons", {}):
             done.append(stage)
     return done

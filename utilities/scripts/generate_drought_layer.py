@@ -13,6 +13,7 @@ Stages so far:
             10 m LULC, the 2017-2024 normal, the cropland mask, and area sown per season
   vegetation  on the 500 m grid of the region: each window's highest NDVI and NDWI per
             year from 2000 (cloud-flagged images only as a fallback), and VCI per season
+  mai       on the 500 m grid of the region: ET / PET per window from MOD16A2GF
 
 Each stage skips what is already done, so running again continues an
 interrupted run or adds seasons whose inputs have arrived.
@@ -33,13 +34,13 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_DIR))
 
-from computing.drought.local import cropland, rainfall, vegetation  # noqa: E402
+from computing.drought.local import cropland, moisture, rainfall, vegetation  # noqa: E402
 from computing.drought.local.config import FIRST_SEASON, MANUAL_EDITION, METHOD_VERSION, Paths  # noqa: E402
 from computing.drought.local.grid import load_grid, tile_window, window_mask  # noqa: E402
 from computing.drought.local.status import season_states, stage_can_run  # noqa: E402
 from computing.drought.local.store import run_lock, update_status  # noqa: E402
 
-STAGES = ["rain", "cropland", "vegetation"]
+STAGES = ["rain", "cropland", "vegetation", "mai"]
 log = logging.getLogger("drought_layer")
 
 
@@ -177,6 +178,8 @@ def main():
                 run_cropland(paths, seasons, args.workers, region)
             if "vegetation" in args.stages:
                 run_region_stage("vegetation", vegetation, paths, seasons, args.workers, region)
+            if "mai" in args.stages:
+                run_region_stage("mai", moisture, paths, seasons, args.workers, region)
         print()
 
     print_status(paths, seasons)
