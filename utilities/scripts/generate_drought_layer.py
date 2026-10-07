@@ -7,8 +7,10 @@ The method is the CoRE v3 writeup (section 3.2.2.1) with the thresholds and
 severity rule of the Manual for Drought Management, updated to December 2020.
 
 Stages so far:
-  rain   on the CHIRPS grid: weekly totals, 1991-2020 normals, SPI fits, monsoon
-         onset, dry-spell weeks and each window's rainfall trigger
+  rain      on the CHIRPS grid for all of India: weekly totals, 1991-2020 normals,
+            SPI fits, monsoon onset, dry-spell weeks and each window's rainfall trigger
+  cropland  on the 500 m grid of the region: each pixel's kharif-sown share from the
+            10 m LULC, the 2017-2024 normal, the cropland mask, and area sown per season
 
 Each stage skips what is already done, so running again continues an
 interrupted run or adds seasons whose inputs have arrived.
@@ -29,13 +31,13 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_DIR))
 
-from computing.drought.local import rainfall  # noqa: E402
+from computing.drought.local import cropland, rainfall  # noqa: E402
 from computing.drought.local.config import FIRST_SEASON, MANUAL_EDITION, METHOD_VERSION, Paths  # noqa: E402
 from computing.drought.local.grid import load_grid, tile_window, window_mask  # noqa: E402
 from computing.drought.local.status import season_states, stage_can_run  # noqa: E402
 from computing.drought.local.store import run_lock, update_status  # noqa: E402
 
-STAGES = ["rain"]
+STAGES = ["rain", "cropland"]
 log = logging.getLogger("drought_layer")
 
 
@@ -97,6 +99,26 @@ def run_rain(paths, seasons, workers):
     update_status(paths, record)
 
 
+def run_cropland(paths, seasons, workers, region):
+    runnable = [s for s in seasons if stage_can_run(paths, "cropland", s)]
+    skipped = sorted(set(seasons) - set(runnable))
+    if skipped:
+        log.info("Cropland stage: LULC missing for %s; skipped", ", ".join(map(str, skipped)))
+    if not runnable:
+        return
+    written = cropland.run(paths, runnable, region, workers)
+
+    def record(status):
+        part = status.setdefault("regions", {}).setdefault(paths.region_key, {}).setdefault("cropland", {})
+        part.setdefault("normal", {"finished_at": now(), "years": "2017-2024"})
+        done = part.setdefault("seasons", {})
+        for season in runnable:
+            if season in written or str(season) not in done:
+                done[str(season)] = {"finished_at": now()}
+
+    update_status(paths, record)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--status", action="store_true", help="show the state of each season and exit")
@@ -116,8 +138,9 @@ def main():
         parser.error(f"data folder not found: {paths.data_dir}")
     seasons = args.seasons or list(range(FIRST_SEASON, dt.date.today().year + 1))
 
+    grid = load_grid(paths)
+    region = grid.full
     if args.tile:
-        grid = load_grid(paths)
         try:
             region = tile_window(grid, args.tile)
         except ValueError as exc:
@@ -129,6 +152,8 @@ def main():
         with run_lock(paths):
             if "rain" in args.stages:
                 run_rain(paths, seasons, args.workers)
+            if "cropland" in args.stages:
+                run_cropland(paths, seasons, args.workers, region)
         print()
 
     print_status(paths, seasons)

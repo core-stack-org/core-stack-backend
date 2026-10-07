@@ -31,7 +31,7 @@ DONE, OUTDATED, READY, WAITING = "done", "outdated", "ready", "waiting"
 MODIS_LAYERS = {"mod09a1": MOD09A1_LAYERS, "mod16a2gf": MOD16A2GF_LAYERS}
 
 # Which inputs each stage needs.
-STAGE_INPUTS = {"rain": {"chirps"}}
+STAGE_INPUTS = {"rain": {"chirps"}, "cropland": {"lulc"}}
 
 
 def read_json(path):
@@ -116,10 +116,13 @@ def stage_can_run(paths, stage, season):
     return not any(inp in needs for inp, _ in baseline_gaps(paths) + season_gaps(paths, season))
 
 
-def stages_done(status, season):
+def stages_done(status, paths, season):
     done = []
     if str(season) in status.get("shared", {}).get("rain", {}).get("seasons", {}):
         done.append("rain")
+    region = status.get("regions", {}).get(paths.region_key, {})
+    if str(season) in region.get("cropland", {}).get("seasons", {}):
+        done.append("cropland")
     return done
 
 
@@ -141,7 +144,7 @@ def season_states(paths, seasons=None):
                 rows.append((season, OUTDATED, f"made with {done.get('method_version')}, now {METHOD_VERSION}"))
             continue
         gaps = shared + season_gaps(paths, season)
-        stages = stages_done(status, season)
+        stages = stages_done(status, paths, season)
         progress = f"; stages done: {', '.join(stages)}" if stages else ""
         if gaps:
             rows.append((season, WAITING, "; ".join(text for _, text in gaps) + progress))
