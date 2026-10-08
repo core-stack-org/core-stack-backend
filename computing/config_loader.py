@@ -174,6 +174,8 @@ SWB_VECTOR_PATH: Path = _base_layer_path(
 
 SOI_TEHSIL_PATH: Path = _base_layer_path("admin boundaries")
 
+SITE_SUITABILITY_RASTER_PATH: Path = _base_layer_path("plantation_site_suitability")
+
 SOIL_TYPE_BASE_DIR: Path = _base_layer_path("soil type")
 SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
     "available_water_capacity": SOIL_TYPE_BASE_DIR / "available_water_capacity.tif",
@@ -189,9 +191,9 @@ SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
     "topsoil_ph": SOIL_TYPE_BASE_DIR / "topsoil_pH.tif",
     "topsoil_texture": SOIL_TYPE_BASE_DIR / "topsoil_texture.tif",
 }
-PAN_INDIA_OUTER_BOUNDARY_PATH: Path = (
-    DATA_DIR / "india_state_outer_no_islands.geojson"
-)
+
+PAN_INDIA_OUTER_BOUNDARY_PATH: Path = DATA_DIR / "india_state_outer_no_islands.geojson"
+
 
 ADMIN_BOUNDARY_INPUT_DIR: Path = DATA_DIR / "admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR: Path = DATA_DIR / "admin-boundary/output"
