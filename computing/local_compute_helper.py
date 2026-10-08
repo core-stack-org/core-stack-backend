@@ -48,6 +48,26 @@ RIDGE_CLASSES = {3, 7, 10, 11}
 SLOPY_CLASSES = {6}
 
 
+class TerrainProperties(typing.TypedDict):
+    plain_area: float
+    valley_area: float
+    hill_slopes_area: float
+    ridge_area: float
+    slopy_area: float
+    terrainClusters: int
+
+    @staticmethod
+    def dummy():
+        return {
+            "plain_area": 0.0,
+            "valley_area": 0.0,
+            "hill_slopes_area": 0.0,
+            "ridge_area": 0.0,
+            "slopy_area": 0.0,
+            "terrainClusters": -1,
+        }
+
+
 def _slug(value, fallback):
     return valid_gee_text(str(value).strip().lower()) or fallback
 
@@ -931,51 +951,24 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
             working_gdf = working_gdf.to_crs(src.crs)
 
         nodata = src.nodata
-        computed_rows = []
+        computed_rows: list[TerrainProperties] = []
 
         total = len(working_gdf)
         for index, row in enumerate(working_gdf.itertuples(index=False), start=1):
             geom = row.geometry
             if geom is None or geom.is_empty:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(TerrainProperties.dummy())
                 continue
 
             try:
                 clipped, _ = mask(src, [mapping(geom)], crop=True, filled=True)
             except ValueError:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(TerrainProperties.dummy())
                 continue
 
             values = clipped[0]
             if values.size == 0:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(TerrainProperties.dummy())
                 continue
 
             values = np.rint(values).astype(np.int16, copy=False)
