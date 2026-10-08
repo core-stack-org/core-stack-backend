@@ -107,9 +107,14 @@ def manifest_relative_output(root: Path, output_path: str) -> Path | None:
 
 
 def fallback_gpkg_path(root: Path, state: str, district: str, tehsil: str) -> Path:
+    from computing.base_layer_setup import tehsil_mws_file_candidates
+
     base = root / slugify(state) / slugify(district) / slugify(tehsil)
-    for suffix in (".gpkg", ".geojson"):
-        candidate = base.with_suffix(suffix)
+    # tehsil_mws layout first, then the legacy flat {tehsil}.gpkg layout
+    candidates = tehsil_mws_file_candidates(
+        root, state, district, tehsil, (".gpkg", ".geojson")
+    ) + [base.with_suffix(".gpkg"), base.with_suffix(".geojson")]
+    for candidate in candidates:
         if candidate.exists():
             return candidate
     return base.with_suffix(".gpkg")

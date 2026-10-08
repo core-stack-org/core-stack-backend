@@ -1,7 +1,6 @@
 import logging
 import subprocess
 from functools import wraps
-from inspect import signature
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -429,24 +428,52 @@ def _active_tehsil_locations():
     )
 
 
-def _tehsil_watershed_details(state, district, tehsil):
+def tehsil_file_candidates(root, state, district, tehsil, file_stem, extensions):
+    """
+    Candidate paths root/{state}/{district}/{tehsil}/{file_stem}{ext}, where
+    file_stem(district_slug, tehsil_slug) builds the file name. Slugs come
+    from valid_gee_text (which keeps "-"); since boundary datasets name
+    hyphenated places either way, the directory and file name parts are each
+    tried as-is and with "-" replaced by "_".
+    """
     from utilities.gee_utils import valid_gee_text
 
-    state_slug = valid_gee_text(state.strip().lower())
-    district_slug = valid_gee_text(district.strip().lower())
-    tehsil_slug = valid_gee_text(tehsil.strip().lower())
-    base = TEHSIL_WATERSHEDS_DIR / state_slug / district_slug / tehsil_slug
-    return base, f"mws:mws_{district_slug}_{tehsil_slug}"
+    slugs = [valid_gee_text(str(v).strip().lower()) for v in (state, district, tehsil)]
+    styles = (lambda s: s, lambda s: s.replace("-", "_"))
+    candidates = []
+    for dir_style in styles:
+        tehsil_dir = Path(root).joinpath(*(dir_style(s) for s in slugs))
+        for file_style in styles:
+            stem = file_stem(file_style(slugs[1]), file_style(slugs[2]))
+            for ext in extensions:
+                path = tehsil_dir / f"{stem}{ext}"
+                if path not in candidates:
+                    candidates.append(path)
+    return candidates
+
+
+def tehsil_mws_file_candidates(root, state, district, tehsil, extensions):
+    return tehsil_file_candidates(
+        root,
+        state,
+        district,
+        tehsil,
+        lambda d, t: f"filtered_mws_{d}_{t}_uid",
+        extensions,
+    )
 
 
 def ensure_tehsil_watershed(state, district, tehsil, force=False):
     """
     Returns the local tehsil MWS boundary file (gpkg preferred, else geojson)
-    from DATA_DIR/base_layers/tehsil_mws. The boundaries are provisioned
+    from DATA_DIR/base_layers/tehsil_mws/{state}/{district}/{tehsil}/
+    filtered_mws_{district}_{tehsil}_uid.*. The boundaries are provisioned
     locally beforehand, so nothing is downloaded; raises if the file is absent.
+    Hyphenated names may use "-" or "_" (see tehsil_file_candidates).
     """
-    base, _ = _tehsil_watershed_details(state, district, tehsil)
-    candidates = [base.with_suffix(ext) for ext in (".gpkg", ".geojson")]
+    candidates = tehsil_mws_file_candidates(
+        TEHSIL_WATERSHEDS_DIR, state, district, tehsil, (".gpkg", ".geojson")
+    )
     for path in candidates:
         if path.exists():
             return path
@@ -454,25 +481,6 @@ def ensure_tehsil_watershed(state, district, tehsil, force=False):
         f"Tehsil MWS boundary not found for {state}/{district}/{tehsil}. "
         f"Expected one of: {[str(p) for p in candidates]}"
     )
-
-
-def with_tehsil_watershed(func):
-    func_signature = signature(func)
-
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        call = func_signature.bind_partial(*args, **kwargs)
-        call.apply_defaults()
-        compute = str(call.arguments.get("compute", "local")).strip().lower()
-        if compute == "local":
-            ensure_tehsil_watershed(
-                state=call.arguments["state"],
-                district=call.arguments["district"],
-                tehsil=call.arguments.get("block") or call.arguments.get("tehsil"),
-            )
-        return func(*args, **kwargs)
-
-    return wrapper
 
 
 def ensure_tehsil_watersheds(force=False):

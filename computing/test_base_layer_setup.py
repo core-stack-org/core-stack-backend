@@ -7,35 +7,7 @@ from django.test import SimpleTestCase
 from computing.base_layer_setup import (
     ensure_tehsil_watershed,
     ensure_tehsil_watersheds,
-    with_tehsil_watershed,
 )
-
-
-class TehsilWatershedDecoratorTests(SimpleTestCase):
-    @patch("computing.base_layer_setup.ensure_tehsil_watershed")
-    def test_local_compute_ensures_requested_tehsil(self, ensure):
-        @with_tehsil_watershed
-        def generate(state, district, block, compute="gee"):
-            return "generated"
-
-        result = generate("Bihar", "Banka", "Banka", compute="local")
-
-        self.assertEqual(result, "generated")
-        ensure.assert_called_once_with(
-            state="Bihar",
-            district="Banka",
-            tehsil="Banka",
-        )
-
-    @patch("computing.base_layer_setup.ensure_tehsil_watershed")
-    def test_gee_compute_does_not_ensure_local_tehsil(self, ensure):
-        @with_tehsil_watershed
-        def generate(state, district, block, compute="gee"):
-            return "generated"
-
-        generate("Bihar", "Banka", "Banka")
-
-        ensure.assert_not_called()
 
 
 class EnsureTehsilWatershedTests(SimpleTestCase):
@@ -52,18 +24,18 @@ class EnsureTehsilWatershedTests(SimpleTestCase):
         self.temp_dir.cleanup()
 
     def _touch(self, name):
-        path = self.output_dir / "bihar" / "banka" / name
+        path = self.output_dir / "bihar" / "banka" / "banka" / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"x")
         return path
 
     def test_geojson_is_resolved(self):
-        path = self._touch("banka.geojson")
+        path = self._touch("filtered_mws_banka_banka_uid.geojson")
         self.assertEqual(ensure_tehsil_watershed("Bihar", "Banka", "Banka"), path)
 
     def test_gpkg_preferred_over_geojson(self):
-        self._touch("banka.geojson")
-        path = self._touch("banka.gpkg")
+        self._touch("filtered_mws_banka_banka_uid.geojson")
+        path = self._touch("filtered_mws_banka_banka_uid.gpkg")
         self.assertEqual(ensure_tehsil_watershed("Bihar", "Banka", "Banka"), path)
 
     def test_missing_file_raises_without_network(self):
@@ -75,5 +47,45 @@ class EnsureTehsilWatershedTests(SimpleTestCase):
         active.return_value = [("Bihar", "Banka", "Banka")]
         with self.assertRaisesRegex(FileNotFoundError, "Bihar/Banka/Banka"):
             ensure_tehsil_watersheds()
-        self._touch("banka.geojson")
+        self._touch("filtered_mws_banka_banka_uid.geojson")
         ensure_tehsil_watersheds()
+
+
+class TehsilFileCandidatesTests(SimpleTestCase):
+    STEM = staticmethod(lambda d, t: f"{d}_{t}")
+
+    def _resolve(self, relative):
+        from computing.base_layer_setup import tehsil_file_candidates
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            path.write_text("{}")
+            candidates = tehsil_file_candidates(
+                root,
+                "West Bengal",
+                "North Twenty-Four Parganas",
+                "Basirhat-II",
+                self.STEM,
+                (".geojson",),
+            )
+            found = [p for p in candidates if p.exists()]
+            return [p.relative_to(root) for p in found]
+
+    def test_all_hyphen_and_underscore_combinations_resolve(self):
+        for dirs in ("north_twenty-four_parganas/basirhat-ii",
+                     "north_twenty_four_parganas/basirhat_ii"):
+            for name in ("north_twenty-four_parganas_basirhat-ii",
+                         "north_twenty_four_parganas_basirhat_ii"):
+                relative = Path("west_bengal") / dirs / f"{name}.geojson"
+                with self.subTest(relative=str(relative)):
+                    self.assertEqual(self._resolve(relative), [relative])
+
+    def test_names_without_hyphens_have_single_candidate(self):
+        from computing.base_layer_setup import tehsil_file_candidates
+
+        candidates = tehsil_file_candidates(
+            Path("/r"), "Bihar", "Banka", "Banka", self.STEM, (".geojson",)
+        )
+        self.assertEqual(candidates, [Path("/r/bihar/banka/banka/banka_banka.geojson")])

@@ -1,5 +1,4 @@
 from nrm_app.celery import app
-from computing.base_layer_setup import with_tehsil_watershed
 from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
 from computing.mws.mws import mws_layer
@@ -339,7 +338,6 @@ TASK_REGISTRIES = {
 
 
 @app.task(bind=True)
-@with_tehsil_watershed
 def layer_generate_map(
     self,
     state,
@@ -361,6 +359,20 @@ def layer_generate_map(
     log_ctx = f"state={state}, district={district}, block={block}, map={map_order}, compute={compute}"
     status = {}
 
+    # Local runs: boundaries must exist locally and be on GeoServer before
+    # any layer in the map is generated.
+    if compute == "local":
+        from computing.local_compute_helper import (
+            TehsilBoundaryError,
+            prepare_local_tehsil_boundaries,
+        )
+
+        try:
+            prepare_local_tehsil_boundaries(state, district, block)
+        except TehsilBoundaryError as e:
+            logger.error(f"Boundary {e.stage} failed ({log_ctx}): {e}")
+            return f"{e.stage} failed for {district}_{block}: {e}"
+
     # checking:- is mws layer generated?
     try:
         if compute == "gee" and map_order in ["map_2_1", "map_2_2", "map_3", "map_4"]:
@@ -377,17 +389,6 @@ def layer_generate_map(
     except Exception as e:
         logger.exception(f"Exception while checking mws layer ({log_ctx})")
         return f"exception occur while checking mws for {district}_{block} as: {e}"
-
-    if compute == "local":
-        try:
-            from computing.local_compute_helper import (
-                sync_tehsil_boundaries_to_geoserver,
-            )
-
-            sync_tehsil_boundaries_to_geoserver(state, district, block)
-        except Exception as e:
-            logger.exception(f"Boundary sync to GeoServer failed ({log_ctx})")
-            return f"boundary sync to geoserver failed for {district}_{block} as: {e}"
 
     global_args = {}
     if start_year:
