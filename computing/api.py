@@ -255,6 +255,55 @@ from .views import (
     check_missing_excel_files,
 )
 from .zoi_layers.zoi import generate_zoi
+from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid import generate_mws_centroid_data
+from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.livestocks import generate_livestocks_layer_task
+from .misc.digital_elevation_model import generate_dem_layer
+from .misc.canal_layer import canal_vector
+from .STAC_specs.stac_collection import generate_stac_collection_task
+from .farm_boundaries.farm_boundary import build_farm_boundary_map
+
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_farm_boundaries(request):
+    print("Inside generate_farm_boundaries API.")
+    try:
+        state = request.data.get("state", "").lower().strip()
+        district = request.data.get("district", "").lower().strip()
+        block = request.data.get("block", "").lower().strip()
+        year = request.data.get("year", None)
+        overwrite = request.data.get("overwrite", False)
+
+        if not all([state, district, block]):
+            return Response(
+                {"Error": "state, district, block are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if year is not None:
+            year = int(year)
+            if year < 2017 or year > 2025:
+                return Response(
+                    {"Error": "year must be between 2017 and 2025."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        build_farm_boundary_map.apply_async(
+            args=[state, district, block, year, overwrite],
+            queue="nrm",
+        )
+
+        msg = "Farm boundary pipeline initiated."
+        if year:
+            msg += f" ET intersection enabled for year {year}."
+
+        return Response({"Success": msg}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in generate_farm_boundaries api :: ", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 logger = logging.getLogger(__name__)
 
