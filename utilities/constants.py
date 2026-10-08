@@ -1,4 +1,6 @@
 # import
+from enum import IntEnum
+
 from nrm_app.settings import (
     GCS_BUCKET_NAME as SETTINGS_GCS_BUCKET_NAME,
     GEE_STORAGE_PROJECT,
@@ -230,6 +232,23 @@ LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
 )
 
 LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+
+
+class LulcClass(IntEnum):
+    BACKGROUND = 0
+    BUILT_UP = 1
+    KHARIF_WATER = 2
+    KHARIF_RABI_WATER = 3
+    KHARIF_RABI_ZAID_WATER = 4
+    CROPS = 5
+    TREES = 6
+    BARREN_LAND = 7
+    SINGLE_KHARIF = 8
+    SINGLE_NON_KHARIF = 9
+    DOUBLE_CROPPING = 10
+    TRIPLE_ANNUAL_PERENNIAL = 11
+    SHRUBS_SCRUBS = 12
+    PLANTATION = 13
 
 
 # Moderation Constants
