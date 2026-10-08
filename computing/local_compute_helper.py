@@ -17,12 +17,17 @@ logger = logging.getLogger(__name__)
 
 from computing.config_loader import (
     AEZ_VECTOR_PATH,
+    LOCAL_ADMIN_BOUNDARY_DIR,
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
     TERRAIN_RASTER_PATH,
 )
-from computing.base_layer_setup import ensure_tehsil_watershed
+from computing.base_layer_setup import (
+    ensure_tehsil_watershed,
+    tehsil_file_candidates,
+    tehsil_mws_file_candidates,
+)
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 
 PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
@@ -113,14 +118,9 @@ def resolve_precomputed_vector_file(
     missing_file_label="Precomputed vector file",
 ):
     roi_dir = Path(precomputed_roi_dir or PRECOMPUTED_TEHSIL_WATERSHED_DIR)
-    state_slug = _slug(state, "unknown_state")
-    district_slug = _slug(district, "unknown_district")
-    block_slug = _slug(block, "unknown_tehsil")
-
-    expected_paths = [
-        roi_dir / state_slug / district_slug / f"{block_slug}{ext}"
-        for ext in extensions
-    ]
+    expected_paths = tehsil_mws_file_candidates(
+        roi_dir, state, district, block, extensions
+    )
     for path in expected_paths:
         if path.exists():
             return path
@@ -570,6 +570,135 @@ def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"
         layer_name,
         "vector",
     )
+
+
+def _resolve_local_admin_boundary_file(state, district, block):
+    # e.g. pune/mulshi_paud/pune_mulshi-paud.geojson
+    candidates = tehsil_file_candidates(
+        LOCAL_ADMIN_BOUNDARY_DIR,
+        state,
+        district,
+        block,
+        lambda d, t: f"{d}_{t}",
+        (".geojson",),
+    )
+    for path in candidates:
+        if path.exists():
+            return path
+    raise FileNotFoundError(
+        f"Admin boundary file not found for {state}/{district}/{block}. "
+        f"Expected one of: {[str(p) for p in candidates]}"
+    )
+
+
+def _layer_exists_on_all_targets(workspace, layer_name):
+    return all(
+        _verify_raster_layer(geo, workspace, layer_name)
+        for _, geo in _geoserver_targets()
+    )
+
+
+def _push_boundary_to_geoserver(source_path, workspace, layer_name, overwrite):
+    import tempfile
+
+    if not overwrite and _layer_exists_on_all_targets(workspace, layer_name):
+        logger.info("%s:%s already on GeoServer; skipping.", workspace, layer_name)
+        return None
+
+    gdf = read_validated_vector_file(
+        source_path, f"Boundary file has no valid geometries: {source_path}"
+    )
+    gdf = gdf.set_crs("EPSG:4326") if gdf.crs is None else gdf.to_crs("EPSG:4326")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        gpkg_base = os.path.join(tmp_dir, layer_name)
+        gdf.to_file(gpkg_base + ".gpkg", driver="GPKG", layer=layer_name)
+        response = push_local_vector_to_geoserver(
+            gpkg_base, layer_name, workspace, "gpkg"
+        )
+    if response.get("status_code") not in (200, 201, 202):
+        raise RuntimeError(
+            f"Failed to push {workspace}:{layer_name} to GeoServer: {response}"
+        )
+    return response
+
+
+def sync_tehsil_boundaries_to_geoserver(state, district, block, overwrite=False):
+    """
+    Publishes the locally provisioned admin boundary
+    (panchayat_boundaries:{district}_{block}) and MWS boundary
+    (mws:mws_{district}_{block}) of a tehsil to GeoServer. Layers already on
+    GeoServer are skipped unless overwrite is true.
+    """
+    district_slug = _slug(district, "unknown_district")
+    block_slug = _slug(block, "unknown_tehsil")
+
+    admin_path = _resolve_local_admin_boundary_file(state, district, block)
+    mws_path = resolve_precomputed_vector_file(
+        state=state,
+        district=district,
+        block=block,
+        missing_file_label="Precomputed tehsil MWS file",
+    )
+    return {
+        "admin_boundary": _push_boundary_to_geoserver(
+            admin_path,
+            "panchayat_boundaries",
+            f"{district_slug}_{block_slug}",
+            overwrite,
+        ),
+        "mws": _push_boundary_to_geoserver(
+            mws_path,
+            "mws",
+            f"mws_{district_slug}_{block_slug}",
+            overwrite,
+        ),
+    }
+
+
+class TehsilBoundaryError(Exception):
+    """Raised when a tehsil's local boundaries are missing or fail to sync."""
+
+    def __init__(self, stage, message):
+        super().__init__(message)
+        self.stage = stage  # "boundary_check" or "boundary_sync"
+
+
+def prepare_local_tehsil_boundaries(state, district, block, overwrite=False):
+    """
+    First step of every local layer run for a tehsil: checks that the local
+    admin boundary and MWS boundary both exist, then publishes them to
+    GeoServer (panchayat_boundaries:{district}_{block}, mws:mws_{district}_{block}).
+    Raises TehsilBoundaryError naming the failing stage, so callers can stop
+    before any layer computation starts.
+    """
+    location = f"{state}/{district}/{block}"
+    missing = []
+    for resolve in (
+        lambda: _resolve_local_admin_boundary_file(state, district, block),
+        lambda: ensure_tehsil_watershed(state, district, block),
+    ):
+        try:
+            resolve()
+        except FileNotFoundError as exc:
+            missing.append(str(exc))
+    if missing:
+        raise TehsilBoundaryError(
+            "boundary_check",
+            f"Local boundaries missing for {location}: " + " | ".join(missing),
+        )
+
+    try:
+        result = sync_tehsil_boundaries_to_geoserver(
+            state, district, block, overwrite=overwrite
+        )
+    except Exception as exc:
+        raise TehsilBoundaryError(
+            "boundary_sync",
+            f"Boundary sync to GeoServer failed for {location}: {exc}",
+        ) from exc
+    logger.info("Local boundaries ready and synced for %s", location)
+    return result
 
 
 def push_local_raster_to_geoserver(

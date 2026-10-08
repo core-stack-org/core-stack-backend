@@ -318,6 +318,12 @@ def run_pipeline(
     gee_account_id: str | None = None,
 ) -> Any:
     runner = get_pipeline(name, compute)
+    if str(compute).strip().lower() == "local":
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        prepare_local_tehsil_boundaries(
+            location["state"], location["district"], location["block"]
+        )
     if isinstance(runner, PipelineSpec):
         return runner.run(location, overwrite)
     kwargs = _legacy_runner_kwargs(
