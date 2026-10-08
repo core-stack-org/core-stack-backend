@@ -1,5 +1,5 @@
 import logging
-import os
+import typing
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -20,7 +20,6 @@ from computing.config_loader import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
-    TERRAIN_RASTER_PATH,
 )
 from computing.base_layer_setup import ensure_tehsil_watershed
 from utilities.download_gpkg_from_geoserver import generate_gpkg
@@ -176,7 +175,7 @@ def load_precomputed_watersheds(
         )
 
     except FileNotFoundError:
-        print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
+        print(f"Precomputed watershed not found for {state}/{district}/{block}")
         ensure_tehsil_watershed(
             state=state,
             district=district,
@@ -214,7 +213,7 @@ def load_precomputed_panchayat(
         )
 
     except FileNotFoundError:
-        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
+        print(f"Precomputed panchayat not found for {state}/{district}/{block}")
         generate_gpkg(
             state=state,
             district=district,
