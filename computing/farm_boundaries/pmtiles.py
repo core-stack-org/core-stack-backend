@@ -18,9 +18,15 @@ LAYER_NAME = "farm_boundaries"
 # farm_id is the join key back to farm_static/farm_annual/farm_monthly
 # parquets, so consumers can look up everything else from there instead of
 # duplicating it into the tileset.
-TILE_PROPERTY_COLUMNS = ["farm_id", "area_m2"]
+# frequency / intensity are the drought indicators computed into static.parquet
+# by et_intersection (Phase 3); farms with no value (NaN) get a null property.
+TILE_PROPERTY_COLUMNS = ["farm_id", "area_m2", "frequency", "intensity"]
 
 REQUIRED_BINARIES = ["tippecanoe", "pmtiles"]
+
+# Parquets under <block>/farms/ uploaded alongside the tileset:
+#   S3 key: <state>/<district>/<block>/farms/<file>
+FARM_PARQUET_FILES = ["static.parquet", "sub_annual.parquet", "annual.parquet"]
 
 # Same AWS account/credentials as DPR's S3 upload (dpr/utils.py), separate
 # bucket dedicated to farm boundary tilesets.
@@ -152,6 +158,35 @@ def _upload_pmtiles_to_s3(local_path, state, district, block):
     return s3_url
 
 
+def _upload_farm_parquets_to_s3(state, district, block):
+    """
+    Upload farms/{static,sub_annual,annual}.parquet to
+    <bucket>/<state>/<district>/<block>/farms/<file>, overwriting whatever is
+    there. Files that don't exist locally are skipped with a warning.
+
+    Returns a dict {filename: s3_url} for the files that were uploaded.
+    """
+    s3 = _s3_client()
+    uploaded = {}
+    for name in FARM_PARQUET_FILES:
+        local_path = os.path.join(_output_dir(state, district, block), "farms", name)
+        if not os.path.exists(local_path):
+            logger.warning("%s not found — skipping S3 upload.", local_path)
+            continue
+
+        s3_key = f"{state}/{district}/{block}/farms/{name}"
+        with open(local_path, "rb") as f:
+            s3.upload_fileobj(
+                f,
+                FARM_DATA_S3_BUCKET,
+                s3_key,
+                ExtraArgs={"ContentType": "application/octet-stream"},
+            )
+        uploaded[name] = f"https://{FARM_DATA_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}"
+        logger.info("Parquet uploaded to S3: %s", uploaded[name])
+    return uploaded
+
+
 # ── public entry point ───────────────────────────────────────────────────────
 
 
@@ -219,6 +254,8 @@ def convert_boundaries_to_pmtiles(
         # tmp_dir (geojsonseq + mbtiles + pmtiles) is removed on context exit —
         # the S3 copy is the only one that persists.
 
+    parquet_s3_urls = _upload_farm_parquets_to_s3(state, district, block)
+
     summary = {
         "state": state,
         "district": district,
@@ -226,6 +263,7 @@ def convert_boundaries_to_pmtiles(
         "farm_count": len(gdf),
         "s3_url": s3_url,
         "size_bytes": size_bytes,
+        "parquet_s3_urls": parquet_s3_urls,
     }
     logger.info("Phase 4 complete: %s", summary)
     return summary
