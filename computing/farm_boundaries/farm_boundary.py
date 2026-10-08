@@ -86,7 +86,6 @@ def build_farm_boundary_map(
             state=state,
             district=district,
             block=block,
-            api_key=api_key,
             resume=True,  # safe to retry; already-fetched cells are skipped
         )
         logger.info("Phase 1 done: %s", phase1_summary)
@@ -95,7 +94,6 @@ def build_farm_boundary_map(
             state=state,
             district=district,
             block=block,
-            api_key=api_key,
             resume=True,  # safe to retry; already-fetched cells are skipped
         )
         logger.info("Phase 2 done: %s", phase2_summary)

@@ -105,26 +105,25 @@ def generate_farm_boundaries(request):
         state = request.data.get("state", "").lower().strip()
         district = request.data.get("district", "").lower().strip()
         block = request.data.get("block", "").lower().strip()
-        api_key = request.data.get("api_key", "").strip()
         year = request.data.get("year", None)
         overwrite = request.data.get("overwrite", False)
 
-        if not all([state, district, block, api_key]):
+        if not all([state, district, block]):
             return Response(
-                {"Error": "state, district, block, and api_key are required."},
+                {"Error": "state, district, block are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         if year is not None:
             year = int(year)
-            if year < 2017 or year > 2024:
+            if year < 2017 or year > 2025:
                 return Response(
-                    {"Error": "year must be between 2017 and 2024."},
+                    {"Error": "year must be between 2017 and 2025."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
         build_farm_boundary_map.apply_async(
-            args=[state, district, block, api_key, year, overwrite],
+            args=[state, district, block, year, overwrite],
             queue="nrm",
         )
 

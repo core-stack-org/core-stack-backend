@@ -1,28 +1,3 @@
-"""
-Phase 1 — Fetch raw farm boundary data from the Google AnthroKrishi
-(Agricultural Understanding) API and persist each S2-cell response as a
-JSON file on disk.
-
-**Optimised with async I/O**:  Uses ``aiohttp`` to fire concurrent
-API requests (controlled by a semaphore) instead of the original
-sequential loop.  For Sanganer (810 cells) this reduces Phase 1 from
-~6 minutes to under 30 seconds.
-
-Directory layout after a successful run:
-    data/farm_boundaries/<state>/<district>/<block>/raw/<cell_token>.json
-    data/farm_boundaries/<state>/<district>/<block>/manifest.json
-
-The manifest records which cells were successfully fetched so that
-Phase 2 (convert.py) and any future resume run know exactly what to
-process.  Cells that returned an error or an empty landscape are
-recorded separately so you can inspect them without re-querying.
-
-Usage (standalone / debug):
-    from computing.farm_boundaries.fetch_raw import fetch_raw_boundaries
-    fetch_raw_boundaries("rajasthan", "jaipur", "sanganer",
-                         api_key="AIzaSy...")
-"""
-
 import asyncio
 import json
 import logging
@@ -34,14 +9,21 @@ import geopandas as gpd
 import s2sphere
 from shapely.geometry import box
 
+import environ
+
 from utilities.constants import FARM_BOUNDARIES_PATH, SOI_TEHSIL
+
 
 logger = logging.getLogger(__name__)
 
+env = environ.Env()
+# reading .env file
+environ.Env.read_env()
+
 # ── AnthroKrishi REST endpoint ────────────────────────────────────────────────
-ANTHROKRISHI_API_URL = (
-    "https://agriculturalunderstanding.googleapis.com/v1:lookupLandscape"
-)
+ANTHROKRISHI_API_URL = env("ANTHROKRISHI_ALU_API_URL")
+API_KEY = env("ANTHROKRISHI_API_KEY")
+
 
 # S2 level 13 ≈ 1 km × 1 km tiles
 S2_LEVEL = 13
@@ -135,7 +117,6 @@ async def _fetch_one_cell_async(
     session: aiohttp.ClientSession,
     semaphore: asyncio.Semaphore,
     cell_id: s2sphere.CellId,
-    api_key: str,
     raw_dir: str,
 ) -> dict:
     """
@@ -154,7 +135,7 @@ async def _fetch_one_cell_async(
         try:
             async with session.post(
                 ANTHROKRISHI_API_URL,
-                params={"key": api_key},
+                params={"key": API_KEY},
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
@@ -183,7 +164,6 @@ async def _fetch_one_cell_async(
 
 async def _fetch_all_cells_async(
     cells_to_fetch: list,
-    api_key: str,
     raw_dir: str,
     manifest_file: str,
     manifest: dict,
@@ -215,7 +195,7 @@ async def _fetch_all_cells_async(
 
             # Fire all requests in this batch concurrently
             tasks = [
-                _fetch_one_cell_async(session, semaphore, cell_id, api_key, raw_dir)
+                _fetch_one_cell_async(session, semaphore, cell_id, raw_dir)
                 for cell_id in batch
             ]
             results = await asyncio.gather(*tasks)
@@ -248,7 +228,6 @@ def fetch_raw_boundaries(
     state: str,
     district: str,
     block: str,
-    api_key: str,
     max_concurrent: int = MAX_CONCURRENT_REQUESTS,
     resume: bool = True,
 ) -> dict:
@@ -263,8 +242,6 @@ def fetch_raw_boundaries(
     ----------
     state, district, block : str
         Lower-cased administrative names (must match SOI shapefile columns).
-    api_key : str
-        AnthroKrishi / Agricultural Understanding API key.
     max_concurrent : int
         Maximum number of simultaneous HTTP requests (default 20).
     resume : bool
@@ -312,7 +289,7 @@ def fetch_raw_boundaries(
         )
         results = asyncio.run(
             _fetch_all_cells_async(
-                cells_to_fetch, api_key, raw_dir, manifest_file, manifest, max_concurrent,
+                cells_to_fetch, raw_dir, manifest_file, manifest, max_concurrent,
             )
         )
         logger.info(
