@@ -1,0 +1,627 @@
+--- !DAG
+id: CoreStack_DAG_LocalCompute_StaticLayers
+name: STACD Local Compute DAG - Static Layers (v1)
+version: '1'
+description: Local-compute pipeline for static layers (independent, dependency-free
+  layers) from local_layer_map.json.
+params:
+- state
+- district
+- block
+alg_type_nodes:
+- Aquifer_Vector
+- Livestock
+- Antyodaya
+- Drainage_Density
+- River
+- Canal
+- Digital_Elevation_Model
+- Facilities_Proximity
+- Drainage_Lines
+- Restoration_Opportunity
+- SOGE_Vector
+- LCW_Conflict
+- Agro_Ecological
+- Factory_CSR
+- Green_Credit
+- Mining
+- Natural_Depression
+- Dist_to_Drainage
+- Catchment_Area
+- Slope_Percentage
+- MWS_Connectivity
+- MWS_Centroid
+- Soil_Type
+dataset_type_nodes:
+- Admin_Boundary_Asset
+- Agro_Ecological_Asset
+- Antyodaya_Asset
+- Aquifer_Vector_Asset
+- Canal_Asset
+- Catchment_Area_Asset
+- Digital_Elevation_Model_Asset
+- Dist_to_Drainage_Asset
+- Drainage_Density_Asset
+- Drainage_Lines_Asset
+- Facilities_Proximity_Asset
+- Factory_CSR_Asset
+- Green_Credit_Asset
+- LCW_Conflict_Asset
+- Livestock_Asset
+- MWS_Boundaries
+- MWS_Centroid_Asset
+- MWS_Connectivity_Asset
+- Mining_Asset
+- Natural_Depression_Asset
+- Restoration_Opportunity_Asset
+- River_Asset
+- SOGE_Vector_Asset
+- Slope_Percentage_Asset
+- Soil_Type_Asset
+
+
+--- !Dataset_Type
+id: Admin_Boundary_Asset
+name: Admin Boundary Asset
+description: Admin Boundary Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Agro_Ecological_Asset
+name: Agro Ecological Asset
+description: Agro Ecological Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Antyodaya_Asset
+name: Antyodaya Asset
+description: Antyodaya Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Aquifer_Vector_Asset
+name: Aquifer Vector Asset
+description: Aquifer Vector Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Canal_Asset
+name: Canal Asset
+description: Canal Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Catchment_Area_Asset
+name: Catchment Area Asset
+description: Catchment Area Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Digital_Elevation_Model_Asset
+name: Digital Elevation Model Asset
+description: Digital Elevation Model Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Dist_to_Drainage_Asset
+name: Dist to Drainage Asset
+description: Dist to Drainage Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Drainage_Density_Asset
+name: Drainage Density Asset
+description: Drainage Density Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Drainage_Lines_Asset
+name: Drainage Lines Asset
+description: Drainage Lines Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Facilities_Proximity_Asset
+name: Facilities Proximity Asset
+description: Facilities Proximity Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Factory_CSR_Asset
+name: Factory CSR Asset
+description: Factory CSR Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Green_Credit_Asset
+name: Green Credit Asset
+description: Green Credit Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: LCW_Conflict_Asset
+name: LCW Conflict Asset
+description: LCW Conflict Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Livestock_Asset
+name: Livestock Asset
+description: Livestock Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: MWS_Boundaries
+name: MWS Boundaries
+description: MWS Boundaries
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: MWS_Centroid_Asset
+name: MWS Centroid Asset
+description: MWS Centroid Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: MWS_Connectivity_Asset
+name: MWS Connectivity Asset
+description: MWS Connectivity Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Mining_Asset
+name: Mining Asset
+description: Mining Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Natural_Depression_Asset
+name: Natural Depression Asset
+description: Natural Depression Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Restoration_Opportunity_Asset
+name: Restoration Opportunity Asset
+description: Restoration Opportunity Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: River_Asset
+name: River Asset
+description: River Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: SOGE_Vector_Asset
+name: SOGE Vector Asset
+description: SOGE Vector Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Slope_Percentage_Asset
+name: Slope Percentage Asset
+description: Slope Percentage Asset
+format: GEEAsset
+
+
+--- !Dataset_Type
+id: Soil_Type_Asset
+name: Soil Type Asset
+description: Soil Type Asset
+format: GEEAsset
+
+
+--- !Algorithm_Type
+id: Aquifer_Vector
+name: Aquifer_Vector
+description: Generates the aquifer vector layer from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Aquifer_Vector_Asset
+
+
+--- !Algorithm_Type
+id: Livestock
+name: Livestock
+description: Generates livestock census statistics from local admin geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- Admin_Boundary_Asset
+outputs:
+- Livestock_Asset
+
+
+--- !Algorithm_Type
+id: Antyodaya
+name: Antyodaya
+description: Generates Mission Antyodaya statistics from local admin geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- Admin_Boundary_Asset
+outputs:
+- Antyodaya_Asset
+
+
+--- !Algorithm_Type
+id: Drainage_Density
+name: Drainage_Density
+description: Generates the drainage density layer from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Drainage_Density_Asset
+
+
+--- !Algorithm_Type
+id: River
+name: River
+description: Generates the river vector layer from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- River_Asset
+
+
+--- !Algorithm_Type
+id: Canal
+name: Canal
+description: Generates the canal vector layer from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Canal_Asset
+
+
+--- !Algorithm_Type
+id: Digital_Elevation_Model
+name: Digital_Elevation_Model
+description: Generates FABDEM raster and vector outputs from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Digital_Elevation_Model_Asset
+
+
+--- !Algorithm_Type
+id: Facilities_Proximity
+name: Facilities_Proximity
+description: Generates facilities proximity statistics from local admin geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- Admin_Boundary_Asset
+outputs:
+- Facilities_Proximity_Asset
+
+
+--- !Algorithm_Type
+id: Drainage_Lines
+name: Drainage_Lines
+description: Clips drainage lines to local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Drainage_Lines_Asset
+
+
+--- !Algorithm_Type
+id: Restoration_Opportunity
+name: Restoration_Opportunity
+description: Generates the restoration opportunity layer from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Restoration_Opportunity_Asset
+
+
+--- !Algorithm_Type
+id: SOGE_Vector
+name: SOGE_Vector
+description: Generates the SOGE vector layer from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- SOGE_Vector_Asset
+
+
+--- !Algorithm_Type
+id: LCW_Conflict
+name: LCW_Conflict
+description: Generates land-crop-water conflict data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- LCW_Conflict_Asset
+
+
+--- !Algorithm_Type
+id: Agro_Ecological
+name: Agro_Ecological
+description: Generates agro-ecological zone data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Agro_Ecological_Asset
+
+
+--- !Algorithm_Type
+id: Factory_CSR
+name: Factory_CSR
+description: Generates factory/CSR zone data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Factory_CSR_Asset
+
+
+--- !Algorithm_Type
+id: Green_Credit
+name: Green_Credit
+description: Generates green credit zone data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Green_Credit_Asset
+
+
+--- !Algorithm_Type
+id: Mining
+name: Mining
+description: Generates mining zone data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Mining_Asset
+
+
+--- !Algorithm_Type
+id: Natural_Depression
+name: Natural_Depression
+description: Generates natural depression data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Natural_Depression_Asset
+
+
+--- !Algorithm_Type
+id: Dist_to_Drainage
+name: Dist_to_Drainage
+description: Computes distance to nearest drainage line from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Dist_to_Drainage_Asset
+
+
+--- !Algorithm_Type
+id: Catchment_Area
+name: Catchment_Area
+description: Generates single-flow catchment area from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Catchment_Area_Asset
+
+
+--- !Algorithm_Type
+id: Slope_Percentage
+name: Slope_Percentage
+description: Generates slope percentage data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Slope_Percentage_Asset
+
+
+--- !Algorithm_Type
+id: MWS_Connectivity
+name: MWS_Connectivity
+description: Generates MWS connectivity data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- MWS_Connectivity_Asset
+
+
+--- !Algorithm_Type
+id: MWS_Centroid
+name: MWS_Centroid
+description: Generates MWS centroid points from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- MWS_Centroid_Asset
+
+
+--- !Algorithm_Type
+id: Soil_Type
+name: Soil_Type
+description: Generates soil type vector data from local watershed geometry.
+params:
+- name: state
+  type: string
+- name: district
+  type: string
+- name: block
+  type: string
+input_datasets:
+- MWS_Boundaries
+outputs:
+- Soil_Type_Asset
+

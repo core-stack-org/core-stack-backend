@@ -4,10 +4,9 @@ from plantations.models import PlantationProfile
 from utilities.constants import (
     GEE_PATH_PLANTATION,
     GEE_ASSET_PATH,
-    GEE_DATASET_PATH,
-    INDIA_SAT_LULC_V3_PAN_INDIA,
     ROAD_DRRP,
     CRS_4326,
+    PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH,
 )
 from utilities.gee_utils import (
     is_gee_asset_exists,
@@ -474,7 +473,9 @@ def get_dataset(variable, state, roi, start_year, end_year):
         s_year = start_year
         lulc_years = []
         while s_year <= end_year:
-            asset_id = f"{GEE_DATASET_PATH}{INDIA_SAT_LULC_V3_PAN_INDIA}{s_year}_{str(s_year + 1)}"
+            asset_id = (
+                f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{s_year}_{str(s_year + 1)}"
+            )
             lulc_img = (
                 ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
             )
@@ -514,7 +515,9 @@ def get_dataset(variable, state, roi, start_year, end_year):
         s_year = start_year
         lulc_years = []
         while s_year <= end_year:
-            asset_id = f"{GEE_DATASET_PATH}{INDIA_SAT_LULC_V3_PAN_INDIA}{s_year}_{str(s_year + 1)}"
+            asset_id = (
+                f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{s_year}_{str(s_year + 1)}"
+            )
             lulc_img = (
                 ee.Image(asset_id).select(["predicted_label"]).clip(roi.geometry())
             )

@@ -217,7 +217,13 @@ def translate_choice(labels, field_name, value, language="en"):
 
     value_normalized = str(value).strip().lower().replace("'", "’")
 
-    translations = field_labels.get(value_normalized)
+    # ODK choice codes are underscore_case, but some raw submissions store the
+    # already-spaced label instead (e.g. "Erosion on the check dam" rather
+    # than "erosion_on_the_check_dam") -- fall back to an underscored variant
+    # so both forms resolve to the same translation.
+    translations = field_labels.get(value_normalized) or field_labels.get(
+        value_normalized.replace(" ", "_")
+    )
 
     if translations:
         return translations.get(language_name, value)

@@ -31,14 +31,14 @@ from computing.utils import save_layer_info_to_db
 
 
 @app.task(bind=True)
-def mws_layer(self, state, district, block, gee_account_id):
+def mws_layer(self, state, district, block, gee_account_id, sync_to_geoserver=True):
     ee_initialize(gee_account_id)
     description = (
-        "filtered_mws_"
-        + valid_gee_text(district.lower())
-        + "_"
-        + valid_gee_text(block.lower())
-        + "_uid"
+            "filtered_mws_"
+            + valid_gee_text(district.lower())
+            + "_"
+            + valid_gee_text(block.lower())
+            + "_uid"
     )
     asset_id = get_gee_asset_path(state, district, block) + description
     layer_name = (
@@ -75,19 +75,20 @@ def mws_layer(self, state, district, block, gee_account_id):
             algorithm_version="1.2",
         )
         fc = ee.FeatureCollection(asset_id)
-        res = sync_fc_to_geoserver(
-            fc,
-            state,
-            layer_name,
-            "mws",
-        )
 
-        if res and layer_id:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
-            print("sync to geoserver flag is updated")
-        layer_generated = True
+        if sync_to_geoserver:
+            res = sync_fc_to_geoserver(
+                fc,
+                state,
+                layer_name,
+                "mws",
+            )
+
+            if res and layer_id:
+                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+                print("sync to geoserver flag is updated")
+            layer_generated = True
     return layer_generated
-
 
 # @app.task(bind=True)
 # def mws_layer(self, state, district, block):

@@ -21,13 +21,20 @@ DEBUG = env.bool("DEBUG", default=False)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
 
+conda_env = os.path.dirname(site.__file__).split("/lib")[0]
+gdal_data = os.path.join(conda_env, "share", "gdal")
+proj_lib = os.path.join(conda_env, "share", "proj")
+lib_path = os.path.join(conda_env, "lib")
+
+if os.path.isdir(gdal_data):
+    os.environ["GDAL_DATA"] = gdal_data
+if os.path.isdir(proj_lib):
+    os.environ["PROJ_LIB"] = proj_lib
+    os.environ["PROJ_DATA"] = proj_lib
+if os.path.isdir(lib_path):
+    os.environ["LD_LIBRARY_PATH"] = lib_path
+
 if DEBUG:
-    conda_env = os.path.dirname(site.__file__).split('/lib')[0]
     print("CONDA ENV: ", conda_env)
-    os.environ['GDAL_DATA'] = f"{conda_env}/share/gdal"
-    os.environ['LD_LIBRARY_PATH'] = f"{conda_env}/lib"
-else:
-    os.environ['GDAL_DATA'] = '/home/ubuntu/prod_dir/nrm-app/venv/envs/corestack/share/gdal'
-    os.environ['LD_LIBRARY_PATH'] = '/home/ubuntu/prod_dir/nrm-app/venv/envs/corestack/lib'
 
 application = get_wsgi_application()

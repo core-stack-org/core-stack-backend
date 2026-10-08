@@ -1008,7 +1008,20 @@ def location_query(location: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def as_geojson_feature_collection(payload: Any) -> dict[str, Any]:
+    """Accept a raw FeatureCollection or a public-API success envelope."""
+    if not isinstance(payload, dict):
+        return {}
+    inner = payload.get("data")
+    if isinstance(inner, dict) and (
+        inner.get("type") == "FeatureCollection" or "features" in inner
+    ):
+        return inner
+    return payload
+
+
 def extract_mws_ids(geojson: Any) -> list[str]:
+    geojson = as_geojson_feature_collection(geojson)
     if not isinstance(geojson, dict):
         return []
 
@@ -1486,7 +1499,9 @@ def aggregate_bulk_download_outputs(
         for summary in tehsil_summaries:
             payload = read_json_if_exists(Path(summary["output_dir"]) / "metadata" / "mws_geometries.json")
             if isinstance(payload, dict):
-                mws_collections.append((summary["location"], payload))
+                mws_collections.append(
+                    (summary["location"], as_geojson_feature_collection(payload))
+                )
         if mws_collections:
             merged_mws, mws_sources, duplicate_mws = merge_feature_collections(
                 mws_collections,
@@ -1970,7 +1985,9 @@ def run_smoke_test(args: argparse.Namespace) -> int:
         "location": location,
         "layer_count": len(layers) if isinstance(layers, list) else 0,
         "sample_layers": [layer.get("layer_name") for layer in layers[:5]],
-        "mws_feature_count": len(mws_geometries.get("features", [])),
+        "mws_feature_count": len(
+            as_geojson_feature_collection(mws_geometries).get("features", [])
+        ),
         "sample_mws_ids": extract_mws_ids(mws_geometries)[:5],
         "notes": notes,
     }
@@ -2114,7 +2131,10 @@ def download_for_tehsil_target(
             timeout=args.timeout,
         )
         if mws_geometries is not None and "mws_geometries" in streams:
-            write_json(metadata_dir / "mws_geometries.json", mws_geometries)
+            write_json(
+                metadata_dir / "mws_geometries.json",
+                as_geojson_feature_collection(mws_geometries),
+            )
 
     mws_ids: list[str] = []
     if args.mws_id:

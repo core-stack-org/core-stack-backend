@@ -41,6 +41,12 @@ def _clean_csv_value(v, default=None):
     return v
 
 
+def _clean_style_url(v):
+    """Return the style URL, or "" for blanks and placeholders like "No style file"."""
+    url = str(_clean_csv_value(v, "")).strip()
+    return url if url.lower().startswith(("http://", "https://")) else ""
+
+
 _STAC_DATA = os.path.join(BASE_DIR, "data", "STAC_specs")
 
 JAVA_TYPE_MAP = {
@@ -186,6 +192,56 @@ class GeoServerClient:
             shape = [
                 int(high_c[1]) - int(low_c[1]) + 1,
                 int(high_c[0]) - int(low_c[0]) + 1,
+            ]
+        else:
+            shape = [0, 0]
+
+        return bbox, mapping(footprint), 4326, shape
+
+    # -- raster metadata via REST API (fallback) ------------------------------
+    # WCS 2.0 DescribeCoverage returns 500 when the GeoTIFF's native CRS has no
+    # EPSG match (e.g. "GCS Name = WGS 84" from GEE exports); REST still works.
+
+    def fetch_raster_metadata_rest(self, workspace, layer_name):
+        url = (
+            f"{self.base_url}/rest/workspaces/{workspace}"
+            f"/coverages/{layer_name}.json"
+        )
+        log.info("Fetching raster metadata via REST: %s", url)
+        response = self._get(url)
+        if response.status_code != 200:
+            log.error(
+                "Raster coverage REST fetch failed [status=%s] url=%s body=%s",
+                response.status_code,
+                url,
+                response.text[:300],
+            )
+            return None
+
+        cov = response.json()["coverage"]
+        ll = cov["latLonBoundingBox"]
+        bbox = [
+            float(ll["minx"]),
+            float(ll["miny"]),
+            float(ll["maxx"]),
+            float(ll["maxy"]),
+        ]
+        footprint = Polygon(
+            [
+                [bbox[0], bbox[1]],
+                [bbox[0], bbox[3]],
+                [bbox[2], bbox[3]],
+                [bbox[2], bbox[1]],
+            ]
+        )
+
+        grid_range = (cov.get("grid") or {}).get("range") or {}
+        if grid_range.get("low") and grid_range.get("high"):
+            low_c = grid_range["low"].split()
+            high_c = grid_range["high"].split()
+            shape = [
+                int(high_c[1]) - int(low_c[1]),
+                int(high_c[0]) - int(low_c[0]),
             ]
         else:
             shape = [0, 0]
@@ -365,7 +421,7 @@ class MetadataProvider:
         return {
             "workspace": _clean_csv_value(row["geoserver_workspace_name"], ""),
             "layer_name": gs_layer,
-            "style_file_url": _clean_csv_value(row["style_file_url"], ""),
+            "style_file_url": _clean_style_url(row["style_file_url"]),
             "display_name": _clean_csv_value(row["display_name"], ""),
             "ee_layer_name": _clean_csv_value(row["ee_layer_name"], ""),
             "gsd": _clean_csv_value(row["spatial_resolution_in_meters"]),
@@ -730,22 +786,23 @@ class CatalogManager:
 
 
 class S3Syncer:
-    def __init__(self, access_key, secret_key):
+    def __init__(self, access_key, secret_key, local_data_dir):
         self.access_key = access_key
         self.secret_key = secret_key
+        self.local_data_dir = local_data_dir
 
     def sync(self, folder_path, s3_uri):
-        source = os.path.relpath(folder_path, BASE_DIR)
-        destination = s3_uri + os.path.basename(folder_path) + "/"
+        destination = (
+            s3_uri + os.path.relpath(folder_path, self.local_data_dir) + "/"
+        )
         env = {
             **os.environ,
             "AWS_ACCESS_KEY_ID": self.access_key,
             "AWS_SECRET_ACCESS_KEY": self.secret_key,
         }
-        log.info("S3 sync starting: %s -> %s (cwd=%s)", source, destination, BASE_DIR)
+        log.info("S3 sync starting: %s -> %s", folder_path, destination)
         result = subprocess.run(
-            ["aws", "s3", "sync", source, destination],
-            cwd=BASE_DIR,
+            ["aws", "s3", "sync", folder_path, destination],
             env=env,
             capture_output=True,
             text=True,
@@ -753,7 +810,7 @@ class S3Syncer:
         if result.returncode == 0:
             log.info(
                 "S3 sync OK: %s -> %s\n%s",
-                source,
+                folder_path,
                 destination,
                 result.stdout.strip() or "(no changes)",
             )
@@ -761,7 +818,7 @@ class S3Syncer:
             log.error(
                 "S3 sync FAILED [rc=%s]: %s -> %s\nstdout:\n%s\nstderr:\n%s",
                 result.returncode,
-                source,
+                folder_path,
                 destination,
                 result.stdout.strip(),
                 result.stderr.strip(),
@@ -780,17 +837,15 @@ class S3Syncer:
             if not os.path.exists(path):
                 log.warning("S3 upload skipped (does not exist): %s", path)
                 continue
-            rel = os.path.relpath(path, BASE_DIR)
+            rel = os.path.relpath(path, self.local_data_dir)
             if os.path.isdir(path):
                 dest = s3_uri + rel + "/"
-                cmd = ["aws", "s3", "sync", rel, dest]
+                cmd = ["aws", "s3", "sync", path, dest]
             else:
                 dest = s3_uri + rel
-                cmd = ["aws", "s3", "cp", rel, dest]
-            log.info("S3 upload: %s -> %s", rel, dest)
-            result = subprocess.run(
-                cmd, cwd=BASE_DIR, env=env, capture_output=True, text=True
-            )
+                cmd = ["aws", "s3", "cp", path, dest]
+            log.info("S3 upload: %s -> %s", path, dest)
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True)
             if result.returncode == 0:
                 log.info(
                     "S3 upload OK: %s\n%s",
@@ -914,10 +969,14 @@ class BaseSTACItemBuilder(ABC):
 
     @staticmethod
     def _add_style_asset(item, layer_map):
+        style_url = (layer_map.get("style_file_url") or "").strip()
+        if not style_url:
+            log.info("No style_file_url for item=%s; skipping style asset", item.id)
+            return item
         item.add_asset(
             "style",
             pystac.Asset(
-                href=layer_map["style_file_url"],
+                href=style_url,
                 media_type=pystac.MediaType.XML,
                 roles=["metadata"],
                 title="QGIS Style file",
@@ -970,6 +1029,8 @@ class RasterSTACItemBuilder(BaseSTACItemBuilder):
 
         desc_url = self.geoserver.raster_describe_url(ws, gs_layer)
         meta = self.geoserver.fetch_raster_metadata(desc_url)
+        if meta is None:
+            meta = self.geoserver.fetch_raster_metadata_rest(ws, gs_layer)
         if meta is None:
             log.error(
                 "Could not fetch raster metadata for layer=%s ws=%s gs_layer=%s",
@@ -1033,9 +1094,14 @@ class RasterSTACItemBuilder(BaseSTACItemBuilder):
         return item
 
     def _add_extensions(self, item, layer_map, **kw):
-        style_classes = self.style_parser.parse_raster_style(
-            layer_map["style_file_url"]
-        )
+        style_url = (layer_map.get("style_file_url") or "").strip()
+        if not style_url:
+            log.warning(
+                "No style_file_url for item=%s; skipping classification extension",
+                item.id,
+            )
+            return item
+        style_classes = self.style_parser.parse_raster_style(style_url)
         cls_ext = pystac.extensions.classification.ClassificationExtension.ext(
             item.assets["data"], add_if_missing=True
         )
@@ -1144,7 +1210,9 @@ class STACCollectionGenerator:
         self.metadata = MetadataProvider(self.config)
         self.style_parser = StyleParser(self.config.style_file_dir)
         self.catalog_mgr = CatalogManager(self.config)
-        self.s3_syncer = S3Syncer(S3_ACCESS_KEY, S3_SECRET_KEY)
+        self.s3_syncer = S3Syncer(
+            S3_ACCESS_KEY, S3_SECRET_KEY, self.config.local_data_dir
+        )
 
     def _builder_args(self):
         return (self.config, self.geoserver, self.metadata, self.style_parser)

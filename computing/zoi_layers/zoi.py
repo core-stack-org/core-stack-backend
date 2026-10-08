@@ -1,10 +1,57 @@
+from datetime import datetime
+
 from computing.zoi_layers.zoi1 import generate_zoi1
 from computing.zoi_layers.zoi2 import generate_zoi_ci
 from computing.zoi_layers.zoi3 import get_ndvi_for_zoi
-from projects.models import Project
-from utilities.gee_utils import ee_initialize, valid_gee_text, check_task_status
-from waterrejuvenation.utils import wait_for_task_completion, delete_asset_on_GEE
 from nrm_app.celery import app
+from projects.models import Project
+from utilities.gee_utils import ee_initialize, valid_gee_text
+
+
+def _resolve_zoi_time_window(
+    start_date=None,
+    end_date=None,
+    start_year=None,
+    end_year=None,
+):
+    """
+    Validate and normalize ZOI date window.
+
+    Accepts explicit dates or hydrological start/end years. A hydrological year
+    runs from July 1 through June 30 of the following calendar year.
+    """
+    if not start_date and start_year is not None:
+        start_date = f"{int(start_year)}-07-01"
+    if not end_date and end_year is not None:
+        end_date = f"{int(end_year) + 1}-06-30"
+
+    if not start_date or not end_date:
+        raise ValueError(
+            "start_date and end_date are required (YYYY-MM-DD), or provide "
+            "start_year and end_year (hydrological years)."
+        )
+
+    start_date = str(start_date).strip()
+    end_date = str(end_date).strip()
+
+    try:
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError("start_date and end_date must be in YYYY-MM-DD format.") from exc
+
+    if start_dt > end_dt:
+        raise ValueError("start_date must be less than or equal to end_date.")
+
+    # ZOI CI/NDVI use hydrological years (July -> June), represented by start-year.
+    start_year = start_dt.year if start_dt.month >= 7 else start_dt.year - 1
+    end_year = end_dt.year if end_dt.month >= 7 else end_dt.year - 1
+    if start_year > end_year:
+        raise ValueError(
+            "Provided date window does not contain a valid hydrological year."
+        )
+
+    return start_date, end_date, start_year, end_year
 
 
 @app.task()
@@ -18,6 +65,10 @@ def generate_zoi(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
+    start_date=None,
+    end_date=None,
+    start_year=None,
+    end_year=None,
 ):
     print(f"gee account id {gee_account_id}")
     ee_initialize(gee_account_id)
@@ -31,6 +82,13 @@ def generate_zoi(
         asset_folder_list = [proj_obj.name.lower()]
         asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
 
+    start_date, end_date, start_year, end_year = _resolve_zoi_time_window(
+        start_date,
+        end_date,
+        start_year,
+        end_year,
+    )
+
     generate_zoi1(
         state,
         district,
@@ -41,6 +99,8 @@ def generate_zoi(
         app_type,
         gee_account_id,
         proj_id,
+        start_date=start_date,
+        end_date=end_date,
     )
 
     generate_zoi_ci(
@@ -52,10 +112,13 @@ def generate_zoi(
         app_type,
         gee_account_id,
         proj_id,
+        start_date=start_date,
+        end_date=end_date,
+        start_year=start_year,
+        end_year=end_year,
     )
 
     if proj_id:
-
         get_ndvi_for_zoi(
             state=state,
             district=district,
@@ -65,4 +128,10 @@ def generate_zoi(
             app_type=app_type,
             gee_account_id=gee_account_id,
             proj_id=proj_id,
+            start_date=start_date,
+            end_date=end_date,
+            start_year=start_year,
+            end_year=end_year,
         )
+
+    return True

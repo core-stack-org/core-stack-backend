@@ -113,17 +113,36 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 continue
 
             # Prepare data for serializer
+            is_compute = request.data.get("is_compute", False)
+            is_processing_required = request.data.get("is_processing_required", True)
+            start_date = request.data.get("start_date") or request.data.get("startDate")
+            end_date = request.data.get("end_date") or request.data.get("endDate")
+
+            def _as_bool(val, default=False):
+                if val is None:
+                    return default
+                if isinstance(val, bool):
+                    return val
+                return str(val).lower() in ("true", "1", "yes")
+
+            compute_enabled = _as_bool(is_compute, False)
+            processing_enabled = _as_bool(is_processing_required, True)
+            if compute_enabled and processing_enabled and (not start_date or not end_date):
+                errors.append(
+                    "start_date and end_date are required when compute processing "
+                    "is enabled (YYYY-MM-DD)."
+                )
+                continue
+
             data = {
                 "name": request.data.get("name", valid_gee_text(uploaded_file.name)),
                 "file": uploaded_file,
                 "project": project.id,
                 "gee_account_id": request.data.get("gee_account_id"),
                 "is_lulc_required": request.data.get("is_lulc_required", True),
-                "is_processing_required": request.data.get(
-                    "is_processing_required", True
-                ),
+                "is_processing_required": is_processing_required,
                 "is_closest_wp": request.data.get("is_closest_wp", True),
-                "is_compute": request.data.get("is_compute", False),
+                "is_compute": is_compute,
             }
             print(data)
             serializer = self.get_serializer(data=data)
@@ -150,6 +169,8 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                         project=project,
                         uploaded_by=request.user,
                         excel_hash=excel_hash,
+                        start_date=start_date,
+                        end_date=end_date,
                     )
 
                     # # Convert KML to GeoJSON

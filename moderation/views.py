@@ -43,6 +43,24 @@ FETCH_FIELD_MAP = {
     ODK_agrohorticulture: "data_agohorticulture",
 }
 
+# Mirrors FETCH_FIELD_MAP -- the JSON field on each model that preserves the
+# raw, pre-transform values (e.g. original demand_type/select_one_activities)
+# for fields the DPR pipeline has since overwritten/normalized.
+MODIFIED_FIELD_MAP = {
+    ODK_settlement: "modified_data_settlement",
+    ODK_well: "modified_data_well",
+    ODK_waterbody: "modified_data_waterbody",
+    ODK_groundwater: "modified_data_groundwater",
+    ODK_agri: "modified_data_agri",
+    ODK_livelihood: "modified_data_livelihood",
+    ODK_crop: "modified_data_crop",
+    Agri_maintenance: "modified_data_agri_maintenance",
+    GW_maintenance: "modified_data_gw_maintenance",
+    SWB_maintenance: "modified_data_swb_maintenance",
+    SWB_RS_maintenance: "modified_data_swb_rs_maintenance",
+    ODK_agrohorticulture: "modified_data_agohorticulture",
+}
+
 
 def paginate_queryset(queryset, page=1, per_page=10):
     paginator = Paginator(queryset, per_page)
@@ -71,6 +89,7 @@ class SubmissionsOfPlan:
         field_name = FETCH_FIELD_MAP.get(model)
         if not field_name:
             raise ValueError(f"No fetch field configured for {model.__name__}")
+        modified_field_name = MODIFIED_FIELD_MAP.get(model)
 
         if model in [Agri_maintenance, GW_maintenance]:
             rows = (
@@ -79,6 +98,7 @@ class SubmissionsOfPlan:
                 .order_by("-submission_time")
                 .values(
                     field_name,
+                    modified_field_name,
                     "is_moderated",
                     "uuid",
                     "latitude",
@@ -95,6 +115,7 @@ class SubmissionsOfPlan:
                         "latitude": row["latitude"],
                         "longitude": row["longitude"],
                         "submission_time": row["submission_time"],
+                        "modified_data": row[modified_field_name],
                     },
                 ]
                 for row in rows
@@ -104,13 +125,23 @@ class SubmissionsOfPlan:
                 model.objects.filter(plan_id=plan_id)
                 .exclude(is_deleted=True)
                 .order_by("-agrohorticulture_id")
-                .values(field_name, "is_moderated", "latitude", "longitude")
+                .values(
+                    field_name,
+                    modified_field_name,
+                    "is_moderated",
+                    "latitude",
+                    "longitude",
+                )
             )
             qs = [
                 [
                     row[field_name],
                     row["is_moderated"],
-                    {"latitude": row["latitude"], "longitude": row["longitude"]},
+                    {
+                        "latitude": row["latitude"],
+                        "longitude": row["longitude"],
+                        "modified_data": row[modified_field_name],
+                    },
                 ]
                 for row in rows
             ]
@@ -121,6 +152,7 @@ class SubmissionsOfPlan:
                 .order_by("-submission_time")
                 .values(
                     field_name,
+                    modified_field_name,
                     "is_moderated",
                     "latitude",
                     "longitude",
@@ -135,6 +167,7 @@ class SubmissionsOfPlan:
                         "latitude": row["latitude"],
                         "longitude": row["longitude"],
                         "submission_time": row["submission_time"],
+                        "modified_data": row[modified_field_name],
                     },
                 ]
                 for row in rows

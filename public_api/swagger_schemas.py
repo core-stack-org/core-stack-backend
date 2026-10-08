@@ -1,4 +1,8 @@
+import copy
+
 from drf_yasg import openapi
+
+from .dataset_filters import tehsil_data_type_help_markdown
 
 # ============= COMMON PARAMETERS =============
 
@@ -53,13 +57,64 @@ mws_id_param = openapi.Parameter(
     required=True,
 )
 
-# Village Parameters
+mws_id_optional_param = openapi.Parameter(
+    "mws_id",
+    openapi.IN_QUERY,
+    description="Unique MWS identifier (e.g. '12_234647'). Optional; if omitted returns all MWS geometries in the tehsil.",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
 village_id_param = openapi.Parameter(
     "village_id",
     openapi.IN_QUERY,
-    description="Unique Village identifier (e.g. '8234647')",
+    description="Village identifier (vill_ID). Optional; if omitted returns all villages in the tehsil layer.",
     type=openapi.TYPE_STRING,
-    required=True,
+    required=False,
+)
+
+tehsil_data_filter_param = openapi.Parameter(
+    "data",
+    openapi.IN_QUERY,
+    description=(
+        "Optional v2 sheet filter. Omit or pass `all` for every sheet. "
+        "Pass one or more sheet names: `data=drought,stream_order` or "
+        "`data=drought&data=stream_order`."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_state_filter_param = openapi.Parameter(
+    "state",
+    openapi.IN_QUERY,
+    description="Optional state name filter (e.g. 'Rajasthan').",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_district_filter_param = openapi.Parameter(
+    "district",
+    openapi.IN_QUERY,
+    description="Optional district name filter (e.g. 'Bhilwara').",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_tehsil_filter_param = openapi.Parameter(
+    "tehsil",
+    openapi.IN_QUERY,
+    description="Optional tehsil / block name filter (e.g. 'Mandalgarh'). Alias: `block`.",
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+active_locations_block_filter_param = openapi.Parameter(
+    "block",
+    openapi.IN_QUERY,
+    description="Optional block name filter. Same as `tehsil`.",
+    type=openapi.TYPE_STRING,
+    required=False,
 )
 
 # File Type Parameters
@@ -80,6 +135,14 @@ authorization_param = openapi.Parameter(
     required=True,
 )
 
+jwt_authorization_param = openapi.Parameter(
+    "Authorization",
+    openapi.IN_HEADER,
+    description="JWT from POST /api/v1/auth/login/. Format: Bearer <access>",
+    type=openapi.TYPE_STRING,
+    required=True,
+)
+
 # ============= COMMON RESPONSES =============
 
 # Error Responses
@@ -93,122 +156,468 @@ not_found_response = openapi.Response(description="Not Found - Data not found")
 
 internal_error_response = openapi.Response(description="Internal Server Error")
 
+# ============= COMMON EXAMPLES =============
+def success_example(data):
+    return {"status": "success", "error_message": None, "data": data}
+
+
+def error_example(message, details=None):
+    payload = {"status": "error", "error_message": message, "error": message}
+    if details is not None:
+        payload["details"] = details
+    return payload
+
+
+def v1_error_example(message):
+    return {"error": message}
+
+
+def _set_json_example(schema, status_code, payload, description=None):
+    existing = (schema.get("responses") or {}).get(status_code)
+    desc = description
+    if desc is None and existing is not None:
+        desc = getattr(existing, "description", None) or "Response"
+    schema.setdefault("responses", {})[status_code] = openapi.Response(
+        description=desc,
+        examples={"application/json": payload},
+    )
+
+
+ADMIN_V1_EXAMPLE = {
+    "State": "UTTAR PRADESH",
+    "District": "JAUNPUR",
+    "Tehsil": "BADLAPUR",
+}
+ADMIN_V2_EXAMPLE = {
+    "admin_details": dict(ADMIN_V1_EXAMPLE),
+    "admin_field_hints": {
+        "State": "state_name",
+        "District": "district_name",
+        "Tehsil": "tehsil_or_block_name",
+    },
+}
+MWS_LATLON_V1_EXAMPLE = {
+    "State": "UTTAR PRADESH",
+    "District": "JAUNPUR",
+    "Tehsil": "BADLAPUR",
+    "mws_id": "12_234647",
+    "uid": "12_234647",
+}
+MWS_LATLON_V2_EXAMPLE = {
+    "mws_details": {
+        "uid": "12_234647",
+        "State": "UTTAR PRADESH",
+        "District": "JAUNPUR",
+        "Tehsil": "BADLAPUR",
+    },
+    "mws_field_hints": {
+        "uid": "mws_identifier",
+        "State": "state_name",
+        "District": "district_name",
+        "Tehsil": "tehsil_or_block_name",
+    },
+}
+TEHSIL_V1_EXAMPLE = {
+    "aquifer_vector": [
+        {
+            "uid": "12_207597",
+            "area_in_ha": 2336.11,
+            "aquifer_class": "Alluvium",
+        }
+    ],
+    "Soge_vector": ["..............."],
+}
+TEHSIL_V2_EXAMPLE = {
+    "tehsil_data": {
+        "aquifer_vector": [
+            {
+                "uid": "12_207597",
+                "area_in_ha": 2336.11,
+                "aquifer_class": "Alluvium",
+            }
+        ]
+    },
+    "tehsil_units": {
+        "aquifer_vector": {"area_in_ha": "ha"},
+    },
+}
+KYL_V1_EXAMPLE = [
+    {
+        "mws_id": "12_234647",
+        "terraincluster_id": 1,
+        "avg_precipitation": 764.45,
+        "total_nrega_assets": 550,
+    }
+]
+KYL_V2_EXAMPLE = {
+    "indicators": {
+        "mws_id": "12_234647",
+        "terraincluster_id": 1,
+        "avg_precipitation": 764.45,
+        "total_nrega_assets": 550,
+    },
+    "indicator_units": {
+        "mws_id": "id",
+        "terraincluster_id": "id",
+        "avg_precipitation": "mm",
+        "total_nrega_assets": "count",
+    },
+}
+LAYER_V1_EXAMPLE = [
+    {
+        "layer_name": "SOGE",
+        "dataset_name": "SOGE",
+        "layer_type": "vector",
+        "layer_url": "https://geoserver.core-stack.org/geoserver/wfs?...",
+        "layer_version": "1.0",
+        "style_url": "",
+        "gee_asset_path": "projects/ee-.../asset",
+    }
+]
+LAYER_V2_EXAMPLE = {
+    "layers": LAYER_V1_EXAMPLE,
+    "layer_field_units": {
+        "layer_name": "name",
+        "dataset_name": "name",
+        "layer_type": "vector|raster|point|custom",
+        "layer_url": "geoserver_wfs_or_wcs_url",
+        "layer_version": "version_label",
+        "style_url": "style_url_or_empty",
+        "gee_asset_path": "earth_engine_asset_id_or_null",
+    },
+}
+REPORT_V1_EXAMPLE = {
+    "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104"
+}
+REPORT_V2_EXAMPLE = {
+    "report": dict(REPORT_V1_EXAMPLE),
+    "report_field_hints": {"Mws_report_url": "mws_pdf_or_html_report_url"},
+}
+ACTIVE_LOCATIONS_V1_EXAMPLE = [
+    {
+        "label": "Rajasthan",
+        "value": "1251",
+        "state_id": "8",
+        "district": [
+            {
+                "label": "Bhilwara",
+                "district_id": "123",
+                "blocks": [{"label": "Mandalgarh", "value": 1}],
+            }
+        ],
+    }
+]
+ACTIVE_LOCATIONS_V2_EXAMPLE = {
+    "locations": ACTIVE_LOCATIONS_V1_EXAMPLE,
+    "location_field_hints": {
+        "label": "display_name",
+        "value": "ordinal_code_in_ui_list",
+        "state_id": "state_identifier",
+        "district_id": "district_identifier",
+        "block_id": "block_tehsil_identifier",
+        "district": "districts_under_state",
+        "blocks": "blocks_tehsils_under_district",
+    },
+}
+MWS_FC_EXAMPLE = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {"uid": "12_208104"},
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [75.02716659, 25.2401886],
+                        [75.0868641493802, 25.20231618101583],
+                        [75.091234567, 25.251234567],
+                        [75.02716659, 25.2401886],
+                    ]
+                ],
+            },
+        }
+    ],
+}
+VILLAGE_FC_EXAMPLE = {
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "id": "jamui_jamui.1",
+            "geometry": {
+                "type": "MultiPolygon",
+                "coordinates": [
+                    [
+                        [
+                            [86.11306, 24.75025],
+                            [86.11629, 24.74811],
+                            [86.12035, 24.74641],
+                            [86.11306, 24.75025],
+                        ]
+                    ]
+                ],
+            },
+            "properties": {"vill_ID": 258411, "vill_name": "Example Village"},
+        }
+    ],
+}
+
+
+def v2_schema_from(base_schema, operation_id, path_suffix):
+    schema = dict(base_schema)
+    schema["operation_id"] = operation_id
+    schema["tags"] = ["Dataset APIs v2"]
+    if "responses" in schema:
+        schema["responses"] = copy.deepcopy(schema["responses"])
+    if "manual_parameters" in schema:
+        schema["manual_parameters"] = list(schema["manual_parameters"])
+    return schema
+
+
+# ============= AUTH SCHEMAS =============
+
+LOGIN_V1_EXAMPLE = {
+    "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+        "id": 12,
+        "username": "partner",
+        "email": "partner@example.org",
+    },
+}
+
+GENERATE_API_KEY_V1_EXAMPLE = {
+    "action": "generate",
+    "success": True,
+    "message": "API key generated successfully",
+    "data": {
+        "api_key": "knog3H.OZ7LCmWNjLWK6HcaxUEM1tP2",
+        "is_active": True,
+        "expires_at": "2034-01-15T10:30:00Z",
+        "created_at": "2026-01-15T10:30:00Z",
+    },
+}
+
+login_schema = {
+    "operation_id": "auth_login",
+    "operation_summary": "Create a session",
+    "operation_description": """
+    Creates a session and returns a JWT.
+
+    Send ``username`` and ``password``. Use ``access`` as
+    ``Authorization: Bearer <access>`` on Create an API key.
+
+    **Returns**
+    ``access``, ``refresh``, and the signed-in ``user``. Tokens expire;
+    call this again for a new pair.
+
+    **Related**
+    Create an API key
+    """,
+    "request_body": openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=["username", "password"],
+        properties={
+            "username": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Core Stack account username",
+                example="partner",
+            ),
+            "password": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Account password",
+                example="your-password",
+            ),
+        },
+    ),
+    "responses": {
+        200: openapi.Response(
+            description="Success - JWT access and refresh tokens.",
+            examples={"application/json": LOGIN_V1_EXAMPLE},
+        ),
+        401: openapi.Response(
+            description="Unauthorized - invalid username or password.",
+            examples={
+                "application/json": {
+                    "detail": "No active account found with the given credentials"
+                }
+            },
+        ),
+    },
+    "tags": ["Auth APIs"],
+    "security": [],
+}
+
+generate_api_key_schema = {
+    "method": "post",
+    "operation_id": "generate_api_key",
+    "operation_summary": "Create an API key",
+    "operation_description": """
+    Creates an ``X-API-Key`` for Dataset and Waterbody requests.
+
+    Authenticate with ``Authorization: Bearer <access>`` from Create a
+    session. An empty body, or ``name`` and ``expiry_days``, creates a
+    key (default expiry 3000 days). Optional ``action=deactivate`` with
+    ``user_id`` and ``api_key`` turns a key off.
+
+    **Returns**
+    ``data.api_key``. Send it as ``X-API-Key`` on every public request.
+
+    **Related**
+    Create a session · List active locations
+    """,
+    "manual_parameters": [jwt_authorization_param],
+    "request_body": openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        properties={
+            "name": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Optional label for the key",
+                example="Partner integration key",
+            ),
+            "expiry_days": openapi.Schema(
+                type=openapi.TYPE_INTEGER,
+                description="Days until the key expires. Default 3000.",
+                example=3000,
+            ),
+            "action": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="``generate`` (default) or ``deactivate``",
+                example="generate",
+            ),
+            "user_id": openapi.Schema(
+                type=openapi.TYPE_INTEGER,
+                description="Required only when action is deactivate",
+            ),
+            "api_key": openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description="Required only when action is deactivate",
+            ),
+        },
+    ),
+    "responses": {
+        201: openapi.Response(
+            description="Created - new API key. Copy data.api_key into X-API-Key.",
+            examples={"application/json": GENERATE_API_KEY_V1_EXAMPLE},
+        ),
+        400: openapi.Response(
+            description="Bad Request - invalid action or expiry_days.",
+            examples={
+                "application/json": {
+                    "success": False,
+                    "error": "Invalid expiry_days value",
+                }
+            },
+        ),
+        401: openapi.Response(
+            description="Unauthorized - missing or invalid JWT.",
+            examples={
+                "application/json": {
+                    "error": "Authentication failed",
+                    "details": "JWT token required in Authorization header",
+                }
+            },
+        ),
+    },
+    "tags": ["Auth APIs"],
+}
+
 # ============= API SCHEMAS =============
 
 # Admin Details by Lat Lon Schema
 admin_by_latlon_schema = {
     "method": "get",
     "operation_id": "get_admin_details_by_latlon",
-    "operation_summary": "Get Admin Details by Lat Lon",
+    "operation_summary": "Retrieve admin details",
     "operation_description": """
-    Retrieve admin data based on given latitude and longitude coordinates.
-    
-    **Response dataset details:**
-    ```
-    [
-        "State": "State name",
-        "District": "District name",
-        "Tehsil": "Tehsil name"
-    ]
-    ```
+    Retrieves the ``State``, ``District``, and ``Tehsil`` for a WGS84 point.
+
+    Use these exact strings on every other dataset route. Confirm the tehsil
+    appears in List active locations first. If it does not, request it with the
+    [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
+
+    **Returns**
+    A raw admin object. Points outside the SOI boundary return ``{"error": "..."}``.
+
+    **Related**
+    List active locations · Retrieve a micro-watershed ID
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data having admin details.",
-            examples={
-                "application/json": {
-                    "State": "UTTAR PRADESH",
-                    "District": "JAUNPUR",
-                    "Tehsil": "BADLAPUR",
-                }
-            },
+            examples={"application/json": ADMIN_V1_EXAMPLE},
         ),
         400: openapi.Response(
-            description="Bad Request - Both 'latitude' and 'longitude' parameters are required. OR Latitude and longitude must be valid numbers(float)."
+            description="Bad Request - Invalid latitude/longitude input.",
+            examples={
+                "application/json": v1_error_example(
+                    "Both 'latitude' and 'longitude' parameters are required."
+                )
+            },
         ),
         401: unauthorized_response,
         404: openapi.Response(
-            description="Not Found - Latitude and longitude is not in SOI boundary."
+            description="Not Found - Latitude and longitude is not in SOI boundary.",
+            examples={
+                "application/json": v1_error_example(
+                    "Latitude and longitude is not in SOI boundary."
+                )
+            },
         ),
         500: internal_error_response,
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # MWS ID by Lat Lon Schema
 mws_by_latlon_schema = {
     "method": "get",
     "operation_id": "get_mwsid_by_latlon",
-    "operation_summary": "Get MWSID by Lat Lon",
+    "operation_summary": "Retrieve a micro-watershed ID",
     "operation_description": """
-    Retrieve MWS ID data based on given latitude and longitude coordinates.
-    
-    **Response dataset details:**
-    ```
-    [
-        "uid": "MWS_id"
-        "State": "State name",
-        "District": "District name",
-        "Tehsil": "Tehsil name"
-    ]
-    ```
+    Retrieves the micro-watershed that contains a WGS84 point.
+
+    ``uid`` (also ``mws_id``) is the join key for time series, KYL, reports,
+    and geometries.
+
+    **Returns**
+    A raw object with ``mws_id``, ``uid``, and admin names.
+
+    **Related**
+    Retrieve admin details · Retrieve MWS time series
     """,
     "manual_parameters": [latitude_param, longitude_param, authorization_param],
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data having admin detail with mws_id.",
-            examples={
-                "application/json": {
-                    "uid": "12_234647",
-                    "state": "UTTAR PRADESH",
-                    "district": "JAUNPUR",
-                    "tehsil": "BADLAPUR",
-                }
-            },
+            examples={"application/json": MWS_LATLON_V1_EXAMPLE},
         ),
         400: bad_request_response,
         401: unauthorized_response,
         404: not_found_response,
         500: internal_error_response,
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # MWS Data Schema
 get_mws_data_schema = {
     "method": "get",
     "operation_id": "get_mws_data",
-    "operation_summary": "Get MWS Time Series Data",
+    "operation_summary": "Retrieve MWS time series",
     "operation_description": """
-    Retrieve MWS time series data, including ET, Runoff, Precipitation and NDVI(crop, tree, shrubs) for a given state, district, tehsil, and MWS ID.
-    
-    **Response dataset details:**
-    ```
-    {
-        "mws_id": "12_208104",
-        "time_series": [
-            {
-                "date": "2024-01-01",
-                "et": 2.5,
-                "runoff": 1.3,
-                "precipitation": 10.2,
-                "ndvi_crop": "0.4",
-                "ndvi_shrub": "0.3",
-                "ndvi_tree": "0.3"
-            },
-            {
-                "date": "2024-01-15",
-                "et": 3.1,
-                "runoff": 0.8,
-                "precipitation": 5.4,
-                "ndvi_crop": "0.2",
-                "ndvi_shrub": "0.4",
-                "ndvi_tree": "0.4"
-            }
-        ]
-    }
-    ```
+    Retrieves hydrology time series for one micro-watershed: ET, runoff,
+    precipitation, and NDVI.
+
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``.
+
+    **Returns**
+    ``mws_id`` and a ``time_series`` row list. Missing IDs return ``{"error": "..."}``.
+
+    **Related**
+    Retrieve a micro-watershed ID · List tehsil datasets
     """,
     "manual_parameters": [
         state_param,
@@ -223,26 +632,7 @@ get_mws_data_schema = {
             examples={
                 "application/json": {
                     "mws_id": "12_208104",
-                    "time_series": [
-                        {
-                            "date": "2024-01-01",
-                            "et": 2.5,
-                            "runoff": 1.3,
-                            "precipitation": 10.2,
-                            "ndvi_crop": 0.4,
-                            "ndvi_shrub": 0.3,
-                            "ndvi_tree": 0.3,
-                        },
-                        {
-                            "date": "2024-01-15",
-                            "et": 3.1,
-                            "runoff": 0.8,
-                            "precipitation": 5.4,
-                            "ndvi_crop": 0.2,
-                            "ndvi_shrub": 0.4,
-                            "ndvi_tree": 0.4,
-                        },
-                    ],
+                    "time_series": [],
                 }
             },
         ),
@@ -263,10 +653,94 @@ get_mws_data_schema = {
         ),
         500: openapi.Response(
             description="Internal Server Error",
-            examples={"application/json": {"Exception": "Error message details"}},
+            examples={
+                "application/json": {
+                    "Exception": "Error message details",
+                }
+            },
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
+}
+
+
+get_mws_data_v2_schema = {
+    "method": "get",
+    "operation_id": "get_mws_data_v2",
+    "operation_summary": "Retrieve MWS time series",
+    "operation_description": """
+    Retrieves hydrology time series for one micro-watershed: evapotranspiration
+    (ET), runoff, and precipitation.
+
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id`` from List
+    active locations and Retrieve a micro-watershed ID.
+
+    **Returns**
+    ``{status, error_message, data}``. ``data.fortnight`` is aligned ~15-day
+    arrays (``time``, ``et``, ``runoff``, ``precipitation``).
+    ``data.fortnight_units`` names the units (``mm``, ``iso8601``). This is
+    not the v1 ``time_series`` row list.
+
+    **Related**
+    List active locations · Retrieve a micro-watershed ID
+    """,
+    "manual_parameters": [
+        state_param,
+        district_param,
+        tehsil_param,
+        mws_id_param,
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - fortnight-aligned MWS time series in v2 envelope",
+            examples={
+                "application/json": success_example(
+                    {
+                        "metadata": {"mws_id": "12_208104"},
+                        "fortnight": {
+                            "time": ["2024-01-01", "2024-01-15"],
+                            "et": [2.5, 3.1],
+                            "runoff": [1.3, 0.8],
+                            "precipitation": [10.2, 5.4],
+                        },
+                        "fortnight_units": {
+                            "time": "iso8601",
+                            "time_step": "15_days",
+                            "et": "mm",
+                            "runoff": "mm",
+                            "precipitation": "mm",
+                        },
+                    }
+                )
+            },
+        ),
+        400: openapi.Response(
+            description="Bad Request - Missing required parameters or invalid format",
+            examples={
+                "application/json": error_example(
+                    "'state', 'district', 'tehsil', and 'mws_id' parameters are required."
+                )
+            },
+        ),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(
+            description="Not Found - MWS ID not found",
+            examples={
+                "application/json": error_example("Data not found for the given mws_id")
+            },
+        ),
+        500: openapi.Response(
+            description="Internal Server Error",
+            examples={
+                "application/json": error_example(
+                    "Internal server error while fetching MWS data",
+                    details="Error message details",
+                )
+            },
+        ),
+    },
+    "tags": ["Dataset APIs v2"],
 }
 
 
@@ -274,24 +748,19 @@ get_mws_data_schema = {
 tehsil_data_schema = {
     "method": "get",
     "operation_id": "get_tehsil_data",
-    "operation_summary": "Get Tehsil Data",
+    "operation_summary": "List tehsil datasets",
     "operation_description": """
-    Retrieve tehsil-level JSON data for a given state, district, and tehsil.
-    
-    **Response dataset details:**
-    ```
-        [
-           "aquifer_vector": [
-                {
-                    "uid": "MWS_id",
-                    "area_in_ha": "Area for the mws",
-                    "aquifer_class": "Class for the aquifer",
-                    "principle_aq_alluvium_percent": "Total percentage area under aquifer class",
-                    "principle_aq_banded gneissic complex_percent": "Total percentage area under aquifer class"
-                }
-              ]  
-        ]
-    ```
+    Lists every analytical sheet for a tehsil: drought, hydrology, LULC,
+    NREGA, and others.
+
+    Requires ``state``, ``district``, and ``tehsil``. Stats must already exist
+    for that location (see List active locations).
+
+    **Returns**
+    A raw object keyed by sheet name, one row per MWS. v1 has no ``data=`` filter.
+
+    **Related**
+    List active locations · Retrieve KYL indicators
     """,
     "manual_parameters": [
         state_param,
@@ -302,27 +771,7 @@ tehsil_data_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data for the tehsil.",
-            examples={
-                "application/json": {
-                    "aquifer_vector": [
-                        {
-                            "uid": "12_207597",
-                            "area_in_ha": 2336.11,
-                            "aquifer_class": "Alluvium",
-                            "principle_aq_alluvium_percent": 100,
-                            "principle_aq_banded gneissic complex_percent": 0,
-                        },
-                        {
-                            "uid": "12_208413",
-                            "area_in_ha": 864.04,
-                            "aquifer_class": "Alluvium",
-                            "principle_aq_alluvium_percent": 100,
-                            "principle_aq_banded gneissic complex_percent": 0,
-                        },
-                    ],
-                    "Soge_vector": ["..............."],
-                }
-            },
+            examples={"application/json": TEHSIL_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', and 'tehsil' are required. OR State/District/Tehsil must contain only letters, spaces, and underscores"
@@ -333,7 +782,7 @@ tehsil_data_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -341,29 +790,18 @@ tehsil_data_schema = {
 kyl_indicators_schema = {
     "method": "get",  # ✅ Changed = to :
     "operation_id": "get_mws_kyl_indicators",
-    "operation_summary": "Get MWS KYL Indicators",
+    "operation_summary": "Retrieve KYL indicators",
     "operation_description": """
-    Retrieve KYL indicator data for a specific MWS ID in a given state, district, and tehsil.
-    
-    **Example Response:**
-    ```
-        [
-            {
-                "mws_id": "MWS id",
-                "terraincluster_id": "Cluster id",
-                "avg_precipitation": "Average precipitation in mm",
-                "cropping_intensity_trend": "Cropping intensity trend value",
-                "cropping_intensity_avg": "Average cropping Intensity",
-                "avg_single_cropped": "Average Single cropped area",
-                "avg_double_cropped": "Average Double cropped area",
-                "avg_triple_cropped": "Average Triple cropped area",
-                ".................": ".................",
-                "avg_number_dry_spell": "Average number of dry spell",
-                "avg_runoff": "Average runoff",
-                "total_nrega_assets": "Total nrega assets"
-            }
-        ]
-    ```
+    Retrieves a single-row KYL snapshot for one micro-watershed.
+
+    Use this for terrain class, average rainfall, and asset counts. This is
+    not a time series.
+
+    **Returns**
+    The raw indicator object for ``mws_id``.
+
+    **Related**
+    Retrieve MWS time series · List tehsil datasets
     """,
     "manual_parameters": [
         state_param,
@@ -375,24 +813,7 @@ kyl_indicators_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data of the KYL Indicator for the mws_id.",
-            examples={
-                "application/json": [
-                    {
-                        "mws_id": "12_234647",
-                        "terraincluster_id": 1,
-                        "avg_precipitation": 764.4457,
-                        "cropping_intensity_trend": 0,
-                        "cropping_intensity_avg": 1.7417,
-                        "avg_single_cropped": 8.2647,
-                        "avg_double_cropped": 80.1709,
-                        "avg_triple_cropped": 1.8198,
-                        "..................": ".......",
-                        "avg_number_dry_spell": 2.1667,
-                        "avg_runoff": 167.7886,
-                        "total_nrega_assets": 550,
-                    }
-                ]
-            },
+            examples={"application/json": KYL_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores OR MWS id can only contain numbers and underscores"
@@ -403,28 +824,25 @@ kyl_indicators_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 # Generated Layer URLs Schema
 generated_layer_urls_schema = {
     "method": "get",
     "operation_id": "get_generated_layer_urls",
-    "operation_summary": "Get Generated Layer Url",
+    "operation_summary": "List generated layers",
     "operation_description": """
-    Retrieve generated layer URLs for a given state, district, and tehsil.
-    
-    **Example Response:**
-    ```
-        [
-                "layer_name": "Name of the layer",
-                "layer_type": "Vector/ Raster",
-                "layer_url": "Geoserver url for the layer",
-                "layer_version": "Version of the layer",
-                "style_url": "Url for the style",
-                "gee_asset_path": "GEE Asset path for the layer"
-        ]
-    ```
+    Lists every generated dataset layer for a tehsil.
+
+    Each record includes a GeoServer ``layer_url`` (WFS for vectors, WCS for
+    rasters). Open that URL in QGIS or any WFS/WCS client.
+
+    **Returns**
+    Raw layer records. Missing locations return ``{"error": "..."}``.
+
+    **Related**
+    List active locations · List MWS geometries
     """,
     "manual_parameters": [
         state_param,
@@ -435,26 +853,7 @@ generated_layer_urls_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON data for the generated layers.",
-            examples={
-                "application/json": [
-                    {
-                        "layer_name": "SOGE",
-                        "layer_type": "vector",
-                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/soge/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=soge:soge_vector_nalanda_hilsa&outputFormat=application/json",
-                        "layer_version": "1.0",
-                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/SOGE_style.qml",
-                        "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/soge_vector_nalanda_hilsa",
-                    },
-                    {
-                        "layer_name": "Drainage",
-                        "layer_type": "vector",
-                        "layer_url": "https://geoserver.core-stack.org:8443/geoserver/drainage/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=drainage:nalanda_hilsa&outputFormat=application/json",
-                        "layer_version": "1.0",
-                        "style_url": "https://github.com/core-stack-org/QGIS-Styles/blob/main/Hydrology/Drainage-Layer-Style.qml",
-                        "gee_asset_path": "projects/ee-corestackdev/assets/apps/mws/bihar/nalanda/hilsa/drainage_lines_nalanda_hilsa",
-                    },
-                ]
-            },
+            examples={"application/json": LAYER_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', and 'tehsil' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores"
@@ -465,7 +864,7 @@ generated_layer_urls_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -473,16 +872,18 @@ generated_layer_urls_schema = {
 mws_report_urls_schema = {
     "method": "get",  # ✅ Changed = to :
     "operation_id": "get_mws_report",
-    "operation_summary": "Get MWS Report url",
+    "operation_summary": "Retrieve an MWS report",
     "operation_description": """
-    Retrieve MWS report url for a given state, district, tehsil and mws_id.
-    
-    **Response dataset details:**
-    ```
-        [
-            "Mws_report_url": "Url for the MWS report"
-        ]
-    ```
+    Retrieves the URL for a micro-watershed PDF/HTML report.
+
+    Requires ``state``, ``district``, ``tehsil``, and ``mws_id``. The stats
+    file and MWS layer must already exist.
+
+    **Returns**
+    A raw object with ``Mws_report_url``.
+
+    **Related**
+    Retrieve a micro-watershed ID · Retrieve KYL indicators
     """,
     "manual_parameters": [
         state_param,
@@ -494,11 +895,7 @@ mws_report_urls_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - It will return JSON having mws report url.",
-            examples={
-                "application/json": {
-                    "Mws_report_url": "http://127.0.0.1:8000/api/v1/generate_mws_report/?state=uttar_pradesh&district=bara_banki&block=fatehpur&uid=12_208104",
-                }
-            },
+            examples={"application/json": REPORT_V1_EXAMPLE},
         ),
         400: openapi.Response(
             description="Bad Request - 'state', 'district', 'tehsil', and 'mws_id' parameters are required. OR State/District/Tehsil must contain only letters, spaces, and underscores OR MWS id can only contain numbers and underscores"
@@ -509,7 +906,138 @@ mws_report_urls_schema = {
         ),
         500: openapi.Response(description="Internal Server Error"),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
+}
+
+
+# MWS Geometry Schema
+mws_geometries_schema = {
+    "method": "get",
+    "operation_id": "get_mws_geometries",
+    "operation_summary": "List MWS geometries",
+    "operation_description": """
+    Lists micro-watershed polygons for a tehsil.
+
+    Omit ``mws_id`` for every MWS; pass ``mws_id`` for one feature.
+
+    **Returns**
+    A GeoJSON FeatureCollection (or a single-feature payload). Vertices are
+    the actual GeoServer coordinates. Save the collection to open it in QGIS.
+
+    **Related**
+    Retrieve a micro-watershed ID · List village geometries
+    """,
+    "manual_parameters": [
+        state_param,
+        district_param,
+        tehsil_param,
+        mws_id_optional_param,
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - One MWS geometry, or all tehsil geometries when mws_id is omitted.",
+            examples={
+                "application/json": success_example(
+                    {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "properties": {"uid": "12_208104"},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [
+                                        [
+                                            [75.02716659, 25.2401886],
+                                            [75.0868641493802, 25.20231618101583],
+                                            [75.091234567, 25.251234567],
+                                            [75.02716659, 25.2401886],
+                                        ]
+                                    ],
+                                },
+                            }
+                        ],
+                    }
+                )
+            },
+        ),
+        400: openapi.Response(
+            description="Bad Request - 'state', 'district', and 'tehsil' are required. Invalid mws_id format if provided."
+        ),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(
+            description="Not Found - MWS layer or mws_id not found for this location"
+        ),
+        500: openapi.Response(description="Internal Server Error"),
+    },
+    "tags": ["Dataset APIs v1"],
+}
+
+
+village_geometries_schema = {
+    "method": "get",
+    "operation_id": "get_village_geometries",
+    "operation_summary": "List village geometries",
+    "operation_description": """
+    Lists village / panchayat polygons for a tehsil.
+
+    Optional ``village_id`` keeps a single feature.
+
+    **Returns**
+    A GeoJSON FeatureCollection. Rings are the actual GeoServer vertices.
+    Save the collection to open it in QGIS.
+
+    **Related**
+    List MWS geometries · List active locations
+    """,
+    "manual_parameters": [
+        state_param,
+        district_param,
+        tehsil_param,
+        village_id_param,
+        authorization_param,
+    ],
+    "responses": {
+        200: openapi.Response(
+            description="Success - Returns a GeoJSON FeatureCollection of village polygons",
+            examples={
+                "application/json": success_example(
+                    {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "id": "jamui_jamui.1",
+                                "geometry": {
+                                    "type": "MultiPolygon",
+                                    "coordinates": [
+                                        [
+                                            [
+                                                [86.11306, 24.75025],
+                                                [86.11629, 24.74811],
+                                                [86.12035, 24.74641],
+                                                [86.11306, 24.75025],
+                                            ]
+                                        ]
+                                    ],
+                                },
+                                "properties": {
+                                    "vill_ID": 258411,
+                                    "vill_name": "Example Village",
+                                },
+                            }
+                        ],
+                    }
+                )
+            },
+        ),
+        400: openapi.Response(description="Bad Request - invalid input or layer schema issue"),
+        401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
+        404: openapi.Response(description="Not Found - layer or village not found"),
+        500: openapi.Response(description="Internal Server Error"),
+    },
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -517,22 +1045,22 @@ mws_report_urls_schema = {
 generate_active_locations_schema = {
     "method": "get",
     "operation_id": "generate_active_locations",
-    "operation_summary": "Get Active Locations",
+    "operation_summary": "List active locations",
     "operation_description": """
-    Return activated locations data.
-    
-    **Response dataset details:**
-    ```
-    {
-        "state_name": {
-            "districts": {
-                "district_name": {
-                    "tehsils": ["tehsil1", "tehsil2"]
-                }
-            }
-        }
-    }
-    ```
+    Lists tehsils where the full Core Stack dataset is already available.
+
+    Each tehsil is computed on Google Earth Engine on partner request.
+    Use the returned ``state``, ``district``, and ``tehsil`` strings on
+    every other dataset route.
+
+    To request a new location, submit the
+    [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
+
+    **Returns**
+    A raw state → district → tehsil tree. v1 has no place filter.
+
+    **Related**
+    Retrieve admin details · List tehsil datasets
     """,
     "manual_parameters": [
         authorization_param,
@@ -540,27 +1068,17 @@ generate_active_locations_schema = {
     "responses": {
         200: openapi.Response(
             description="Success - Returns activated locations data",
-            examples={
-                "application/json": {
-                    "uttar_pradesh": {
-                        "districts": {
-                            "bara_banki": {"tehsils": ["fatehpur", "nawabganj"]},
-                            "lucknow": {"tehsils": ["mohanlalganj", "malihabad"]},
-                        }
-                    },
-                    "jharkhand": {
-                        "districts": {"deoghar": {"tehsils": ["devipur", "sarwan"]}}
-                    },
-                }
-            },
+            examples={"application/json": ACTIVE_LOCATIONS_V1_EXAMPLE},
         ),
         401: openapi.Response(description="Unauthorized - Invalid or missing API key"),
         500: openapi.Response(
             description="Internal Server Error",
-            examples={"application/json": {"Exception": "Error message details"}},
+            examples={
+                "application/json": {"Exception": "Error message details"}
+            },
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -569,43 +1087,18 @@ generate_active_locations_schema = {
 get_mws_geometries_schema = {
     "method": "get",
     "operation_id": "get_mws_geometries",
-    "operation_summary": "Get MWS Geometries",
+    "operation_summary": "List MWS geometries",
     "operation_description": """
-    Retrieve MWS geometries for a given state, district, tehsil.
+    Lists every micro-watershed boundary in a tehsil.
 
-    **Response format:**
-    Returns a GeoJSON geometry object containing the polygon coordinates of all the MWS boundary in a tehsil.
+    Each feature has ``properties.uid`` and a Polygon or MultiPolygon ring.
 
-    **Example response:**
-    ```json
-    {
-        "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "id": "mws_amaravati_achalpur.1",
-                    "geometry": {
-                        "type": "MultiPolygon",
-                        "coordinates": [
-                            [
-                                [
-                                    [77.311209, 21.226113],
-                                    [77.311195, 21.22611],
-                                    [77.311185, 21.226108],
-                                    [77.311552, 21.226182],
-                                    [77.311209, 21.226113]
-                                ]
-                            ]
-                        ]
-                    },
-                    "geometry_name": "the_geom",
-                    "properties": {
-                        "uid": "1_523"
-                    }
-                }
-            ]
-        }
-    ```
+    **Returns**
+    A GeoJSON FeatureCollection at the top level. Save the file and open it
+    in QGIS. Vertices are the actual GeoServer coordinates.
+
+    **Related**
+    Retrieve a micro-watershed ID · List village geometries
     """,
     "manual_parameters": [
         state_param,
@@ -688,7 +1181,7 @@ get_mws_geometries_schema = {
             examples={"application/json": {"error": "Internal server error"}},
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
 
 
@@ -696,44 +1189,18 @@ get_mws_geometries_schema = {
 get_village_geometries_schema = {
     "method": "get",
     "operation_id": "get_village_geometries",
-    "operation_summary": "Get Village Geometries",
+    "operation_summary": "List village geometries",
     "operation_description": """
-    Retrieve village geometries for a given state, district and tehsil.
+    Lists every village / panchayat boundary in a tehsil.
 
-    **Response format:**
-    Returns a GeoJSON geometry object containing the polygon coordinates of all the village boundary in a tehsil.
+    Features include ``vill_ID``, ``vill_name``, and MultiPolygon rings.
 
-    **Example response:**
-    ```json
-        {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "id": "amaravati_achalpur.3",
-                    "geometry": {
-                        "type": "MultiPolygon",
-                        "coordinates": [
-                            [
-                                [
-                                    [77.311209, 21.226113],
-                                    [77.311195, 21.22611],
-                                    [77.311185, 21.226108],
-                                    [77.311552, 21.226182],
-                                    [77.311209, 21.226113]
-                                ]
-                            ]
-                        ]
-                    },
-                    "geometry_name": "the_geom",
-                    "properties": {
-                        "vill_ID": 0,
-                        "vill_name": "ALIPUR"
-                    }
-                }
-            ]
-        }
-    ```
+    **Returns**
+    A GeoJSON FeatureCollection at the top level. Save the file and open it
+    in QGIS. Coordinates are the actual GeoServer vertices.
+
+    **Related**
+    List MWS geometries · List active locations
     """,
     "manual_parameters": [
         state_param,
@@ -816,5 +1283,262 @@ get_village_geometries_schema = {
             },
         ),
     },
-    "tags": ["Dataset APIs"],
+    "tags": ["Dataset APIs v1"],
 }
+
+# ============= V2 API SCHEMAS (distinct operation_id for Swagger/ReDoc) =============
+
+admin_by_latlon_schema_v2 = v2_schema_from(
+    admin_by_latlon_schema,
+    "get_admin_details_by_latlon_v2",
+    "get_admin_details_by_latlon/",
+)
+_set_json_example(
+    admin_by_latlon_schema_v2,
+    200,
+    success_example(ADMIN_V2_EXAMPLE),
+    "Success - admin details in the v2 envelope",
+)
+_set_json_example(
+    admin_by_latlon_schema_v2,
+    400,
+    error_example("Both 'latitude' and 'longitude' parameters are required."),
+    "Bad Request - Invalid latitude/longitude input.",
+)
+_set_json_example(
+    admin_by_latlon_schema_v2,
+    404,
+    error_example("Latitude and longitude is not in SOI boundary."),
+    "Not Found - Latitude and longitude is not in SOI boundary.",
+)
+admin_by_latlon_schema_v2["operation_summary"] = "Retrieve admin details"
+admin_by_latlon_schema_v2["operation_description"] = """
+Retrieves the ``State``, ``District``, and ``Tehsil`` for a WGS84 point.
+
+Use these exact strings on every other dataset route. Confirm the tehsil
+appears in List active locations first. If it does not, request it with the
+[Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
+
+**Returns**
+``{status, error_message, data}`` with ``admin_details`` and ``admin_field_hints``.
+
+**Related**
+List active locations · Retrieve a micro-watershed ID
+"""
+mws_by_latlon_schema_v2 = v2_schema_from(
+    mws_by_latlon_schema,
+    "get_mwsid_by_latlon_v2",
+    "get_mwsid_by_latlon/",
+)
+_set_json_example(
+    mws_by_latlon_schema_v2,
+    200,
+    success_example(MWS_LATLON_V2_EXAMPLE),
+    "Success - MWS id and admin details in the v2 envelope",
+)
+mws_by_latlon_schema_v2["operation_summary"] = "Retrieve a micro-watershed ID"
+mws_by_latlon_schema_v2["operation_description"] = """
+Retrieves the micro-watershed that contains a WGS84 point.
+
+Use ``uid`` as ``mws_id`` on other v2 dataset routes.
+
+**Returns**
+``{status, error_message, data}`` with ``mws_details`` and ``mws_field_hints``.
+
+**Related**
+Retrieve admin details · Retrieve MWS time series
+"""
+tehsil_data_schema_v2 = v2_schema_from(
+    tehsil_data_schema,
+    "get_tehsil_data_v2",
+    "get_tehsil_data/",
+)
+tehsil_data_schema_v2["operation_summary"] = "List tehsil datasets"
+tehsil_data_schema_v2["operation_description"] = f"""
+Lists analytical sheets for a tehsil: drought, hydrology, LULC, NREGA, and others.
+
+Filter with ``data=all`` (default) or sheet names:
+``data=drought,stream_order``.
+
+**Returns**
+``{{status, error_message, data}}`` with ``tehsil_data`` and ``tehsil_units``.
+
+**Related**
+List active locations · Retrieve KYL indicators
+
+{tehsil_data_type_help_markdown()}
+"""
+tehsil_data_schema_v2["manual_parameters"] = list(
+    tehsil_data_schema_v2["manual_parameters"]
+) + [tehsil_data_filter_param]
+_set_json_example(
+    tehsil_data_schema_v2,
+    200,
+    success_example(TEHSIL_V2_EXAMPLE),
+    "Success - tehsil sheets in the v2 envelope",
+)
+kyl_indicators_schema_v2 = v2_schema_from(
+    kyl_indicators_schema,
+    "get_mws_kyl_indicators_v2",
+    "get_mws_kyl_indicators/",
+)
+kyl_indicators_schema_v2["operation_summary"] = "Retrieve KYL indicators"
+kyl_indicators_schema_v2["operation_description"] = """
+Retrieves a single-row KYL snapshot for one micro-watershed.
+
+This is a flat table, not a time series.
+
+**Returns**
+``{status, error_message, data}`` with ``indicators`` and ``indicator_units``
+(mm, ha, count, and similar).
+
+**Related**
+Retrieve MWS time series · List tehsil datasets
+"""
+_set_json_example(
+    kyl_indicators_schema_v2,
+    200,
+    success_example(KYL_V2_EXAMPLE),
+    "Success - KYL indicators in the v2 envelope",
+)
+generated_layer_urls_schema_v2 = v2_schema_from(
+    generated_layer_urls_schema,
+    "get_generated_layer_urls_v2",
+    "get_generated_layer_urls/",
+)
+generated_layer_urls_schema_v2["operation_summary"] = "List generated layers"
+generated_layer_urls_schema_v2["operation_description"] = """
+Lists every generated dataset layer for a tehsil.
+
+Each record includes a GeoServer ``layer_url`` (WFS for vectors, WCS for
+rasters). Open that URL in QGIS or any WFS/WCS client.
+
+**Returns**
+``{status, error_message, data}`` with ``layers`` and ``layer_field_units``.
+
+**Related**
+List active locations · List MWS geometries
+"""
+_set_json_example(
+    generated_layer_urls_schema_v2,
+    200,
+    success_example(LAYER_V2_EXAMPLE),
+    "Success - generated layer URLs in the v2 envelope",
+)
+mws_report_urls_schema_v2 = v2_schema_from(
+    mws_report_urls_schema,
+    "get_mws_report_urls_v2",
+    "get_mws_report/",
+)
+mws_report_urls_schema_v2["operation_summary"] = "Retrieve an MWS report"
+mws_report_urls_schema_v2["operation_description"] = """
+Retrieves the URL for a micro-watershed PDF/HTML report.
+
+The stats file and MWS layer must already exist.
+
+**Returns**
+``{status, error_message, data}`` with ``report.Mws_report_url`` and
+``report_field_hints``.
+
+**Related**
+Retrieve a micro-watershed ID · Retrieve KYL indicators
+"""
+_set_json_example(
+    mws_report_urls_schema_v2,
+    200,
+    success_example(REPORT_V2_EXAMPLE),
+    "Success - MWS report URL in the v2 envelope",
+)
+mws_geometries_schema_v2 = v2_schema_from(
+    mws_geometries_schema,
+    "get_mws_geometries_v2",
+    "get_mws_geometries/",
+)
+mws_geometries_schema_v2["operation_summary"] = "List MWS geometries"
+mws_geometries_schema_v2["operation_description"] = """
+Lists micro-watershed polygons for a tehsil.
+
+Omit ``mws_id`` for every MWS; pass ``mws_id`` for one feature.
+
+**Returns**
+``{status, error_message, data}``. Without ``mws_id``, ``data`` is a
+FeatureCollection. With ``mws_id``, ``data`` has ``mws_geometry``.
+Save ``data`` to open it in QGIS.
+
+**Related**
+Retrieve a micro-watershed ID · List village geometries
+"""
+_set_json_example(
+    mws_geometries_schema_v2,
+    200,
+    success_example(MWS_FC_EXAMPLE),
+    "Success - MWS FeatureCollection in the v2 envelope",
+)
+village_geometries_schema_v2 = v2_schema_from(
+    village_geometries_schema,
+    "get_village_geometries_v2",
+    "get_village_geometries/",
+)
+village_geometries_schema_v2["operation_summary"] = "List village geometries"
+village_geometries_schema_v2["operation_description"] = """
+Lists village / panchayat polygons for a tehsil.
+
+Optional ``village_id`` keeps a single feature.
+
+**Returns**
+``{status, error_message, data}``. ``data`` is a FeatureCollection.
+Save ``data`` to open it in QGIS.
+
+**Related**
+List MWS geometries · List active locations
+"""
+_set_json_example(
+    village_geometries_schema_v2,
+    200,
+    success_example(VILLAGE_FC_EXAMPLE),
+    "Success - village FeatureCollection in the v2 envelope",
+)
+generate_active_locations_schema_v2 = v2_schema_from(
+    generate_active_locations_schema,
+    "get_active_locations_v2",
+    "get_active_locations/",
+)
+generate_active_locations_schema_v2["operation_summary"] = "List active locations"
+generate_active_locations_schema_v2["operation_description"] = """
+Lists tehsils where the full Core Stack dataset is already available.
+
+Each tehsil is computed on Google Earth Engine on partner request.
+Filter with optional ``state``, ``district``, and ``tehsil`` (alias ``block``).
+
+To request a new location, submit the
+[Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
+
+**Returns**
+``{status, error_message, data}`` with ``locations`` and ``location_field_hints``.
+
+**Related**
+Retrieve admin details · List tehsil datasets
+"""
+generate_active_locations_schema_v2["manual_parameters"] = list(
+    generate_active_locations_schema_v2["manual_parameters"]
+) + [
+    active_locations_state_filter_param,
+    active_locations_district_filter_param,
+    active_locations_tehsil_filter_param,
+    active_locations_block_filter_param,
+]
+_set_json_example(
+    generate_active_locations_schema_v2,
+    200,
+    success_example(ACTIVE_LOCATIONS_V2_EXAMPLE),
+    "Success - activated locations in the v2 envelope",
+)
+_set_json_example(
+    generate_active_locations_schema_v2,
+    500,
+    error_example(
+        "Internal server error while generating active locations",
+        details="Error message details",
+    ),
+    "Internal Server Error",
+)

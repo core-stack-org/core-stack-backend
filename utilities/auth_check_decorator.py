@@ -1,7 +1,6 @@
 from functools import wraps
 from django.http import JsonResponse
 from rest_framework import status
-from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
@@ -15,6 +14,7 @@ from django.contrib.auth import get_user_model
 from geoadmin.models import UserAPIKey
 from rest_framework.decorators import api_view as drf_api_view
 from rest_framework.schemas import AutoSchema
+from utilities.renderers import RoundedJSONRenderer
 
 User = get_user_model()
 
@@ -102,7 +102,7 @@ def api_security_check(auth_type="JWT", allowed_methods="GET", required_headers=
 
                 if isinstance(result, Response):
                     if not hasattr(result, 'accepted_renderer') or result.accepted_renderer is None:
-                        result.accepted_renderer = JSONRenderer()
+                        result.accepted_renderer = RoundedJSONRenderer()
                         result.accepted_media_type = "application/json"
                         result.renderer_context = {}
                     return result
@@ -129,7 +129,7 @@ def api_security_check(auth_type="JWT", allowed_methods="GET", required_headers=
 def create_drf_response(data, status_code=status.HTTP_200_OK):
     """Helper function to create properly configured DRF Response"""
     response = Response(data, status=status_code)
-    response.accepted_renderer = JSONRenderer()
+    response.accepted_renderer = RoundedJSONRenderer()
     response.accepted_media_type = "application/json"
     response.renderer_context = {}
     return response

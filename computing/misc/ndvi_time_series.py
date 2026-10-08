@@ -17,7 +17,7 @@ from computing.utils import (
     create_chunk,
     merge_chunks,
 )
-from utilities.constants import GEE_PATHS
+from utilities.constants import GEE_PATHS, PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -384,17 +384,20 @@ def _generate_ndvi(
     task_id = None
     if not is_gee_asset_exists(ndvi_asset_id):
 
+        # lulc = ee.Image(
+        #     get_gee_dir_path(
+        #         asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        #     )
+        #     + asset_suffix
+        #     + "_"
+        #     + str(f_start_date.year)
+        #     + "-07-01_"
+        #     + str(f_start_date.year + 1)
+        #     + "-06-30_LULCmap_10m"
+        # )
         lulc = ee.Image(
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
-            )
-            + asset_suffix
-            + "_"
-            + str(f_start_date.year)
-            + "-07-01_"
-            + str(f_start_date.year + 1)
-            + "-06-30_LULCmap_10m"
-        )
+            f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{f_start_date.year}_{str(f_start_date.year + 1)}"
+        ).clip(roi.geometry())
         crop_mask = lulc.remap([8, 9, 10, 11], [1, 1, 1, 1], 0)
         tree_mask = lulc.eq(6)
         shrub_mask = lulc.eq(12)

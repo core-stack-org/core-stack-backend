@@ -6,6 +6,13 @@ Please find [full CoRE-Stack documentation](https://docs.core-stack.org/) and de
 
 ### Installation
 
+#### Docker
+
+Runs the whole stack without installing Conda, PostgreSQL, Redis or GeoServer
+on the host. Follow **[installation/DOCKER.md](installation/DOCKER.md)**.
+
+#### Native installer
+
 We provide a single installation script that handles everything (**on a linux environment, if you are using Windows, you may need to install ```wsl``` first**).
 - Installs **Miniconda** and sets up the Python environment
 - Installs & configures **PostgreSQL**
@@ -49,6 +56,32 @@ After the successfull installation of all the packages, run the following comman
 conda activate corestack-backend (or whatever is the name of your virtual environment)
 python manage.py runserver
 ```
+
+#### Download base layers
+
+After installation, download the local base layers into `data/` before running local compute pipelines:
+
+```bash
+conda activate corestack-backend
+python manage.py local_compute_layer_setup
+```
+
+To inspect available layer selectors:
+
+```bash
+python manage.py local_compute_layer_setup --list
+```
+
+To download only specific layers or groups:
+
+```bash
+python manage.py local_compute_layer_setup terrain mws lulc_v3
+python manage.py local_compute_layer_setup static_layers
+python manage.py local_compute_layer_setup tehsil_level
+python manage.py local_compute_layer_setup --ensure-soi-tehsil 
+python manage.py local_compute_layer_setup --ensure-tehsil-watersheds
+```
+
 - **Running celery:**
 If you are running some tasks, you need to run 
 ```bash

@@ -8,6 +8,9 @@ from rest_framework.decorators import api_view, schema
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from drf_yasg.utils import swagger_auto_schema
+
+from public_api.swagger_schemas import generate_api_key_schema
 from utilities.auth_check_decorator import api_security_check
 from utilities.auth_utils import auth_free
 
@@ -206,8 +209,8 @@ def activate_location(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@swagger_auto_schema(**generate_api_key_schema)
 @api_security_check(allowed_methods="POST")
-@schema(None)
 def generate_api_key(request):
     """
     Single API for generating and deactivating API keys

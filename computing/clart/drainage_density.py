@@ -13,7 +13,11 @@ from utilities.gee_utils import (
     get_geojson_from_gcs,
     make_asset_public,
 )
-from utilities.constants import DRAINAGE_DENSITY_OUTPUT, CRS_4326
+from utilities.constants import (
+    DRAINAGE_DENSITY_OUTPUT,
+    CRS_4326,
+    PAN_INDIA_DRAINAGE_LINES_DATASET,
+)
 from nrm_app.celery import app
 from .rasterize_vector import rasterize_vector
 from computing.utils import save_layer_info_to_db
@@ -76,14 +80,15 @@ def drainage_density(self, state, district, block):
 
 
 def generate_vector(state, district, block):
-    mws = ee.FeatureCollection(
+    mws_fc = ee.FeatureCollection(
         get_gee_asset_path(state, district, block)
         + "filtered_mws_"
         + valid_gee_text(district.lower())
         + "_"
         + valid_gee_text(block.lower())
         + "_uid"
-    ).getInfo()
+    )
+    mws = mws_fc.getInfo()
 
     if isinstance(mws, str):
         mws = json.loads(mws)
@@ -92,9 +97,8 @@ def generate_vector(state, district, block):
     watersheds.set_crs(CRS_4326, inplace=True)
 
     drainage_lines = ee.FeatureCollection(
-        get_gee_asset_path(state, district, block)
-        + f"drainage_lines_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-    )
+        PAN_INDIA_DRAINAGE_LINES_DATASET
+    ).filterBounds(mws_fc.geometry())
 
     try:
         drainage_lines = drainage_lines.getInfo()

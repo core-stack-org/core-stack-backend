@@ -1,0 +1,298 @@
+--- !Algorithm_Instance
+type: Aquifer_Vector
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/aquifer_vector/
+
+
+--- !Algorithm_Instance
+type: Livestock
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_livestocks/
+
+
+--- !Algorithm_Instance
+type: Antyodaya
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_antyodaya/
+
+
+--- !Algorithm_Instance
+type: Drainage_Density
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_density_vector/
+
+
+--- !Algorithm_Instance
+type: River
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_river_data/
+
+
+--- !Algorithm_Instance
+type: Canal
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_canal_vector/
+
+
+--- !Algorithm_Instance
+type: Digital_Elevation_Model
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_dem_raster_vector/
+
+
+--- !Algorithm_Instance
+type: Facilities_Proximity
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_facilities_proximity/
+
+
+--- !Algorithm_Instance
+type: Drainage_Lines
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_drainage_layer/
+
+
+--- !Algorithm_Instance
+type: Restoration_Opportunity
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/restoration_opportunity/
+
+
+--- !Algorithm_Instance
+type: SOGE_Vector
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/soge_vector/
+
+
+--- !Algorithm_Instance
+type: LCW_Conflict
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_lcw/
+
+
+--- !Algorithm_Instance
+type: Agro_Ecological
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_agroecological/
+
+
+--- !Algorithm_Instance
+type: Factory_CSR
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_factory_csr/
+
+
+--- !Algorithm_Instance
+type: Green_Credit
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_green_credit/
+
+
+--- !Algorithm_Instance
+type: Mining
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_mining/
+
+
+--- !Algorithm_Instance
+type: Natural_Depression
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_natural_depression/
+
+
+--- !Algorithm_Instance
+type: Dist_to_Drainage
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_distance_nearest_DL/
+
+
+--- !Algorithm_Instance
+type: Catchment_Area
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_catchment_area_singleflow/
+
+
+--- !Algorithm_Instance
+type: Slope_Percentage
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_slope_percentage/
+
+
+--- !Algorithm_Instance
+type: MWS_Connectivity
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_mws_connectivity_data/
+
+
+--- !Algorithm_Instance
+type: MWS_Centroid
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/generate_mws_centroid/
+
+
+--- !Algorithm_Instance
+type: Soil_Type
+version: '1'
+assets:
+  code: https://github.com/core-stack-org/core-stack-backend/tree/corestack-lite
+date: 2026-09-09 00:00:00
+execution_modes:
+  api:
+    enabled: true
+    priority: 1
+    url: http://core-stack:8000/api/v1/soil_type/
+

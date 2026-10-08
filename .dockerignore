@@ -1,0 +1,27 @@
+.git
+.gitignore
+.env*
+**/.env*
+data/
+backups/
+gee_confs/
+**/.pyc
+**/__pycache__
+**/*.pyo
+.installation_state
+IITD_setup_scripts
+zoi_fix
+ubuntu@geoserver.core-stack.org
+*.7z
+*.zip
+docs/**/*.pdf
+static
+logs
+tmp
+.venv
+miniconda.sh
+# Written at runtime into the mounted checkout; not part of the image.
+*/migrations/*.py
+!*/migrations/__init__.py
+bot_interface/whatsapp_media
+cufile.log
