@@ -257,7 +257,7 @@ from .views import (
 from .zoi_layers.zoi import generate_zoi
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
-from .misc.facilities_proximity import generate_facilities_proximity_task
+from .misc.facilities.pipeline import generate_facilities_proximity_task
 from .misc.antyodaya import generate_antyodaya_layer_task
 from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
