@@ -56,16 +56,16 @@ class TerrainProperties(typing.TypedDict):
     slopy_area: float
     terrainClusters: int
 
-    @staticmethod
-    def dummy():
-        return {
-            "plain_area": 0.0,
-            "valley_area": 0.0,
-            "hill_slopes_area": 0.0,
-            "ridge_area": 0.0,
-            "slopy_area": 0.0,
-            "terrainClusters": -1,
-        }
+
+def dummy_terrain_props() -> TerrainProperties:
+    return {
+        "plain_area": 0.0,
+        "valley_area": 0.0,
+        "hill_slopes_area": 0.0,
+        "ridge_area": 0.0,
+        "slopy_area": 0.0,
+        "terrainClusters": -1,
+    }
 
 
 def _slug(value, fallback):
@@ -957,18 +957,18 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
         for index, row in enumerate(working_gdf.itertuples(index=False), start=1):
             geom = row.geometry
             if geom is None or geom.is_empty:
-                computed_rows.append(TerrainProperties.dummy())
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             try:
                 clipped, _ = mask(src, [mapping(geom)], crop=True, filled=True)
             except ValueError:
-                computed_rows.append(TerrainProperties.dummy())
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             values = clipped[0]
             if values.size == 0:
-                computed_rows.append(TerrainProperties.dummy())
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             values = np.rint(values).astype(np.int16, copy=False)
