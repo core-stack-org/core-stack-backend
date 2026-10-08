@@ -24,8 +24,10 @@ Water stress methodology (aligned with Shuvam Chakraborty / ET Applications):
 Missing data protocol (mirrors Shuvam's divide_where_valid approach):
     - Pixel-level : MAI = NaN if AET is NaN, PET is NaN, or PET = 0
     - Farm-level  : column = NaN if the farm has zero valid pixels for that band
-    - Annual MAI  : mean of all valid monthly MAI values (NaN months excluded)
-    - No imputation is performed on missing farms or missing months.
+    - Annual MAI  : annual AET / annual PET (raster band 13 = agri-year value,
+                    Jul Y -> Jun Y+1), capped to [0, 1]
+    - No imputation is performed on missing farms or missing months; the
+      rasters are already gap-filled when generated.
 
 Crop columns (crop1/conf1, crop2/conf2, crop3/conf3):
     farms/static.parquet does NOT carry monitoring_prediction, so it is
@@ -50,9 +52,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import rasterio
-import rasterio.features
 import rasterio.merge
-import rasterio.windows
 from shapely.geometry import box
 
 from utilities.constants import (
@@ -572,62 +572,6 @@ def _extract_farm_zonal_means(band_stack, geom, transform):
     return _weighted_band_means(band_stack, weighted_pixels, num_bands)
 
 
-# ── temporal gap-filling ───────────────────────────────────────────────────────
-# Mirrors Shuvam Chakraborty's fill_monthly_collection() in ET_Applications/helper.py.
-# Crop year: July (agri-month 1) → June (agri-month 12).
-# Rules:
-#   July  (agri_month 1)  → neighbour: August only  (no backward crossing crop-year start)
-#   June  (agri_month 12) → neighbour: May only     (no forward crossing crop-year end)
-#   All others            → previous and next calendar month (±1 month)
-# NaN farm-months with no valid neighbour remain NaN.
-
-# Calendar-month index (0=Jan … 11=Dec) → list of neighbour indices
-_GAP_FILL_NEIGHBOURS: dict = {
-    0:  [11, 1],   # Jan: Dec, Feb
-    1:  [0,  2],   # Feb: Jan, Mar
-    2:  [1,  3],   # Mar: Feb, Apr
-    3:  [2,  4],   # Apr: Mar, May
-    4:  [3,  5],   # May: Apr, Jun
-    5:  [4],       # Jun: May only  (crop-year end  — no forward crossing)
-    6:  [7],       # Jul: Aug only  (crop-year start — no backward crossing)
-    7:  [6,  8],   # Aug: Jul, Sep
-    8:  [7,  9],   # Sep: Aug, Oct
-    9:  [8, 10],   # Oct: Sep, Nov
-    10: [9, 11],   # Nov: Oct, Dec
-    11: [10, 0],   # Dec: Nov, Jan
-}
-
-
-def _gap_fill_monthly_farms(monthly_matrix: np.ndarray) -> np.ndarray:
-    """
-    Gap-fill a (n_farms × 12) monthly matrix following Shuvam's crop-year rules.
-
-    Parameters
-    ----------
-    monthly_matrix : np.ndarray, shape (n_farms, 12)
-        Columns are calendar months Jan–Dec (indices 0–11).
-        NaN = missing / nodata.
-
-    Returns
-    -------
-    filled : np.ndarray, same shape.
-        NaN cells replaced with the nanmean of valid neighbours.
-        Cells with no valid neighbour remain NaN.
-    """
-    filled = monthly_matrix.copy()
-
-    for m, neighbours in _GAP_FILL_NEIGHBOURS.items():
-        missing = np.isnan(filled[:, m])
-        if not missing.any():
-            continue
-        neighbour_vals = np.stack([filled[:, n] for n in neighbours], axis=1)
-        fill_vals      = np.nanmean(neighbour_vals, axis=1)
-        can_fill       = missing & np.isfinite(fill_vals)
-        filled[can_fill, m] = fill_vals[can_fill]
-
-    return filled
-
-
 def _extract_all_farms(gdf, band_data, transform, label):
     """
     Loop over every farm polygon and compute its area-weighted per-band
@@ -656,7 +600,7 @@ def _extract_all_farms(gdf, band_data, transform, label):
     return means
 
 
-def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=None):
+def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform):
     """
     Compute per-farm monthly AET, PET, MAI from pre-loaded raster arrays.
     Adds wide-format columns (aet_jan..aet_dec, pet_jan..pet_dec, mai_jan..mai_dec,
@@ -679,14 +623,6 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=
         col = f"aet_{_MONTH_NUM_TO_NAME[cal_month]}"
         gdf[col] = np.round(aet_means[:, band_idx], 4)
 
-    # ── Temporal gap-fill AET — matrix in calendar order (jan=col0..dec=col11) ──
-    aet_matrix  = gdf[aet_monthly_cols].values.astype("float64")
-    aet_filled  = _gap_fill_monthly_farms(aet_matrix)
-    n_filled_aet = int(np.sum(np.isnan(aet_matrix) & np.isfinite(aet_filled)))
-    logger.info("Gap-fill AET: filled %d farm-month NaN values.", n_filled_aet)
-    for i, col in enumerate(aet_monthly_cols):
-        gdf[col] = np.round(aet_filled[:, i], 4)
-
     if num_aet_bands >= 13:
         gdf["aet_annual"] = np.round(aet_means[:, 12], 4)
     else:
@@ -694,78 +630,77 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data=None, pet_transform=
 
     # PET monthly
     pet_monthly_cols = [f"pet_{m}" for m in MONTH_NAMES]
-    if pet_data is not None:
-        logger.info("Extracting PET for %d farms via geometric intersection...", num_farms)
-        pet_means = _extract_all_farms(gdf, pet_data, pet_transform, label="PET")
+    logger.info("Extracting PET for %d farms via geometric intersection...", num_farms)
+    pet_means = _extract_all_farms(gdf, pet_data, pet_transform, label="PET")
 
-        num_pet_bands = pet_data.shape[0]
-        for band_idx in range(min(num_pet_bands, 12)):
-            cal_month = CROP_YEAR_BAND_TO_MONTH[band_idx]
-            col = f"pet_{_MONTH_NUM_TO_NAME[cal_month]}"
-            gdf[col] = np.round(pet_means[:, band_idx], 4)
+    num_pet_bands = pet_data.shape[0]
+    for band_idx in range(min(num_pet_bands, 12)):
+        cal_month = CROP_YEAR_BAND_TO_MONTH[band_idx]
+        col = f"pet_{_MONTH_NUM_TO_NAME[cal_month]}"
+        gdf[col] = np.round(pet_means[:, band_idx], 4)
 
-        # ── Temporal gap-fill PET ─────────────────────────────────────────────
-        pet_matrix  = gdf[pet_monthly_cols].values.astype("float64")
-        pet_filled  = _gap_fill_monthly_farms(pet_matrix)
-        n_filled_pet = int(np.sum(np.isnan(pet_matrix) & np.isfinite(pet_filled)))
-        logger.info("Gap-fill PET: filled %d farm-month NaN values.", n_filled_pet)
-        for i, col in enumerate(pet_monthly_cols):
-            gdf[col] = np.round(pet_filled[:, i], 4)
-
-        if num_pet_bands >= 13:
-            gdf["pet_annual"] = np.round(pet_means[:, 12], 4)
-        else:
-            gdf["pet_annual"] = gdf[pet_monthly_cols].mean(axis=1).round(4)
+    if num_pet_bands >= 13:
+        gdf["pet_annual"] = np.round(pet_means[:, 12], 4)
+    else:
+        gdf["pet_annual"] = gdf[pet_monthly_cols].mean(axis=1).round(4)
 
     # MAI + water stress
-    if len(pet_monthly_cols) == 12:
-        mai_monthly_cols = []
-        for month in MONTH_NAMES:
-            col = f"mai_{month}"
-            aet_vals = gdf[f"aet_{month}"].values
-            pet_vals = gdf[f"pet_{month}"].values
-            with np.errstate(invalid="ignore", divide="ignore"):
-                v = aet_vals / pet_vals
-            # MAI is physically bounded to [0, 1]: AET cannot exceed PET.
-            # Values > 1 indicate raster misalignment or model artifacts → cap at 1.
-            n_invalid = int(np.sum(np.isfinite(v) & (v > 1)))
-            if n_invalid > 0:
-                logger.warning(
-                    "MAI[%s]: %d farms have MAI > 1 (raster artifact) — capped at 1.0",
-                    month, n_invalid,
-                )
-            # Set to NaN where not finite, cap valid values to [0, 1]
-            v = np.where(np.isfinite(v), np.clip(v, 0.0, 1.0), np.nan)
-            gdf[col] = np.round(v, 4)
-            mai_monthly_cols.append(col)
+    mai_monthly_cols = []
+    for month in MONTH_NAMES:
+        col = f"mai_{month}"
+        aet_vals = gdf[f"aet_{month}"].values
+        pet_vals = gdf[f"pet_{month}"].values
+        with np.errstate(invalid="ignore", divide="ignore"):
+            v = aet_vals / pet_vals
+        # MAI is physically bounded to [0, 1]: AET cannot exceed PET.
+        # Values > 1 indicate raster misalignment or model artifacts → cap at 1.
+        n_invalid = int(np.sum(np.isfinite(v) & (v > 1)))
+        if n_invalid > 0:
+            logger.warning(
+                "MAI[%s]: %d farms have MAI > 1 (raster artifact) — capped at 1.0",
+                month, n_invalid,
+            )
+        # Set to NaN where not finite, cap valid values to [0, 1]
+        v = np.where(np.isfinite(v), np.clip(v, 0.0, 1.0), np.nan)
+        gdf[col] = np.round(v, 4)
+        mai_monthly_cols.append(col)
 
-        gdf["mai_annual"] = gdf[mai_monthly_cols].mean(axis=1).round(4)
-
-        kharif_cols = [f"mai_{m}" for m in KHARIF_MONTH_NAMES]
-        kharif_df   = gdf[kharif_cols]
-        gdf["kharif_mai"] = kharif_df.mean(axis=1).round(4)
-
-        # Moderate stress: any kharif month with MAI <= 0.50
-        gdf["kharif_water_stress"] = (
-            (kharif_df <= MAI_MODERATE_THRESHOLD) & kharif_df.notna()
-        ).any(axis=1)
-
-        # Severe stress: any kharif month with MAI <= 0.25
-        gdf["kharif_severe_stress"] = (
-            (kharif_df <= MAI_SEVERE_THRESHOLD) & kharif_df.notna()
-        ).any(axis=1)
-
-        n_nan   = int(gdf["mai_annual"].isna().sum())
-        n_valid = int(gdf["mai_annual"].notna().sum())
-        logger.info(
-            "MAI complete: avg_annual=%.4f | kharif_stress=%d | severe=%d | nan_farms=%d | valid_farms=%d",
-            gdf["mai_annual"].mean() if n_valid > 0 else float("nan"),
-            int(gdf["kharif_water_stress"].sum()),
-            int(gdf["kharif_severe_stress"].sum()),
-            n_nan, n_valid,
+    # mai_annual: agri-year (Jul Y -> Jun Y+1) MAI from the raster's band-13
+    # annual AET and PET, not the mean of the monthly MAIs. Same [0, 1] cap.
+    with np.errstate(invalid="ignore", divide="ignore"):
+        v = gdf["aet_annual"].values / gdf["pet_annual"].values
+    n_invalid = int(np.sum(np.isfinite(v) & (v > 1)))
+    if n_invalid > 0:
+        logger.warning(
+            "MAI[annual]: %d farms have MAI > 1 (raster artifact) — capped at 1.0",
+            n_invalid,
         )
-    else:
-        logger.warning("PET not available — MAI not computed.")
+    v = np.where(np.isfinite(v), np.clip(v, 0.0, 1.0), np.nan)
+    gdf["mai_annual"] = np.round(v, 4)
+
+    kharif_cols = [f"mai_{m}" for m in KHARIF_MONTH_NAMES]
+    kharif_df   = gdf[kharif_cols]
+    gdf["kharif_mai"] = kharif_df.mean(axis=1).round(4)
+
+    # Moderate stress: any kharif month with MAI <= 0.50
+    gdf["kharif_water_stress"] = (
+        (kharif_df <= MAI_MODERATE_THRESHOLD) & kharif_df.notna()
+    ).any(axis=1)
+
+    # Severe stress: any kharif month with MAI <= 0.25
+    gdf["kharif_severe_stress"] = (
+        (kharif_df <= MAI_SEVERE_THRESHOLD) & kharif_df.notna()
+    ).any(axis=1)
+
+    n_nan   = int(gdf["mai_annual"].isna().sum())
+    n_valid = int(gdf["mai_annual"].notna().sum())
+    logger.info(
+        "MAI complete: avg_annual=%.4f | kharif_stress=%d | severe=%d | nan_farms=%d | valid_farms=%d",
+        gdf["mai_annual"].mean() if n_valid > 0 else float("nan"),
+        int(gdf["kharif_water_stress"].sum()),
+        int(gdf["kharif_severe_stress"].sum()),
+        n_nan, n_valid,
+    )
 
     return gdf
 
@@ -1351,17 +1286,15 @@ def intersect_et_with_farms(
     aet_data, aet_transform = _read_raster_clipped(aet_paths, bbox)
     logger.info("AET loaded: %d bands, shape=%s", aet_data.shape[0], aet_data.shape[1:])
 
-    # 3. Load local PET raster(s) (optional)
-    pet_data, pet_transform = None, None
+    # 3. Load local PET raster(s)
     pet_paths = [_local_pet_path(z, year) for z in aez_zones]
-    if any(os.path.exists(p) for p in pet_paths):
-        logger.info("Reading local PET raster(s): %s", pet_paths)
-        pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
-        logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
-    else:
-        logger.warning(
-            "No local PET raster found for zones %s — MAI will not be computed.", aez_zones
+    if not any(os.path.exists(p) for p in pet_paths):
+        raise FileNotFoundError(
+            f"No local PET raster found for zones {aez_zones}: {pet_paths}"
         )
+    logger.info("Reading local PET raster(s): %s", pet_paths)
+    pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
+    logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
 
     # 4. Zonal statistics
     gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
@@ -1448,27 +1381,19 @@ def compute_multi_year_water_stress(
         aet_paths = [_local_aet_path(z, year) for z in aez_zones]
         pet_paths = [_local_pet_path(z, year) for z in aez_zones]
 
-        if not any(os.path.exists(p) for p in aet_paths):
-            logger.warning("AET raster(s) missing for year %d (zones %s) — skipping.", year, aez_zones)
+        if not any(os.path.exists(p) for p in aet_paths) or not any(os.path.exists(p) for p in pet_paths):
+            logger.warning("AET/PET raster(s) missing for year %d (zones %s) — skipping.", year, aez_zones)
             continue
 
         try:
             aet_data, aet_transform = _read_raster_clipped(aet_paths, bbox)
-            pet_data, pet_transform = (
-                _read_raster_clipped(pet_paths, bbox)
-                if any(os.path.exists(p) for p in pet_paths)
-                else (None, None)
-            )
+            pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
         except Exception as exc:
             logger.warning("Year %d: raster read failed — %s", year, exc)
             continue
 
         year_gdf = base_gdf.copy()
         year_gdf = _run_zonal_stats(year_gdf, aet_data, aet_transform, pet_data, pet_transform)
-
-        if "kharif_water_stress" not in year_gdf.columns:
-            logger.warning("Year %d: MAI not computed (PET missing?). Skipping.", year)
-            continue
 
         # Save this year into annual + monthly parquets
         _save_annual_parquet(year_gdf, state, district, block, year)
