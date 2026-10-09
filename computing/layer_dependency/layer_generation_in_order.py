@@ -135,6 +135,9 @@ from computing.terrain_descriptor.terrain_compute_all_local import (
 from computing.terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as terrain_raster_local,
 )
+from computing.forest_fire.forest_fire_local_compute import (
+    generate_forest_fire_local,
+)
 from computing.forest_fringe.forest_fringe_local_compute import (
     generate_forest_fringe_local,
 )
@@ -325,6 +328,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_hydrology": generate_hydrology_local,
     "hydrology_fortnightly": generate_hydrology_local,
     "hydrology_annual": generate_hydrology_local,
+    "forest_fire": generate_forest_fire_local,
+    "generate_forest_fire": generate_forest_fire_local,
     "forest_fringe": generate_forest_fringe_local,
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
