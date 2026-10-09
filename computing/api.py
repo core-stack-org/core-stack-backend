@@ -267,6 +267,7 @@ from .STAC_specs.stac_collection import generate_stac_collection_task
 from .farm_boundaries.farm_boundary import build_farm_boundary_map
 from .forest_fire.forest_fire_local_compute import generate_forest_fire_local
 
+
 @api_security_check(allowed_methods="POST")
 @schema(None)
 def generate_farm_boundaries(request):
@@ -304,7 +305,10 @@ def generate_farm_boundaries(request):
         return Response({"Success": msg}, status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in generate_farm_boundaries api :: ", e)
-        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 logger = logging.getLogger(__name__)
 
@@ -521,7 +525,6 @@ def generate_mws_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 @api_security_check(allowed_methods="POST")
 @schema(None)
 @require_local_tehsil_boundaries()
@@ -661,9 +664,7 @@ def _ensure_local_hydrology_base_layers(start_year, end_year, is_annual):
 def _generate_pan_india_hydrology_base_layer(request, is_annual):
     compute = _get_compute_mode(request, default="local")
     if compute != "local":
-        raise ValueError(
-            "Pan-India hydrology generation supports compute='local' only"
-        )
+        raise ValueError("Pan-India hydrology generation supports compute='local' only")
     if _has_any_payload_field(request, PAN_INDIA_PAYLOAD_FIELDS):
         raise ValueError(
             "Do not pass pan_india to the Pan-India hydrology API; "
@@ -721,13 +722,18 @@ def generate_pan_india_fortnightly_hydrology(request):
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=False)
     except HeavyWorkerUnavailable as e:
-        logger.warning("Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api: %s", e)
+        logger.warning(
+            "Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api: %s",
+            e,
+        )
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        logger.warning("Invalid request in generate_pan_india_fortnightly_hydrology api: %s", e)
+        logger.warning(
+            "Invalid request in generate_pan_india_fortnightly_hydrology api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_pan_india_fortnightly_hydrology api")
@@ -744,13 +750,17 @@ def generate_pan_india_annual_hydrology(request):
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=True)
     except HeavyWorkerUnavailable as e:
-        logger.warning("Heavy worker unavailable in generate_pan_india_annual_hydrology api: %s", e)
+        logger.warning(
+            "Heavy worker unavailable in generate_pan_india_annual_hydrology api: %s", e
+        )
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        logger.warning("Invalid request in generate_pan_india_annual_hydrology api: %s", e)
+        logger.warning(
+            "Invalid request in generate_pan_india_annual_hydrology api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_pan_india_annual_hydrology api")
@@ -849,7 +859,6 @@ def et_download(request):
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 
 @api_view(["POST"])
@@ -1090,7 +1099,9 @@ def generate_ci_layer(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        logger.warning("Invalid request in generate_cropping_intensity_layer api: %s", e)
+        logger.warning(
+            "Invalid request in generate_cropping_intensity_layer api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_cropping_intensity_layer api")
@@ -2270,7 +2281,9 @@ def generate_distance_nearest_upstream_DL(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        logger.exception("Exception in generate_distance_nearest_upstream_DL_to_gee api")
+        logger.exception(
+            "Exception in generate_distance_nearest_upstream_DL_to_gee api"
+        )
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
