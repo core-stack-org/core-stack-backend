@@ -282,6 +282,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 and layer_name == f"ndvi_timeseries_{district}_{block}_crop"
             ):
                 crop_df = create_excel_for_ndvi(geojson_data, "crop_trend")
+            elif workspace == "forest_fire":
+                create_excel_for_forest_fire(geojson_data, writer)
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
@@ -306,6 +308,37 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                     del writer.sheets["ndvi_shrub"]
                 print("Deleted existing 'ndvi_shrub' sheet")
     return results
+
+
+def create_excel_for_forest_fire(geojson_data, writer):
+    print("inside forest fire excel generation")
+    try:
+        features = geojson_data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = ["id"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(
+            columns={
+                "uid": "UID",
+                "fire_count_per_year": "fire_count_per_year_in_FRP",
+                "fire_frp_max": "fire_frp_max_in_FRP",
+                "fire_frp_mean": "fire_frp_mean_in_FRP",
+            },
+            inplace=True,
+        )
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="forest_fire", index=False)
+        print("Excel file created for tree in grassland")
+    except Exception as e:
+        print("error while generating excel for forest fire")
 
 
 def create_excel_for_tree_in_grassland(geojson_data, writer):
