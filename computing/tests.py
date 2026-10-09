@@ -635,8 +635,11 @@ class BulkPipelineRegistryTests(SimpleTestCase):
                 pipeline,
             )
 
+    @patch("computing.local_compute_helper.prepare_local_tehsil_boundaries")
     @patch("computing.bulk_layer_generation.import_string")
-    def test_registered_pipeline_builds_standard_payload(self, import_string):
+    def test_registered_pipeline_builds_standard_payload(
+        self, import_string, _prepare_boundaries
+    ):
         runner = import_string.return_value
         location = {
             "state": "Jharkhand",
@@ -684,9 +687,10 @@ class BulkPipelineRegistryTests(SimpleTestCase):
             gee_account_id=None,
         )
 
+    @patch("computing.local_compute_helper.prepare_local_tehsil_boundaries")
     @patch("computing.bulk_layer_generation._task_registry")
     def test_existing_registry_pipeline_receives_supported_arguments(
-        self, task_registry
+        self, task_registry, _prepare_boundaries
     ):
         def lulc(
             state,

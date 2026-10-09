@@ -1,5 +1,4 @@
 from nrm_app.celery import app
-from computing.base_layer_setup import with_tehsil_watershed
 from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
 from computing.mws.mws import mws_layer
@@ -135,6 +134,9 @@ from computing.terrain_descriptor.terrain_compute_all_local import (
 )
 from computing.terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as terrain_raster_local,
+)
+from computing.forest_fire.forest_fire_local_compute import (
+    generate_forest_fire_local,
 )
 from computing.forest_fringe.forest_fringe_local_compute import (
     generate_forest_fringe_local,
@@ -326,6 +328,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_hydrology": generate_hydrology_local,
     "hydrology_fortnightly": generate_hydrology_local,
     "hydrology_annual": generate_hydrology_local,
+    "forest_fire": generate_forest_fire_local,
+    "generate_forest_fire": generate_forest_fire_local,
     "forest_fringe": generate_forest_fringe_local,
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
@@ -339,7 +343,6 @@ TASK_REGISTRIES = {
 
 
 @app.task(bind=True)
-@with_tehsil_watershed
 def layer_generate_map(
     self,
     state,
@@ -360,6 +363,20 @@ def layer_generate_map(
     compute = normalize_compute(compute)
     log_ctx = f"state={state}, district={district}, block={block}, map={map_order}, compute={compute}"
     status = {}
+
+    # Local runs: boundaries must exist locally and be on GeoServer before
+    # any layer in the map is generated.
+    if compute == "local":
+        from computing.local_compute_helper import (
+            TehsilBoundaryError,
+            prepare_local_tehsil_boundaries,
+        )
+
+        try:
+            prepare_local_tehsil_boundaries(state, district, block)
+        except TehsilBoundaryError as e:
+            logger.error(f"Boundary {e.stage} failed ({log_ctx}): {e}")
+            return f"{e.stage} failed for {district}_{block}: {e}"
 
     # checking:- is mws layer generated?
     try:

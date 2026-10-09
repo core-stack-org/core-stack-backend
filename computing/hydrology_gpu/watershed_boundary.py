@@ -107,7 +107,17 @@ def manifest_relative_output(root: Path, output_path: str) -> Path | None:
 
 
 def fallback_gpkg_path(root: Path, state: str, district: str, tehsil: str) -> Path:
-    return root / slugify(state) / slugify(district) / f"{slugify(tehsil)}.gpkg"
+    from computing.base_layer_setup import tehsil_mws_file_candidates
+
+    base = root / slugify(state) / slugify(district) / slugify(tehsil)
+    # tehsil_mws layout first, then the legacy flat {tehsil}.gpkg layout
+    candidates = tehsil_mws_file_candidates(
+        root, state, district, tehsil, (".gpkg", ".geojson")
+    ) + [base.with_suffix(".gpkg"), base.with_suffix(".geojson")]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return base.with_suffix(".gpkg")
 
 
 def find_tehsil_watershed(root: Path, state: str, district: str, tehsil: str) -> tuple[Path, dict]:
@@ -115,7 +125,12 @@ def find_tehsil_watershed(root: Path, state: str, district: str, tehsil: str) ->
     wanted_district = normalize_name(district)
     wanted_tehsil = normalize_name(tehsil)
 
-    for row in load_manifest(root):
+    try:
+        manifest_rows = load_manifest(root)
+    except FileNotFoundError:
+        manifest_rows = []  # e.g. tehsil_mws has no manifest; use file lookup
+
+    for row in manifest_rows:
         if normalize_name(row.get("state", "")) != wanted_state:
             continue
         if normalize_name(row.get("district", "")) != wanted_district:

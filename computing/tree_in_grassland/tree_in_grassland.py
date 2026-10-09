@@ -23,6 +23,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     make_asset_public,
     export_vector_asset_to_gee,
+    # export_raster_asset_to_gee,
 )
 from nrm_app.celery import app
 from .tree_in_grassland_utils import (
@@ -58,19 +59,19 @@ def tree_in_grassland_for_AEZ(aez_no, start_year=None, end_year=None, gee_accoun
 
 @app.task(bind=True)
 def generate_tree_in_grassland_layer(
-        self,
-        state=None,
-        district=None,
-        block=None,
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        start_year=None,
-        end_year=None,
-        gee_account_id=None,
-        app_type="MWS",
-        sync_to_db=True,
-        sync_to_geoserver=True,
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=None,
+    end_year=None,
+    gee_account_id=None,
+    app_type="MWS",
+    sync_to_db=True,
+    sync_to_geoserver=True,
 ):
     """
     Generate tree-in-grassland context metrics as a vector layer.
@@ -113,7 +114,7 @@ def generate_tree_in_grassland_layer(
 
     if state and district and block:
         asset_suffix = (
-                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -168,6 +169,14 @@ def generate_tree_in_grassland_layer(
             """Grassland area, tree loss, and degradation metrics."""
             aoi = f.geometry()
 
+            def area(mask):
+                area_in_m2 = (
+                    pixel_area.updateMask(mask)
+                    .reduceRegion(ee.Reducer.sum(), aoi, SCALE, maxPixels=MAXPIX)
+                    .get("area")
+                )
+                return ee.Number(area_in_m2).multiply(0.0001)
+
             lulc_start = (
                 ee.ImageCollection([lulc_by_year[y] for y in start_years])
                 .reduce(ee.Reducer.mode())
@@ -185,43 +194,35 @@ def generate_tree_in_grassland_layer(
 
             grassland_mask = (context_start.eq(1)).Or(context_start.eq(2))
 
-            tree_loss = grassland_mask.And(context_end.eq(0))
-            tree_to_barren = grassland_mask.And(lulc_end.eq(7))
+            tree_in_shrubs = context_start.eq(1)
 
-            to_built = grassland_mask.And(lulc_end.eq(1))
-            to_kharif = grassland_mask.And(lulc_end.eq(2))
-            to_kharif_rabi = grassland_mask.And(lulc_end.eq(3))
+            tree_loss = tree_in_shrubs.And(context_end.eq(0))
+            tree_to_barren = tree_loss.And(lulc_end.eq(7))
 
-            to_zaid = grassland_mask.And(lulc_end.eq(4))
-            to_crops = grassland_mask.And(
+            to_built = tree_loss.And(lulc_end.eq(1))
+            to_kharif = tree_loss.And(lulc_end.eq(2))
+            to_kharif_rabi = tree_loss.And(lulc_end.eq(3))
+
+            to_zaid = tree_loss.And(lulc_end.eq(4))
+            to_crops = tree_loss.And(
                 lulc_end.eq(5)
                 .Or(lulc_end.eq(8))
                 .Or(lulc_end.eq(9))
                 .Or(lulc_end.eq(10))
                 .Or(lulc_end.eq(11))
             )
-
-            def area(mask):
-                area_in_m2 = (
-                    pixel_area.updateMask(mask)
-                    .reduceRegion(ee.Reducer.sum(), aoi, SCALE, maxPixels=MAXPIX)
-                    .get("area")
-                )
-                return ee.Number(area_in_m2).multiply(0.0001)
-
-            grassland_area = area(grassland_mask)
-            tree_in_shrub_area = area(context_start.eq(1))
-            tree_loss_area = area(tree_loss)
+            to_shrubs = tree_loss.And(lulc_end.eq(12))
+            to_trees = tree_loss.And(lulc_end.eq(6))
 
             return f.set(
                 {
-                    "shrubs_trees_area_in_ha": grassland_area,
-                    "tree_in_shrubs_trees_area_in_ha": tree_in_shrub_area,
+                    "shrubs_trees_area_in_ha": area(grassland_mask),
+                    "tree_in_shrubs_trees_area_in_ha": area(tree_in_shrubs),
                     "isolated_shrub_area_in_ha": area(
                         lulc_start.eq(12).And(context_start.eq(0))
                     ),
                     "shrubland_area_in_ha": area(lulc_start.eq(12)),
-                    "tree_loss_in_tree_in_shrub_area_in_ha": tree_loss_area,
+                    "tree_loss_in_tree_in_shrub_area_in_ha": area(tree_loss),
                     "tree_in_tree_in_shrub_to_barren_area_in_ha": area(tree_to_barren),
                     "tree_in_tree_in_shrub_to_built_area_in_ha": area(to_built),
                     "tree_in_tree_in_shrub_to_kharif_water_area_in_ha": area(to_kharif),
@@ -232,8 +233,17 @@ def generate_tree_in_grassland_layer(
                         to_zaid
                     ),
                     "tree_in_tree_in_shrub_to_crops_area_in_ha": area(to_crops),
+                    "tree_in_tree_in_shrub_to_shrubs_area_in_ha": area(to_shrubs),
+                    "tree_in_tree_in_shrub_to_trees_area_in_ha": area(to_trees),
                 }
             )
+
+        # raster_image = _build_tree_in_grassland_raster(
+        #     lulc_by_year=lulc_by_year,
+        #     aoi=roi.geometry(),
+        #     start_years=start_years,
+        #     end_years=end_years,
+        # )
 
         results_fc = roi.map(compute_stats)
 
@@ -252,16 +262,35 @@ def generate_tree_in_grassland_layer(
                 "tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha",
                 "tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha",
                 "tree_in_tree_in_shrub_to_crops_area_in_ha",
+                "tree_in_tree_in_shrub_to_shrubs_area_in_ha",
+                "tree_in_tree_in_shrub_to_trees_area_in_ha",
             ]
         )
 
         # --------------------------------------------------------------
-        # Export to GEE
+        # Export vector outputs to GEE
         # --------------------------------------------------------------
-        task_id = export_vector_asset_to_gee(fc, description, asset_id)
-        if task_id:
-            check_task_status([task_id])
-            print("Tree in Grassland layer exported to GEE.")
+        vector_task_id = export_vector_asset_to_gee(fc, description, asset_id)
+        if vector_task_id and (sync_to_db or sync_to_geoserver):
+            check_task_status([vector_task_id])
+            print("Tree in Grassland vector layer exported to GEE.")
+
+        # --------------------------------------------------------------
+        # Export raster outputs to GEE for validation
+        # --------------------------------------------------------------
+        # raster_description = f"{description}_raster"
+        # raster_asset_id = asset_id + "_raster"
+        # raster_task_id = export_raster_asset_to_gee(
+        #     image=raster_image,
+        #     description=raster_description,
+        #     asset_id=raster_asset_id,
+        #     scale=SCALE,
+        #     region=roi.geometry(),
+        # )
+        # if raster_task_id:
+        #     check_task_status([raster_task_id])
+        #     make_asset_public(raster_asset_id)
+        #     print("Tree in Grassland validation raster exported to GEE.")
 
     # ------------------------------------------------------------------
     # Publish to GeoServer and save metadata to DB
@@ -281,22 +310,69 @@ def generate_tree_in_grassland_layer(
     return layer_at_geoserver
 
 
-# ------------------------------------------------------------------
-# Private helpers (publish / persist)
-# ------------------------------------------------------------------
+def _build_tree_in_grassland_raster(lulc_by_year, aoi, start_years, end_years):
+    """Build a categorical raster for validating context and transitions."""
+    context_start, context_end = temporal_context(
+        lulc_by_year, aoi, start_years, end_years
+    )
+    lulc_end = (
+        ee.ImageCollection([lulc_by_year[y] for y in end_years])
+        .reduce(ee.Reducer.mode())
+        .clip(aoi)
+    )
+
+    tree_context = context_start.eq(1)
+    # shrub_context = context_start.eq(2)
+    tree_loss = tree_context.And(context_end.eq(0))
+
+    tree_to_barren = tree_loss.And(lulc_end.eq(7))
+    tree_to_built = tree_loss.And(lulc_end.eq(1))
+    tree_to_kharif = tree_loss.And(lulc_end.eq(2))
+    tree_to_kharif_rabi = tree_loss.And(lulc_end.eq(3))
+    tree_to_zaid = tree_loss.And(lulc_end.eq(4))
+    tree_to_crops = tree_loss.And(
+        lulc_end.eq(5)
+        .Or(lulc_end.eq(8))
+        .Or(lulc_end.eq(9))
+        .Or(lulc_end.eq(10))
+        .Or(lulc_end.eq(11))
+    )
+    tree_to_shrub = tree_loss.And(lulc_end.eq(12))
+    tree_to_tree = tree_loss.And(lulc_end.eq(6))
+
+    transition = (
+        ee.Image(0)
+        .where(tree_to_barren, 1)
+        .where(tree_to_built, 2)
+        .where(tree_to_crops, 3)
+        .where(tree_to_kharif.Or(tree_to_kharif_rabi).Or(tree_to_zaid), 4)
+        .where(tree_to_shrub, 5)
+        .where(tree_to_tree, 6)
+        .clip(aoi)
+        .toInt()
+    )
+
+    return (
+        ee.ImageCollection(
+            [context_start, context_end, lulc_end, transition, tree_loss]
+        )
+        .toBands()
+        .rename(["start_context", "end_context", "end_lulc", "transition", "tree_loss"])
+        .setDefaultProjection(lulc_end.projection())
+    )
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        start_year=None,
-        end_year=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
-        sync_to_db=True,
-        sync_to_geoserver=True,
+    layer_name=None,
+    asset_id=None,
+    start_year=None,
+    end_year=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
+    sync_to_db=True,
+    sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Tree in Grassland: save_to_db_and_sync_to_geoserver")

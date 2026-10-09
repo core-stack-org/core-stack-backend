@@ -1,0 +1,170 @@
+"""
+Celery task that orchestrates the three-phase farm boundary pipeline:
+
+  Phase 1 — fetch_raw.fetch_raw_boundaries()
+      Queries the AnthroKrishi API per S2 cell and saves raw JSON files
+      to disk with a crash-safe manifest.
+
+  Phase 2 — convert.convert_to_geoparquet()
+      Reads raw JSON via DuckDB, filters farm field polygons, clips to
+      the tehsil boundary with GeoPandas, and writes a GeoParquet file.
+
+  Phase 3 — et_intersection.intersect_et_with_farms()  [OPTIONAL]
+      Downloads AET raster from Google Earth Engine, computes per-farm
+      monthly ET via zonal statistics, and writes an enhanced parquet.
+
+  Phase 4 — pmtiles.convert_boundaries_to_pmtiles()
+      Converts farm_boundaries.parquet into a PMTiles vector tile archive
+      (via tippecanoe + the pmtiles CLI) for map rendering. Runs regardless
+      of Phase 3, since it only needs the farm boundary geometry. A failure
+      here is logged but does not fail the overall task — Phases 1-3's
+      output is still usable without the tileset.
+
+The task is wired to the "nrm" Celery queue (same as all other CoRE Stack
+pipelines) and supports automatic retries on transient failures.
+
+Triggered via the Django API:
+    POST /api/v1/generate_farm_boundaries/
+    {
+        "state": "rajasthan",
+        "district": "jaipur",
+        "block": "sanganer",
+        "api_key": "AIzaSy...",
+        "year": 2017            ← optional, enables Phase 3
+    }
+"""
+
+import logging
+
+from nrm_app.celery import app
+
+from .convert import convert_to_geoparquet
+from .fetch_raw import fetch_raw_boundaries
+from .fetch_metadata import fetch_farm_metadata
+
+logger = logging.getLogger(__name__)
+
+
+@app.task(bind=True, max_retries=3, default_retry_delay=60)
+def build_farm_boundary_map(
+    self,
+    state: str,
+    district: str,
+    block: str,
+    api_key: str,
+    year: int = None,
+    overwrite=False,
+):
+    """
+    Celery task: runs Phase 1, Phase 2, and optionally Phase 3.
+
+    Parameters
+    ----------
+    state, district, block : str
+        Lower-cased administrative names.
+    api_key : str
+        AnthroKrishi / Agricultural Understanding API key.
+    year : int, optional
+        If provided, runs Phase 3 (ET intersection) for the given year.
+        Valid range: 2017–2024.
+
+    Returns
+    -------
+    dict
+        Combined summary from all phases.
+    """
+    logger.info(
+        "Farm boundary pipeline started — state=%s district=%s block=%s",
+        state,
+        district,
+        block,
+    )
+
+    try:
+        # ── Phase 1: Fetch ──────────────────────────────────────────────────
+        phase1_summary = fetch_raw_boundaries(
+            state=state,
+            district=district,
+            block=block,
+            resume=True,  # safe to retry; already-fetched cells are skipped
+        )
+        logger.info("Phase 1 done: %s", phase1_summary)
+
+        phase2_summary = fetch_farm_metadata(
+            state=state,
+            district=district,
+            block=block,
+            resume=True,  # safe to retry; already-fetched cells are skipped
+        )
+        logger.info("Phase 2 done: %s", phase2_summary)
+
+        # ── Phase 3: Convert ────────────────────────────────────────────────
+        phase3_summary = convert_to_geoparquet(
+            state=state,
+            district=district,
+            block=block,
+            overwrite=False,  # skip if parquet already exists
+        )
+        logger.info("Phase 3 done: %s", phase2_summary)
+
+        # ── Phase 3: ET Intersection (optional) ─────────────────────────────
+        phase4_summary = None
+        if year is not None:
+            from .et_intersection import (
+                 compute_multi_year_water_stress,
+                 intersect_et_with_farms,
+            )
+
+            logger.info("Phase 3 — ET intersection for year %d", year)
+            # phase3_summary = intersect_et_with_farms(
+            #       state=state,
+            #       district=district,
+            #       block=block,
+            #       year=year,
+            # )
+            phase3_summary = compute_multi_year_water_stress(
+                state=state, district=district, block=block
+            )
+            logger.info("Phase 3 done: %s", phase3_summary)
+
+    except Exception as exc:
+        logger.exception(
+            "Farm boundary pipeline failed for %s/%s/%s: %s",
+            state,
+            district,
+            block,
+            exc,
+        )
+        raise self.retry(exc=exc)
+
+    # ── Phase 5: PMTiles conversion ───────────────────────────────────────────
+    phase5_summary = None
+    try:
+        from .pmtiles import convert_boundaries_to_pmtiles
+
+        logger.info("Phase 5 — PMTiles conversion")
+        phase5_summary = convert_boundaries_to_pmtiles(
+            state=state,
+            district=district,
+            block=block,
+        )
+        logger.info("Phase 5 done: %s", phase4_summary)
+    except Exception as exc:
+        logger.exception(
+            "Phase 5 (PMTiles) failed for %s/%s/%s: %s",
+            state,
+            district,
+            block,
+            exc,
+        )
+        phase4_summary = {"error": str(exc)}
+
+    result = {
+        "phase1": phase1_summary,
+        "phase2": phase2_summary,
+        "phase3": phase3_summary,
+        "phase4": phase4_summary,
+        "phase5": phase5_summary,
+    }
+    logger.info("Farm boundary pipeline completed successfully: %s", result)
+    return result

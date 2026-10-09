@@ -566,3 +566,66 @@ def sync_layer_generation_if_enabled(view_func):
         return response
 
     return wrapper
+
+
+def require_local_tehsil_boundaries(default_compute="gee"):
+    """
+    For local compute requests on a tehsil, checks that the admin and MWS
+    boundaries exist locally and syncs them to GeoServer before the view runs.
+    Any failure is returned to the caller right away and no task is queued.
+    Requests that are not local, are pan-India, or have no full
+    state/district/block (e.g. custom ROI) pass through unchanged.
+
+    Put it above @sync_layer_generation_if_enabled so a failure response is
+    not enriched as a layer result.
+    """
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(*args, **kwargs):
+            request = args[0] if args else kwargs.get("request")
+            data = getattr(request, "data", None)
+            compute = (_get_request_value(data, "compute") or default_compute).lower()
+            pan_india = (_get_request_value(data, "pan_india") or "").lower()
+            state, district, block = read_location_from_request(request)
+            if (
+                compute != "local"
+                or pan_india in {"1", "true", "yes", "y"}
+                or not (state and district and block)
+            ):
+                return view_func(*args, **kwargs)
+
+            from rest_framework import status
+            from rest_framework.response import Response
+
+            from computing.local_compute_helper import (
+                TehsilBoundaryError,
+                prepare_local_tehsil_boundaries,
+            )
+
+            try:
+                prepare_local_tehsil_boundaries(state, district, block)
+            except TehsilBoundaryError as exc:
+                logger.error(
+                    "Boundary preflight failed | view=%s stage=%s | %s",
+                    getattr(view_func, "__name__", "unknown"),
+                    exc.stage,
+                    exc,
+                )
+                return Response(
+                    {
+                        "Exception": str(exc),
+                        "stage": exc.stage,
+                        "layer_generated": False,
+                    },
+                    status=(
+                        status.HTTP_400_BAD_REQUEST
+                        if exc.stage == "boundary_check"
+                        else status.HTTP_502_BAD_GATEWAY
+                    ),
+                )
+            return view_func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator

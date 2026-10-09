@@ -179,6 +179,9 @@ LOCAL_TASK_DATASETS = {
     ),
     "computing.soil_type.soil_type_local.generate_soil_type_local": ("Soil Type",),
     "computing.zoi_layers.zoi.generate_zoi": ("Surface Water Bodies",),
+    "computing.forest_fire.forest_fire_local_compute.generate_forest_fire_local": (
+        "Forest Fire",
+    ),
     "computing.forest_fringe.forest_fringe_local_compute.generate_forest_fringe_local": (
         "Forest Fringe",
     ),
@@ -318,6 +321,12 @@ def run_pipeline(
     gee_account_id: str | None = None,
 ) -> Any:
     runner = get_pipeline(name, compute)
+    if str(compute).strip().lower() == "local":
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        prepare_local_tehsil_boundaries(
+            location["state"], location["district"], location["block"]
+        )
     if isinstance(runner, PipelineSpec):
         return runner.run(location, overwrite)
     kwargs = _legacy_runner_kwargs(

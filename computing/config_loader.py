@@ -157,7 +157,8 @@ SOIL_RASTER_PATH: Path = _base_layer_path(
 
 AEZ_VECTOR_PATH: Path = _base_layer_path("aez")
 
-PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_watersheds"
+PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_mws"
+LOCAL_ADMIN_BOUNDARY_DIR: Path = DATA_DIR / "base_layers/admin-boundary/output"
 
 MICROWATERSHED_PATH: Path = _base_layer_path("mws")
 
@@ -189,9 +190,7 @@ SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
     "topsoil_ph": SOIL_TYPE_BASE_DIR / "topsoil_pH.tif",
     "topsoil_texture": SOIL_TYPE_BASE_DIR / "topsoil_texture.tif",
 }
-PAN_INDIA_OUTER_BOUNDARY_PATH: Path = (
-    DATA_DIR / "india_state_outer_no_islands.geojson"
-)
+PAN_INDIA_OUTER_BOUNDARY_PATH: Path = DATA_DIR / "india_state_outer_no_islands.geojson"
 
 ADMIN_BOUNDARY_INPUT_DIR: Path = DATA_DIR / "admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR: Path = DATA_DIR / "admin-boundary/output"
@@ -344,3 +343,9 @@ PAN_INDIA_TREE_IN_GRASSLAND = _base_layer_path(
     allowed_suffixes=(".geojson", ".gpkg", ".shp"),
 )
 LOCAL_TREE_IN_GRASSLAND_OUTPUT = _derived_output_dir("tree in grassland")
+
+PAN_INDIA_FOREST_FIRE = _base_layer_path(
+    "forest fire",
+    allowed_suffixes=(".geojson", ".gpkg", ".shp"),
+)
+LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fringe")
