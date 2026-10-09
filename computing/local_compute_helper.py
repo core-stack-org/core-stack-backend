@@ -1,5 +1,5 @@
 import logging
-import os
+import typing
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -20,7 +20,6 @@ from computing.config_loader import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
-    TERRAIN_RASTER_PATH,
 )
 from computing.base_layer_setup import ensure_tehsil_watershed
 from utilities.download_gpkg_from_geoserver import generate_gpkg
@@ -47,6 +46,26 @@ VALLEY_CLASSES = {1, 2, 4, 9}
 HILL_SLOPES_CLASSES = {8}
 RIDGE_CLASSES = {3, 7, 10, 11}
 SLOPY_CLASSES = {6}
+
+
+class TerrainProperties(typing.TypedDict):
+    plain_area: float
+    valley_area: float
+    hill_slopes_area: float
+    ridge_area: float
+    slopy_area: float
+    terrainClusters: int
+
+
+def dummy_terrain_props() -> TerrainProperties:
+    return {
+        "plain_area": 0.0,
+        "valley_area": 0.0,
+        "hill_slopes_area": 0.0,
+        "ridge_area": 0.0,
+        "slopy_area": 0.0,
+        "terrainClusters": -1,
+    }
 
 
 def _slug(value, fallback):
@@ -176,7 +195,7 @@ def load_precomputed_watersheds(
         )
 
     except FileNotFoundError:
-        print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
+        print(f"Precomputed watershed not found for {state}/{district}/{block}")
         ensure_tehsil_watershed(
             state=state,
             district=district,
@@ -214,7 +233,7 @@ def load_precomputed_panchayat(
         )
 
     except FileNotFoundError:
-        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
+        print(f"Precomputed panchayat not found for {state}/{district}/{block}")
         generate_gpkg(
             state=state,
             district=district,
@@ -932,51 +951,24 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
             working_gdf = working_gdf.to_crs(src.crs)
 
         nodata = src.nodata
-        computed_rows = []
+        computed_rows: list[TerrainProperties] = []
 
         total = len(working_gdf)
         for index, row in enumerate(working_gdf.itertuples(index=False), start=1):
             geom = row.geometry
             if geom is None or geom.is_empty:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             try:
                 clipped, _ = mask(src, [mapping(geom)], crop=True, filled=True)
             except ValueError:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             values = clipped[0]
             if values.size == 0:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             values = np.rint(values).astype(np.int16, copy=False)
