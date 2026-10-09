@@ -110,7 +110,6 @@ def generate_mws_data_for_kyl_filters(
             try:
                 with pd.ExcelFile(file_xl_path + ".xlsx") as xl:
                     available_sheets = xl.sheet_names  # Get list of available sheets
-                    print("AVAILABLE SHEETS:", available_sheets)
 
                     # Try to parse each sheet if it exists
                     for sheet_name in sheets.keys():
@@ -678,13 +677,13 @@ def generate_mws_data_for_kyl_filters(
                     plantations_columns = df_nrega_assets_mws_data.filter(like="Plantations_count")
                     nrega_count["irrigation"] = irrigation_columns.select_dtypes(
                         include="number"
-                    ).sum().sum()
+                    ).sum()
                     nrega_count["swc"] = swc_columns.select_dtypes(
                         include="number"
-                    ).sum().sum()
+                    ).sum()
                     nrega_count["plantations"] = plantations_columns.select_dtypes(
                         include="number"
-                    ).sum().sum()
+                    ).sum()
                     nrega_assets_sum = (
                         df_nrega_assets_mws_data.iloc[:, 1:]
                         .select_dtypes(include="number")
@@ -830,7 +829,6 @@ def generate_mws_data_for_kyl_filters(
                     ].max(axis=1).iloc[0]
 
                 except Exception as e:
-                    print(f"BANK ERROR for UID {specific_mws_id}: {e}")
                     dist_to_bank = -9999
 
                 ############# Terrain lulc slope / plain  #####################
