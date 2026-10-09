@@ -564,64 +564,96 @@ def generate_mws_data_for_kyl_filters(
                     df_crpDrought_mws_data = sheets["croppingDrought_kharif"][
                         sheets["croppingDrought_kharif"]["UID"] == specific_mws_id
                     ]
-                    monsoon_onset_columns = df_crpDrought_mws_data.filter(like="monsoon_onset")
-                    monsoon_onset_days = [
-                        pd.to_datetime(value).dayofyear
-                        for value in monsoon_onset_columns.iloc[0]
-                        if pd.notna(value)
+
+                        # ---------------- drought_category ----------------
+                    try:
+                        monsoon_onset_columns = df_crpDrought_mws_data.filter(like="monsoon_onset")
+                        monsoon_onset_days = [
+                            pd.to_datetime(value).dayofyear
+                            for value in monsoon_onset_columns.iloc[0]
+                            if pd.notna(value)
+                            
+                        ]
+                    
+                        max_monsoon_onset_day = max(monsoon_onset_days) if monsoon_onset_days else 0
+                        min_monsoon_onset_day = min(monsoon_onset_days) if monsoon_onset_days else 0
+
+                        severe_columns = df_crpDrought_mws_data.filter(like="Severe_in_weeks")
+                        moderate_columns = df_crpDrought_mws_data.filter(like="Moderate_in_weeks")
+
+                        max_drought_weeks_severe = severe_columns.max(axis=1).iloc[0]
+                        max_drought_weeks_moderate = moderate_columns.max(axis=1).iloc[0]
+
+                        max_drought_weeks = max_drought_weeks_severe + max_drought_weeks_moderate
                         
-                    ]
-                    
-                    max_monsoon_onset_day = max(monsoon_onset_days) if monsoon_onset_days else 0
-                    min_monsoon_onset_day = min(monsoon_onset_days) if monsoon_onset_days else 0
-
-                    severe_columns = df_crpDrought_mws_data.filter(like="Severe_in_weeks")
-                    moderate_columns = df_crpDrought_mws_data.filter(like="Moderate_in_weeks")
-
-                    max_drought_weeks_severe = severe_columns.max(axis=1).iloc[0]
-                    max_drought_weeks_moderate = moderate_columns.max(axis=1).iloc[0]
-
-                    max_drought_weeks = max_drought_weeks_severe + max_drought_weeks_moderate
-                    
-                    sum_moderate_severe = {
-                        year: (
-                            1
-                            if (
-                                df_crpDrought_mws_data.iloc[0][
-                                    f"Moderate_in_weeks_{year}"
-                                ]
-                                + df_crpDrought_mws_data.iloc[0][
-                                    f"Severe_in_weeks_{year}"
-                                ]
+                        sum_moderate_severe = {
+                            year: (
+                                1
+                                if (
+                                    df_crpDrought_mws_data.iloc[0][
+                                        f"Moderate_in_weeks_{year}"
+                                    ]
+                                    + df_crpDrought_mws_data.iloc[0][
+                                        f"Severe_in_weeks_{year}"
+                                    ]
+                                )
+                                >= 5
+                                else 0
                             )
-                            >= 5
-                            else 0
+                            for year in years
+                        }
+                        sum_of_values = sum(sum_moderate_severe.values())
+                        drought_category = None
+                        if sum_of_values >= 2:
+                            drought_category = 2
+                        else:
+                            drought_category = sum_of_values
+                    except Exception as e:
+                        print(f"Error while calculating drought category: {e}")
+                        drought_category = -9999
+
+                     # ---------------- max_drought_weeks ----------------
+                    try:
+                        severe_columns = df_crpDrought_mws_data.filter(
+                            like="Severe_in_weeks"
                         )
-                        for year in years
-                    }
-                    sum_of_values = sum(sum_moderate_severe.values())
-                    drought_category = None
-                    if sum_of_values >= 2:
-                        drought_category = 2
-                    else:
-                        drought_category = sum_of_values
+
+                        moderate_columns = df_crpDrought_mws_data.filter(
+                            like="Moderate_in_weeks"
+                        )
+
+                        max_drought_weeks_severe = severe_columns.max(axis=1).iloc[0]
+                        max_drought_weeks_moderate = moderate_columns.max(axis=1).iloc[0]
+
+                        max_drought_weeks = (
+                            max_drought_weeks_severe + max_drought_weeks_moderate
+                        )
+
+                    except Exception as e:
+                        print(f"Error while calculating max drought weeks: {e}")
+                        max_drought_weeks = -9999
 
 
 
                     ########   avg_dry_spell_in_weeks
-                    dryspell_columns = df_crpDrought_mws_data.filter(
-                        like="drysp_unit_4_weeks"
-                    )  # avg_dry_spell_in_weeks
-                    total_dryspell_column = dryspell_columns.shape[1]
-                    sum_dryspell = dryspell_columns.sum(axis=1).sum()
-                    avg_dry_spell_in_weeks = round(
-                        (
-                            sum_dryspell / total_dryspell_column
-                            if total_dryspell_column > 0
-                            else 0
-                        ),
-                        4,
-                    )
+                    try:
+                        dryspell_columns = df_crpDrought_mws_data.filter(
+                            like="drysp_unit_4_weeks"
+                        )  # avg_dry_spell_in_weeks
+                        total_dryspell_column = dryspell_columns.shape[1]
+                        sum_dryspell = dryspell_columns.sum(axis=1).sum()
+                        avg_dry_spell_in_weeks = round(
+                            (
+                                sum_dryspell / total_dryspell_column
+                                if total_dryspell_column > 0
+                                else 0
+                            ),
+                            4,
+                        )
+                    except Exception as e:
+                        print(f"Error while calculating average dry spell: {e}")
+                        avg_dry_spell_in_weeks = -9999
+
                 except Exception as e:
                     drought_category = -9999
                     avg_dry_spell_in_weeks = -9999
@@ -680,42 +712,54 @@ def generate_mws_data_for_kyl_filters(
                         "change_detection_degradation"
                     ][sheets["change_detection_degradation"]["UID"] == specific_mws_id]
 
-                    cropping_to_shrub_area = df_change_degr_detection_mws_data[
-                        "farm_to_scrub_land_area_in_ha"
-                    ].iloc[0]
-                    degr_sum = (
-                        df_change_degr_detection_mws_data[
+                    df_change_crp_detection_mws_data = sheets[
+                        "change_detection_cropintensity"
+                    ][
+                        sheets["change_detection_cropintensity"]["UID"] == specific_mws_id
+                    ]
+
+                    ########### Cropping to Shrub Area #####################
+                    try:
+                        cropping_to_shrub_area = df_change_degr_detection_mws_data[
+                            "farm_to_scrub_land_area_in_ha"
+                        ].iloc[0]
+                        
+                    except:
+                        cropping_to_shrub_area = -9999
+
+                    ########### Degradation Land area #####################
+                    try:
+                        degr_sum = df_change_degr_detection_mws_data[
                             [
                                 "farm_to_barren_area_in_ha",
                                 "farm_to_scrub_land_area_in_ha",
                             ]
-                        ]
-                        .sum(axis=1)
-                        .iloc[0]
-                    )
-                    df_change_crp_detection_mws_data = sheets[
-                        "change_detection_cropintensity"
-                    ][
-                        sheets["change_detection_cropintensity"]["UID"]
-                        == specific_mws_id
-                    ]
-                    crp_sum = (
-                        df_change_crp_detection_mws_data[
-                            [
-                                "double_to_single_area_in_ha",
-                                "triple_to_double_area_in_ha",
-                                "triple_to_single_area_in_ha",
+                        ].sum(axis=1).iloc[0]
+                    
+                        crp_sum = (
+                            df_change_crp_detection_mws_data[
+                                [
+                                    "double_to_single_area_in_ha",
+                                    "triple_to_double_area_in_ha",
+                                    "triple_to_single_area_in_ha",
+                                ]
                             ]
-                        ]
-                        .sum(axis=1)
-                        .iloc[0]
-                    )
-                    degradation_land_area = degr_sum + crp_sum
-                    change_in_cropping_intensity_area = (
-                        df_change_crp_detection_mws_data.get(
-                            "total_change_crop_intensity_area_in_ha", None
-                        ).iloc[0]
-                    )
+                            .sum(axis=1)
+                            .iloc[0]
+                        )
+                        degradation_land_area = degr_sum + crp_sum
+                    except:
+                        degradation_land_area = -9999
+
+                        ###### Change in cropping intensity area #######
+                    try:
+                        change_in_cropping_intensity_area = (
+                            df_change_crp_detection_mws_data.get(
+                                "total_change_crop_intensity_area_in_ha", None
+                            ).iloc[0]
+                        )
+                    except:
+                        change_in_cropping_intensity_area = -9999
 
                 except:
                     degradation_land_area = -9999
@@ -1101,8 +1145,6 @@ def generate_mws_data_for_kyl_filters(
                             area_in_ha = float(row.get("area_in_ha", 0))
                             cropped_area_in_ha = float(row.get("sum_area_in_ha", 0))
 
-                            cropping_area = cropped_area_in_ha
-
                             lulc_crop_percent = round(
                                 (cropped_area_in_ha / area_in_ha) * 100, 2
                             )
@@ -1447,7 +1489,7 @@ def generate_mws_data_for_kyl_filters(
                         "trees_in_forest_fringe_loss": trees_in_forest_fringe_loss,
                         "mean_kharif_water_surface_area": mean_kharif_water_surface_area,
                         "trees_in_grassland_loss": trees_in_grassland_loss,
-                        "cropping_area": cropping_area,
+                        "cropping_area": cropped_area_in_ha,
                         "cropping_to_shrub_area": cropping_to_shrub_area,
                         "degradation_in_forests": degradation_in_forests,
                         "trees_in_forest_loss": trees_in_forest_loss,
