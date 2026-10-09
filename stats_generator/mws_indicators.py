@@ -1342,10 +1342,19 @@ def generate_mws_data_for_kyl_filters(
                     ]
                     shrub_trend = df_ndvi_mws_data["shrub_trend"].iloc[0]
 
+                    trend_mapping = {
+                        "no trend": 0,
+                        "increasing": 1,
+                        "decreasing": -1
+                    }
+
+                    shrub_trend = trend_mapping.get(str(shrub_trend).strip().lower(), -9999)
+
                 except Exception as e:
                     print(f"Error while fetching shrub trend: {e}")
                     shrub_trend = -9999
 
+                    
                     ############## Forest Fringe ################
                 try:
                     df_forest_fringe_mws_data = sheets["forest_fringes"][
