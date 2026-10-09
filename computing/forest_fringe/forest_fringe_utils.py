@@ -10,13 +10,13 @@ from utilities.constants import (
     TREE_OVERALL_CHANGE,
     PAN_INDIA_LULC_V3_DATASET,
     LTP_STP_CHANGE,
+    LulcClass,
 )
 
 # ----------------------------------------
 # PARAMETERS / CONSTANTS
 # ----------------------------------------
 
-TREE_CLASS = 6
 FRINGE_WIDTH = 50
 OUTER_BUFFER = 100
 SCALE = 30
@@ -41,7 +41,7 @@ def load_tree_mode():
         [
             ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}_{year + 1}")
             .select("predicted_label")
-            .eq(TREE_CLASS)
+            .eq(LulcClass.TREES)
             for year in LULC_YEARS
         ]
     )

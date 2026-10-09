@@ -18,7 +18,6 @@ from shapely.geometry import box, mapping
 from computing.config_loader import (
     AQUIFER_VECTOR_PATH,
     HYDROLOGY_LOCAL_OUTPUT_DIR,
-    PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
 )
 from computing.hydrology_gpu.watershed_boundary import (
@@ -333,7 +332,7 @@ def _pan_india_watershed_offset(
     state,
     district,
     block,
-    watershed_root=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    watershed_root=PAN_INDIA_RUNOFF_WATERSHED_ROOT,
 ):
     root = Path(watershed_root)
     target_path, target_row = find_tehsil_watershed(
@@ -460,7 +459,7 @@ def _attach_pan_india_timeseries(
     district,
     block,
     series_dirs,
-    watershed_root=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    watershed_root=PAN_INDIA_RUNOFF_WATERSHED_ROOT,
     watershed_ids=None,
     uid_to_watershed_id=None,
 ):
