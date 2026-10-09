@@ -2847,6 +2847,8 @@ def update_layer_sync_remote(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @schema(None)
 def sync_layer_remote(request):
     """
