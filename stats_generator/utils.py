@@ -336,7 +336,7 @@ def create_excel_for_forest_fire(geojson_data, writer):
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
         df.to_excel(writer, sheet_name="forest_fire", index=False)
-        print("Excel file created for tree in grassland")
+        print("Excel file created for forest fire")
     except Exception as e:
         print("error while generating excel for forest fire")
 
