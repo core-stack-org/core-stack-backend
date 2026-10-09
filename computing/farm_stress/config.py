@@ -103,6 +103,7 @@ LOCAL_DIR_SPI1_TIMESERIES_500M = os.path.join(LOCAL_EXPORT_ROOT, "spi1_timeserie
 # which is PET prorated onto the 28-day SPEI periods, not 8-day composites.
 LOCAL_DIR_MODIS_ET_500M = os.path.join(LOCAL_EXPORT_ROOT, "modis_et_500m")
 LOCAL_DIR_MODIS_PET_8DAY_500M = os.path.join(LOCAL_EXPORT_ROOT, "modis_pet_8day_500m")
+LOCAL_DIR_MAI_500M = os.path.join(LOCAL_EXPORT_ROOT, "mai_500m")
 GCS_PATH_MODIS_ET_500M = "ksheetiz/farm_stress/modis_et_500m/"
 GCS_PATH_MODIS_PET_8DAY_500M = "ksheetiz/farm_stress/modis_pet_8day_500m/"
 
