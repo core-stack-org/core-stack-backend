@@ -351,6 +351,38 @@ def create_excel_for_forest_fringe(geojson_data, writer):
         exclude_cols = ["id"]
         df = df.drop(columns=exclude_cols, errors="ignore")
         df.rename(columns={"uid": "UID"}, inplace=True)
+        try:
+            wb = writer.book
+            if "lulc_vector" in wb.sheetnames:
+                ws = wb["lulc_vector"]
+                headers = [cell.value for cell in ws[1]]
+                header_idx = {h: i for i, h in enumerate(headers)}
+                uid_idx = header_idx["UID"]
+                years = range(2017, 2020)
+                tree_forest_cols = [f"tree_forest_area_in_ha_{y}" for y in years]
+                tree_forest_idxs = [
+                    header_idx[c] for c in tree_forest_cols if c in header_idx
+                ]
+                missing = [c for c in tree_forest_cols if c not in header_idx]
+                if missing:
+                    print("Warning - missing lulc columns:", missing)
+                lulc_rows = []
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    tree_forest_sum = sum((row[i] or 0) for i in tree_forest_idxs)
+                    area_under_tree_cover = tree_forest_sum / 3
+                    lulc_rows.append(
+                        {
+                            "UID": row[uid_idx],
+                            "area_under_tree_cover": area_under_tree_cover,
+                        }
+                    )
+                lulc_df = pd.DataFrame(lulc_rows)
+                df = df.merge(lulc_df, on="UID", how="left")
+
+            else:
+                print("Warning - lulc_vector sheet not found")
+        except Exception as e:
+            print(f"error get while calculating area_under_tree_cover {e}")
         priority_cols = ["UID", "mws_area_in_ha"]
         priority_cols = [c for c in priority_cols if c in df.columns]
         other_cols = [c for c in df.columns if c not in priority_cols]
