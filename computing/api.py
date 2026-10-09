@@ -265,7 +265,7 @@ from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
 from .farm_boundaries.farm_boundary import build_farm_boundary_map
-
+from .forest_fire.forest_fire_local_compute import generate_forest_fire_local
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
@@ -3285,7 +3285,13 @@ def generate_forest_fire(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fire_layer.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_forest_fire_layer,
+            generate_forest_fire_local,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -3297,7 +3303,7 @@ def generate_forest_fire(request):
             queue="nrm",
         )
         return Response(
-            {"Success": "Forest Fire task initiated"},
+            {"Success": "forest_fire task initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
