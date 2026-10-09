@@ -21,8 +21,8 @@ env = environ.Env()
 environ.Env.read_env()
 
 # ── AnthroKrishi REST endpoint ────────────────────────────────────────────────
-ANTHROKRISHI_API_URL = env("ANTHROKRISHI_ALU_API_URL")
-API_KEY = env("ANTHROKRISHI_API_KEY")
+ANTHROKRISHI_API_URL = env("ANTHROKRISHI_ALU_API_URL", default="")
+API_KEY = env("ANTHROKRISHI_API_KEY", default="")
 
 
 # S2 level 13 ≈ 1 km × 1 km tiles
