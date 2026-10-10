@@ -1653,25 +1653,25 @@
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #F0F4A3; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #F5F8BF; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Single Kharif</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #D6E96B; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #FEC016; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Single Non-Kharif</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #B7D43A; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #7FAF2E; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Double Cropping</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 4px;">
                                 <div
-                                    style="width: 10px; height: 10px; background-color: #7FAF2E; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
+                                    style="width: 10px; height: 10px; background-color: #73861D; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0;">
                                 </div>
                                 <span style="font-size: 9px; color: #4b5563; line-height: 1.1;">Triple Cropping</span>
                             </div>
@@ -3120,54 +3120,41 @@
             });
         };
 
-        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false, showIntersectPct = false) => {
-            try {
-                const mwsGeometry = mwsFeature.getGeometry();
-                const mwsUid = mwsFeature.get('uid');
+        // Villages recorded against this MWS in the "mws_intersect_villages" sheet (Village IDs column),
+        // fetched once from the panchayat_boundaries layer (matched by vill_ID) and cached - every map
+        // that needs the village boundaries (terrain/soil-health/degradation/afforestation comparison
+        // maps, the demographic maps, etc.) reuses this instead of re-fetching the same villages.
+        let cachedVillagesGeoJsonPromise = null;
+        const fetchIntersectingVillagesGeoJson = () => {
+            if (cachedVillagesGeoJsonPromise) return cachedVillagesGeoJsonPromise;
 
-                if (!mwsGeometry || !mwsUid) {
-                    return;
-                }
+            cachedVillagesGeoJsonPromise = (async () => {
+                if (!villagesIdForLinks || villagesIdForLinks.length === 0) return null;
 
-                // Get the bounding box of the MWS
-                const extent = mwsGeometry.getExtent();
-                const minLon = extent[0];
-                const minLat = extent[1];
-                const maxLon = extent[2];
-                const maxLat = extent[3];
+                const idFilter = `vill_ID IN (${villagesIdForLinks.join(',')})`;
+                const url = `https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=panchayat_boundaries:{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(idFilter)}`;
 
-                // Create WFS URL with BBOX filter (simpler, more compatible)
-                const baseUrl = 'https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows';
-
-                // BBOX filter syntax: BBOX(geometry_column, minx, miny, maxx, maxy)
-                const bboxFilter = `BBOX(the_geom,${minLon},${minLat},${maxLon},${maxLat})`;
-
-                const params = new URLSearchParams({
-                    service: 'WFS',
-                    version: '1.0.0',
-                    request: 'GetFeature',
-                    typeName: `panchayat_boundaries:{{district}}_{{block}}`,
-                    outputFormat: 'application/json',
-                    CQL_FILTER: bboxFilter
-                });
-
-                const url = baseUrl + '?' + params.toString();
-
-                // Fetch villages from GeoServer
                 const response = await fetch(url);
-
-                if (!response.ok) {
-                    return;
-                }
+                if (!response.ok) return null;
 
                 const geoJsonData = await response.json();
+                if (!geoJsonData.features || geoJsonData.features.length === 0) return null;
 
-                // Check if we got any features
-                if (!geoJsonData.features || geoJsonData.features.length === 0) {
+                return geoJsonData;
+            })();
+
+            return cachedVillagesGeoJsonPromise;
+        };
+
+        const addVillageBoundariesToMap = async (map, mwsFeature, showLabels = false, showIntersectPct = false) => {
+            try {
+                const geoJsonData = await fetchIntersectingVillagesGeoJson();
+                if (!geoJsonData) {
                     return;
                 }
 
-                // Create vector source from GeoJSON
+                // Parse fresh ol.Feature instances per map - the cached response (the network fetch)
+                // is reused, but each vector source needs its own Feature objects.
                 const villageSource = new ol.source.Vector({
                     features: new ol.format.GeoJSON().readFeatures(geoJsonData)
                 });
@@ -3256,15 +3243,10 @@
 
                 if (!mwsGeometry || !mwsUid) return;
 
-                const extent = mwsGeometry.getExtent();
-                const bboxFilter = `BBOX(the_geom,${extent[0]},${extent[1]},${extent[2]},${extent[3]})`;
-
-                const url = `https://geoserver.core-stack.org:8443/geoserver/panchayat_boundaries/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=panchayat_boundaries:{{district}}_{{block}}&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(bboxFilter)}`;
-
-                const response = await fetch(url);
-                if (!response.ok) return;
-                const geoJsonData = await response.json();
-                if (!geoJsonData.features || geoJsonData.features.length === 0) return;
+                // Reuses the same cached villages fetch as addVillageBoundariesToMap -
+                // avoids re-fetching the same villages for this map.
+                const geoJsonData = await fetchIntersectingVillagesGeoJson();
+                if (!geoJsonData) return;
 
                 const format = new ol.format.GeoJSON();
                 const features = format.readFeatures(geoJsonData);
