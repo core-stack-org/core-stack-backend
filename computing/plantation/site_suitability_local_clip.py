@@ -28,7 +28,7 @@ def run_site_suitability_clipping_local(
     asset_suffix=None,
     roi=None,
     precomputed_roi_dir=None,
-    push_to_geoserver=True,
+    push_to_geoserver=False,
     sync_layer_metadata=False,
 ):
     if state and district and block:
@@ -66,7 +66,7 @@ def run_site_suitability_clipping_local(
         output_path=output_raster_path,
     )
 
-    print(f"Local clipped FABDEM raster written to: {clipped_raster_path}")
+    print(f"Local clipped site suitability raster written to: {clipped_raster_path}")
 
     layer_id = None
     if sync_layer_metadata and state and district and block:
@@ -95,7 +95,9 @@ def run_site_suitability_clipping_local(
             if geoserver_response.get("status_code") != 202:
                 raise RuntimeError(str(geoserver_response))
         except Exception as error:
-            print(f"Failed to queue local FABDEM raster for GeoServer: {error}")
+            print(
+                f"Failed to queue local site suitability raster for GeoServer: {error}"
+            )
             return False
 
     return True
