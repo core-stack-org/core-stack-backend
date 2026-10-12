@@ -6,6 +6,7 @@ from nrm_app.settings import (
     GEE_STORAGE_PROJECT,
     GEE_STORAGE_PROJECT_HELPER,
     GEOSERVER_URL,
+    ARCHIVE_DATA_DIR
 )
 
 # Directory Path
@@ -27,8 +28,8 @@ MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
 CROP_GRID_PATH = "data/crop_grid"
-FARM_BOUNDARIES_PATH = "data/farm_boundaries"
-LOCAL_ET_RASTERS_PATH = "data/et_rasters"
+FARM_BOUNDARIES_PATH = f"{ARCHIVE_DATA_DIR}/farm_boundaries"
+LOCAL_ET_RASTERS_PATH = f"{ARCHIVE_DATA_DIR}"
 
 KML_PATH = "data/kml/"
 SHAPEFILE_DIR = "data/kml/shapefiles"
