@@ -6,7 +6,8 @@ from nrm_app.settings import (
     GEE_STORAGE_PROJECT,
     GEE_STORAGE_PROJECT_HELPER,
     GEOSERVER_URL,
-    ARCHIVE_DATA_DIR
+    ARCHIVE_DATA_DIR,
+    BASE_DATA_DIR
 )
 
 # Directory Path
@@ -339,8 +340,8 @@ INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
 ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
 WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
-SOI_TEHSIL = "data/admin-boundary/input/soi_tehsil.geojson"
-AEZ_GEOJSON = "data/AEZ_GeoJSON.geojson"
+SOI_TEHSIL = f"{BASE_DATA_DIR}/admin-boundary/input/soi_tehsil.geojson"
+AEZ_GEOJSON = f"{BASE_DATA_DIR}/AEZ_GeoJSON.geojson"
 FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
