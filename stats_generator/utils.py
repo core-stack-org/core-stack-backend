@@ -321,9 +321,9 @@ def create_excel_for_forest_fire(geojson_data, writer):
         df.rename(
             columns={
                 "uid": "UID",
-                "fire_count_per_year": "fire_count_per_year_in_FRP",
-                "fire_frp_max": "fire_frp_max_in_FRP",
-                "fire_frp_mean": "fire_frp_mean_in_FRP",
+                "fire_count_per_year": "fire_count_per_year",
+                "fire_frp_max": "fire_frp_max_in_MW",
+                "fire_frp_mean": "fire_frp_mean_in_MW",
             },
             inplace=True,
         )
