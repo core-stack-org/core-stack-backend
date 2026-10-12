@@ -11,7 +11,7 @@ runs add seasons whose inputs have arrived.
 
 | Stage | What it makes | Grid |
 |---|---|---|
-| `rain` | Weekly rainfall, 1991-2020 normals, SPI fits, onset, dry spells, each window's rainfall trigger | CHIRPS 0.05° (all of India, always) |
+| `rain` | Weekly rainfall since 1981; per season, against 1981 to the year before it: onset, dry spells, each window's rainfall trigger | CHIRPS 0.05° (all of India, always) |
 | `cropland` | Kharif-sown share per season, the 2017-2024 normal, the cropland mask, area sown | 500 m MODIS |
 | `vegetation` | Highest NDVI and NDWI per window for every year from 2000, VCI per season | 500 m MODIS |
 | `mai` | ET / PET per window | 500 m MODIS |
@@ -54,6 +54,8 @@ Run these from the repo folder. The repo is mounted at `/app` and the data at `$
 
 To stop it, press Ctrl+C. To continue, run the same command again.
 When new inputs arrive (for example `lulc_v3_2025_2026.tif`), run it again: only the new season is computed.
+When a stage's output is rewritten (for example after a change to the rainfall rules), the next run
+classifies the affected seasons again.
 
 ## Output
 
@@ -61,7 +63,7 @@ When new inputs arrive (for example `lulc_v3_2025_2026.tif`), run it again: only
 data/base_layers/drought/
 ├── status.json                         which seasons and stages are done, per region
 ├── v1/                                 pan-India, method version 1
-│   ├── rain/                           weekly/<year>.tif, normals.tif, spi_fit.tif, seasons/<year>.tif
+│   ├── rain/                           weekly/<year>.tif, seasons/<year>.tif
 │   ├── cropland/                       share_<year>.tif, normal_2017_2024.tif
 │   ├── vegetation/                     window_max/<year>.tif, vci_<year>.tif
 │   ├── moisture/                       mai_<year>.tif
@@ -82,6 +84,8 @@ data/base_layers/drought/
 | `windows_cloud_fallback` | Windows whose VCI had to use cloud-flagged images |
 
 Files written from the container are owned by root on the host.
+`rain/normals.tif` and `rain/spi_fit.tif` from runs before October 2026 (fixed 1991-2020 normals) are no
+longer used and can be deleted.
 
 ## Size and time
 
@@ -89,7 +93,7 @@ Measured on tile h25v07 with 16 workers and the uint8 LULC; a pan-India run is a
 
 | Stage | Tile h25v07 | Pan-India (estimate) | Disk, pan-India |
 |---|---|---|---|
-| `rain` | 2 min | 2 min (always pan-India) | 1.1 GB |
+| `rain` | 3 min | 3 min (always pan-India) | 1.3 GB |
 | `cropland` | 9 min | about 40 min | about 0.5 GB |
 | `vegetation` | 3 min | about 25 min | about 30 GB |
 | `mai` | 1 min | about 4 min | about 2 GB |

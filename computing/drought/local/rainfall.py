@@ -4,10 +4,19 @@ Every 500 m pixel inside a CHIRPS pixel gets that pixel's rainfall (nearest
 neighbour, as in GEE), so computing here and copying the results to the 500 m
 grid later gives the same answer as computing at 500 m, with about 60 times less work.
 
+Season Y is compared with the CHIRPS record from 1981 to Y-1 (as in GEE, without
+the season's own year): the weekly normals, the dry-week test, the deviation and
+the SPI gamma fits all use those years.
+
+Onset, per cell (writeup 3.2.2.3, with the GEE code's zone percentiles):
+  1. threshold: the zone's percentile of the cell's 52 weekly normals
+  2. onset: the first week from 19 to 43 whose rain this year is above the threshold
+  3. if there is none: the median of the past years' onset weeks, found the same way
+     (same threshold; years without one left out; the later middle week when their count is even)
+  4. if no past year has one either: the onset of the nearest cell that has one
+
 Files, under drought/<version>/rain/:
   weekly/<year>.tif     rainfall per standard meteorological week (52 bands, mm)
-  normals.tif           1991-2020 mean of each week (52 bands, mm)
-  spi_fit.tif           gamma fit of 1991-2020 4-week totals, per window start week
   seasons/<year>.tif    onset, dry-spell weeks, and per window: trigger, deviation, SPI, dry spell
 """
 
@@ -18,14 +27,16 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import rasterio
+from scipy.spatial import cKDTree
 from scipy.special import gammainc, ndtri
 
 from computing.drought.local import rules
 from computing.drought.local.config import (
     ONSET_FIRST_WEEK,
-    RAIN_NORMAL_YEARS,
+    RAIN_RECORD_START,
     SEASON_LAST_WEEK,
     WINDOW_WEEKS,
+    rain_normal_years,
 )
 from computing.drought.local.store import read_bands, read_tags, to_int16, write_stack
 from computing.drought.local.weeks import WEEKS_PER_YEAR, season_window_starts, week_end, week_of, week_start
@@ -36,9 +47,11 @@ CHIRPS_NODATA = -9999.0
 RAINY_DAY_MM = 2.5  # IMD's definition of a rainy day
 WINDOW_STARTS = list(season_window_starts(ONSET_FIRST_WEEK))  # weeks 19 to 40
 SEASON_WEEKS = list(range(ONSET_FIRST_WEEK, SEASON_LAST_WEEK + 1))  # weeks 19 to 43
+SEASON_SPAN = slice(ONSET_FIRST_WEEK - 1, SEASON_LAST_WEEK)  # their rows in a 52-week stack
 
 # Onset source codes stored in the season file.
-ONSET_THIS_YEAR, ONSET_NORMAL, ONSET_DEFAULT = 1, 2, 3
+ONSET_THIS_YEAR, ONSET_PAST_MEDIAN, ONSET_NEAREST = 1, 2, 3
+ONSET_RULE = "this year; else median of past onsets; else nearest cell"
 
 # Hydro-meteorological zones (writeup figure 3.20, same rectangles as the GEE pipeline):
 # name, west, south, east, north, percentile of the normal weekly rainfall used as onset threshold.
@@ -62,21 +75,13 @@ def weekly_file(paths, year):
     return rain_dir(paths) / "weekly" / f"{year}.tif"
 
 
-def normals_file(paths):
-    return rain_dir(paths) / "normals.tif"
-
-
-def spi_fit_file(paths):
-    return rain_dir(paths) / "spi_fit.tif"
-
-
 def season_file(paths, year):
     return rain_dir(paths) / "seasons" / f"{year}.tif"
 
 
 def chirps_grid(paths):
     """Transform, CRS and shape of the CHIRPS India window the downloader stores."""
-    with rasterio.open(paths.chirps_day(dt.date(RAIN_NORMAL_YEARS[0], 1, 1))) as src:
+    with rasterio.open(paths.chirps_day(dt.date(RAIN_RECORD_START, 1, 1))) as src:
         return src.transform, src.crs, (src.height, src.width)
 
 
@@ -194,64 +199,89 @@ def spi(total, alpha, beta, zero_share):
     return value
 
 
-def ensure_baselines(paths, workers=8):
-    """Weekly totals for the normal years, the weekly normals, and the SPI fits."""
-    first, last = RAIN_NORMAL_YEARS
-    years = range(first, last + 1)
-    ensure_weekly(paths, years, workers=workers)
-    transform, crs, _ = chirps_grid(paths)
-    tags = {"years": f"{first}-{last}"}
-
-    if not normals_file(paths).is_file():
-        log.info("Rainfall normals %s-%s", first, last)
-        stack = np.stack([read_weekly(paths, y) for y in years])
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
-            normals = np.nanmean(stack, axis=0).astype(np.float32)
-        names = [f"week_{w:02d}" for w in range(1, WEEKS_PER_YEAR + 1)]
-        write_stack(normals_file(paths), normals, transform, crs, names, np.nan, {**tags, "units": "mm"})
-
-    if not spi_fit_file(paths).is_file():
-        log.info("SPI gamma fits %s-%s for window start weeks %s-%s", first, last, WINDOW_STARTS[0], WINDOW_STARTS[-1])
-        totals = np.stack([window_totals(read_weekly(paths, y)) for y in years])  # (years, windows, r, c)
-        bands, names = [], []
-        for i, w in enumerate(WINDOW_STARTS):
-            alpha, beta, zero_share = gamma_fit(totals[:, i])
-            bands += [alpha, beta, zero_share]
-            names += [f"alpha_w{w:02d}", f"beta_w{w:02d}", f"zero_share_w{w:02d}"]
-        write_stack(spi_fit_file(paths), np.stack(bands).astype(np.float32), transform, crs, names, np.nan, tags)
+def history_window_totals(history, start_week):
+    """4-week totals of the past years for the window starting in start_week;
+    history holds weeks 19-43 of each past year, shape (years, 25, ...)."""
+    first = start_week - ONSET_FIRST_WEEK
+    return history[:, first:first + WINDOW_WEEKS].sum(axis=1)
 
 
 # ---------------------------------------------------------------- onset
 
 
-def onset_week(weekly, normals, pct):
-    """First week from week 19 whose rainfall exceeds the pixel's onset threshold (the zone's
-    percentile of its normal weekly rainfall). If the season never exceeds it, the week the
-    normal year would, else week 19. Returns (week, source)."""
+def onset_threshold(normals, pct):
+    """Each cell's onset threshold: its zone's percentile of the cell's 52 weekly normals."""
+    threshold = np.full(pct.shape, np.nan)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
-        threshold = np.full(pct.shape, np.nan)
         for p in np.unique(pct[~np.isnan(pct)]):
             sel = pct == p
             threshold[sel] = np.nanpercentile(normals[:, sel], p, axis=0)
-    span = slice(ONSET_FIRST_WEEK - 1, SEASON_LAST_WEEK)
+    return threshold
+
+
+def first_week_above(season_weeks, threshold, axis=0):
+    """First week (19-43) whose rain is above the threshold; NaN where no week is.
+    season_weeks holds weeks 19-43 along axis."""
     with np.errstate(invalid="ignore"):
-        this_year = weekly[span] > threshold
-        normal_year = normals[span] > threshold
-    week = np.where(
-        this_year.any(axis=0),
-        this_year.argmax(axis=0) + ONSET_FIRST_WEEK,
-        np.where(normal_year.any(axis=0), normal_year.argmax(axis=0) + ONSET_FIRST_WEEK, ONSET_FIRST_WEEK),
-    )
-    source = np.where(this_year.any(axis=0), ONSET_THIS_YEAR,
-                      np.where(normal_year.any(axis=0), ONSET_NORMAL, ONSET_DEFAULT))
-    return week.astype(np.int16), source.astype(np.int16)
+        above = np.asarray(season_weeks) > threshold
+    return np.where(above.any(axis=axis), above.argmax(axis=axis) + ONSET_FIRST_WEEK, np.nan)
+
+
+def upper_median(values, axis=0):
+    """Median that takes the later of the two middle values when their count is even.
+    NaN values are left out; the result is NaN where nothing is left."""
+    values = np.sort(np.asarray(values, dtype=np.float64), axis=axis)  # NaN sort last
+    count = (~np.isnan(values)).sum(axis=axis)
+    index = np.expand_dims(np.minimum(count // 2, values.shape[axis] - 1), axis)
+    middle = np.take_along_axis(values, index, axis).squeeze(axis)
+    return np.where(count > 0, middle, np.nan)
+
+
+def _unit_vectors(lon, lat):
+    lon, lat = np.radians(lon), np.radians(lat)
+    return np.column_stack([np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)])
+
+
+def nearest_onset(week, lon, lat, missing):
+    """Onset week of the nearest cell that has one, for each missing cell (great-circle distance).
+    When several cells are equally near, the upper median of their weeks."""
+    donors = ~np.isnan(week) & ~missing
+    if not donors.any():
+        raise ValueError("no cell has an onset to copy")
+    k = int(min(8, donors.sum()))
+    tree = cKDTree(_unit_vectors(lon[donors], lat[donors]))
+    dist, index = tree.query(_unit_vectors(lon[missing], lat[missing]), k=k)
+    dist, index = dist.reshape(-1, k), index.reshape(-1, k)
+    tied = dist <= dist[:, :1] * (1 + 1e-9) + 1e-15
+    return upper_median(np.where(tied, week[donors][index], np.nan), axis=1)
+
+
+def season_onset(this_year, history, threshold, land, lon, lat):
+    """Onset week and its source code per cell (NaN and 0 outside land).
+    this_year: weeks 19-43 of the season, shape (25, r, c); history: the same weeks of
+    every past year, shape (years, 25, r, c)."""
+    week = np.where(land, first_week_above(this_year, threshold), np.nan)
+    source = np.where(np.isnan(week), 0, ONSET_THIS_YEAR).astype(np.int16)
+
+    todo = land & np.isnan(week)
+    if todo.any():
+        past = first_week_above(history[:, :, todo], threshold[todo], axis=1)  # (years, cells)
+        median = upper_median(past, axis=0)
+        week[todo] = median
+        source[todo] = np.where(np.isnan(median), 0, ONSET_PAST_MEDIAN)
+
+    missing = land & np.isnan(week)
+    if missing.any():
+        week[missing] = nearest_onset(week, lon, lat, missing)
+        source[missing] = ONSET_NEAREST
+    return week, source
 
 
 def onset_day(paths, year, week):
     """Day of year of the first rainy day (2.5 mm or more) in each pixel's onset week;
-    the first day with any rain if none reaches 2.5 mm; else the week's first day."""
+    the first day with any rain if none reaches 2.5 mm; else the week's first day.
+    Pixels with week 0 (outside land) get 0."""
     first = week_start(year, ONSET_FIRST_WEEK)
     days = [first + dt.timedelta(days=i) for i in range((week_end(year, SEASON_LAST_WEEK) - first).days + 1)]
     out = np.zeros(week.shape, dtype=np.int16)
@@ -270,7 +300,7 @@ def onset_day(paths, year, week):
         first_any[wet], found_any[wet] = doy, True
     use_any = ~found_rainy & found_any
     out[use_any] = first_any[use_any]
-    none = ~found_rainy & ~found_any
+    none = ~found_rainy & ~found_any & (week > 0)
     for w in np.unique(week[none]):
         out[none & (week == w)] = week_start(year, int(w)).timetuple().tm_yday
     return out
@@ -279,56 +309,89 @@ def onset_day(paths, year, week):
 # ---------------------------------------------------------------- season
 
 
-def season_rain(paths, year):
-    """Onset, dry-spell weeks and the per-window rainfall trigger for one season."""
+def season_rain(paths, year, normals, history):
+    """Onset, dry-spell weeks and the per-window rainfall trigger for one season.
+    normals: the 52 weekly means over the past years; history: weeks 19-43 of each past year."""
     transform, crs, shape = chirps_grid(paths)
+    first_year, last_year = rain_normal_years(year)
     weekly = read_weekly(paths, year)
-    normals = read_bands(normals_file(paths))
-    fit = read_bands(spi_fit_file(paths))
     lon, lat = cell_lonlat(transform, shape)
     pct = zone_percentile(lon, lat)
     pct[np.isnan(normals).all(axis=0)] = np.nan  # outside CHIRPS land
+    land = ~np.isnan(pct)
 
-    onset, source = onset_week(weekly, normals, pct)
-    doy = onset_day(paths, year, onset)
+    threshold = onset_threshold(normals, pct)
+    onset, source = season_onset(weekly[SEASON_SPAN], history, threshold, land, lon, lat)
+    onset_week = np.where(land, onset, 0).astype(np.int16)
+    doy = onset_day(paths, year, onset_week)
 
     dry = rules.dry_weeks(weekly, normals)  # (52, r, c)
     week_numbers = np.arange(1, WEEKS_PER_YEAR + 1)[:, None, None]
-    after_onset = dry & (week_numbers >= onset)
-    season = slice(ONSET_FIRST_WEEK - 1, SEASON_LAST_WEEK)
-    dry_spell_weeks = rules.dry_spell_weeks(after_onset[season])
-    longest_dry_spell = rules.longest_dry_spell(after_onset[season])
+    after_onset = dry & land & (week_numbers >= onset_week)
+    dry_spell_weeks = rules.dry_spell_weeks(after_onset[SEASON_SPAN])
+    longest_dry_spell = rules.longest_dry_spell(after_onset[SEASON_SPAN])
 
     totals = window_totals(weekly)
     normal_totals = window_totals(normals)
-    bands = [onset, doy, source, dry_spell_weeks.astype(np.int16), longest_dry_spell.astype(np.int16)]
-    names = ["onset_week", "onset_day_of_year", "onset_source", "dry_spell_weeks", "longest_dry_spell_weeks"]
+    bands = [onset_week, doy, source, to_int16(threshold, 10), dry_spell_weeks.astype(np.int16),
+             longest_dry_spell.astype(np.int16)]
+    names = ["onset_week", "onset_day_of_year", "onset_source", "onset_threshold_x10",
+             "dry_spell_weeks", "longest_dry_spell_weeks"]
     for i, w in enumerate(WINDOW_STARTS):
         with np.errstate(divide="ignore", invalid="ignore"):
             deviation = np.where(normal_totals[i] > 0, (totals[i] - normal_totals[i]) / normal_totals[i] * 100, np.nan)
-        index = spi(totals[i], fit[3 * i], fit[3 * i + 1], fit[3 * i + 2])
+        index = spi(totals[i], *gamma_fit(history_window_totals(history, w)))
         dry_spell = rules.dry_spell_in_window(dry[w - 1:w - 1 + WINDOW_WEEKS])
         trigger = rules.rain_trigger(dry_spell, deviation, index)
         bands += [trigger.astype(np.int16), to_int16(deviation), to_int16(index, 100), dry_spell.astype(np.int16)]
         names += [f"trigger_w{w:02d}", f"deviation_pct_w{w:02d}", f"spi_x100_w{w:02d}", f"dry_spell_w{w:02d}"]
 
-    land = ~np.isnan(pct)
     data = np.stack(bands).astype(np.int16)
     data[:, ~land] = -32768
+    years = f"{first_year}-{last_year}"
     write_stack(season_file(paths, year), data, transform, crs, names, -32768,
-                {"season": year, "rain_normal_years": f"{RAIN_NORMAL_YEARS[0]}-{RAIN_NORMAL_YEARS[1]}",
-                 "deviation": "% of normal, window total", "spi": "x100, gamma fit 1991-2020"})
-    return {"onset_this_year_share": round(float((source[land] == ONSET_THIS_YEAR).mean()), 3)}
+                {"season": year, "rain_normal_years": years, "onset_rule": ONSET_RULE,
+                 "onset_source": "1 this year, 2 median of past onsets, 3 nearest cell",
+                 "onset_threshold": "mm per week x10", "deviation": "% of normal, window total",
+                 "spi": f"x100, gamma fit {years}"})
+    return {"normal_years": years,
+            "onset_this_year_share": round(float((source[land] == ONSET_THIS_YEAR).mean()), 4),
+            "onset_past_median_cells": int((source == ONSET_PAST_MEDIAN).sum()),
+            "onset_nearest_cells": int((source == ONSET_NEAREST).sum())}
+
+
+def season_is_current(paths, year):
+    """True when the season file exists and was made with this rule and these normal years."""
+    path = season_file(paths, year)
+    if not path.is_file():
+        return False
+    tags = read_tags(path)
+    first_year, last_year = rain_normal_years(year)
+    return tags.get("rain_normal_years") == f"{first_year}-{last_year}" and tags.get("onset_rule") == ONSET_RULE
 
 
 def run(paths, seasons, workers=8):
-    """Rainfall stage for the given seasons. Returns {season: summary}."""
-    ensure_baselines(paths, workers)
-    ensure_weekly(paths, seasons, last_week=SEASON_LAST_WEEK, workers=workers)
-    done = {}
-    for year in seasons:
-        if season_file(paths, year).is_file():
-            continue
-        log.info("Rainfall season %s", year)
-        done[year] = season_rain(paths, year)
+    """Rainfall stage for the given seasons whose file is missing or made under an older rule.
+    Returns {season: summary}."""
+    todo = sorted(s for s in seasons if not season_is_current(paths, s))
+    if not todo:
+        return {}
+    first = RAIN_RECORD_START
+    ensure_weekly(paths, range(first, todo[-1]), workers=workers)  # whole past years
+    ensure_weekly(paths, todo, last_week=SEASON_LAST_WEEK, workers=workers)
+
+    # Read each past year once: a running sum for the normals and weeks 19-43 for SPI and onset.
+    _, _, shape = chirps_grid(paths)
+    history = np.empty((todo[-1] - first, len(SEASON_WEEKS)) + shape, dtype=np.float32)
+    total = np.zeros((WEEKS_PER_YEAR,) + shape, dtype=np.float64)
+    loaded, done = 0, {}
+    for year in todo:
+        while first + loaded < year:
+            weekly = read_weekly(paths, first + loaded)
+            total += weekly
+            history[loaded] = weekly[SEASON_SPAN]
+            loaded += 1
+        log.info("Rainfall season %s against %s-%s", year, first, year - 1)
+        normals = (total / loaded).astype(np.float32)
+        done[year] = season_rain(paths, year, normals, history[:loaded])
     return done

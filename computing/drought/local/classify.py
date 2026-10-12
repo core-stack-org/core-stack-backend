@@ -25,7 +25,7 @@ from rasterio.windows import transform as window_transform
 from computing.drought.local import cropland, moisture, rainfall, rules, vegetation
 from computing.drought.local.config import ONSET_FIRST_WEEK, SEASON_LAST_WEEK
 from computing.drought.local.grid import load_grid, lookup_index, pixel_lonlat
-from computing.drought.local.store import band_names, read_bands, write_stack
+from computing.drought.local.store import band_names, read_bands, read_tags, write_stack
 
 log = logging.getLogger(__name__)
 
@@ -52,10 +52,24 @@ def published_file(paths, season):
     return paths.version_dir / "published" / f"drought_{season}.tif"
 
 
+def input_files(paths, season):
+    return [rainfall.season_file(paths, season), cropland.normal_file(paths), cropland.share_file(paths, season),
+            vegetation.vci_file(paths, season), moisture.mai_file(paths, season)]
+
+
 def inputs_ready(paths, season):
-    return all(p.is_file() for p in (
-        rainfall.season_file(paths, season), cropland.normal_file(paths), cropland.share_file(paths, season),
-        vegetation.vci_file(paths, season), moisture.mai_file(paths, season)))
+    return all(p.is_file() for p in input_files(paths, season))
+
+
+def inputs_stamp(paths, season):
+    """When each input was written. A season is classified again when any input is rewritten."""
+    return ";".join(read_tags(p).get("written_at", "") for p in input_files(paths, season))
+
+
+def is_current(paths, season):
+    summary = summary_file(paths, season)
+    return (summary.is_file() and published_file(paths, season).is_file()
+            and read_tags(summary).get("inputs_written_at") == inputs_stamp(paths, season))
 
 
 def classify_arrays(onset, triggers, vci, mai, sown, crop, fallback, dry_total, dry_longest):
@@ -128,7 +142,7 @@ def classify_season(paths, season, region):
     summary[:, ~inside] = UINT8_NODATA
     transform = window_transform(region, grid.transform)
     tags = {"season": season, "region": paths.region_key, "weeks": f"{SEASON_WEEKS[0]}-{SEASON_WEEKS[-1]}",
-            "classes": "0 none, 1 mild, 2 moderate, 3 severe"}
+            "classes": "0 none, 1 mild, 2 moderate, 3 severe", "inputs_written_at": inputs_stamp(paths, season)}
     write_stack(labels_file(paths, season), labels, transform, grid.crs,
                 [f"week_{w:02d}" for w in SEASON_WEEKS], UINT8_NODATA, tags)
     write_stack(summary_file(paths, season), summary, transform, grid.crs, SUMMARY_NAMES, UINT8_NODATA, tags)
@@ -152,13 +166,14 @@ def publish(paths, season):
 
 
 def run(paths, seasons, region, workers=8):
-    """Classification for the seasons whose stage outputs all exist. Returns the seasons written."""
+    """Classification for the seasons whose stage outputs all exist and are newer than
+    the last classification. Returns the seasons written."""
     written = []
     for season in seasons:
-        if summary_file(paths, season).is_file() and published_file(paths, season).is_file():
-            continue
         if not inputs_ready(paths, season):
             log.info("Classify %s: earlier stages not finished; skipped", season)
+            continue
+        if is_current(paths, season):
             continue
         log.info("Classify season %s", season)
         classify_season(paths, season, region)

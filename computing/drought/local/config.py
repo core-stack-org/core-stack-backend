@@ -13,7 +13,7 @@ METHOD_VERSION = "v1"
 MANUAL_EDITION = "Manual for Drought Management, updated to December 2020"
 
 FIRST_SEASON = 2017
-RAIN_NORMAL_YEARS = (1991, 2020)
+RAIN_RECORD_START = 1981  # CHIRPS's first year
 SOWN_NORMAL_YEARS = (2017, 2024)
 VCI_HISTORY_START = 2000
 
@@ -26,6 +26,12 @@ WINDOW_WEEKS = 4
 MOD09A1_LAYERS = ("b01", "b02", "b06", "state")
 MOD16A2GF_LAYERS = ("ET", "PET")
 MODIS_FILE_PREFIX = {"mod09a1": "MOD09A1", "mod16a2gf": "MOD16A2GF"}
+
+
+def rain_normal_years(season):
+    """Season Y's rainfall is compared with 1981 to Y-1, as in GEE; the season's own year is left out,
+    so a finished season never changes when later years are added."""
+    return RAIN_RECORD_START, season - 1
 
 
 @dataclass(frozen=True)

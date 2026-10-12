@@ -5,7 +5,7 @@ writes. Progress comes from drought/status.json, which the stages update as they
 finish:
 
     {"method_version": "v1",
-     "shared":  {"rain": {"baselines": {...}, "seasons": {"2023": {...}}}},
+     "shared":  {"rain": {"seasons": {"2023": {...}}}},
      "regions": {"india": {"seasons": {"2023": {"state": "done", ...}}}, "h25v07": {...}}}
 """
 
@@ -20,9 +20,9 @@ from computing.drought.local.config import (
     MOD09A1_LAYERS,
     MOD16A2GF_LAYERS,
     ONSET_FIRST_WEEK,
-    RAIN_NORMAL_YEARS,
     SEASON_LAST_WEEK,
     SOWN_NORMAL_YEARS,
+    rain_normal_years,
 )
 from computing.drought.local.store import read_status
 from computing.drought.local.weeks import season_composites, vci_history_years, week_end, week_start
@@ -77,10 +77,6 @@ def _plural(n, word):
 def baseline_gaps(paths):
     """[(input, reason)] for inputs every season shares."""
     gaps = []
-    first, last = RAIN_NORMAL_YEARS
-    missing = missing_chirps_days(paths, dt.date(first, 1, 1), dt.date(last, 12, 31))
-    if missing:
-        gaps.append(("chirps", f"CHIRPS {first}-{last} normals: {_plural(len(missing), 'day')} missing"))
     lulc = [y for y in range(SOWN_NORMAL_YEARS[0], SOWN_NORMAL_YEARS[1] + 1) if not paths.lulc_file(y).is_file()]
     if lulc:
         gaps.append(("lulc", "area-sown normal: " + ", ".join(paths.lulc_file(y).name for y in lulc) + " not found"))
@@ -90,6 +86,10 @@ def baseline_gaps(paths):
 def season_gaps(paths, season):
     """[(input, reason)] for what a season still needs; empty when it can run."""
     gaps = []
+    first_year, last_year = rain_normal_years(season)
+    record = missing_chirps_days(paths, dt.date(first_year, 1, 1), dt.date(last_year, 12, 31))
+    if record:
+        gaps.append(("chirps", f"CHIRPS {first_year}-{last_year} record: {_plural(len(record), 'day')} missing"))
     first, last = week_start(season, ONSET_FIRST_WEEK), week_end(season, SEASON_LAST_WEEK)
     days = missing_chirps_days(paths, first, last)
     if days:

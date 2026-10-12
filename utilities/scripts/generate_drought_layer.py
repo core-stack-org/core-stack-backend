@@ -7,8 +7,9 @@ The method is the CoRE v3 writeup (section 3.2.2.1) with the thresholds and
 severity rule of the Manual for Drought Management, updated to December 2020.
 
 Stages so far:
-  rain      on the CHIRPS grid for all of India: weekly totals, 1991-2020 normals,
-            SPI fits, monsoon onset, dry-spell weeks and each window's rainfall trigger
+  rain      on the CHIRPS grid for all of India: weekly totals since 1981, monsoon onset,
+            dry-spell weeks and each window's rainfall trigger, each season against
+            1981 to the year before it
   cropland  on the 500 m grid of the region: each pixel's kharif-sown share from the
             10 m LULC, the 2017-2024 normal, the cropland mask, and area sown per season
   vegetation  on the 500 m grid of the region: each window's highest NDVI and NDWI per
@@ -94,12 +95,15 @@ def run_rain(paths, seasons, workers):
 
     def record(status):
         rain = status.setdefault("shared", {}).setdefault("rain", {})
-        rain["baselines"] = {"finished_at": rain.get("baselines", {}).get("finished_at") or now(),
-                             "normal_years": "1991-2020"}
+        rain.pop("baselines", None)  # from the earlier fixed 1991-2020 normals
         seasons_done = rain.setdefault("seasons", {})
         for season in runnable:
             if str(season) not in seasons_done or season in summaries:
                 seasons_done[str(season)] = {"finished_at": now(), **summaries.get(season, {})}
+        # New rainfall results: every region has to classify these seasons again.
+        for region in status.get("regions", {}).values():
+            for season in summaries:
+                region.get("seasons", {}).pop(str(season), None)
 
     update_status(paths, record)
 
