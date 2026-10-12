@@ -118,10 +118,10 @@ def _monthly_parquet_path(state, district, block):
     return os.path.join(_block_dir(state, district, block), "farms/sub_annual.parquet")
 
 def _local_aet_path(aez, year):
-    return os.path.join(LOCAL_ET_RASTERS_PATH, f"AET_latest/AET_AEZ_{aez}/AET_{aez}_{year}_cog.tif")
+    return os.path.join(LOCAL_ET_RASTERS_PATH, f"AET_Rasters/AET_AEZ_{aez}/AET_{aez}_{year}_cog.tif")
 
 def _local_pet_path(aez, year):
-    return os.path.join(LOCAL_ET_RASTERS_PATH, f"PET_drive_data/PET{aez}/merge_PET_{aez}_{year}_cog.tif")
+    return os.path.join(LOCAL_ET_RASTERS_PATH, f"PET_Rasters/PET_AEZ_{aez}/merge_PET_{aez}_{year}_cog.tif")
 
 def _manifest_path(state: str, district: str, block: str) -> str:
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "manifest.json")
