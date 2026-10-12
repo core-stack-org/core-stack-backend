@@ -51,7 +51,6 @@ def build_farm_boundary_map(
     state: str,
     district: str,
     block: str,
-    api_key: str,
     year: int = None,
     overwrite=False,
 ):
