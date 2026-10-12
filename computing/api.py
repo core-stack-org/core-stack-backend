@@ -294,7 +294,7 @@ def generate_farm_boundaries(request):
                 )
 
         build_farm_boundary_map.apply_async(
-            args=[state, district, block, year, overwrite],
+            kwargs={"state" : state, "district" : district, "block" : block, "year" : year, "overwrite" : overwrite},
             queue="nrm",
         )
 
