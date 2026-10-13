@@ -1965,6 +1965,7 @@ All endpoints accept `Authorization: Bearer <token>` **or** `X-API-Key: <key>`.
 | `PATCH dpr_data/{id}/demand-status/` | No | Any resource/demand model (single record update) |
 | `GET dpr_data/{id}/report-status/` | No | `DPR_Report` (current workflow status) |
 | `PATCH dpr_data/{id}/report-status/` | No | `DPR_Report` (update workflow status) |
+| `GET dpr_data/export_plans_csv/?organization_id=` | No | `dpr/utils/dpr_dump_views.sql` (CSV download, all plans of an organization) |
 
 ---
 
@@ -2275,6 +2276,36 @@ Approve the DPR without touching individual records:
 **Error Responses**:
 - `400 Bad Request` — no fields provided, or invalid value for any field
 - `404 Not Found` — plan or DPR report not found
+
+---
+
+### Export Plans CSV (DPR Dump)
+
+- **URL**: `/api/v1/dpr_data/export_plans_csv/`
+- **Method**: GET
+- **Auth**: JWT only (`Authorization: Bearer <token>`; API key is not accepted)
+- **Description**: Downloads the section-wise DPR data of **all plans of an organization** as one wide CSV. It runs the temp views in `dpr/utils/dpr_dump_views.sql` (the `pradan_dpr_dump` view) inside a single transaction and streams the result via `COPY ... TO STDOUT`. Rows are ordered by `Plan ID, Section, DPR Table, Record ID`.
+
+**Query Parameters**:
+- `organization_id` (UUID, required): Organization whose plans are exported
+- `sections` (string, optional): Letters from `B`–`G`, case-insensitive, e.g. `sections=efg`. Defaults to `BCDEFG` (all). Duplicates are dropped and the order is normalised. Section `A` (team details) is not part of the dump.
+
+When a subset of sections is requested, the first 19 identity columns (organization … Record ID) are always kept and data columns that are empty for those sections are dropped.
+
+**Access**: superuser, superadmin, or a user whose `organization_id` equals the requested `organization_id`.
+
+**Response** (`200 OK`): `text/csv; charset=utf-8` with
+`Content-Disposition: attachment; filename="plans-<org-name-slug>-<YYYY-MM-DD>.csv"`
+
+**Example**:
+```
+GET /api/v1/dpr_data/export_plans_csv/?organization_id=3f2b8c1e-5d4a-4e7b-9a10-2c6d8e9f0a11&sections=EFG
+```
+
+**Error Responses**:
+- `400 Bad Request` — `organization_id` missing or not a valid UUID, or `sections` contains letters outside `B`–`G`
+- `403 Forbidden` — user does not have access to this organization
+- `404 Not Found` — organization not found
 
 ---
 
