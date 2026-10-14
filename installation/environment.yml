@@ -104,3 +104,4 @@ dependencies:
       - xee==0.0.24
       - zarr==2.18.3
       - xarray
+      - pygbif

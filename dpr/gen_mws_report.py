@@ -3866,6 +3866,72 @@ def get_soge_data(state, district, block, uid):
         return ""
 
 
+def get_biodiversity_data(state, district, block, uid):
+    """
+    Narrative + data dict for the biodiversity (GBIF) section of the MWS report.
+    Always pairs richness with sampling effort and a data-poor caveat, because GBIF is
+    opportunistic (absence in GBIF != true absence).
+    """
+    empty = {
+        "species_richness": 0,
+        "occurrence_count": 0,
+        "threatened_species_count": 0,
+        "shannon_diversity_index": 0,
+        "dominant_class": "Unknown",
+        "biodiversity_category": "Unknown",
+        "data_poor": True,
+    }
+    try:
+        df = pd.read_excel(
+            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/"
+            + district.lower() + "_" + block.lower() + ".xlsx",
+            sheet_name="biodiversity",
+        )
+        row = df.loc[df["UID"] == uid]
+        if row.empty:
+            return "", empty
+        r = row.iloc[0]
+        data = {
+            "species_richness": int(r.get("species_richness", 0)),
+            "occurrence_count": int(r.get("occurrence_count", 0)),
+            "threatened_species_count": int(r.get("threatened_species_count", 0)),
+            "shannon_diversity_index": round(float(r.get("shannon_diversity_index", 0)), 2),
+            "dominant_class": r.get("dominant_class", "Unknown"),
+            "biodiversity_category": r.get("biodiversity_category", "Unknown"),
+            "data_poor": bool(r.get("data_poor", True)),
+        }
+
+        if data["data_poor"]:
+            desc = (
+                f"This watershed has only {data['occurrence_count']} biodiversity "
+                f"records in GBIF (under-surveyed). The {data['species_richness']} species "
+                "on record are likely an underestimate — a field survey is recommended "
+                "before drawing conclusions."
+            )
+        else:
+            desc = (
+                f"This watershed has {data['biodiversity_category'].lower()} biodiversity: "
+                f"{data['species_richness']} distinct species across "
+                f"{data['occurrence_count']} occurrence records, dominated by "
+                f"{data['dominant_class']} (Shannon diversity {data['shannon_diversity_index']})."
+            )
+        if data["threatened_species_count"] > 0:
+            desc += (
+                f" {data['threatened_species_count']} IUCN-threatened species "
+                "(Vulnerable/Endangered/Critically Endangered) have been recorded — "
+                "this warrants attention during any land-use planning."
+            )
+        return desc, data
+
+    except Exception:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Biodiversity Data",
+            district,
+            block,
+        )
+        return "", empty
+
+
 def get_drought_data(state, district, block, uid):
     try:
         df = read_excel_sheet(

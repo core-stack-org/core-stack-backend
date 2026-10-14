@@ -79,6 +79,11 @@ urlpatterns = [
         api.change_detection_vector,
         name="change_detection_vector",
     ),
+    path(
+        "generate_biodiversity_layer/",
+        api.generate_biodiversity_layer,
+        name="generate_biodiversity_layer",
+    ),
     path("crop_grid/", api.crop_grid, name="crop_grid"),
     path(
         "generate_farm_boundaries/",

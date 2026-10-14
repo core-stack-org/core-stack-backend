@@ -65,3 +65,10 @@ computing/migrations/0004_layermapping.py
 # Vim swap files
 *.swp
 *.swo
+# GBIF biodiversity local data & caches (do not commit)
+computing/gbif/_data/
+computing/gbif/_cache/
+
+# local installer state and GEE service-account key (never commit)
+.installation_state/
+core-stack-key.json

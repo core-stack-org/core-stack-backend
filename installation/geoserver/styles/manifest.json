@@ -1,7 +1,7 @@
 {
   "source_url": "https://geoserver.core-stack.org:8443/geoserver",
   "fetched_at": "2026-05-22T10:21:50.016965+00:00",
-  "style_count": 55,
+  "style_count": 56,
   "styles": [
     {
       "name": "burg",
@@ -277,6 +277,11 @@
       "name": "nightlight1",
       "workspace": "zerodose",
       "file": "workspaces/zerodose/nightlight1.sld"
+    },
+    {
+      "name": "biodiversity_mws",
+      "workspace": "biodiversity",
+      "file": "workspaces/biodiversity/biodiversity_mws.sld"
     }
   ]
 }

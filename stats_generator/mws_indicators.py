@@ -106,6 +106,7 @@ def generate_mws_data_for_kyl_filters(
                 "tree_in_grassland": -1,
                 "antyodaya": -1,
                 "forest_fire": -1,
+                "biodiversity": -1,
             }
 
             try:
@@ -1453,6 +1454,37 @@ def generate_mws_data_for_kyl_filters(
                 except Exception as e:
                     print(f"error while getting fire frp mean: {e}")
                     forest_fire_mean_intensity = -9999
+                ############ Biodiversity (GBIF) ########################
+                species_richness = 0
+                occurrence_count = 0
+                threatened_species_count = 0
+                shannon_diversity_index = 0
+                dominant_class = "Unknown"
+                biodiversity_category = "Unknown"
+                biodiversity_data_poor = True
+                try:
+                    biodiversity_df = sheets["biodiversity"]
+                    if isinstance(biodiversity_df, pd.DataFrame) and not biodiversity_df.empty:
+                        mws_bio_data = biodiversity_df[
+                            biodiversity_df["UID"] == specific_mws_id
+                        ]
+                        if not mws_bio_data.empty:
+                            row = mws_bio_data.iloc[0]
+                            species_richness = int(row.get("species_richness", 0))
+                            occurrence_count = int(row.get("occurrence_count", 0))
+                            threatened_species_count = int(
+                                row.get("threatened_species_count", 0)
+                            )
+                            shannon_diversity_index = round(
+                                float(row.get("shannon_diversity_index", 0)), 3
+                            )
+                            dominant_class = row.get("dominant_class", "Unknown")
+                            biodiversity_category = row.get(
+                                "biodiversity_category", "Unknown"
+                            )
+                            biodiversity_data_poor = bool(row.get("data_poor", True))
+                except Exception as e:
+                    print(f"Error in getting biodiversity data: {e}")
 
                 results.append(
                     {
@@ -1538,6 +1570,13 @@ def generate_mws_data_for_kyl_filters(
                         "tree_cover_area": tree_cover_area,
                         "shg_penetration": shg_penetration,
                         "forest_fire_mean_intensity": forest_fire_mean_intensity,
+                        "species_richness": species_richness,
+                        "occurrence_count": occurrence_count,
+                        "threatened_species_count": threatened_species_count,
+                        "shannon_diversity_index": shannon_diversity_index,
+                        "dominant_taxon_group": dominant_class,
+                        "biodiversity_category": biodiversity_category,
+                        "biodiversity_data_poor": biodiversity_data_poor,
                     }
                 )
 

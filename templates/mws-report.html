@@ -2840,6 +2840,34 @@
                 model incoming runoff into the microwatershed, as well as sub-surface flow from adjacent areas.</p>
         </section>
 
+        {% if biodiversity_desc %}
+        <section class="section">
+            <h3>Biodiversity</h3>
+
+            <p>Biodiversity here is derived from GBIF species-occurrence records within this
+                micro-watershed. GBIF data is opportunistic — it reflects where surveyors have
+                visited, so the record count (survey effort) is shown alongside species richness.
+                Absence of a species in GBIF does not confirm its absence on the ground.</p>
+
+            <p>{{biodiversity_desc}}</p>
+
+            <table class="data-table">
+                <tr><th>Indicator</th><th>Value</th></tr>
+                <tr><td>Biodiversity category</td><td>{{biodiversity_data.biodiversity_category}}</td></tr>
+                <tr><td>Distinct species recorded</td><td>{{biodiversity_data.species_richness}}</td></tr>
+                <tr><td>Occurrence records (survey effort)</td><td>{{biodiversity_data.occurrence_count}}</td></tr>
+                <tr><td>IUCN-threatened species</td><td>{{biodiversity_data.threatened_species_count}}</td></tr>
+                <tr><td>Shannon diversity index</td><td>{{biodiversity_data.shannon_diversity_index}}</td></tr>
+                <tr><td>Dominant group</td><td>{{biodiversity_data.dominant_class}}</td></tr>
+            </table>
+
+            {% if biodiversity_data.data_poor %}
+            <p><em>⚠ Under-surveyed watershed (fewer than 20 records): treat the figures above as a
+                lower bound, not a complete inventory.</em></p>
+            {% endif %}
+        </section>
+        {% endif %}
+
         {% if soge_desc %}
         <section class="section">
             <h3>Groundwater Extraction</h3>

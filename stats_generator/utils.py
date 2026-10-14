@@ -255,6 +255,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
             elif workspace == "drainage_density":
                 create_excel_for_drainage_density(geojson_data, writer)
+            elif workspace == "biodiversity":
+                create_excel_for_biodiversity(geojson_data, writer)
             elif workspace == "antyodaya_2020":
                 create_excel_for_antyodaya_20(geojson_data, writer)
             elif workspace == "livestocks":
@@ -712,6 +714,48 @@ def create_excel_for_antyodaya_20(data, writer):
         print("Excel file created for antyodaya")
     except Exception as e:
         print(f"Error in getting antyodaya data: {e}")
+
+
+def create_excel_for_biodiversity(data, writer):
+    print("Inside create_excel_for Biodiversity")
+    df_data = []
+    features = data.get("features", [])
+    if not features:
+        print("No biodiversity features returned by GeoServer; skipping sheet")
+        return
+
+    for feature in features:
+        properties = feature["properties"]
+        row = {
+            "UID": properties.get("uid", ""),
+            "species_richness": properties.get("species_richness", 0),
+            "occurrence_count": properties.get("occurrence_count", 0),
+            "threatened_species_count": properties.get("threatened_species_count", 0),
+            "rare_species_count": properties.get("rare_species_count", 0),
+            "shannon_diversity_index": properties.get("shannon_diversity_index", 0),
+            "simpson_diversity_index": properties.get("simpson_diversity_index", 0),
+            "pielou_evenness": properties.get("pielou_evenness", 0),
+            "bird_species_count": properties.get("bird_species_count", 0),
+            "mammal_species_count": properties.get("mammal_species_count", 0),
+            "plant_species_count": properties.get("plant_species_count", 0),
+            "reptile_species_count": properties.get("reptile_species_count", 0),
+            "amphibian_species_count": properties.get("amphibian_species_count", 0),
+            "insect_species_count": properties.get("insect_species_count", 0),
+            "dominant_class": properties.get("dominant_class", "Unknown"),
+            "biodiversity_category": properties.get("biodiversity_category", "Unknown"),
+            "observation_density_per_km2": properties.get(
+                "observation_density_per_km2", None
+            ),
+            "data_poor": properties.get("data_poor", True),
+        }
+        df_data.append(row)
+
+    df = pd.DataFrame(df_data)
+    df = df.sort_values(["UID"])
+    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+    df[numeric_cols] = df[numeric_cols].round(2)
+    df.to_excel(writer, sheet_name="biodiversity", index=False)
+    print("Excel file created for Biodiversity")
 
 
 def create_excel_for_drainage_density(data, writer):

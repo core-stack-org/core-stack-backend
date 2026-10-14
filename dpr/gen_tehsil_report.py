@@ -2296,6 +2296,58 @@ def get_forest_degrad_data(state, district, block):
         }, {"nodes": [], "links": []}
 
 
+def get_biodiversity_summary_data(state, district, block):
+    """
+    Block-level aggregate of the per-MWS biodiversity sheet for the tehsil report.
+    Returns a summary dict; empty-safe if the sheet is absent.
+    """
+    summary = {
+        "total_mws": 0,
+        "mws_with_data": 0,
+        "data_poor_count": 0,
+        "total_observations": 0,
+        "avg_richness": 0,
+        "median_richness": 0,
+        "avg_shannon": 0,
+        "mws_with_threatened": 0,
+        "category_distribution": {},
+        "top5": [],
+    }
+    try:
+        file_path = (
+            DATA_DIR_TEMP + state.upper() + "/" + district.upper() + "/"
+            + district.lower() + "_" + block.lower() + ".xlsx"
+        )
+        df = pd.read_excel(file_path, sheet_name="biodiversity")
+        if df.empty:
+            return summary
+
+        summary["total_mws"] = int(len(df))
+        summary["mws_with_data"] = int((df["occurrence_count"] > 0).sum())
+        summary["data_poor_count"] = int(df["data_poor"].sum())
+        summary["total_observations"] = int(df["occurrence_count"].sum())
+        summary["avg_richness"] = round(float(df["species_richness"].mean()), 1)
+        summary["median_richness"] = int(df["species_richness"].median())
+        summary["avg_shannon"] = round(float(df["shannon_diversity_index"].mean()), 2)
+        summary["mws_with_threatened"] = int((df["threatened_species_count"] > 0).sum())
+        summary["category_distribution"] = (
+            df["biodiversity_category"].value_counts().to_dict()
+        )
+        summary["top5"] = (
+            df.nlargest(5, "species_richness")[
+                ["UID", "species_richness", "shannon_diversity_index", "biodiversity_category"]
+            ].to_dict("records")
+        )
+        return summary
+    except Exception:
+        logger.info(
+            "Not able to access excel for %s district, %s block for Biodiversity summary",
+            district,
+            block,
+        )
+        return summary
+
+
 def get_mining_presence_data(state, district, block):
     try:
         file_path = (

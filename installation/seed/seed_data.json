@@ -49369,6 +49369,21 @@
 },
 {
   "model": "computing.dataset",
+  "pk": 53,
+  "fields": {
+    "name": "Biodiversity Occurrence",
+    "layer_type": "vector",
+    "workspace": "biodiversity",
+    "style_name": "biodiversity_mws",
+    "misc": null,
+    "created_at": "2025-08-01T08:44:47.070Z",
+    "updated_at": "2025-08-01T08:44:47.070Z",
+    "created_by": null,
+    "updated_by": null
+  }
+},
+{
+  "model": "computing.dataset",
   "pk": 29,
   "fields": {
     "name": "Terrain LULC",

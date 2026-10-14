@@ -195,7 +195,18 @@ The installation script automatically performs the following:
 | Migrations | Runs database migrations |
 | GEE Import | Optionally stages GEE JSONs into `data/gee_confs/` and imports them |
 | Admin Boundary | Downloads and normalizes the admin-boundary dataset into `data/admin-boundary/` |
+| Seed Data | Loads `installation/seed/seed_data.json`, seeds the default plantation, and registers the biodiversity layer via `register_biodiversity_layer` (skipped if the DB is already seeded) |
 | Validation | Runs `computing/misc/internal_api_initialisation_test.py` |
+
+> **Note — registering the Biodiversity layer on an existing database.** Seed loading is skipped once
+> the DB already has data, so on an **existing** deployment run the idempotent registration command
+> once (safe to re-run — it will not create duplicates):
+> ```bash
+> python manage.py register_biodiversity_layer
+> ```
+> This adds the `stats_generator.LayerInfo` row that drives the biodiversity Excel/KYL/report
+> generation. (`LayerInfo` is an admin-managed registry, so it is registered via this command rather
+> than a seed fixture — mirroring `seed_default_plantation` and `load_layer_mappings`.)
 
 ### 2.5 Script Output
 

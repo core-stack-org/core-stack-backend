@@ -31,6 +31,7 @@ from computing.change_detection.change_detection_vector import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local_task,
 )
+from computing.gbif.biodiversity_task import generate_biodiversity_block
 from computing.layer_dependency.layer_generation_in_order import (
     layer_generate_map,
     normalize_compute as _normalize_layer_order_compute,
@@ -1451,6 +1452,30 @@ def change_detection_vector(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in change_detection_vector api")
+        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+@sync_layer_generation_if_enabled
+def generate_biodiversity_layer(request):
+    """Per-MWS GBIF biodiversity layer for a block (GEE compute only)."""
+    logger.info("Inside generate_biodiversity_layer api")
+    try:
+        state = request.data.get("state").lower()
+        district = request.data.get("district").lower()
+        block = request.data.get("block").lower()
+        gee_account_id = request.data.get("gee_account_id")
+        generate_biodiversity_block.apply_async(
+            args=[state, district, block, gee_account_id],
+            queue="nrm",
+        )
+        return Response(
+            {"Success": "biodiversity task initiated"},
+            status=status.HTTP_200_OK,
+        )
+    except Exception as e:
+        logger.exception("Exception in generate_biodiversity_layer api :: %s", e)
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

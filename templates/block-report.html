@@ -1102,6 +1102,36 @@
             </p>
             <br>
             <br>
+
+            {% if biodiversity_summary.total_mws %}
+            <h3>Biodiversity (GBIF)</h3>
+            <p class="pattern-summary">
+                Across {{biodiversity_summary.total_mws}} micro-watersheds,
+                {{biodiversity_summary.total_observations}} species-occurrence records are on file in
+                GBIF (average {{biodiversity_summary.avg_richness}} species per MWS, median
+                {{biodiversity_summary.median_richness}}). {{biodiversity_summary.mws_with_threatened}}
+                micro-watersheds contain at least one IUCN-threatened species and should be treated as
+                sensitive during planning. {{biodiversity_summary.data_poor_count}} micro-watersheds are
+                under-surveyed (&lt; 20 records) — these are survey gaps, not confirmed low biodiversity.
+            </p>
+            <table class="data-table">
+                <tr><th>Micro-watershed</th><th>Species richness</th><th>Shannon</th><th>Category</th></tr>
+                {% for r in biodiversity_summary.top5 %}
+                <tr>
+                    <td>{{r.UID}}</td>
+                    <td>{{r.species_richness}}</td>
+                    <td>{{r.shannon_diversity_index}}</td>
+                    <td>{{r.biodiversity_category}}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            <p class="legend-note">
+                Note: GBIF data is opportunistic — richness is shown alongside record count (survey
+                effort). Absence of a species in GBIF does not confirm its absence on the ground.
+            </p>
+            <br>
+            <br>
+            {% endif %}
         </section>
 
         <section class="section" id="health-section">
