@@ -48,6 +48,7 @@ from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
 from utilities.gee_utils import check_gee_task_status, download_gee_layer
 from utilities.pipelines import api_request_payload
+from utilities.geoserver_sync_gate import parse_bool
 from utilities.layer_generation_mode import (
     require_local_tehsil_boundaries,
     sync_layer_generation_if_enabled,
@@ -2054,6 +2055,9 @@ def generate_layer_in_order(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "compute": compute,
+                "skip_existing": parse_bool(
+                    request.data.get("skip_existing")
+                ),
             },
             queue="nrm",
         )
@@ -2902,6 +2906,33 @@ def sync_layer_remote(request):
         )
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def unsynced_local_layers(request):
+    """
+    Called by a local compute instance. Lists locally generated layers that are
+    not on GeoServer yet and whose tehsil is active on this (prod) backend.
+    Validates the request API key against PROD_BACKEND_API_KEY.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    from computing.pending_geoserver_sync import (
+        serialize_unsynced_layers,
+        unsynced_local_layers_queryset,
+    )
+
+    queryset = unsynced_local_layers_queryset(
+        request.query_params.get("state"),
+        request.query_params.get("district"),
+        request.query_params.get("block"),
+    )
+    return Response({"layers": serialize_unsynced_layers(queryset)})
 
 
 @api_view(["GET"])

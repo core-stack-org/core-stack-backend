@@ -152,6 +152,7 @@ from nrm_app.celery import app
 from computing.models import Layer
 from django.conf import settings
 import json
+from contextvars import ContextVar
 
 logger = logging.getLogger(__name__)
 
@@ -353,6 +354,7 @@ def layer_generate_map(
     start_year=None,
     end_year=None,
     compute="gee",
+    skip_existing=False,
 ):
     """
     This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
@@ -420,18 +422,22 @@ def layer_generate_map(
 
     logger.info(f"Starting layer generation ({log_ctx})")
     task_registry = TASK_REGISTRIES[compute]
-    for func in map_config:
-        run_node_tree(
-            node=func,
-            task_registry=task_registry,
-            compute=compute,
-            state=state,
-            district=district,
-            block=block,
-            global_args=global_args,
-            gee_account_id=gee_account_id,
-            status=status,
-        )
+    skip_token = _SKIP_EXISTING.set(bool(skip_existing) and compute == "local")
+    try:
+        for func in map_config:
+            run_node_tree(
+                node=func,
+                task_registry=task_registry,
+                compute=compute,
+                state=state,
+                district=district,
+                block=block,
+                global_args=global_args,
+                gee_account_id=gee_account_id,
+                status=status,
+            )
+    finally:
+        _SKIP_EXISTING.reset(skip_token)
 
     failed_nodes = sorted(name for name, ok in status.items() if not ok)
     succeeded_nodes = sorted(name for name, ok in status.items() if ok)
@@ -647,6 +653,23 @@ DependencyValidator.LOCAL_VALIDATORS = {
 }
 
 
+_SKIP_EXISTING = ContextVar("layer_map_skip_existing", default=False)
+
+
+def _layer_already_generated(node_func_obj, state, district, block):
+    from computing.bulk_layer_generation import (
+        LOCAL_TASK_DATASETS,
+        datasets_exist_locally,
+    )
+
+    dataset_names = LOCAL_TASK_DATASETS.get(getattr(node_func_obj, "name", None))
+    if not dataset_names:
+        return False
+    return datasets_exist_locally(
+        dataset_names, {"state": state, "district": district, "block": block}
+    )
+
+
 def run_node_tree(
     node,
     task_registry,
@@ -719,6 +742,12 @@ def run_layer_with_dependency(
             break
     else:
         try:
+            if _SKIP_EXISTING.get() and _layer_already_generated(
+                node_func_obj, state, district, block
+            ):
+                status[node_func_name] = True
+                logger.info(f"Skipping {node_func_name}, layer already exists ({log_ctx})")
+                return
             end_year_rules = load_end_year_rules(compute=compute)
             if node_func_name in end_year_rules:
                 args["end_year"] = end_year_rules[node_func_name]

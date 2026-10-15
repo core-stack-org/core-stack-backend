@@ -90,6 +90,21 @@ def publish_local_layer(
     return response
 
 
+@app.task(name="computing.tasks.sync_unsynced_local_layers")
+def sync_unsynced_local_layers(state=None, district=None, block=None):
+    """
+    Push locally generated layers that were kept off GeoServer, for tehsils that
+    are active now. Safe to run repeatedly; a failure to read prod changes nothing.
+    """
+    from computing.pending_geoserver_sync import queue_unsynced_layers
+
+    try:
+        return queue_unsynced_layers(state, district, block)
+    except Exception:
+        logger.exception("Could not fetch unsynced local layers; nothing synced")
+        return {"error": "unsynced layers unavailable"}
+
+
 @app.task(name="computing.tasks.bulk_generate_layer")
 def bulk_generate_layer(
     pipeline,
@@ -99,7 +114,22 @@ def bulk_generate_layer(
     start_year=None,
     end_year=None,
     gee_account_id=None,
+    sync_to_geoserver=False,
+    skip_existing=False,
 ):
+    from computing.bulk_layer_generation import layer_exists_locally
+    from utilities.geoserver_sync_gate import geoserver_sync_context
+
+    if skip_existing and compute == "local" and layer_exists_locally(pipeline, location):
+        logger.info(
+            "Skipping bulk pipeline %s for %s/%s/%s: layer already exists",
+            pipeline,
+            location["state"],
+            location["district"],
+            location["block"],
+        )
+        return {"skipped": "exists"}
+
     logger.info(
         "Running bulk pipeline %s for %s/%s/%s",
         pipeline,
@@ -107,18 +137,27 @@ def bulk_generate_layer(
         location["district"],
         location["block"],
     )
-    return run_pipeline(
-        pipeline,
-        location,
-        overwrite=overwrite,
-        compute=compute,
-        start_year=start_year,
-        end_year=end_year,
-        gee_account_id=gee_account_id,
-    )
+    # Layers are only pushed when requested AND the tehsil is active; the rest
+    # stay on local disk and are pushed once the tehsil is activated.
+    with geoserver_sync_context(
+        sync_to_geoserver,
+        location["state"],
+        location["district"],
+        location["block"],
+    ):
+        return run_pipeline(
+            pipeline,
+            location,
+            overwrite=overwrite,
+            compute=compute,
+            start_year=start_year,
+            end_year=end_year,
+            gee_account_id=gee_account_id,
+        )
 
 
-__all__ = ["bulk_generate_layer", 
+__all__ = ["bulk_generate_layer",
+           "sync_unsynced_local_layers",
            "generate_stac_collection_task", 
            "et_download",
            "generate_hydrology",
