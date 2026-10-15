@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand, CommandError
 from computing.bulk_layer_generation import (
     get_active_locations,
     get_active_locations_from_api,
+    get_all_locations,
     get_locally_generated_locations,
     get_regeneration_dataset_names,
     layer_exists_locally,
@@ -21,6 +22,15 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("pipeline", nargs="?")
         parser.add_argument("--all-active", action="store_true")
+        parser.add_argument(
+            "--all-tehsils",
+            action="store_true",
+            help=(
+                "Every tehsil in the local database, active or not. Can be "
+                "narrowed with --state/--district/--block. Layers of inactive "
+                "tehsils are generated but never pushed to GeoServer."
+            ),
+        )
         parser.add_argument(
             "--regenerate-local",
             action="store_true",
@@ -110,11 +120,21 @@ class Command(BaseCommand):
         if (
             not options["all_active"]
             and not options["regenerate_local"]
+            and not options["all_tehsils"]
             and not filters
         ):
             raise CommandError(
-                "Specify --all-active, --regenerate-local, or at least one of "
-                "--state, --district, or --block."
+                "Specify --all-active, --all-tehsils, --regenerate-local, or "
+                "at least one of --state, --district, or --block."
+            )
+        if options["all_tehsils"] and (
+            options["all_active"]
+            or options["regenerate_local"]
+            or options["from_prod_api"]
+        ):
+            raise CommandError(
+                "--all-tehsils cannot be combined with --all-active, "
+                "--regenerate-local or --from-prod-api."
             )
         if options["all_active"] and (options["regenerate_local"] or filters):
             raise CommandError(
@@ -135,6 +155,8 @@ class Command(BaseCommand):
 
         if options["regenerate_local"]:
             location_loader = get_locally_generated_locations
+        elif options["all_tehsils"]:
+            location_loader = get_all_locations
         elif options["from_prod_api"]:
             location_loader = get_active_locations_from_api
         else:
@@ -157,7 +179,9 @@ class Command(BaseCommand):
 
         action = "Would queue" if options["dry_run"] else "Queueing"
         location_source = (
-            "locally generated" if options["regenerate_local"] else "active"
+            "locally generated"
+            if options["regenerate_local"]
+            else "matching" if options["all_tehsils"] else "active"
         )
         self.stdout.write(
             f"{action} {options['compute']} pipeline '{pipeline}' for "
