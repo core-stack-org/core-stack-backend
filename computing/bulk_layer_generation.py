@@ -387,23 +387,23 @@ def get_active_locations(
     block: str | None = None,
     blocks: list[str] | None = None,
     limit: int | None = None,
+    only_active: bool = True,
 ) -> list[Location]:
     if block and blocks:
         raise ValueError("Use either block or blocks, not both.")
 
-    queryset = (
-        TehsilSOI.objects.filter(
+    queryset = TehsilSOI.objects.all()
+    if only_active:
+        queryset = queryset.filter(
             active_status=True,
             district__active_status=True,
             district__state__active_status=True,
         )
-        .select_related("district__state")
-        .order_by(
-            "district__state__state_name",
-            "district__district_name",
-            "tehsil_name",
-            "pk",
-        )
+    queryset = queryset.select_related("district__state").order_by(
+        "district__state__state_name",
+        "district__district_name",
+        "tehsil_name",
+        "pk",
     )
     if state:
         queryset = queryset.filter(district__state__state_name__iexact=state)
@@ -428,6 +428,11 @@ def get_active_locations(
         )
         for tehsil in queryset
     ]
+
+
+def get_all_locations(**filters) -> list[Location]:
+    """Every tehsil in the DB, active or not (same filters as get_active_locations)."""
+    return get_active_locations(only_active=False, **filters)
 
 
 def get_locally_generated_locations(
