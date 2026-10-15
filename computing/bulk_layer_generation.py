@@ -255,12 +255,27 @@ def layer_exists_locally(name: str, location: Mapping[str, str]) -> bool:
     return datasets_exist_locally(dataset_names, location)
 
 
+# Dataset names that are alternatives for the same layer (a task writes
+# whichever exists), so having either one counts.
+DATASET_ALIAS_GROUPS = (frozenset({"LULC_v3", "LULC_level_3"}),)
+
+
+def _required_dataset_groups(dataset_names):
+    groups = []
+    for name in dataset_names:
+        alias = next((g for g in DATASET_ALIAS_GROUPS if name in g), None)
+        group = set(alias) if alias else {name}
+        if group not in groups:
+            groups.append(group)
+    return groups
+
+
 def datasets_exist_locally(
     dataset_names: tuple[str, ...], location: Mapping[str, str]
 ) -> bool:
-    for dataset_name in dataset_names:
+    for group in _required_dataset_groups(dataset_names):
         layers = Layer.objects.filter(
-            dataset__name=dataset_name,
+            dataset__name__in=group,
             misc__is_generated_locally=True,
             state__state_name__iexact=location["state"],
             district__district_name__iexact=location["district"],

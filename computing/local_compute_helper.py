@@ -12,7 +12,7 @@ from shapely.geometry import mapping
 from utilities.gee_utils import valid_gee_text
 
 from computing.utils import convert_to_zip
-from utilities.geoserver_sync_gate import skip_and_record
+from utilities.geoserver_sync_gate import should_skip_sync, skip_and_record
 
 logger = logging.getLogger(__name__)
 
@@ -688,6 +688,12 @@ def prepare_local_tehsil_boundaries(state, district, block, overwrite=False):
             "boundary_check",
             f"Local boundaries missing for {location}: " + " | ".join(missing),
         )
+
+    if should_skip_sync():
+        # Inactive tehsil (or sync not requested): keep the boundaries local.
+        # They are pushed with the tehsil's layers once it is active.
+        logger.info("Boundary sync to GeoServer skipped for %s", location)
+        return {"skipped": True}
 
     try:
         result = sync_tehsil_boundaries_to_geoserver(
