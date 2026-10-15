@@ -7,6 +7,7 @@ from celery.app.task import Task
 from django.conf import settings
 
 from utilities.layer_generation_logging import log_task_failure, log_task_step
+from utilities.geoserver_sync_gate import geoserver_sync_context, parse_bool
 from utilities.stac_spec_collector import collect_generated_stac_specs
 
 logger = logging.getLogger("core_stack.layer_generation")
@@ -500,7 +501,7 @@ def sync_layer_generation_if_enabled(view_func):
     """
 
     @wraps(view_func)
-    def wrapper(*args, **kwargs):
+    def run_view(*args, **kwargs):
         request = args[0] if args else kwargs.get("request")
         if not is_sync_layer_generation_request(request):
             logger.debug(
@@ -564,6 +565,17 @@ def sync_layer_generation_if_enabled(view_func):
             _SYNC_LAYER_GENERATION_CONTEXT.reset(token)
 
         return response
+
+    @wraps(view_func)
+    def wrapper(*args, **kwargs):
+        # Optional body key `sync_to_geoserver` (default false). Layers are only
+        # pushed when it is true AND the tehsil is active; the rest stay local.
+        request = args[0] if args else kwargs.get("request")
+        data = getattr(request, "data", None)
+        requested = parse_bool(_get_request_value(data, "sync_to_geoserver"))
+        state, district, block = read_location_from_request(request)
+        with geoserver_sync_context(requested, state, district, block):
+            return run_view(*args, **kwargs)
 
     return wrapper
 

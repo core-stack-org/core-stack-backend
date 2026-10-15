@@ -12,6 +12,7 @@ from shapely.geometry import mapping
 from utilities.gee_utils import valid_gee_text
 
 from computing.utils import convert_to_zip
+from utilities.geoserver_sync_gate import skip_and_record
 
 logger = logging.getLogger(__name__)
 
@@ -733,6 +734,18 @@ def queue_local_layer_for_geoserver(
     verify=False,
 ):
     from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
+
+    skipped = skip_and_record(
+        layer_type,
+        path,
+        layer_name,
+        workspace,
+        style_name,
+        file_type,
+        status_code=202,
+    )
+    if skipped:
+        return skipped
 
     result = publish_local_layer.apply_async(
         kwargs={
