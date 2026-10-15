@@ -2055,8 +2055,8 @@ def generate_layer_in_order(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "compute": compute,
-                "skip_existing": parse_bool(
-                    request.data.get("skip_existing")
+                "skip_existing": not parse_bool(
+                    request.data.get("regenerate_all")
                 ),
             },
             queue="nrm",

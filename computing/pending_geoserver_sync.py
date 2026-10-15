@@ -109,12 +109,36 @@ def _publish_args(entry):
     }
 
 
+def _sync_boundaries(entries):
+    """
+    Boundaries are kept off GeoServer while a tehsil is inactive, so push them
+    now for every tehsil that has layers to sync (already-published ones are
+    skipped). Runs outside the gate, so it really pushes.
+    """
+    from computing.local_compute_helper import sync_tehsil_boundaries_to_geoserver
+
+    tehsils = {(e["state"], e["district"], e["block"]) for e in entries}
+    for state, district, block in sorted(tehsils):
+        try:
+            sync_tehsil_boundaries_to_geoserver(state, district, block)
+        except Exception:
+            logger.exception(
+                "Boundary sync failed for %s/%s/%s; its layers are still queued",
+                state,
+                district,
+                block,
+            )
+
+
 def queue_unsynced_layers(state=None, district=None, block=None, dry_run=False):
     """Queue the GeoServer push of every unsynced local layer of active tehsils."""
     from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
 
     summary = {"found": 0, "queued": 0, "skipped_unusable": 0}
-    for entry in fetch_unsynced_layers(state, district, block):
+    entries = fetch_unsynced_layers(state, district, block)
+    if not dry_run:
+        _sync_boundaries(entries)
+    for entry in entries:
         summary["found"] += 1
         args = _publish_args(entry)
         if args is None:

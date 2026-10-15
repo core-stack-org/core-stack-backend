@@ -8,6 +8,7 @@ from django.conf import settings
 
 from utilities.layer_generation_logging import log_task_failure, log_task_step
 from utilities.geoserver_sync_gate import geoserver_sync_context, parse_bool
+from utilities.skip_existing import maybe_skip, skip_existing_context
 from utilities.stac_spec_collector import collect_generated_stac_specs
 
 logger = logging.getLogger("core_stack.layer_generation")
@@ -441,6 +442,9 @@ def _apply_async_in_process(
     """
     Drop-in replacement for Task.apply_async that executes the task immediately.
     """
+    skipped = maybe_skip(task_self)
+    if skipped is not None:
+        return skipped
     task_args = args or ()
     task_kwargs = kwargs or {}
     task_name = getattr(task_self, "name", "unknown_task")
@@ -574,8 +578,19 @@ def sync_layer_generation_if_enabled(view_func):
         data = getattr(request, "data", None)
         requested = parse_bool(_get_request_value(data, "sync_to_geoserver"))
         state, district, block = read_location_from_request(request)
+        # Optional body key `regenerate_all` (default false): by default a local
+        # layer that already exists for the tehsil is not generated again.
+        regenerate = parse_bool(_get_request_value(data, "regenerate_all"))
         with geoserver_sync_context(requested, state, district, block):
-            return run_view(*args, **kwargs)
+            with skip_existing_context(
+                not regenerate, state, district, block
+            ) as skip_ctx:
+                response = run_view(*args, **kwargs)
+        payload = getattr(response, "data", None)
+        if skip_ctx["skipped"] and isinstance(payload, dict):
+            payload["skipped"] = "Layer already exists; send regenerate_all=true to regenerate"
+            payload["skipped_tasks"] = skip_ctx["skipped"]
+        return response
 
     return wrapper
 
@@ -615,8 +630,12 @@ def require_local_tehsil_boundaries(default_compute="gee"):
                 prepare_local_tehsil_boundaries,
             )
 
+            requested = parse_bool(_get_request_value(data, "sync_to_geoserver"))
             try:
-                prepare_local_tehsil_boundaries(state, district, block)
+                # This runs before the inner decorator opens the gate, so open
+                # it here too: boundaries only go to GeoServer for active tehsils.
+                with geoserver_sync_context(requested, state, district, block):
+                    prepare_local_tehsil_boundaries(state, district, block)
             except TehsilBoundaryError as exc:
                 logger.error(
                     "Boundary preflight failed | view=%s stage=%s | %s",

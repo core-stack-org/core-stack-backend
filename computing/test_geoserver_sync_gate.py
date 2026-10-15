@@ -115,3 +115,60 @@ class PublishArgsTests(SimpleTestCase):
         base = {"workspace": "ws", "layer_name": "layer", "layer_type": "raster"}
         self.assertIsNone(_publish_args({**base, "path": "projects/ee/asset"}))
         self.assertIsNone(_publish_args({**base, "path": "/nonexistent/x.tif"}))
+
+
+class BoundaryGateTests(SimpleTestCase):
+    @patch("computing.local_compute_helper.sync_tehsil_boundaries_to_geoserver")
+    @patch("computing.local_compute_helper.ensure_tehsil_watershed")
+    @patch("computing.local_compute_helper._resolve_local_admin_boundary_file")
+    def test_boundaries_stay_local_when_gate_closed(self, _admin, _mws, sync):
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        with gate.geoserver_sync_context(False, *LOCATION):
+            result = prepare_local_tehsil_boundaries(*LOCATION)
+        self.assertEqual(result, {"skipped": True})
+        sync.assert_not_called()
+
+    @patch("computing.local_compute_helper.sync_tehsil_boundaries_to_geoserver")
+    @patch("computing.local_compute_helper.ensure_tehsil_watershed")
+    @patch("computing.local_compute_helper._resolve_local_admin_boundary_file")
+    def test_boundaries_pushed_without_gate(self, _admin, _mws, sync):
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        prepare_local_tehsil_boundaries(*LOCATION)
+        sync.assert_called_once()
+
+
+class SkipExistingTests(SimpleTestCase):
+    TASK = SimpleNamespace(name="computing.lulc.lulc_v3_local.clip_lulc_v3")
+
+    @patch("computing.bulk_layer_generation.datasets_exist_locally", return_value=True)
+    def test_existing_layer_is_skipped_by_default(self, _exists):
+        from utilities.skip_existing import maybe_skip, skip_existing_context
+
+        with skip_existing_context(True, *LOCATION) as ctx:
+            self.assertTrue(maybe_skip(self.TASK).skipped)
+        self.assertEqual(ctx["skipped"], [self.TASK.name])
+
+    @patch("computing.bulk_layer_generation.datasets_exist_locally", return_value=True)
+    def test_regenerate_all_runs_the_task(self, _exists):
+        from utilities.skip_existing import maybe_skip, skip_existing_context
+
+        with skip_existing_context(False, *LOCATION):
+            self.assertIsNone(maybe_skip(self.TASK))
+
+    @patch("computing.bulk_layer_generation.datasets_exist_locally", return_value=True)
+    def test_unmapped_task_and_missing_tehsil_always_run(self, _exists):
+        from utilities.skip_existing import maybe_skip, skip_existing_context
+
+        with skip_existing_context(True, *LOCATION):
+            self.assertIsNone(maybe_skip(SimpleNamespace(name="some.gee.task")))
+        with skip_existing_context(True, "Maharashtra", None, None):
+            self.assertIsNone(maybe_skip(self.TASK))
+
+    @patch("computing.bulk_layer_generation.datasets_exist_locally", return_value=False)
+    def test_missing_layer_runs(self, _exists):
+        from utilities.skip_existing import maybe_skip, skip_existing_context
+
+        with skip_existing_context(True, *LOCATION):
+            self.assertIsNone(maybe_skip(self.TASK))
