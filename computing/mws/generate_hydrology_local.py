@@ -30,6 +30,7 @@ from computing.hydrology_gpu.et_download import (
     FLDAS_GLOBAL_MONTHLY_PATCH_FILLED_SOURCE,
     FLDAS_GLOBAL_MONTHLY_SOURCE,
 )
+from utilities.geoserver_sync_gate import skip_and_record
 from computing.local_compute_helper import (
     build_output_vector_path,
     load_precomputed_watersheds,
@@ -1744,7 +1745,12 @@ def _run_generate_hydrology_area_local(
 
     geoserver_synced = False
     if push_to_geoserver:
-        response = push_local_vector_to_geoserver(
+        response = skip_and_record(
+            "vector",
+            os.path.splitext(asset_id)[0],
+            layer_name,
+            GEOSERVER_WORKSPACE,
+        ) or push_local_vector_to_geoserver(
             path=os.path.splitext(asset_id)[0],
             layer_name=layer_name,
             workspace=GEOSERVER_WORKSPACE,
@@ -2359,7 +2365,12 @@ def _run_clip_hydrology_area_from_base_layers(
 
     geoserver_synced = False
     if push_to_geoserver:
-        response = push_local_vector_to_geoserver(
+        response = skip_and_record(
+            "vector",
+            os.path.splitext(asset_id)[0],
+            layer_name,
+            GEOSERVER_WORKSPACE,
+        ) or push_local_vector_to_geoserver(
             path=os.path.splitext(asset_id)[0],
             layer_name=layer_name,
             workspace=GEOSERVER_WORKSPACE,

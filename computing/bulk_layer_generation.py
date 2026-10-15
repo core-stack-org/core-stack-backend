@@ -1,4 +1,6 @@
+import glob
 import inspect
+import os
 from dataclasses import asdict, dataclass
 from functools import reduce
 from operator import or_
@@ -237,6 +239,44 @@ def get_regeneration_dataset_names(name: str) -> tuple[str, ...]:
         raise ValueError(
             f"Local regeneration datasets are not configured for pipeline '{name}'."
         ) from exc
+
+
+def layer_exists_locally(name: str, location: Mapping[str, str]) -> bool:
+    """
+    True when every dataset of the pipeline already has a locally generated
+    Layer row for this tehsil and its output file is still on disk. Pipelines
+    without a dataset mapping (or that write no Layer row) never count as
+    existing, so they are always regenerated.
+    """
+    try:
+        dataset_names = get_regeneration_dataset_names(name)
+    except ValueError:
+        return False
+    return datasets_exist_locally(dataset_names, location)
+
+
+def datasets_exist_locally(
+    dataset_names: tuple[str, ...], location: Mapping[str, str]
+) -> bool:
+    for dataset_name in dataset_names:
+        layers = Layer.objects.filter(
+            dataset__name=dataset_name,
+            misc__is_generated_locally=True,
+            state__state_name__iexact=location["state"],
+            district__district_name__iexact=location["district"],
+            block__tehsil_name__iexact=location["block"],
+        )
+        if not any(_layer_output_present(layer) for layer in layers):
+            return False
+    return True
+
+
+def _layer_output_present(layer: Layer) -> bool:
+    path = layer.gee_asset_path
+    if not path or not os.path.isabs(path):
+        # Not a local file path; the Layer row is the only evidence we have.
+        return True
+    return os.path.exists(path) or bool(glob.glob(glob.escape(path) + ".*"))
 
 
 def _legacy_runner_kwargs(

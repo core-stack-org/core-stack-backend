@@ -254,6 +254,11 @@ urlpatterns = [
         api.update_layer_sync_remote,
         name="update_layer_sync_remote",
     ),
+    path(
+        "unsynced_local_layers/",
+        api.unsynced_local_layers,
+        name="unsynced_local_layers",
+    ),
     path("missing_layers/", api.missing_layers, name="missing_layer"),
     path(
         "generate_fabdem_layer/",
