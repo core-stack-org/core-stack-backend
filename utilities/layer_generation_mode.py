@@ -615,8 +615,12 @@ def require_local_tehsil_boundaries(default_compute="gee"):
                 prepare_local_tehsil_boundaries,
             )
 
+            requested = parse_bool(_get_request_value(data, "sync_to_geoserver"))
             try:
-                prepare_local_tehsil_boundaries(state, district, block)
+                # This runs before the inner decorator opens the gate, so open
+                # it here too: boundaries only go to GeoServer for active tehsils.
+                with geoserver_sync_context(requested, state, district, block):
+                    prepare_local_tehsil_boundaries(state, district, block)
             except TehsilBoundaryError as exc:
                 logger.error(
                     "Boundary preflight failed | view=%s stage=%s | %s",

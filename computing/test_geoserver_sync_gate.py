@@ -115,3 +115,25 @@ class PublishArgsTests(SimpleTestCase):
         base = {"workspace": "ws", "layer_name": "layer", "layer_type": "raster"}
         self.assertIsNone(_publish_args({**base, "path": "projects/ee/asset"}))
         self.assertIsNone(_publish_args({**base, "path": "/nonexistent/x.tif"}))
+
+
+class BoundaryGateTests(SimpleTestCase):
+    @patch("computing.local_compute_helper.sync_tehsil_boundaries_to_geoserver")
+    @patch("computing.local_compute_helper.ensure_tehsil_watershed")
+    @patch("computing.local_compute_helper._resolve_local_admin_boundary_file")
+    def test_boundaries_stay_local_when_gate_closed(self, _admin, _mws, sync):
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        with gate.geoserver_sync_context(False, *LOCATION):
+            result = prepare_local_tehsil_boundaries(*LOCATION)
+        self.assertEqual(result, {"skipped": True})
+        sync.assert_not_called()
+
+    @patch("computing.local_compute_helper.sync_tehsil_boundaries_to_geoserver")
+    @patch("computing.local_compute_helper.ensure_tehsil_watershed")
+    @patch("computing.local_compute_helper._resolve_local_admin_boundary_file")
+    def test_boundaries_pushed_without_gate(self, _admin, _mws, sync):
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        prepare_local_tehsil_boundaries(*LOCATION)
+        sync.assert_called_once()
