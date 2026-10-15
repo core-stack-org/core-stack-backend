@@ -108,23 +108,22 @@ def build_farm_boundary_map(
 
         # ── Phase 3: ET Intersection (optional) ─────────────────────────────
         phase4_summary = None
-        if year is not None:
-            from .et_intersection import (
-                 compute_multi_year_water_stress,
-                 intersect_et_with_farms,
-            )
+        from .et_intersection import (
+                compute_multi_year_water_stress,
+                intersect_et_with_farms,
+        )
 
-            logger.info("Phase 3 — ET intersection for year %d", year)
-            # phase3_summary = intersect_et_with_farms(
-            #       state=state,
-            #       district=district,
-            #       block=block,
-            #       year=year,
-            # )
-            phase3_summary = compute_multi_year_water_stress(
-                state=state, district=district, block=block
-            )
-            logger.info("Phase 3 done: %s", phase3_summary)
+        logger.info("Phase 3 — ET intersection for year %d", year)
+        # phase3_summary = intersect_et_with_farms(
+        #       state=state,
+        #       district=district,
+        #       block=block,
+        #       year=year,
+        # )
+        phase3_summary = compute_multi_year_water_stress(
+            state=state, district=district, block=block
+        )
+        logger.info("Phase 3 done: %s", phase3_summary)
 
     except Exception as exc:
         logger.exception(
