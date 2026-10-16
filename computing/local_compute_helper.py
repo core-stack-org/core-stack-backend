@@ -1,4 +1,5 @@
 import logging
+import tempfile
 import typing
 from contextlib import ExitStack
 from pathlib import Path
@@ -619,8 +620,6 @@ def _layer_exists_on_all_targets(workspace, layer_name):
 
 
 def _push_boundary_to_geoserver(source_path, workspace, layer_name, overwrite):
-    import tempfile
-
     if not overwrite and _layer_exists_on_all_targets(workspace, layer_name):
         logger.info("%s:%s already on GeoServer; skipping.", workspace, layer_name)
         return None
@@ -631,7 +630,7 @@ def _push_boundary_to_geoserver(source_path, workspace, layer_name, overwrite):
     gdf = gdf.set_crs("EPSG:4326") if gdf.crs is None else gdf.to_crs("EPSG:4326")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
-        gpkg_base = os.path.join(tmp_dir, layer_name)
+        gpkg_base = str(Path(tmp_dir) / layer_name)
         gdf.to_file(gpkg_base + ".gpkg", driver="GPKG", layer=layer_name)
         response = push_local_vector_to_geoserver(
             gpkg_base, layer_name, workspace, "gpkg"
