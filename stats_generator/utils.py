@@ -1,4 +1,5 @@
 import os
+import re
 import requests, json
 from django.http import HttpResponse, Http404
 from rest_framework.response import Response
@@ -52,6 +53,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     shrub_df = None
     tree_df = None
     crop_df = None
+    soge_dfs = []
 
     # Use append mode with if_sheet_exists='replace'
     with pd.ExcelWriter(
@@ -226,7 +228,9 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "aquifer":
                 create_excel_for_aquifer(geojson_data, writer)
             elif workspace == "soge":
-                create_excel_for_soge(geojson_data, xlsx_file, writer)
+                soge_dfs.append(
+                    build_soge_df(geojson_data, start_year, layer_name)
+                )
             elif workspace == "lcw":
                 create_excel_for_lcw(geojson_data, writer)
             elif workspace == "agroecological":
@@ -287,6 +291,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
+        if soge_dfs:
+            create_excel_for_soge(soge_dfs, writer)
         ndvi_df = None
         if shrub_df is not None:
             ndvi_df = shrub_df
@@ -1253,22 +1259,34 @@ def create_excel_for_lcw(data, writer):
         print("lcw Layer not found :: ", e)
 
 
-def create_excel_for_soge(data, xlsx_file, writer):
+def build_soge_df(data, year=None, layer_name=None):
+    if year is None and layer_name:
+        match = re.search(r"_(\d{4})$", layer_name)
+        year = int(match.group(1)) if match else None
+    suffix = f"_{year}" if year else ""
+
     df_data = []
-    features = data["features"]
-
-    for feature in features:
+    for feature in data["features"]:
         properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "area_in_ha": properties["area_in_ha"],
-            "soge_dev_percent": properties["sgw_dev_pe"],
-            "class_code": properties["code"],
-            "class_name": properties["class"],
-        }
+        df_data.append(
+            {
+                "UID": properties["uid"],
+                "area_in_ha": properties["area_in_ha"],
+                f"soge_dev_percent{suffix}": properties["sgw_dev_pe"],
+                f"class_code{suffix}": properties["code"],
+                f"class_name{suffix}": properties["class"],
+            }
+        )
+    return year or 0, pd.DataFrame(df_data)
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
+
+def create_excel_for_soge(soge_dfs, writer):
+    """Merges the per-year SOGE dataframes on UID and writes the soge_vector sheet."""
+    # LayerInfo rows come newest-first; order columns oldest to newest.
+    soge_dfs = [df for _, df in sorted(soge_dfs, key=lambda item: item[0])]
+    df = soge_dfs[0]
+    for other in soge_dfs[1:]:
+        df = df.merge(other.drop(columns=["area_in_ha"]), on="UID", how="outer")
     df = df.sort_values(["UID"])
 
     ## for roundoff all numeric value upto 2 decimal
