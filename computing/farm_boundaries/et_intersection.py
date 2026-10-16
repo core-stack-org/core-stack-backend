@@ -717,6 +717,7 @@ CROP_RANK_OUTPUT_COLUMNS = ["crop1", "conf1", "crop2", "conf2", "crop3", "conf3"
 CROP_NAME_COLUMNS = ["crop1", "crop2", "crop3"]
 CROP_CONF_COLUMNS = ["conf1", "conf2", "conf3"]
 CROP_DATE_COLUMNS = ["crop_start_date", "crop_end_date"]
+CROP_INTENSITY_COLUMN = "crop_intensity"   # float; placeholder, populated later
 
 def _normalise_crop_name(value):
     """Return a stable crop label, or None if missing/blank."""
@@ -1007,6 +1008,9 @@ def _enforce_crop_schema(df):
         if col not in df.columns:
             df[col] = np.nan
         df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
+    if CROP_INTENSITY_COLUMN not in df.columns:
+        df[CROP_INTENSITY_COLUMN] = np.nan
+    df[CROP_INTENSITY_COLUMN] = pd.to_numeric(df[CROP_INTENSITY_COLUMN], errors="coerce").astype("float64")
     return df
 
 
@@ -1016,6 +1020,7 @@ def _write_annual_parquet(df, path):
     table = pa.Table.from_pandas(df, preserve_index=False)
     targets = {c: pa.string() for c in CROP_NAME_COLUMNS + CROP_DATE_COLUMNS}
     targets.update({c: pa.float64() for c in CROP_CONF_COLUMNS})
+    targets[CROP_INTENSITY_COLUMN] = pa.float64()
     for col, typ in targets.items():
         i = table.schema.get_field_index(col)
         if table.schema.field(i).type != typ:
@@ -1060,7 +1065,7 @@ def _save_annual_parquet(gdf, state, district, block, year):
 
     col_order = ["farm_id", "tehsil", "district", "state", "area_in_ha", "year",
          "aet_annual", "pet_annual", "mai_annual", "kharif_mai",
-         "kharif_water_stress", "kharif_severe_stress"] + CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS
+         "kharif_water_stress", "kharif_severe_stress"] + CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS + [CROP_INTENSITY_COLUMN]
     annual = annual[[c for c in col_order if c in annual.columns]]
 
     if os.path.exists(out_path):
