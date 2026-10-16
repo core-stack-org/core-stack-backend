@@ -183,7 +183,7 @@ async def _fetch_all_cells_async(
     batch_size = MANIFEST_FLUSH_INTERVAL
     results_summary = {"fetched": 0, "empty": 0, "errors": 0}
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(trust_env=True) as session:
         for batch_start in range(0, total, batch_size):
             batch = cells_to_fetch[batch_start : batch_start + batch_size]
             batch_end = min(batch_start + len(batch), total)
