@@ -1447,12 +1447,12 @@ def generate_mws_data_for_kyl_filters(
                     df_forest_fire_data = sheets["forest_fire"][
                         sheets["forest_fire"]["UID"] == specific_mws_id
                     ]
-                    forest_fire_mean_intensity = df_forest_fire_data[
-                        "fire_frp_mean_in_MW"
+                    fire_count_per_year = df_forest_fire_data[
+                        "fire_count_per_year"
                     ].iloc[0]
                 except Exception as e:
                     print(f"error while getting fire frp mean: {e}")
-                    forest_fire_mean_intensity = -9999
+                    fire_count_per_year = -9999
 
                 results.append(
                     {
@@ -1537,7 +1537,7 @@ def generate_mws_data_for_kyl_filters(
                         "trees_in_forest_loss": trees_in_forest_loss,
                         "tree_cover_area": tree_cover_area,
                         "shg_penetration": shg_penetration,
-                        "forest_fire_mean_intensity": forest_fire_mean_intensity,
+                        "fire_count_per_year": fire_count_per_year,
                     }
                 )
 
