@@ -256,6 +256,7 @@ def run_lulc_on_slope_cluster_local(
         raise ValueError(
             f"No watersheds larger than {MIN_WATERSHED_AREA_HA} ha found for {state}/{district}/{block}."
         )
+    filtered_watersheds.drop(columns=["area"], inplace=True)
 
     terrain_classified = compute_terrain_properties_for_watersheds(
         watersheds_gdf=filtered_watersheds,
