@@ -1132,84 +1132,39 @@ def _save_monthly_parquet(gdf, state, district, block, year):
     return out_path
 
 
-# ── kharif drought years (shared by frequency / intensity) ────────────────────
+# ── drought indicators (static.parquet) ───────────────────────────────────────
 
-KHARIF_MONTH_NUMBERS = (7, 8, 9, 10)   # Jul–Oct
-# Moderate (0.26–0.50) + severe (0.00–0.25) combined: any MAI in this range = drought month.
-DROUGHT_MAI_RANGE = (0.0, MAI_MODERATE_THRESHOLD)
-
-
-def _kharif_drought_years(monthly):
+def _update_static_drought_indicators(state, district, block):
     """
-    Bool Series indexed by (farm_id, year): True = kharif-drought year, i.e.
-    any valid (non-NaN) Jul–Oct MAI within DROUGHT_MAI_RANGE (inclusive).
-    Years with no valid Jul–Oct MAI are left out entirely.
-    `monthly` = contents of farms/sub_annual.parquet (farm_id, year, date, mai).
+    Populate frequency_moderate/severe and intensity_moderate/severe in
+    farms/static.parquet from annual.parquet's kharif_mai (mean Jul–Oct MAI).
+      severe year   : kharif_mai <= MAI_SEVERE_THRESHOLD (0.25)
+      moderate year : 0.25 < kharif_mai <= MAI_MODERATE_THRESHOLD (0.50)
+      N             = years with a valid kharif_mai
+      frequency_*   = N / #years of that type (NaN if none), 2 dp
+      intensity_*   = mean kharif_mai over years of that type (NaN if none), 4 dp
     """
-    kharif = monthly[monthly["date"].dt.month.isin(KHARIF_MONTH_NUMBERS) & monthly["mai"].notna()]
-    in_drought = kharif["mai"].between(*DROUGHT_MAI_RANGE)
-    return in_drought.groupby([kharif["farm_id"], kharif["year"]]).any()
-
-
-# ── frequency column (static.parquet) ─────────────────────────────────────────
-
-def _update_static_frequency(state, district, block):
-    """
-    Populate `frequency` in farms/static.parquet: return period in years =
-    N / #kharif-drought years, per farm.
-      N            = years in sub_annual.parquet where the farm has a valid
-                     (non-NaN) MAI in at least one of Jul–Oct
-      drought year = see _kharif_drought_years
-    Farms with zero drought years (or no data) get NaN. Rounded to 2 dp.
-    """
-    monthly_path = _monthly_parquet_path(state, district, block)
-    static_path  = _static_parquet_path(state, district, block)
-    if not (os.path.exists(monthly_path) and os.path.exists(static_path)):
-        logger.warning("Cannot update frequency — monthly/static parquet missing.")
+    annual_path = _annual_parquet_path(state, district, block)
+    static_path = _static_parquet_path(state, district, block)
+    if not (os.path.exists(annual_path) and os.path.exists(static_path)):
+        logger.warning("Cannot update drought indicators — annual/static parquet missing.")
         return None
 
-    monthly = pd.read_parquet(monthly_path, columns=["farm_id", "year", "date", "mai"])
-    is_drought = _kharif_drought_years(monthly)
-    n_years       = is_drought.groupby("farm_id").size()            # years with valid kharif MAI
-    drought_years = is_drought.groupby("farm_id").sum()
-    frequency = (n_years / drought_years.where(drought_years > 0)).round(2)
+    annual = pd.read_parquet(annual_path, columns=["farm_id", "year", "kharif_mai"]).dropna(subset=["kharif_mai"])
+    kharif = annual["kharif_mai"]
+    annual["drought_type"] = np.select(
+        [kharif <= MAI_SEVERE_THRESHOLD, kharif <= MAI_MODERATE_THRESHOLD],
+        ["severe", "moderate"], default="none")
+    n_years = annual.groupby("farm_id").size()
 
-    static = gpd.read_parquet(static_path)
-    static["frequency"] = static["farm_id"].map(frequency)          # no data / zero drought → NaN
+    static = gpd.read_parquet(static_path).drop(columns=["frequency", "intensity"], errors="ignore")
+    for kind in ("moderate", "severe"):
+        years = annual[annual["drought_type"] == kind]
+        count = years.groupby("farm_id").size()
+        static[f"frequency_{kind}"] = static["farm_id"].map((n_years / count).round(2))
+        static[f"intensity_{kind}"] = static["farm_id"].map(years.groupby("farm_id")["kharif_mai"].mean().round(4))
     static.to_parquet(static_path, index=False)
-    logger.info("frequency column updated in %s", static_path)
-    return static_path
-
-
-# ── intensity column (static.parquet) ─────────────────────────────────────────
-
-def _update_static_intensity(state, district, block):
-    """
-    Populate `intensity` in farms/static.parquet: per farm, the mean of
-    `kharif_mai` (from annual.parquet) over its kharif-drought years.
-    Drought years come from _kharif_drought_years, the same rule used
-    for `frequency`. Farms with zero drought years get NaN. Rounded to 4 dp.
-    """
-    monthly_path = _monthly_parquet_path(state, district, block)
-    annual_path  = _annual_parquet_path(state, district, block)
-    static_path  = _static_parquet_path(state, district, block)
-    if not all(os.path.exists(p) for p in (monthly_path, annual_path, static_path)):
-        logger.warning("Cannot update intensity — monthly/annual/static parquet missing.")
-        return None
-
-    monthly = pd.read_parquet(monthly_path, columns=["farm_id", "year", "date", "mai"])
-    is_drought = _kharif_drought_years(monthly)
-    drought_years = is_drought[is_drought].reset_index()[["farm_id", "year"]]
-
-    annual = pd.read_parquet(annual_path, columns=["farm_id", "year", "kharif_mai"])
-    drought_kharif_mai = drought_years.merge(annual, on=["farm_id", "year"], how="inner")
-    drought_kharif_mai = drought_kharif_mai.dropna(subset=["kharif_mai"])   # safeguard: no kharif value
-    intensity = drought_kharif_mai.groupby("farm_id")["kharif_mai"].mean().round(4)
-
-    static = gpd.read_parquet(static_path)
-    static["intensity"] = static["farm_id"].map(intensity)          # no drought years → NaN
-    static.to_parquet(static_path, index=False)
-    logger.info("intensity column updated in %s", static_path)
+    logger.info("Drought indicator columns updated in %s", static_path)
     return static_path
 
 
@@ -1310,8 +1265,7 @@ def intersect_et_with_farms(
     annual_path  = _save_annual_parquet(gdf, state, district, block, year)
     _populate_annual_crop_columns(gdf, state, district, block)
     monthly_path = _save_monthly_parquet(gdf, state, district, block, year)
-    _update_static_frequency(state, district, block)
-    _update_static_intensity(state, district, block)
+    _update_static_drought_indicators(state, district, block)
 
     summary = {
         "state": state, "district": district, "block": block, "year": year,
@@ -1414,8 +1368,7 @@ def compute_multi_year_water_stress(
     # Crop data for every processed year in one go (table built once)
     _populate_annual_crop_columns(base_gdf, state, district, block)
 
-    _update_static_frequency(state, district, block)
-    _update_static_intensity(state, district, block)
+    _update_static_drought_indicators(state, district, block)
 
     # Cross-year indicators
     result_gdf = base_gdf.copy()

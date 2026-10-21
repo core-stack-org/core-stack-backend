@@ -48,8 +48,10 @@ ALU_TYPE_TO_PARQUET = {
 }
 
 # Placeholder filled in later by et_intersection (Phase 3) from monthly MAI.
-FREQUENCY_COLUMN = "frequency"
-INTENSITY_COLUMN = "intensity"
+DROUGHT_INDICATOR_COLUMNS = [
+    "frequency_moderate", "frequency_severe",
+    "intensity_moderate", "intensity_severe",
+]
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -387,13 +389,13 @@ def convert_to_geoparquet(
         # ------------------------------------
 
         if alu_type == "field":
-            subset[FREQUENCY_COLUMN] = np.nan
-            subset[INTENSITY_COLUMN] = np.nan
+            for col in DROUGHT_INDICATOR_COLUMNS:
+                subset[col] = np.nan
 
         # Reorder columns
         priority_cols = ["farm_id", "cell_token",
                          "alu_type", "plus_code", "area_m2", "class_confidence",
-                         "capture_date", FREQUENCY_COLUMN, INTENSITY_COLUMN, "geometry"]
+                         "capture_date"] + DROUGHT_INDICATOR_COLUMNS + ["geometry"]
         existing = [c for c in priority_cols if c in subset.columns]
         subset = subset[existing]
 
