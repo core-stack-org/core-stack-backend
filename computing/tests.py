@@ -564,6 +564,22 @@ class BulkPipelineRegistryTests(SimpleTestCase):
             "LULC_v3_river_basin/pan_india_lulc_v3_2017_2018",
         )
 
+    @patch("computing.local_compute_helper.prepare_local_tehsil_boundaries")
+    @patch("computing.layer_dependency.layer_generation_in_order.generate_hydrology_local")
+    def test_hydrology_runners_bind_is_annual(self, mock_hydrology, _prepare):
+        from computing.layer_dependency.layer_generation_in_order import (
+            LOCAL_TASK_REGISTRY,
+        )
+
+        location = {"state": "s", "district": "d", "block": "b"}
+        for name, expected in (
+            ("hydrology_annual", True),
+            ("hydrology_fortnightly", False),
+        ):
+            mock_hydrology.reset_mock()
+            run_pipeline(name, location, compute="local", start_year=2017, end_year=2024)
+            self.assertIs(mock_hydrology.call_args.kwargs["is_annual"], expected)
+
     def test_zoi_is_registered_for_local_bulk_generation(self):
         self.assertIn("generate_zoi", pipeline_names("local"))
         self.assertEqual(

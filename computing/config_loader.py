@@ -316,6 +316,12 @@ PAN_INDIA_RESTORATION_PATH = _base_layer_path(
 )
 LOCAL_RESTORATION_OUTPUT = DATA_DIR / "layers/restoration_opportunity"
 
+PAN_INDIA_SITE_SUITABILITY_PATH = _base_layer_path(
+    "site suitability",
+    fallback="{DATA_DIR}/base_layers/site_suitability_pan_india_cog.tif",
+)
+LOCAL_SITE_SUITABILITY_OUTPUT = DATA_DIR / "layers/site_suitability"
+
 PAN_INDIA_RIVER_PATH = _base_layer_path(
     "river", fallback="{DATA_DIR}/river/River_pan_india.geojson"
 )
