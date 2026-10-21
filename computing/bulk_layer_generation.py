@@ -133,6 +133,9 @@ LOCAL_TASK_DATASETS = {
         "Restoration Raster",
         "Restoration Vector",
     ),
+    "computing.plantation.site_suitability_local.generate_site_suitability_local": (
+        "Site Suitability",
+    ),
     "computing.mws.mws_connectivity_local_compute.mws_connectivity_vector": (
         "Mws Connectivity",
     ),
