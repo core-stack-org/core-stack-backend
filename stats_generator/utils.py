@@ -1360,10 +1360,10 @@ def create_excel_for_restoration(data, xlsx_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "wide_scale_restoration_area_in_ha": properties["Wide-scale"],
+            "wide_scale_restoration_area_in_ha": properties["Wide-scale Restoration"],
             "protection_area_in_ha": properties["Protection"],
-            "mosaic_restoration_area_in_ha": properties["Mosaic Res"],
-            "excluded_areas_in_ha": properties["Excluded A"],
+            "mosaic_restoration_area_in_ha": properties["Mosaic Restoration"],
+            "excluded_areas_in_ha": properties["Excluded Areas"],
         }
 
         df_data.append(row)

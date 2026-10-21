@@ -29,9 +29,9 @@ RESTORATION_STYLE_NAME = "restoration_style"
 
 
 RESTORATION_CLASSES = [
-    {"value": 0, "label": "Excluded A"},
-    {"value": 1, "label": "Mosaic Res"},
-    {"value": 2, "label": "Wide-scale"},
+    {"value": 0, "label": "Excluded Areas"},
+    {"value": 1, "label": "Mosaic Restoration"},
+    {"value": 2, "label": "Wide-scale Restoration"},
     {"value": 3, "label": "Protection"},
 ]
 
@@ -59,7 +59,9 @@ def run_raster_restoration_local(
         if not roi_path or not asset_suffix:
             raise ValueError("ROI path and asset_suffix are required for custom runs.")
         layer_name = f"{asset_suffix}_restoration_raster".lower()
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        watersheds_gdf = read_validated_vector_file(
+            roi_path, f"Invalid ROI file: {roi_path}"
+        )
 
     # ==========================================
     # 1. Raster Processing
@@ -132,7 +134,9 @@ def run_vector_restoration_local(
         )
     else:
         layer_name = f"{asset_suffix}_restoration_vector".lower()
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
+        watersheds_gdf = read_validated_vector_file(
+            roi_path, f"Invalid ROI file: {roi_path}"
+        )
 
     # ==========================================
     # 2. Vector Processing
@@ -145,14 +149,14 @@ def run_vector_restoration_local(
     )
 
     desired_cols = [
-        "uid", 
-        "id", 
-        "area_in_ha", 
-        "Excluded A", 
-        "Mosaic Res", 
-        "Protection", 
-        "Wide-scale", 
-        "geometry"
+        "uid",
+        "id",
+        "area_in_ha",
+        "Excluded Areas",
+        "Mosaic Restoration",
+        "Protection",
+        "Wide-scale Restoration",
+        "geometry",
     ]
     keep_cols = [c for c in desired_cols if c in vector_result_gdf.columns]
     vector_result_gdf = vector_result_gdf[keep_cols]
