@@ -22,8 +22,15 @@ logger = logging.getLogger(__name__)
 VECTOR_EXTENSIONS = (".gpkg", ".shp", ".geojson")
 
 
-def unsynced_local_layers_queryset(state=None, district=None, block=None):
-    """Locally generated layers not on GeoServer whose tehsil chain is active."""
+def unsynced_local_layers_queryset(
+    state=None, district=None, block=None, layer_type=None
+):
+    """
+    Locally generated layers not on GeoServer whose tehsil chain is active.
+
+    ``layer_type`` is a bulk pipeline name; it narrows the layers to the
+    datasets that pipeline generates. Raises ValueError for an unknown one.
+    """
     queryset = Layer.objects.filter(
         is_sync_to_geoserver=False,
         misc__is_generated_locally=True,
@@ -31,6 +38,12 @@ def unsynced_local_layers_queryset(state=None, district=None, block=None):
         district__active_status=True,
         state__active_status=True,
     ).select_related("dataset", "state", "district", "block")
+    if layer_type:
+        from computing.bulk_layer_generation import get_regeneration_dataset_names
+
+        queryset = queryset.filter(
+            dataset__name__in=get_regeneration_dataset_names(layer_type)
+        )
     if state:
         queryset = queryset.filter(state__state_name__iexact=state)
     if district:
@@ -57,11 +70,11 @@ def serialize_unsynced_layers(queryset):
     ]
 
 
-def fetch_unsynced_layers(state=None, district=None, block=None):
+def fetch_unsynced_layers(state=None, district=None, block=None, layer_type=None):
     prod_url = getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
     if not prod_url:
         return serialize_unsynced_layers(
-            unsynced_local_layers_queryset(state, district, block)
+            unsynced_local_layers_queryset(state, district, block, layer_type)
         )
     response = requests.get(
         f"{prod_url}/api/v1/unsynced_local_layers/",
@@ -71,6 +84,7 @@ def fetch_unsynced_layers(state=None, district=None, block=None):
                 ("state", state),
                 ("district", district),
                 ("block", block),
+                ("layer_type", layer_type),
             )
             if value
         },
@@ -130,16 +144,39 @@ def _sync_boundaries(entries):
             )
 
 
-def queue_unsynced_layers(state=None, district=None, block=None, dry_run=False):
-    """Queue the GeoServer push of every unsynced local layer of active tehsils."""
+def queue_unsynced_layers(
+    state=None, district=None, block=None, layer_type=None, dry_run=False
+):
+    """
+    Queue the GeoServer push of every unsynced local layer of active tehsils,
+    optionally only for one ``layer_type`` (bulk pipeline name).
+
+    "queued" means handed to Celery, not yet on GeoServer; the layer flag flips
+    when the publish task succeeds.
+    """
     from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
 
-    summary = {"found": 0, "queued": 0, "skipped_unusable": 0}
-    entries = fetch_unsynced_layers(state, district, block)
+    summary = {
+        "found": 0,
+        "queued": 0,
+        "skipped_unusable": 0,
+        "dry_run": dry_run,
+        "queued_layers": [],
+        "skipped_layers": [],
+    }
+    entries = fetch_unsynced_layers(state, district, block, layer_type)
     if not dry_run:
         _sync_boundaries(entries)
     for entry in entries:
         summary["found"] += 1
+        info = {
+            "layer_id": entry.get("layer_id"),
+            "workspace": entry.get("workspace"),
+            "layer_name": entry.get("layer_name"),
+            "state": entry.get("state"),
+            "district": entry.get("district"),
+            "block": entry.get("block"),
+        }
         args = _publish_args(entry)
         if args is None:
             logger.warning(
@@ -149,8 +186,13 @@ def queue_unsynced_layers(state=None, district=None, block=None, dry_run=False):
                 entry.get("path"),
             )
             summary["skipped_unusable"] += 1
+            summary["skipped_layers"].append({**info, "reason": "no local file"})
             continue
         if not dry_run:
-            publish_local_layer.apply_async(kwargs=args, queue=GEOSERVER_QUEUE)
+            result = publish_local_layer.apply_async(
+                kwargs=args, queue=GEOSERVER_QUEUE
+            )
+            info["task_id"] = result.id
         summary["queued"] += 1
+        summary["queued_layers"].append(info)
     return summary

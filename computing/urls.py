@@ -255,6 +255,11 @@ urlpatterns = [
         name="update_layer_sync_remote",
     ),
     path(
+        "sync_local_layers_to_geoserver/",
+        api.sync_local_layers_to_geoserver,
+        name="sync_local_layers_to_geoserver",
+    ),
+    path(
         "unsynced_local_layers/",
         api.unsynced_local_layers,
         name="unsynced_local_layers",

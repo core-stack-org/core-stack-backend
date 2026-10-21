@@ -2927,12 +2927,50 @@ def unsynced_local_layers(request):
         unsynced_local_layers_queryset,
     )
 
-    queryset = unsynced_local_layers_queryset(
-        request.query_params.get("state"),
-        request.query_params.get("district"),
-        request.query_params.get("block"),
-    )
+    try:
+        queryset = unsynced_local_layers_queryset(
+            request.query_params.get("state"),
+            request.query_params.get("district"),
+            request.query_params.get("block"),
+            request.query_params.get("layer_type"),
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     return Response({"layers": serialize_unsynced_layers(queryset)})
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def sync_local_layers_to_geoserver(request):
+    """
+    Run on the local compute instance. Queues the GeoServer push of locally
+    generated layers of active tehsils; all fields are optional filters.
+    Body: {"state", "district", "block", "layer_type", "dry_run"}.
+    Requires the X-Api-Key header to match PROD_BACKEND_API_KEY.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if not api_key or request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    from computing.pending_geoserver_sync import queue_unsynced_layers
+
+    d = request.data
+    try:
+        summary = queue_unsynced_layers(
+            d.get("state"),
+            d.get("district"),
+            d.get("block"),
+            layer_type=d.get("layer_type"),
+            dry_run=parse_bool(d.get("dry_run", False)),
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("sync_local_layers_to_geoserver failed")
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(summary, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])

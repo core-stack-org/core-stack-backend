@@ -91,7 +91,7 @@ def publish_local_layer(
 
 
 @app.task(name="computing.tasks.sync_unsynced_local_layers")
-def sync_unsynced_local_layers(state=None, district=None, block=None):
+def sync_unsynced_local_layers(state=None, district=None, block=None, layer_type=None):
     """
     Push locally generated layers that were kept off GeoServer, for tehsils that
     are active now. Safe to run repeatedly; a failure to read prod changes nothing.
@@ -99,7 +99,7 @@ def sync_unsynced_local_layers(state=None, district=None, block=None):
     from computing.pending_geoserver_sync import queue_unsynced_layers
 
     try:
-        return queue_unsynced_layers(state, district, block)
+        return queue_unsynced_layers(state, district, block, layer_type)
     except Exception:
         logger.exception("Could not fetch unsynced local layers; nothing synced")
         return {"error": "unsynced layers unavailable"}
