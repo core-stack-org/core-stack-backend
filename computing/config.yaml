@@ -32,6 +32,11 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/restoration_opportunity/restoration_opportunity.tif
           type: file
 
+        - name: site suitability
+          local_path: "{DATA_DIR}/base_layers/site_suitability_pan_india_cog.tif"
+          source: ""
+          type: file
+
         - name: soge
           local_path: "{DATA_DIR}/base_layers/soge/soge.geojson"
           source: s3://corestack-datasets/base_layers/static_layers/soge/soge.geojson
@@ -541,7 +546,7 @@ derived_layers:
       layer_type: vector
 
     - name: hydrology_annual
-      filename: "deltaG_annual_{district}_{block}.gpkg"
+      filename: "deltaG_well_depth_{district}_{block}.gpkg"
       local_path: "{DATA_DIR}/hydrology/hydrology_local/{state}/{district}/{block}/{filename}"
       geoserver_workspace: mws_layers
       layer_type: vector
@@ -556,6 +561,11 @@ derived_layers:
     - name: restoration_opportunity
       local_path: "{DATA_DIR}/layers/restoration_opportunity/"
       geoserver_workspace: restoration
+      layer_type: raster
+
+    - name: site_suitability
+      local_path: "{DATA_DIR}/layers/site_suitability/"
+      geoserver_workspace: plantation
       layer_type: raster
 
     - name: soge_vector
