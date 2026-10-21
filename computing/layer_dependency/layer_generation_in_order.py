@@ -6,6 +6,7 @@ from computing.mws.generate_hydrology import generate_hydrology
 from computing.mws.generate_hydrology_local import (
     generate_hydrology as generate_hydrology_local,
 )
+
 from computing.lulc.lulc_v3 import clip_lulc_v3
 from computing.lulc.lulc_vector import vectorise_lulc
 from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
@@ -114,6 +115,7 @@ from computing.misc.naturaldepression_local_compute import (
     generate_natural_depression_data_local,
 )
 from computing.misc.nrega_local_compute import generate_nrega_data_local
+from computing.plantation.site_suitability_local import generate_site_suitability_local
 from computing.misc.restoration_opportunity_local_compute import (
     generate_restoration_opportunity_local,
 )
@@ -254,6 +256,34 @@ GEE_TASK_REGISTRY = {
     "generate_mws_centroid": generate_mws_centroid_data,
 }
 
+def _hydrology_local_runner(is_annual):
+    def runner(
+        state=None,
+        district=None,
+        block=None,
+        start_year=None,
+        end_year=None,
+        gee_account_id=None,
+        overwrite=False,
+    ):
+        return generate_hydrology_local(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            is_annual=is_annual,
+            gee_account_id=gee_account_id,
+            overwrite=overwrite,
+        )
+
+    return runner
+
+
+generate_hydrology_annual_local = _hydrology_local_runner(True)
+generate_hydrology_fortnightly_local = _hydrology_local_runner(False)
+
+
 LOCAL_TASK_REGISTRY = {
     "clip_nrega_district_block": generate_nrega_data_local,
     "generate_nrega_data": generate_nrega_data_local,
@@ -304,6 +334,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_mining": generate_mining_data_local,
     "generate_restoration_opportunity": generate_restoration_opportunity_local,
     "restoration_opportunity": generate_restoration_opportunity_local,
+    "site_suitability": generate_site_suitability_local,
+    "plantation_site_suitability": generate_site_suitability_local,
     "generate_mws_connectivity_data": mws_connectivity_vector,
     "generate_mws_connectivity": mws_connectivity_vector,
     "generate_facilities_proximity": generate_facilities_proximity_task,
@@ -327,8 +359,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_zoi": generate_zoi,
     "generate_zoi_data": generate_zoi,
     "generate_hydrology": generate_hydrology_local,
-    "hydrology_fortnightly": generate_hydrology_local,
-    "hydrology_annual": generate_hydrology_local,
+    "hydrology_fortnightly": generate_hydrology_fortnightly_local,
+    "hydrology_annual": generate_hydrology_annual_local,
     "forest_fire": generate_forest_fire_local,
     "generate_forest_fire": generate_forest_fire_local,
     "forest_fringe": generate_forest_fringe_local,
