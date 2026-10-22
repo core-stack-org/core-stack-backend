@@ -90,6 +90,87 @@ def publish_local_layer(
     return response
 
 
+@app.task(
+    bind=True,
+    name="computing.tasks.publish_gee_layer",
+    autoretry_for=(GeoServerPublishError,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=5,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def publish_gee_layer(
+    self,
+    layer_type,
+    asset_id,
+    layer_name,
+    workspace,
+    state,
+    style_name=None,
+    layer_id=None,
+    gee_account_id=None,
+):
+    """
+    Push a GEE-generated layer that was kept off GeoServer: a vector is re-read
+    from its GEE asset, a raster is taken from the tif already in GCS.
+    """
+    import ee
+
+    from computing.utils import sync_fc_to_geoserver, update_layer_sync_status
+    from utilities.gee_utils import ee_initialize, sync_raster_gcs_to_geoserver
+
+    try:
+        if layer_type == "raster":
+            response = sync_raster_gcs_to_geoserver(
+                workspace, layer_name, layer_name, style_name=style_name
+            )
+        elif layer_type == "vector":
+            ee_initialize(gee_account_id)
+            response = sync_fc_to_geoserver(
+                ee.FeatureCollection(asset_id),
+                state,
+                layer_name,
+                workspace,
+                style_name,
+            )
+        else:
+            raise ValueError(f"Unsupported GeoServer layer type: {layer_type}")
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise GeoServerPublishError(
+            f"Failed to publish {workspace}:{layer_name}: {exc}"
+        ) from exc
+
+    if not response or (isinstance(response, dict) and response.get("skipped")):
+        raise GeoServerPublishError(
+            f"{workspace}:{layer_name} was not pushed: {response}"
+        )
+    if response == "No features in FeatureCollection":
+        logger.warning("Nothing to publish for %s:%s: %s", workspace, layer_name, response)
+        return response
+
+    if layer_id and update_layer_sync_status(
+        layer_id=layer_id,
+        sync_to_geoserver=True,
+        is_stac_specs_generated=False,
+    ) is None:
+        raise GeoServerPublishError(
+            f"Published {workspace}:{layer_name}, but metadata update failed"
+        )
+
+    logger.info(
+        "Published GEE %s layer %s:%s from task %s",
+        layer_type,
+        workspace,
+        layer_name,
+        self.request.id,
+    )
+    return response
+
+
 @app.task(name="computing.tasks.sync_unsynced_local_layers")
 def sync_unsynced_local_layers(state=None, district=None, block=None, layer_type=None):
     """
@@ -163,4 +244,5 @@ __all__ = ["bulk_generate_layer",
            "generate_hydrology",
            "generate_hydrology_base_layer",
            "generate_runoff_gpu",
-           "publish_local_layer"]
+           "publish_local_layer",
+           "publish_gee_layer"]
