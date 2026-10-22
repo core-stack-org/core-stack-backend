@@ -2,9 +2,9 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
+from computing.config_loader import TERRAIN_RASTER_PATH
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    TERRAIN_RASTER_PATH,
     build_output_raster_path,
     clip_raster_with_roi,
     load_precomputed_roi,
