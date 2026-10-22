@@ -7,6 +7,11 @@ A kept-local layer is a ``Layer`` row with ``is_sync_to_geoserver=False`` and
 which the local compute DB does not mirror, so when PROD_BACKEND_URL is set the
 rows are read from prod (which also applies the active check). Pushing flips
 the flag through ``publish_local_layer``.
+
+GEE-generated layers are handled too: a ``Layer`` row with
+``is_sync_to_geoserver=False`` and a real GEE asset path. Their vector asset is
+re-read from GEE, and their raster is taken from the GCS tif exported at
+generation time, by ``publish_gee_layer``.
 """
 
 import logging
@@ -21,23 +26,63 @@ logger = logging.getLogger(__name__)
 
 VECTOR_EXTENSIONS = (".gpkg", ".shp", ".geojson")
 
+# Datasets whose GEE sync is deliberately disabled in their pipeline.
+GEE_SYNC_EXCLUDED_DATASETS = frozenset()
+
 
 def unsynced_local_layers_queryset(
-    state=None, district=None, block=None, layer_type=None
+    state=None, district=None, block=None, layer_type=None, force=False
 ):
     """
     Locally generated layers not on GeoServer whose tehsil chain is active.
+    ``force`` also returns layers already marked as synced.
 
     ``layer_type`` is a bulk pipeline name; it narrows the layers to the
     datasets that pipeline generates. Raises ValueError for an unknown one.
     """
     queryset = Layer.objects.filter(
-        is_sync_to_geoserver=False,
         misc__is_generated_locally=True,
         block__active_status=True,
         district__active_status=True,
         state__active_status=True,
     ).select_related("dataset", "state", "district", "block")
+    if not force:
+        queryset = queryset.filter(is_sync_to_geoserver=False)
+    if layer_type:
+        from computing.bulk_layer_generation import get_regeneration_dataset_names
+
+        queryset = queryset.filter(
+            dataset__name__in=get_regeneration_dataset_names(layer_type)
+        )
+    if state:
+        queryset = queryset.filter(state__state_name__iexact=state)
+    if district:
+        queryset = queryset.filter(district__district_name__iexact=district)
+    if block:
+        queryset = queryset.filter(block__tehsil_name__iexact=block)
+    return queryset
+
+
+def unsynced_gee_layers_queryset(
+    state=None, district=None, block=None, layer_type=None, force=False
+):
+    """
+    GEE-generated layers not on GeoServer whose tehsil chain is active.
+    ``force`` also returns layers already marked as synced.
+    """
+    queryset = (
+        Layer.objects.filter(
+            gee_asset_path__startswith="projects/",
+            block__active_status=True,
+            district__active_status=True,
+            state__active_status=True,
+        )
+        .exclude(misc__is_generated_locally=True)
+        .exclude(dataset__name__in=GEE_SYNC_EXCLUDED_DATASETS)
+        .select_related("dataset", "state", "district", "block")
+    )
+    if not force:
+        queryset = queryset.filter(is_sync_to_geoserver=False)
     if layer_type:
         from computing.bulk_layer_generation import get_regeneration_dataset_names
 
@@ -70,11 +115,18 @@ def serialize_unsynced_layers(queryset):
     ]
 
 
-def fetch_unsynced_layers(state=None, district=None, block=None, layer_type=None):
+def fetch_unsynced_layers(
+    state=None, district=None, block=None, layer_type=None, source="local", force=False
+):
     prod_url = getattr(settings, "PROD_BACKEND_URL", "").rstrip("/")
     if not prod_url:
+        queryset_for = (
+            unsynced_gee_layers_queryset
+            if source == "gee"
+            else unsynced_local_layers_queryset
+        )
         return serialize_unsynced_layers(
-            unsynced_local_layers_queryset(state, district, block, layer_type)
+            queryset_for(state, district, block, layer_type, force)
         )
     response = requests.get(
         f"{prod_url}/api/v1/unsynced_local_layers/",
@@ -85,6 +137,8 @@ def fetch_unsynced_layers(state=None, district=None, block=None, layer_type=None
                 ("district", district),
                 ("block", block),
                 ("layer_type", layer_type),
+                ("source", source if source != "local" else None),
+                ("force", "true" if force else None),
             )
             if value
         },
@@ -144,39 +198,34 @@ def _sync_boundaries(entries):
             )
 
 
-def queue_unsynced_layers(
-    state=None, district=None, block=None, layer_type=None, dry_run=False
-):
-    """
-    Queue the GeoServer push of every unsynced local layer of active tehsils,
-    optionally only for one ``layer_type`` (bulk pipeline name).
-
-    "queued" means handed to Celery, not yet on GeoServer; the layer flag flips
-    when the publish task succeeds.
-    """
-    from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
-
-    summary = {
+def _empty_summary():
+    return {
         "found": 0,
         "queued": 0,
         "skipped_unusable": 0,
-        "dry_run": dry_run,
         "queued_layers": [],
         "skipped_layers": [],
     }
-    entries = fetch_unsynced_layers(state, district, block, layer_type)
-    if not dry_run:
-        _sync_boundaries(entries)
+
+
+def _layer_info(entry):
+    return {
+        "layer_id": entry.get("layer_id"),
+        "workspace": entry.get("workspace"),
+        "layer_name": entry.get("layer_name"),
+        "state": entry.get("state"),
+        "district": entry.get("district"),
+        "block": entry.get("block"),
+    }
+
+
+def _queue_local_entries(entries, dry_run):
+    from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
+
+    summary = _empty_summary()
     for entry in entries:
         summary["found"] += 1
-        info = {
-            "layer_id": entry.get("layer_id"),
-            "workspace": entry.get("workspace"),
-            "layer_name": entry.get("layer_name"),
-            "state": entry.get("state"),
-            "district": entry.get("district"),
-            "block": entry.get("block"),
-        }
+        info = _layer_info(entry)
         args = _publish_args(entry)
         if args is None:
             logger.warning(
@@ -195,4 +244,121 @@ def queue_unsynced_layers(
             info["task_id"] = result.id
         summary["queued"] += 1
         summary["queued_layers"].append(info)
+    return summary
+
+
+def _gee_skip_reason(entry, gee_account_id, ee_ready):
+    """
+    Why a GEE layer cannot be pushed, or None when its source is available:
+    the GEE asset for vectors, the GCS tif for rasters.
+    """
+    from utilities.gee_utils import ee_initialize, gcs_file_exists, is_gee_asset_exists
+
+    try:
+        if entry.get("layer_type") == "raster":
+            if not gcs_file_exists(entry["layer_name"]):
+                return "no gcs file"
+            return None
+        if not ee_ready[0]:
+            ee_initialize(gee_account_id)
+            ee_ready[0] = True
+        if not is_gee_asset_exists(entry["path"]):
+            return "gee asset missing"
+    except Exception as exc:
+        logger.warning(
+            "Could not check source of %s:%s: %s",
+            entry.get("workspace"),
+            entry.get("layer_name"),
+            exc,
+        )
+        return f"source check failed: {exc}"
+    return None
+
+
+def _queue_gee_entries(entries, dry_run, gee_account_id):
+    from computing.tasks import GEOSERVER_QUEUE, publish_gee_layer
+
+    summary = {
+        **_empty_summary(),
+        "vector": {"found": 0, "queued": 0, "skipped": 0},
+        "raster": {"found": 0, "queued": 0, "skipped": 0},
+    }
+    ee_ready = [False]
+    for entry in entries:
+        kind = "raster" if entry.get("layer_type") == "raster" else "vector"
+        summary["found"] += 1
+        summary[kind]["found"] += 1
+        info = {**_layer_info(entry), "layer_type": kind}
+        reason = (
+            "missing workspace or layer name"
+            if not entry.get("workspace") or not entry.get("layer_name")
+            else _gee_skip_reason(entry, gee_account_id, ee_ready)
+        )
+        if reason:
+            summary["skipped_unusable"] += 1
+            summary[kind]["skipped"] += 1
+            summary["skipped_layers"].append({**info, "reason": reason})
+            continue
+        if not dry_run:
+            result = publish_gee_layer.apply_async(
+                kwargs={
+                    "layer_type": kind,
+                    "asset_id": entry["path"],
+                    "layer_name": entry["layer_name"],
+                    "workspace": entry["workspace"],
+                    "style_name": entry.get("style_name"),
+                    "state": entry["state"],
+                    "layer_id": entry.get("layer_id"),
+                    "gee_account_id": gee_account_id,
+                },
+                queue=GEOSERVER_QUEUE,
+            )
+            info["task_id"] = result.id
+        summary["queued"] += 1
+        summary[kind]["queued"] += 1
+        summary["queued_layers"].append(info)
+    return summary
+
+
+def queue_unsynced_layers(
+    state=None,
+    district=None,
+    block=None,
+    layer_type=None,
+    dry_run=False,
+    source="all",
+    gee_account_id=None,
+    force=False,
+):
+    """
+    Queue the GeoServer push of every unsynced layer of active tehsils,
+    optionally only for one ``layer_type`` (bulk pipeline name). ``force``
+    re-pushes layers already marked as synced too.
+
+    ``source`` is "local", "gee" or "all". The top-level keys describe locally
+    generated layers; GEE-generated layers are under ``gee``.
+
+    "queued" means handed to Celery, not yet on GeoServer; the layer flag flips
+    when the publish task succeeds.
+    """
+    if source not in ("all", "local", "gee"):
+        raise ValueError(f"Unknown source '{source}'; use all, local or gee.")
+
+    local_entries = (
+        fetch_unsynced_layers(state, district, block, layer_type, "local", force)
+        if source in ("all", "local")
+        else []
+    )
+    gee_entries = (
+        fetch_unsynced_layers(state, district, block, layer_type, "gee", force)
+        if source in ("all", "gee")
+        else []
+    )
+    if not dry_run:
+        _sync_boundaries(local_entries + gee_entries)
+
+    summary = _queue_local_entries(local_entries, dry_run)
+    summary["gee"] = _queue_gee_entries(gee_entries, dry_run, gee_account_id)
+    summary["dry_run"] = dry_run
+    summary["force"] = force
     return summary
