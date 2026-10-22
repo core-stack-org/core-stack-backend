@@ -11,12 +11,12 @@ from utilities.gee_utils import valid_gee_text
 from nrm_app.celery import app
 
 from computing.config_loader import LULC_SLOPE_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
+from computing.config_loader import TERRAIN_RASTER_PATH
 from computing.local_compute_helper import (
     AEZ_VECTOR_PATH,
     LULC_BASE_DIR,
     MIN_WATERSHED_AREA_HA,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
-    TERRAIN_RASTER_PATH,
     build_output_vector_path as _build_output_vector_path,
     compute_mode_lulc_array as _compute_mode_lulc_array,
     compute_terrain_properties_for_watersheds,
@@ -256,6 +256,7 @@ def run_lulc_on_slope_cluster_local(
         raise ValueError(
             f"No watersheds larger than {MIN_WATERSHED_AREA_HA} ha found for {state}/{district}/{block}."
         )
+    filtered_watersheds.drop(columns=["area"], inplace=True)
 
     terrain_classified = compute_terrain_properties_for_watersheds(
         watersheds_gdf=filtered_watersheds,

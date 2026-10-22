@@ -24,6 +24,22 @@ class Command(BaseCommand):
                 "layer type is pushed; without it all local layers are."
             ),
         )
+        parser.add_argument(
+            "--source",
+            choices=("all", "local", "gee"),
+            default="all",
+            help="Which layers to push: locally generated, GEE-generated or both.",
+        )
+        parser.add_argument("--gee-account-id")
+        parser.add_argument(
+            "--force",
+            action="store_true",
+            help=(
+                "Also re-push layers already marked as synced (active tehsils "
+                "only). Requires --yes unless --dry-run."
+            ),
+        )
+        parser.add_argument("--yes", action="store_true")
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
             "--schedule",
@@ -36,6 +52,11 @@ class Command(BaseCommand):
         if options["schedule"]:
             self._schedule(options["schedule"])
             return
+        if options["force"] and not (options["dry_run"] or options["yes"]):
+            raise CommandError(
+                "--force re-pushes layers already on GeoServer; "
+                "check with --dry-run, then pass --yes."
+            )
         try:
             summary = queue_unsynced_layers(
                 options["state"],
@@ -43,6 +64,9 @@ class Command(BaseCommand):
                 options["block"],
                 layer_type=options["layer_type"],
                 dry_run=options["dry_run"],
+                source=options["source"],
+                gee_account_id=options["gee_account_id"],
+                force=options["force"],
             )
         except ValueError as exc:
             raise CommandError(str(exc))
@@ -50,9 +74,14 @@ class Command(BaseCommand):
             self.stderr.write(f"Could not fetch unsynced layers: {exc}")
             return
         verb = "would queue" if options["dry_run"] else "queued"
+        scope = "layer(s) in active tehsils" if options["force"] else "unsynced layer(s) in active tehsils"
+        self._report("local", summary, verb, scope)
+        self._report("gee", summary["gee"], verb, scope)
+
+    def _report(self, label, summary, verb, scope):
         self.stdout.write(
-            f"{summary['found']} unsynced layer(s) in active tehsils; "
-            f"{verb} {summary['queued']}, {summary['skipped_unusable']} have no local file."
+            f"[{label}] {summary['found']} {scope}; {verb} {summary['queued']}, "
+            f"{summary['skipped_unusable']} skipped."
         )
         for item in summary["queued_layers"]:
             self.stdout.write(

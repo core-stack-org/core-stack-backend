@@ -1077,6 +1077,13 @@ def save_layer_info_to_db(
 def update_layer_sync_status(
         layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
+    if sync_to_geoserver and should_skip_sync():
+        # The push was skipped by the GeoServer gate, so the layer is not on
+        # GeoServer; callers flip this flag on any truthy push result.
+        sync_to_geoserver = None
+        if is_stac_specs_generated is None:
+            return layer_id
+
     if _get_prod_backend_url():
         _update_layer_sync_remote(
             layer_id,

@@ -2924,15 +2924,23 @@ def unsynced_local_layers(request):
 
     from computing.pending_geoserver_sync import (
         serialize_unsynced_layers,
+        unsynced_gee_layers_queryset,
         unsynced_local_layers_queryset,
     )
 
+    queryset_for = (
+        unsynced_gee_layers_queryset
+        if request.query_params.get("source") == "gee"
+        else unsynced_local_layers_queryset
+    )
+    force = parse_bool(request.query_params.get("force", False))
     try:
-        queryset = unsynced_local_layers_queryset(
+        queryset = queryset_for(
             request.query_params.get("state"),
             request.query_params.get("district"),
             request.query_params.get("block"),
             request.query_params.get("layer_type"),
+            force,
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -2946,8 +2954,11 @@ def unsynced_local_layers(request):
 def sync_local_layers_to_geoserver(request):
     """
     Run on the local compute instance. Queues the GeoServer push of locally
-    generated layers of active tehsils; all fields are optional filters.
-    Body: {"state", "district", "block", "layer_type", "dry_run"}.
+    generated and GEE-generated layers of active tehsils; all fields are
+    optional. GEE layers are reported under the "gee" key of the response.
+    Body: {"state", "district", "block", "layer_type", "dry_run",
+    "source": "all" | "local" | "gee", "gee_account_id", "force"}. ``force``
+    re-pushes layers already marked as synced.
     Requires the X-Api-Key header to match PROD_BACKEND_API_KEY.
     """
     api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
@@ -2964,6 +2975,9 @@ def sync_local_layers_to_geoserver(request):
             d.get("block"),
             layer_type=d.get("layer_type"),
             dry_run=parse_bool(d.get("dry_run", False)),
+            source=d.get("source", "all"),
+            gee_account_id=d.get("gee_account_id"),
+            force=parse_bool(d.get("force", False)),
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
