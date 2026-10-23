@@ -329,11 +329,14 @@ def queue_unsynced_layers(
     source="all",
     gee_account_id=None,
     force=False,
+    sync_boundaries=True,
 ):
     """
     Queue the GeoServer push of every unsynced layer of active tehsils,
     optionally only for one ``layer_type`` (bulk pipeline name). ``force``
-    re-pushes layers already marked as synced too.
+    re-pushes layers already marked as synced too. ``sync_boundaries=False``
+    skips the per-tehsil admin/MWS boundary push (use when they are already on
+    GeoServer).
 
     ``source`` is "local", "gee" or "all". The top-level keys describe locally
     generated layers; GEE-generated layers are under ``gee``.
@@ -354,7 +357,7 @@ def queue_unsynced_layers(
         if source in ("all", "gee")
         else []
     )
-    if not dry_run:
+    if not dry_run and sync_boundaries:
         _sync_boundaries(local_entries + gee_entries)
 
     summary = _queue_local_entries(local_entries, dry_run)
