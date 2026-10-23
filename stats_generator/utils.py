@@ -228,9 +228,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "aquifer":
                 create_excel_for_aquifer(geojson_data, writer)
             elif workspace == "soge":
-                soge_dfs.append(
-                    build_soge_df(geojson_data, start_year, layer_name)
-                )
+                soge_dfs.append(build_soge_df(geojson_data, start_year, layer_name))
             elif workspace == "lcw":
                 create_excel_for_lcw(geojson_data, writer)
             elif workspace == "agroecological":
@@ -1273,8 +1271,15 @@ def build_soge_df(data, year=None, layer_name=None):
                 "UID": properties["uid"],
                 "area_in_ha": properties["area_in_ha"],
                 f"soge_dev_percent{suffix}": properties["sgw_dev_pe"],
-                f"class_code{suffix}": properties["code"],
                 f"class_name{suffix}": properties["class"],
+                f"extraction_for_irrigation_in_bcm{suffix}": properties["agwd_irr"],
+                f"extraction_for_domestic_and_industrial_in_bcm{suffix}": properties[
+                    "agwd_dom_i"
+                ],
+                f"total_extraction_in_bcm{suffix}": properties["agwd_tot"],
+                f"groundwater_recharge_in_bcm{suffix}": properties["ar_gwr_tot"],
+                f"natural_discharge_in_bcm{suffix}": properties["nat_discharge"],
+                f"groundwater_availability_in_bcm{suffix}": properties["na_gwa"],
             }
         )
     return year or 0, pd.DataFrame(df_data)
