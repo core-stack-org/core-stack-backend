@@ -985,6 +985,34 @@ def _populate_annual_crop_columns(gdf, state, district, block):
     return out_path
 
 
+def _populate_annual_crop_intensity(state, district, block):
+    """
+    Fill `crop_intensity` in annual.parquet for every farm/year from the yearly
+    LULC rasters (compute_farm_cropping_intensity). Years with no LULC raster
+    stay null. Rounded to 4 dp.
+    """
+    annual_path = _annual_parquet_path(state, district, block)
+    static_path = _static_parquet_path(state, district, block)
+    if not (os.path.exists(annual_path) and os.path.exists(static_path)):
+        logger.warning("Cannot populate crop_intensity — annual/static parquet missing.")
+        return None
+
+    # lazy: cropping_intesity_local imports Django-dependent modules
+    from computing.cropping_intensity.cropping_intesity_local import (
+        compute_farm_cropping_intensity,
+    )
+
+    farms = gpd.read_parquet(static_path, columns=["farm_id", "geometry"])
+    annual = pd.read_parquet(annual_path).drop(columns=[CROP_INTENSITY_COLUMN], errors="ignore")
+    intensity = compute_farm_cropping_intensity(farms, annual["year"].unique())
+    intensity[CROP_INTENSITY_COLUMN] = intensity.pop("crop_intensity").round(4)
+
+    annual = annual.merge(intensity, on=["farm_id", "year"], how="left", validate="one_to_one")
+    _write_annual_parquet(annual, annual_path)
+    logger.info("crop_intensity populated in %s (%d rows).", annual_path, len(annual))
+    return annual_path
+
+
 # ── crop-column schema enforcement ──────────────────────────────────────────────
 # Ensures crop1/crop2/crop3 are always written as strings and conf1/conf2/conf3
 # as floats — even when a column is entirely null for a given write, which
@@ -1367,6 +1395,7 @@ def compute_multi_year_water_stress(
 
     # Crop data for every processed year in one go (table built once)
     _populate_annual_crop_columns(base_gdf, state, district, block)
+    _populate_annual_crop_intensity(state, district, block)
 
     _update_static_drought_indicators(state, district, block)
 
