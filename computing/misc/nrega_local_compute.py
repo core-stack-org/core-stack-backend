@@ -6,6 +6,7 @@ import numpy as np
 from io import BytesIO
 
 from nrm_app.celery import app
+from utilities.constants import NREGA_S3_PREFIX
 from utilities.gee_utils import valid_gee_text
 from nrm_app.settings import NREGA_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY
 from computing.utils import (
@@ -101,7 +102,10 @@ def generate_nrega_data_local(
     print("Fetching NREGA data from S3...")
     # It fetches district level geojson from S3
     if state and district:
-        key = f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+        key = (
+            f"{NREGA_S3_PREFIX}/{valid_gee_text(state).upper()}/"
+            f"{valid_gee_text(district).upper()}.geojson"
+        )
     else:
         # Fallback or error if custom ROI does not provide state/district mapping to S3
         print("Warning: Custom ROI run without state/district cannot fetch from S3 reliably.")
