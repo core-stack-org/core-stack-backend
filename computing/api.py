@@ -2957,8 +2957,9 @@ def sync_local_layers_to_geoserver(request):
     generated and GEE-generated layers of active tehsils; all fields are
     optional. GEE layers are reported under the "gee" key of the response.
     Body: {"state", "district", "block", "layer_type", "dry_run",
-    "source": "all" | "local" | "gee", "gee_account_id", "force"}. ``force``
-    re-pushes layers already marked as synced.
+    "source": "all" | "local" | "gee", "gee_account_id", "force",
+    "skip_boundaries"}. ``force`` re-pushes layers already marked as synced;
+    ``skip_boundaries`` leaves the tehsil admin/MWS boundaries alone.
     Requires the X-Api-Key header to match PROD_BACKEND_API_KEY.
     """
     api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
@@ -2978,6 +2979,7 @@ def sync_local_layers_to_geoserver(request):
             source=d.get("source", "all"),
             gee_account_id=d.get("gee_account_id"),
             force=parse_bool(d.get("force", False)),
+            sync_boundaries=not parse_bool(d.get("skip_boundaries", False)),
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

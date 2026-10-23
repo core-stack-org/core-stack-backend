@@ -310,6 +310,9 @@ MINING_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/Mining_data_pa
 FACTORY_PAN_INDIA_DATASET = (
     "projects/ext-datasets/assets/datasets/Factory_CSR_pan_india"
 )
+# Folder in the NREGA bucket holding the latest scraped district geojsons.
+NREGA_S3_PREFIX = "nrega_04_2026"
+
 GREEN_CREDIT_PAN_INDIA_DATASET = (
     "projects/ext-datasets/assets/datasets/Green_credit_pan_india"
 )
