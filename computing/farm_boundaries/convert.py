@@ -49,8 +49,8 @@ ALU_TYPE_TO_PARQUET = {
 
 # Placeholder filled in later by et_intersection (Phase 3) from monthly MAI.
 DROUGHT_INDICATOR_COLUMNS = [
-    "frequency_moderate", "frequency_severe",
-    "intensity_moderate", "intensity_severe",
+    "frequency", "frequency_mod", "frequency_sev",
+    "intensity", "intensity_mod", "intensity_sev",
 ]
 
 
