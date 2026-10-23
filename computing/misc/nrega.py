@@ -10,6 +10,7 @@ from computing.utils import (
 )
 from utilities.constants import (
     NREGA_ASSETS_OUTPUT_DIR,
+    NREGA_S3_PREFIX,
 )
 from nrm_app.settings import NREGA_BUCKET
 from utilities.gee_utils import (
@@ -48,7 +49,8 @@ def clip_nrega_district_block(self, state, district, block, gee_account_id):
     ee_initialize(gee_account_id)
 
     nrega_geojson_file = (
-        f"{valid_gee_text(state).upper()}/{valid_gee_text(district).upper()}.geojson"
+        f"{NREGA_S3_PREFIX}/{valid_gee_text(state).upper()}/"
+        f"{valid_gee_text(district).upper()}.geojson"
     )
     nrega_file_url = (
         f"https://{NREGA_BUCKET}.s3.ap-south-1.amazonaws.com/{nrega_geojson_file}"

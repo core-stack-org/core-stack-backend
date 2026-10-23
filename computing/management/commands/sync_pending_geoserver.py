@@ -39,6 +39,14 @@ class Command(BaseCommand):
                 "only). Requires --yes unless --dry-run."
             ),
         )
+        parser.add_argument(
+            "--skip-boundaries",
+            action="store_true",
+            help=(
+                "Do not push the admin and MWS boundaries of each tehsil; use "
+                "when they are already on GeoServer."
+            ),
+        )
         parser.add_argument("--yes", action="store_true")
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -67,6 +75,7 @@ class Command(BaseCommand):
                 source=options["source"],
                 gee_account_id=options["gee_account_id"],
                 force=options["force"],
+                sync_boundaries=not options["skip_boundaries"],
             )
         except ValueError as exc:
             raise CommandError(str(exc))
