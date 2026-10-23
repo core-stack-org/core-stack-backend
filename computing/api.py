@@ -299,7 +299,7 @@ def generate_farm_boundaries(request):
         block = request.data.get("block", "").lower().strip()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        overwrite = request.data.get("overwrite", False)
+        overwrite = parse_bool(request.data.get("overwrite", False))
 
         if not all([state, district, block]):
             return Response(
@@ -635,7 +635,7 @@ def _generate_tehsil_hydrology(request, is_annual):
                 "end_year": end_year,
                 "is_annual": is_annual,
                 "pan_india": False,
-                "overwrite": request.data.get("overwrite", False),
+                "overwrite": parse_bool(request.data.get("overwrite", False)),
             },
             queue="nrm",
         )
@@ -715,7 +715,7 @@ def _generate_pan_india_hydrology_base_layer(request, is_annual):
             "start_year": start_year,
             "end_year": end_year,
             "is_annual": is_annual,
-            "overwrite": request.data.get("overwrite", False),
+            "overwrite": parse_bool(request.data.get("overwrite", False)),
         },
         queue=_heavy_queue(),
     )
@@ -852,7 +852,7 @@ def et_download(request):
                 "end_date": request.data.get("end_date"),
                 "start_year": request.data.get("start_year"),
                 "end_year": request.data.get("end_year"),
-                "overwrite": request.data.get("overwrite", False),
+                "overwrite": parse_bool(request.data.get("overwrite", False)),
                 "patch_fill": request.data.get("patch_fill", True),
             },
             queue=_heavy_queue(),
@@ -2841,8 +2841,8 @@ def generate_stac_collection(request):
         start_year = request.data.get("start_year", "")
         end_year = request.data.get("end_year", "")
         upload_to_s3 = request.data.get("upload_to_s3", False)
-        overwrite = request.data.get("overwrite", False)
-        overwrite_metadata = request.data.get("overwrite_metadata", False)
+        overwrite = parse_bool(request.data.get("overwrite", False))
+        overwrite_metadata = parse_bool(request.data.get("overwrite_metadata", False))
 
         if not all([state, district, block, layer_name, layer_type]):
             return Response(
@@ -3227,7 +3227,7 @@ def generate_spei(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        overwrite = request.data.get("overwrite") or False
+        overwrite = parse_bool(request.data.get("overwrite", False))
 
         generate_spei_pipeline.apply_async(
             args=[aez, start_year, end_year, gee_account_id, overwrite], queue="nrm"
