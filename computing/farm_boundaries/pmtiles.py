@@ -25,12 +25,12 @@ LAYER_NAME = "farm_boundaries"
 # farm_id is the join key back to farm_static/farm_annual/farm_monthly
 # parquets, so consumers can look up everything else from there instead of
 # duplicating it into the tileset.
-# frequency_* / intensity_* are the moderate/severe drought indicators computed into static.parquet
+# frequency / intensity (+ _mod / _sev variants) are the drought indicators computed into static.parquet
 # by et_intersection (Phase 3); farms with no value (NaN) get a null property.
 TILE_PROPERTY_COLUMNS = [
     "farm_id", "area_m2",
-    "frequency_moderate", "frequency_severe",
-    "intensity_moderate", "intensity_severe",
+    "frequency", "frequency_mod", "frequency_sev",
+    "intensity", "intensity_mod", "intensity_sev",
 ]
 
 REQUIRED_BINARIES = ["tippecanoe", "pmtiles"]
