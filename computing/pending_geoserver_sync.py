@@ -19,6 +19,7 @@ import os
 
 import requests
 from django.conf import settings
+from django.db.models import Q
 
 from computing.models import Layer
 
@@ -77,7 +78,12 @@ def unsynced_gee_layers_queryset(
             district__active_status=True,
             state__active_status=True,
         )
-        .exclude(misc__is_generated_locally=True)
+        # A plain .exclude(misc__is_generated_locally=True) also drops rows whose
+        # misc is a dict without that key (NOT of a NULL comparison).
+        .filter(
+            ~Q(misc__is_generated_locally=True)
+            | Q(misc__is_generated_locally__isnull=True)
+        )
         .exclude(dataset__name__in=GEE_SYNC_EXCLUDED_DATASETS)
         .select_related("dataset", "state", "district", "block")
     )
