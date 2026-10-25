@@ -10,7 +10,7 @@
                 "unit": ""
             },
             "error_message": {
-                "type": "string|null",
+                "type": "string",
                 "description": "Error details when the request fails; otherwise null.",
                 "unit": ""
             },
@@ -23,352 +23,352 @@
                         "description": "Waterbody attributes and associated metadata.",
                         "variables": {
                             "Block/Tehsil Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the block or tehsil associated with the waterbody.",
                                 "unit": "value"
                             },
                             "District Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the district associated with the waterbody.",
                                 "unit": "value"
                             },
                             "MWS_UID": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Identifier of the micro-watershed associated with the waterbody.",
                                 "unit": "value"
                             },
                             "State Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the state associated with the waterbody.",
                                 "unit": "value"
                             },
                             "UID": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Unique identifier of the waterbody record.",
                                 "unit": "id"
                             },
                             "Village Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Village name associated with the waterbody.",
                                 "unit": "name"
                             },
                             "any": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of any for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "area_encroached_percentage": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area encroached percentage/area field as supplied by the source.",
                                 "unit": "ha"
                             },
                             "area_ored": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area value recorded for the waterbody.",
                                 "unit": "ha"
                             },
                             "basin_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of basin name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "category_sq_m": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of category sq m for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "cca_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of cca water body for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "census_id": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of census id for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "construcion_year": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of construcion year for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "construction_cost": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of construction cost for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "covering_village_names": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Names of villages covered or intersected by the waterbody.",
                                 "unit": "value"
                             },
                             "filled_up_storage_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of filled up storage name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "filled_up_storage_space_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of filled up storage space name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "intersecting_villages": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Number of villages intersecting the waterbody.",
                                 "unit": "count"
                             },
                             "ipc_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of ipc water body for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ismissing": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of ismissing for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "khasra_number": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of khasra number for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "latitude_dec": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Latitude in decimal degrees, when available.",
                                 "unit": "value"
                             },
                             "longitude_dec": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Longitude in decimal degrees, when available.",
                                 "unit": "value"
                             },
                             "manmade_water_body_type_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of manmade water body type name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "max_catchment_area": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Maximum catchment area associated with the waterbody.",
                                 "unit": "ha"
                             },
                             "max_depth_water_body_fully_filled": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of max depth water body fully filled for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "max_stream_order": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of max stream order for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "nature_of_storage": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of nature of storage for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "no_people_benefited_by_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of no people benefited by water body for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "no_town_cities_benefited": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of no town cities benefited for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "no_villages_benefited": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of no villages benefited for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "on_drainage_line": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of on drainage line for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "reason_water_body_in_use_name2": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of reason water body in use name2 for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "reason_water_body_in_use_name3": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of reason water body in use name3 for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_reason_water_body_in_use_id1_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref reason water body in use id1 name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_dip_sip_exists_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id dip sip exists name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_encroachment_assessed_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id encroachment assessed name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_water_body_encroached_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id water body encroached name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_wua_exists_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id wua exists name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_water_body_in_use_id_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref water body in use id name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_water_body_type_id_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref water body type id name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_water_body_under_repair_renovation_restoration_id_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref water body under repair renovation restoration id name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "renovation_cost": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of renovation cost for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "renovation_year": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of renovation year for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "rip_code": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of rip code for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "river_objectid": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of river objectid for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "rural_or_urban": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of rural or urban for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "scheme_status_reason_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of scheme status reason name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "scheme_under_revival_is_done": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of scheme under revival is done for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "si_no_of_water_body_within_village_town": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of si no of water body within village town for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "storage_capacity_water_body_original": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of storage capacity water body original for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "storage_capacity_water_body_present": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of storage capacity water body present for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "sub_basin_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of sub basin name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "town_municipalty_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of town municipalty name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "unique_id": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of unique id for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "village_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of village name for the waterbody, when available.",
                                 "unit": "name"
                             },
                             "ward_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ward name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of water for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_loc_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body loc name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_nature_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body nature name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_ownership_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body ownership name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_spread_area_of_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Water spread area of the waterbody.",
                                 "unit": "ha"
                             },
                             "waterbody_type": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Category of waterbody.",
                                 "unit": "value"
                             },
                             "waterbody_type_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the waterbody type.",
                                 "unit": "value"
                             },
                             "sum": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area value returned by the API.",
                                 "unit": "ha"
                             },
                             "total_cropable_area_ever_hydroyear": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Total cropable area ever observed across hydroyears.",
                                 "unit": "ha"
                             },
                             "zoi": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Zone-of-influence value returned by the API.",
                                 "unit": "count"
                             },
                             "zoi_area": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area of the zone of influence.",
                                 "unit": "ha"
                             }
@@ -861,16 +861,6 @@
         "description": "Returns details for a single waterbody, including metadata, annual area and cropping metrics, its UID, and administrative location.",
         "type": "object",
         "variables": {
-            "status": {
-                "type": "string",
-                "description": "Indicates whether the request succeeded.",
-                "unit": ""
-            },
-            "error_message": {
-                "type": "string|null",
-                "description": "Error details when the request fails; otherwise null.",
-                "unit": ""
-            },
             "data": {
                 "type": "object",
                 "description": "Details for the requested waterbody.",
@@ -880,352 +870,352 @@
                         "description": "Waterbody attributes and associated metadata.",
                         "variables": {
                             "Block/Tehsil Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the block or tehsil associated with the waterbody.",
                                 "unit": "value"
                             },
                             "District Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the district associated with the waterbody.",
                                 "unit": "value"
                             },
                             "MWS_UID": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Identifier of the micro-watershed associated with the waterbody.",
                                 "unit": "value"
                             },
                             "State Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the state associated with the waterbody.",
                                 "unit": "value"
                             },
                             "UID": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Unique identifier of the waterbody record.",
                                 "unit": "id"
                             },
                             "Village Name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Village name associated with the waterbody.",
                                 "unit": "name"
                             },
                             "any": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of any for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "area_encroached_percentage": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area encroached percentage/area field as supplied by the source.",
                                 "unit": "ha"
                             },
                             "area_ored": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area value recorded for the waterbody.",
                                 "unit": "ha"
                             },
                             "basin_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of basin name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "category_sq_m": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of category sq m for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "cca_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of cca water body for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "census_id": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of census id for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "construcion_year": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of construcion year for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "construction_cost": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of construction cost for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "covering_village_names": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Names of villages covered or intersected by the waterbody.",
                                 "unit": "value"
                             },
                             "filled_up_storage_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of filled up storage name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "filled_up_storage_space_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of filled up storage space name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "intersecting_villages": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Number of villages intersecting the waterbody.",
                                 "unit": "count"
                             },
                             "ipc_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of ipc water body for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ismissing": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of ismissing for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "khasra_number": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of khasra number for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "latitude_dec": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Latitude in decimal degrees, when available.",
                                 "unit": "value"
                             },
                             "longitude_dec": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Longitude in decimal degrees, when available.",
                                 "unit": "value"
                             },
                             "manmade_water_body_type_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of manmade water body type name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "max_catchment_area": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Maximum catchment area associated with the waterbody.",
                                 "unit": "ha"
                             },
                             "max_depth_water_body_fully_filled": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of max depth water body fully filled for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "max_stream_order": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of max stream order for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "nature_of_storage": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of nature of storage for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "no_people_benefited_by_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of no people benefited by water body for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "no_town_cities_benefited": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of no town cities benefited for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "no_villages_benefited": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of no villages benefited for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "on_drainage_line": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of on drainage line for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "reason_water_body_in_use_name2": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of reason water body in use name2 for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "reason_water_body_in_use_name3": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of reason water body in use name3 for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_reason_water_body_in_use_id1_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref reason water body in use id1 name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_dip_sip_exists_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id dip sip exists name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_encroachment_assessed_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id encroachment assessed name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_water_body_encroached_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id water body encroached name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_selection_id_wua_exists_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref selection id wua exists name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_water_body_in_use_id_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref water body in use id name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_water_body_type_id_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref water body type id name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "ref_water_body_under_repair_renovation_restoration_id_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ref water body under repair renovation restoration id name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "renovation_cost": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of renovation cost for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "renovation_year": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of renovation year for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "rip_code": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of rip code for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "river_objectid": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of river objectid for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "rural_or_urban": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of rural or urban for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "scheme_status_reason_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of scheme status reason name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "scheme_under_revival_is_done": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of scheme under revival is done for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "si_no_of_water_body_within_village_town": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of si no of water body within village town for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "storage_capacity_water_body_original": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of storage capacity water body original for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "storage_capacity_water_body_present": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of storage capacity water body present for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "sub_basin_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of sub basin name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "town_municipalty_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of town municipalty name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "unique_id": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of unique id for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "village_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of village name for the waterbody, when available.",
                                 "unit": "name"
                             },
                             "ward_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of ward name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Value of water for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_loc_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body loc name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_nature_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body nature name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_body_ownership_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Value of water body ownership name for the waterbody, when available.",
                                 "unit": "value"
                             },
                             "water_spread_area_of_water_body": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Water spread area of the waterbody.",
                                 "unit": "ha"
                             },
                             "waterbody_type": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Category of waterbody.",
                                 "unit": "value"
                             },
                             "waterbody_type_name": {
-                                "type": "string|null",
+                                "type": "string",
                                 "description": "Name of the waterbody type.",
                                 "unit": "value"
                             },
                             "sum": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area value returned by the API.",
                                 "unit": "ha"
                             },
                             "total_cropable_area_ever_hydroyear": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Total cropable area ever observed across hydroyears.",
                                 "unit": "ha"
                             },
                             "zoi": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Zone-of-influence value returned by the API.",
                                 "unit": "count"
                             },
                             "zoi_area": {
-                                "type": "number|null",
+                                "type": "number",
                                 "description": "Area of the zone of influence.",
                                 "unit": "ha"
                             }
@@ -1736,6 +1726,16 @@
                         "unit": ""
                     }
                 }
+            },
+            "status": {
+                "type": "string",
+                "description": "Indicates whether the request succeeded.",
+                "unit": ""
+            },
+            "error_message": {
+                "type": "string",
+                "description": "Error details when the request fails; otherwise null.",
+                "unit": ""
             }
         }
     }
