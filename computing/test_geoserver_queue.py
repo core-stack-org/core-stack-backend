@@ -78,6 +78,12 @@ class GeeLayerSyncTests(SimpleTestCase):
     }
     GEE_RASTER = {**GEE_VECTOR, "layer_id": 2, "layer_name": "ras", "layer_type": "raster"}
 
+    def setUp(self):
+        # asset type lookup falls back to the dataset type, without hitting GEE
+        patcher = patch("ee.data.getAsset", side_effect=RuntimeError("no gee"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     @patch("computing.tasks.publish_gee_layer.apply_async")
     @patch("computing.pending_geoserver_sync._sync_boundaries")
     @patch("utilities.gee_utils.gcs_file_exists")
@@ -257,3 +263,129 @@ class RelativePathAndRoutingTests(SimpleTestCase):
         self.assertEqual(summary["gee"]["queued"], 1)
         gee_apply.assert_called_once()
         local_apply.assert_not_called()
+
+
+class GeeLayerKindTests(SimpleTestCase):
+    ENTRY = {
+        "layer_id": 3,
+        "layer_name": "stream_order_x_raster",
+        "path": "projects/p/assets/stream_order_x_raster",
+        "workspace": "stream_order",
+        "style_name": "default_style",
+        "layer_type": "vector",  # shared dataset says vector
+        "state": "s",
+        "district": "d",
+        "block": "b",
+    }
+
+    @patch("computing.tasks.publish_gee_layer.apply_async")
+    @patch("utilities.gee_utils.gcs_file_exists", return_value=True)
+    @patch("utilities.gee_utils.ee_initialize")
+    @patch("ee.data.getAsset", return_value={"type": "IMAGE"})
+    @patch("computing.pending_geoserver_sync.fetch_unsynced_layers")
+    def test_image_asset_published_as_raster_despite_vector_dataset(
+        self, fetch, _get, _ee, _gcs, apply_async
+    ):
+        from computing.pending_geoserver_sync import queue_unsynced_layers
+
+        apply_async.return_value.id = "t"
+        fetch.side_effect = lambda *a: [self.ENTRY] if a[4] == "gee" else []
+
+        summary = queue_unsynced_layers(source="gee", sync_boundaries=False)
+
+        self.assertEqual(summary["gee"]["raster"]["queued"], 1)
+        self.assertEqual(summary["gee"]["vector"]["found"], 0)
+        self.assertEqual(apply_async.call_args.kwargs["kwargs"]["layer_type"], "raster")
+
+    @patch("utilities.gee_utils.ee_initialize", side_effect=RuntimeError("no gee"))
+    def test_falls_back_to_name_suffix_when_asset_unreadable(self, _ee):
+        from computing.pending_geoserver_sync import _gee_layer_kind
+
+        self.assertEqual(_gee_layer_kind(self.ENTRY, None, [False]), "raster")
+        vec = {**self.ENTRY, "layer_name": "stream_order_x_vector"}
+        self.assertEqual(_gee_layer_kind(vec, None, [False]), "vector")
+
+
+class GpkgPipelineSyncTests(SimpleTestCase):
+    def _entries(self, tmp):
+        import os
+
+        main = os.path.join(tmp, "facilities_k_k.gpkg")
+        points = os.path.join(tmp, "facilities_k_k.facility_points.gpkg")
+        for f in (main, points):
+            open(f, "w").close()
+        base = {
+            "workspace": "facilities_proximity",
+            "style_name": None,
+            "layer_type": "vector",
+            "state": "s",
+            "district": "d",
+            "block": "b",
+        }
+        return [
+            {**base, "layer_id": 1, "layer_name": "facilities_k_k", "path": main},
+            {
+                **base,
+                "layer_id": 2,
+                "layer_name": "facilities_k_k_tehsil_facility_collection",
+                "path": points,
+            },
+            {
+                **base,
+                "layer_id": 3,
+                "layer_name": "facilities_k_k_village_nearest_facility_collection",
+                "path": points,
+            },
+        ]
+
+    @patch("computing.tasks.publish_local_layer.apply_async")
+    def test_facility_point_layers_share_one_task(self, apply_async):
+        import tempfile
+
+        from computing.pending_geoserver_sync import _queue_local_entries
+
+        apply_async.return_value.id = "t"
+        with tempfile.TemporaryDirectory() as tmp:
+            summary = _queue_local_entries(self._entries(tmp), dry_run=False)
+
+        self.assertEqual(summary["queued"], 3)
+        self.assertEqual(apply_async.call_count, 2)
+        kwargs = [c.kwargs["kwargs"] for c in apply_async.call_args_list]
+        main = next(k for k in kwargs if k["layer_name"] == "facilities_k_k")
+        points = next(k for k in kwargs if k["layer_name"] != "facilities_k_k")
+        self.assertEqual(main["gpkg_layers"], {"facilities_k_k": None})
+        self.assertEqual(points["store_name"], "facilities_k_k_facility_points")
+        self.assertEqual(
+            points["gpkg_layers"],
+            {
+                "facilities_k_k_tehsil_facility_collection": "tehsil_facility_collection",
+                "facilities_k_k_village_nearest_facility_collection": "village_nearest_facility_collection",
+            },
+        )
+        self.assertEqual(points["extra_layer_ids"], [3])
+
+    @patch("computing.utils.update_layer_sync_status", return_value=1)
+    @patch("utilities.pipelines.publish.publish_gpkg_layers")
+    def test_publish_local_layer_publishes_gpkg_tables_and_flips_all_flags(
+        self, publish, update_sync
+    ):
+        from computing.tasks import publish_local_layer
+
+        publish_local_layer.run(
+            layer_type="vector",
+            path="/x/f.facility_points",
+            layer_name="a",
+            workspace="ws",
+            file_type="gpkg",
+            layer_id=2,
+            gpkg_layers={"a": "t1", "b": "t2"},
+            store_name="f_facility_points",
+            extra_layer_ids=[3],
+        )
+
+        publish.assert_called_once()
+        self.assertEqual(publish.call_args.args[0], "/x/f.facility_points.gpkg")
+        self.assertEqual(publish.call_args.kwargs["store_name"], "f_facility_points")
+        self.assertEqual(
+            [c.kwargs["layer_id"] for c in update_sync.call_args_list], [2, 3]
+        )
