@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 VECTOR_EXTENSIONS = (".gpkg", ".shp", ".geojson")
 
+SOIL_HEALTH_RASTER_WORKSPACE = "soil_health_raster"
+SOIL_HEALTH_NUTRIENTS = ("N", "K", "P", "OC", "OC_OLM")
+
 # Datasets whose GEE sync is deliberately disabled in their pipeline.
 GEE_SYNC_EXCLUDED_DATASETS = frozenset()
 
@@ -155,11 +158,74 @@ def fetch_unsynced_layers(
     return response.json()["layers"]
 
 
+def _is_gee_path(path):
+    return bool(path) and str(path).startswith("projects/")
+
+
+def _resolve_local_path(path):
+    """
+    Local generators store output paths relative to the repo (``data/...``).
+    Resolve them under DATA_DIR (which may be relocated) or the repo root;
+    absolute paths are returned as they are.
+    """
+    if os.path.isabs(path):
+        return path
+    from computing.config_loader import DATA_DIR, PROJECT_ROOT
+
+    candidates = []
+    if path == "data" or path.startswith("data/"):
+        candidates.append(str(DATA_DIR / path[len("data/"):]))
+    candidates.append(str(PROJECT_ROOT / path))
+    for candidate in candidates:
+        if os.path.exists(candidate) or os.path.exists(
+            os.path.splitext(candidate)[0] + ".gpkg"
+        ):
+            return candidate
+    return candidates[0]
+
+
+def _expand_soil_health_raster(entry):
+    """
+    A soil health raster row holds one nutrient's path under the bare layer
+    name, but each nutrient is a separate GeoServer layer
+    ``<layer_name>_<nutrient>``. Returns one entry per nutrient file (the row
+    is only flipped by the last one), or the entry itself if it doesn't apply.
+    """
+    path = entry.get("path")
+    if (
+        entry.get("workspace") != SOIL_HEALTH_RASTER_WORKSPACE
+        or not path
+        or _is_gee_path(path)
+    ):
+        return [entry]
+    resolved = _resolve_local_path(path)
+    stem = os.path.splitext(resolved)[0]
+    for nutrient in sorted(SOIL_HEALTH_NUTRIENTS, key=len, reverse=True):
+        if stem.endswith(f"_{nutrient}"):
+            stem = stem[: -len(nutrient) - 1]
+            break
+    else:
+        return [entry]
+    expanded = [
+        {
+            **entry,
+            "path": f"{stem}_{nutrient}.tif",
+            "layer_name": f"{entry['layer_name']}_{nutrient}",
+            "layer_type": "raster",
+        }
+        for nutrient in SOIL_HEALTH_NUTRIENTS
+    ]
+    for sub in expanded[:-1]:
+        sub["layer_id"] = None
+    return expanded
+
+
 def _publish_args(entry):
     """Map a layer entry to publish_local_layer arguments, or None if unusable."""
     path = entry.get("path")
-    if not path or not os.path.isabs(path):
+    if not path or _is_gee_path(path):
         return None  # not a local file (e.g. a GEE asset)
+    path = _resolve_local_path(path)
     if entry.get("layer_type") == "raster":
         layer_type, file_type = "raster", "tif"
     else:
@@ -229,7 +295,8 @@ def _queue_local_entries(entries, dry_run):
     from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
 
     summary = _empty_summary()
-    for entry in entries:
+    expanded = [sub for entry in entries for sub in _expand_soil_health_raster(entry)]
+    for entry in expanded:
         summary["found"] += 1
         info = _layer_info(entry)
         args = _publish_args(entry)
@@ -363,6 +430,10 @@ def queue_unsynced_layers(
         if source in ("all", "gee")
         else []
     )
+    # Layers generated locally but kept as a GEE asset (e.g. surface water
+    # bodies) are published from GEE, not from a local file.
+    gee_entries = gee_entries + [e for e in local_entries if _is_gee_path(e.get("path"))]
+    local_entries = [e for e in local_entries if not _is_gee_path(e.get("path"))]
     if not dry_run and sync_boundaries:
         _sync_boundaries(local_entries + gee_entries)
 

@@ -176,3 +176,84 @@ class ForceSyncTests(SimpleTestCase):
 
         with self.assertRaises(CommandError):
             call_command("sync_pending_geoserver", force=True)
+
+
+class RelativePathAndRoutingTests(SimpleTestCase):
+    def _entry(self, **kw):
+        base = {
+            "layer_id": 1,
+            "layer_name": "kullu_kullu_cluster",
+            "path": "data/terrain/terrain_clusters_local/himachal_pradesh/kullu/kullu/kullu_kullu_cluster.gpkg",
+            "workspace": "terrain",
+            "style_name": None,
+            "layer_type": "vector",
+            "state": "s",
+            "district": "d",
+            "block": "b",
+        }
+        base.update(kw)
+        return base
+
+    def test_relative_path_resolved_under_data_dir(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "terrain" / "x.gpkg"
+            target.parent.mkdir()
+            target.touch()
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                args = _publish_args(self._entry(path="data/terrain/x.gpkg"))
+        self.assertEqual(args["path"], str(Path(tmp) / "terrain" / "x"))
+        self.assertEqual(args["file_type"], "gpkg")
+
+    def test_missing_relative_file_is_unusable(self):
+        from computing.pending_geoserver_sync import _publish_args
+
+        self.assertIsNone(_publish_args(self._entry(path="data/nope/none.gpkg")))
+
+    def test_soil_health_raster_expands_per_nutrient(self):
+        from computing.pending_geoserver_sync import _expand_soil_health_raster
+
+        entry = self._entry(
+            layer_name="kullu_kullu_soil_health_raster",
+            workspace="soil_health_raster",
+            layer_type="raster",
+            path="data/soil_health/h/k/k/kullu_kullu_soil_health_raster_OC_OLM.tif",
+        )
+        out = _expand_soil_health_raster(entry)
+        self.assertEqual(
+            [e["layer_name"] for e in out],
+            [f"kullu_kullu_soil_health_raster_{n}" for n in ("N", "K", "P", "OC", "OC_OLM")],
+        )
+        self.assertTrue(out[2]["path"].endswith("kullu_kullu_soil_health_raster_P.tif"))
+        self.assertEqual([e["layer_id"] for e in out], [None] * 4 + [1])
+
+    @patch("computing.tasks.publish_gee_layer.apply_async")
+    @patch("computing.tasks.publish_local_layer.apply_async")
+    @patch("computing.pending_geoserver_sync._sync_boundaries")
+    @patch("utilities.gee_utils.is_gee_asset_exists", return_value=True)
+    @patch("utilities.gee_utils.ee_initialize")
+    @patch("computing.pending_geoserver_sync.fetch_unsynced_layers")
+    def test_locally_flagged_gee_asset_goes_to_gee_publish(
+        self, fetch, _ee, _exists, _b, local_apply, gee_apply
+    ):
+        from computing.pending_geoserver_sync import queue_unsynced_layers
+
+        gee_apply.return_value.id = "t"
+        swb = self._entry(
+            layer_name="surface_waterbodies_kullu_kullu",
+            workspace="swb",
+            path="projects/p/assets/swb4_kullu_kullu",
+        )
+        fetch.side_effect = lambda *a: [swb] if a[4] == "local" else []
+
+        summary = queue_unsynced_layers()
+
+        self.assertEqual(summary["found"], 0)
+        self.assertEqual(summary["gee"]["queued"], 1)
+        gee_apply.assert_called_once()
+        local_apply.assert_not_called()
