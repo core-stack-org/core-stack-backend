@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import json
 import matplotlib.ticker as ticker
@@ -10,7 +11,11 @@ import numpy as np
 
 from gee_computing.models import GEEAccount
 from nrm_app.celery import app
-from computing.utils import sync_layer_to_geoserver, save_layer_info_to_db
+from computing.utils import (
+    push_shape_to_geoserver,
+    save_layer_info_to_db,
+    update_layer_sync_status,
+)
 from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
@@ -639,25 +644,43 @@ def drought_causality(
         #         asset_id=asset_id,
         #         dataset_name="Drought Causality",
         #     )
-        aggregated_feature_collection = {
-            "type": "FeatureCollection",
-            "features": final_features,
-        }
-        sync_res = sync_layer_to_geoserver(
-            state, aggregated_feature_collection, geo_filename, "drought_causality"
+        # Save to local disk as GPKG (dict columns stored as JSON strings,
+        # since shapefiles cannot hold nested values) and push to GeoServer.
+        gdf_out = gpd.GeoDataFrame.from_features(final_features, crs="EPSG:4326")
+        for col in gdf_out.columns:
+            if col != "geometry":
+                gdf_out[col] = gdf_out[col].apply(
+                    lambda v: json.dumps(v) if isinstance(v, (dict, list)) else v
+                )
+        state_dir = os.path.join("data/fc_to_shape", state)
+        os.makedirs(state_dir, exist_ok=True)
+        path = os.path.join(state_dir, geo_filename)
+        gdf_out.to_file(path + ".gpkg", driver="GPKG")
+        print(f"Saved drought causality layer locally: {path}.gpkg")
+
+        # Honours the GeoServer sync gate: for an inactive tehsil (or when
+        # sync_to_geoserver was not requested) the push is skipped and the layer
+        # stays local with is_sync_to_geoserver=False for sync_pending_geoserver.
+        sync_res = push_shape_to_geoserver(
+            path,
+            workspace="drought_causality",
+            layer_name=geo_filename,
+            file_type="gpkg",
         )
         print(f"Synced aggregated data to GeoServer: {sync_res}")
-        if sync_res["status_code"] == 201:
-            save_layer_info_to_db(
+        if isinstance(sync_res, dict) and sync_res.get("status_code") in (200, 201):
+            layer_id = save_layer_info_to_db(
                 state,
                 district,
                 block,
                 layer_name=geo_filename,
-                asset_id="",
+                asset_id=os.path.abspath(path + ".gpkg"),
                 dataset_name="Drought Causality",
-                sync_to_geoserver=True,
+                misc={"is_generated_locally": True},
             )
-            layer_at_geoserver = True
+            if layer_id:
+                update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            layer_at_geoserver = not sync_res.get("skipped", False)
     except Exception as e:
         print(f"Error syncing aggregated data to GeoServer: {e}")
 
