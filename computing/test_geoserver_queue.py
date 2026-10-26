@@ -389,3 +389,49 @@ class GpkgPipelineSyncTests(SimpleTestCase):
         self.assertEqual(
             [c.kwargs["layer_id"] for c in update_sync.call_args_list], [2, 3]
         )
+
+
+class PushGeeAssetCommandTests(SimpleTestCase):
+    ARGS = (
+        "push_gee_asset",
+        "--asset=projects/p/assets/zoi_ci",
+        "--layer-name=kullu_kullu_intensity_ZOI",
+        "--workspace=crop_intensity",
+    )
+
+    @patch("computing.tasks.publish_gee_layer.apply_async")
+    def test_queues_vector_push_without_a_layer_row(self, apply_async):
+        from django.core.management import call_command
+
+        apply_async.return_value.id = "t1"
+
+        call_command(*self.ARGS, "--folder=kullu_kullu", "--gee-account-id=22")
+
+        kwargs = apply_async.call_args.kwargs
+        self.assertEqual(kwargs["queue"], "geoserver")
+        self.assertEqual(
+            kwargs["kwargs"],
+            {
+                "layer_type": "vector",
+                "asset_id": "projects/p/assets/zoi_ci",
+                "layer_name": "kullu_kullu_intensity_ZOI",
+                "workspace": "crop_intensity",
+                "state": "kullu_kullu",
+                "style_name": None,
+                "layer_id": None,
+                "gee_account_id": 22,
+            },
+        )
+
+    @patch("computing.tasks.publish_gee_layer.apply_async")
+    def test_rejects_non_gee_asset(self, apply_async):
+        from django.core.management import CommandError, call_command
+
+        with self.assertRaises(CommandError):
+            call_command(
+                "push_gee_asset",
+                "--asset=data/local.gpkg",
+                "--layer-name=x",
+                "--workspace=w",
+            )
+        apply_async.assert_not_called()
