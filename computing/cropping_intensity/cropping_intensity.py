@@ -55,12 +55,13 @@ def generate_cropping_intensity(
         )
         asset_folder_list = [state, district, block]
 
-        roi_path = (
-            get_gee_dir_path(
-                asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+        if not zoi_ci_asset:  # ZOI runs on the caller's ZOI rings, not the MWS
+            roi_path = (
+                get_gee_dir_path(
+                    asset_folder_list, asset_path=GEE_PATHS[app_type]["GEE_ASSET_PATH"]
+                )
+                + f"filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_uid"
             )
-            + f"filtered_mws_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_uid"
-        )
 
     if zoi_ci_asset:
         description = "cropping_intensity_zoi_" + asset_suffix

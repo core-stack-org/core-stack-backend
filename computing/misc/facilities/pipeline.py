@@ -1294,12 +1294,32 @@ def run_facilities_pipeline(
             },
         }
     ).as_posix()
-    if request.publish.register_layers and published_layers:
+    # Kept-local layers are registered unsynced, pointing at their gpkg, so the
+    # pending GeoServer sync can push them later.
+    registrable_layers = published_layers or (
+        {
+            "village_properties": {
+                "layer_name": layer_name,
+                "gpkg_path": result.get("gpkg_path"),
+            },
+            "tehsil_facility_collection": {
+                "layer_name": published_tehsil_facilities_layer,
+                "gpkg_path": result.get("facility_points_gpkg_path"),
+            },
+            "village_nearest_facility_collection": {
+                "layer_name": published_village_nearest_layer,
+                "gpkg_path": result.get("facility_points_gpkg_path"),
+            },
+        }
+        if result.get("gpkg_path") and result.get("facility_points_gpkg_path")
+        else {}
+    )
+    if request.publish.register_layers and registrable_layers:
         state = registration_scope.state_name
         district = registration_scope.district_name
         block = registration_scope.tehsil_name
         registrations: dict[str, dict[str, Any]] = {}
-        for role, published in published_layers.items():
+        for role, published in registrable_layers.items():
             dataset_name = (
                 output_config.get("dataset_name", "Facilities Proximity")
                 if role == "village_properties"
@@ -1310,7 +1330,11 @@ def run_facilities_pipeline(
                 district=district,
                 block=block,
                 layer_name=published["layer_name"],
-                asset_id="not applicable: local compute GeoServer layer",
+                asset_id=(
+                    "not applicable: local compute GeoServer layer"
+                    if published_layers
+                    else published["gpkg_path"]
+                ),
                 dataset_name="Facilities Proximity",
                 algorithm=ALGORITHM,
                 algorithm_version=ALGORITHM_VERSION,
@@ -1321,7 +1345,7 @@ def run_facilities_pipeline(
                 raise RuntimeError(
                     f"Database registration failed for layer {published['layer_name']!r}."
                 )
-            if (
+            if published_layers and (
                 update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
                 is None
             ):
