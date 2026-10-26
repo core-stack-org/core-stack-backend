@@ -17,9 +17,17 @@ Data sources:
 
 Water stress methodology (aligned with Shuvam Chakraborty / ET Applications):
     MAI = AET / PET  (ratio, per pixel, only where both AET & PET are valid and PET > 0)
-    Moderate kharif stress : mean kharif MAI <= 0.50
-    Severe kharif stress   : mean kharif MAI <= 0.25
-    Kharif months          : July, August, September, October
+    Monthly MAI uses the corrected AET (aet_corrected) where cropping intensity is
+    available, else the raw raster AET.
+    Moderate drought : MAI <= 0.50     Severe drought : MAI <= 0.25
+    Kharif months    : July, August, September, October
+
+AET correction (aet_corrected per month, aet_annual_corrected per agri year):
+    ET_corrected = ET + x * (0.65 + a1*sin(theta) + b1*cos(theta)),  theta = 2*pi*m/12
+    ET = monthly raster band (mm/day), x = the farm's crop_intensity for the agri year,
+    m = calendar month 1-12, a1 = -0.0819421836584, b1 = -0.47.
+    aet_annual_corrected = sum over the 12 months of aet_corrected * days in month
+    (mm/year, valid months only).
 
 Missing data protocol (mirrors Shuvam's divide_where_valid approach):
     - Pixel-level : MAI = NaN if AET is NaN, PET is NaN, or PET = 0
@@ -40,6 +48,7 @@ Crop columns (crop1/conf1, crop2/conf2, crop3/conf3):
     farm/year row — no season splitting, no long-duration-crop special case.
 """
 
+import calendar
 import logging
 import os
 import warnings
@@ -74,6 +83,11 @@ MAI_SEVERE_THRESHOLD   = 0.25
 
 # Kept for backward compatibility
 KHARIF_WATER_STRESS_MAI_THRESHOLD = MAI_MODERATE_THRESHOLD
+
+# AET correction: ET_corrected = ET + x * (ET_CORR_C + ET_CORR_A1*sin(theta) + ET_CORR_B1*cos(theta))
+ET_CORR_C  = 0.65
+ET_CORR_A1 = -0.0819421836584
+ET_CORR_B1 = -0.47
 
 KHARIF_MONTH_NAMES = ["jul", "aug", "sep", "oct"]
 
@@ -600,11 +614,29 @@ def _extract_all_farms(gdf, band_data, transform, label):
     return means
 
 
-def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform):
+def _crop_intensity_by_year(farms_gdf, years):
+    """
+    {year: per-farm crop_intensity (4 dp, row order of farms_gdf)}; NaN for years
+    with no LULC raster. Needs only the LULC rasters and the farm geometries.
+    """
+    # lazy: cropping_intesity_local imports Django-dependent modules
+    from computing.cropping_intensity.cropping_intesity_local import (
+        compute_farm_cropping_intensity,
+    )
+
+    ci = compute_farm_cropping_intensity(farms_gdf, years)
+    return {int(y): g["crop_intensity"].round(4).to_numpy() for y, g in ci.groupby("year")}
+
+
+def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform, crop_intensity=None, year=None):
     """
     Compute per-farm monthly AET, PET, MAI from pre-loaded raster arrays.
     Adds wide-format columns (aet_jan..aet_dec, pet_jan..pet_dec, mai_jan..mai_dec,
-    aet_annual, pet_annual, mai_annual, kharif_mai, kharif_water_stress) to gdf.
+    aet_annual, pet_annual, mai_annual, kharif_mai) to gdf.
+
+    If `crop_intensity` (per-farm x for the agri year `year`, row order of gdf) is
+    given, also adds crop_intensity, aet_corrected_<mon> and aet_annual_corrected,
+    and monthly MAI uses the corrected AET (raw AET where the corrected value is null).
 
     Per-farm values come from true polygon-raster geometric intersection
     (see _extract_farm_zonal_means) rather than a shared rasterized grid.
@@ -628,6 +660,27 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform):
     else:
         gdf["aet_annual"] = gdf[aet_monthly_cols].mean(axis=1).round(4)
 
+    # AET correction (needs the farm's crop_intensity x for this agri year)
+    if crop_intensity is not None:
+        if year is None:
+            raise ValueError("year is required to correct AET (days per month depend on it).")
+        x = np.asarray(crop_intensity, dtype="float64")
+        if len(x) != num_farms:
+            raise ValueError(f"crop_intensity has {len(x)} values for {num_farms} farms.")
+        gdf[CROP_INTENSITY_COLUMN] = x
+        days = []
+        for m, name in enumerate(MONTH_NAMES, start=1):
+            theta = 2 * np.pi * m / 12
+            adjustment = x * (ET_CORR_C + ET_CORR_A1 * np.sin(theta) + ET_CORR_B1 * np.cos(theta))
+            gdf[f"aet_corrected_{name}"] = np.round(gdf[f"aet_{name}"].values + adjustment, 4)
+            days.append(calendar.monthrange(int(year) if m >= 7 else int(year) + 1, m)[1])  # Jul-Dec: year, Jan-Jun: year+1
+        monthly_total = gdf[[f"aet_corrected_{n}" for n in MONTH_NAMES]].values * np.array(days)
+        gdf["aet_annual_corrected"] = np.where(
+            np.isfinite(monthly_total).any(axis=1),
+            np.round(np.nansum(monthly_total, axis=1), 4),
+            np.nan,
+        )
+
     # PET monthly
     pet_monthly_cols = [f"pet_{m}" for m in MONTH_NAMES]
     logger.info("Extracting PET for %d farms via geometric intersection...", num_farms)
@@ -649,6 +702,9 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform):
     for month in MONTH_NAMES:
         col = f"mai_{month}"
         aet_vals = gdf[f"aet_{month}"].values
+        if crop_intensity is not None:      # corrected AET where available, raw AET otherwise
+            corrected = gdf[f"aet_corrected_{month}"].values
+            aet_vals = np.where(np.isfinite(corrected), corrected, aet_vals)
         pet_vals = gdf[f"pet_{month}"].values
         with np.errstate(invalid="ignore", divide="ignore"):
             v = aet_vals / pet_vals
@@ -682,23 +738,11 @@ def _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform):
     kharif_df   = gdf[kharif_cols]
     gdf["kharif_mai"] = kharif_df.mean(axis=1).round(4)
 
-    # Moderate stress: any kharif month with MAI <= 0.50
-    gdf["kharif_water_stress"] = (
-        (kharif_df <= MAI_MODERATE_THRESHOLD) & kharif_df.notna()
-    ).any(axis=1)
-
-    # Severe stress: any kharif month with MAI <= 0.25
-    gdf["kharif_severe_stress"] = (
-        (kharif_df <= MAI_SEVERE_THRESHOLD) & kharif_df.notna()
-    ).any(axis=1)
-
     n_nan   = int(gdf["mai_annual"].isna().sum())
     n_valid = int(gdf["mai_annual"].notna().sum())
     logger.info(
-        "MAI complete: avg_annual=%.4f | kharif_stress=%d | severe=%d | nan_farms=%d | valid_farms=%d",
+        "MAI complete: avg_annual=%.4f | nan_farms=%d | valid_farms=%d",
         gdf["mai_annual"].mean() if n_valid > 0 else float("nan"),
-        int(gdf["kharif_water_stress"].sum()),
-        int(gdf["kharif_severe_stress"].sum()),
         n_nan, n_valid,
     )
 
@@ -985,34 +1029,6 @@ def _populate_annual_crop_columns(gdf, state, district, block):
     return out_path
 
 
-def _populate_annual_crop_intensity(state, district, block):
-    """
-    Fill `crop_intensity` in annual.parquet for every farm/year from the yearly
-    LULC rasters (compute_farm_cropping_intensity). Years with no LULC raster
-    stay null. Rounded to 4 dp.
-    """
-    annual_path = _annual_parquet_path(state, district, block)
-    static_path = _static_parquet_path(state, district, block)
-    if not (os.path.exists(annual_path) and os.path.exists(static_path)):
-        logger.warning("Cannot populate crop_intensity — annual/static parquet missing.")
-        return None
-
-    # lazy: cropping_intesity_local imports Django-dependent modules
-    from computing.cropping_intensity.cropping_intesity_local import (
-        compute_farm_cropping_intensity,
-    )
-
-    farms = gpd.read_parquet(static_path, columns=["farm_id", "geometry"])
-    annual = pd.read_parquet(annual_path).drop(columns=[CROP_INTENSITY_COLUMN], errors="ignore")
-    intensity = compute_farm_cropping_intensity(farms, annual["year"].unique())
-    intensity[CROP_INTENSITY_COLUMN] = intensity.pop("crop_intensity").round(4)
-
-    annual = annual.merge(intensity, on=["farm_id", "year"], how="left", validate="one_to_one")
-    _write_annual_parquet(annual, annual_path)
-    logger.info("crop_intensity populated in %s (%d rows).", annual_path, len(annual))
-    return annual_path
-
-
 # ── crop-column schema enforcement ──────────────────────────────────────────────
 # Ensures crop1/crop2/crop3 are always written as strings and conf1/conf2/conf3
 # as floats — even when a column is entirely null for a given write, which
@@ -1081,8 +1097,8 @@ def _save_annual_parquet(gdf, state, district, block, year):
     """
     out_path = _annual_parquet_path(state, district, block)
 
-    keep = ["farm_id", "aet_annual", "pet_annual",
-            "mai_annual", "kharif_mai", "kharif_water_stress", "kharif_severe_stress"]
+    keep = ["farm_id", "aet_annual", "aet_annual_corrected", "pet_annual",
+            "mai_annual", "kharif_mai", CROP_INTENSITY_COLUMN]
     annual = gdf[[c for c in keep if c in gdf.columns]].copy()
     annual["tehsil"]   = block
     annual["district"] = district
@@ -1092,12 +1108,14 @@ def _save_annual_parquet(gdf, state, district, block, year):
         annual["area_in_ha"] = (gdf["area_m2"] / 10_000).round(4)
 
     col_order = ["farm_id", "tehsil", "district", "state", "area_in_ha", "year",
-         "aet_annual", "pet_annual", "mai_annual", "kharif_mai",
-         "kharif_water_stress", "kharif_severe_stress"] + CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS + [CROP_INTENSITY_COLUMN]
+         "aet_annual", "aet_annual_corrected", "pet_annual", "mai_annual", "kharif_mai",
+         ] + CROP_RANK_OUTPUT_COLUMNS + CROP_DATE_COLUMNS + [CROP_INTENSITY_COLUMN]
     annual = annual[[c for c in col_order if c in annual.columns]]
 
     if os.path.exists(out_path):
         existing = _enforce_crop_schema(pd.read_parquet(out_path))
+        # stress flags from an earlier version are no longer written
+        existing = existing.drop(columns=["kharif_water_stress", "kharif_severe_stress"], errors="ignore")
         existing = existing[existing["year"] != int(year)]
         combined = pd.concat([existing, annual], ignore_index=True)
     else:
@@ -1138,6 +1156,7 @@ def _save_monthly_parquet(gdf, state, district, block, year):
             "year":      int(year),
             "date":      date(cal_year, month_num, 1),
             "aet":       gdf[f"aet_{month}"].values if f"aet_{month}" in gdf.columns else np.nan,
+            "aet_corrected": gdf[f"aet_corrected_{month}"].values if f"aet_corrected_{month}" in gdf.columns else np.nan,
             "pet":       gdf[f"pet_{month}"].values if f"pet_{month}" in gdf.columns else np.nan,
             "mai":       gdf[f"mai_{month}"].values if f"mai_{month}" in gdf.columns else np.nan,
         }))
@@ -1338,8 +1357,12 @@ def intersect_et_with_farms(
     pet_data, pet_transform = _read_raster_clipped(pet_paths, bbox)
     logger.info("PET loaded: %d bands, shape=%s", pet_data.shape[0], pet_data.shape[1:])
 
-    # 4. Zonal statistics
-    gdf = _run_zonal_stats(gdf, aet_data, aet_transform, pet_data, pet_transform)
+    # 4. Zonal statistics (AET corrected with this year's cropping intensity)
+    crop_intensity = _crop_intensity_by_year(gdf, [year])[int(year)]
+    gdf = _run_zonal_stats(
+        gdf, aet_data, aet_transform, pet_data, pet_transform,
+        crop_intensity=crop_intensity, year=year,
+    )
 
     # 5. Attach crop metadata (farm_id + monitoring_prediction), then write
     gdf = _attach_crop_metadata(gdf, state, district, block)
@@ -1362,9 +1385,6 @@ def intersect_et_with_farms(
         summary["avg_aet_annual"] = round(float(gdf["aet_annual"].mean()), 4)
     if "mai_annual" in gdf.columns and gdf["mai_annual"].notna().any():
         summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
-    if "kharif_water_stress" in gdf.columns:
-        summary["kharif_stress_farms"] = int(gdf["kharif_water_stress"].sum())
-
     logger.info("Phase 3 complete: %s", summary)
     return summary
 
@@ -1379,20 +1399,16 @@ def compute_multi_year_water_stress(
     end_year: int = 2025,
 ) -> dict:
     """
-    Run Phase 3 for each year in [start_year, end_year] and compute
-    cross-year frequency and intensity indicators:
+    Run Phase 3 for each year in [start_year, end_year].
 
-        kharif_water_stress_years  — number of years with kharif stress
-        return_period_years        — N / stress_years  (NaN if 0 stress years)
-        water_stress_intensity_mai — mean kharif MAI over stress years
-
-    The annual parquet is updated with per-year rows.
-    A separate farm_water_stress_summary.parquet is written with the
-    cross-year indicators appended to the static columns.
+    Cropping intensity is computed once up front for all years (it needs only the
+    LULC rasters and the farm geometries) and used to correct each year's AET.
+    The annual and sub-annual parquets are updated per year; crop columns and the
+    static drought indicators are filled in once after the last year.
 
     Returns
     -------
-    dict  summary with paths and aggregate statistics.
+    dict  summary with the years processed.
     """
     logger.info(
         "Multi-year water stress: %s/%s/%s  %d–%d",
@@ -1412,9 +1428,10 @@ def compute_multi_year_water_stress(
     aez_zones = _get_aez_zones(state, district, block)
     years     = list(range(start_year, end_year + 1))
 
-    kharif_stress_count    = np.zeros(num_farms, dtype=int)
-    kharif_mai_sum_stress  = np.zeros(num_farms, dtype=float)
-    years_processed        = 0
+    # crop_intensity (x in the AET correction) needs only LULC + farm geometry: compute once for all years
+    crop_intensity_by_year = _crop_intensity_by_year(base_gdf, years)
+
+    years_processed = 0
 
     for year in years:
         logger.info("── Processing year %d ──", year)
@@ -1434,59 +1451,27 @@ def compute_multi_year_water_stress(
             continue
 
         year_gdf = base_gdf.copy()
-        year_gdf = _run_zonal_stats(year_gdf, aet_data, aet_transform, pet_data, pet_transform)
+        year_gdf = _run_zonal_stats(
+            year_gdf, aet_data, aet_transform, pet_data, pet_transform,
+            crop_intensity=crop_intensity_by_year[year], year=year,
+        )
 
         # Save this year into annual + monthly parquets
         _save_annual_parquet(year_gdf, state, district, block, year)
         _save_monthly_parquet(year_gdf, state, district, block, year)
 
         years_processed += 1
-        is_stress          = year_gdf["kharif_water_stress"].values.astype(bool)
-        kharif_mai_values  = year_gdf["kharif_mai"].values
-        kharif_stress_count += is_stress.astype(int)
-        stress_mask = is_stress & np.isfinite(kharif_mai_values)
-        kharif_mai_sum_stress[stress_mask] += kharif_mai_values[stress_mask]
 
     # Crop data for every processed year in one go (table built once)
     _populate_annual_crop_columns(base_gdf, state, district, block)
-    _populate_annual_crop_intensity(state, district, block)
 
     _update_static_drought_indicators(state, district, block)
 
-    # Cross-year indicators
-    result_gdf = base_gdf.copy()
-    result_gdf["total_years"]              = years_processed
-    result_gdf["kharif_water_stress_years"] = kharif_stress_count
-
-    with np.errstate(invalid="ignore", divide="ignore"):
-        rp = years_processed / kharif_stress_count.astype(float)
-    rp[kharif_stress_count == 0] = np.nan
-    result_gdf["return_period_years"] = np.round(rp, 2)
-
-    with np.errstate(invalid="ignore", divide="ignore"):
-        intensity = kharif_mai_sum_stress / kharif_stress_count.astype(float)
-    intensity[kharif_stress_count == 0] = np.nan
-    result_gdf["water_stress_intensity_mai"] = np.round(intensity, 4)
-
-    # Save summary parquet
-    out_path = os.path.join(
-        _block_dir(state, district, block), "farm_water_stress_summary.parquet"
-    )
-    # keep static cols + cross-year indicators, no geometry duplication
-    summary_cols = [c for c in result_gdf.columns if not c.startswith(("aet_", "pet_", "mai_"))]
-    result_gdf[summary_cols].to_parquet(out_path, index=False)
-    logger.info("Water stress summary parquet saved → %s", out_path)
-
-    valid = result_gdf["return_period_years"].notna().sum()
     summary = {
         "state": state, "district": district, "block": block,
         "years_range": f"{start_year}–{end_year}",
         "years_processed": years_processed,
         "farm_count": num_farms,
-        "farms_with_any_stress": int((kharif_stress_count > 0).sum()),
-        "avg_return_period": round(float(result_gdf["return_period_years"].mean()), 2) if valid > 0 else None,
-        "avg_stress_intensity_mai": round(float(result_gdf["water_stress_intensity_mai"].mean()), 4) if valid > 0 else None,
-        "path": out_path,
     }
     logger.info("Multi-year analysis complete: %s", summary)
     return summary
