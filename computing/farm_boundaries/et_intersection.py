@@ -1376,7 +1376,7 @@ def compute_multi_year_water_stress(
     district: str,
     block: str,
     start_year: int = 2017,
-    end_year: int = 2024,
+    end_year: int = 2025,
 ) -> dict:
     """
     Run Phase 3 for each year in [start_year, end_year] and compute
