@@ -496,33 +496,59 @@ def generate_mws_data_for_kyl_filters(
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
                     ]
+                    try:
 
-                    # Mean Kharif water surface area across all years
-                    kharif_area_columns = df_swb_annual_mws_data.filter(
-                        like="kharif_area_in_ha"
-                    )
-
-                    mean_kharif_water_surface_area = round(
-                        kharif_area_columns.mean(axis=1).iloc[0], 4
-                    )
-
-                    # Mean Rabi water surface area across all years
-                    rabi_area_columns = df_swb_annual_mws_data.filter(
-                        like="rabi_area_in_ha"
-                    )
-
-                    mean_rabi_water_surface_area = round(
-                        rabi_area_columns.mean(axis=1).iloc[0], 4
-                    )
-
-                    # Ratio of mean Rabi area to mean Kharif area
-                    if mean_kharif_water_surface_area > 0:
-                        mean_kharif_rabi_ratio = round(
-                            mean_rabi_water_surface_area
-                            / mean_kharif_water_surface_area,
-                            4,
+                        # Mean Kharif water surface area across all years
+                        kharif_area_columns = df_swb_annual_mws_data.filter(
+                            like="kharif_area_in_ha"
                         )
-                    else:
+
+                        mean_kharif_water_surface_area = round(
+                            kharif_area_columns.mean(axis=1).iloc[0], 4
+                            if not kharif_area_columns.empty
+                            and not df_swb_annual_mws_data.empty
+                            else -9999
+                        )
+                    except Exception as e:
+                        print(f"Error calculating mean Kharif water surface area: {e}")
+                        mean_kharif_water_surface_area = -9999
+
+                    try:
+
+                        # Mean Rabi water surface area across all years
+                        rabi_area_columns = df_swb_annual_mws_data.filter(
+                            like="rabi_area_in_ha"
+                        )
+
+                        mean_rabi_water_surface_area = round(
+                            rabi_area_columns.mean(axis=1).iloc[0], 4
+                            if not rabi_area_columns.empty
+                            and not df_swb_annual_mws_data.empty
+                            else -9999
+                        )
+
+                    except Exception as e:
+                        print(f"Error calculating mean Rabi water surface area: {e}")
+                        mean_rabi_water_surface_area = -9999
+
+
+                       # ---------------- Mean Kharif-Rabi Ratio ----------------
+                    try:
+                        if (
+                            mean_kharif_water_surface_area != -9999
+                            and mean_rabi_water_surface_area != -9999
+                            and mean_kharif_water_surface_area > 0
+                        ):
+                            mean_kharif_rabi_ratio = round(
+                                mean_rabi_water_surface_area
+                                / mean_kharif_water_surface_area,
+                                4,
+                            )
+                        else:
+                            mean_kharif_rabi_ratio = -9999
+
+                    except Exception as e:
+                        print(f"Error calculating mean Kharif-Rabi ratio: {e}")
                         mean_kharif_rabi_ratio = -9999
 
                 except Exception as e:
