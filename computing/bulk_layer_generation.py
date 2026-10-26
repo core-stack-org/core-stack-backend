@@ -193,6 +193,7 @@ LOCAL_TASK_DATASETS = {
     "computing.tree_in_grassland.tree_in_grassland_local_compute.generate_tree_in_grassland_local": (
         "Tree in Grassland",
     ),
+    "computing.drought.drought_causality.drought_causality": ("Drought Causality",),
 }
 
 
