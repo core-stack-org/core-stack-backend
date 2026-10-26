@@ -72,7 +72,7 @@ from computing.change_detection.change_detection_local import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local,
 )
-from computing.cropping_intensity.cropping_intesity_local import (
+from computing.cropping_intensity.cropping_intensity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local,
 )
 from computing.lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local
