@@ -352,11 +352,6 @@
                                 "description": "Name of the waterbody type.",
                                 "unit": "value"
                             },
-                            "sum": {
-                                "type": "number",
-                                "description": "Area value returned by the API.",
-                                "unit": "ha"
-                            },
                             "total_cropable_area_ever_hydroyear": {
                                 "type": "number",
                                 "description": "Total cropable area ever observed across hydroyears.",
@@ -706,11 +701,6 @@
                             "waterbody_type_name": {
                                 "type": "string",
                                 "description": "Unit or value label for metadata field waterbody_type_name.",
-                                "unit": ""
-                            },
-                            "sum": {
-                                "type": "string",
-                                "description": "Unit or value label for metadata field sum.",
                                 "unit": ""
                             },
                             "total_cropable_area_ever_hydroyear": {
@@ -1199,11 +1189,6 @@
                                 "description": "Name of the waterbody type.",
                                 "unit": "value"
                             },
-                            "sum": {
-                                "type": "number",
-                                "description": "Area value returned by the API.",
-                                "unit": "ha"
-                            },
                             "total_cropable_area_ever_hydroyear": {
                                 "type": "number",
                                 "description": "Total cropable area ever observed across hydroyears.",
@@ -1553,11 +1538,6 @@
                             "waterbody_type_name": {
                                 "type": "string",
                                 "description": "Unit or value label for metadata field waterbody_type_name.",
-                                "unit": ""
-                            },
-                            "sum": {
-                                "type": "string",
-                                "description": "Unit or value label for metadata field sum.",
                                 "unit": ""
                             },
                             "total_cropable_area_ever_hydroyear": {

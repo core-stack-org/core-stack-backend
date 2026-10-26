@@ -189,7 +189,7 @@ from .mws.mws_connectivity_local_compute import (
     mws_connectivity_vector as generate_mws_connectivity_local_task,
 )
 from .plantation.site_suitability import site_suitability
-from .spei.spei import (
+from .hazards.hazards import (
     generate_spei_pipeline,
     run_drought_resistance_resilience,
     run_rainfall_resistance_resilience,
@@ -295,7 +295,13 @@ def generate_farm_boundaries(request):
                 )
 
         build_farm_boundary_map.apply_async(
-            kwargs={"state" : state, "district" : district, "block" : block, "year" : year, "overwrite" : overwrite},
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "year": year,
+                "overwrite": overwrite,
+            },
             queue="nrm",
         )
 
@@ -2055,9 +2061,7 @@ def generate_layer_in_order(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "compute": compute,
-                "skip_existing": not parse_bool(
-                    request.data.get("regenerate_all")
-                ),
+                "skip_existing": not parse_bool(request.data.get("regenerate_all")),
             },
             queue="nrm",
         )
@@ -3314,9 +3318,7 @@ def generate_tree_in_grassland(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        compute = _normalize_layer_order_compute(
-            request.data.get("compute") or "gee"
-        )
+        compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
         task = (
             generate_tree_in_grassland_local
             if compute == "local"
