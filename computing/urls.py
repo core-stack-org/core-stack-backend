@@ -1,5 +1,3 @@
-from tkinter.font import names
-
 from django.urls import path
 from . import api
 from .views import layer_status
