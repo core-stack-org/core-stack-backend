@@ -367,6 +367,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
+    "drought_causality": drought_causality,
+    "mws_drought_causality": drought_causality,
 }
 
 TASK_REGISTRIES = {

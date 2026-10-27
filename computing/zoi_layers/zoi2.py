@@ -60,6 +60,9 @@ def generate_zoi_ci(
     else:
         roi = ee.FeatureCollection(asset_id_zoi)
     generate_cropping_intensity(
+        state=state,
+        district=district,
+        block=block,
         roi_path=roi,
         zoi_ci_asset=asset_id_zoi_ci,
         asset_folder_list=asset_folder_list,
