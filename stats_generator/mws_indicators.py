@@ -648,7 +648,12 @@ def generate_mws_data_for_kyl_filters(
 
                 #########  drought_category  ##############
                 try:
-
+                    monsoon_onset_day_range = -9999
+                    drought_category = -9999
+                    avg_dry_spell_in_weeks = -9999
+                    max_dry_spell_weeks = -9999
+                    max_drought_weeks = -9999
+                    
                     layers = LayerInfo.objects.get(
                         layer_type="vector", workspace="drought"
                     )
@@ -804,6 +809,12 @@ def generate_mws_data_for_kyl_filters(
                 avg_runoff = sum_runoff / total_runoff_column
 
                 ############## Nrega Asset ##########################
+                nrega_count = {
+                    "irrigation": -9999,
+                    "swc": -9999,
+                    "plantations": -9999,
+                }
+                nrega_assets_sum = -9999
                 try:
                     df_nrega_assets_mws_data = sheets["nrega_annual"][
                         sheets["nrega_annual"]["mws_id"] == specific_mws_id
