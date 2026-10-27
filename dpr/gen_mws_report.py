@@ -986,7 +986,10 @@ def get_osm_data(state, district, block, uid):
         district_display = display_name(district)
         state_display = display_name(state)
         logger.info("The geojson is empty !", e)
-        return f"The Tehsil {block_display} lies in district {district_display} in {state_display}.", f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong> which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>."
+        return (
+            f"The Tehsil {block_display} lies in district {district_display} in {state_display}.",
+            f"The micro-watershed <strong>{uid}</strong> is in Tehsil <strong>{block_display}</strong> which lies in district <strong>{district_display}</strong> in <strong>{state_display}</strong>.",
+        )
 
 
 def get_terrain_data(state, district, block, uid):
@@ -1462,9 +1465,7 @@ def get_crop_intensity_sankey_data(state, district, block, uid):
                         }
                     )
     except Exception as e:
-        logger.info(
-            f"Failed to read change_detection_degradation sheet for {uid}: {e}"
-        )
+        logger.info(f"Failed to read change_detection_degradation sheet for {uid}: {e}")
 
     return sankey_data
 
@@ -1599,9 +1600,7 @@ def get_shrub_change_sankey_data(state, district, block, uid):
                         }
                     )
     except Exception as e:
-        logger.info(
-            f"Failed to read change_detection_shrubchange sheet for {uid}: {e}"
-        )
+        logger.info(f"Failed to read change_detection_shrubchange sheet for {uid}: {e}")
 
     return sankey_data
 
@@ -1717,7 +1716,9 @@ def get_change_detection_data(state, district, block, uid):
                 degradation_area = 0
 
             if not degradation_area:
-                degradation_clause = "but the reduction in Canopy density has been zero during 2017-24."
+                degradation_clause = (
+                    "but the reduction in Canopy density has been zero during 2017-24."
+                )
             else:
                 degradation_clause = f"while reduction in canopy density and/or height of tree cover has been noted at about {round(degradation_area, 2)} hectares during 2017-24."
 
@@ -1749,9 +1750,9 @@ def get_change_detection_data(state, district, block, uid):
             parameter_afforest += f"There has been a considerate increase in tree cover in this micro watershed over the years 2017-2024, with about {round(afforestation, 2)} hectares of new tree cover gained, as compared to {round(avg, 2)} hectares per micro watershed in the entire block."
 
         # ? Shrubland Diversion
-        df_shrub["total_change_area_in_ha"] = df_shrub[
-            "total_change_area_in_ha"
-        ].apply(pd.to_numeric, errors="coerce")
+        df_shrub["total_change_area_in_ha"] = df_shrub["total_change_area_in_ha"].apply(
+            pd.to_numeric, errors="coerce"
+        )
         filtered_df = df_shrub.loc[df_shrub["UID"] == uid, "total_change_area_in_ha"]
         shrub_change = filtered_df.iloc[0]
         avg = df_shrub["total_change_area_in_ha"].mean()
@@ -1798,9 +1799,7 @@ def get_change_detection_data(state, district, block, uid):
         afforestation_sankey = get_afforestation_sankey_data(
             state, district, block, uid
         )
-        shrub_change_sankey = get_shrub_change_sankey_data(
-            state, district, block, uid
-        )
+        shrub_change_sankey = get_shrub_change_sankey_data(state, district, block, uid)
         urbanization_sankey = get_urbanization_sankey_data(state, district, block, uid)
 
         return (
@@ -2547,8 +2546,8 @@ def get_surface_Water_bodies_data(state, district, block, uid):
             )
             if wb_large_count > 0:
                 parameter_intro += f"Of the {wb_total_count} number of total waterbodies, {wb_large_count} are more than 5 hectares. "
-            
-            if(wb_declining_percent == 0):
+
+            if wb_declining_percent == 0:
                 parameter_intro += (
                     f"No water bodies seem to have a declining trend of surface water availability "
                     f"over the years {year_range_text}. The drainage density in this micro-watershed is {drainage_density}. "
@@ -3470,10 +3469,12 @@ def get_hydro_tabular_data(state, district, block, uid):
         try:
             df_soge = read_excel_sheet(base_path, "soge_vector")
             row_soge = df_soge.loc[df_soge["UID"] == uid]
-            soge_class = row_soge["class_name"].values[0] if not row_soge.empty else "-"
+            soge_class = (
+                row_soge["class_name_2025"].values[0] if not row_soge.empty else "-"
+            )
             soge_dev_percent = (
-                round(float(row_soge["soge_dev_percent"].values[0]), 2)
-                if not row_soge.empty and "soge_dev_percent" in row_soge.columns
+                round(float(row_soge["soge_dev_percent_2025"].values[0]), 2)
+                if not row_soge.empty and "soge_dev_percent_2025" in row_soge.columns
                 else "-"
             )
         except Exception as e:

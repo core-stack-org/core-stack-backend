@@ -73,7 +73,7 @@ LOCAL_TASK_DATASETS = {
     "computing.misc.nrega_local_compute.generate_nrega_data_local": ("NREGA Assets",),
     "computing.lulc.lulc_v3_local.clip_lulc_v3": ("LULC_v3", "LULC_level_3"),
     "computing.lulc.lulc_vector_local.vectorise_lulc": ("LULC",),
-    "computing.cropping_intensity.cropping_intesity_local.generate_cropping_intensity": (
+    "computing.cropping_intensity.cropping_intensity_local.generate_cropping_intensity": (
         "Cropping Intensity",
     ),
     "computing.surface_water_bodies.swb_local.generate_swb_layer": (
