@@ -61,7 +61,7 @@ from .clart.clart import generate_clart_layer
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .crop_grid.crop_grid import create_crop_grids
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
-from .cropping_intensity.cropping_intesity_local import (
+from .cropping_intensity.cropping_intensity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
 from .forest_fire.forest_fire import generate_forest_fire_layer
