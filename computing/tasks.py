@@ -41,14 +41,29 @@ def publish_local_layer(
     file_type="gpkg",
     layer_id=None,
     verify=False,
+    gpkg_layers=None,
+    store_name=None,
+    extra_layer_ids=None,
 ):
     from computing.local_compute_helper import (
         push_local_raster_to_geoserver,
         push_local_vector_to_geoserver,
     )
     from computing.utils import update_layer_sync_status
+    from utilities.pipelines.publish import publish_gpkg_layers
 
-    if layer_type == "raster":
+    if gpkg_layers:
+        # gpkg pipelines (facilities, antyodaya, livestock): publish the gpkg
+        # tables to one datastore and verify them through WFS.
+        publish_gpkg_layers(
+            f"{path}.{file_type}",
+            workspace=workspace,
+            store_name=store_name or layer_name,
+            layers=gpkg_layers,
+            overwrite=True,
+        )
+        response = {"status_code": 201}
+    elif layer_type == "raster":
         response = push_local_raster_to_geoserver(
             file_path=path,
             layer_name=layer_name,
@@ -71,14 +86,15 @@ def publish_local_layer(
             f"Failed to publish {workspace}:{layer_name}: {response}"
         )
 
-    if layer_id and update_layer_sync_status(
-        layer_id=layer_id,
-        sync_to_geoserver=True,
-        is_stac_specs_generated=False,
-    ) is None:
-        raise GeoServerPublishError(
-            f"Published {workspace}:{layer_name}, but metadata update failed"
-        )
+    for lid in [layer_id, *(extra_layer_ids or [])]:
+        if lid and update_layer_sync_status(
+            layer_id=lid,
+            sync_to_geoserver=True,
+            is_stac_specs_generated=False,
+        ) is None:
+            raise GeoServerPublishError(
+                f"Published {workspace}:{layer_name}, but metadata update failed"
+            )
 
     logger.info(
         "Published %s layer %s:%s from task %s",

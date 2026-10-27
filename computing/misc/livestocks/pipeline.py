@@ -574,7 +574,11 @@ def run_livestocks_pipeline(
                 }
         timings["publish_geoserver_seconds"] = round(time.perf_counter() - t0, 3)
     result["geoserver"] = geoserver
-    if request.publish.register_layers and geoserver and geoserver.get("ok"):
+    published = bool(geoserver and geoserver.get("ok"))
+    # Kept-local layers (GeoServer publish not requested, or it failed) are
+    # still registered, unsynced and pointing at their gpkg, so the pending
+    # GeoServer sync can push them later.
+    if request.publish.register_layers and (published or result.get("gpkg_path")):
         state = registration_scope.state_name
         district = registration_scope.district_name
         block = registration_scope.tehsil_name
@@ -584,7 +588,11 @@ def run_livestocks_pipeline(
             district=district,
             block=block,
             layer_name=layer_name,
-            asset_id="not applicable: local compute GeoServer layer",
+            asset_id=(
+                "not applicable: local compute GeoServer layer"
+                if published
+                else result["gpkg_path"]
+            ),
             dataset_name=dataset_name,
             algorithm=ALGORITHM,
             algorithm_version=ALGORITHM_VERSION,
@@ -595,7 +603,11 @@ def run_livestocks_pipeline(
             raise RuntimeError(
                 f"Database registration failed for layer {layer_name!r}."
             )
-        if update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True) is None:
+        if (
+            published
+            and update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+            is None
+        ):
             raise RuntimeError(
                 f"GeoServer sync status update failed for layer ID {layer_id}."
             )

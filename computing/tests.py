@@ -511,6 +511,10 @@ class ZoiPipelineTests(SimpleTestCase):
             district="Raj Samand",
             block="Bhim",
             gee_account_id="22",
+            start_date="2017-07-01",
+            end_date="2018-06-30",
+            start_year=2017,
+            end_year=2017,
         )
 
         output_asset_id = (
@@ -522,6 +526,9 @@ class ZoiPipelineTests(SimpleTestCase):
             generate_ci.call_args.kwargs["zoi_ci_asset"],
             output_asset_id,
         )
+        self.assertEqual(generate_ci.call_args.kwargs["state"], "Rajasthan")
+        self.assertEqual(generate_ci.call_args.kwargs["district"], "Raj Samand")
+        self.assertEqual(generate_ci.call_args.kwargs["block"], "Bhim")
 
 
 class BulkPipelineRegistryTests(SimpleTestCase):
