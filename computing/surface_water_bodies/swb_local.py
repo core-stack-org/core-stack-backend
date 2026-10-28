@@ -25,6 +25,10 @@ from computing.surface_water_bodies.swb3 import (
     waterbody_catchment_streamorder_properties,
 )
 from computing.surface_water_bodies.swb4 import waterbody_wbc_intersection
+from computing.surface_water_bodies.swb3_local import (
+    waterbody_catchment_streamorder_properties_local,
+)
+from computing.surface_water_bodies.swb4_local import waterbody_wbc_intersection_local
 from computing.utils import (
     push_shape_to_geoserver,
     save_layer_info_to_db,
@@ -235,7 +239,7 @@ def _restore_legacy_columns(gdf):
     return gdf.rename(columns=renamed_columns)
 
 
-def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
+def _build_swb2_gdf(swb_path, roi_geometry):
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
         raise ValueError("No surface water body features intersect the provided ROI.")
@@ -253,6 +257,11 @@ def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
         "Converted SWB area columns from square meters to hectares: %s",
         converted_area_columns,
     )
+    return clipped_gdf
+
+
+def _create_local_swb_output(swb_path, roi_geometry, output_path, layer_name):
+    clipped_gdf = _build_swb2_gdf(swb_path, roi_geometry)
 
     local_asset_path = write_vector_output(
         gdf=clipped_gdf,
@@ -511,6 +520,107 @@ def _complete_swb_pipeline(
     return True
 
 
+def _sync_local_swb_stage(
+    state,
+    district,
+    block,
+    layer_name,
+    local_path,
+    source_stage,
+    start_year,
+    end_year,
+    push_to_geoserver,
+    sync_layer_metadata,
+):
+    layer_id = None
+    if sync_layer_metadata:
+        misc = {
+            "is_generated_locally": True,
+            "local_vector_path": str(local_path),
+            "source_stage": f"{source_stage}_local",
+        }
+        if start_year is not None:
+            misc["start_year"] = start_year
+        if end_year is not None:
+            misc["end_year"] = end_year
+        layer_id = save_layer_info_to_db(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=layer_name,
+            asset_id=str(local_path),
+            dataset_name=DATASET_NAME,
+            misc=misc,
+            algorithm=LOCAL_ALGORITHM,
+            algorithm_version=LOCAL_ALGORITHM_VERSION,
+        )
+
+    if not push_to_geoserver:
+        return True
+
+    if not _push_local_swb_to_geoserver(output_path=local_path, layer_name=layer_name):
+        raise RuntimeError(
+            f"Failed to sync {source_stage.upper()} layer to GeoServer: {layer_name}"
+        )
+    if layer_id:
+        update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+    return True
+
+
+def _complete_swb_pipeline_local(
+    state,
+    district,
+    block,
+    asset_suffix,
+    swb_path,
+    roi_geometry,
+    output_path,
+    start_year,
+    end_year,
+    push_to_geoserver,
+    sync_layer_metadata,
+):
+    """SWB2, SWB3 and SWB4 entirely on local layers; each stage rewrites and re-pushes the final layer."""
+    layer_name = _final_layer_name(asset_suffix)
+
+    def sync_stage(stage, gdf):
+        local_path = write_vector_output(
+            gdf=gdf, output_path=output_path, layer_name=layer_name
+        )
+        _sync_local_swb_stage(
+            state=state,
+            district=district,
+            block=block,
+            layer_name=layer_name,
+            local_path=local_path,
+            source_stage=stage,
+            start_year=start_year,
+            end_year=end_year,
+            push_to_geoserver=push_to_geoserver,
+            sync_layer_metadata=sync_layer_metadata,
+        )
+
+    swb2_gdf = _build_swb2_gdf(swb_path, roi_geometry)
+    sync_stage("swb2", swb2_gdf)
+
+    swb3_gdf = waterbody_catchment_streamorder_properties_local(swb2_gdf)
+    sync_stage("swb3", swb3_gdf)
+
+    if not state:
+        logger.info("Skipping local SWB4: state is required for the census join")
+        return True
+    try:
+        swb4_gdf = waterbody_wbc_intersection_local(swb3_gdf, state=state)
+        sync_stage("swb4", swb4_gdf)
+    except Exception:
+        logger.exception(
+            "Local SWB4 enrichment failed for %s; retaining the SWB3 layer",
+            asset_suffix,
+        )
+        sync_stage("swb3", swb3_gdf)
+    return True
+
+
 def run_swb_local(
     state=None,
     district=None,
@@ -526,6 +636,7 @@ def run_swb_local(
     start_year=None,
     end_year=None,
     overwrite=False,
+    use_gee=False,
 ):
     state = str(state).strip().lower() if state else None
     district = str(district).strip().lower() if district else None
@@ -553,6 +664,34 @@ def run_swb_local(
 
     asset_suffix = _resolve_asset_suffix(state, district, block, asset_suffix)
     layer_name = _layer_name(asset_suffix)
+
+    if not use_gee:
+        output_path = build_output_vector_path(
+            layer_name=layer_name,
+            state=state,
+            district=district,
+            block=block,
+            output_base_dir=LOCAL_OUTPUT_BASE_DIR,
+            custom_subdir=asset_suffix,
+            block_fallback="unknown_block",
+        )
+        logger.info("Local SWB output path (no GEE): %s", output_path)
+        if overwrite:
+            output_path.unlink(missing_ok=True)
+        return _complete_swb_pipeline_local(
+            state=state,
+            district=district,
+            block=block,
+            asset_suffix=asset_suffix,
+            swb_path=swb_path,
+            roi_geometry=roi_geometry,
+            output_path=output_path,
+            start_year=start_year,
+            end_year=end_year,
+            push_to_geoserver=push_to_geoserver,
+            sync_layer_metadata=sync_layer_metadata,
+        )
+
     gee_description, gee_asset_id, asset_folder_list = _resolve_gee_asset_id(
         state=state,
         district=district,
@@ -773,6 +912,7 @@ def _generate_swb_local_task(
     gee_account_id=None,
     app_type="MWS",
     overwrite=False,
+    use_gee=False,
 ):
     return run_swb_local(
         state=state,
@@ -788,6 +928,7 @@ def _generate_swb_local_task(
         start_year=start_year,
         end_year=end_year,
         overwrite=overwrite,
+        use_gee=use_gee,
     )
 
 
@@ -805,6 +946,7 @@ def generate_swb_layer(
     gee_account_id=None,
     app_type="MWS",
     overwrite=False,
+    use_gee=False,
 ):
     _ = self
     return _generate_swb_local_task(
@@ -819,4 +961,5 @@ def generate_swb_layer(
         gee_account_id=gee_account_id,
         app_type=app_type,
         overwrite=overwrite,
+        use_gee=use_gee,
     )
