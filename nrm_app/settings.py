@@ -346,6 +346,8 @@ EXCEL_DIR = resolve_env_path(
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+TEST_RUNNER = "nrm_app.test_runner.OfflineTestRunner"
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,  # keep Django's default loggers
