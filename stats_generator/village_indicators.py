@@ -108,6 +108,9 @@ def extract_soc_eco(df_soc_eco_indi, v_id):
         "total_population": village_row["total_population_count"].iloc[0],
         "percent_sc_population": round(village_row["SC_percent"].iloc[0], 4),
         "percent_st_population": round(village_row["ST_percent"].iloc[0], 4),
+        "percent_sc_st_population": round(
+            village_row["SC_percent"].iloc[0] + village_row["ST_percent"].iloc[0], 4
+        ),
         "literacy_level": round(village_row["literacy_rate_percent"].iloc[0], 4),
     }
 

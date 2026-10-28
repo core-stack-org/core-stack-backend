@@ -904,7 +904,7 @@ class GEEManager:
         mask = np.where(data == target_value, 1, 0)
 
         # Compute distance to nearest target pixel (in pixels)
-        distance = scipy.ndimage.distance_transform_edt(mask == 0)
+        distance = distance_transform_edt(mask == 0)
         # Convert to meters
         distance_meters = distance * pixel_size
 

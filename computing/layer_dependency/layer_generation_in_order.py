@@ -72,7 +72,7 @@ from computing.change_detection.change_detection_local import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local,
 )
-from computing.cropping_intensity.cropping_intesity_local import (
+from computing.cropping_intensity.cropping_intensity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local,
 )
 from computing.lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local
@@ -106,6 +106,7 @@ from computing.misc.digital_elevation_model_local import (
 )
 from computing.misc.drainage_density_local_compute import drainage_density
 from computing.misc.livestocks.pipeline import generate_livestocks_layer_task
+from utilities.pipelines.admin import AdminScopeNotFound
 from computing.misc.river_local_compute import river_vector as river_vector_local
 from computing.misc.factory_csr_local_compute import generate_factory_csr_data_local
 from computing.misc.green_credit_local_compute import generate_green_credit_data_local
@@ -367,6 +368,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
+    "drought_causality": drought_causality,
+    "mws_drought_causality": drought_causality,
 }
 
 TASK_REGISTRIES = {
@@ -804,6 +807,11 @@ def run_layer_with_dependency(
                 logger.warning(
                     f"{node_func_name} returned a falsy result, treating as failed ({log_ctx}): result={result}"
                 )
+        except AdminScopeNotFound as e:
+            status[node_func_name] = False
+            logger.warning(
+                f"Skipping {node_func_name}, location not in admin boundary ({log_ctx}): {e}"
+            )
         except Exception:
             status[node_func_name] = False
             logger.exception(f"{node_func_name} raised an error ({log_ctx})")
