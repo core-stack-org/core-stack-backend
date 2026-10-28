@@ -80,7 +80,7 @@ def _make_config(tmp_dir):
 def _mock_geoserver():
     gs = MagicMock(spec=GeoServerClient)
     gs.fetch_vector_metadata.return_value = (FAKE_BBOX, FAKE_FOOTPRINT, FAKE_VECTOR_COLUMNS)
-    gs.fetch_raster_metadata.return_value = (FAKE_BBOX, FAKE_FOOTPRINT, "EPSG:4326", [100, 200])
+    gs.fetch_raster_metadata.return_value = (FAKE_BBOX, FAKE_FOOTPRINT, 4326, [100, 200])
     gs.wms_thumbnail_url.return_value = "https://fake-geoserver/wms?fake=1"
     gs.download_thumbnail.return_value = True
     gs.raster_describe_url.return_value = "https://fake-geoserver/wcs?describe"
@@ -219,7 +219,7 @@ class TestGeoServerClient(unittest.TestCase):
         self.assertIsNotNone(result)
         bbox, footprint, crs, shape = result
         self.assertEqual(bbox, [85.0, 25.0, 86.0, 26.0])
-        self.assertEqual(crs, "EPSG:4326")
+        self.assertEqual(crs, 4326)
         self.assertEqual(shape, [200, 100])
 
 
@@ -440,13 +440,14 @@ class TestSTACCollectionGeneratorVector(unittest.TestCase):
     @patch("computing.STAC_specs.stac_collection.GEOSERVER_PASSWORD", "pass")
     @patch("computing.STAC_specs.stac_collection.S3_ACCESS_KEY", "key")
     @patch("computing.STAC_specs.stac_collection.S3_SECRET_KEY", "secret")
+    @patch.object(GeoServerClient, "fetch_layer_default_style", return_value=None)
     @patch.object(GeoServerClient, "fetch_vector_metadata", return_value=(FAKE_BBOX, FAKE_FOOTPRINT, FAKE_VECTOR_COLUMNS))
     @patch.object(GeoServerClient, "download_thumbnail", return_value=True)
     @patch.object(MetadataProvider, "get_layer_description", return_value="desc")
     @patch.object(MetadataProvider, "get_layer_mapping", return_value=FAKE_LAYER_MAP)
     @patch.object(MetadataProvider, "get_vector_column_descriptions")
     def test_end_to_end_vector(self, mock_col_desc, mock_mapping, mock_desc,
-                                mock_thumb, mock_meta):
+                                mock_thumb, mock_meta, mock_style):
         mock_col_desc.return_value = FAKE_COLUMN_DESC_DF.rename(
             {"column_name_description": "column_description"}, axis=1,
         )
@@ -490,12 +491,14 @@ class TestSTACCollectionGeneratorRaster(unittest.TestCase):
     @patch("computing.STAC_specs.stac_collection.GEOSERVER_PASSWORD", "pass")
     @patch("computing.STAC_specs.stac_collection.S3_ACCESS_KEY", "key")
     @patch("computing.STAC_specs.stac_collection.S3_SECRET_KEY", "secret")
+    @patch.object(GeoServerClient, "fetch_layer_default_style", return_value=None)
     @patch.object(GeoServerClient, "fetch_raster_metadata",
-                  return_value=(FAKE_BBOX, FAKE_FOOTPRINT, "EPSG:4326", [100, 200]))
+                  return_value=(FAKE_BBOX, FAKE_FOOTPRINT, 4326, [100, 200]))
     @patch.object(GeoServerClient, "download_thumbnail", return_value=True)
     @patch.object(MetadataProvider, "get_layer_description", return_value="desc")
     @patch.object(MetadataProvider, "get_layer_mapping", return_value=FAKE_LAYER_MAP)
-    def test_end_to_end_raster(self, mock_mapping, mock_desc, mock_thumb, mock_meta):
+    def test_end_to_end_raster(self, mock_mapping, mock_desc, mock_thumb, mock_meta,
+                               mock_style):
         sp = _mock_style_parser()
         with patch("computing.STAC_specs.stac_collection.StyleParser", return_value=sp):
             gen = STACCollectionGenerator(config=self.config)
