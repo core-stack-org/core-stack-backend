@@ -79,6 +79,10 @@ INTERNAL_ADMIN_COLUMNS = (
 )
 
 
+class AdminScopeNotFound(ValueError):
+    """The requested state/district/tehsil is absent from the admin boundary."""
+
+
 def is_internal_admin_column(column: Any) -> bool:
     """Return true for fixed source admin fields that should not leak to outputs."""
 
@@ -135,7 +139,7 @@ def _unique_admin_name_match(
         if requested_keys & admin_name_match_keys(candidate)
     ]
     if len(matches) != 1:
-        raise ValueError(
+        raise AdminScopeNotFound(
             f"Could not uniquely resolve {label} {requested!r}."
         )
     return matches[0]
@@ -547,7 +551,7 @@ class CSAdminSource:
                     params=resolved_params,
                 )
             if rows.empty:
-                raise ValueError(f"No admin rows found for scope: {scope}")
+                raise AdminScopeNotFound(f"No admin rows found for scope: {scope}")
             return AdminSelection(
                 resolved_scope,
                 rows,
