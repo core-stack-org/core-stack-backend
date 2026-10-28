@@ -10,6 +10,9 @@ from dataclasses import dataclass
 
 import pandas as pd
 import pystac
+import pystac.extensions.classification
+import pystac.extensions.projection
+import pystac.extensions.table
 import requests
 from shapely.geometry import Polygon, mapping
 
