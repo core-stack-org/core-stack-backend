@@ -1593,7 +1593,7 @@
     "variables": {
       "area_in_ha": {
         "type": "float",
-        "description": "area in hectares idenfied for analysis",
+        "description": "area in hectares identified for analysis",
         "unit": "hectares"
       },
       "cropping_intensity_unit_less_2017-2018": {
@@ -1626,172 +1626,212 @@
       },
       "cropping_intensity_unit_less_2024-2025": {
         "type": "float",
-        "description": "cropping intensity of ZoI for 2024"
+        "description": "cropping intensity for 2024"
       },
       "doubly_cropped_area_in_ha_2017-2018": {
         "type": "float",
-        "description": "double cropped area for 2017"
+        "description": "double cropped area for 2017",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2018-2019": {
         "type": "float",
-        "description": "double cropped area for 2018"
+        "description": "double cropped area for 2018",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2019-2020": {
         "type": "float",
-        "description": "double cropped area for 2019"
+        "description": "double cropped area for 2019",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2020-2021": {
         "type": "float",
-        "description": "double cropped area for 2020"
+        "description": "double cropped area for 2020",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2021-2022": {
         "type": "float",
-        "description": "double cropped area for 2021"
+        "description": "double cropped area for 2021",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2022-2023": {
         "type": "float",
-        "description": "double cropped area for 2022"
+        "description": "double cropped area for 2022",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2023-2024": {
         "type": "float",
-        "description": "double cropped area for 2023"
+        "description": "double cropped area for 2023",
+        "unit": "hectares"
       },
       "doubly_cropped_area_in_ha_2024-2025": {
         "type": "float",
-        "description": "double cropped area of ZoI for 2024"
+        "description": "double cropped area for 2024",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2017-2018": {
         "type": "float",
-        "description": "single cropped area for 2017"
+        "description": "single cropped area for 2017",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2018-2019": {
         "type": "float",
-        "description": "single cropped area for 2018"
+        "description": "single cropped area for 2018",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2019-2020": {
         "type": "float",
-        "description": "single cropped area for 2019"
+        "description": "single cropped area for 2019",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2020-2021": {
         "type": "float",
-        "description": "single cropped area for 2020"
+        "description": "single cropped area for 2020",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2021-2022": {
         "type": "float",
-        "description": "single cropped area for 2021"
+        "description": "single cropped area for 2021",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2022-2023": {
         "type": "float",
-        "description": "single cropped area for 2022"
+        "description": "single cropped area for 2022",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2023-2024": {
         "type": "float",
-        "description": "single cropped area for 2023"
+        "description": "single cropped area for 2023",
+        "unit": "hectares"
       },
       "single_cropped_area_in_ha_2024-2025": {
         "type": "float",
-        "description": "single cropped area of ZoI in hectares for 2024"
+        "description": "single cropped area in hectares for 2024",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2017-2018": {
         "type": "float",
-        "description": "single kharif cropped area for 2017"
+        "description": "single kharif cropped area for 2017",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2018-2019": {
         "type": "float",
-        "description": "single kharif cropped area for 2018"
+        "description": "single kharif cropped area for 2018",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2019-2020": {
         "type": "float",
-        "description": "single kharif cropped area for 2019"
+        "description": "single kharif cropped area for 2019",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2020-2021": {
         "type": "float",
-        "description": "single kharif cropped area for 2020"
+        "description": "single kharif cropped area for 2020",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2021-2022": {
         "type": "float",
-        "description": "single kharif cropped area for 2021"
+        "description": "single kharif cropped area for 2021",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2022-2023": {
         "type": "float",
-        "description": "single kharif cropped area for 2022"
+        "description": "single kharif cropped area for 2022",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2023-2024": {
         "type": "float",
-        "description": "single kharif cropped area for 2023"
+        "description": "single kharif cropped area for 2023",
+        "unit": "hectares"
       },
       "single_kharif_cropped_area_in_ha_2024-2025": {
         "type": "float",
-        "description": "single kharif cropped area of ZoI for 2024"
+        "description": "single kharif cropped area for 2024",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2017-2018": {
         "type": "float",
-        "description": "single non kharif cropped area for 2017"
+        "description": "single non kharif cropped area for 2017",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2018-2019": {
         "type": "float",
-        "description": "single non kharif cropped area for 2018"
+        "description": "single non kharif cropped area for 2018",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2019-2020": {
         "type": "float",
-        "description": "single non kharif cropped area for 2019"
+        "description": "single non kharif cropped area for 2019",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2020-2021": {
         "type": "float",
-        "description": "single non kharif cropped area for 2020"
+        "description": "single non kharif cropped area for 2020",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2021-2022": {
         "type": "float",
-        "description": "single non kharif cropped area for 2021"
+        "description": "single non kharif cropped area for 2021",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2022-2023": {
         "type": "float",
-        "description": "single non kharif cropped area for 2022"
+        "description": "single non kharif cropped area for 2022",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2023-2024": {
         "type": "float",
-        "description": "single non kharif cropped area for 2023"
+        "description": "single non kharif cropped area for 2023",
+        "unit": "hectares"
       },
       "single_non_kharif_cropped_area_in_ha_2024-2025": {
         "type": "float",
-        "description": "single non kharif cropped area of ZoI for 2024"
+        "description": "single non kharif cropped area for 2024",
+        "unit": "hectares"
       },
       "sum_area_in_ha": {
         "type": "float",
-        "description": "area in hectares idenfied for analysis",
+        "description": "total cropped area in hectares",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2017-2018": {
         "type": "float",
-        "description": "tripple cropped crea for 2017"
+        "description": "triple/annual/perennial cropped crea for 2017",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2018-2019": {
         "type": "float",
-        "description": "tripple cropped crea for 2018"
+        "description": "triple/annual/perennial cropped crea for 2018",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2019-2020": {
         "type": "float",
-        "description": "tripple cropped crea for 2019"
+        "description": "triple/annual/perennial cropped crea for 2019",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2020-2021": {
         "type": "float",
-        "description": "tripple cropped crea for 2020"
+        "description": "triple/annual/perennial cropped crea for 2020",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2021-2022": {
         "type": "float",
-        "description": "tripple/annual/perennial cropping area for 2021"
+        "description": "triple/annual/perennial cropping area for 2021",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2022-2023": {
         "type": "float",
-        "description": "tripple cropped crea for 2022"
+        "description": "triple/annual/perennial cropped crea for 2022",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2023-2024": {
         "type": "float",
-        "description": "tripple cropped crea for 2023"
+        "description": "triple/annual/perennial cropped crea for 2023",
+        "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2024-2025": {
         "type": "float",
-        "description": "tripple cropped area of ZoI for 2024"
+        "description": "triple/annual/perennial cropped area for 2024",
+        "unit": "hectares"
       },
       "UID": {
         "type": "string",
