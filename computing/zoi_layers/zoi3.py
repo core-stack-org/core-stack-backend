@@ -9,7 +9,11 @@ from utilities.gee_utils import (
     get_gee_dir_path,
     is_gee_asset_exists,
 )
-from waterrejuvenation.utils import wait_for_task_completion, resolve_zoi_ndvi_input
+from waterrejuvenation.utils import (
+    wait_for_task_completion,
+    resolve_zoi_ndvi_input,
+    delete_asset_on_GEE,
+)
 import ee
 
 
@@ -51,6 +55,7 @@ def get_ndvi_for_zoi(
     fc = get_ndvi_data(
         zoi_collections, start_year, end_year, description_ndvi, ndvi_asset_path
     )
+    delete_asset_on_GEE(ndvi_asset_path)  # re-runs would otherwise fail on the export
     task = ee.batch.Export.table.toAsset(
         collection=fc, description=description_ndvi, assetId=ndvi_asset_path
     )
