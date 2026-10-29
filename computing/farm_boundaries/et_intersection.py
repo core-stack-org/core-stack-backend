@@ -619,8 +619,8 @@ def _crop_intensity_by_year(farms_gdf, years):
     {year: per-farm crop_intensity (4 dp, row order of farms_gdf)}; NaN for years
     with no LULC raster. Needs only the LULC rasters and the farm geometries.
     """
-    # lazy: cropping_intesity_local imports Django-dependent modules
-    from computing.cropping_intensity.cropping_intesity_local import (
+    # lazy: cropping_intensity_local imports Django-dependent modules
+    from computing.cropping_intensity.cropping_intensity_local import (
         compute_farm_cropping_intensity,
     )
 
