@@ -153,7 +153,7 @@ class LayerApiCoverageTests(SimpleTestCase):
     NOT_TEHSIL_SCOPED = {"et_download", "generate_ltp_stp", "generate_ltp_stp_change"}
 
     def test_local_capable_views_are_guarded(self):
-        source = (Path(__file__).parent / "api.py").read_text()
+        source = (Path(__file__).parents[1] / "api.py").read_text()
         unguarded = []
         for node in ast.parse(source).body:
             if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
