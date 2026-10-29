@@ -65,6 +65,7 @@ from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
 from computing.misc.ndvi_time_series import ndvi_timeseries
 from computing.zoi_layers.zoi import generate_zoi
+from computing.zoi_layers.zoi_local import generate_zoi as generate_zoi_local
 from computing.mws.mws_centroid import generate_mws_centroid_data
 from computing.change_detection.change_detection_local import (
     get_change_detection as get_change_detection_local,
@@ -297,6 +298,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_ci_layer": generate_cropping_intensity_local,
     "generate_swb_layer": generate_swb_layer_local,
     "generate_swb": generate_swb_layer_local,
+    "generate_zoi": generate_zoi_local,
+    "generate_zoi_data": generate_zoi_local,
     "get_change_detection": get_change_detection_local,
     "change_detection": get_change_detection_local,
     "vectorise_change_detection": vectorise_change_detection_local,
