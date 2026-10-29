@@ -257,6 +257,7 @@ from .views import (
     check_missing_excel_files,
 )
 from .zoi_layers.zoi import generate_zoi
+from .zoi_layers.zoi_local import generate_zoi as generate_zoi_local
 from .mws.mws_connectivity import generate_mws_connectivity_data
 from .mws.mws_centroid import generate_mws_centroid_data
 from .misc.facilities.pipeline import generate_facilities_proximity_task
@@ -2386,6 +2387,7 @@ def generate_ndvi_timeseries(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_zoi_to_gee(request):
     logger.info("Inside generate zoi layers")
@@ -2433,7 +2435,10 @@ def generate_zoi_to_gee(request):
         district = district.lower()
         block = block.lower()
 
-        generate_zoi.apply_async(
+        compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
+        task = generate_zoi_local if compute == "local" else generate_zoi
+
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -2442,7 +2447,7 @@ def generate_zoi_to_gee(request):
                 "start_date": start_date,
                 "end_date": end_date,
             },
-            queue="waterbody",
+            queue="nrm" if compute == "local" else "waterbody",
         )
 
         return Response(

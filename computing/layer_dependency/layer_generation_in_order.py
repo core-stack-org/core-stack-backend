@@ -360,8 +360,6 @@ LOCAL_TASK_REGISTRY = {
     "soil_health": soil_health_local,
     "generate_soil_type": generate_soil_type_local,
     "soil_type": generate_soil_type_local,
-    "generate_zoi": generate_zoi,
-    "generate_zoi_data": generate_zoi,
     "generate_hydrology": generate_hydrology_local,
     "hydrology_fortnightly": generate_hydrology_fortnightly_local,
     "hydrology_annual": generate_hydrology_annual_local,
@@ -371,8 +369,18 @@ LOCAL_TASK_REGISTRY = {
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
+    # GEE-backed tasks that can be triggered from the local map
+    # (nodes need "pass_gee_account_id": true).
+    "ndvi_timeseries": ndvi_timeseries,
+    "generate_ndvi_timeseries": ndvi_timeseries,
+    "calculate_drought": calculate_drought,
+    "generate_drought_layer": calculate_drought,
     "drought_causality": drought_causality,
     "mws_drought_causality": drought_causality,
+    "generate_stream_order": generate_stream_order,
+    "stream_order": generate_stream_order,
+    "generate_clart_layer": generate_clart_layer,
+    "generate_clart": generate_clart_layer,
 }
 
 TASK_REGISTRIES = {
