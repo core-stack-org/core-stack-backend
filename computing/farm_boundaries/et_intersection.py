@@ -1206,17 +1206,20 @@ def _update_static_drought_indicators(state, district, block):
     Combined `frequency` / `intensity` (any month rule, via _kharif_drought_years):
       drought year = any valid Jul–Oct month MAI in 0–0.50 (sub_annual.parquet)
       N            = years with a valid Jul–Oct MAI
-      frequency    = N / #drought years (NaN if none), 2 dp
-      intensity    = mean annual kharif_mai over the drought years (NaN if none), 4 dp
+      frequency    = N / #drought years, 2 dp; 0 if the farm has data but no drought year
+      intensity    = mean annual kharif_mai over the drought years, 4 dp (NaN if none)
 
     Split `*_mod` / `*_sev` (year classified by the MODE of its Jul–Oct monthly categories):
       month category : severe MAI <= 0.25, moderate MAI <= 0.50, else none
       year type      : most frequent category among the year's valid Jul–Oct months;
                        a tie goes to the more severe category
       N              = years with at least one valid Jul–Oct month
-      frequency_*    = N / #years of that type (NaN if none), 2 dp
+      frequency_*    = N / #years of that type, 2 dp; 0 if the farm has data but no
+                       year of that type
       intensity_*    = mean annual kharif_mai (mean of the months) over years of that
-                       type (NaN if none), 4 dp
+                       type, 4 dp (NaN if none)
+
+    A farm with no valid Jul–Oct MAI in any year has no data: all six columns are NaN.
     """
     annual_path  = _annual_parquet_path(state, district, block)
     monthly_path = _monthly_parquet_path(state, district, block)
@@ -1236,7 +1239,9 @@ def _update_static_drought_indicators(state, district, block):
     is_drought = _kharif_drought_years(monthly)
     n_kharif_years = is_drought.groupby("farm_id").size()           # years with valid kharif MAI
     n_drought      = is_drought.groupby("farm_id").sum()
-    static["frequency"] = static["farm_id"].map((n_kharif_years / n_drought.where(n_drought > 0)).round(2))
+    # farms with data but no drought year -> 0 ; farms with no data are absent from n_kharif_years -> NaN
+    frequency = (n_kharif_years / n_drought.where(n_drought > 0)).fillna(0).round(2)
+    static["frequency"] = static["farm_id"].map(frequency)
     drought_years = is_drought[is_drought].reset_index()[["farm_id", "year"]]
     drought_kharif_mai = drought_years.merge(annual, on=["farm_id", "year"], how="inner")
     static["intensity"] = static["farm_id"].map(drought_kharif_mai.groupby("farm_id")["kharif_mai"].mean().round(4))
@@ -1262,7 +1267,8 @@ def _update_static_drought_indicators(state, district, block):
     for kind, short in (("moderate", "mod"), ("severe", "sev")):
         years = typed[typed["drought_type"] == kind]
         count = years.groupby("farm_id").size()
-        static[f"frequency_{short}"] = static["farm_id"].map((n_years / count).round(2))
+        frequency_kind = (n_years / count.reindex(n_years.index)).fillna(0).round(2)   # 0 = data, none of this type
+        static[f"frequency_{short}"] = static["farm_id"].map(frequency_kind)
         static[f"intensity_{short}"] = static["farm_id"].map(years.groupby("farm_id")["kharif_mai"].mean().round(4))
     static.to_parquet(static_path, index=False)
     logger.info("Drought indicator columns updated in %s", static_path)
