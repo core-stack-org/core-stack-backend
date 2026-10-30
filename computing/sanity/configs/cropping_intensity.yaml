@@ -61,9 +61,15 @@ rules:
   # Raw vector area fields produced by the cropping-intensity computation.
   - name: ci_vector_area_type
     type: data_type
-    fields:
-      - total_cropable_area_ever_hydroyear_2017_2023
+    field_pattern: "total_cropable_area_ever_hydroyear_*"
     expected_type: numeric
+    allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: ci_vector_area_min
+    type: min_value
+    field_pattern: "total_cropable_area_ever_hydroyear_*"
+    value: 0
     allow_missing_fields: true
     applies_to: [vector]
 
