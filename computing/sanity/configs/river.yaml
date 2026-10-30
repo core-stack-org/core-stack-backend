@@ -4,12 +4,22 @@ sheet_names:
 
 rules:
   # Source: Pan India STAC drainage/river vector metadata.
+  # One row per MWS x river segment, so uids repeat; segments outside every MWS
+  # get uid "" (not null) by design in river_local_compute.py.
   - name: river_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: river_name_not_null
-    applies_to: [excel, vector]
+  # Vector keeps the source WRIS field name rivname. Blank names are stored as
+  # "" which not_null can't see; the Excel rule below catches them.
+  - name: river_vector_name_not_null
+    applies_to: [vector]
+    type: not_null
+    field: rivname
+
+  # Excel: the export renames rivname to river_name; blank names read back as null.
+  - name: river_excel_name_not_null
+    applies_to: [excel]
     type: not_null
     field: river_name

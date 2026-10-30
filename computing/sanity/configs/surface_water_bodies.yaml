@@ -4,29 +4,146 @@ sheet_names:
 
 rules:
   # Source: STAC Surface Water Bodies vector table:columns.
+  # Pipeline: computing/surface_water_bodies/swb*.py writes one row per water
+  # body with area_<yy-yy> (ha), k_/kr_/krz_<yy-yy> (% of area_ored) and
+  # area_ored (ha). stats_generator aggregates these per MWS into
+  # <season>_area_in_ha_<yyyy-yyyy>, filling missing values with 0.
   - name: swb_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
-    allow_missing_fields: true
 
-  - name: swb_schema_present
+  - name: swb_uid_present
     applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
-      - "total_area_in_ha_*"
-      - "kharif_area_in_ha_*"
+      - "uid"
 
-  - name: swb_area_type
-    applies_to: [excel, vector]
+  # Vector: each water body must link to its MWS (MWS_UID, or mws_uid_list in
+  # older layers) and carry the yearly area and seasonal percentage families.
+  - name: swb_vector_mws_uid_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "mws_uid"
+      - "mws_uid_list"
+
+  - name: swb_vector_area_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "area_ored"
+
+  - name: swb_vector_yearly_area_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "area_[0-9][0-9]-[0-9][0-9]"
+
+  - name: swb_vector_kharif_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "k_[0-9][0-9]-[0-9][0-9]"
+
+  - name: swb_vector_rabi_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "kr_[0-9][0-9]-[0-9][0-9]"
+
+  - name: swb_vector_zaid_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "krz_[0-9][0-9]-[0-9][0-9]"
+
+  # Vector areas are hectares: numeric, never null, never negative.
+  - name: swb_vector_area_type
+    applies_to: [vector]
+    type: data_type
+    field_pattern: "area_*"
+    expected_type: numeric
+
+  - name: swb_vector_area_not_null
+    applies_to: [vector]
+    type: not_null
+    field_pattern: "area_*"
+
+  - name: swb_vector_area_min
+    applies_to: [vector]
+    type: min_value
+    field_pattern: "area_*"
+    value: 0
+
+  # Seasonal water presence is a percentage of area_ored: 0..100. The max
+  # allows float noise from count/total*100 (prod has 100.00000000000003).
+  - name: swb_vector_season_pct_type
+    applies_to: [vector]
+    type: data_type
+    field_pattern: "k*_[0-9][0-9]-[0-9][0-9]"
+    expected_type: numeric
+
+  - name: swb_vector_season_pct_not_null
+    applies_to: [vector]
+    type: not_null
+    field_pattern: "k*_[0-9][0-9]-[0-9][0-9]"
+
+  - name: swb_vector_season_pct_min
+    applies_to: [vector]
+    type: min_value
+    field_pattern: "k*_[0-9][0-9]-[0-9][0-9]"
+    value: 0
+
+  - name: swb_vector_season_pct_max
+    applies_to: [vector]
+    type: max_value
+    field_pattern: "k*_[0-9][0-9]-[0-9][0-9]"
+    value: 100.001
+
+  # Size class from swb1.py (GEE); local layers may not write it.
+  - name: swb_vector_category_allowed
+    applies_to: [vector]
+    type: allowed_values
+    field_pattern: "category_sq_m"
+    value: ["0-500", "500-1000", "1000-5000", "5000 and above"]
+    allow_missing_fields: true
+
+  # Excel: per-MWS total and seasonal areas (ha) must exist, be numeric and
+  # be non-negative. Zero-filled gaps can't be told apart from real zeros.
+  - name: swb_excel_total_area_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "total_area_in_ha_*"
+
+  - name: swb_excel_season_area_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "kharif_area_in_ha_*"
+      - "rabi_area_in_ha_*"
+      - "zaid_area_in_ha_*"
+
+  - name: swb_excel_swb_area_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "total_swb_area_in_ha"
+
+  - name: swb_excel_area_type
+    applies_to: [excel]
     type: data_type
     field_pattern: "*area_in_ha*"
     expected_type: numeric
-    allow_missing_fields: true
 
-  - name: swb_area_min
-    applies_to: [excel, vector]
+  - name: swb_excel_area_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "*area_in_ha*"
+
+  - name: swb_excel_area_min
+    applies_to: [excel]
     type: min_value
     field_pattern: "*area_in_ha*"
     value: 0
-    allow_missing_fields: true

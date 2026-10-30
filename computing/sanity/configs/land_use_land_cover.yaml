@@ -4,33 +4,79 @@ sheet_names:
 
 rules:
   # Source: STAC Land Use Land Cover vector table:columns.
+  # Pipeline: computing/lulc/lulc_vector*.py writes <class>_area_<year> in ha
+  # per MWS; stats_generator renames them to <class>_area_in_ha_<year>. The
+  # patterns below match both forms.
   - name: lulc_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: lulc_schema_present
+  # Every LULC export must carry the MWS area and the main class families.
+  - name: lulc_mws_area_present
     applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
-      - "cropland_in_ha_*"
-      - "barrenland_in_ha_*"
-      - "built_up_area_in_ha_*"
+      - "area_in_ha"
 
-  - name: lulc_numeric_type
+  - name: lulc_built_up_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "built-up_area_*"
+
+  - name: lulc_water_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "k_water_area_*"
+      - "kr_water_area_*"
+      - "krz_water_area_*"
+
+  - name: lulc_tree_forest_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "tree_forest_area_*"
+
+  - name: lulc_barrenlands_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "barrenlands_area_*"
+
+  - name: lulc_shrub_scrub_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "shrub_scrub_area_*"
+
+  - name: lulc_cropped_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "single_kharif_cropped_area_*"
+      - "single_non_kharif_cropped_area_*"
+      - "doubly_cropped_area_*"
+      - "triply_cropped_area_*"
+
+  # All area fields (MWS area and per-class areas) are numeric hectares,
+  # never negative, and never null (Excel writes None for a missing year).
+  # Only *area* columns are checked: MWS code leftovers (bacode, sbcode,
+  # wsconc) are strings and the GEE reducer leftover `sum` is not an area.
+  - name: lulc_area_numeric_type
     applies_to: [excel, vector]
     type: data_type
-    field_pattern: "*"
+    field_pattern: "*area*"
     expected_type: numeric
-    exclude_field_patterns:
-      - "*uid*"
-      - "id"
-      - "geometry"
-    allow_missing_fields: true
+
+  - name: lulc_area_not_null
+    applies_to: [excel, vector]
+    type: not_null
+    field_pattern: "*area*"
 
   - name: lulc_area_min
     applies_to: [excel, vector]
     type: min_value
-    field_pattern: "*_in_ha*"
+    field_pattern: "*area*"
     value: 0
-    allow_missing_fields: true

@@ -4,21 +4,46 @@ sheet_names:
 
 rules:
   # Source: STAC MWS Connectivity vector table:columns.
+  # Pipeline: computing/mws/mws_connectivity*.py clips the pan-India
+  # connectivity dataset (uid, direction, downstream, upstream).
+  # stats_generator renames downstream/upstream to *_mws and writes
+  # "unknown" for empty strings.
   - name: mws_connectivity_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: mws_connectivity_schema_present
+  - name: mws_connectivity_uid_present
     applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
-      - "downstream_mws"
-      - "upstream_mws"
-      - "direction"
+      - "uid"
 
+  # Flow direction code 0..8 (0 = no direction, 1..8 = NE clockwise to N;
+  # see create_excel_for_mws_connectivity).
   - name: mws_connectivity_direction_not_null
     applies_to: [excel, vector]
     type: not_null
-    field: direction
-    allow_missing_fields: true
+    field_pattern: "direction"
+
+  - name: mws_connectivity_direction_allowed
+    applies_to: [excel, vector]
+    type: allowed_values
+    field_pattern: "direction"
+    value: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+  # Downstream / upstream links: raw names in the vector, *_mws in Excel.
+  # upstream is a list literal and may be "[]"; downstream must be set.
+  - name: mws_connectivity_vector_links_not_null
+    applies_to: [vector]
+    type: not_null
+    fields:
+      - downstream
+      - upstream
+
+  - name: mws_connectivity_excel_links_not_null
+    applies_to: [excel]
+    type: not_null
+    fields:
+      - downstream_mws
+      - upstream_mws

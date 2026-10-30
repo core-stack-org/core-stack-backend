@@ -4,32 +4,99 @@ sheet_names:
 
 rules:
   # Source: Pan India STAC drainage metadata and stats-generator drainage density export.
+  # Every MWS row needs its identifier in both forms.
   - name: drainage_density_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: drainage_density_schema_present
-    applies_to: [excel, vector]
-    type: required_any_field_pattern
+  # Vector: drainage_density_local_compute.py writes the two densities as numbers
+  # and the per-order breakdowns as stringified lists (parsed by the Excel export).
+  # Leftover watershed codes (bacode/sbcode/wsconc) are not checked.
+  - name: drainage_density_vector_schema_present
+    applies_to: [vector]
+    type: required_fields
     value:
-      - "drainage_density_weighted_in_km_per_km2"
-      - "stream_order_length_in_km"
+      - area_in_ha
+      - drainage_density_std
+      - drainage_density_weighted
+      - drainage_density_stream
+      - stream_length_km
 
-  - name: drainage_density_numeric_type
-    applies_to: [excel, vector]
+  - name: drainage_density_vector_not_null
+    applies_to: [vector]
+    type: not_null
+    fields:
+      - area_in_ha
+      - drainage_density_std
+      - drainage_density_weighted
+      - drainage_density_stream
+      - stream_length_km
+
+  - name: drainage_density_vector_numeric_type
+    applies_to: [vector]
     type: data_type
-    field_pattern: "*"
+    fields:
+      - area_in_ha
+      - drainage_density_std
+      - drainage_density_weighted
     expected_type: numeric
-    exclude_field_patterns:
-      - "*uid*"
-      - "geometry"
 
-  - name: drainage_density_min
-    applies_to: [excel, vector]
+  # Lengths, areas and densities can't be negative.
+  - name: drainage_density_vector_min
+    applies_to: [vector]
     type: min_value
-    field_pattern: "*"
+    fields:
+      - area_in_ha
+      - drainage_density_std
+      - drainage_density_weighted
     value: 0
-    exclude_field_patterns:
-      - "*uid*"
-      - "geometry"
+
+  - name: drainage_density_vector_list_type
+    applies_to: [vector]
+    type: data_type
+    fields:
+      - drainage_density_stream
+      - stream_length_km
+    expected_type: string
+
+  # Excel: renamed with units; stream_order_length_in_km is the sum of
+  # stream_length_km. The export writes "" for missing vector fields, so nulls
+  # here mean missing source values.
+  - name: drainage_density_excel_schema_present
+    applies_to: [excel]
+    type: required_fields
+    value:
+      - area_in_ha
+      - drainage_density_weighted_in_km_per_km2
+      - drainage_density_std_in_km_per_km2
+      - stream_order_length_in_km
+
+  - name: drainage_density_excel_not_null
+    applies_to: [excel]
+    type: not_null
+    fields:
+      - area_in_ha
+      - drainage_density_weighted_in_km_per_km2
+      - drainage_density_std_in_km_per_km2
+      - stream_order_length_in_km
+
+  - name: drainage_density_excel_numeric_type
+    applies_to: [excel]
+    type: data_type
+    fields:
+      - area_in_ha
+      - drainage_density_weighted_in_km_per_km2
+      - drainage_density_std_in_km_per_km2
+      - stream_order_length_in_km
+    expected_type: numeric
+
+  - name: drainage_density_excel_min
+    applies_to: [excel]
+    type: min_value
+    fields:
+      - area_in_ha
+      - drainage_density_weighted_in_km_per_km2
+      - drainage_density_std_in_km_per_km2
+      - stream_order_length_in_km
+    value: 0

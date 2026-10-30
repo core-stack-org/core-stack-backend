@@ -3,23 +3,82 @@ sheet_names:
   - antyodaya
 
 rules:
-  # Source: stats-generator village-level Antyodaya export.
-  - name: antyodaya_village_id_not_null
+  # Source: computing/misc/antyodaya (antyodaya_pipeline.yaml validation block)
+  # and stats-generator create_excel_for_antyodaya_20, which drops rows without
+  # a village_id, renames antyodaya_status and drops most *_feat_value columns.
+
+  # Key fields in both forms.
+  - name: antyodaya_village_id_present
     applies_to: [excel, vector]
+    type: required_fields
+    value: [village_id]
+
+  - name: antyodaya_cat_cluster_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value: ["*_cat_cluster"]
+
+  - name: antyodaya_cat_value_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value: ["*_cat_value"]
+
+  - name: antyodaya_total_hhd_present
+    applies_to: [excel, vector]
+    type: required_fields
+    value: [total_hhd]
+
+  # Vector rows for admin polygons without a village id legitimately carry a
+  # null village_id (antyodaya_status = "no village id available"); the Excel
+  # export drops them, so village_id must be set there.
+  - name: antyodaya_excel_village_id_not_null
+    applies_to: [excel]
     type: not_null
     field: village_id
 
-  - name: antyodaya_schema_present
-    applies_to: [excel, vector]
-    type: required_any_field_pattern
-    value:
-      - "*_cluster"
-      - "*_value"
-      - "total_hhd"
+  - name: antyodaya_vector_status_allowed_values
+    applies_to: [vector]
+    type: allowed_values
+    field: antyodaya_status
+    value: ["matched", "no village id available", "no data available for this village"]
 
-  - name: antyodaya_numeric_min
+  - name: antyodaya_excel_status_allowed_values
+    applies_to: [excel]
+    type: allowed_values
+    field: data_availability_status
+    value: ["matched", "no data available for this village"]
+
+  # Category clusters are normalized to HIGH/MEDIUM/LOW (null when unmatched).
+  - name: antyodaya_cat_cluster_allowed_values
+    applies_to: [excel, vector]
+    type: allowed_values
+    field_pattern: "*_cat_cluster"
+    value: ["HIGH", "MEDIUM", "LOW"]
+
+  # Category and feature scores are normalized to 0..1.
+  - name: antyodaya_value_type
+    applies_to: [excel, vector]
+    type: data_type
+    field_pattern: "*_value"
+    expected_type: numeric
+
+  - name: antyodaya_value_min
     applies_to: [excel, vector]
     type: min_value
-    field_pattern: "total*"
+    field_pattern: "*_value"
     value: 0
-    allow_missing_fields: true
+
+  - name: antyodaya_value_max
+    applies_to: [excel, vector]
+    type: max_value
+    field_pattern: "*_value"
+    value: 1
+
+  # Raw Antyodaya counts, areas and availability flags are non-negative.
+  # Text answers (e.g. availability_of_drainage_system) are skipped as non-numeric.
+  - name: antyodaya_raw_min
+    applies_to: [excel, vector]
+    type: min_value
+    field_pattern: "*"
+    exclude_field_patterns: ["geometry", "id", "*_name", "*_status", "*_cat_cluster", "*_value"]
+    value: 0
