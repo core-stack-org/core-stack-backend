@@ -1615,7 +1615,6 @@ def generate_mws_data_for_kyl_filters(
                     print(f"Error while fetching trees in grassland loss: {e}")
                     trees_in_grassland_loss = -9999
 
-                    ###################shg penetration########################
 
                 ################### SHG penetration ########################
 
@@ -1646,6 +1645,61 @@ def generate_mws_data_for_kyl_filters(
                 except Exception as e:
                     print(f"error while getting fire frp mean: {e}")
                     fire_count_per_year = -9999
+
+                def get_percentile_for_value(row, value, nutrient, unit="kg_per_ha"):
+                    percentiles = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95]
+                    values = [row[f"{nutrient}_p{p:02d}_in_{unit}"] for p in percentiles]
+
+                    if any(pd.isna(v) for v in values):
+                        return -9999
+
+                    k = sum(1 for v in values if v <= value)
+
+                    if k == 0:
+                        return 0.0
+                    if k == len(values):
+                        return 100.0
+
+                    lower_p, upper_p = percentiles[k - 1], percentiles[k]
+                    lower_v, upper_v = values[k - 1], values[k]
+
+                    return lower_p + (value - lower_v) / (upper_v - lower_v) * (upper_p - lower_p)
+
+
+                def get_low_nutrient_area(soil_health_df, mws_id, nutrient, threshold, unit="kg_per_ha"):
+                    try:
+                        if not isinstance(soil_health_df, pd.DataFrame) or soil_health_df.empty:
+                            return -9999, -9999
+
+                        mws_data = soil_health_df[soil_health_df["UID"] == mws_id]
+                        if mws_data.empty:
+                            return -9999, -9999
+
+                        soil_row = mws_data.iloc[0]
+                        percent = get_percentile_for_value(soil_row, threshold, nutrient, unit)
+                        if percent == -9999:
+                            return -9999, -9999
+
+                        area = round((percent / 100) * soil_row["area_under_cropping_in_ha"], 4)
+                        return area, round(percent, 4)
+
+                    except Exception as e:
+                        print(f"Error while calculating low {nutrient} area: {e}")
+                        return -9999, -9999
+
+                                ############ Low Nitrogen / Potassium Area ########################
+                low_nitrogen_area, low_nitrogen_percent = get_low_nutrient_area(
+                    sheets["soil_health"], specific_mws_id, "N", 280
+                )
+                low_potassium_area, low_potassium_percent = get_low_nutrient_area(
+                    sheets["soil_health"], specific_mws_id, "K", 120
+                )
+                low_phosphorus_area, low_phosphorus_percent = get_low_nutrient_area(
+                    sheets["soil_health"], specific_mws_id, "P", 10
+                )
+                low_organic_carbon_area, low_organic_carbon_percent = get_low_nutrient_area(
+                    sheets["soil_health"], specific_mws_id, "OC", 0.5, "percent"
+                )
 
                 results.append(
                     {
@@ -1738,6 +1792,15 @@ def generate_mws_data_for_kyl_filters(
                         "tree_cover_gain_75_percent": round(
                             tree_cover_gain_75_percent, 4
                         ),
+                        "low_nitrogen_area":low_nitrogen_area,
+                        "low_nitrogen_percent": low_nitrogen_percent,
+                        "low_potassium_area":low_potassium_area,
+                        "low_potassium_percent":low_potassium_percent,
+                                                "low_phosphorus_area": low_phosphorus_area,
+                        "low_phosphorus_percent": low_phosphorus_percent,
+                        "low_organic_carbon_area": low_organic_carbon_area,
+                        "low_organic_carbon_percent": low_organic_carbon_percent,
+
                     }
                 )
 
