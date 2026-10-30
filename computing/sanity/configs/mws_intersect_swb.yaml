@@ -4,58 +4,75 @@ sheet_names:
 
 rules:
   # Source: STAC Surface Water Bodies vector metadata and MWS-SWB intersection export.
+  # Excel only: stats_generator (create_excel_for_mws_intersect_swb) derives
+  # one row per (MWS, water body) from the SWB layer, with the water body's
+  # centroid. There is no vector layer of its own. Patterns are used instead
+  # of exact names because the prod API lowercases the Excel headers
+  # (UID -> uid, SWB_UID -> swb_uid, Latitude -> latitude).
   - name: mws_swb_uid_not_null
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: mws_swb_schema_present
-    applies_to: [excel, vector]
+  # MWS and water body IDs and the centroid must all be present.
+  # Waterbodies_name is mostly null on prod (only census-matched SWBs have it).
+  - name: mws_swb_mws_uid_present
+    applies_to: [excel]
     type: required_any_field_pattern
     value:
-      - "SWB_UID"
-      - "Waterbodies_name"
-      - "Latitude"
-      - "Longitude"
+      - "uid"
 
-  - name: mws_swb_latitude_type
-    applies_to: [excel, vector]
-    type: data_type
-    field: Latitude
-    expected_type: numeric
-    allow_missing_fields: true
+  - name: mws_swb_swb_uid_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "swb_uid"
 
-  - name: mws_swb_longitude_type
-    applies_to: [excel, vector]
+  - name: mws_swb_latitude_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "latitude"
+
+  - name: mws_swb_longitude_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "longitude"
+
+  # Centroid coordinates: numeric, non-null, inside India's bounding box
+  # (lat 6..38, lon 68..98) rather than the whole globe.
+  - name: mws_swb_coord_type
+    applies_to: [excel]
     type: data_type
-    field: Longitude
+    field_pattern: "l*itude"
     expected_type: numeric
-    allow_missing_fields: true
+
+  - name: mws_swb_coord_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "l*itude"
 
   - name: mws_swb_latitude_min
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: min_value
-    field: Latitude
-    value: -90
-    allow_missing_fields: true
+    field_pattern: "latitude"
+    value: 6
 
   - name: mws_swb_latitude_max
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: max_value
-    field: Latitude
-    value: 90
-    allow_missing_fields: true
+    field_pattern: "latitude"
+    value: 38
 
   - name: mws_swb_longitude_min
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: min_value
-    field: Longitude
-    value: -180
-    allow_missing_fields: true
+    field_pattern: "longitude"
+    value: 68
 
   - name: mws_swb_longitude_max
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: max_value
-    field: Longitude
-    value: 180
-    allow_missing_fields: true
+    field_pattern: "longitude"
+    value: 98

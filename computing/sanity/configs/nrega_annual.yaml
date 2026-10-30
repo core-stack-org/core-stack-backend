@@ -3,30 +3,82 @@ sheet_names:
   - nrega_annual
 
 rules:
-  # Source: STAC NREGA Works vector metadata and stats-generator annual export.
-  - name: nrega_mws_id_not_null
-    applies_to: [excel, vector]
-    type: not_null
-    field_pattern: "*id"
+  # Source: NREGA asset point layer (nrega_assets/<district>_<block>) and
+  # stats-generator create_excel_for_nrega_assets, which joins the points to
+  # MWS polygons and counts assets per mws_id, category and creation year.
+  # The vector rules check the point fields that export depends on; the Excel
+  # rules check the per-MWS counts.
 
-  - name: nrega_schema_present
-    applies_to: [excel, vector]
+  # Vector: asset id, creation time and work category (field names differ
+  # between layer versions: creation_t/creation_time, WorkCatego/WorkCategory).
+  - name: nrega_vector_asset_id_present
+    applies_to: [vector]
     type: required_any_field_pattern
-    value:
-      - "*_count_*"
-      - "WorkCatego"
-      - "Asset ID"
+    value: ["asset*id"]
 
-  - name: nrega_count_type
-    applies_to: [excel, vector]
+  - name: nrega_vector_creation_time_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value: ["creation_t*"]
+
+  - name: nrega_vector_work_category_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value: ["WorkCatego*"]
+
+  - name: nrega_vector_asset_id_not_null
+    applies_to: [vector]
+    type: not_null
+    field_pattern: "asset*id"
+
+  # Assets without a parseable creation time are silently skipped by the export.
+  - name: nrega_vector_creation_time_not_null
+    applies_to: [vector]
+    type: not_null
+    field_pattern: "creation_t*"
+
+  # Categories the export maps (prod spells "Agri Impact - HH,  Community" with
+  # two spaces; the export's annual mapping uses one) plus "Un Identified".
+  - name: nrega_vector_work_category_allowed_values
+    applies_to: [vector]
+    type: allowed_values
+    field_pattern: "WorkCatego*"
+    value:
+      - "SWC - Landscape level impact"
+      - "Agri Impact - HH, Community"
+      - "Agri Impact - HH,  Community"
+      - "Plantation"
+      - "Irrigation - Site level impact"
+      - "Irrigation Site level - Non RWH"
+      - "Household Livelihood"
+      - "Others - HH, Community"
+      - "Un Identified"
+
+  # Excel: one row per MWS with <category>_count_<year> columns.
+  - name: nrega_excel_mws_id_present
+    applies_to: [excel]
+    type: required_fields
+    value: [mws_id]
+
+  - name: nrega_excel_count_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value: ["*_count_*"]
+
+  - name: nrega_excel_mws_id_not_null
+    applies_to: [excel]
+    type: not_null
+    field: mws_id
+
+  # Excel: asset counts are non-negative numbers.
+  - name: nrega_excel_count_type
+    applies_to: [excel]
     type: data_type
     field_pattern: "*_count_*"
     expected_type: numeric
-    allow_missing_fields: true
 
-  - name: nrega_count_min
-    applies_to: [excel, vector]
+  - name: nrega_excel_count_min
+    applies_to: [excel]
     type: min_value
     field_pattern: "*_count_*"
     value: 0
-    allow_missing_fields: true

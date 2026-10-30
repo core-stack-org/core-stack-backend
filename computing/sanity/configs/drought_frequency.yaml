@@ -9,28 +9,60 @@ rules:
     field_pattern: "*uid*"
     applies_to: [excel, vector]
 
-  # Vector schema check from STAC Drought frequency vector table:columns.
-  - name: drought_vector_schema_present
+  # Vector schema checks from computing/drought/merge_layers.py. Each key family
+  # is required on its own: drlb_* (weekly drought class list) drives the
+  # Excel week counts, pcr_k_*/kh_cr_* are the kharif crop metrics and drysp_*
+  # the dry-spell counts.
+  - name: drought_vector_drlb_present
     type: required_any_field_pattern
     value:
       - "drlb_*"
+    applies_to: [vector]
+
+  - name: drought_vector_dryspell_present
+    type: required_any_field_pattern
+    value:
       - "drysp_*"
-      - "frth*"
-      - "inth*"
-      - "kh_cr_*"
+    applies_to: [vector]
+
+  - name: drought_vector_crop_percent_present
+    type: required_any_field_pattern
+    value:
       - "pcr_k_*"
     applies_to: [vector]
 
-  # Excel schema check from stats-generator croppingDrought_kharif export.
-  - name: drought_excel_schema_present
+  - name: drought_vector_crop_area_present
+    type: required_any_field_pattern
+    value:
+      - "kh_cr_*"
+    applies_to: [vector]
+
+  # Excel schema checks from stats-generator croppingDrought_kharif export.
+  - name: drought_excel_weeks_present
     type: required_any_field_pattern
     value:
       - "No_Drought_in_weeks_*"
       - "Mild_in_weeks_*"
       - "Moderate_in_weeks_*"
       - "Severe_in_weeks_*"
+    applies_to: [excel]
+
+  - name: drought_excel_dryspell_present
+    type: required_any_field_pattern
+    value:
       - "drysp_unit_4_weeks_*"
+    applies_to: [excel]
+
+  - name: drought_excel_crop_percent_present
+    type: required_any_field_pattern
+    value:
       - "kharif_cropped_area_percent_*"
+    applies_to: [excel]
+
+  - name: drought_excel_crop_area_present
+    type: required_any_field_pattern
+    value:
+      - "kharif_cropped_sqkm_*"
     applies_to: [excel]
 
   # Vector numeric columns include frequency/intensity/count/crop metrics.
@@ -48,6 +80,7 @@ rules:
     applies_to: [vector]
 
   # Excel numeric columns include weekly class counts and crop-area metrics.
+  # The export fills missing years with the string "0", which reads as 0.
   - name: drought_excel_numeric_type
     type: data_type
     field_pattern: "*"
@@ -83,6 +116,15 @@ rules:
     allow_missing_fields: true
     applies_to: [excel]
 
+  # Rainfall deviation (rdYY-MM-DD) is a percent departure from normal, so it
+  # cannot fall below -100 (no rain). It has no upper bound.
+  - name: drought_vector_rainfall_deviation_min
+    type: min_value
+    field_pattern: "rd*"
+    value: -100
+    allow_missing_fields: true
+    applies_to: [vector]
+
   # Percent columns are bounded; rainfall-deviation columns are excluded above.
   - name: drought_vector_percent_max
     type: max_value
@@ -97,3 +139,49 @@ rules:
     value: 100
     allow_missing_fields: true
     applies_to: [excel]
+
+  # Week counts (per-class weeks, threshold frequencies, total weeks, dry
+  # spells) are counted within one year, so none can exceed 53.
+  - name: drought_vector_class_weeks_max
+    type: max_value
+    field_pattern: "w_*"
+    value: 53
+    allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: drought_vector_frequency_weeks_max
+    type: max_value
+    field_pattern: "frth*"
+    value: 53
+    allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: drought_vector_total_weeks_max
+    type: max_value
+    field_pattern: "t_wks_*"
+    value: 53
+    allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: drought_vector_dryspell_max
+    type: max_value
+    field_pattern: "drysp_*"
+    value: 53
+    allow_missing_fields: true
+    applies_to: [vector]
+
+  - name: drought_excel_weeks_max
+    type: max_value
+    field_pattern: "*weeks_*"
+    value: 53
+    allow_missing_fields: true
+    applies_to: [excel]
+
+  # Intensity (inth*) is a mean drought class, and classes run 0 (none) to
+  # 3 (severe).
+  - name: drought_vector_intensity_max
+    type: max_value
+    field_pattern: "inth*"
+    value: 3
+    allow_missing_fields: true
+    applies_to: [vector]

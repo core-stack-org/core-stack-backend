@@ -3,26 +3,67 @@ sheet_names:
   - livestock
 
 rules:
-  # Source: stats-generator village-level livestock export.
-  - name: livestock_village_id_not_null
-    applies_to: [excel, vector]
-    type: not_null
-    field: pc11_village_id
+  # Source: computing/misc/livestocks (livestocks_pipeline.yaml count_columns)
+  # and stats-generator create_excel_for_livestock, which drops rows without a
+  # village_id, drops the *_male/*_female columns and renames livestock_status.
 
+  # Key fields in both forms: village id and the per-species and group totals.
   - name: livestock_schema_present
     applies_to: [excel, vector]
-    type: required_any_field_pattern
+    type: required_fields
     value:
-      - "cattle_total"
-      - "buffalo_total"
-      - "goat_total"
+      - village_id
+      - all_livestock_total
+      - large_animals_total
+      - small_animals_total
+      - cattle_total
+      - buffalo_total
+      - sheep_total
+      - goat_total
+      - pig_total
 
-  - name: livestock_count_min
+  # Vector rows for admin polygons without a village id legitimately carry a
+  # null village_id (livestock_status = "no village id available"); the Excel
+  # export drops them, so village_id must be set there.
+  - name: livestock_excel_village_id_not_null
+    applies_to: [excel]
+    type: not_null
+    field: village_id
+
+  - name: livestock_vector_status_allowed_values
+    applies_to: [vector]
+    type: allowed_values
+    field: livestock_status
+    value: ["matched", "no village id available", "no data available for this village"]
+
+  - name: livestock_excel_status_allowed_values
+    applies_to: [excel]
+    type: allowed_values
+    field: data_availability_status
+    value: ["matched", "no data available for this village"]
+
+  # Head counts are non-negative numbers. Totals are 0 (not null) for
+  # unmatched villages; the vector's *_male/*_female splits stay null there.
+  - name: livestock_total_type
+    applies_to: [excel, vector]
+    type: data_type
+    field_pattern: "*_total"
+    expected_type: numeric
+
+  - name: livestock_total_min
     applies_to: [excel, vector]
     type: min_value
-    field_pattern: "*"
+    field_pattern: "*_total"
     value: 0
-    exclude_field_patterns:
-      - "NAME"
-      - "*id"
-    allow_missing_fields: true
+
+  - name: livestock_vector_sex_split_type
+    applies_to: [vector]
+    type: data_type
+    field_pattern: "*male"
+    expected_type: numeric
+
+  - name: livestock_vector_sex_split_min
+    applies_to: [vector]
+    type: min_value
+    field_pattern: "*male"
+    value: 0

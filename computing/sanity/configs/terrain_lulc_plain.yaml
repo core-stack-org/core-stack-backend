@@ -4,26 +4,146 @@ sheet_names:
 
 rules:
   # Source: terrain and LULC cross-tab stats-generator export.
+  # Every MWS row needs its identifier in both forms.
   - name: terrain_lulc_plain_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: terrain_lulc_plain_schema_present
+  # Area is carried through unchanged from the MWS layer in both forms.
+  - name: terrain_lulc_plain_area_type
     applies_to: [excel, vector]
-    type: required_any_field_pattern
-    value:
-      - "terrain_cluster_id"
-      - "*_area_percent"
+    type: data_type
+    field: area_in_ha
+    expected_type: numeric
 
-  - name: terrain_lulc_plain_percent_min
+  - name: terrain_lulc_plain_area_min
     applies_to: [excel, vector]
+    type: min_value
+    field: area_in_ha
+    value: 0
+
+  # Vector: lulc_on_plain_cluster(_local).py writes the terrain cluster, the
+  # LULC-on-plains cluster (LxP_cluster, -1 when no plain/slope pixels) with its
+  # name, and seven LULC class shares as percent of plain+slope area.
+  - name: terrain_lulc_plain_vector_schema_present
+    applies_to: [vector]
+    type: required_fields
+    value:
+      - area_in_ha
+      - terrain_cluster
+      - LxP_cluster
+      - clust_name
+      - barren
+      - double_crop
+      - shrubs_scrubs
+      - sing_crop
+      - sing_non_kharif_crop
+      - forest
+      - triple_crop
+
+  # Plains clusters exclude terrain cluster 2 (hills and valleys); -1 is the
+  # terrain layer's no-data cluster.
+  - name: terrain_lulc_plain_vector_terrain_cluster_allowed
+    applies_to: [vector]
+    type: allowed_values
+    field: terrain_cluster
+    value: [-1, 0, 1, 3]
+
+  - name: terrain_lulc_plain_vector_lxp_cluster_type
+    applies_to: [vector]
+    type: data_type
+    field: LxP_cluster
+    expected_type: integer
+
+  - name: terrain_lulc_plain_vector_lxp_cluster_min
+    applies_to: [vector]
+    type: min_value
+    field: LxP_cluster
+    value: -1
+
+  - name: terrain_lulc_plain_vector_cluster_name_not_null
+    applies_to: [vector]
+    type: not_null
+    field: clust_name
+
+  - name: terrain_lulc_plain_vector_percent_not_null
+    applies_to: [vector]
+    type: not_null
+    fields: [barren, double_crop, shrubs_scrubs, sing_crop, sing_non_kharif_crop, forest, triple_crop]
+
+  - name: terrain_lulc_plain_vector_percent_type
+    applies_to: [vector]
+    type: data_type
+    fields: [barren, double_crop, shrubs_scrubs, sing_crop, sing_non_kharif_crop, forest, triple_crop]
+    expected_type: numeric
+
+  - name: terrain_lulc_plain_vector_percent_min
+    applies_to: [vector]
+    type: min_value
+    fields: [barren, double_crop, shrubs_scrubs, sing_crop, sing_non_kharif_crop, forest, triple_crop]
+    value: 0
+
+  - name: terrain_lulc_plain_vector_percent_max
+    applies_to: [vector]
+    type: max_value
+    fields: [barren, double_crop, shrubs_scrubs, sing_crop, sing_non_kharif_crop, forest, triple_crop]
+    value: 100
+
+  # Excel: the export renames the classes to *_area_percent and maps the terrain
+  # cluster to a description (blank for -1).
+  - name: terrain_lulc_plain_excel_schema_present
+    applies_to: [excel]
+    type: required_fields
+    value:
+      - area_in_ha
+      - terrain_cluster_id
+      - terrain_description
+      - cluster_name
+      - barren_area_percent
+      - forests_area_percent
+      - shrub_scrubs_area_percent
+      - single_non_kharif_area_percent
+      - single_kharif_area_percent
+      - double_cropping_area_percent
+      - triple_cropping_area_percent
+
+  - name: terrain_lulc_plain_excel_terrain_cluster_allowed
+    applies_to: [excel]
+    type: allowed_values
+    field: terrain_cluster_id
+    value: [-1, 0, 1, 3]
+
+  - name: terrain_lulc_plain_excel_terrain_description_allowed
+    applies_to: [excel]
+    type: allowed_values
+    field: terrain_description
+    value: [Broad Sloppy and Hilly, Mostly Plains, Broad Plains and Slopes]
+
+  - name: terrain_lulc_plain_excel_cluster_name_not_null
+    applies_to: [excel]
+    type: not_null
+    field: cluster_name
+
+  - name: terrain_lulc_plain_excel_percent_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "*_area_percent"
+
+  - name: terrain_lulc_plain_excel_percent_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*_area_percent"
+    expected_type: numeric
+
+  - name: terrain_lulc_plain_excel_percent_min
+    applies_to: [excel]
     type: min_value
     field_pattern: "*_area_percent"
     value: 0
 
-  - name: terrain_lulc_plain_percent_max
-    applies_to: [excel, vector]
+  - name: terrain_lulc_plain_excel_percent_max
+    applies_to: [excel]
     type: max_value
     field_pattern: "*_area_percent"
     value: 100

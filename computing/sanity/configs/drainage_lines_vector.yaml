@@ -4,28 +4,51 @@ sheet_names:
 
 rules:
   # Source: STAC Drainage Lines vector table:columns.
+  # Vector only: the stats generator has no drainage lines sheet, so these rules
+  # never apply to Excel. Fields come from the Pan-India drainage network
+  # (GRASS r.stream.order output), clipped per tehsil.
   - name: drainage_lines_id_not_null
-    applies_to: [excel, vector]
+    applies_to: [vector]
     type: not_null
     field: id
 
+  # All three stream attributes are needed; drainage density reads ORDER.
   - name: drainage_lines_schema_present
-    applies_to: [excel, vector]
-    type: required_any_field_pattern
+    applies_to: [vector]
+    type: required_fields
     value:
-      - "ORDER"
-      - "stream_typ"
-      - "type_code"
+      - ORDER
+      - stream_typ
+      - type_code
 
+  - name: drainage_lines_order_type
+    applies_to: [vector]
+    type: data_type
+    field: ORDER
+    expected_type: integer
+
+  # Strahler order starts at 1; drainage density only counts orders 1..11.
   - name: drainage_lines_order_min
-    applies_to: [excel, vector]
+    applies_to: [vector]
     type: min_value
-    field_pattern: "ORDER"
-    value: 0
+    field: ORDER
+    value: 1
+
+  - name: drainage_lines_order_max
+    applies_to: [vector]
+    type: max_value
+    field: ORDER
+    value: 11
+
+  # r.stream.order stream types: start (type_code 0) and intermediate (1).
+  - name: drainage_lines_stream_type_allowed
+    applies_to: [vector]
+    type: allowed_values
+    field: stream_typ
+    value: [start, intermediate]
 
   - name: drainage_lines_type_code_allowed
-    applies_to: [excel, vector]
+    applies_to: [vector]
     type: allowed_values
     field: type_code
     value: [0, 1]
-    allow_missing_fields: true

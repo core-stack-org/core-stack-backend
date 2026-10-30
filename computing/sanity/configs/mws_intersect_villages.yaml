@@ -4,21 +4,62 @@ sheet_names:
 
 rules:
   # Source: stats-generator MWS-village intersection export.
+  # Excel only: create_excel_mws_inters_villages writes one row per MWS that
+  # intersects at least one village (MWS UID, area_in_ha, Village IDs,
+  # Village Details). There is no vector layer of its own. Patterns are used
+  # instead of exact names because the prod API lowercases the headers
+  # (MWS UID -> mws uid).
   - name: mws_village_uid_not_null
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: not_null
-    field: MWS UID
+    field_pattern: "mws uid"
 
-  - name: mws_village_schema_present
-    applies_to: [excel, vector]
+  # All four columns must be present.
+  - name: mws_village_uid_present
+    applies_to: [excel]
     type: required_any_field_pattern
     value:
-      - "Village IDs"
-      - "Village Details"
+      - "mws uid"
+
+  - name: mws_village_ids_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "village ids"
+
+  - name: mws_village_details_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "village details"
+
+  # Rows exist only for MWS with intersecting villages, so the village
+  # columns are never empty.
+  - name: mws_village_lists_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "village *"
+
+  # MWS area in hectares: numeric, non-null, never negative.
+  - name: mws_village_area_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "area_in_ha"
+
+  - name: mws_village_area_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "area_in_ha"
+    expected_type: numeric
+
+  - name: mws_village_area_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "area_in_ha"
 
   - name: mws_village_area_min
-    applies_to: [excel, vector]
+    applies_to: [excel]
     type: min_value
-    field: area_in_ha
+    field_pattern: "area_in_ha"
     value: 0
-    allow_missing_fields: true
