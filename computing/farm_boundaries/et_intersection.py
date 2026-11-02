@@ -62,6 +62,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import rasterio
 import rasterio.merge
+from rasterio.windows import Window
 from shapely.geometry import box
 
 from utilities.constants import (
@@ -69,6 +70,7 @@ from utilities.constants import (
     FARM_BOUNDARIES_PATH,
     LOCAL_ET_RASTERS_PATH,
     SOI_TEHSIL,
+    LulcClass,
 )
 
 logger = logging.getLogger(__name__)
@@ -614,16 +616,131 @@ def _extract_all_farms(gdf, band_data, transform, label):
     return means
 
 
+def compute_farm_cropping_intensity(farms_gdf, years, lulc_dir=None):
+    """
+    Per-farm cropping intensity for each agri year in `years`, as a DataFrame
+    (farm_id, year, crop_intensity). Same formula and denominator as the watershed
+    pipeline (cropping_intensity_local):
+        (single + 2*double + 3*triple) / area ever cropped (initial year..last year read)
+
+    Farm-scale version of the watershed pipeline: each yearly LULC raster is
+    read once, as a single in-memory window over all farms, and each farm's
+    pixel overlap weights (exact shapely overlap areas, as for AET/PET) are
+    computed once and reused for every year.
+
+    LULC rasters are read from the initial year upwards and reading stops at the
+    first missing year: that year and later ones get NaN (all years, if even the
+    first raster is missing), and the denominator uses the rasters found. Farms
+    never cropped in any year, or lying outside the raster, get 0.0.
+    """
+    # lazy: the helper module imports Django-dependent modules
+    from computing.local_compute_helper import (
+        ALL_CROP_CLASSES,
+        CROPPING_INTENSITY_INITIAL_YEAR,
+        LULC_BASE_DIR,
+        SINGLE_CROP_CLASSES,
+        compute_cropping_intensity,
+        resolve_lulc_raster_paths,
+    )
+
+    lulc_dir = LULC_BASE_DIR if lulc_dir is None else lulc_dir
+    initial_year = CROPPING_INTENSITY_INITIAL_YEAR
+    years = sorted(int(y) for y in years)
+    farms = farms_gdf[["farm_id", "geometry"]].reset_index(drop=True)
+    n_farms = len(farms)
+    if farms.crs is None:
+        raise ValueError("Farm CRS is missing; cannot align with LULC rasters.")
+
+    areas = {}           # year -> per-farm (single, double, triple) weighted area
+    ever_cropped = None  # bool array over the window: cropped in any year read so far
+    ref = None           # grid + window fixed by the first raster, reused for all years
+    outside_raster = False
+    farm_idx = rows = cols = w = None
+
+    for year in range(initial_year, years[-1] + 1):
+        try:
+            raster_path = resolve_lulc_raster_paths(year, year, lulc_dir)[0]
+        except FileNotFoundError:
+            print(f"LULC raster for {year}-{year + 1} not found - stopping; later years get null")
+            break
+
+        with rasterio.open(raster_path) as src:
+            if ref is None:
+                farms_r = farms.to_crs(src.crs) if src.crs and farms.crs != src.crs else farms
+                win = src.window(*farms_r.total_bounds)
+                col0 = max(int(np.floor(win.col_off)), 0)
+                row0 = max(int(np.floor(win.row_off)), 0)
+                col1 = min(int(np.ceil(win.col_off + win.width)), src.width)
+                row1 = min(int(np.ceil(win.row_off + win.height)), src.height)
+                if col1 <= col0 or row1 <= row0:
+                    print("Farms lie outside the LULC raster - cropping intensity is 0.0 for all farms")
+                    outside_raster = True
+                    break
+                window = Window(col0, row0, col1 - col0, row1 - row0)
+                shape = (row1 - row0, col1 - col0)
+                ref = (src.transform, (src.height, src.width), window)
+                transform = src.window_transform(window)
+
+                # one-time per farm: flat (farm, row, col, weight) arrays reused for every year
+                f_idx, f_rows, f_cols, f_w = [], [], [], []
+                for i, geom in enumerate(farms_r.geometry):
+                    if geom is None or geom.is_empty:
+                        continue
+                    r0, r1, c0, c1 = _farm_pixel_window(geom, transform, *shape)
+                    for r, c, weight in _farm_pixel_weights(geom, transform, r0, r1, c0, c1):
+                        f_idx.append(i)
+                        f_rows.append(r)
+                        f_cols.append(c)
+                        f_w.append(weight)
+                    if (i + 1) % 10000 == 0 or (i + 1) == n_farms:
+                        print(f"Computed LULC pixel weights for {i + 1}/{n_farms} farms")
+                farm_idx = np.asarray(f_idx, dtype=np.int64)
+                rows = np.asarray(f_rows, dtype=np.int64)
+                cols = np.asarray(f_cols, dtype=np.int64)
+                w = np.asarray(f_w, dtype=np.float64)
+                # drop float-noise slivers where a farm edge sits exactly on a pixel edge
+                keep = w > 1e-6 * abs(transform.a * transform.e)
+                farm_idx, rows, cols, w = farm_idx[keep], rows[keep], cols[keep], w[keep]
+                ever_cropped = np.zeros(shape, dtype=bool)
+            elif (src.transform, (src.height, src.width)) != ref[:2]:
+                raise ValueError(
+                    f"LULC raster {raster_path} is not on the same grid as the first raster."
+                )
+            lulc = src.read(1, window=ref[2])
+
+        print(f"Computing farm cropping intensity inputs for {year}-{year + 1}")
+        vals = lulc[rows, cols]
+        areas[year] = (
+            np.bincount(farm_idx, weights=w * np.isin(vals, SINGLE_CROP_CLASSES), minlength=n_farms),
+            np.bincount(farm_idx, weights=w * (vals == LulcClass.DOUBLE_CROPPING), minlength=n_farms),
+            np.bincount(farm_idx, weights=w * (vals == LulcClass.TRIPLE_ANNUAL_PERENNIAL), minlength=n_farms),
+        )
+        ever_cropped |= np.isin(lulc, ALL_CROP_CLASSES)
+
+    if ref is not None:
+        denominator = np.bincount(farm_idx, weights=w * ever_cropped[rows, cols], minlength=n_farms)
+    else:
+        denominator = np.zeros(n_farms)
+
+    frames = []
+    for year in years:
+        if year in areas:
+            intensity = compute_cropping_intensity(*areas[year], denominator)   # never cropped -> 0.0
+        elif outside_raster and year >= initial_year:
+            intensity = np.zeros(n_farms)          # farms outside the raster -> 0.0
+        else:
+            intensity = np.full(n_farms, np.nan)   # no LULC raster for this year -> null
+        frames.append(
+            pd.DataFrame({"farm_id": farms["farm_id"].values, "year": year, "crop_intensity": intensity})
+        )
+    return pd.concat(frames, ignore_index=True)
+
+
 def _crop_intensity_by_year(farms_gdf, years):
     """
     {year: per-farm crop_intensity (4 dp, row order of farms_gdf)}; NaN for years
     with no LULC raster. Needs only the LULC rasters and the farm geometries.
     """
-    # lazy: cropping_intensity_local imports Django-dependent modules
-    from computing.cropping_intensity.cropping_intensity_local import (
-        compute_farm_cropping_intensity,
-    )
-
     ci = compute_farm_cropping_intensity(farms_gdf, years)
     return {int(y): g["crop_intensity"].round(4).to_numpy() for y, g in ci.groupby("year")}
 
