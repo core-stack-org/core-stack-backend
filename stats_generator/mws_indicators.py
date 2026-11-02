@@ -655,9 +655,10 @@ def generate_mws_data_for_kyl_filters(
                     avg_dry_spell_in_weeks = -9999
                     max_dry_spell_weeks = -9999
                     max_drought_weeks = -9999
-                    
+
                     layers = LayerInfo.objects.get(
-                        layer_type="vector", workspace="drought"
+                        layer_type="vector",
+                        workspace__in=["drought", "cropping_drought"],
                     )
                     years = [
                         str(year)
