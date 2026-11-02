@@ -10,7 +10,7 @@ from utilities.gee_utils import (
 
 
 def generate_drought_resistance(
-        aez, start_year=2004, end_year=None, gee_account_id=None
+    aez, start_year=2004, end_year=None, gee_account_id=None
 ):
     """
     * Forest Sensitivity Analysis Pipeline — Script 2
@@ -22,8 +22,10 @@ def generate_drought_resistance(
     * compute_spei.R — selected directly by that name here, not by a
     * positional rename.
     *
-    * For each forest pixel, computes mean resistance and resilience
-    * across all drought years (SPEI-12 < threshold).
+    * For each forest pixel and drought year that has a next-year kNDVI,
+    * stores signed resistance, signed resilience, and the yearly class.
+    * A year without Ye+1 is not scored, including resistance.
+    * classify_drought_metrics averages the yearly class numbers.
     *
     * Harmonization: Transforms Landsat 8/9 (OLI) to Landsat 5/7 (ETM+)
     * equivalent before computing kNDVI to eliminate sensor-shift bias.
@@ -31,8 +33,9 @@ def generate_drought_resistance(
     * Signed resistance (both +ve and -ve events):
     * Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
     *
-    * Resilience computed ONLY when Ye < Yn_bar (negative effect years):
     * Resilience = |Ye - Yn_bar| / |Ye+1 - Yn_bar| × sign(Ye+1 - Yn_bar)
+    * Stored only when Ye / Yn_bar < 0.95. Otherwise the resilience class
+    * is 0. The class comes from the kNDVI ratios.
     *
     * Requires:
     * - Forest mask asset from Script 1
@@ -47,16 +50,14 @@ def generate_drought_resistance(
             "cannot infer a safe default."
         )
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
     OUTPUT_DESC = f"Drought_Metrics_AEZ_{aez}"
-    OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/hazards/{OUTPUT_DESC}"
-    )
+    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/drought_Rt_Re/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
-        return None
+        return None, OUTPUT_ASSET_ID
 
-    DROUGHT_THRESHOLD = -1.0  # SPEI-12 below this = drought year
+    DROUGHT_THRESHOLD = -1.0  # SPEI-3 JAS below this = drought year
 
     # Fixed baseline window. This is independent of analysis START_YEAR/END_YEAR.
     # Please don't EVER change this once results are published, or old outputs will change when the pipeline timeline is extended.
@@ -69,6 +70,8 @@ def generate_drought_resistance(
 
     kndviMinYear = min(start_year, BASELINE_START_YEAR)
     kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+    # Last scored year is the last year whose next year is fetched.
+    metric_end_year = min(end_year, kndviMaxYear - 1)
 
     # kndviMaxYear is the furthest single ag-year fetched anywhere in this
     # script; that ag-year isn't complete until Jun 30 of kndviMaxYear+1.
@@ -80,24 +83,22 @@ def generate_drought_resistance(
             f"{date.today().isoformat()}. Reduce end_year."
         )
 
-    SPEI12_ASSET = (
-        "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/SPEI12"
-    )
+    SPEI3_ASSET = "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/SPEI3"
 
     if not is_gee_asset_exists(TREE_COVER_ASSET):
         raise ValueError(
             f"Tree cover asset not found: {TREE_COVER_ASSET}. Run "
             f"generate_hybrid_tree_mask with end_year={end_year} first."
         )
-    if not is_gee_asset_exists(SPEI12_ASSET):
-        raise ValueError(f"SPEI-12 asset not found: {SPEI12_ASSET}.")
+    if not is_gee_asset_exists(SPEI3_ASSET):
+        raise ValueError(f"SPEI-3 asset not found: {SPEI3_ASSET}.")
 
-    requiredSpeiBands = {f"y{y}_{y + 1}" for y in range(speiMinYear, speiMaxYear + 1)}
-    availableSpeiBands = set(ee.Image(SPEI12_ASSET).bandNames().getInfo())
+    requiredSpeiBands = {f"y{y}_m07_09" for y in range(speiMinYear, speiMaxYear + 1)}
+    availableSpeiBands = set(ee.Image(SPEI3_ASSET).bandNames().getInfo())
     missingSpeiBands = sorted(requiredSpeiBands - availableSpeiBands)
     if missingSpeiBands:
         raise ValueError(
-            f"{SPEI12_ASSET} is missing bands: {missingSpeiBands}. Re-run the "
+            f"{SPEI3_ASSET} is missing bands: {missingSpeiBands}. Re-run the "
             f"SPEI pipeline with start_year<=2004 and end_year>={speiMaxYear}."
         )
 
@@ -107,21 +108,22 @@ def generate_drought_resistance(
     #     .filter(ee.Filter.eq("Name", "Odisha"))
     #     .geometry()
     # )
+    # Loading the assets :=
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
 
     startYear = treeMeta.select("start_year")
     endYear = treeMeta.select("end_year")
 
-    # Load SPEI-12 collection from single multiband asset. Bands are named
-    # "{y}_{y+1}" by compute_spei.R (e.g. "2004_2005" for ag-year 2004) —
+    # Load SPEI-3 collection from single multiband asset. SPEI-3 ending
+    # September = July–August–September, band "y{y}_m07_09" for ag-year y —
     # select directly by that name rather than assuming band order.
-    spei12_raw = ee.Image(SPEI12_ASSET)
+    spei3_raw = ee.Image(SPEI3_ASSET)
 
     speiImages = []
     for y in range(speiMinYear, speiMaxYear + 1):
         speiImages.append(
-            spei12_raw.select(f"y{y}_{y + 1}").rename("spei").set("year", y)
+            spei3_raw.select(f"y{y}_m07_09").rename("spei").set("year", y)
         )
     speiCol = ee.ImageCollection(speiImages)
 
@@ -216,7 +218,7 @@ def generate_drought_resistance(
 
     # The analysis years will still remain the same, so if some internal year width is given like 2010-2018 for example
     # then too the baseline yn_bar would be same of the bigger normalization. But the analysis will be resulting only of the analysis years.
-    analysisYears = ee.List.sequence(start_year, end_year)
+    analysisYears = ee.List.sequence(start_year, metric_end_year)
 
     baselineYears = ee.List.sequence(BASELINE_START_YEAR, BASELINE_END_YEAR)
 
@@ -254,47 +256,139 @@ def generate_drought_resistance(
         isDrought = speiYe.lt(DROUGHT_THRESHOLD)
         eventMask = isForest.And(isDrought)
 
+        kndviNext = kndviCol.filter(ee.Filter.eq("year", year.add(1))).first()
+        scored = eventMask.updateMask(kndviNext.mask())
+
         diffRaw = kndviYe.subtract(Yn_bar)
         diffAbs = diffRaw.abs().max(1e-6)
+        diffNext = kndviNext.subtract(Yn_bar)
+        diffNextAbs = diffNext.abs().max(1e-6)
+        ratio = kndviYe.divide(Yn_bar)
+        ratioNext = kndviNext.divide(Yn_bar)
+        deepDrop = ratio.lt(0.95)
 
-        # Resistance: signed, computed for ALL drought years
         resistance = (
             Yn_bar.divide(diffAbs)
             .multiply(diffRaw.signum())
             .rename("resistance")
-            .updateMask(eventMask)
+            .updateMask(scored)
         )
-
-        # Resilience: ONLY computed when Ye < Yn_bar (negative effect years)
-        isNegativeEffect = kndviYe.lt(Yn_bar)
-        resilMask = eventMask.And(isNegativeEffect)
-
-        kndviNext = kndviCol.filter(ee.Filter.eq("year", year.add(1))).first()
-        diffNext = kndviNext.subtract(Yn_bar)
-        diffNextAbs = diffNext.abs().max(1e-6)
-
         resilience = (
             diffAbs.divide(diffNextAbs)
             .multiply(diffNext.signum())
             .rename("resilience")
-            .updateMask(resilMask)
+            .updateMask(scored.And(deepDrop))
+        )
+        resistance_class = (
+            _resistance_class(ratio).rename("resistance_class").updateMask(scored)
+        )
+        resilience_class = (
+            _resilience_class(ratio, ratioNext, kndviYe, kndviNext)
+            .rename("resilience_class")
+            .updateMask(scored)
         )
 
-        return ee.Image.cat([resistance, resilience]).set("year", year)
+        return ee.Image.cat(
+            [resistance, resilience, resistance_class, resilience_class]
+        ).set("year", year)
 
     metricsCol = ee.ImageCollection(analysisYears.map(calc_metrics_col))
 
-    # AGGREGATE & EXPORT :=
-
-    meanResistance = metricsCol.select("resistance").mean().clip(aoi)
-    meanResilience = metricsCol.select("resilience").mean().clip(aoi)
-
-    finalOutput = meanResistance.rename("resistance").addBands(
-        meanResilience.rename("resilience")
-    )
+    yearly_bands = []
+    for yy in range(start_year, metric_end_year + 1):
+        year_img = ee.Image(metricsCol.filter(ee.Filter.eq("year", yy)).first())
+        yearly_bands.append(year_img.select("resistance").rename(f"resistance_{yy}"))
+        yearly_bands.append(year_img.select("resilience").rename(f"resilience_{yy}"))
+        yearly_bands.append(
+            year_img.select("resistance_class").rename(f"resistance_class_{yy}")
+        )
+        yearly_bands.append(
+            year_img.select("resilience_class").rename(f"resilience_class_{yy}")
+        )
+    finalOutput = ee.Image.cat(yearly_bands).clip(aoi)
 
     task_id = export_raster_asset_to_gee(
         finalOutput, OUTPUT_DESC, OUTPUT_ASSET_ID, scale=30, region=aoi
     )
 
-    return task_id
+    return task_id, OUTPUT_ASSET_ID
+
+
+def _resistance_class(ratio):
+    """Class from Ye/Yn. Lower edge included, upper edge excluded."""
+    return (
+        ee.Image(1)
+        .where(ratio.gte(0.95), 2)
+        .where(ratio.gte(1), 3)
+        .where(ratio.gte(1.05), 4)
+        .toInt16()
+    )
+
+
+def _resilience_class(ratio, ratio_next, kndvi_ye, kndvi_next):
+    """Class from the two ratios. Class 0 means resilience is not computed."""
+    deep_drop = ratio.lt(0.95)
+    return (
+        ee.Image(0)
+        .where(deep_drop.And(ratio_next.lt(0.95)).And(kndvi_next.lte(kndvi_ye)), 1)
+        .where(deep_drop.And(ratio_next.lt(0.95)).And(kndvi_next.gt(kndvi_ye)), 2)
+        .where(deep_drop.And(ratio_next.gte(0.95)).And(ratio_next.lt(1)), 3)
+        .where(deep_drop.And(ratio_next.gte(1)).And(ratio_next.lt(1.05)), 4)
+        .where(deep_drop.And(ratio_next.gte(1.05)), 5)
+        .toInt16()
+    )
+
+
+def _round_half_up(image):
+    return image.add(0.5).floor().toInt16()
+
+
+def _mean_classes(img, start_year, end_year):
+    resist, resil = [], []
+    for year in range(start_year, end_year + 1):
+        resist.append(img.select(f"resistance_class_{year}").rename("class"))
+        resilience_year = img.select(f"resilience_class_{year}").rename("class")
+        resil.append(resilience_year.updateMask(resilience_year.gt(0)))
+    resistance_class = _round_half_up(ee.ImageCollection(resist).mean()).rename(
+        "resistance_class"
+    )
+    resilience_class = (
+        _round_half_up(ee.ImageCollection(resil).mean())
+        .unmask(0)
+        .updateMask(resistance_class.mask())
+        .rename("resilience_class")
+    )
+    return resistance_class.addBands(resilience_class)
+
+
+def classify_drought_metrics(aez, start_year=2004, end_year=None, gee_account_id=None):
+    """Mean yearly drought classes and round half up.
+
+    Resistance uses every scored drought year. Resilience leaves out class 0.
+    If every year is class 0, the pixel is 0. end_year is the last year that
+    has a next-year kNDVI.
+    """
+    ee_initialize(gee_account_id)
+    if end_year is None:
+        raise ValueError("end_year must be specified explicitly.")
+
+    root = "projects/corestack-datasets-alpha/assets/datasets/hazards/drought_Rt_Re"
+    yearly_id = f"{root}/Drought_Metrics_AEZ_{aez}"
+    output_desc = f"Drought_Metrics_ClassMean_AEZ_{aez}"
+    output_id = f"{root}/{output_desc}"
+    if is_gee_asset_exists(output_id):
+        return None
+    if not is_gee_asset_exists(yearly_id):
+        raise ValueError(f"Yearly metrics asset not found: {yearly_id}")
+
+    img = ee.Image(yearly_id)
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
+    final_output = _mean_classes(img, start_year, end_year).clip(aoi)
+    return export_raster_asset_to_gee(
+        final_output, output_desc, output_id, scale=30, region=aoi
+    )

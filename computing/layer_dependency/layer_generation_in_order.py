@@ -65,6 +65,7 @@ from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
 from computing.misc.ndvi_time_series import ndvi_timeseries
 from computing.zoi_layers.zoi import generate_zoi
+from computing.zoi_layers.zoi_local import generate_zoi as generate_zoi_local
 from computing.mws.mws_centroid import generate_mws_centroid_data
 from computing.change_detection.change_detection_local import (
     get_change_detection as get_change_detection_local,
@@ -106,6 +107,7 @@ from computing.misc.digital_elevation_model_local import (
 )
 from computing.misc.drainage_density_local_compute import drainage_density
 from computing.misc.livestocks.pipeline import generate_livestocks_layer_task
+from utilities.pipelines.admin import AdminScopeNotFound
 from computing.misc.river_local_compute import river_vector as river_vector_local
 from computing.misc.factory_csr_local_compute import generate_factory_csr_data_local
 from computing.misc.green_credit_local_compute import generate_green_credit_data_local
@@ -296,6 +298,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_ci_layer": generate_cropping_intensity_local,
     "generate_swb_layer": generate_swb_layer_local,
     "generate_swb": generate_swb_layer_local,
+    "generate_zoi": generate_zoi_local,
+    "generate_zoi_data": generate_zoi_local,
     "get_change_detection": get_change_detection_local,
     "change_detection": get_change_detection_local,
     "vectorise_change_detection": vectorise_change_detection_local,
@@ -356,8 +360,6 @@ LOCAL_TASK_REGISTRY = {
     "soil_health": soil_health_local,
     "generate_soil_type": generate_soil_type_local,
     "soil_type": generate_soil_type_local,
-    "generate_zoi": generate_zoi,
-    "generate_zoi_data": generate_zoi,
     "generate_hydrology": generate_hydrology_local,
     "hydrology_fortnightly": generate_hydrology_fortnightly_local,
     "hydrology_annual": generate_hydrology_annual_local,
@@ -367,8 +369,18 @@ LOCAL_TASK_REGISTRY = {
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
+    # GEE-backed tasks that can be triggered from the local map
+    # (nodes need "pass_gee_account_id": true).
+    "ndvi_timeseries": ndvi_timeseries,
+    "generate_ndvi_timeseries": ndvi_timeseries,
+    "calculate_drought": calculate_drought,
+    "generate_drought_layer": calculate_drought,
     "drought_causality": drought_causality,
     "mws_drought_causality": drought_causality,
+    "generate_stream_order": generate_stream_order,
+    "stream_order": generate_stream_order,
+    "generate_clart_layer": generate_clart_layer,
+    "generate_clart": generate_clart_layer,
 }
 
 TASK_REGISTRIES = {
@@ -806,6 +818,11 @@ def run_layer_with_dependency(
                 logger.warning(
                     f"{node_func_name} returned a falsy result, treating as failed ({log_ctx}): result={result}"
                 )
+        except AdminScopeNotFound as e:
+            status[node_func_name] = False
+            logger.warning(
+                f"Skipping {node_func_name}, location not in admin boundary ({log_ctx}): {e}"
+            )
         except Exception:
             status[node_func_name] = False
             logger.exception(f"{node_func_name} raised an error ({log_ctx})")

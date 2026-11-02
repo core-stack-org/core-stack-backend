@@ -21,8 +21,9 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     * asset (Script 1) is also ag-year, so startYear/endYear comparisons
     * against `year` carry no fuzz.
     *
-    * For each forest pixel, computes mean resistance and resilience
-    * across all high-windspeed ag-years (WSmax > threshold).
+    * For each forest pixel and high-wind year, stores signed resistance
+    * and resilience. classify_wind_metrics averages the yearly class
+    * numbers. A year without Ye+1 is not scored.
     *
     * Harmonization: Transforms Landsat 8/9 (OLI) to Landsat 5/7 (ETM+)
     * equivalent before computing kNDVI to eliminate sensor-shift bias.
@@ -30,8 +31,9 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     * Signed resistance (both +ve and -ve events):
     * Resistance = Yn_bar / |Ye - Yn_bar| × sign(Ye - Yn_bar)
     *
-    * Resilience computed ONLY when Ye < Yn_bar (negative effect years):
     * Resilience = |Ye - Yn_bar| / |Ye+1 - Yn_bar| × sign(Ye+1 - Yn_bar)
+    * Stored only when Ye / Yn_bar < 0.95 and the next year exists.
+    * Otherwise the resilience class is 0. A year without Ye+1 is not scored.
     *
     * Requires:
     * - Forest mask asset from Script 1
@@ -48,16 +50,14 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
             "cannot infer a safe default."
         )
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
-    WIND_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/wind_index_AEZ_{aez}"
+    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    WIND_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/wind_index/wind_index_AEZ_{aez}"
 
     OUTPUT_DESC = f"wind_metrics_harmonized_kNDVI_AEZ_{aez}"
-    OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/hazards/{OUTPUT_DESC}"
-    )
+    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/wind_Rt_Re/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
-        return None
+        return None, OUTPUT_ASSET_ID
 
     WIND_THRESHOLD = 15
 
@@ -73,6 +73,8 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
     kndviMinYear = min(start_year, BASELINE_START_YEAR)
     kndviMaxYear = max(end_year + 1, BASELINE_END_YEAR)
+    # Last scored year is the last year whose next year is fetched.
+    metric_end_year = min(end_year, kndviMaxYear - 1)
 
     # kndviMaxYear is the furthest single ag-year fetched anywhere in this
     # script; that ag-year isn't complete until Jun 30 of kndviMaxYear+1.
@@ -224,7 +226,7 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
     # BASELINE kNDVI (Yn_bar):=
     # Mean kNDVI across non-high-wind ag-years only
 
-    analysisYears = ee.List.sequence(start_year, end_year)
+    analysisYears = ee.List.sequence(start_year, metric_end_year)
 
     # This is my frozen baseline window — the ag-years I use to WORK OUT
     # what Yn_bar (my "normal" kNDVI reference) is, kept separate from
@@ -265,46 +267,139 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
         isHighWind = wsYe.gt(WIND_THRESHOLD)
         eventMask = isForest.And(isHighWind)
 
+        kndviNext = kndviCol.filter(ee.Filter.eq("year", year.add(1))).first()
+        scored = eventMask.updateMask(kndviNext.mask())
+
         diffRaw = kndviYe.subtract(Yn_bar)
         diffAbs = diffRaw.abs().max(1e-6)
+        diffNext = kndviNext.subtract(Yn_bar)
+        diffNextAbs = diffNext.abs().max(1e-6)
+        ratio = kndviYe.divide(Yn_bar)
+        ratioNext = kndviNext.divide(Yn_bar)
+        deepDrop = ratio.lt(0.95)
 
-        # Resistance: signed, computed for ALL high-wind years
         resistance = (
             Yn_bar.divide(diffAbs)
             .multiply(diffRaw.signum())
             .rename("resistance")
-            .updateMask(eventMask)
+            .updateMask(scored)
         )
-
-        # Resilience: ONLY computed when Ye < Yn_bar (negative effect years)
-        isNegativeEffect = kndviYe.lt(Yn_bar)
-        resilMask = eventMask.And(isNegativeEffect)
-
-        kndviNext = kndviCol.filter(ee.Filter.eq("year", year.add(1))).first()
-        diffNext = kndviNext.subtract(Yn_bar)
-        diffNextAbs = diffNext.abs().max(1e-6)
-
         resilience = (
             diffAbs.divide(diffNextAbs)
             .multiply(diffNext.signum())
             .rename("resilience")
-            .updateMask(resilMask)
+            .updateMask(scored.And(deepDrop))
+        )
+        resistance_class = (
+            _resistance_class(ratio).rename("resistance_class").updateMask(scored)
+        )
+        resilience_class = (
+            _resilience_class(ratio, ratioNext, kndviYe, kndviNext)
+            .rename("resilience_class")
+            .updateMask(scored)
         )
 
-        return ee.Image.cat([resistance, resilience]).set("year", year)
+        return ee.Image.cat(
+            [resistance, resilience, resistance_class, resilience_class]
+        ).set("year", year)
 
     metricsCol = ee.ImageCollection(analysisYears.map(calc_metrics_col))
 
-    # AGGREGATE & EXPORT
-    meanResistance = metricsCol.select("resistance").mean().clip(aoi)
-    meanResilience = metricsCol.select("resilience").mean().clip(aoi)
-
-    finalOutput = meanResistance.rename("resistance").addBands(
-        meanResilience.rename("resilience")
-    )
+    yearly_bands = []
+    for yy in range(start_year, metric_end_year + 1):
+        year_img = ee.Image(metricsCol.filter(ee.Filter.eq("year", yy)).first())
+        yearly_bands.append(year_img.select("resistance").rename(f"resistance_{yy}"))
+        yearly_bands.append(year_img.select("resilience").rename(f"resilience_{yy}"))
+        yearly_bands.append(
+            year_img.select("resistance_class").rename(f"resistance_class_{yy}")
+        )
+        yearly_bands.append(
+            year_img.select("resilience_class").rename(f"resilience_class_{yy}")
+        )
+    finalOutput = ee.Image.cat(yearly_bands).clip(aoi)
 
     task_id = export_raster_asset_to_gee(
         finalOutput, OUTPUT_DESC, OUTPUT_ASSET_ID, scale=30, region=aoi
     )
 
-    return task_id
+    return task_id, OUTPUT_ASSET_ID
+
+
+def _resistance_class(ratio):
+    """Class from Ye/Yn. Lower edge included, upper edge excluded."""
+    return (
+        ee.Image(1)
+        .where(ratio.gte(0.95), 2)
+        .where(ratio.gte(1), 3)
+        .where(ratio.gte(1.05), 4)
+        .toInt16()
+    )
+
+
+def _resilience_class(ratio, ratio_next, kndvi_ye, kndvi_next):
+    """Class from the two ratios. Class 0 means resilience is not computed."""
+    deep_drop = ratio.lt(0.95)
+    return (
+        ee.Image(0)
+        .where(deep_drop.And(ratio_next.lt(0.95)).And(kndvi_next.lte(kndvi_ye)), 1)
+        .where(deep_drop.And(ratio_next.lt(0.95)).And(kndvi_next.gt(kndvi_ye)), 2)
+        .where(deep_drop.And(ratio_next.gte(0.95)).And(ratio_next.lt(1)), 3)
+        .where(deep_drop.And(ratio_next.gte(1)).And(ratio_next.lt(1.05)), 4)
+        .where(deep_drop.And(ratio_next.gte(1.05)), 5)
+        .toInt16()
+    )
+
+
+def _round_half_up(image):
+    return image.add(0.5).floor().toInt16()
+
+
+def _mean_classes(img, start_year, end_year):
+    resist, resil = [], []
+    for year in range(start_year, end_year + 1):
+        resist.append(img.select(f"resistance_class_{year}").rename("class"))
+        resilience_year = img.select(f"resilience_class_{year}").rename("class")
+        resil.append(resilience_year.updateMask(resilience_year.gt(0)))
+    resistance_class = _round_half_up(ee.ImageCollection(resist).mean()).rename(
+        "resistance_class"
+    )
+    resilience_class = (
+        _round_half_up(ee.ImageCollection(resil).mean())
+        .unmask(0)
+        .updateMask(resistance_class.mask())
+        .rename("resilience_class")
+    )
+    return resistance_class.addBands(resilience_class)
+
+
+def classify_wind_metrics(aez, start_year=2004, end_year=None, gee_account_id=None):
+    """Mean yearly wind classes and round half up.
+
+    Resistance uses every scored high-wind year. Resilience leaves out class 0.
+    If every year is class 0, the pixel is 0. end_year is the last year that
+    has a next-year kNDVI.
+    """
+    ee_initialize(gee_account_id)
+    if end_year is None:
+        raise ValueError("end_year must be specified explicitly.")
+
+    root = "projects/corestack-datasets-alpha/assets/datasets/hazards/wind_Rt_Re"
+    yearly_id = f"{root}/wind_metrics_harmonized_kNDVI_AEZ_{aez}"
+    output_desc = f"wind_metrics_classmean_AEZ_{aez}"
+    output_id = f"{root}/{output_desc}"
+    if is_gee_asset_exists(output_id):
+        return None
+    if not is_gee_asset_exists(yearly_id):
+        raise ValueError(f"Yearly metrics asset not found: {yearly_id}")
+
+    img = ee.Image(yearly_id)
+    aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
+    # aoi = (
+    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
+    #     .filter(ee.Filter.eq("Name", "Odisha"))
+    #     .geometry()
+    # )
+    final_output = _mean_classes(img, start_year, end_year).clip(aoi)
+    return export_raster_asset_to_gee(
+        final_output, output_desc, output_id, scale=30, region=aoi
+    )

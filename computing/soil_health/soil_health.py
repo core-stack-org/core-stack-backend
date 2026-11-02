@@ -145,6 +145,48 @@ def _clip_raster_to_roi(
     return clipped_data, clipped_meta
 
 
+def _align_to_reference_grid(clipped_data, clipped_meta, reference_meta):
+    """
+    Snaps a clipped nutrient raster onto the reference grid. The base
+    nutrient rasters have different origins (e.g. K/OC vs N/P), so
+    independent clips of the same ROI can differ by a row or column.
+    """
+
+    if (
+        clipped_data.shape == (reference_meta["height"], reference_meta["width"])
+        and clipped_meta["transform"] == reference_meta["transform"]
+    ):
+        return clipped_data, clipped_meta
+
+    nodata = clipped_meta["nodata"]
+    aligned = np.full(
+        (reference_meta["height"], reference_meta["width"]),
+        nodata,
+        dtype=clipped_data.dtype,
+    )
+    reproject(
+        source=clipped_data,
+        destination=aligned,
+        src_transform=clipped_meta["transform"],
+        src_crs=clipped_meta["crs"],
+        src_nodata=nodata,
+        dst_transform=reference_meta["transform"],
+        dst_crs=reference_meta["crs"],
+        dst_nodata=nodata,
+        resampling=Resampling.nearest,
+    )
+
+    aligned_meta = clipped_meta.copy()
+    aligned_meta.update(
+        {
+            "height": reference_meta["height"],
+            "width": reference_meta["width"],
+            "transform": reference_meta["transform"],
+        }
+    )
+    return aligned, aligned_meta
+
+
 def _prepare_mode_lulc(
     reference_meta,
     lulc_paths,
@@ -280,6 +322,9 @@ def clip_soil_health_raster(
             clipped_data, clipped_meta = _clip_raster_to_roi(
                 roi_gdf,
                 SOIL_MAP_PATH,
+            )
+            clipped_data, clipped_meta = _align_to_reference_grid(
+                clipped_data, clipped_meta, reference_meta
             )
 
         allowed_mask_classes = _get_lulc_mask_classes(nutrient)
