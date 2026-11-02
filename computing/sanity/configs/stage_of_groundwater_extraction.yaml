@@ -3,38 +3,141 @@ sheet_names:
   - soge_vector
 
 rules:
-  # Source: STAC Stage of Groundwater extraction vector table:columns.
+  # Source: soge_vector_<district>_<tehsil>[_<year>] layers
+  # (computing/misc/soge_vector*.py) and the stats_generator soge_vector sheet.
+  # The pipeline writes -9999 for every quantity when an MWS has no SOGE
+  # polygon ("No Data") or the source year lacks a column, so quantity bounds
+  # can only reject values below that sentinel.
   - name: soge_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
-    allow_missing_fields: true
 
-  - name: soge_schema_present
-    applies_to: [excel, vector]
+  # Vector: raw CGWB attribute names (shapefile-truncated, e.g. sgw_dev_pe).
+  - name: soge_vector_percent_present
+    applies_to: [vector]
     type: required_any_field_pattern
     value:
-      - "soge_dev_percent"
-      - "class_code"
-      - "class_name"
+      - "sgw_dev_pe"
 
-  - name: soge_percent_type
-    applies_to: [excel, vector]
+  - name: soge_vector_class_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "class"
+
+  # Numeric CGWB quantities and overlap stats. "code" is excluded: it is the
+  # numeric class code in older layers but an admin code string ("JH050600")
+  # in the 2025 layers.
+  - name: soge_vector_numeric_type
+    applies_to: [vector]
     type: data_type
-    field: soge_dev_percent
+    field_pattern: "*"
     expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "geometry"
+      - "class"
+      - "code"
+      - "sbcode"
+      - "bacode"
+      - "wsconc"
+      - "soge_block"
+      - "soge_district"
+      - "soge_state"
+      - "soge_tehsil"
     allow_missing_fields: true
 
-  - name: soge_percent_min
-    applies_to: [excel, vector]
+  - name: soge_vector_quantities_min
+    applies_to: [vector]
     type: min_value
-    field: soge_dev_percent
+    field_pattern: "*"
+    value: -9999
+    exclude_field_patterns:
+      - "*uid*"
+      - "geometry"
+      - "class"
+      - "code"
+      - "sbcode"
+      - "bacode"
+      - "wsconc"
+      - "soge_block"
+      - "soge_district"
+      - "soge_state"
+      - "soge_tehsil"
+    allow_missing_fields: true
+
+  # Overlap stats are filled with 0 (not -9999) for No Data, so they are strict.
+  - name: soge_vector_area_min
+    applies_to: [vector]
+    type: min_value
+    field_pattern: "*area*"
     value: 0
     allow_missing_fields: true
 
-  - name: soge_class_code_allowed
-    applies_to: [excel, vector]
+  - name: soge_vector_pct_area_max
+    applies_to: [vector]
+    type: max_value
+    fields: [pct_area_soge]
+    value: 100
+    allow_missing_fields: true
+
+  - name: soge_vector_class_allowed
+    applies_to: [vector]
     type: allowed_values
-    field: class_code
-    value: [1, 2, 3, 4]
+    field_pattern: "class"
+    value: [Safe, Semi-Critical, Critical, Over Exploited, Saline, Not Assessed, No Data]
+    allow_missing_fields: true
+
+  # Excel: one block of columns per SOGE assessment year
+  # (soge_dev_percent_2011, class_name_2011, *_in_bcm_2011, ...). The patterns
+  # also match the older unsuffixed export (soge_dev_percent, class_name).
+  - name: soge_excel_percent_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "soge_dev_percent*"
+
+  - name: soge_excel_class_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "class_name*"
+
+  - name: soge_excel_numeric_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+      - "class_name*"
+    allow_missing_fields: true
+
+  - name: soge_excel_percent_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "soge_dev_percent*"
+    value: -9999
+    allow_missing_fields: true
+
+  - name: soge_excel_quantities_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "*_in_bcm*"
+    value: -9999
+    allow_missing_fields: true
+
+  - name: soge_excel_area_min
+    applies_to: [excel]
+    type: min_value
+    fields: [area_in_ha]
+    value: 0
+    allow_missing_fields: true
+
+  - name: soge_excel_class_allowed
+    applies_to: [excel]
+    type: allowed_values
+    field_pattern: "class_name*"
+    value: [Safe, Semi-Critical, Critical, Over Exploited, Saline, Not Assessed, No Data]
     allow_missing_fields: true

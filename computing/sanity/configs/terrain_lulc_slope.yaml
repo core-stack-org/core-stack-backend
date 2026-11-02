@@ -4,26 +4,146 @@ sheet_names:
 
 rules:
   # Source: terrain and LULC cross-tab stats-generator export.
+  # Every MWS row needs its identifier in both forms.
   - name: terrain_lulc_slope_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: terrain_lulc_slope_schema_present
+  # Area is carried through unchanged from the MWS layer in both forms.
+  - name: terrain_lulc_slope_area_type
     applies_to: [excel, vector]
-    type: required_any_field_pattern
-    value:
-      - "terrain_cluster_id"
-      - "*_area_percent"
+    type: data_type
+    field: area_in_ha
+    expected_type: numeric
 
-  - name: terrain_lulc_slope_percent_min
+  - name: terrain_lulc_slope_area_min
     applies_to: [excel, vector]
+    type: min_value
+    field: area_in_ha
+    value: 0
+
+  # Vector: lulc_on_slope_cluster(_local).py writes the terrain cluster, the
+  # LULC-on-slopes cluster (LxS_cluster, -1 when no plain/slope pixels) with its
+  # name, and seven LULC class shares as percent of plain+slope area.
+  - name: terrain_lulc_slope_vector_schema_present
+    applies_to: [vector]
+    type: required_fields
+    value:
+      - area_in_ha
+      - terrain_cluster
+      - LxS_cluster
+      - clust_name
+      - barren
+      - double
+      - shrub_scrub
+      - sing_kharif
+      - sing_non_kharif
+      - forests
+      - triple
+
+  # Slope clusters only cover terrain clusters 0 (sloppy and hilly) and
+  # 3 (plains and slopes).
+  - name: terrain_lulc_slope_vector_terrain_cluster_allowed
+    applies_to: [vector]
+    type: allowed_values
+    field: terrain_cluster
+    value: [0, 3]
+
+  - name: terrain_lulc_slope_vector_lxs_cluster_type
+    applies_to: [vector]
+    type: data_type
+    field: LxS_cluster
+    expected_type: integer
+
+  - name: terrain_lulc_slope_vector_lxs_cluster_min
+    applies_to: [vector]
+    type: min_value
+    field: LxS_cluster
+    value: -1
+
+  - name: terrain_lulc_slope_vector_cluster_name_not_null
+    applies_to: [vector]
+    type: not_null
+    field: clust_name
+
+  - name: terrain_lulc_slope_vector_percent_not_null
+    applies_to: [vector]
+    type: not_null
+    fields: [barren, double, shrub_scrub, sing_kharif, sing_non_kharif, forests, triple]
+
+  - name: terrain_lulc_slope_vector_percent_type
+    applies_to: [vector]
+    type: data_type
+    fields: [barren, double, shrub_scrub, sing_kharif, sing_non_kharif, forests, triple]
+    expected_type: numeric
+
+  - name: terrain_lulc_slope_vector_percent_min
+    applies_to: [vector]
+    type: min_value
+    fields: [barren, double, shrub_scrub, sing_kharif, sing_non_kharif, forests, triple]
+    value: 0
+
+  - name: terrain_lulc_slope_vector_percent_max
+    applies_to: [vector]
+    type: max_value
+    fields: [barren, double, shrub_scrub, sing_kharif, sing_non_kharif, forests, triple]
+    value: 100
+
+  # Excel: the export renames the classes to *_area_percent and maps the terrain
+  # cluster to a description.
+  - name: terrain_lulc_slope_excel_schema_present
+    applies_to: [excel]
+    type: required_fields
+    value:
+      - area_in_ha
+      - terrain_cluster_id
+      - terrain_description
+      - cluster_name
+      - barren_area_percent
+      - forests_area_percent
+      - shrub_scrubs_area_percent
+      - single_non_kharif_area_percent
+      - single_kharif_area_percent
+      - double_cropping_area_percent
+      - triple_cropping_area_percent
+
+  - name: terrain_lulc_slope_excel_terrain_cluster_allowed
+    applies_to: [excel]
+    type: allowed_values
+    field: terrain_cluster_id
+    value: [0, 3]
+
+  - name: terrain_lulc_slope_excel_terrain_description_allowed
+    applies_to: [excel]
+    type: allowed_values
+    field: terrain_description
+    value: [Broad Sloppy and Hilly, Broad Plains and Slopes]
+
+  - name: terrain_lulc_slope_excel_cluster_name_not_null
+    applies_to: [excel]
+    type: not_null
+    field: cluster_name
+
+  - name: terrain_lulc_slope_excel_percent_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "*_area_percent"
+
+  - name: terrain_lulc_slope_excel_percent_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*_area_percent"
+    expected_type: numeric
+
+  - name: terrain_lulc_slope_excel_percent_min
+    applies_to: [excel]
     type: min_value
     field_pattern: "*_area_percent"
     value: 0
 
-  - name: terrain_lulc_slope_percent_max
-    applies_to: [excel, vector]
+  - name: terrain_lulc_slope_excel_percent_max
+    applies_to: [excel]
     type: max_value
     field_pattern: "*_area_percent"
     value: 100

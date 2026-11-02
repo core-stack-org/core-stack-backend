@@ -3,39 +3,103 @@ sheet_names:
   - social_economic_indicator
 
 rules:
-  # Source: STAC Admin Boundaries vector table:columns.
-  - name: admin_village_id_not_null
-    applies_to: [excel, vector]
-    type: not_null
-    field_pattern: "*village*id"
-    allow_missing_fields: true
+  # Source: computing/misc/admin_boundary.py (panchayat_boundaries layer, Census
+  # 2011 village polygons) and stats_generator create_excel_for_village_boun,
+  # which sums TOT_P/P_LIT/P_SC/P_ST per vill_ID into the
+  # social_economic_indicator sheet.
 
-  - name: admin_schema_present
-    applies_to: [excel, vector]
-    type: required_any_field_pattern
+  # Vector: the village key and the census fields the Excel export reads. The
+  # SOI fallback writes only tehsil/district/state, so this fails loudly.
+  - name: admin_vector_schema_present
+    applies_to: [vector]
+    type: required_fields
     value:
-      - "village_id"
-      - "vill_ID"
-      - "total_population_count"
-      - "TOT_P"
+      - vill_ID
+      - vill_name
+      - TOT_P
+      - P_LIT
+      - P_SC
+      - P_ST
 
-  - name: admin_count_min
-    applies_to: [excel, vector]
+  - name: admin_vector_village_id_not_null
+    applies_to: [vector]
+    type: not_null
+    field: vill_ID
+
+  # Vector: census counts (TOT_*, P_/M_/F_*, No_HH) and the 2001/2011/2019
+  # index columns (ADI_, ASSET_, BF_, FC_, MSW_) are non-negative numbers.
+  - name: admin_vector_numeric_type
+    applies_to: [vector]
+    type: data_type
+    field_pattern: "*"
+    exclude_field_patterns: ["geometry", "id", "vill_name", "tehsil", "district", "state"]
+    expected_type: numeric
+
+  - name: admin_vector_count_min
+    applies_to: [vector]
     type: min_value
-    field_pattern: "*count"
+    field_pattern: "*"
+    exclude_field_patterns: ["geometry", "id", "vill_name", "tehsil", "district", "state"]
     value: 0
-    allow_missing_fields: true
 
-  - name: admin_percent_min
-    applies_to: [excel, vector]
+  # Excel: village key and population columns. Patterns because the API
+  # lowercases names the export writes as total_SC_population_count etc.
+  - name: admin_excel_village_id_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value: ["village_id"]
+
+  - name: admin_excel_population_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value: ["total_population_count"]
+
+  - name: admin_excel_percent_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value: ["*_percent"]
+
+  - name: admin_excel_village_id_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "village_id"
+
+  # Excel: 0 is the admin layer's "no census village" placeholder; the export
+  # merges every such polygon into one fake village row (other village sheets
+  # drop village_id 0).
+  - name: admin_excel_village_id_min
+    applies_to: [excel]
     type: min_value
-    field_pattern: "*percent"
-    value: 0
-    allow_missing_fields: true
+    field_pattern: "village_id"
+    value: 1
 
-  - name: admin_percent_max
-    applies_to: [excel, vector]
+  - name: admin_excel_count_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*_count"
+    expected_type: numeric
+
+  - name: admin_excel_count_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "*_count"
+    value: 0
+
+  # Excel: literacy/SC/ST shares of total population, in percent.
+  - name: admin_excel_percent_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*_percent"
+    expected_type: numeric
+
+  - name: admin_excel_percent_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "*_percent"
+    value: 0
+
+  - name: admin_excel_percent_max
+    applies_to: [excel]
     type: max_value
-    field_pattern: "*percent"
+    field_pattern: "*_percent"
     value: 100
-    allow_missing_fields: true

@@ -3,35 +3,116 @@ sheet_names:
   - hydrological_seasonal
 
 rules:
-  # Source: STAC Water balance fortnightly vector table:columns.
+  # Source: deltaG_fortnight vector (computing/mws/delta_g.py, calculateG.py,
+  # generate_hydrology_local.py) and stats_generator create_excel_seas_mws.
   - name: hydrological_seasonal_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: hydrological_seasonal_schema_present
-    applies_to: [excel, vector]
+  # Vector: one column per fortnight start date ("2017-07-01") holding a JSON
+  # string with Precipitation/ET/RunOff/DeltaG/G. The rules cannot look inside
+  # the JSON, so they only check the columns exist and are never empty. No
+  # type rule: gpd.read_file parses these to dicts for GeoJSON but keeps str
+  # for GPKG, so the dtype depends on the file format, not the data.
+  - name: hydrological_seasonal_vector_fortnights_present
+    applies_to: [vector]
     type: required_any_field_pattern
     value:
-      - "precipitation_*"
-      - "runoff_*"
-      - "et_*"
-      - "delta g_*"
+      - "20??-??-??"
 
-  - name: hydrological_seasonal_numeric_type
-    applies_to: [excel, vector]
+  - name: hydrological_seasonal_vector_fortnights_not_null
+    applies_to: [vector]
+    type: not_null
+    field_pattern: "20??-??-??"
+    allow_missing_fields: true
+
+  # Vector scalar columns (area_in_ha, id).
+  - name: hydrological_seasonal_vector_numeric_type
+    applies_to: [vector]
     type: data_type
     field_pattern: "*"
     expected_type: numeric
     exclude_field_patterns:
       - "*uid*"
-      - "id"
       - "geometry"
+      - "20*"
     allow_missing_fields: true
 
-  - name: hydrological_seasonal_area_min
-    applies_to: [excel, vector]
+  - name: hydrological_seasonal_vector_area_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "area_in_ha"
+
+  - name: hydrological_seasonal_vector_area_min
+    applies_to: [vector]
     type: min_value
-    field_pattern: "*area*"
+    fields: [area_in_ha]
+    value: 0
+    allow_missing_fields: true
+
+  # Excel: <metric>_<kharif|rabi|zaid>_in_mm_<yyyy-yyyy>, fortnights summed per
+  # season. Every metric family is required on its own. Seasons with no
+  # fortnights are zero-filled by the export, which no rule can tell apart.
+  - name: hydrological_seasonal_excel_precipitation_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "precipitation_*_in_mm_*"
+
+  - name: hydrological_seasonal_excel_et_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "et_*_in_mm_*"
+
+  - name: hydrological_seasonal_excel_runoff_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "runoff_*_in_mm_*"
+
+  - name: hydrological_seasonal_excel_deltag_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "delta g_*_in_mm_*"
+
+  - name: hydrological_seasonal_excel_g_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "g_*_in_mm_*"
+
+  - name: hydrological_seasonal_excel_numeric_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+    allow_missing_fields: true
+
+  # Precipitation, ET and runoff are fluxes and cannot be negative. DeltaG and
+  # G are signed and have no physical bound.
+  - name: hydrological_seasonal_excel_precipitation_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "precipitation_*_in_mm_*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: hydrological_seasonal_excel_et_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "et_*_in_mm_*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: hydrological_seasonal_excel_runoff_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "runoff_*_in_mm_*"
     value: 0
     allow_missing_fields: true

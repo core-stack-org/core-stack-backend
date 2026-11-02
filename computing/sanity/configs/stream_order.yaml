@@ -9,26 +9,86 @@ rules:
     field_pattern: "*uid*"
     applies_to: [excel, vector]
 
-  - name: stream_order_schema_present
-    type: required_any_field_pattern
-    value:
-      - "order_*_area_percent"
-    applies_to: [excel, vector]
+  # Vector also carries the MWS area through from the watershed layer.
+  - name: stream_order_vector_area_type
+    type: data_type
+    field: area_in_ha
+    expected_type: numeric
+    applies_to: [vector]
 
-  - name: stream_order_percent_type
+  - name: stream_order_vector_area_min
+    type: min_value
+    field: area_in_ha
+    value: 0
+    applies_to: [vector]
+
+  # Vector: stream_order.py writes one field per Strahler order, named "1".."11",
+  # holding the percent of MWS area draining at that order. The Excel export
+  # reads all eleven (properties["N"]), so each must exist.
+  - name: stream_order_vector_schema_present
+    type: required_fields
+    value: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+    applies_to: [vector]
+
+  - name: stream_order_vector_percent_not_null
+    type: not_null
+    fields: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+    applies_to: [vector]
+
+  - name: stream_order_vector_percent_type
+    type: data_type
+    fields: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+    expected_type: numeric
+    applies_to: [vector]
+
+  - name: stream_order_vector_percent_min
+    type: min_value
+    fields: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+    value: 0
+    applies_to: [vector]
+
+  - name: stream_order_vector_percent_max
+    type: max_value
+    fields: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+    value: 100
+    applies_to: [vector]
+
+  # Excel: the same eleven values renamed order_<n>_area_percent.
+  - name: stream_order_excel_schema_present
+    type: required_fields
+    value:
+      - order_1_area_percent
+      - order_2_area_percent
+      - order_3_area_percent
+      - order_4_area_percent
+      - order_5_area_percent
+      - order_6_area_percent
+      - order_7_area_percent
+      - order_8_area_percent
+      - order_9_area_percent
+      - order_10_area_percent
+      - order_11_area_percent
+    applies_to: [excel]
+
+  - name: stream_order_excel_percent_not_null
+    type: not_null
+    field_pattern: "order_*_area_percent"
+    applies_to: [excel]
+
+  - name: stream_order_excel_percent_type
     type: data_type
     field_pattern: "order_*_area_percent"
     expected_type: numeric
-    applies_to: [excel, vector]
+    applies_to: [excel]
 
-  - name: stream_order_percent_min
+  - name: stream_order_excel_percent_min
     type: min_value
     field_pattern: "order_*_area_percent"
     value: 0
-    applies_to: [excel, vector]
+    applies_to: [excel]
 
-  - name: stream_order_percent_max
+  - name: stream_order_excel_percent_max
     type: max_value
     field_pattern: "order_*_area_percent"
     value: 100
-    applies_to: [excel, vector]
+    applies_to: [excel]

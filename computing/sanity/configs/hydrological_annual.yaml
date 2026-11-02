@@ -3,23 +3,35 @@ sheet_names:
   - hydrological_annual
 
 rules:
-  # Source: STAC Annual water balance / change in well depth vector table:columns.
+  # Source: deltaG_well_depth vector (computing/mws/well_depth.py, net_value.py,
+  # generate_hydrology_local.py) and stats_generator create_excel_annual_mws.
   - name: hydrological_annual_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: hydrological_annual_schema_present
-    applies_to: [excel, vector]
+  # Vector: one column per hydro-year ("2017_2018") holding a JSON string with
+  # Precipitation/ET/RunOff/DeltaG/G/WellDepth. The rules cannot look inside
+  # the JSON, so they only check the columns exist and are never empty. No
+  # type rule: gpd.read_file parses these to dicts for GeoJSON but keeps str
+  # for GPKG, so the dtype depends on the file format, not the data.
+  - name: hydrological_annual_vector_years_present
+    applies_to: [vector]
     type: required_any_field_pattern
     value:
-      - "ET_in_mm_*"
-      - "RunOff_in_mm_*"
-      - "Precipitation_in_mm_*"
-      - "Net*"
+      - "20??_20??"
 
-  - name: hydrological_annual_numeric_type
-    applies_to: [excel, vector]
+  - name: hydrological_annual_vector_years_not_null
+    applies_to: [vector]
+    type: not_null
+    field_pattern: "20??_20??"
+    allow_missing_fields: true
+
+  # Vector scalar columns: Net<start>_<end> five-year sums, area_in_ha and the
+  # specific-yield fraction (weighted_avg_yeild, truncated to weighted_a in
+  # shapefile-sourced layers).
+  - name: hydrological_annual_vector_numeric_type
+    applies_to: [vector]
     type: data_type
     field_pattern: "*"
     expected_type: numeric
@@ -27,11 +39,110 @@ rules:
       - "*uid*"
       - "id"
       - "geometry"
+      - "20*"
     allow_missing_fields: true
 
-  - name: hydrological_annual_area_min
-    applies_to: [excel, vector]
+  - name: hydrological_annual_vector_area_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "area_in_ha"
+
+  - name: hydrological_annual_vector_area_min
+    applies_to: [vector]
     type: min_value
-    field_pattern: "*area*"
+    fields: [area_in_ha]
+    value: 0
+    allow_missing_fields: true
+
+  # WellDepth = DeltaG / (yield * 1000), so the yield must be a fraction.
+  - name: hydrological_annual_vector_yield_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "weighted_a*"
+
+  - name: hydrological_annual_vector_yield_min
+    applies_to: [vector]
+    type: min_value
+    field_pattern: "weighted_a*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: hydrological_annual_vector_yield_max
+    applies_to: [vector]
+    type: max_value
+    field_pattern: "weighted_a*"
+    value: 1
+    allow_missing_fields: true
+
+  # Excel: <metric>_in_mm_<yyyy-yyyy> (welldepth_in_m_*). Every metric family
+  # is required on its own; missing metrics are written as "N/A", which the
+  # numeric type rule catches.
+  - name: hydrological_annual_excel_precipitation_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "precipitation_in_mm_*"
+
+  - name: hydrological_annual_excel_et_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "et_in_mm_*"
+
+  - name: hydrological_annual_excel_runoff_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "runoff_in_mm_*"
+
+  - name: hydrological_annual_excel_deltag_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "deltag_in_mm_*"
+
+  - name: hydrological_annual_excel_g_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "g_in_mm_*"
+
+  - name: hydrological_annual_excel_welldepth_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value:
+      - "welldepth_in_m_*"
+
+  - name: hydrological_annual_excel_numeric_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*"
+    expected_type: numeric
+    exclude_field_patterns:
+      - "*uid*"
+    allow_missing_fields: true
+
+  # Precipitation, ET and runoff are fluxes and cannot be negative. DeltaG, G
+  # and WellDepth are signed changes and have no physical bound.
+  - name: hydrological_annual_excel_precipitation_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "precipitation_in_mm_*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: hydrological_annual_excel_et_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "et_in_mm_*"
+    value: 0
+    allow_missing_fields: true
+
+  - name: hydrological_annual_excel_runoff_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "runoff_in_mm_*"
     value: 0
     allow_missing_fields: true

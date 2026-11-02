@@ -8,24 +8,104 @@ rules:
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
-    allow_missing_fields: true
 
-  - name: restoration_schema_present
-    applies_to: [excel, vector]
+  # Vector class columns. The GEE pipeline writes full labels ("Mosaic
+  # Restoration"); the local pipeline writes shapefile-style truncations
+  # ("Mosaic Res"). Each pattern accepts both, one rule per class so a
+  # layer missing any class fails.
+  - name: restoration_vector_excluded_present
+    applies_to: [vector]
     type: required_any_field_pattern
+    value:
+      - "Excluded A*"
+
+  - name: restoration_vector_mosaic_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "Mosaic Res*"
+
+  - name: restoration_vector_wide_scale_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "Wide-scale*"
+
+  - name: restoration_vector_protection_present
+    applies_to: [vector]
+    type: required_any_field_pattern
+    value:
+      - "Protection"
+
+  # Excel schema from stats-generator restoration_vector sheet.
+  - name: restoration_excel_schema_present
+    applies_to: [excel]
+    type: required_fields
     value:
       - "wide_scale_restoration_area_in_ha"
       - "mosaic_restoration_area_in_ha"
       - "protection_area_in_ha"
+      - "excluded_areas_in_ha"
 
-  - name: restoration_area_type
-    applies_to: [excel, vector]
+  # Vector areas in hectares (pixelArea * 0.0001), both label variants.
+  - name: restoration_vector_area_type
+    applies_to: [vector]
     type: data_type
-    field_pattern: "*area_in_ha"
+    fields:
+      - "area_in_ha"
+      - "Excluded Areas"
+      - "Excluded A"
+      - "Mosaic Restoration"
+      - "Mosaic Res"
+      - "Wide-scale Restoration"
+      - "Wide-scale"
+      - "Protection"
+    expected_type: numeric
+    allow_missing_fields: true
+
+  - name: restoration_vector_area_not_null
+    applies_to: [vector]
+    type: not_null
+    fields:
+      - "area_in_ha"
+      - "Excluded Areas"
+      - "Excluded A"
+      - "Mosaic Restoration"
+      - "Mosaic Res"
+      - "Wide-scale Restoration"
+      - "Wide-scale"
+      - "Protection"
+    allow_missing_fields: true
+
+  - name: restoration_vector_area_min
+    applies_to: [vector]
+    type: min_value
+    fields:
+      - "area_in_ha"
+      - "Excluded Areas"
+      - "Excluded A"
+      - "Mosaic Restoration"
+      - "Mosaic Res"
+      - "Wide-scale Restoration"
+      - "Wide-scale"
+      - "Protection"
+    value: 0
+    allow_missing_fields: true
+
+  # Excel areas, including excluded_areas_in_ha and the MWS area_in_ha.
+  - name: restoration_excel_area_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*area*in_ha"
     expected_type: numeric
 
-  - name: restoration_area_min
-    applies_to: [excel, vector]
+  - name: restoration_excel_area_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "*area*in_ha"
+
+  - name: restoration_excel_area_min
+    applies_to: [excel]
     type: min_value
-    field_pattern: "*area_in_ha"
+    field_pattern: "*area*in_ha"
     value: 0

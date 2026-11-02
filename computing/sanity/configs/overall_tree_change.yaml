@@ -9,24 +9,117 @@ rules:
     type: not_null
     field_pattern: "*uid*"
 
-  - name: tree_change_schema_present
-    applies_to: [excel, vector]
-    type: required_any_field_pattern
+  # Vector class labels are fixed in overall_change_vector(_local).py and the
+  # Excel export indexes each one directly, so all of them are required.
+  - name: tree_change_vector_schema_present
+    applies_to: [vector]
+    type: required_fields
+    value:
+      - "Deforestation"
+      - "Degradation"
+      - "No_Change"
+      - "Improvement"
+      - "Afforestation"
+      - "Partially_Degraded"
+      - "Missing Data"
+
+  - name: tree_change_excel_schema_present
+    applies_to: [excel]
+    type: required_fields
     value:
       - "afforestation_area_in_ha"
       - "deforestation_area_in_ha"
       - "degradation_area_in_ha"
+      - "improvement_area_in_ha"
+      - "missing_data_in_ha"
+      - "no_change_area_in_ha"
+      - "partially_degraded_area_in_ha"
+      - "area_under_tree_cover_in_ha"
+      - "degradation_in_percent"
+      - "improvement_in_percent"
 
-  - name: tree_change_numeric_type
-    applies_to: [excel, vector]
+  # Vector class areas in hectares (pixelArea * 0.0001), plus the MWS area.
+  # Listed explicitly: some states' MWS carry watershed code strings
+  # (bacode, sbcode, wsconc).
+  - name: tree_change_vector_numeric_type
+    applies_to: [vector]
     type: data_type
-    field_pattern: "*_area_in_ha"
+    fields:
+      - "area_in_ha"
+      - "Deforestation"
+      - "Degradation"
+      - "No_Change"
+      - "Improvement"
+      - "Afforestation"
+      - "Partially_Degraded"
+      - "Missing Data"
     expected_type: numeric
     allow_missing_fields: true
 
-  - name: tree_change_area_min
-    applies_to: [excel, vector]
+  - name: tree_change_vector_not_null
+    applies_to: [vector]
+    type: not_null
+    fields:
+      - "area_in_ha"
+      - "Deforestation"
+      - "Degradation"
+      - "No_Change"
+      - "Improvement"
+      - "Afforestation"
+      - "Partially_Degraded"
+      - "Missing Data"
+    allow_missing_fields: true
+
+  - name: tree_change_vector_area_min
+    applies_to: [vector]
     type: min_value
-    field_pattern: "*_area_in_ha"
+    fields:
+      - "area_in_ha"
+      - "Deforestation"
+      - "Degradation"
+      - "No_Change"
+      - "Improvement"
+      - "Afforestation"
+      - "Partially_Degraded"
+      - "Missing Data"
     value: 0
     allow_missing_fields: true
+
+  # Excel areas: class areas, MWS area and LULC-derived tree cover.
+  - name: tree_change_excel_numeric_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*_in_ha"
+    expected_type: numeric
+
+  - name: tree_change_excel_area_not_null
+    applies_to: [excel]
+    type: not_null
+    field_pattern: "*_in_ha"
+
+  - name: tree_change_excel_area_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "*_in_ha"
+    value: 0
+
+  # Degradation/improvement as a share of average 2017-2019 LULC tree cover.
+  # Not null-checked: 0/0 on an MWS with no tree cover is NaN by design.
+  # Above 100 (or inf) means the tree-health raster and LULC disagree badly.
+  - name: tree_change_excel_percent_type
+    applies_to: [excel]
+    type: data_type
+    field_pattern: "*_in_percent"
+    expected_type: numeric
+
+  - name: tree_change_excel_percent_min
+    applies_to: [excel]
+    type: min_value
+    field_pattern: "*_in_percent"
+    value: 0
+
+  - name: tree_change_excel_percent_max
+    applies_to: [excel]
+    type: max_value
+    field_pattern: "*_in_percent"
+    value: 100

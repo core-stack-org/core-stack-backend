@@ -10,8 +10,10 @@ rules:
     applies_to: [excel, vector]
 
   # Vector schema from STAC Land Use Change: Urbanization table:columns.
+  # Labels are fixed in change_detection_vector(_local).py, so every one is
+  # required: a layer missing one class would otherwise pass.
   - name: urbanization_vector_schema_present
-    type: required_any_field_pattern
+    type: required_fields
     value:
       - "b_bu"
       - "bu_bu"
@@ -21,8 +23,11 @@ rules:
     applies_to: [vector]
 
   # Excel schema from stats-generator change_detection_urbanization sheet.
+  # The export writes every column even when the vector lacks the source
+  # field (properties.get(..., None)), so the Excel not-null check below is
+  # what catches a missing vector class here.
   - name: urbanization_excel_schema_present
-    type: required_any_field_pattern
+    type: required_fields
     value:
       - "barren_shrub_to_built_up_area_in_ha"
       - "built_up_to_built_up_area_in_ha"
@@ -31,38 +36,61 @@ rules:
       - "total_urbanization_area_in_ha"
     applies_to: [excel]
 
+  # Vector area fields, listed explicitly: MWS layers in some states also carry
+  # watershed code strings (bacode, sbcode, wsconc) that are not areas.
+  # Areas are hectares (pixelArea * 0.0001), so never negative.
   - name: urbanization_vector_numeric_type
     type: data_type
-    field_pattern: "*"
+    fields:
+      - "area_in_ha"
+      - "b_bu"
+      - "bu_bu"
+      - "tr_bu"
+      - "w_bu"
+      - "total_urb"
     expected_type: numeric
-    exclude_field_patterns:
-      - "*uid*"
-      - "the_geom"
-      - "geometry"
     allow_missing_fields: true
     applies_to: [vector]
 
-  - name: urbanization_excel_numeric_type
-    type: data_type
-    field_pattern: "*_area_in_ha"
-    expected_type: numeric
+  - name: urbanization_vector_area_not_null
+    type: not_null
+    fields:
+      - "area_in_ha"
+      - "b_bu"
+      - "bu_bu"
+      - "tr_bu"
+      - "w_bu"
+      - "total_urb"
     allow_missing_fields: true
-    applies_to: [excel]
+    applies_to: [vector]
 
   - name: urbanization_vector_area_min
     type: min_value
-    field_pattern: "*"
+    fields:
+      - "area_in_ha"
+      - "b_bu"
+      - "bu_bu"
+      - "tr_bu"
+      - "w_bu"
+      - "total_urb"
     value: 0
-    exclude_field_patterns:
-      - "*uid*"
-      - "the_geom"
-      - "geometry"
     allow_missing_fields: true
     applies_to: [vector]
 
+  # Excel area fields, including the MWS area_in_ha.
+  - name: urbanization_excel_numeric_type
+    type: data_type
+    field_pattern: "*area_in_ha"
+    expected_type: numeric
+    applies_to: [excel]
+
+  - name: urbanization_excel_area_not_null
+    type: not_null
+    field_pattern: "*area_in_ha"
+    applies_to: [excel]
+
   - name: urbanization_excel_area_min
     type: min_value
-    field_pattern: "*_area_in_ha"
+    field_pattern: "*area_in_ha"
     value: 0
-    allow_missing_fields: true
     applies_to: [excel]

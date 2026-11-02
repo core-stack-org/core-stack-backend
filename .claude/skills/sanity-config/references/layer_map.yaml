@@ -1,0 +1,53 @@
+# Which prod vector layer each sanity config (computing/sanity/configs/<stem>.yaml)
+# validates. Used by scripts/fetch_tehsil.py to pick the layer from a tehsil's
+# generated-layer catalog (metadata/generated_layer_urls.json).
+#
+#   dataset: the catalog's dataset_name
+#   layer:   regex matched against layer_name (first match wins); {district} and
+#            {tehsil} are replaced with the tehsil's slugs before matching.
+#            Anchor it (^...$) when the dataset holds several layers.
+#   pick:    latest_year -> among matches, prefer the newest _YYYY suffix
+#   wfs:     workspace:typeName on prod GeoServer, for layers that exist there
+#            but are missing from the catalog (fetched directly over WFS)
+#
+# null means prod has no vector layer for this config; only the Excel sheet
+# (from tehsil_data) can be checked. The sheet may still be computed from an
+# upstream layer (e.g. nrega_assets_village from the NREGA asset points).
+# Excel sheets need no entry: they come from the config's sheet_names.
+
+administrative_boundaries: {dataset: Admin Boundary, layer: "^{district}_{tehsil}$"}
+antyodaya: {dataset: Antyodaya 2020, layer: "^antyodaya"}
+aquifer_vector: {dataset: Aquifer, layer: "^aquifer_vector_"}
+canal: {dataset: Canal Vector, layer: "_canal_vector$"}
+change_detection_afforestation: {dataset: Change Detection Vector, layer: "_Afforestation$"}
+change_detection_cropintensity: {dataset: Change Detection Vector, layer: "_CropIntensity$"}
+change_detection_deforestation: {dataset: Change Detection Vector, layer: "_Deforestation$"}
+change_detection_degradation: {dataset: Change Detection Vector, layer: "_Degradation$"}
+change_detection_urbanization: {dataset: Change Detection Vector, layer: "_Urbanization$"}
+cropping_intensity: {dataset: Cropping Intensity, layer: "^{district}_{tehsil}_intensity$"}
+dem: {dataset: DEM Vector, layer: "_dem_vector$"}
+drainage_density: {dataset: Drainage Density Vector, layer: "_drainage_density$"}
+drainage_lines_vector: {wfs: "drainage:{district}_{tehsil}"}
+drought_frequency: {dataset: Drought, layer: "_drought$"}
+facilities_proximity: {dataset: Facilities Proximity, layer: "^facilities_{district}_{tehsil}$"}
+hydrological_annual: {dataset: Hydrology, layer: "^deltaG_well_depth_"}
+hydrological_seasonal: {dataset: Hydrology, layer: "^deltaG_fortnight_"}
+land_use_land_cover: {dataset: LULC, layer: "^lulc_vector_"}
+livestock: {dataset: Livestock Census, layer: "^livestocks_"}
+mws: {dataset: MWS, layer: "^mws_{district}_{tehsil}$"}
+mws_connectivity: {dataset: Mws Connectivity, layer: "_mws_connectivity$"}
+mws_intersect_swb: null
+mws_intersect_villages: null
+# The NREGA asset points are the input the MWS-level nrega_annual sheet is
+# computed from; vector rules check the fields that export depends on.
+nrega_annual: {dataset: NREGA Assets, layer: "^nrega_{district}_{tehsil}$"}
+nrega_assets_village: null
+overall_tree_change: {dataset: Tree Overall Change Vector, layer: "^overall_change_vector_"}
+river: {dataset: River Vector, layer: "_river_vector$"}
+stage_of_groundwater_extraction: {dataset: SOGE, layer: "^soge_vector_{district}_{tehsil}(_\\d\\d\\d\\d)?$", pick: latest_year}
+stream_order: {dataset: Stream Order, layer: "^stream_order_{district}_{tehsil}_vector$"}
+surface_water_bodies: {dataset: Surface Water Bodies, layer: "^surface_waterbodies_"}
+terrain: {dataset: Terrain Vector, layer: "_cluster$"}
+terrain_lulc_plain: {dataset: Terrain LULC, layer: "_lulc_plain$"}
+terrain_lulc_slope: {dataset: Terrain LULC, layer: "_lulc_slope$"}
+wri_restoration: {dataset: Restoration Vector, layer: "^restoration_"}
