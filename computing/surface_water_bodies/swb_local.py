@@ -55,6 +55,8 @@ DATASET_NAME = "Surface Water Bodies"
 GEOSERVER_WORKSPACE = "swb"
 logger = logging.getLogger(__name__)
 GEE_EXPORT_CHUNK_SIZE = 1000
+# EE rejects requests > 10 MB; keep GeoJSON payload well below (serialization adds overhead).
+GEE_EXPORT_MAX_CHUNK_BYTES = 4 * 1024 * 1024
 ANNUAL_COLUMN_PATTERN = re.compile(r"^(area|k|kr|krz)_(\d{4})$")
 
 
@@ -191,7 +193,10 @@ def _prepare_gdf_for_gee(gdf):
     for column in prepared.columns:
         if column == "geometry":
             continue
-        prepared[column] = prepared[column].where(prepared[column].notna(), None)
+        # Cast to object first: on float columns .where(..., None) turns None back
+        # into NaN, which serializes as bare `NaN` and EE rejects as invalid JSON.
+        series = prepared[column].astype(object)
+        prepared[column] = series.where(prepared[column].notna(), None)
     return prepared
 
 
@@ -287,12 +292,27 @@ def _chunk_description(base_description, index):
     return f"{base_description}_chunk_{index:04d}"
 
 
+def _adaptive_chunk_size(gdf, max_size=GEE_EXPORT_CHUNK_SIZE):
+    """Largest chunk (<= max_size) whose payload stays under GEE_EXPORT_MAX_CHUNK_BYTES.
+
+    Wide layers (e.g. ZOI rings carrying ~220 columns) blow past the Earth Engine
+    10 MB request limit at the fixed 1000-feature chunk size.
+    """
+    if gdf.empty:
+        return max_size
+    sample = gdf.iloc[: min(len(gdf), 50)]
+    bytes_per_feature = max(len(sample.to_json()) / len(sample), 1)
+    return int(max(1, min(max_size, GEE_EXPORT_MAX_CHUNK_BYTES // bytes_per_feature)))
+
+
 def _export_gdf_to_gee_in_chunks(gdf, base_description, base_asset_id):
     chunk_asset_ids = []
     task_ids = []
+    chunk_size = _adaptive_chunk_size(gdf)
+    logger.info("Using GEE export chunk_size=%s for %s features", chunk_size, len(gdf))
 
-    for index, start in enumerate(range(0, len(gdf), GEE_EXPORT_CHUNK_SIZE)):
-        chunk = gdf.iloc[start : start + GEE_EXPORT_CHUNK_SIZE].copy()
+    for index, start in enumerate(range(0, len(gdf), chunk_size)):
+        chunk = gdf.iloc[start : start + chunk_size].copy()
         chunk_description = _chunk_description(base_description, index)
         chunk_asset_id = _chunk_asset_id(base_asset_id, index)
         logger.info(
