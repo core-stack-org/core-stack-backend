@@ -176,6 +176,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
             district="Bid",
             block="Bid",
             sync_layer_metadata=False,
+            use_gee=True,
         )
 
         create_local_output.assert_called_once()
@@ -467,6 +468,67 @@ class LocalSwbContinuationTests(SimpleTestCase):
             ],
         )
         self.assertTrue(result)
+
+
+class LocalOnlySwbTests(SimpleTestCase):
+    @patch("computing.surface_water_bodies.swb_local._complete_swb_pipeline_local")
+    @patch("computing.surface_water_bodies.swb_local.ee_initialize")
+    @patch("computing.surface_water_bodies.swb_local.export_vector_asset_to_gee")
+    @patch("computing.surface_water_bodies.swb_local._resolve_roi_gdf")
+    def test_default_run_never_touches_gee(
+        self, resolve_roi, export_to_gee, ee_initialize, complete_local
+    ):
+        import geopandas as gpd
+        from shapely.geometry import box
+
+        resolve_roi.return_value = gpd.GeoDataFrame(
+            geometry=[box(0, 0, 1, 1)], crs="EPSG:4326"
+        )
+        complete_local.return_value = True
+
+        with TemporaryDirectory() as output_dir, patch(
+            "computing.surface_water_bodies.swb_local.LOCAL_OUTPUT_BASE_DIR",
+            Path(output_dir),
+        ):
+            result = run_swb_local(state="Odisha", district="D", block="B")
+
+        self.assertTrue(result)
+        ee_initialize.assert_not_called()
+        export_to_gee.assert_not_called()
+        complete_local.assert_called_once()
+
+    def test_swb4_local_matches_closest_census_point_and_marks_rest_na(self):
+        import geopandas as gpd
+        from shapely.geometry import Point, box
+
+        from computing.surface_water_bodies.swb4_local import (
+            waterbody_wbc_intersection_local,
+        )
+
+        swb = gpd.GeoDataFrame(
+            {"wb_id": ["a", "b"], "area_ored": [1.0, 2.0]},
+            geometry=[box(77.0, 12.0, 77.001, 12.001), box(77.1, 12.1, 77.101, 12.101)],
+            crs="EPSG:4326",
+        )
+        census = gpd.GeoDataFrame(
+            {
+                "unique_id": ["u1", "u2"],
+                "State Name": ["KARNATAKA", "KERALA"],
+                "water_spread_area_of_water_body": [1.0, 2.0],
+                "storage_capacity_water_body_original": [None, None],
+                "max_depth_water_body_fully_filled": [None, None],
+                "water_body_name": ["pond", "other state"],
+            },
+            geometry=[Point(77.0005, 12.0005), Point(77.1005, 12.1005)],
+            crs="EPSG:4326",
+        )
+        with TemporaryDirectory() as folder:
+            census_path = Path(folder) / "census.gpkg"
+            census.to_file(census_path, driver="GPKG")
+            result = waterbody_wbc_intersection_local(swb, "Karnataka", census_path)
+
+        self.assertEqual(list(result["census_id"]), ["u1", "NA"])
+        self.assertEqual(list(result["water_body_name"]), ["pond", "NA"])
 
 
 class ZoiPipelineTests(SimpleTestCase):

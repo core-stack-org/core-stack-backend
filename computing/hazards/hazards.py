@@ -1,9 +1,11 @@
 from computing.hazards.drought_sensitivity.drought_resistance_resilience import (
     generate_drought_resistance,
+    classify_drought_metrics,
 )
 from computing.hazards.forestfire_sensitivity.export_fire_index import fire_index
 from computing.hazards.forestfire_sensitivity.forest_fire_resistance_resilience import (
     forest_fire_sensitivity,
+    classify_fire_metrics,
 )
 from computing.hazards.generate_spei.download_base_datasets import download_data_locally
 from computing.hazards.generate_spei.generate_ppet_multiband import ppet_multiband
@@ -12,11 +14,13 @@ from computing.hazards.generate_spei.spei_runner import run_spei
 from computing.hazards.high_wind_sensitivity.export_max_wind_index import max_wind_index
 from computing.hazards.high_wind_sensitivity.highwind_resistance_resilience import (
     high_wind_sensitivity,
+    classify_wind_metrics,
 )
 from computing.hazards.hybrid_tree_mask import generate_hybrid_tree_mask
 from computing.hazards.rainfall_sensitivity.export_rainfall_index import rainfall_index
 from computing.hazards.rainfall_sensitivity.rainfall_resistance_resilience import (
     generate_rainfall_resilience,
+    classify_rainfall_metrics,
 )
 from utilities.gee_utils import ee_initialize, check_task_status, is_gee_asset_exists
 from nrm_app.celery import app
@@ -69,9 +73,16 @@ def run_drought_resistance_resilience(
         check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
-        generate_drought_resistance(
+        task_id, asset_id = generate_drought_resistance(
             aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
         )
+        if task_id:
+            check_task_status([task_id])
+
+        if is_gee_asset_exists(asset_id):
+            classify_drought_metrics(
+                aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
+            )
 
 
 @app.task(bind=True)
@@ -91,9 +102,16 @@ def run_rainfall_resistance_resilience(
         check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
-        generate_rainfall_resilience(
+        task_id, asset_id = generate_rainfall_resilience(
             aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
         )
+        if task_id:
+            check_task_status([task_id])
+
+        if is_gee_asset_exists(asset_id):
+            classify_rainfall_metrics(
+                aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
+            )
 
 
 @app.task(bind=True)
@@ -113,9 +131,16 @@ def run_forest_fire_resistance_resilience(
         check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
-        forest_fire_sensitivity(
+        task_id, asset_id = forest_fire_sensitivity(
             aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
         )
+        if task_id:
+            check_task_status([task_id])
+
+        if is_gee_asset_exists(asset_id):
+            classify_fire_metrics(
+                aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
+            )
 
 
 @app.task(bind=True)
@@ -135,6 +160,13 @@ def run_high_wind_resistance_resilience(
         check_task_status([task_id])
 
     if is_gee_asset_exists(asset_id):
-        high_wind_sensitivity(
+        task_id, asset_id = high_wind_sensitivity(
             aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
         )
+        if task_id:
+            check_task_status([task_id])
+
+        if is_gee_asset_exists(asset_id):
+            classify_wind_metrics(
+                aez, start_year=2004, end_year=end_year, gee_account_id=gee_account_id
+            )
