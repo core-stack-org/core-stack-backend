@@ -2794,13 +2794,6 @@ VILLAGE_GP_MAPPING_CSV = os.path.join(
 )
 
 
-def _normalize_id_series(series):
-    """Normalize ID columns to clean strings so CSV and GeoJSON IDs match
-    (e.g. 645200, 645200.0 and " 645200 " all become "645200")."""
-    series = series.astype("string").str.strip().str.replace(r"\.0+$", "", regex=True)
-    return series.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
-
-
 @lru_cache(maxsize=1)
 def _load_village_gp_source():
     """Read the Pan-India village-GP mapping once"""
@@ -2809,13 +2802,9 @@ def _load_village_gp_source():
         usecols=["village_id", "village_name", "gp_id", "gp_name"],
         dtype=str,
     )
-    source_df["village_id"] = _normalize_id_series(source_df["village_id"])
-    source_df["gp_id"] = _normalize_id_series(source_df["gp_id"])
-
-    # If a village is mapped to multiple GPs, retain only the first one
-    # (in source file order). Rows without a GP are ignored.
-    source_df = source_df.dropna(subset=["village_id", "gp_id"])
-    source_df = source_df.drop_duplicates(subset=["village_id"], keep="first")
+    # Convert to numeric so IDs match the integer/float values from geojson
+    source_df["village_id"] = pd.to_numeric(source_df["village_id"], errors="coerce")
+    source_df["gp_id"] = pd.to_numeric(source_df["gp_id"], errors="coerce")
     return source_df
 
 
@@ -2823,7 +2812,6 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
     """
     Scenarios covered (our villages = villages in social_economic_indicator or panchayat boundary):
           1. Our village with a known GP in source      -> village + GP row
-             (if mapped to multiple GPs, only the first GP is retained)
           2. Our village with no known GP in source     -> village row, GP empty
              (village absent from source OR present with an empty gp_id)
           3. Village NOT in our data but in one of our GPs (GP expansion)-> village + GP row
@@ -2841,9 +2829,7 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
             ],
             columns=["village_id", "village_name"],
         )
-        village_props["village_id"] = _normalize_id_series(village_props["village_id"])
-        village_props = village_props.dropna(subset=["village_id"])
-        indicator_village_ids = set(village_props["village_id"])
+        indicator_village_ids = village_props["village_id"]
 
         # Scenario 1: source records for our villages that have a GP.
         matched_villages = source_df[
@@ -2851,36 +2837,64 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
             & source_df["gp_id"].notna()
         ]
         matched_village_ids = set(matched_villages["village_id"])
-        unmatched_village_ids = indicator_village_ids - matched_village_ids
+        unmatched_village_ids = set(indicator_village_ids) - matched_village_ids
         known_gp_ids = set(matched_villages["gp_id"])
 
-        # Scenario 1 + 3: expand to ALL villages belonging to the identified GPs
-        gp_villages = source_df[source_df["gp_id"].isin(known_gp_ids)]
+        # Scenario 1: villages from our data that have a known GP
+        # LGD_village_id mirrors village_id (both come from source).
+        scenario1_df = matched_villages[
+            ["village_id", "village_name", "gp_id", "gp_name"]
+        ].copy()
+        scenario1_df["LGD_village_id"] = scenario1_df["village_id"]
 
-        # Scenario 2: villages from our data that don't have a GP in the source
-        unmatched_df = (
-            village_props[village_props["village_id"].isin(unmatched_village_ids)]
-            .drop_duplicates(subset=["village_id"])
-            .assign(gp_id="Unknown", gp_name="Unknown")
-        )
+        # Scenario 3: GP expansion – villages in identified GPs but NOT in our original data.
+        # but LGD_village_id retains the real source village_id.
+        expansion_villages = source_df[
+            source_df["gp_id"].isin(known_gp_ids)
+            & ~source_df["village_id"].isin(indicator_village_ids)
+        ].copy()
+        expansion_villages["LGD_village_id"] = expansion_villages["village_id"]
+        expansion_villages["village_id"] = "Unknown"
 
-        output_cols = ["village_id", "village_name", "gp_id", "gp_name"]
+        # Scenario 2: villages from our data that don't have a GP in the source.
+        # LGD_village_id is "Unknown" as these villages are absent from the source.
+        unmatched_df = village_props[
+            village_props["village_id"].isin(unmatched_village_ids)
+        ].assign(gp_id="Unknown", gp_name="Unknown", LGD_village_id="Unknown")
+
+        output_cols = [
+            "village_id",
+            "village_name",
+            "gp_id",
+            "gp_name",
+            "LGD_village_id",
+        ]
         mapping_df = pd.concat(
-            [gp_villages[output_cols], unmatched_df[output_cols]], ignore_index=True
+            [
+                scenario1_df[output_cols],
+                expansion_villages[output_cols],
+                unmatched_df[output_cols],
+            ],
+            ignore_index=True,
         )
+        # Validation summary
+        final_real_village_ids = set(
+            mapping_df.loc[mapping_df["village_id"] != "Unknown", "village_id"].dropna()
+        )
+        missing_original_villages = set(indicator_village_ids) - final_real_village_ids
+        expanded_villages_count = len(expansion_villages)
 
-        # One row per village (source is already one GP per village).
-        mapping_df = mapping_df.drop_duplicates(subset=["village_id"], keep="first")
-
-        # Validation summary (computed on normalized string IDs)
-        final_village_ids = set(mapping_df["village_id"].dropna())
-        missing_original_villages = indicator_village_ids - final_village_ids
-        expanded_villages = final_village_ids - indicator_village_ids
-
-        # Write IDs as integers to match social_economic_indicator
+        # Write IDs as integers to match social_economic_indicator.
+        # LGD_village_id is cast the same way: numeric where available, "Unknown" otherwise.
         mapping_df["village_id"] = pd.to_numeric(
             mapping_df["village_id"], errors="coerce"
         ).astype("Int64")
+        mapping_df["LGD_village_id"] = (
+            pd.to_numeric(mapping_df["LGD_village_id"], errors="coerce")
+            .astype("Int64")
+            .astype(str)
+            .replace("<NA>", "Unknown")
+        )
         mapping_df["gp_id"] = mapping_df["gp_id"].fillna("Unknown").astype(str)
 
         mapping_df = mapping_df.sort_values(
@@ -2894,7 +2908,7 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
             f"found in source={len(matched_village_ids)}, "
             f"not found in source={len(unmatched_village_ids)}, "
             f"relevant GPs={len(known_gp_ids)}, "
-            f"added through GP expansion={len(expanded_villages)}, "
+            f"added through GP expansion={expanded_villages_count}, "
             f"final rows={len(mapping_df)}"
         )
         if missing_original_villages:
