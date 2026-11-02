@@ -1795,22 +1795,22 @@
       },
       "triply_cropped_area_in_ha_2017-2018": {
         "type": "float",
-        "description": "triple/annual/perennial cropped crea for 2017",
+        "description": "triple/annual/perennial cropped area for 2017",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2018-2019": {
         "type": "float",
-        "description": "triple/annual/perennial cropped crea for 2018",
+        "description": "triple/annual/perennial cropped area for 2018",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2019-2020": {
         "type": "float",
-        "description": "triple/annual/perennial cropped crea for 2019",
+        "description": "triple/annual/perennial cropped area for 2019",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2020-2021": {
         "type": "float",
-        "description": "triple/annual/perennial cropped crea for 2020",
+        "description": "triple/annual/perennial cropped area for 2020",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2021-2022": {
@@ -1820,12 +1820,12 @@
       },
       "triply_cropped_area_in_ha_2022-2023": {
         "type": "float",
-        "description": "triple/annual/perennial cropped crea for 2022",
+        "description": "triple/annual/perennial cropped area for 2022",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2023-2024": {
         "type": "float",
-        "description": "triple/annual/perennial cropped crea for 2023",
+        "description": "triple/annual/perennial cropped area for 2023",
         "unit": "hectares"
       },
       "triply_cropped_area_in_ha_2024-2025": {
