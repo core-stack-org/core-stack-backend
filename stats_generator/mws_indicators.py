@@ -658,7 +658,7 @@ def generate_mws_data_for_kyl_filters(
 
                     layers = LayerInfo.objects.get(
                         layer_type="vector",
-                        workspace__in=["drought", "cropping_drought"],
+                        workspace="drought",
                     )
                     years = [
                         str(year)
