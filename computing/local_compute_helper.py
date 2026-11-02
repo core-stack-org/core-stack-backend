@@ -10,6 +10,7 @@ import pandas as pd
 import rasterio
 from rasterio.mask import mask
 from shapely.geometry import mapping
+from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
 from computing.utils import convert_to_zip
@@ -1173,6 +1174,34 @@ def resolve_lulc_raster_paths(
         ensure_file_exists(raster_path, f"LULC raster for {year}-{year + 1}")
         raster_paths.append(str(raster_path))
     return raster_paths
+
+
+# ── cropping intensity (shared by the watershed and farm pipelines) ─────────────
+
+CROPPING_INTENSITY_INITIAL_YEAR = 2017
+SINGLE_CROP_CLASSES = (LulcClass.SINGLE_KHARIF, LulcClass.SINGLE_NON_KHARIF)
+ALL_CROP_CLASSES = SINGLE_CROP_CLASSES + (
+    LulcClass.DOUBLE_CROPPING,
+    LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+)
+
+
+def compute_cropping_intensity(single_area, double_area, triple_area, denominator):
+    """
+    Cropping intensity = (single + 2*double + 3*triple) / denominator, where the
+    denominator is the area ever cropped. Element-wise on arrays; 0.0 where the
+    denominator is 0 (never cropped).
+    """
+    single = np.asarray(single_area, dtype="float64")
+    double = np.asarray(double_area, dtype="float64")
+    triple = np.asarray(triple_area, dtype="float64")
+    denominator = np.asarray(denominator, dtype="float64")
+    intensity = np.zeros(denominator.shape, dtype="float64")
+    nonzero = denominator > 0
+    intensity[nonzero] = (
+        single[nonzero] + 2.0 * double[nonzero] + 3.0 * triple[nonzero]
+    ) / denominator[nonzero]
+    return intensity
 
 
 def get_watershed_areas_in_hectares(watersheds_gdf):
