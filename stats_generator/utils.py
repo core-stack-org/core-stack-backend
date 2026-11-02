@@ -2741,25 +2741,27 @@ def create_excel_for_village_boun(old_geojson, writer):
         village_name = properties.get("vill_name", None)
 
         # Initialize village data using village_id as the key
-        if village_id not in village_data:
-            village_data[village_id] = {
-                "village_name": village_name,
-                "TOT_P": 0,
-                "P_LIT": 0,
-                "P_SC": 0,
-                "P_ST": 0,
-                "state_census_ID": state_census_ID,
-                "dist_census_ID": dist_census_ID,
-                "block_census_ID": block_census_ID,
-                "geometry": feature["geometry"],
-            }
+        if village_id is not None:
+            key = (village_id, village_name)
+            if key not in village_data:
+                village_data[key] = {
+                    "village_name": village_name,
+                    "TOT_P": 0,
+                    "P_LIT": 0,
+                    "P_SC": 0,
+                    "P_ST": 0,
+                    "state_census_ID": state_census_ID,
+                    "dist_census_ID": dist_census_ID,
+                    "block_census_ID": block_census_ID,
+                    "geometry": feature["geometry"],
+                }
 
-        village_data[village_id]["TOT_P"] += properties.get("TOT_P", 0)
-        village_data[village_id]["P_LIT"] += properties.get("P_LIT", 0)
-        village_data[village_id]["P_SC"] += properties.get("P_SC", 0)
-        village_data[village_id]["P_ST"] += properties.get("P_ST", 0)
+        village_data[key]["TOT_P"] += properties.get("TOT_P", 0)
+        village_data[key]["P_LIT"] += properties.get("P_LIT", 0)
+        village_data[key]["P_SC"] += properties.get("P_SC", 0)
+        village_data[key]["P_ST"] += properties.get("P_ST", 0)
 
-    for village_id, data in village_data.items():
+    for (village_id, village_name), data in village_data.items():
         total_popu = data["TOT_P"]
         literacy_rate = data["P_LIT"] * 100 / total_popu if total_popu > 0 else 0.0
         total_SC_popu = data["P_SC"]
@@ -2767,13 +2769,23 @@ def create_excel_for_village_boun(old_geojson, writer):
         sc_perce = (data["P_SC"] * 100 / total_popu) if total_popu > 0 else 0.0
         st_perce = (data["P_ST"] * 100 / total_popu) if total_popu > 0 else 0.0
 
+        if (
+            village_id == 0
+            and total_popu <= 0
+            and total_SC_popu <= 0
+            and total_ST_popu <= 0
+            and literacy_rate <= 0
+            and sc_perce <= 0
+            and st_perce <= 0
+        ):
+            continue
         results.append(
             {
                 "state_census_ID": data["state_census_ID"],
                 "dist_census_ID": data["dist_census_ID"],
                 "block_census_ID": data["block_census_ID"],
                 "village_id": village_id,
-                "village_name": data["village_name"],
+                "village_name": village_name,
                 "total_population_count": total_popu,
                 "total_SC_population_count": total_SC_popu,
                 "total_ST_population_count": total_ST_popu,
