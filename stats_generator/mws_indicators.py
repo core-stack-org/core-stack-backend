@@ -1399,6 +1399,7 @@ def generate_mws_data_for_kyl_filters(
                 try:
                     reduction_canopy_density_height = -9999
                     increase_canopy_density_height = -9999
+                    degradation_in_forests = -9999
                     overall_tree_change_df = sheets["overall_tree_change"]
                     if (
                         overall_tree_change_df is not -1
