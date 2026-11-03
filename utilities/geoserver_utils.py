@@ -1559,6 +1559,33 @@ class Geoserver:
             raise GeoserverException(r.status_code, r.content)
 
     # NOTE: To upload the RASTER style on the GEOSERVER
+    def style_exists(self, style_name: str, workspace: Optional[str] = None) -> bool:
+        """
+        True if ``style_name`` resolves on this GeoServer.
+
+        ``ws:name`` is looked up in workspace ``ws``; a bare name is looked up
+        globally first, then in ``workspace``.
+        """
+        if ":" in style_name:
+            style_ws, bare = style_name.split(":", 1)
+            candidates = [
+                "{}/rest/workspaces/{}/styles/{}.json".format(
+                    self.service_url, style_ws, bare
+                )
+            ]
+        else:
+            candidates = ["{}/rest/styles/{}.json".format(self.service_url, style_name)]
+            if workspace:
+                candidates.append(
+                    "{}/rest/workspaces/{}/styles/{}.json".format(
+                        self.service_url, workspace, style_name
+                    )
+                )
+        for url in candidates:
+            if self._requests("get", url).status_code == 200:
+                return True
+        return False
+
     def publish_style(
         self,
         layer_name: str,
@@ -1580,6 +1607,20 @@ class Geoserver:
         the path to the file and file_type indicating it is a geotiff, arcgrid or other raster type.
 
         """
+        if not self.style_exists(style_name, workspace):
+            # Pointing a layer at a style that does not exist leaves a null
+            # defaultStyle reference, which makes every WMS/REST read of the
+            # layer fail with a NullPointerException. Keep GeoServer's default.
+            logger.warning(
+                "Style %r not found on %s (workspace %s); leaving layer %s on "
+                "its default style.",
+                style_name,
+                self.service_url,
+                workspace,
+                layer_name,
+            )
+            return None
+
         headers = {"content-type": "text/xml"}
         url = "{}/rest/layers/{}:{}".format(self.service_url, workspace, layer_name)
         style_xml = (
