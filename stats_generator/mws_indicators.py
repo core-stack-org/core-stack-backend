@@ -289,6 +289,7 @@ def generate_mws_data_for_kyl_filters(
                     print(f"Error occurred: {e}")
 
                 ############### Kharif Average Rainfall ################
+                kharif_annual_rainfall_ratio = -9999
                 try:
                     df_hydrological_seasonal_mws_data = sheets["hydrological_seasonal"][
                         sheets["hydrological_seasonal"]["UID"] == specific_mws_id
@@ -323,6 +324,9 @@ def generate_mws_data_for_kyl_filters(
                     kharif_annual_rainfall_ratio = -9999
 
                 ##################### SWB #####################
+                avg_wsr_ratio_kharif = -9999
+                avg_wsr_ratio_rabi = -9999
+                avg_wsr_ratio_zaid = -9999
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -488,7 +492,9 @@ def generate_mws_data_for_kyl_filters(
                     ) = avg_perc_zaid_surface_water_mws = -9999
 
                 ###################### Mean of Kharif and Rabi Water Surface Area ######################
-
+                mean_kharif_water_surface_area = -9999
+                mean_rabi_water_surface_area = -9999
+                mean_kharif_rabi_ratio = -9999
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -562,6 +568,7 @@ def generate_mws_data_for_kyl_filters(
                     mean_kharif_rabi_ratio = -9999
 
                 ################# SWB Trend ######################
+                trend_swb = -9999
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -583,6 +590,7 @@ def generate_mws_data_for_kyl_filters(
                     trend_swb = -9999
 
                     ################# Numeric Water Surface Area Trend #################
+                trend_water_surface_area_value = -9999
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -618,6 +626,7 @@ def generate_mws_data_for_kyl_filters(
                     trend_water_surface_area_value = -9999
 
                 ######### G Trend  #################
+                trend_g = -9999
                 try:
                     G_Trend = (
                         hydro_annual_mws_data.filter(like="G")
@@ -649,13 +658,12 @@ def generate_mws_data_for_kyl_filters(
                     trend_g = -9999
 
                 #########  drought_category  ##############
+                monsoon_onset_day_range = -9999
+                drought_category = -9999
+                avg_dry_spell_in_weeks = -9999
+                max_dry_spell_weeks = -9999
+                max_drought_weeks = -9999
                 try:
-                    monsoon_onset_day_range = -9999
-                    drought_category = -9999
-                    avg_dry_spell_in_weeks = -9999
-                    max_dry_spell_weeks = -9999
-                    max_drought_weeks = -9999
-
                     layers = LayerInfo.objects.get(
                         layer_type="vector", workspace="drought"
                     )
@@ -735,6 +743,7 @@ def generate_mws_data_for_kyl_filters(
                         drought_category = -9999
 
                     # ---------------- max_drought_weeks ----------------
+                    max_drought_weeks = -9999
                     try:
                         severe_columns = df_crpDrought_mws_data.filter(
                             like="Severe_in_weeks"
@@ -758,6 +767,7 @@ def generate_mws_data_for_kyl_filters(
                         max_drought_weeks = -9999
 
                     ########   avg_dry_spell_in_weeks
+                    avg_dry_spell_in_weeks = -9999
                     try:
                         dryspell_columns = df_crpDrought_mws_data.filter(
                             like="drysp_unit_4_weeks"
@@ -777,6 +787,7 @@ def generate_mws_data_for_kyl_filters(
                         avg_dry_spell_in_weeks = -9999
 
                     ################# Max Dry Spell Weeks #################
+                    max_dry_spell_weeks = -9999
                     try:
                         dryspell_columns = df_crpDrought_mws_data.filter(
                             like="drysp_unit_4_weeks"
@@ -847,9 +858,15 @@ def generate_mws_data_for_kyl_filters(
                         .sum()
                     )
                 except:
+                    nrega_count = {
+                        "irrigation": -9999,
+                        "swc": -9999,
+                        "plantations": -9999,
+                    }
                     nrega_assets_sum = -9999
 
                 ############ MWS Intersect Villages  ########################
+                mws_intersect_villages = []
                 try:
                     df_mws_inters_villages_mws_data = sheets["mws_intersect_villages"][
                         sheets["mws_intersect_villages"]["MWS UID"] == specific_mws_id
@@ -862,6 +879,10 @@ def generate_mws_data_for_kyl_filters(
                     mws_intersect_villages = []
 
                 ############  Change Detection Degradation  ###################
+                degradation_land_area = -9999
+                change_in_cropping_intensity_area = -9999
+                cropping_to_shrub_area = -9999
+                
                 try:
                     df_change_degr_detection_mws_data = sheets[
                         "change_detection_degradation"
@@ -927,6 +948,10 @@ def generate_mws_data_for_kyl_filters(
                     cropping_to_shrub_area = -9999
 
                 ############  Change Detection Afforestation  ###################
+
+                forest_to_farm = -9999
+                deforestation_land_area = -9999
+                afforestation_land_area = -9999
                 try:
                     df_change_affo_detection_mws_data = sheets[
                         "change_detection_afforestation"
@@ -945,6 +970,7 @@ def generate_mws_data_for_kyl_filters(
                     afforestation_land_area = -9999
 
                 ############  Change Detection Deforestation  ###################
+                deforestation_land_area = -9999
                 try:
                     df_change_defo_detection_mws_data = sheets[
                         "change_detection_deforestation"
@@ -963,6 +989,7 @@ def generate_mws_data_for_kyl_filters(
                     deforestation_land_area = -9999
 
                 ############ Tree Cover Gain/Loss Thresholds ################
+                tree_cover_gain_75_percent = -9999
                 try:
                     tree_cover_gain_75_percent = (
                         deforestation_land_area * 0.75
@@ -977,6 +1004,7 @@ def generate_mws_data_for_kyl_filters(
                     tree_cover_gain_75_percent = -9999
 
                 ############  Change Detection Urbanization  ###################
+                urbanization_land_area = -9999
                 try:
                     df_change_urba_detection_mws_data = sheets[
                         "change_detection_urbanization"
@@ -988,6 +1016,7 @@ def generate_mws_data_for_kyl_filters(
                     urbanization_land_area = -9999
 
                     ############## Facilities Proximity ################
+                dist_to_bank = -9999
                 try:
                     df_facilities_proximity_mws_data = sheets["facilities_proximity"][
                         sheets["facilities_proximity"]["village_id"].isin(
@@ -1012,6 +1041,7 @@ def generate_mws_data_for_kyl_filters(
                     dist_to_bank = -9999
 
                 ############## Distance to Cooperatives ################
+                dist_to_coops = -9999
                 try:
                     df_facilities_proximity_mws_data = sheets["facilities_proximity"][
                         sheets["facilities_proximity"]["village_id"].isin(
@@ -1034,6 +1064,7 @@ def generate_mws_data_for_kyl_filters(
                     dist_to_coops = -9999
 
                 ############ Max Livestock Load ########################
+                max_livestock_score = -9999
                 try:
                     df_livestock = sheets["livestock"]
                     df_livestock_mws_data = df_livestock[
@@ -1054,6 +1085,7 @@ def generate_mws_data_for_kyl_filters(
                     max_livestock_score = -9999
 
                 ############# Terrain lulc slope / plain  #####################
+                lulc_slope_category = -9999
                 try:
                     df_lulc_slope_mws_data = sheets["terrain_lulc_slope"][
                         sheets["terrain_lulc_slope"]["UID"] == specific_mws_id
@@ -1068,6 +1100,7 @@ def generate_mws_data_for_kyl_filters(
                     lulc_slope_category = -9999
 
                 try:
+                    lulc_plain_category = -9999
                     df_lulc_plain_mws_data = sheets["terrain_lulc_plain"][
                         sheets["terrain_lulc_plain"]["UID"] == specific_mws_id
                     ]
@@ -1081,6 +1114,8 @@ def generate_mws_data_for_kyl_filters(
                     lulc_plain_category = -9999
 
                 ################# Restoration Vector  #########################
+                wide_scale_restoration = -9999
+                area_protection = -9999
                 try:
                     df_restoration_vector_mws_data = sheets["restoration_vector"][
                         sheets["restoration_vector"]["UID"] == specific_mws_id
@@ -1096,6 +1131,7 @@ def generate_mws_data_for_kyl_filters(
                     area_protection = -9999
 
                 ################# Aquifer Vector  #########################
+                aquifer_class = -9999
                 aquifer_class_map = {0: "Hard Rock", 1: "Alluvial"}
 
                 class_to_id = {v: k for k, v in aquifer_class_map.items()}
@@ -1137,6 +1173,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ################## LCW Conflict  ######################
                 ## if count is 0 then Areas with no conflicts else Areas with conflicts
+                lcw_conflict = -9999
                 try:
                     lcw_conflict_count = sheets["lcw_conflict"][
                         sheets["lcw_conflict"]["UID"] == specific_mws_id
@@ -1150,6 +1187,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ################## mining  ######################
                 ## if count is 0 then Areas with no mining else Areas with mining
+                mining = 0
                 try:
                     mining_count = sheets["mining"][
                         sheets["mining"]["UID"] == specific_mws_id
@@ -1163,6 +1201,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ################## green credit  ######################
                 ## if count is 0 then Areas with no green credit else Areas with green credit
+                green_credit = 0
                 try:
                     green_credit_count = sheets["green_credit"][
                         sheets["green_credit"]["UID"] == specific_mws_id
@@ -1176,6 +1215,7 @@ def generate_mws_data_for_kyl_filters(
 
                 ################## factory csr  ######################
                 ## if count is 0 then Areas with no factory else Areas with factory
+                factory_csr = 0
                 try:
                     factory_csr_count = sheets["factory_csr"][
                         sheets["factory_csr"]["UID"] == specific_mws_id
@@ -1188,6 +1228,7 @@ def generate_mws_data_for_kyl_filters(
                     factory_csr = 0
 
                 ############ MWS Intersect Swb ########################
+                mws_intersect_swb = []
                 try:
                     swb_df = sheets["mws_intersect_swb"]
 
@@ -1223,6 +1264,9 @@ def generate_mws_data_for_kyl_filters(
                     mws_intersect_swb = []
 
                 ############ DEM (Digital Elevation Model) ########################
+                relief = -9999
+                mean_elevation = -9999
+                relative_mean_elevation = -9999
                 try:
                     dem_df = sheets["dem"]
                     if dem_df is not -1 and not dem_df.empty:
@@ -1262,6 +1306,7 @@ def generate_mws_data_for_kyl_filters(
                     relative_mean_elevation = -9999
 
                 ############ Canal ########################
+                canal_available = False
                 try:
                     canal_df = sheets["canal"]
                     if canal_df is not -1 and not canal_df.empty:
@@ -1279,6 +1324,7 @@ def generate_mws_data_for_kyl_filters(
                     canal_available = False
 
                 ############ Canal ########################
+                river_available = False
                 try:
                     river_df = sheets["river"]
                     if river_df is not -1 and not river_df.empty:
@@ -1354,6 +1400,9 @@ def generate_mws_data_for_kyl_filters(
                     lulc_forest_percent = -9999
 
                 ################### cropping intensity ###############
+
+                lulc_crop_percent = -9999
+                cropped_area_in_ha = -9999
                 try:
                     crop_df = sheets["croppingIntensity_annual"]
                     if crop_df is not -1 and not crop_df.empty:
@@ -1374,6 +1423,7 @@ def generate_mws_data_for_kyl_filters(
                     print(f"error in croppingIntensity_annual{e}")
 
                 ############ Canal ########################
+                drainage_density = -9999
                 try:
                     drainage_density_df = sheets["drainage_density"]
                     if drainage_density_df is not -1 and not drainage_density_df.empty:
@@ -1396,10 +1446,14 @@ def generate_mws_data_for_kyl_filters(
                     drainage_density = -9999
 
                 ############ overall_tree_change #################
+
+                reduction_canopy_density_height = -9999
+                increase_canopy_density_height = -9999
+                degradation_in_forests = -9999
+                trees_in_forest_loss = -9999
+                tree_cover_area = -9999
                 try:
-                    reduction_canopy_density_height = -9999
-                    increase_canopy_density_height = -9999
-                    degradation_in_forests = -9999
+
                     overall_tree_change_df = sheets["overall_tree_change"]
                     if (
                         overall_tree_change_df is not -1
@@ -1429,10 +1483,7 @@ def generate_mws_data_for_kyl_filters(
                             )
                 except Exception as e:
                     print(f"Error in getting overall_tree_change data: {e}")
-                    degradation_in_forests = -9999
-                    trees_in_forest_loss = -9999
-                    tree_cover_area = -9999
-
+                    
                 ########## soil health ###########
                 try:
                     nitrogen_levels = -9999
@@ -1557,6 +1608,7 @@ def generate_mws_data_for_kyl_filters(
                     upstream_mws_count = -9999
 
                     ############### NDVI Shrub trend #########################
+                shrub_trend = -9999
                 try:
                     df_ndvi_mws_data = sheets["ndvi"][
                         sheets["ndvi"]["UID"] == specific_mws_id
@@ -1574,6 +1626,7 @@ def generate_mws_data_for_kyl_filters(
                     shrub_trend = -9999
 
                     ############## Forest Fringe ################
+                trees_in_forest_fringe_loss = -9999
                 try:
                     df_forest_fringe_mws_data = sheets["forest_fringes"][
                         sheets["forest_fringes"]["UID"] == specific_mws_id
@@ -1588,6 +1641,7 @@ def generate_mws_data_for_kyl_filters(
                     trees_in_forest_fringe_loss = -9999
 
                     ############ Mean Annual Delta G #################
+                mean_annual_delta_g_mm = -9999
                 try:
                     delta_g_columns = hydro_annual_mws_data.filter(like="DeltaG")
 
@@ -1603,6 +1657,7 @@ def generate_mws_data_for_kyl_filters(
                     mean_annual_delta_g_mm = -9999
 
                     ############## Trees in Grassland Loss ################
+                trees_in_grassland_loss = -9999
                 try:
                     df_tree_in_grassland_mws_data = sheets["tree_in_grassland"][
                         sheets["tree_in_grassland"]["UID"] == specific_mws_id
@@ -1618,7 +1673,7 @@ def generate_mws_data_for_kyl_filters(
 
 
                 ################### SHG penetration ########################
-
+                shg_penetration = -9999
                 try:
                     df_antyodaya_mws_data = sheets["antyodaya"][
                         sheets["antyodaya"]["village_id"]
@@ -1636,6 +1691,8 @@ def generate_mws_data_for_kyl_filters(
                     print(f"SHG ERROR for UID {specific_mws_id}: {e}")
                     shg_penetration = -9999
 
+                ############## Forest Fire Count ################   
+                fire_count_per_year = -9999
                 try:
                     df_forest_fire_data = sheets["forest_fire"][
                         sheets["forest_fire"]["UID"] == specific_mws_id
