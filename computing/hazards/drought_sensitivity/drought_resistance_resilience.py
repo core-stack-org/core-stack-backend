@@ -18,9 +18,9 @@ def generate_drought_resistance(
     *
     * AGRICULTURAL YEAR CONVENTION:
     * Year `y` = Jul 1 of `y` -> Jun 30 of `y+1`, matching the rest of the
-    * pipeline. SPEI-12 bands are named "{y}_{y+1}" (e.g. "2004_2005") by
-    * compute_spei.R — selected directly by that name here, not by a
-    * positional rename.
+    * pipeline. SPEI-3 bands are named "y{y}_m07_09" (e.g. "y2004_m07_09")
+    * by compute_spei.R — the July–September band of calendar year `y`,
+    * which falls inside ag-year `y`. Selected directly by that name.
     *
     * For each forest pixel and drought year that has a next-year kNDVI,
     * stores signed resistance, signed resilience, and the yearly class.
@@ -37,9 +37,11 @@ def generate_drought_resistance(
     * Stored only when Ye / Yn_bar < 0.95. Otherwise the resilience class
     * is 0. The class comes from the kNDVI ratios.
     *
+    * Drought year: SPEI-3 ending September (July–August–September) < -1.
+    *
     * Requires:
     * - Forest mask asset from Script 1
-    * - SPEI-12 asset from the SPEI pipeline (compute_spei.R)
+    * - SPEI-3 asset from the SPEI pipeline (compute_spei.R, band yYYYY_m07_09)
     """
 
     ee_initialize(gee_account_id)
@@ -269,13 +271,13 @@ def generate_drought_resistance(
 
         resistance = (
             Yn_bar.divide(diffAbs)
-            .multiply(diffRaw.signum())
+            .multiply(diffRaw.signum().where(diffRaw.eq(0), 1))
             .rename("resistance")
             .updateMask(scored)
         )
         resilience = (
             diffAbs.divide(diffNextAbs)
-            .multiply(diffNext.signum())
+            .multiply(diffNext.signum().where(diffNext.eq(0), 1))
             .rename("resilience")
             .updateMask(scored.And(deepDrop))
         )

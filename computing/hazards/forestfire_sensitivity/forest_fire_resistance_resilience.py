@@ -284,13 +284,13 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2024, gee_account_id=
 
         resistance = (
             Yn_bar.divide(diffAbs)
-            .multiply(diffRaw.signum())
+            .multiply(diffRaw.signum().where(diffRaw.eq(0), 1))
             .rename("resistance")
             .updateMask(scored)
         )
         resilience = (
             diffAbs.divide(diffNextAbs)
-            .multiply(diffNext.signum())
+            .multiply(diffNext.signum().where(diffNext.eq(0), 1))
             .rename("resilience")
             .updateMask(scored.And(deepDrop))
         )

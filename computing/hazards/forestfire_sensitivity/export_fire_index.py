@@ -36,11 +36,11 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
     * fireAvg_{year}    = average daily FRP on fire days
     * maxFRP_{year}     = maximum daily FRP recorded in the ag-year
     *
-    * Fire day definition: daily MaxFRP > 30 (MODIS Terra Thermal Anomalies).
-    * NOTE: MaxFRP's documented GEE scale factor is 0.1 (raw -> MW) and this
-    * threshold is compared against the raw band with no scaling applied —
-    * left as-is deliberately, matching the threshold choice already made
-    * in the resistance/resilience script for this index.
+    * Fire day definition: daily MaxFRP > 30 MW (MODIS Terra Thermal Anomalies).
+    * The 0.1 scale factor is applied to the yearly max, sum, and mean.
+    * Daily images stay on the MODIS grid. Scaling each day before max/sum
+    * attaches a 1-degree projection and the export fails with
+    * "Can't transform (0.0,0.0)". The raw cut is therefore 300.
     *
     * Requires: nothing — only public datasets (MODIS MOD14A1)
     """
@@ -63,7 +63,8 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
     #     .filter(ee.Filter.eq("Name", "Odisha"))
     #     .geometry()
     # )
-    FRP_THRESHOLD = 30
+    FRP_SCALE = 0.1
+    FRP_THRESHOLD = 30  # MW. Raw MaxFRP cut is 30 / 0.1 = 300.
     """
     Fixed baseline window for zScore normalization — independent of START_YEAR/END_YEAR.
     Matching the same 2004-2024 ag-year window locked in for rain and (once converted)
@@ -118,21 +119,27 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
         end = ee.Date.fromYMD(ee.Number(y).add(1), 6, 30).advance(1, "day")
 
         yearCollection = modisFire.filterDate(start, end)
+        raw_threshold = FRP_THRESHOLD / FRP_SCALE
 
-        #  Absolute maximum daily FRP for this ag-year
+        #  Absolute maximum daily FRP for this ag-year, stored in MW
         maxFRP = (
-            yearCollection.max().unmask(0).setDefaultProjection(proj).rename("maxFRP")
+            yearCollection.max()
+            .multiply(FRP_SCALE)
+            .unmask(0)
+            .setDefaultProjection(proj)
+            .rename("maxFRP")
         )
 
-        #  Binary mask: isolate days where FRP > 30
+        #  Binary mask: isolate days where raw MaxFRP exceeds 30 MW
         fireDaysCollection = yearCollection.map(
-            lambda img: img.updateMask(img.gt(FRP_THRESHOLD))
+            lambda img: img.updateMask(img.gt(raw_threshold))
         )
 
-        #  1. Ag-year sum of FRP on fire days
+        #  1. Ag-year sum of FRP on fire days, stored in MW
         sumFRP = (
             fireDaysCollection.map(lambda img: img.unmask(0))
             .sum()
+            .multiply(FRP_SCALE)
             .setDefaultProjection(proj)
             .rename("FRP")
         )
@@ -146,9 +153,10 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
             .rename("fireDays")
         )
 
-        #  3. Average FRP of fire days
+        #  3. Average FRP of fire days, stored in MW
         fireAvg = (
             fireDaysCollection.mean()
+            .multiply(FRP_SCALE)
             .unmask(0)
             .setDefaultProjection(proj)
             .rename("fireAvg")
@@ -173,7 +181,12 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
     #  Server-side map architecture over the annual image collection
     def completed_annual_collection_func(img):
         frp = img.select("FRP")
-        z = frp.subtract(frpMean).divide(frpStdDev).rename("zScore")
+        z = (
+            frp.subtract(frpMean)
+            .divide(frpStdDev)
+            .updateMask(frpStdDev.gt(0))
+            .rename("zScore")
+        )
         return img.addBands(z)
 
     completedAnnualCollection = annualMetrics.map(completed_annual_collection_func)
