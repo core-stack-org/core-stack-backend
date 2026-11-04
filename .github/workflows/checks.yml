@@ -1,0 +1,128 @@
+name: Checks
+
+# Each job compares the pull request with its target branch and fails only
+# on problems the pull request adds, so existing issues on dev don't block it.
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: No new ruff findings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: head
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - name: Install ruff
+        run: |
+          python3 -m venv /tmp/ruff
+          /tmp/ruff/bin/pip install --quiet ruff==0.17.3
+      - name: Compare with the target branch
+        run: python3 head/.github/scripts/no_new_ruff_findings.py /tmp/ruff/bin/ruff base head
+
+  tests:
+    name: Django check and no new test failures
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: corestack
+          POSTGRES_PASSWORD: corestack
+          POSTGRES_DB: corestack
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Placeholder settings: the tests mock external services.
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_NAME: corestack
+      DB_USER: corestack
+      DB_PASSWORD: corestack
+      SECRET_KEY: ci-only-not-a-secret
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CORS_ALLOWED_ORIGINS: https://localhost
+      MISSING_LAYER_RECIPIENTS: ci@example.com
+      ADMIN_GROUP_ID: "1"
+      GEE_DEFAULT_ACCOUNT_ID: "1"
+      GEE_HELPER_ACCOUNT_ID: "1"
+      GEE_SERVICE_ACCOUNT_KEY_PATH: /tmp/none.json
+      GEE_HELPER_SERVICE_ACCOUNT_KEY_PATH: /tmp/none.json
+      GEE_DATASETS_SERVICE_ACCOUNT_KEY_PATH: /tmp/none.json
+      GEE_STORAGE_PROJECT: ci
+      GEE_STORAGE_PROJECT_HELPER: ci
+      GCS_BUCKET_NAME: ci
+      NREGA_BUCKET: ci
+      CE_BUCKET_NAME: ci
+      CE_BUCKET_URL: https://localhost
+      CE_API_URL: https://localhost
+      BASE_API_URL: https://localhost
+      LOCAL_COMPUTE_API_URL: https://localhost
+      OVERPASS_URL: https://localhost
+      ODK_USERNAME: ci
+      ODK_PASSWORD: ci
+      ODK_USER_EMAIL_SYNC: ci@example.com
+      ODK_USER_PASSWORD_SYNC: ci
+      AUTH_TOKEN_FB_META: ci
+      AUTH_TOKEN_360: ci
+      CALL_PATCH_API_KEY: ci
+      EARTH_DATA_USER: ci
+      EARTH_DATA_PASSWORD: ci
+      USERNAME_GESDISC: ci
+      PASSWORD_GESDISC: ci
+      EMAIL_HOST_USER: ci@example.com
+      EMAIL_HOST_PASSWORD: ci
+      ES_AUTH: ci
+      S3_ACCESS_KEY: ci
+      S3_SECRET_KEY: ci
+      S3_BUCKET: ci
+      S3_REGION: ap-south-1
+      EXCEL_DIR: /tmp/ci-excel
+      # Run Celery tasks in-process: CI has no broker or workers, and with
+      # eager mode off the tests that dispatch tasks wait on broker retries.
+      CELERY_TASK_ALWAYS_EAGER: "True"
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: head
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      # Built from the pull request's own environment.yml, so a dependency
+      # missing from it shows up here.
+      - uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: head/installation/environment.yml
+          environment-name: corestackenv
+          cache-environment: true
+      # The same geetools fix the Dockerfile applies.
+      - name: Install geetools as the Dockerfile does
+        shell: bash -el {0}
+        run: |
+          python -m pip uninstall -y geetools || true
+          micromamba install -y -n corestackenv -c conda-forge --force-reinstall geetools=1.15.0
+      - name: Generate a throwaway Fernet key
+        shell: bash -el {0}
+        run: python -c "from cryptography.fernet import Fernet; print('FERNET_KEY=' + Fernet.generate_key().decode())" >> "$GITHUB_ENV"
+      - name: Run the suite on both branches and compare
+        shell: bash -el {0}
+        run: bash head/.github/scripts/no_new_test_failures.sh base head
