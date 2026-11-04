@@ -94,6 +94,7 @@ urlpatterns = [
     path("api/v1/", include("waterrejuvenation.urls")),
     path("api/v2/", include("waterrejuvenation.urls_v2")),
     path("api/v1/", include("moderation.urls")),
+    path("layer_comparison/", include("layer_comparison.urls")),
     # Status page
     path("status/", include("status_monitor.urls")),
     # Swagger Doc

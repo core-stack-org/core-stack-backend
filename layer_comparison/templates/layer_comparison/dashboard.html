@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Layer Comparison | CoRE Stack</title>
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          crossorigin="">
+    <link rel="stylesheet"
+          href="{% static 'layer_comparison/css/dashboard.css' %}">
+</head>
+<body>
+<main
+    id="layer-comparison-dashboard"
+    class="dashboard"
+    data-states-url="{% url 'layer_comparison:states' %}"
+    data-districts-url="{% url 'layer_comparison:districts' %}"
+    data-blocks-url="{% url 'layer_comparison:blocks' %}"
+    data-layers-url="{% url 'layer_comparison:layers' %}"
+    data-compare-url="{% url 'layer_comparison:compare' %}"
+>
+    <header class="page-header">
+        <h1>Layer Comparison</h1>
+        <p>Compare GEE outputs with locally generated GeoServer layers.</p>
+    </header>
+
+    <section class="location-panel">
+        <label>State
+            <select id="state-select">
+                <option value="">Loading states...</option>
+            </select>
+        </label>
+        <label>District
+            <select id="district-select" disabled>
+                <option value="">Select state first</option>
+            </select>
+        </label>
+        <label>Block
+            <select id="block-select" disabled>
+                <option value="">Select district first</option>
+            </select>
+        </label>
+        <button id="find-layers-button" disabled type="button">
+            Find layers
+        </button>
+    </section>
+
+    <div id="status-message" role="status" aria-live="polite"></div>
+
+    <section id="layer-selection" hidden>
+        <div class="section-heading">
+            <div>
+                <h2>Available layers</h2>
+                <p id="layer-count"></p>
+            </div>
+            <div class="selection-actions">
+                <button id="select-all-button" class="secondary" type="button">
+                    Select all
+                </button>
+                <button id="clear-all-button" class="secondary" type="button">
+                    Clear
+                </button>
+                <button id="compare-button" type="button" disabled>
+                    <span class="compare-label">Compare selected</span>
+                    <span class="button-spinner" aria-hidden="true"></span>
+                </button>
+            </div>
+        </div>
+        <div id="layer-groups"></div>
+    </section>
+
+    <section id="comparison-container"></section>
+</main>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        crossorigin=""></script>
+<script src="{% static 'layer_comparison/js/dashboard.js' %}"></script>
+</body>
+</html>

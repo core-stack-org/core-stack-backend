@@ -132,6 +132,7 @@ INSTALLED_APPS = [
     "moderation",
     "users.apps.UsersConfig",
     "status_monitor",
+    "layer_comparison",
 ]
 
 # MARK: CORS Settings
@@ -166,7 +167,11 @@ CORS_ALLOW_METHODS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "https://www.cse.iitd.ernet.in", "https://cse.iitd.ernet.in"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "https://www.cse.iitd.ernet.in",
+    "https://cse.iitd.ernet.in",
+]
 
 # MARK: REST Framework
 
@@ -302,9 +307,7 @@ CELERY_BROKER_URL = env(
 )
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="rpc://")
 CELERY_TASK_ALWAYS_EAGER = env.bool("CELERY_TASK_ALWAYS_EAGER", default=False)
-CELERY_TASK_EAGER_PROPAGATES = env.bool(
-    "CELERY_TASK_EAGER_PROPAGATES", default=False
-)
+CELERY_TASK_EAGER_PROPAGATES = env.bool("CELERY_TASK_EAGER_PROPAGATES", default=False)
 CELERY_TIMEZONE = "Asia/Kolkata"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 # Long-running tasks (runoff_gpu, et_download, Pan-India hydrology) are queued
