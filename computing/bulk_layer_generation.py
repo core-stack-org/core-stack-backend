@@ -239,10 +239,30 @@ def get_regeneration_dataset_names(name: str) -> tuple[str, ...]:
 
     try:
         return LOCAL_TASK_DATASETS[pipeline.name]
-    except KeyError as exc:
+    except (AttributeError, KeyError) as exc:
         raise ValueError(
             f"Local regeneration datasets are not configured for pipeline '{name}'."
         ) from exc
+
+
+# Hydrology pipelines are plain-function runners writing one shared "Hydrology"
+# dataset; fortnightly and annual layers differ only by layer-name prefix (see
+# generate_hydrology_local._layer_name), so a sync filter needs both.
+HYDROLOGY_SYNC_DATASETS = ("Hydrology",)
+HYDROLOGY_SYNC_LAYER_PREFIXES = {
+    "hydrology_fortnightly": "deltaG_fortnight_",
+    "hydrology_annual": "deltaG_well_depth_",
+}
+
+
+def get_layer_sync_filter(name: str) -> tuple[tuple[str, ...], str | None]:
+    """
+    (dataset names, layer-name prefix or None) selecting the Layer rows a bulk
+    pipeline produces, for pushing them to GeoServer.
+    """
+    if name in HYDROLOGY_SYNC_LAYER_PREFIXES:
+        return HYDROLOGY_SYNC_DATASETS, HYDROLOGY_SYNC_LAYER_PREFIXES[name]
+    return get_regeneration_dataset_names(name), None
 
 
 def layer_exists_locally(name: str, location: Mapping[str, str]) -> bool:
