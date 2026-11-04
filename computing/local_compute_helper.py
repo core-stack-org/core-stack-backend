@@ -10,6 +10,7 @@ import pandas as pd
 import rasterio
 from rasterio.mask import mask
 from shapely.geometry import mapping
+from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
 from computing.utils import convert_to_zip
@@ -438,22 +439,54 @@ def _push_raster_to_geoserver_instance(
                 layer_name,
                 e,
             )
-        if style_name:
+        if style_name and _style_exists(geo, style_name, workspace):
             style_response = geo.publish_style(
                 layer_name=layer_name,
                 style_name=style_name,
                 workspace=workspace,
             )
+        elif style_name:
+            # Pointing a layer at a style that is not on the server leaves a
+            # dangling reference and GeoServer then 500s on the layer.
+            logger.warning(
+                "Style '%s' not found for workspace %s; not applying it to %s.",
+                style_name,
+                workspace,
+                layer_name,
+            )
+
+    status_code = upload_response.get("status_code")
+    layer_exists = None
+    if status_code in (200, 201):
+        # A 201 only means the coverage store was created; the layer record can
+        # still be missing, which makes the raster invisible to WMS.
+        layer_exists = _verify_raster_layer(geo, workspace, layer_name)
+        if not layer_exists:
+            logger.error(
+                "Raster %s:%s uploaded but no layer is registered on GeoServer.",
+                workspace,
+                layer_name,
+            )
+            status_code = 500
 
     return {
-        "status_code": upload_response.get("status_code"),
+        "status_code": status_code,
         "upload_response": upload_response,
         "configure_response": configure_response,
         "style_response": style_response,
-        "layer_exists": (
-            _verify_raster_layer(geo, workspace, layer_name) if verify else None
-        ),
+        "layer_exists": layer_exists,
     }
+
+
+def _style_exists(geo, style_name, workspace):
+    """True iff the style exists in the workspace or globally on the server."""
+    for ws in (workspace, None):
+        try:
+            geo.get_style(style_name, workspace=ws)
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def _verify_raster_layer(geo, workspace, layer_name):
@@ -510,8 +543,8 @@ def _geoserver_targets():
     from django.conf import settings
     from utilities.geoserver_utils import Geoserver
 
-    yield "local", Geoserver()
-
+    # PROD_GEOSERVER_* is the only GeoServer we publish to. The default
+    # GEOSERVER_URL instance is only a fallback when prod is not configured.
     prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
     if prod_url:
         yield (
@@ -522,11 +555,13 @@ def _geoserver_targets():
                 password=settings.PROD_GEOSERVER_PASSWORD,
             ),
         )
+    else:
+        yield "local", Geoserver()
 
 
 def _push_to_geoserver_targets(publish, layer_name, layer_type):
     responses = {"local": None, "prod": None}
-    statuses = {"local": False, "prod": None}
+    statuses = {"local": None, "prod": None}
 
     for target, geo in _geoserver_targets():
         try:
@@ -558,9 +593,7 @@ def _push_to_geoserver_targets(publish, layer_name, layer_type):
         responses[target] = response
         statuses[target] = ok
 
-    overall_ok = statuses["local"] and (
-        statuses["prod"] if statuses["prod"] is not None else True
-    )
+    overall_ok = all(ok for ok in statuses.values() if ok is not None)
     failure_status = None
     for target in ("local", "prod"):
         response = responses[target]
@@ -1173,6 +1206,34 @@ def resolve_lulc_raster_paths(
         ensure_file_exists(raster_path, f"LULC raster for {year}-{year + 1}")
         raster_paths.append(str(raster_path))
     return raster_paths
+
+
+# ── cropping intensity (shared by the watershed and farm pipelines) ─────────────
+
+CROPPING_INTENSITY_INITIAL_YEAR = 2017
+SINGLE_CROP_CLASSES = (LulcClass.SINGLE_KHARIF, LulcClass.SINGLE_NON_KHARIF)
+ALL_CROP_CLASSES = SINGLE_CROP_CLASSES + (
+    LulcClass.DOUBLE_CROPPING,
+    LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+)
+
+
+def compute_cropping_intensity(single_area, double_area, triple_area, denominator):
+    """
+    Cropping intensity = (single + 2*double + 3*triple) / denominator, where the
+    denominator is the area ever cropped. Element-wise on arrays; 0.0 where the
+    denominator is 0 (never cropped).
+    """
+    single = np.asarray(single_area, dtype="float64")
+    double = np.asarray(double_area, dtype="float64")
+    triple = np.asarray(triple_area, dtype="float64")
+    denominator = np.asarray(denominator, dtype="float64")
+    intensity = np.zeros(denominator.shape, dtype="float64")
+    nonzero = denominator > 0
+    intensity[nonzero] = (
+        single[nonzero] + 2.0 * double[nonzero] + 3.0 * triple[nonzero]
+    ) / denominator[nonzero]
+    return intensity
 
 
 def get_watershed_areas_in_hectares(watersheds_gdf):

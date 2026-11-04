@@ -54,19 +54,19 @@ def forest_fire_on_AEZ(aez_no, gee_account_id=7):
 
 @app.task(bind=True)
 def generate_forest_fire_layer(
-        self,
-        state=None,
-        district=None,
-        block=None,
-        roi=None,
-        asset_suffix=None,
-        asset_folder_list=None,
-        start_year=2004,
-        end_year=2022,
-        gee_account_id=None,
-        app_type="MWS",
-        sync_to_db=True,
-        sync_to_geoserver=True,
+    self,
+    state=None,
+    district=None,
+    block=None,
+    roi=None,
+    asset_suffix=None,
+    asset_folder_list=None,
+    start_year=2004,
+    end_year=2024,
+    gee_account_id=None,
+    app_type="MWS",
+    sync_to_db=True,
+    sync_to_geoserver=True,
 ):
     """
     Generate MODIS fire metrics for a FeatureCollection.
@@ -81,7 +81,7 @@ def generate_forest_fire_layer(
 
     if state and district and block:
         asset_suffix = (
-                valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
+            valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         asset_folder_list = [state, district, block]
 
@@ -233,14 +233,14 @@ def generate_forest_fire_layer(
 
 
 def _save_to_db_and_sync_to_geoserver(
-        layer_name=None,
-        asset_id=None,
-        asset_suffix=None,
-        state=None,
-        district=None,
-        block=None,
-        sync_to_db=True,
-        sync_to_geoserver=True,
+    layer_name=None,
+    asset_id=None,
+    asset_suffix=None,
+    state=None,
+    district=None,
+    block=None,
+    sync_to_db=True,
+    sync_to_geoserver=True,
 ):
     """Publish asset to GeoServer and persist metadata to the database."""
     print("Forest Fire: save_to_db_and_sync_to_geoserver")
