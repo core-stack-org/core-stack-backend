@@ -20,6 +20,8 @@
     data-blocks-url="{% url 'layer_comparison:blocks' %}"
     data-layers-url="{% url 'layer_comparison:layers' %}"
     data-compare-url="{% url 'layer_comparison:compare' %}"
+    data-excel-sheets-url="{% url 'layer_comparison:excel-sheets' %}"
+    data-excel-scatter-url="{% url 'layer_comparison:excel-scatter' %}"
 >
     <header class="page-header">
         <h1>Layer Comparison</h1>
@@ -43,7 +45,10 @@
             </select>
         </label>
         <button id="find-layers-button" disabled type="button">
-            Find layers
+            Compare rasters
+        </button>
+        <button id="compare-excels-button" class="secondary" disabled type="button">
+            Compare Excel values
         </button>
     </section>
 
@@ -72,10 +77,32 @@
     </section>
 
     <section id="comparison-container"></section>
+
+    <section id="excel-comparison" class="excel-comparison" hidden>
+        <div class="section-heading">
+            <div>
+                <h2>Excel value comparison</h2>
+                <p id="excel-comparison-status" role="status" aria-live="polite"></p>
+            </div>
+            <div class="excel-controls">
+                <label>Sheet
+                    <select id="excel-sheet-select" disabled></select>
+                </label>
+                <label>Metric
+                    <select id="excel-metric-select" disabled></select>
+                </label>
+            </div>
+        </div>
+        <div class="excel-chart-wrap">
+            <canvas id="excel-scatter-chart" aria-label="Scatter plot comparing old and current Excel values"></canvas>
+        </div>
+    </section>
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
+        crossorigin="anonymous"></script>
 <script src="{% static 'layer_comparison/js/dashboard.js' %}"></script>
 </body>
 </html>

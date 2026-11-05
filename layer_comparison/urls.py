@@ -10,4 +10,6 @@ urlpatterns = [
     path("api/blocks/", views.blocks_api, name="blocks"),
     path("api/layers/", views.layers_api, name="layers"),
     path("api/compare/", views.compare_api, name="compare"),
+    path("api/excel-sheets/", views.excel_sheets_api, name="excel-sheets"),
+    path("api/excel-scatter/", views.excel_scatter_api, name="excel-scatter"),
 ]

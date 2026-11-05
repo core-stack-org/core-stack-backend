@@ -4,6 +4,9 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
+from django.shortcuts import get_object_or_404
+
+from geoadmin.models import TehsilSOI
 
 from .services.location_service import (
     get_states,
@@ -14,6 +17,10 @@ from .services.location_service import (
 from .services.layer_metadata_service import get_layers_for_location
 from .services.gee_service import get_gee_map_config
 from .services.geoserver_service import get_geoserver_wms_config
+from .services.excel_comparison_service import (
+    get_comparable_sheets,
+    get_scatter_points,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +89,57 @@ def layers_api(request):
     except Exception:
         logger.exception("Could not retrieve layers for selected location")
         return JsonResponse({"error": "Could not retrieve layers."}, status=500)
+
+
+def _selected_location_names(state_id, district_id, block_id):
+    block = get_object_or_404(
+        TehsilSOI.objects.select_related("district__state"),
+        id=block_id,
+        district_id=district_id,
+        district__state_id=state_id,
+    )
+    return (
+        block.district.state.state_name,
+        block.district.district_name,
+        block.tehsil_name,
+    )
+
+
+@login_required
+@require_GET
+def excel_sheets_api(request):
+    try:
+        state_id, district_id, block_id = _location_params(request)
+        location_names = _selected_location_names(state_id, district_id, block_id)
+        result = get_comparable_sheets(*location_names)
+        return JsonResponse(result)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        logger.exception("Could not inspect Excel files for selected location")
+        return JsonResponse({"error": "Could not inspect Excel files."}, status=500)
+
+
+@login_required
+@require_GET
+def excel_scatter_api(request):
+    try:
+        state_id, district_id, block_id = _location_params(request)
+        sheet_name = request.GET.get("sheet", "").strip()
+        metric = request.GET.get("metric", "").strip()
+        if not sheet_name or not metric:
+            return JsonResponse(
+                {"error": "sheet and metric are required."}, status=400
+            )
+
+        location_names = _selected_location_names(state_id, district_id, block_id)
+        result = get_scatter_points(*location_names, sheet_name, metric)
+        return JsonResponse(result)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        logger.exception("Could not compare Excel values for selected location")
+        return JsonResponse({"error": "Could not compare Excel values."}, status=500)
 
 
 @login_required
