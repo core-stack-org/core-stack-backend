@@ -51,9 +51,7 @@ STANDARDISE_CONVERTED_FILES = {
 # cs-geodata writes the sub-annual output to <output_path>/sub-annual (hard-coded in the
 # service); we store it as sub_annual to match the input parquet name.
 CS_GEODATA_SUB_ANNUAL_DIR = "sub-annual"
-# Standardised outputs inside <block>/farms/ that get uploaded. The folder also holds the
-# raw annual/sub_annual parquets and the trees/ponds/wells files, which are not uploaded.
-STANDARDISED_FILES = ["static.parquet", "metadata.json"]
+# Folders cs-geodata is expected to create inside <block>/farms/ (checked after the job).
 STANDARDISED_DIRS = ["annual", "sub_annual"]
 # RQ job statuses reported by GET /api/v1/status
 _STANDARDISE_WAITING = {"queued", "started", "deferred", "scheduled"}
@@ -247,42 +245,6 @@ def _standardise_parquets(state, district, block):
     return farms_dir
 
 
-def _upload_farm_parquets_to_s3(state, district, block, farms_dir):
-    """
-    Upload the standardised outputs in farms_dir (static.parquet, metadata.json,
-    and every file under annual/ and sub_annual/) to
-    <bucket>/<state>/<district>/<block>/farms/<path relative to farms_dir>
-    (e.g. farms/static.parquet, farms/sub_annual/year=2020/data_0.parquet),
-    overwriting whatever is there.
-
-    Returns a dict {relative path: s3_url} for the files uploaded.
-    """
-    local_paths = [
-        os.path.join(farms_dir, name)
-        for name in STANDARDISED_FILES
-        if os.path.isfile(os.path.join(farms_dir, name))
-    ]
-    for folder in STANDARDISED_DIRS:
-        for root, _, files in os.walk(os.path.join(farms_dir, folder)):
-            local_paths += [os.path.join(root, name) for name in sorted(files)]
-
-    s3 = _s3_client()
-    uploaded = {}
-    for local_path in local_paths:
-        rel_path = os.path.relpath(local_path, farms_dir).replace(os.sep, "/")
-        s3_key = f"{state}/{district}/{block}/farms/{rel_path}"
-        with open(local_path, "rb") as f:
-            s3.upload_fileobj(
-                f,
-                FARM_DATA_S3_BUCKET,
-                s3_key,
-                ExtraArgs={"ContentType": "application/octet-stream"},
-            )
-        uploaded[rel_path] = f"https://{FARM_DATA_S3_BUCKET}.s3.{DPR_S3_REGION}.amazonaws.com/{s3_key}"
-        logger.info("Parquet uploaded to S3: %s", uploaded[rel_path])
-    return uploaded
-
-
 # ── public entry point ───────────────────────────────────────────────────────
 
 
@@ -350,8 +312,9 @@ def convert_boundaries_to_pmtiles(
         # tmp_dir (geojsonseq + mbtiles + pmtiles) is removed on context exit —
         # the S3 copy is the only one that persists.
 
-    farms_dir = _standardise_parquets(state, district, block)   # raises on failure → nothing uploaded
-    parquet_s3_urls = _upload_farm_parquets_to_s3(state, district, block, farms_dir)
+    # Optimised parquets are written next to the originals in farms/ and stay local;
+    # only the PMTiles archive is uploaded to S3.
+    _standardise_parquets(state, district, block)
 
     summary = {
         "state": state,
@@ -360,7 +323,6 @@ def convert_boundaries_to_pmtiles(
         "farm_count": len(gdf),
         "s3_url": s3_url,
         "size_bytes": size_bytes,
-        "parquet_s3_urls": parquet_s3_urls,
     }
     logger.info("Phase 4 complete: %s", summary)
     return summary
