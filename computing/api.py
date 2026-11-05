@@ -278,7 +278,8 @@ def generate_farm_boundaries(request):
         state = request.data.get("state", "").lower().strip()
         district = request.data.get("district", "").lower().strip()
         block = request.data.get("block", "").lower().strip()
-        year = request.data.get("year", None)
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
         overwrite = request.data.get("overwrite", False)
 
         if not all([state, district, block]):
@@ -287,28 +288,19 @@ def generate_farm_boundaries(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if year is not None:
-            year = int(year)
-            if year < 2017 or year > 2025:
-                return Response(
-                    {"Error": "year must be between 2017 and 2025."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
         build_farm_boundary_map.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
                 "block": block,
-                "year": year,
+                "start_year": start_year,
+                "end_year" : end_year,
                 "overwrite": overwrite,
             },
             queue="nrm",
         )
 
-        msg = "Farm boundary pipeline initiated."
-        if year:
-            msg += f" ET intersection enabled for year {year}."
+        msg = f"Farm boundary pipeline initiated for {start_year} to {end_year}"
 
         return Response({"Success": msg}, status=status.HTTP_200_OK)
     except Exception as e:

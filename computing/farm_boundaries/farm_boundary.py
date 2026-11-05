@@ -42,6 +42,8 @@ from .convert import convert_to_geoparquet
 from .fetch_raw import fetch_raw_boundaries
 from .fetch_metadata import fetch_farm_metadata
 
+from computing.utils import save_layer_info_to_db
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,7 +53,8 @@ def build_farm_boundary_map(
     state: str,
     district: str,
     block: str,
-    year: int = None,
+    start_year : int,
+    end_year : int,
     overwrite=False,
 ):
     """
@@ -78,6 +81,8 @@ def build_farm_boundary_map(
         district,
         block,
     )
+
+    db_sync_flg = True
 
     try:
         # ── Phase 1: Fetch ──────────────────────────────────────────────────
@@ -113,7 +118,7 @@ def build_farm_boundary_map(
                 intersect_et_with_farms,
         )
 
-        logger.info("Phase 3 — ET intersection for year %d", year)
+        logger.info(f"Phase 3 — ET intersection for year {start_year} to {end_year}")
         # phase3_summary = intersect_et_with_farms(
         #       state=state,
         #       district=district,
@@ -121,11 +126,12 @@ def build_farm_boundary_map(
         #       year=year,
         # )
         phase3_summary = compute_multi_year_water_stress(
-            state=state, district=district, block=block
+            state=state, district=district, block=block, start_year=start_year, end_year=end_year
         )
         logger.info("Phase 3 done: %s", phase3_summary)
 
     except Exception as exc:
+        db_sync_flg = False
         logger.exception(
             "Farm boundary pipeline failed for %s/%s/%s: %s",
             state,
@@ -148,6 +154,7 @@ def build_farm_boundary_map(
         )
         logger.info("Phase 5 done: %s", phase4_summary)
     except Exception as exc:
+        db_sync_flg = False
         logger.exception(
             "Phase 5 (PMTiles) failed for %s/%s/%s: %s",
             state,
@@ -156,6 +163,23 @@ def build_farm_boundary_map(
             exc,
         )
         phase4_summary = {"error": str(exc)}
+
+    if(db_sync_flg):
+        layer_id = save_layer_info_to_db(
+            state=state,
+            district=district,
+            block=block,
+            layer_name= f"Farm_boundaries_{district}_{block}",
+            asset_id=phase5_summary["s3_url"],
+            dataset_name="Farm_boundaries",
+            misc={
+                "start_year": start_year,
+                "end_year": end_year,
+                "is_generated_locally": True,
+            },
+            algorithm="farm_boundaries",
+            algorithm_version="local-1.0",
+        )
 
     result = {
         "phase1": phase1_summary,
