@@ -172,3 +172,33 @@ class SkipExistingTests(SimpleTestCase):
 
         with skip_existing_context(True, *LOCATION):
             self.assertIsNone(maybe_skip(self.TASK))
+
+
+class HydrologySyncFilterTests(SimpleTestCase):
+    def test_fortnightly_and_annual_filters_split_by_layer_prefix(self):
+        from computing.bulk_layer_generation import get_layer_sync_filter
+
+        self.assertEqual(
+            get_layer_sync_filter("hydrology_fortnightly"),
+            (("Hydrology",), "deltaG_fortnight_"),
+        )
+        self.assertEqual(
+            get_layer_sync_filter("hydrology_annual"),
+            (("Hydrology",), "deltaG_well_depth_"),
+        )
+
+    def test_queryset_applies_dataset_and_prefix(self):
+        from computing.pending_geoserver_sync import unsynced_local_layers_queryset
+
+        sql = str(
+            unsynced_local_layers_queryset(layer_type="hydrology_annual", force=True).query
+        )
+        self.assertIn("LIKE deltaG", sql)  # underscores are escaped in the SQL
+        self.assertIn("well", sql)
+        self.assertIn("Hydrology", sql)
+
+    def test_unmapped_function_pipeline_raises_value_error(self):
+        from computing.bulk_layer_generation import get_regeneration_dataset_names
+
+        with self.assertRaises(ValueError):
+            get_regeneration_dataset_names("hydrology_annual")

@@ -223,6 +223,42 @@ def _build_geodataframe(records: list) -> gpd.GeoDataFrame:
     return gdf
 
 
+def _drop_duplicate_farm_ids(gdf: gpd.GeoDataFrame, label: str = "field") -> gpd.GeoDataFrame:
+    """
+    Keep exactly one row per farm_id.
+
+    The feature id is a Plus Code of the polygon's centroid, not a unique record
+    id, so two polygons whose centroids fall in the same tiny code cell (for
+    example one field detected on two imagery dates) share an id. Every file
+    downstream (annual, sub_annual, tiles, S3) is keyed on farm_id, so repeats
+    are dropped here. The row kept is the most recent capture; ties go to the
+    higher class_confidence, then the larger area. Row order is preserved.
+    Works on any frame with farm_id, capture_date, class_confidence, area_m2
+    (also used for the metadata records); `label` only names it in the log.
+    """
+    gdf = gdf.reset_index(drop=True)
+    repeated = gdf["farm_id"].duplicated(keep=False)
+    if not repeated.any():
+        return gdf
+
+    ranked = gdf.sort_values(
+        ["capture_date", "class_confidence", "area_m2"],
+        ascending=False,
+        na_position="last",
+        kind="stable",
+    )
+    keep_index = ranked.drop_duplicates(subset="farm_id", keep="first").index
+    result = gdf.loc[gdf.index.isin(keep_index)].reset_index(drop=True)
+
+    dropped_ids = sorted(gdf.loc[repeated, "farm_id"].unique())
+    logger.warning(
+        "[%s] Dropped %d duplicate-farm_id row(s) across %d farm_id(s), keeping the most recent capture. "
+        "Examples: %s",
+        label, len(gdf) - len(result), len(dropped_ids), dropped_ids[:5],
+    )
+    return result
+
+
 def _build_metadata_geodataframe(records: list) -> gpd.GeoDataFrame:
 
     if not records:
@@ -389,6 +425,8 @@ def convert_to_geoparquet(
         # ------------------------------------
 
         if alu_type == "field":
+            # farm_id keys every downstream file, so it must be unique
+            subset = _drop_duplicate_farm_ids(subset)
             for col in DROUGHT_INDICATOR_COLUMNS:
                 subset[col] = np.nan
 

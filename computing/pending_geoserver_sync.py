@@ -64,11 +64,12 @@ def unsynced_local_layers_queryset(
     if not force:
         queryset = queryset.filter(is_sync_to_geoserver=False)
     if layer_type:
-        from computing.bulk_layer_generation import get_regeneration_dataset_names
+        from computing.bulk_layer_generation import get_layer_sync_filter
 
-        queryset = queryset.filter(
-            dataset__name__in=get_regeneration_dataset_names(layer_type)
-        )
+        dataset_names, layer_name_prefix = get_layer_sync_filter(layer_type)
+        queryset = queryset.filter(dataset__name__in=dataset_names)
+        if layer_name_prefix:
+            queryset = queryset.filter(layer_name__startswith=layer_name_prefix)
     if state:
         queryset = queryset.filter(state__state_name__iexact=state)
     if district:
@@ -104,11 +105,12 @@ def unsynced_gee_layers_queryset(
     if not force:
         queryset = queryset.filter(is_sync_to_geoserver=False)
     if layer_type:
-        from computing.bulk_layer_generation import get_regeneration_dataset_names
+        from computing.bulk_layer_generation import get_layer_sync_filter
 
-        queryset = queryset.filter(
-            dataset__name__in=get_regeneration_dataset_names(layer_type)
-        )
+        dataset_names, layer_name_prefix = get_layer_sync_filter(layer_type)
+        queryset = queryset.filter(dataset__name__in=dataset_names)
+        if layer_name_prefix:
+            queryset = queryset.filter(layer_name__startswith=layer_name_prefix)
     if state:
         queryset = queryset.filter(state__state_name__iexact=state)
     if district:

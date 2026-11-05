@@ -65,6 +65,7 @@ import rasterio.merge
 from rasterio.windows import Window
 from shapely.geometry import box
 
+from computing.farm_boundaries.convert import _drop_duplicate_farm_ids
 from utilities.constants import (
     AEZ_GEOJSON,
     FARM_BOUNDARIES_PATH,
@@ -230,6 +231,9 @@ def _build_metadata_geodataframe(records: list) -> gpd.GeoDataFrame:
             columns=[
                 "farm_id",
                 "monitoring_prediction",
+                "capture_date",
+                "class_confidence",
+                "area_m2",
             ]
         )
 
@@ -261,10 +265,17 @@ def _build_metadata_geodataframe(records: list) -> gpd.GeoDataFrame:
                 "monitoring_prediction" : props.get(
                     "monitoring_prediction"
                 ),
+                # used only to pick one record when the same id appears more than once
+                "capture_date": props.get("capture_timestamp_sec"),
+                "class_confidence": props.get("class_confidence"),
+                "area_m2": props.get("area_sq_m"),
             }
         )
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    for col in ("capture_date", "class_confidence", "area_m2"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+    return df
 
 
 def _load_crop_metadata_df(state, district, block):
@@ -272,7 +283,12 @@ def _load_crop_metadata_df(state, district, block):
     Load farm-level monitoring_prediction from the raw per-cell metadata JSON
     files. farms/static.parquet does not carry this column, so it's sourced
     here instead. Returns a DataFrame: farm_id, monitoring_prediction
-    (one row per farm; a farm never repeats across cell JSONs).
+    (plus the capture_date / class_confidence / area_m2 used to rank records).
+
+    One row per farm_id is guaranteed: the id is a Plus Code of the centroid, so
+    two different polygons can share it. If the metadata has the same id more
+    than once, the record chosen is the same one Phase 2 keeps for the farm
+    (most recent capture, then higher class_confidence, then larger area).
     """
     manifest_file = _manifest_path(state, district, block)
     fetched_tokens = _load_fetched_tokens(manifest_file)
@@ -282,6 +298,7 @@ def _load_crop_metadata_df(state, district, block):
 
     if "farm_id" in metadata_df.columns:
         metadata_df["farm_id"] = metadata_df["farm_id"].astype(str).str.strip()
+        metadata_df = _drop_duplicate_farm_ids(metadata_df, label="metadata")
 
     logger.info("Loaded crop metadata for %d farms from %s.", len(metadata_df), metadata_dir)
     return metadata_df
@@ -312,6 +329,7 @@ def _attach_crop_metadata(gdf, state, district, block):
         metadata_df[["farm_id", "monitoring_prediction"]],
         on="farm_id",
         how="left",
+        validate="many_to_one",   # a repeated metadata id must never multiply farm rows
     )
     n_matched = int(gdf["monitoring_prediction"].notna().sum())
     logger.info("Crop metadata attached: %d/%d farms matched by farm_id.", n_matched, len(gdf))
