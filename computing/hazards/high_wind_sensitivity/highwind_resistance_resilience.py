@@ -61,6 +61,8 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
     WIND_THRESHOLD = 15
 
+    WIND_THRESHOLD = 15
+
     BASELINE_START_YEAR = 2004
     BASELINE_END_YEAR = 2024
 
@@ -280,13 +282,13 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
 
         resistance = (
             Yn_bar.divide(diffAbs)
-            .multiply(diffRaw.signum())
+            .multiply(diffRaw.signum().where(diffRaw.eq(0), 1))
             .rename("resistance")
             .updateMask(scored)
         )
         resilience = (
             diffAbs.divide(diffNextAbs)
-            .multiply(diffNext.signum())
+            .multiply(diffNext.signum().where(diffNext.eq(0), 1))
             .rename("resilience")
             .updateMask(scored.And(deepDrop))
         )

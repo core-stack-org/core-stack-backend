@@ -102,6 +102,31 @@ def generate_rainfall_resilience(
             f"{date.today().isoformat()}. Reduce end_year."
         )
 
+    # Tree-mask asset names embed end_year and auto-version; rain-index
+    # asset names don't, and silently no-op on re-run unless deleted first
+    # (see is_gee_asset_exists guard in rainfall_index). That mismatch
+    # means it's easy to expand end_year, regenerate the tree mask, forget
+    # to regenerate rainfall_index, and end up reading a stale rain-index
+    # asset against a fresh tree-mask one. Fail loudly instead.
+    if not is_gee_asset_exists(TREE_COVER_ASSET):
+        raise ValueError(
+            f"Tree cover asset not found: {TREE_COVER_ASSET}. Run "
+            f"generate_hybrid_tree_mask with end_year={end_year} first."
+        )
+    if not is_gee_asset_exists(RAIN_INDEX_ASSET):
+        raise ValueError(f"Rain index asset not found: {RAIN_INDEX_ASSET}.")
+
+    requiredZBands = {f"zScore_{y}" for y in range(zMinYear, zMaxYear + 1)}
+    availableZBands = set(ee.Image(RAIN_INDEX_ASSET).bandNames().getInfo())
+    missingZBands = sorted(requiredZBands - availableZBands)
+    if missingZBands:
+        raise ValueError(
+            f"{RAIN_INDEX_ASSET} is missing bands: {missingZBands}. It was "
+            f"likely exported with a smaller end_year — re-run rainfall_index "
+            f"with end_year >= {zMaxYear} (delete the existing asset first, "
+            "its name doesn't auto-version)."
+        )
+
     treeMeta = ee.Image(TREE_COVER_ASSET)
     startYearTree = treeMeta.select("start_year")
     endYearTree = treeMeta.select("end_year")
@@ -261,13 +286,13 @@ def generate_rainfall_resilience(
 
         resistance = (
             Yn_bar.divide(diffAbs)
-            .multiply(diffRaw.signum())
+            .multiply(diffRaw.signum().where(diffRaw.eq(0), 1))
             .rename("resistance")
             .updateMask(scored)
         )
         resilience = (
             diffAbs.divide(diffNextAbs)
-            .multiply(diffNext.signum())
+            .multiply(diffNext.signum().where(diffNext.eq(0), 1))
             .rename("resilience")
             .updateMask(scored.And(deepDrop))
         )

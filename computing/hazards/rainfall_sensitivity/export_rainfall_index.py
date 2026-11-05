@@ -51,8 +51,8 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
             "cannot infer a safe default."
         )
 
-    # An ag-year `y` isn't complete until Jun 30 of y+1 has passed. Refuse to
-    # silently compute a partial year as if it were final.
+        # An ag-year `y` isn't complete until Jun 30 of y+1 has passed. Refuse to
+        # silently compute a partial year as if it were final.
     ag_year_end_date = date(end_year + 1, 6, 30)
     if ag_year_end_date > date.today():
         raise ValueError(
@@ -74,6 +74,7 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
     #     .filter(ee.Filter.eq("Name", "Odisha"))
     #     .geometry()
     # )
+
     # 2. FULL CHIRPS COLLECTION
     # Deliberately unbounded on the end date. This collection feeds BOTH the
     # baseline percentile calc (bounded separately below) AND the per-year
@@ -169,7 +170,12 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
 
     def add_zscore(img):
         hm = img.select("Hm")
-        z = hm.subtract(hmMean).divide(hmStdDev).rename("zScore")
+        z = (
+            hm.subtract(hmMean)
+            .divide(hmStdDev)
+            .updateMask(hmStdDev.gt(0))
+            .rename("zScore")
+        )
         return img.addBands(z)
 
     completedAnnualCollection = annualMetrics.map(add_zscore)
