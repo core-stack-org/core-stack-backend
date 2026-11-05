@@ -11,6 +11,8 @@ from rest_framework import status
 from django.http import HttpResponse
 from .models import LayerInfo
 
+import re
+
 
 def create_geojson_for_all_mws(existing_geojson_path, df, new_geojson_path):
     with open(existing_geojson_path) as f:
@@ -429,67 +431,45 @@ def generate_mws_data_for_kyl_filters(
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
                     ]
                     if not df_swb_annual_mws_data.empty:
-                        total_swb_area = df_swb_annual_mws_data.iloc[0][
-                            "total_swb_area_in_ha"
+                        row = df_swb_annual_mws_data.iloc[0]
+
+                        # Discover years from the "total_area_in_ha_<year>" columns,
+                        # so newly added years are picked up automatically.
+                        years = [
+                            m.group(1)
+                            for col in df_swb_annual_mws_data.columns
+                            if (m := re.fullmatch(r"total_area_in_ha_(\d{4}-\d{4})", col))
                         ]
 
-                    if total_swb_area != 0:  # Check if total_swb_area is not zero
-                        swb_area_kharif_columns = df_swb_annual_mws_data.filter(
-                            like="kharif_area"
-                        )
-                        total_swb_area_kharif_column = swb_area_kharif_columns.shape[1]
-                        sum_swb_area_kharif = (
-                            swb_area_kharif_columns.sum(axis=1).sum() / total_swb_area
-                        )
-                        avg_kharif_surface_water_mws = round(
-                            (
-                                sum_swb_area_kharif * 100 / total_swb_area_kharif_column
-                                if total_swb_area_kharif_column > 0
-                                else 0
-                            ),
-                            4,
-                        )
+                        def avg_season_percent(season):
+                            yearly_percents = []
+                            for year in years:
+                                total_col = f"total_area_in_ha_{year}"
+                                season_col = f"{season}_area_in_ha_{year}"
+                                if season_col not in df_swb_annual_mws_data.columns:
+                                    continue
+                                total_area = pd.to_numeric(row[total_col], errors="coerce")
+                                season_area = pd.to_numeric(row[season_col], errors="coerce")
+                                # skip years with missing data or zero water (avoid divide-by-zero)
+                                if pd.isna(total_area) or pd.isna(season_area) or total_area == 0:
+                                    continue
+                                yearly_percents.append((season_area / total_area) * 100)
+                            if not yearly_percents:
+                                return 0
+                            return round(sum(yearly_percents) / len(yearly_percents), 4)
 
-                        swb_rabi_area_columns = df_swb_annual_mws_data.filter(
-                            like="rabi_area"
-                        )
-                        total_swb_rabi_area_column = swb_rabi_area_columns.shape[1]
-                        sum_swb_rabi_area = (
-                            swb_rabi_area_columns.sum(axis=1).sum() / total_swb_area
-                        )
-                        avg_rabi_surface_water_mws = round(
-                            (
-                                sum_swb_rabi_area * 100 / total_swb_rabi_area_column
-                                if total_swb_rabi_area_column > 0
-                                else 0
-                            ),
-                            4,
-                        )
-
-                        swb_zaid_area_columns = df_swb_annual_mws_data.filter(
-                            like="zaid_area"
-                        )
-                        total_swb_zaid_area_column = swb_zaid_area_columns.shape[1]
-                        sum_swb_zaid_area = (
-                            swb_zaid_area_columns.sum(axis=1).sum() / total_swb_area
-                        )
-                        avg_zaid_surface_water_mws = round(
-                            (
-                                sum_swb_zaid_area * 100 / total_swb_zaid_area_column
-                                if total_swb_zaid_area_column > 0
-                                else 0
-                            ),
-                            4,
-                        )
+                        avg_kharif_surface_water_mws = avg_season_percent("kharif")
+                        avg_rabi_surface_water_mws = avg_season_percent("rabi")
+                        avg_zaid_surface_water_mws = avg_season_percent("zaid")
                     else:
-                        avg_perc_kharif_surface_water_mws = (
-                            avg_perc_rabi_surface_water_mws
-                        ) = avg_perc_zaid_surface_water_mws = 0
+                        avg_kharif_surface_water_mws = (
+                            avg_rabi_surface_water_mws
+                        ) = avg_zaid_surface_water_mws = 0
 
-                except:
-                    avg_perc_kharif_surface_water_mws = (
-                        avg_perc_rabi_surface_water_mws
-                    ) = avg_perc_zaid_surface_water_mws = -9999
+                except Exception:
+                    avg_kharif_surface_water_mws = (
+                        avg_rabi_surface_water_mws
+                    ) = avg_zaid_surface_water_mws = -9999
 
                 ###################### Mean of Kharif and Rabi Water Surface Area ######################
                 mean_kharif_water_surface_area = -9999
