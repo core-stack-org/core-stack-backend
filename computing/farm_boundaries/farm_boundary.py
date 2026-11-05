@@ -118,7 +118,7 @@ def build_farm_boundary_map(
                 intersect_et_with_farms,
         )
 
-        logger.info("Phase 3 — ET intersection for year %d", year)
+        logger.info(f"Phase 3 — ET intersection for year {start_year} to {end_year}")
         # phase3_summary = intersect_et_with_farms(
         #       state=state,
         #       district=district,
