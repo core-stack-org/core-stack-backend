@@ -12,6 +12,7 @@ from computing.lulc.lulc_vector import vectorise_lulc
 from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
 from computing.surface_water_bodies.swb import generate_swb_layer
 from computing.drought.drought import calculate_drought
+from computing.drought.drought_local_compute import calculate_drought_local
 from computing.drought.drought_causality import drought_causality
 from computing.crop_grid.crop_grid import create_crop_grids
 from computing.change_detection.change_detection import get_change_detection
@@ -330,6 +331,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
+    "calculate_drought": calculate_drought_local,
+    "generate_drought_layer": calculate_drought_local,
 }
 
 TASK_REGISTRIES = {
