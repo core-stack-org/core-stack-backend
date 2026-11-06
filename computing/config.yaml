@@ -641,6 +641,9 @@ derived_layers:
     - name: merge_swb_ponds
 
     - name: generate_drought_layer
+      local_path: "{DATA_DIR}/drought/output/"
+      geoserver_workspace: drought
+      layer_type: vector
 
     - name: mws_drought_causality
 
