@@ -9,6 +9,7 @@ import fcntl
 import json
 import os
 from contextlib import contextmanager
+from pathlib import Path
 
 import numpy as np
 import rasterio
@@ -113,6 +114,10 @@ def update_status(paths, change):
     os.replace(tmp, paths.status_file)
 
 
+class RunInProgress(RuntimeError):
+    """Another run holds the lock of drought/."""
+
+
 @contextmanager
 def run_lock(paths):
     """One run at a time writes into drought/."""
@@ -121,5 +126,66 @@ def run_lock(paths):
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            raise SystemExit(f"Another run is using {paths.base}. Wait for it to finish.")
+            raise RunInProgress(f"Another run is using {paths.base}. Wait for it to finish.")
         yield
+
+
+def run_in_progress(paths):
+    """True while a run holds the lock of drought/."""
+    if not paths.lock_file.is_file():
+        return False
+    with open(paths.lock_file) as handle:  # read-only is enough to test a lock
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(handle, fcntl.LOCK_UN)
+    return False
+
+
+# ---------------------------------------------------------------- file owner
+
+
+def run_as_checkout_owner(repo_dir):
+    """When started as root (docker compose exec), switch to the owner of the checkout, as the
+    containers' as-owner.sh does for the web app and the workers, so a script run writes files
+    the workers can still change. Nothing changes when not root or when root owns the checkout."""
+    if os.geteuid() != 0:
+        return
+    owner = os.stat(repo_dir)
+    if owner.st_uid == 0:
+        return
+    home = Path("/tmp/corestack-home")
+    home.mkdir(parents=True, exist_ok=True)
+    os.chown(home, owner.st_uid, owner.st_gid)
+    os.setgroups([])
+    os.setgid(owner.st_gid)
+    os.setuid(owner.st_uid)
+    os.environ.update(HOME=str(home), USER="corestack", LOGNAME="corestack")
+
+
+class NotWritable(PermissionError):
+    """Folders a run must write to belong to another user."""
+
+
+def not_writable(*roots):
+    """A message naming the folders (and lock files) under roots that this process cannot write,
+    with the fix; None when all are writable. Runs write through <name>.tmp and a rename, so a
+    writable folder is enough for every file but the lock files."""
+    bad = []
+    for root in map(Path, roots):
+        if not root.exists():
+            continue
+        for folder, _, files in os.walk(root):
+            if not os.access(folder, os.W_OK | os.X_OK):
+                bad.append(folder)
+            bad += [os.path.join(folder, f) for f in files
+                    if f.endswith(".lock") and not os.access(os.path.join(folder, f), os.W_OK)]
+    if not bad:
+        return None
+    uid, gid = os.getuid(), os.getgid()
+    shown = ", ".join(bad[:5]) + (f" and {len(bad) - 5} more" if len(bad) > 5 else "")
+    return (f"Not writable by this process (uid {uid}): {shown}. They were made by another user, for example "
+            f"by a script run as root before scripts switched to the checkout owner. Fix once with: "
+            f"docker compose exec backend chown -R {uid}:{gid} {' '.join(map(str, roots))}")
+
