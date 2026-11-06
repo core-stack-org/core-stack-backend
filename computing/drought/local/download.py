@@ -62,8 +62,9 @@ ENV_FILE = Path(os.environ.get("APP_ENV_FILE") or REPO_DIR / "nrm_app" / ".env")
 DEFAULT_BOUNDARY = "base_layers/PanIndia_Boundaries/india_state_outer_no_islands.geojson"
 
 # CHIRPS: global 0.05 degree grid with origin (-180, 50), the same grid GEE uses.
-CHIRPS_COG_URL = "https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_daily/cogs/p05"
-CHIRPS_TIF_URL = "https://data.chc.ucsb.edu/products/CHIRPS-2.0/global_daily/tifs/p05"
+CHIRPS_COG_URL = "https://data.chc.ucsb.edu/products/CHIRPS/v2.0/global_daily/cogs/p05"
+CHIRPS_TIF_URL = "https://data.chc.ucsb.edu/products/CHIRPS/v2.0/global_daily/tifs/p05"
+CHIRPS_LISTING_PAUSE = 2  # seconds before each folder listing: the server refuses bursts (403, 429)
 CHIRPS_FIRST_YEAR = 1981
 CHIRPS_RES = 0.05
 CHIRPS_NODATA = -9999.0
@@ -179,6 +180,15 @@ def gdal_settings():
 def http_session():
     session = requests.Session()
     retry = Retry(total=5, backoff_factor=5, status_forcelist=(429, 500, 502, 503, 504))
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    return session
+
+
+def chirps_session():
+    """As http_session, but a refused request (403) is retried too, after 30 s, 1 and 2 minutes:
+    the CHIRPS server refuses bursts of requests for a while. At NASA a 403 means no access."""
+    session = requests.Session()
+    retry = Retry(total=4, backoff_factor=15, status_forcelist=(403, 429, 500, 502, 503, 504))
     session.mount("https://", HTTPAdapter(max_retries=retry))
     return session
 
@@ -352,6 +362,7 @@ def chirps_days_on_server(http, year):
     not have yet come from the .tif.gz files (same values, but the whole globe)."""
     days = {}
     for base, ext in ((CHIRPS_TIF_URL, "tif.gz"), (CHIRPS_COG_URL, "cog")):  # COG wins
+        time.sleep(CHIRPS_LISTING_PAUSE)
         response = http.get(f"{base}/{year}/", timeout=120)
         if response.status_code == 404:
             continue
@@ -419,7 +430,15 @@ def run_chirps(periodic_dir, http, args):
                 days_in_year = 366 if calendar.isleap(year) else 365
                 if len(have) >= days_in_year:
                     continue
-                on_server = chirps_days_on_server(http, year)
+                try:
+                    on_server = chirps_days_on_server(http, year)
+                except requests.RequestException as exc:
+                    # The server keeps refusing or dropping us: leave the rest of CHIRPS to the next run.
+                    failed[f"listing {year}"] = str(exc)
+                    log.warning("CHIRPS %s: could not list the server folder (%s); the remaining years "
+                                "are left for the next run", year, exc)
+                    break
+                failed.pop(f"listing {year}", None)
                 todo = [d for d in sorted(on_server) if chirps_path(root, d).name not in have]
                 if not todo:
                     continue
@@ -862,7 +881,7 @@ def run_download(
         failed = 0
         for product in products:
             if product == "chirps":
-                failed += run_chirps(periodic_dir, http, args)
+                failed += run_chirps(periodic_dir, chirps_session(), args)
             else:
                 failed += run_modis(product, periodic_dir, http, auth, args)
 
