@@ -85,14 +85,23 @@ def window_mask(grid, window):
 
 def pixel_lonlat(grid, window):
     """Longitude and latitude (degrees) of each pixel centre in window."""
-    cols = np.arange(window.col_off, window.col_off + window.width) + 0.5
-    rows = np.arange(window.row_off, window.row_off + window.height) + 0.5
-    x = grid.transform.c + cols * grid.transform.a
-    y = grid.transform.f + rows * grid.transform.e
-    xx, yy = np.meshgrid(x, y)
-    lat = yy / EARTH_RADIUS
-    lon = xx / (EARTH_RADIUS * np.cos(lat))
+    rows, cols = np.mgrid[window.row_off:window.row_off + window.height, window.col_off:window.col_off + window.width]
+    return lonlat_at(grid, rows, cols)
+
+
+def lonlat_at(grid, rows, cols):
+    """Longitude and latitude (degrees) of the centres of the pixels at rows, cols."""
+    x = grid.transform.c + (np.asarray(cols) + 0.5) * grid.transform.a
+    y = grid.transform.f + (np.asarray(rows) + 0.5) * grid.transform.e
+    lat = y / EARTH_RADIUS
+    lon = x / (EARTH_RADIUS * np.cos(lat))
     return np.degrees(lon), np.degrees(lat)
+
+
+def sinusoidal_xy(lon, lat):
+    """MODIS sinusoidal x, y (metres) of lon/lat points (degrees); the inverse of lonlat_at."""
+    lat = np.radians(lat)
+    return EARTH_RADIUS * np.radians(lon) * np.cos(lat), EARTH_RADIUS * lat
 
 
 def lookup_index(lon, lat, transform, shape):

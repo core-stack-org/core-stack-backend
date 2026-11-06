@@ -24,6 +24,7 @@ from computing.drought.local.config import (
     SOWN_NORMAL_YEARS,
     rain_normal_years,
 )
+from computing.drought.local.onset import regions_file
 from computing.drought.local.store import read_status
 from computing.drought.local.weeks import season_composites, vci_history_years, week_end, week_start
 
@@ -31,8 +32,9 @@ DONE, OUTDATED, READY, WAITING = "done", "outdated", "ready", "waiting"
 MODIS_LAYERS = {"mod09a1": MOD09A1_LAYERS, "mod16a2gf": MOD16A2GF_LAYERS}
 
 # Which inputs each stage needs.
-STAGE_INPUTS = {"rain": {"chirps"}, "cropland": {"lulc"}, "vegetation": {"mod09a1"}, "mai": {"mod16a2gf"},
-                "classify": {"chirps", "lulc", "mod09a1", "mod16a2gf"}}
+STAGE_INPUTS = {"rain": {"chirps", "boundaries"}, "cropland": {"lulc"}, "vegetation": {"mod09a1"},
+                "mai": {"mod16a2gf"}, "classify": {"chirps", "boundaries", "lulc", "mod09a1", "mod16a2gf"},
+                "mws": {"chirps", "boundaries", "lulc", "mod09a1", "mod16a2gf"}}
 
 
 def read_json(path):
@@ -80,6 +82,10 @@ def baseline_gaps(paths):
     lulc = [y for y in range(SOWN_NORMAL_YEARS[0], SOWN_NORMAL_YEARS[1] + 1) if not paths.lulc_file(y).is_file()]
     if lulc:
         gaps.append(("lulc", "area-sown normal: " + ", ".join(paths.lulc_file(y).name for y in lulc) + " not found"))
+    if not regions_file(paths).is_file():
+        missing = [p.name for p in (paths.soi_tehsils, paths.india_outline) if not p.is_file()]
+        if missing:
+            gaps.append(("boundaries", "onset regions: " + ", ".join(missing) + " not found"))
     return gaps
 
 
@@ -122,7 +128,7 @@ def stages_done(status, paths, season):
     if str(season) in status.get("shared", {}).get("rain", {}).get("seasons", {}):
         done.append("rain")
     region = status.get("regions", {}).get(paths.region_key, {})
-    for stage in ("cropland", "vegetation", "mai"):
+    for stage in ("cropland", "vegetation", "mai", "mws"):
         if str(season) in region.get(stage, {}).get("seasons", {}):
             done.append(stage)
     return done
@@ -141,7 +147,9 @@ def season_states(paths, seasons=None):
         done = record.get(str(season), {})
         if done.get("state") == DONE:
             if done.get("method_version") == METHOD_VERSION:
-                rows.append((season, DONE, f"finished {done.get('finished_at', '?')}"))
+                layer = "mws" in stages_done(status, paths, season)
+                rows.append((season, DONE, f"finished {done.get('finished_at', '?')}"
+                             + ("; MWS layer done" if layer else "; MWS layer not made yet")))
             else:
                 rows.append((season, OUTDATED, f"made with {done.get('method_version')}, now {METHOD_VERSION}"))
             continue

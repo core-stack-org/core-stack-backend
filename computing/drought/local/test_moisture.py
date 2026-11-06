@@ -28,6 +28,15 @@ class MaiTests(unittest.TestCase):
         self.assertTrue(np.isnan(got[2]))  # PET 0
         self.assertTrue(np.isnan(mo.window_mai([np.array([100]), None], [np.array([200]), None], [1, 1])[0]))
 
+    def test_window_sums_are_kept(self):
+        """The MWS stage divides sums of these, so they carry the same weights and gaps as MAI."""
+        et = [np.array([100, 32766]), np.array([300, 100])]
+        pet = [np.array([400, 400]), np.array([400, 400])]
+        et_sum, pet_sum = mo.window_sums(et, pet, [1, 0.5])
+        self.assertAlmostEqual(float(et_sum[0]), 10 + 15)
+        self.assertAlmostEqual(float(pet_sum[0]), 40 + 20)
+        self.assertTrue(np.isnan(et_sum[1]) and np.isnan(pet_sum[1]))
+
 
 if __name__ == "__main__":
     unittest.main()
