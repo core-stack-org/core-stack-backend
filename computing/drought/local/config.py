@@ -62,6 +62,20 @@ class Paths:
     def modis_mask(self):
         return self.periodic / "modis_india_mask.tif"
 
+    @property
+    def india_outline(self):
+        """Mainland India without islands; the download script's default boundary."""
+        return self.data_dir / "base_layers" / "PanIndia_Boundaries" / "india_state_outer_no_islands.geojson"
+
+    @property
+    def soi_tehsils(self):
+        return self.data_dir / "base_layers" / "admin_boundary" / "SOI_tehsil.geojson"
+
+    @property
+    def tehsil_watersheds(self):
+        """The MWS of the pan-India hydrology layers, one file per tehsil, with a manifest."""
+        return self.data_dir / "base_layers" / "hydrology" / "runoff" / "commons" / "tehsil_watersheds"
+
     def modis(self, product):
         return self.periodic / product
 

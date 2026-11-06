@@ -4,11 +4,14 @@ Run from the repo root:
     python -m unittest computing.drought.local.test_rainfall -v
 """
 
+import datetime as dt
 import unittest
 
 import numpy as np
+from rasterio.transform import from_origin
 from scipy import stats
 
+from computing.drought.local import onset
 from computing.drought.local import rainfall as rf
 
 
@@ -43,70 +46,80 @@ class SpiTests(unittest.TestCase):
 
 
 class OnsetTests(unittest.TestCase):
-    def setUp(self):
-        # Normals: 2 mm a week until week 22, then 60 mm a week to week 39, then 5 mm.
-        self.normals = np.full((52, 1), 2.0)
-        self.normals[21:39] = 60.0
-        self.normals[39:] = 5.0
-        self.threshold = rf.onset_threshold(self.normals, np.array([50.0]))  # median of the 52 normals: 5 mm
+    def days(self, first=(5, 7), n=60, year=2023):
+        start = dt.date(year, *first)
+        return [start + dt.timedelta(days=i) for i in range(n)]
 
-    def onset(self, this_year, history, land=None, lon=None, lat=None):
-        cells = this_year.shape[-1]
-        land = np.ones(cells, bool) if land is None else land
-        lon = np.arange(cells, dtype=float) * 0.05 if lon is None else lon
-        lat = np.full(cells, 20.0) if lat is None else lat
-        threshold = np.repeat(self.threshold, cells)
-        week, source = rf.season_onset(this_year[rf.SEASON_SPAN], history[:, rf.SEASON_SPAN], threshold, land, lon, lat)
-        return week.tolist(), source.tolist()
+    def test_kerala_date_needs_6_stations_on_2_days_from_22_may(self):
+        days = self.days()
+        rain = np.zeros((len(days), 12))
+        i = {d: k for k, d in enumerate(days)}
+        rain[i[dt.date(2023, 5, 15)]:i[dt.date(2023, 5, 17)], :8] = 20.0  # before 22 May
+        rain[i[dt.date(2023, 5, 25)]:i[dt.date(2023, 5, 27)], :5] = 20.0  # only 5 stations
+        rain[i[dt.date(2023, 6, 1)], :6] = 20.0  # a single day
+        rain[i[dt.date(2023, 6, 7)]:i[dt.date(2023, 6, 9)], :6] = 15.0
+        self.assertEqual(onset.kerala_date(rain, days), dt.date(2023, 6, 8).timetuple().tm_yday)
 
-    def year_with_onset(self, week, cells=1):
-        weekly = np.full((52, cells), 1.0)
-        weekly[week - 1:] = 60.0
-        return weekly
+    def test_kerala_pair_may_start_on_21_may(self):
+        days = self.days()
+        rain = np.zeros((len(days), 12))
+        rain[14:16, :] = 30.0  # 21 and 22 May
+        self.assertEqual(onset.kerala_date(rain, days), dt.date(2023, 5, 22).timetuple().tm_yday)
 
-    def test_threshold_is_the_zone_percentile_of_the_52_normals(self):
-        self.assertEqual(self.threshold.tolist(), [5.0])
+    def test_first_pair_from_the_earliest_day(self):
+        area = np.zeros((40, 4), np.float32)
+        area[5:7] = 3.0  # a pair before the earliest day
+        area[20] = 3.0  # a single wet day
+        area[25:27] = 3.0
+        threshold = np.array([2.5, 2.5, 5.0, np.nan], np.float32)
+        day, source = onset.first_pair(area, 100, threshold, np.array([109.2, 110, 110, 110]))
+        self.assertEqual(day.tolist(), [126, 126, 110, 110])  # cell 2: no pair reaches 5 mm -> earliest day
+        self.assertEqual(source.tolist(), [onset.SOURCE_RAIN, onset.SOURCE_RAIN, onset.SOURCE_FALLBACK,
+                                           onset.SOURCE_NO_RAIN_TEST])
 
-    def test_this_year(self):
-        history = np.stack([self.year_with_onset(22)])
-        self.assertEqual(self.onset(self.year_with_onset(26), history), ([26.0], [rf.ONSET_THIS_YEAR]))
+    def test_pair_on_the_earliest_day_counts(self):
+        area = np.zeros((40, 1), np.float32)
+        area[9:11] = 1.0
+        day, _ = onset.first_pair(area, 100, np.array([1.0], np.float32), np.array([110.0]))
+        self.assertEqual(day.tolist(), [110])
 
-    def test_no_onset_takes_the_median_of_past_onsets(self):
-        dry = np.full((52, 1), 1.0)
-        history = np.stack([self.year_with_onset(w) for w in (22, 30, 24)] + [dry])  # dry year left out
-        self.assertEqual(self.onset(dry, history), ([24.0], [rf.ONSET_PAST_MEDIAN]))
+    def test_latitude_limit(self):
+        self.assertEqual(onset.latitude_limit(150, np.array([8.0, 10.0, 25.0]), 0.75).tolist(), [150, 150, 170])
 
-    def test_even_count_takes_the_later_middle_week(self):
-        dry = np.full((52, 1), 1.0)
-        history = np.stack([self.year_with_onset(w) for w in (22, 30, 24, 26)])
-        self.assertEqual(self.onset(dry, history), ([26.0], [rf.ONSET_PAST_MEDIAN]))
+    def test_area_rain_uses_india_cells_only(self):
+        india = np.zeros((30, 30), bool)
+        india[:, :15] = True
+        daily = np.where(india, 4.0, 100.0)[None].astype(np.float32)  # heavy rain outside India
+        area = onset.area_rain(daily, india)
+        self.assertAlmostEqual(float(area[0, 15, 14]), 4.0, places=4)  # on the border
+        self.assertAlmostEqual(float(area[0, 15, 20]), 4.0, places=4)  # outside, India cells in its box
+        self.assertTrue(np.isnan(area[0, 15, 29]))  # no India cell in its box
 
-    def test_no_onset_ever_copies_the_nearest_cell(self):
-        # Cells along a line 0.05 degrees apart; cell 2 never gets rain above the threshold.
-        this_year = np.full((52, 4), 1.0)
-        this_year[24:, 0] = this_year[27:, 1] = this_year[29:, 3] = 60.0  # onsets 25, 28, -, 30
-        history = np.stack([this_year])
-        week, source = self.onset(this_year, history)
-        # Cells 1 and 3 are equally near: the later of their weeks (28, 30).
-        self.assertEqual(week, [25.0, 28.0, 30.0, 30.0])
-        self.assertEqual(source, [1, 1, rf.ONSET_NEAREST, 1])
+    def test_region_settings(self):
+        threshold, speed, margin = onset.region_settings(np.array([1, 4, 7, 0]))
+        self.assertEqual(threshold[:2].tolist(), [2.5, 0.5])
+        self.assertTrue(np.isnan(threshold[2]))  # Ladakh: no rain test
+        self.assertEqual(speed[:3].tolist(), [0.75, 0.5, 0.75])
+        self.assertEqual(margin[:3].tolist(), [3, 5, 0])
 
-    def test_outside_land_has_no_onset(self):
-        history = np.stack([self.year_with_onset(22, cells=2)])
-        week, source = self.onset(self.year_with_onset(26, cells=2), history, land=np.array([True, False]))
-        self.assertEqual(source, [rf.ONSET_THIS_YEAR, 0])
-        self.assertTrue(np.isnan(week[1]))
+    def test_regions_by_state_with_nearest_fill(self):
+        transform = from_origin(70.0, 30.0, 0.05, 0.05)
+        box = lambda x0, x1: {"type": "Polygon", "coordinates": [[(x0, 29.5), (x1, 29.5), (x1, 30.0), (x0, 30.0), (x0, 29.5)]]}  # noqa: E731
+        tehsils = [{"geometry": box(70.0, 70.25), "properties": {"STATE": "RAJASTHAN"}},
+                   {"geometry": box(70.25, 70.4), "properties": {"STATE": "Disputed (West Bengal)"}},
+                   {"geometry": box(70.4, 70.5), "properties": {"STATE": "DISPUTED"}}]
+        land = np.ones((10, 10), bool)
+        land[:, 9] = False
+        region, india = onset.build_regions(tehsils, [{"geometry": box(70.0, 70.3)}], transform, (10, 10), land)
+        self.assertEqual(region[0].tolist(), [3] * 5 + [2] * 3 + [2, 0])  # DISPUTED: nearest; sea: 0
+        self.assertEqual(india[0].tolist(), [True] * 6 + [False] * 4)
 
-    def test_upper_median(self):
-        values = np.array([[3, 1, np.nan], [2, np.nan, np.nan], [9, 4, np.nan], [1, np.nan, np.nan]])
-        self.assertEqual(rf.upper_median(values, axis=0)[:2].tolist(), [3.0, 4.0])  # [1,2,3,9] -> 3; [1,4] -> 4
-        self.assertTrue(np.isnan(rf.upper_median(values, axis=0)[2]))
-
-    def test_zones(self):
-        pct = rf.zone_percentile(np.array([76.95, 73.0, 77.0, 88.0, 82.10, 68.0]),
-                                 np.array([16.35, 30.0, 22.0, 25.0, 22.0, 35.0]))
-        # Devadurga southern, Punjab northern, central, eastern, gap -> nearest (eastern), west of A -> northern
-        self.assertEqual(pct.tolist(), [50, 75, 69, 65, 65, 75])
+    def test_station_cells_on_the_chirps_window(self):
+        rows, cols = onset.station_cells(from_origin(67.60, 38.00, 0.05, 0.05))
+        names = list(onset.KERALA_STATIONS)
+        k, t = names.index("Kochi"), names.index("Thiruvananthapuram")
+        self.assertEqual((rows[t], cols[t]), (590, 186))
+        self.assertEqual((rows[k], cols[k]), (560, 173))
 
 
 class HistoryTests(unittest.TestCase):
