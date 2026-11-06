@@ -153,6 +153,19 @@ def generate_forest_fire_layer(
                 )
             )
 
+        fire_count_per_year = reduce(
+            fire_count_img,
+            ee.Reducer.sum(),
+            "sum",
+        )
+        fire_count_per_year = ee.Number(
+            ee.Algorithms.If(
+                fire_count_per_year.multiply(n_years).lt(1),
+                0,
+                fire_count_per_year,
+            )
+        )
+
         return ee.Feature(f.geometry()).set(
             {
                 "uid": f.get("uid"),
@@ -166,11 +179,7 @@ def generate_forest_fire_layer(
                     ee.Reducer.max(),
                     "max",
                 ),
-                "fire_count_per_year": reduce(
-                    fire_count_img,
-                    ee.Reducer.sum(),
-                    "sum",
-                ),
+                "fire_count_per_year": fire_count_per_year,
             }
         )
 
