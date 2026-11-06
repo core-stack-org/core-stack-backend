@@ -18,7 +18,6 @@ from shapely.geometry import box, mapping
 from computing.config_loader import (
     AQUIFER_VECTOR_PATH,
     HYDROLOGY_LOCAL_OUTPUT_DIR,
-    PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
 )
 from computing.hydrology_gpu.watershed_boundary import (
@@ -31,6 +30,7 @@ from computing.hydrology_gpu.et_download import (
     FLDAS_GLOBAL_MONTHLY_PATCH_FILLED_SOURCE,
     FLDAS_GLOBAL_MONTHLY_SOURCE,
 )
+from utilities.geoserver_sync_gate import skip_and_record
 from computing.local_compute_helper import (
     build_output_vector_path,
     load_precomputed_watersheds,
@@ -333,7 +333,7 @@ def _pan_india_watershed_offset(
     state,
     district,
     block,
-    watershed_root=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    watershed_root=PAN_INDIA_RUNOFF_WATERSHED_ROOT,
 ):
     root = Path(watershed_root)
     target_path, target_row = find_tehsil_watershed(
@@ -460,7 +460,7 @@ def _attach_pan_india_timeseries(
     district,
     block,
     series_dirs,
-    watershed_root=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    watershed_root=PAN_INDIA_RUNOFF_WATERSHED_ROOT,
     watershed_ids=None,
     uid_to_watershed_id=None,
 ):
@@ -1745,7 +1745,12 @@ def _run_generate_hydrology_area_local(
 
     geoserver_synced = False
     if push_to_geoserver:
-        response = push_local_vector_to_geoserver(
+        response = skip_and_record(
+            "vector",
+            os.path.splitext(asset_id)[0],
+            layer_name,
+            GEOSERVER_WORKSPACE,
+        ) or push_local_vector_to_geoserver(
             path=os.path.splitext(asset_id)[0],
             layer_name=layer_name,
             workspace=GEOSERVER_WORKSPACE,
@@ -2360,7 +2365,12 @@ def _run_clip_hydrology_area_from_base_layers(
 
     geoserver_synced = False
     if push_to_geoserver:
-        response = push_local_vector_to_geoserver(
+        response = skip_and_record(
+            "vector",
+            os.path.splitext(asset_id)[0],
+            layer_name,
+            GEOSERVER_WORKSPACE,
+        ) or push_local_vector_to_geoserver(
             path=os.path.splitext(asset_id)[0],
             layer_name=layer_name,
             workspace=GEOSERVER_WORKSPACE,

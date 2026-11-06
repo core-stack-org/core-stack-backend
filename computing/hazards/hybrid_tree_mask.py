@@ -69,9 +69,7 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
     LULC_START_YEAR = 2017
 
     OUTPUT_DESC = f"Hybrid_Tree_AEZ_{aez}_{str(start_year)}_{str(end_year)}"
-    OUTPUT_ASSET_ID = (
-        f"projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/{OUTPUT_DESC}"
-    )
+    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID

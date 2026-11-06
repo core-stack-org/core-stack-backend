@@ -37,8 +37,55 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
             New User Registered
           </h2>
           <p style="font-size: 16px; margin-bottom: 20px;">
-            A new user <strong>{instance.email}</strong> has registered on the dashboard.
+            A new user has registered on the dashboard.
           </p>
+
+          <table style="width: 100%; border-collapse: collapse; font-size: 15px; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; width: 40%;">
+                <strong>Name</strong>
+              </td>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                {instance.first_name} {instance.last_name}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                <strong>Email</strong>
+              </td>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                {instance.email}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                <strong>Contact Number</strong>
+              </td>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                {instance.contact_number}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                <strong>Organization</strong>
+              </td>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                {instance.organization}
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                <strong>Username</strong>
+              </td>
+              <td style="padding: 10px; border: 1px solid #ddd;">
+                {instance.username}
+              </td>
+            </tr>
+          </table>
           <p style="font-size: 16px; margin-bottom: 15px;">Please take the following action:</p>
           <ol style="padding-left: 20px; font-size: 15px;">
             <li>

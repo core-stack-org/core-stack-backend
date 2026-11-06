@@ -1,5 +1,3 @@
-from tkinter.font import names
-
 from django.urls import path
 from . import api
 from .views import layer_status
@@ -90,6 +88,11 @@ urlpatterns = [
         name="change_detection_vector",
     ),
     path("crop_grid/", api.crop_grid, name="crop_grid"),
+    path(
+        "generate_farm_boundaries/",
+        api.generate_farm_boundaries,
+        name="generate_farm_boundaries",
+    ),
     path("tree_health_raster/", api.tree_health_raster, name="tree_health_raster"),
     path("tree_health_vector/", api.tree_health_vector, name="tree_health_vector"),
     path("stream_order/", api.stream_order, name="stream_order"),
@@ -258,6 +261,16 @@ urlpatterns = [
         "update_layer_sync_remote/",
         api.update_layer_sync_remote,
         name="update_layer_sync_remote",
+    ),
+    path(
+        "sync_local_layers_to_geoserver/",
+        api.sync_local_layers_to_geoserver,
+        name="sync_local_layers_to_geoserver",
+    ),
+    path(
+        "unsynced_local_layers/",
+        api.unsynced_local_layers,
+        name="unsynced_local_layers",
     ),
     path("missing_layers/", api.missing_layers, name="missing_layer"),
     path(

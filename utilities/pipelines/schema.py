@@ -10,6 +10,8 @@ from typing import Any, Iterable, Mapping
 import pandas as pd
 import yaml
 
+from utilities.geoserver_sync_gate import should_skip_sync
+
 from .admin import AdminScope
 
 
@@ -158,13 +160,18 @@ def api_request_payload(data: Mapping[str, Any], *, overwrite: bool = True) -> d
 
     publish = dict(body.get("publish") or {})
     for key, default in (
-        ("sync_to_geoserver", True),
+        ("sync_to_geoserver", False),
         ("overwrite", overwrite),
         ("register_layers", True),
         ("use_pregenerated", False),
     ):
         # Simple bodies carry publish flags at the top level.
         publish.setdefault(key, body.get(key, default))
+
+    # Only push when the request asked for it and the tehsil is active (the
+    # gate is closed otherwise). Without a gate context, the request decides.
+    if should_skip_sync():
+        publish["sync_to_geoserver"] = False
 
     return {
         "scope": scope,

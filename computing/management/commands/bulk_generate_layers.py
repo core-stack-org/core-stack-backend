@@ -3,8 +3,10 @@ from django.core.management.base import BaseCommand, CommandError
 from computing.bulk_layer_generation import (
     get_active_locations,
     get_active_locations_from_api,
+    get_all_locations,
     get_locally_generated_locations,
     get_regeneration_dataset_names,
+    layer_exists_locally,
     pipeline_names,
     validate_pipeline,
 )
@@ -20,6 +22,15 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("pipeline", nargs="?")
         parser.add_argument("--all-active", action="store_true")
+        parser.add_argument(
+            "--all-tehsils",
+            action="store_true",
+            help=(
+                "Every tehsil in the local database, active or not. Can be "
+                "narrowed with --state/--district/--block. Layers of inactive "
+                "tehsils are generated but never pushed to GeoServer."
+            ),
+        )
         parser.add_argument(
             "--regenerate-local",
             action="store_true",
@@ -51,6 +62,23 @@ class Command(BaseCommand):
         parser.add_argument("--end-year", type=int)
         parser.add_argument("--gee-account-id")
         parser.add_argument("--dry-run", action="store_true")
+        parser.add_argument(
+            "--sync-to-geoserver",
+            action="store_true",
+            help=(
+                "Push generated layers to GeoServer, only for active tehsils. "
+                "Without it layers stay on local disk and are pushed once the "
+                "tehsil is activated (see sync_pending_geoserver)."
+            ),
+        )
+        parser.add_argument(
+            "--regenerate-all",
+            action="store_true",
+            help=(
+                "Generate even when the layer already exists locally. By "
+                "default existing layers are skipped."
+            ),
+        )
         parser.add_argument("--list-pipelines", action="store_true")
 
         overwrite_group = parser.add_mutually_exclusive_group()
@@ -92,11 +120,21 @@ class Command(BaseCommand):
         if (
             not options["all_active"]
             and not options["regenerate_local"]
+            and not options["all_tehsils"]
             and not filters
         ):
             raise CommandError(
-                "Specify --all-active, --regenerate-local, or at least one of "
-                "--state, --district, or --block."
+                "Specify --all-active, --all-tehsils, --regenerate-local, or "
+                "at least one of --state, --district, or --block."
+            )
+        if options["all_tehsils"] and (
+            options["all_active"]
+            or options["regenerate_local"]
+            or options["from_prod_api"]
+        ):
+            raise CommandError(
+                "--all-tehsils cannot be combined with --all-active, "
+                "--regenerate-local or --from-prod-api."
             )
         if options["all_active"] and (options["regenerate_local"] or filters):
             raise CommandError(
@@ -117,6 +155,8 @@ class Command(BaseCommand):
 
         if options["regenerate_local"]:
             location_loader = get_locally_generated_locations
+        elif options["all_tehsils"]:
+            location_loader = get_all_locations
         elif options["from_prod_api"]:
             location_loader = get_active_locations_from_api
         else:
@@ -133,9 +173,15 @@ class Command(BaseCommand):
         if not locations:
             raise CommandError("No locations matched the requested scope.")
 
+        skip_existing = not (
+            options["regenerate_all"] or options["regenerate_local"]
+        ) and options["compute"] == "local"
+
         action = "Would queue" if options["dry_run"] else "Queueing"
         location_source = (
-            "locally generated" if options["regenerate_local"] else "active"
+            "locally generated"
+            if options["regenerate_local"]
+            else "matching" if options["all_tehsils"] else "active"
         )
         self.stdout.write(
             f"{action} {options['compute']} pipeline '{pipeline}' for "
@@ -143,11 +189,18 @@ class Command(BaseCommand):
             f"location(s) on queue '{queue}'."
         )
 
+        queued = 0
+        skipped = 0
         for location in locations:
             location_data = location.asdict()
             label = (
                 f"{location.state}/{location.district}/{location.block}"
             )
+            if skip_existing and layer_exists_locally(pipeline, location_data):
+                skipped += 1
+                self.stdout.write(f"  {label}: exists, skipped")
+                continue
+            queued += 1
             if options["dry_run"]:
                 self.stdout.write(f"  {label}")
                 continue
@@ -161,16 +214,25 @@ class Command(BaseCommand):
                     "start_year": options["start_year"],
                     "end_year": options["end_year"],
                     "gee_account_id": options["gee_account_id"],
+                    "sync_to_geoserver": options["sync_to_geoserver"],
+                    "skip_existing": skip_existing,
                 },
                 queue=queue,
             )
             self.stdout.write(f"  {label}: {result.id}")
 
         if options["dry_run"]:
-            self.stdout.write(self.style.SUCCESS("Dry run complete; no tasks queued."))
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Dry run complete; {queued} would queue, {skipped} "
+                    "already exist."
+                )
+            )
         else:
             self.stdout.write(
-                self.style.SUCCESS(f"Queued {len(locations)} task(s).")
+                self.style.SUCCESS(
+                    f"Queued {queued} task(s); {skipped} already existed."
+                )
             )
 
     def _list_pipelines(self, compute):

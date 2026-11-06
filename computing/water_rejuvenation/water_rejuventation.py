@@ -13,6 +13,7 @@ from utilities.constants import (
     LANDSAT8_T1_CALIBERATED_TOA,
     PAN_INDIA_LULC_PATH,
     PAN_INDIA_MWS_PATH,
+    LulcClass,
 )
 from utilities.gee_utils import (
     ee_initialize,
@@ -54,7 +55,11 @@ def find_closest_water_pixel(lon, lat, lulc_class):
     final_lulc_img = ee.Image(PAN_INDIA_LULC_PATH).select("predicted_label")
 
     # STEP 1: CHECK IF THE REFERENCE POINT IS ALREADY A WATER PIXEL
-    if lulc_class in [2, 3, 4]:
+    if lulc_class in [
+        LulcClass.KHARIF_WATER,
+        LulcClass.KHARIF_RABI_WATER,
+        LulcClass.KHARIF_RABI_ZAID_WATER,
+    ]:
         print(f"The reference point is already a water pixel (class {lulc_class}).")
         return True, lat, lon, 0
 
@@ -68,7 +73,11 @@ def find_closest_water_pixel(lon, lat, lulc_class):
     )
 
     # STEP 2: CREATE A WATER MASK AROUND THE REFERENCE POINT
-    water_mask = final_lulc_img.eq(2).Or(final_lulc_img.eq(3)).Or(final_lulc_img.eq(4))
+    water_mask = (
+        final_lulc_img.eq(LulcClass.KHARIF_WATER)
+        .Or(final_lulc_img.eq(LulcClass.KHARIF_RABI_WATER))
+        .Or(final_lulc_img.eq(LulcClass.KHARIF_RABI_ZAID_WATER))
+    )
     water_pixels = water_mask.selfMask()
     buffer_distance = 1500
     search_region = reference_point.buffer(buffer_distance)
@@ -236,7 +245,12 @@ def calculate_elevation(landsat_collection, lulc_asset_id):
         landsat_collection.mean().normalizedDifference(["B5", "B6"]).rename("NDMI")
     )
     lulc = ee.Image(lulc_asset_id)
-    cropping_mask = lulc.eq(8).Or(lulc.eq(9)).Or(lulc.eq(10)).Or(lulc.eq(11))
+    cropping_mask = (
+        lulc.eq(LulcClass.SINGLE_KHARIF)
+        .Or(lulc.eq(LulcClass.SINGLE_NON_KHARIF))
+        .Or(lulc.eq(LulcClass.DOUBLE_CROPPING))
+        .Or(lulc.eq(LulcClass.TRIPLE_ANNUAL_PERENNIAL))
+    )
     # Load elevation dataset
     elevation = ee.Image(SRTM_DIGITAL_ELEVATION)
     return elevation, cropping_mask, ndmi_image

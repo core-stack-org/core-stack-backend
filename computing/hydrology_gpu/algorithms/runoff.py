@@ -4,6 +4,7 @@ import os
 from natsort import natsorted
 from tqdm import tqdm
 from . import GenericAlgorithm, GeoTIFFHandler
+from ..utils import load_tif_image
 import cupy as cp
 import numpy as np
 from ..downloads import rainfall

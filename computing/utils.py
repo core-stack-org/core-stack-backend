@@ -46,6 +46,7 @@ from utilities.gee_utils import (
     valid_gee_text,
 )
 from utilities.geoserver_utils import Geoserver
+from utilities.geoserver_sync_gate import should_skip_sync, skip_and_record
 from django.core.mail import EmailMessage, get_connection
 import time
 
@@ -81,6 +82,12 @@ def convert_to_zip(dir_name, file_type):
 def push_shape_to_geoserver(
         path, store_name=None, workspace=None, layer_name=None, file_type="shp"
 ):
+    skipped = skip_and_record(
+        "vector", path, layer_name or store_name, workspace, file_type=file_type
+    )
+    if skipped:
+        return skipped
+
     geo = Geoserver()
 
     print(f"layer_name: {layer_name}")
@@ -202,6 +209,8 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
             layer_name=layer_name,
             file_type="gpkg",
         )
+        if isinstance(res, dict) and res.get("skipped"):
+            return res
         if style_name:
             style_res = geo.publish_style(
                 layer_name=layer_name, style_name=style_name, workspace=workspace
@@ -903,7 +912,7 @@ def generate_swb_layer_with_max_so_catchment(
 
 
 
-def save_layer_info_to_db(
+def _save_layer_info_to_db(
     state,
     district,
     block,
@@ -1039,9 +1048,42 @@ def save_layer_info_to_db(
     return layer_obj.id
 
 
+def save_layer_info_to_db(
+    state,
+    district,
+    block,
+    layer_name,
+    asset_id,
+    dataset_name,
+    sync_to_geoserver=False,
+    **kwargs,
+):
+    """
+    Saves the layer row. When the GeoServer gate is closed for this request the
+    layer is stored as not synced, so it is picked up once its tehsil is active.
+    """
+    return _save_layer_info_to_db(
+        state,
+        district,
+        block,
+        layer_name,
+        asset_id,
+        dataset_name,
+        False if should_skip_sync() else sync_to_geoserver,
+        **kwargs,
+    )
+
+
 def update_layer_sync_status(
         layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
 ):
+    if sync_to_geoserver and should_skip_sync():
+        # The push was skipped by the GeoServer gate, so the layer is not on
+        # GeoServer; callers flip this flag on any truthy push result.
+        sync_to_geoserver = None
+        if is_stac_specs_generated is None:
+            return layer_id
+
     if _get_prod_backend_url():
         _update_layer_sync_remote(
             layer_id,

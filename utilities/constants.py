@@ -1,9 +1,13 @@
 # import
+from enum import IntEnum
+
 from nrm_app.settings import (
     GCS_BUCKET_NAME as SETTINGS_GCS_BUCKET_NAME,
     GEE_STORAGE_PROJECT,
     GEE_STORAGE_PROJECT_HELPER,
     GEOSERVER_URL,
+    ARCHIVE_DATA_DIR,
+    BASE_DATA_DIR
 )
 
 # Directory Path
@@ -25,6 +29,8 @@ MERGE_MWS_PATH = "data/merge_mws"
 
 RASTERS_PATH = "data/rasters"
 CROP_GRID_PATH = "data/crop_grid"
+FARM_BOUNDARIES_PATH = f"{ARCHIVE_DATA_DIR}/farm_boundaries"
+LOCAL_ET_RASTERS_PATH = f"{ARCHIVE_DATA_DIR}"
 
 KML_PATH = "data/kml/"
 SHAPEFILE_DIR = "data/kml/shapefiles"
@@ -232,6 +238,23 @@ LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
 LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
 
 
+class LulcClass(IntEnum):
+    BACKGROUND = 0
+    BUILT_UP = 1
+    KHARIF_WATER = 2
+    KHARIF_RABI_WATER = 3
+    KHARIF_RABI_ZAID_WATER = 4
+    CROPS = 5
+    TREES = 6
+    BARREN_LAND = 7
+    SINGLE_KHARIF = 8
+    SINGLE_NON_KHARIF = 9
+    DOUBLE_CROPPING = 10
+    TRIPLE_ANNUAL_PERENNIAL = 11
+    SHRUBS_SCRUBS = 12
+    PLANTATION = 13
+
+
 # Moderation Constants
 filter_query_updated = "$filter=__system/submissionDate ge 2025-11-28T00:00:00.000Z"
 filter_query_edited = "$filter=__system/submissionDate lt 2025-11-28T00:00:00.000Z and __system/updatedAt ge 2025-11-28T00:00:00.000Z"
@@ -250,7 +273,9 @@ DRAINAGE_LINES_ASSET = (
     "projects/corestack-datasets/assets/datasets/drainage-line/pan_india_drainage_lines"
 )
 GLOBAL_DRAINAGE_EPS_M = 10.0
-GEOSERVER_BASE = (GEOSERVER_URL or "https://geoserver.core-stack.org:8443/geoserver/").rstrip("/") + "/"
+GEOSERVER_BASE = (
+    GEOSERVER_URL or "https://geoserver.core-stack.org:8443/geoserver/"
+).rstrip("/") + "/"
 WORKSPACE_URL_END = "wms?service=WMS&request=GetCapabilities"
 WORKS_WORKSPACE = "works"
 RESOURCES_WORKSPACE = "resources"
@@ -285,6 +310,9 @@ MINING_PAN_INDIA_DATASET = "projects/ext-datasets/assets/datasets/Mining_data_pa
 FACTORY_PAN_INDIA_DATASET = (
     "projects/ext-datasets/assets/datasets/Factory_CSR_pan_india"
 )
+# Folder in the NREGA bucket holding the latest scraped district geojsons.
+NREGA_S3_PREFIX = "nrega_04_2026"
+
 GREEN_CREDIT_PAN_INDIA_DATASET = (
     "projects/ext-datasets/assets/datasets/Green_credit_pan_india"
 )
@@ -315,7 +343,8 @@ INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
 ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
 WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
-SOI_TEHSIL = "data/admin-boundary/input/soi_tehsil.geojson"
+SOI_TEHSIL = f"{BASE_DATA_DIR}/admin-boundary/input/soi_tehsil.geojson"
+AEZ_GEOJSON = f"{BASE_DATA_DIR}/AEZ_GeoJSON.geojson"
 FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
@@ -382,3 +411,4 @@ LTP_STP_CHANGE = (
 )
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
+SOI_DISTRICT = "projects/ext-datasets/assets/datasets/SOI_districts"

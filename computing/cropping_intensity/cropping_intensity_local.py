@@ -5,6 +5,7 @@ from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
 from computing.local_compute_helper import (
+    CROPPING_INTENSITY_INITIAL_YEAR,
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
@@ -20,6 +21,7 @@ from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
 )
+from utilities.constants import LulcClass
 
 
 LOCAL_OUTPUT_BASE_DIR = (
@@ -28,18 +30,19 @@ LOCAL_OUTPUT_BASE_DIR = (
 GEOSERVER_WORKSPACE = "crop_intensity"
 LOCAL_ALGORITHM = "local_cropping_intensity"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
-INITIAL_YEAR = 2017
-
-SINGLE_KHARIF = 8
-SINGLE_NON_KHARIF = 9
-DOUBLE = 10
-TRIPLE = 11
+INITIAL_YEAR = CROPPING_INTENSITY_INITIAL_YEAR   # defined once in local_compute_helper
 
 YEARLY_CLASS_DEFINITIONS = (
-    {"value": SINGLE_KHARIF, "label_prefix": "single_kharif_cropped_area_"},
-    {"value": SINGLE_NON_KHARIF, "label_prefix": "single_non_kharif_cropped_area_"},
-    {"value": DOUBLE, "label_prefix": "doubly_cropped_area_"},
-    {"value": TRIPLE, "label_prefix": "triply_cropped_area_"},
+    {"value": LulcClass.SINGLE_KHARIF, "label_prefix": "single_kharif_cropped_area_"},
+    {
+        "value": LulcClass.SINGLE_NON_KHARIF,
+        "label_prefix": "single_non_kharif_cropped_area_",
+    },
+    {"value": LulcClass.DOUBLE_CROPPING, "label_prefix": "doubly_cropped_area_"},
+    {
+        "value": LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+        "label_prefix": "triply_cropped_area_",
+    },
 )
 
 
@@ -106,7 +109,12 @@ def _compute_total_croppable_area(result_gdf, denominator_raster_paths, end_year
     return compute_union_categorical_area_across_rasters_for_watersheds(
         watersheds_gdf=result_gdf,
         raster_paths=denominator_raster_paths,
-        class_values=[SINGLE_KHARIF, SINGLE_NON_KHARIF, DOUBLE, TRIPLE],
+        class_values=[
+            LulcClass.SINGLE_KHARIF,
+            LulcClass.SINGLE_NON_KHARIF,
+            LulcClass.DOUBLE_CROPPING,
+            LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+        ],
         output_column=output_column,
     )
 

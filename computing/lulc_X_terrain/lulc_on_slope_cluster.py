@@ -87,6 +87,11 @@ def lulc_on_slope_cluster(
         result = process_feature_collection(
             slope_mwsheds, study_area_landforms, study_area_lulc, slope_centroids
         )
+        result = result.map(
+            lambda feature: feature.select(
+                feature.propertyNames().remove("area")
+            )
+        )
         print("Processing completed successfully")
         task = export_vector_asset_to_gee(result, asset_description, asset_id)
         task_id_list = check_task_status([task])

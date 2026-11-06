@@ -1,5 +1,6 @@
 import logging
-import os
+import tempfile
+import typing
 from contextlib import ExitStack
 from pathlib import Path
 
@@ -9,20 +10,26 @@ import pandas as pd
 import rasterio
 from rasterio.mask import mask
 from shapely.geometry import mapping
+from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
 from computing.utils import convert_to_zip
+from utilities.geoserver_sync_gate import should_skip_sync, skip_and_record
 
 logger = logging.getLogger(__name__)
 
 from computing.config_loader import (
     AEZ_VECTOR_PATH,
+    LOCAL_ADMIN_BOUNDARY_DIR,
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
-    TERRAIN_RASTER_PATH,
 )
-from computing.base_layer_setup import ensure_tehsil_watershed
+from computing.base_layer_setup import (
+    ensure_tehsil_watershed,
+    tehsil_file_candidates,
+    tehsil_mws_file_candidates,
+)
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 
 PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
@@ -47,6 +54,26 @@ VALLEY_CLASSES = {1, 2, 4, 9}
 HILL_SLOPES_CLASSES = {8}
 RIDGE_CLASSES = {3, 7, 10, 11}
 SLOPY_CLASSES = {6}
+
+
+class TerrainProperties(typing.TypedDict):
+    plain_area: float
+    valley_area: float
+    hill_slopes_area: float
+    ridge_area: float
+    slopy_area: float
+    terrainClusters: int
+
+
+def dummy_terrain_props() -> TerrainProperties:
+    return {
+        "plain_area": 0.0,
+        "valley_area": 0.0,
+        "hill_slopes_area": 0.0,
+        "ridge_area": 0.0,
+        "slopy_area": 0.0,
+        "terrainClusters": -1,
+    }
 
 
 def _slug(value, fallback):
@@ -113,14 +140,9 @@ def resolve_precomputed_vector_file(
     missing_file_label="Precomputed vector file",
 ):
     roi_dir = Path(precomputed_roi_dir or PRECOMPUTED_TEHSIL_WATERSHED_DIR)
-    state_slug = _slug(state, "unknown_state")
-    district_slug = _slug(district, "unknown_district")
-    block_slug = _slug(block, "unknown_tehsil")
-
-    expected_paths = [
-        roi_dir / state_slug / district_slug / f"{block_slug}{ext}"
-        for ext in extensions
-    ]
+    expected_paths = tehsil_mws_file_candidates(
+        roi_dir, state, district, block, extensions
+    )
     for path in expected_paths:
         if path.exists():
             return path
@@ -176,7 +198,7 @@ def load_precomputed_watersheds(
         )
 
     except FileNotFoundError:
-        print(f"Precomputed watershed not found for " f"{state}/{district}/{block}")
+        print(f"Precomputed watershed not found for {state}/{district}/{block}")
         ensure_tehsil_watershed(
             state=state,
             district=district,
@@ -214,7 +236,7 @@ def load_precomputed_panchayat(
         )
 
     except FileNotFoundError:
-        print(f"Precomputed panchayat not found for " f"{state}/{district}/{block}")
+        print(f"Precomputed panchayat not found for {state}/{district}/{block}")
         generate_gpkg(
             state=state,
             district=district,
@@ -417,22 +439,54 @@ def _push_raster_to_geoserver_instance(
                 layer_name,
                 e,
             )
-        if style_name:
+        if style_name and _style_exists(geo, style_name, workspace):
             style_response = geo.publish_style(
                 layer_name=layer_name,
                 style_name=style_name,
                 workspace=workspace,
             )
+        elif style_name:
+            # Pointing a layer at a style that is not on the server leaves a
+            # dangling reference and GeoServer then 500s on the layer.
+            logger.warning(
+                "Style '%s' not found for workspace %s; not applying it to %s.",
+                style_name,
+                workspace,
+                layer_name,
+            )
+
+    status_code = upload_response.get("status_code")
+    layer_exists = None
+    if status_code in (200, 201):
+        # A 201 only means the coverage store was created; the layer record can
+        # still be missing, which makes the raster invisible to WMS.
+        layer_exists = _verify_raster_layer(geo, workspace, layer_name)
+        if not layer_exists:
+            logger.error(
+                "Raster %s:%s uploaded but no layer is registered on GeoServer.",
+                workspace,
+                layer_name,
+            )
+            status_code = 500
 
     return {
-        "status_code": upload_response.get("status_code"),
+        "status_code": status_code,
         "upload_response": upload_response,
         "configure_response": configure_response,
         "style_response": style_response,
-        "layer_exists": (
-            _verify_raster_layer(geo, workspace, layer_name) if verify else None
-        ),
+        "layer_exists": layer_exists,
     }
+
+
+def _style_exists(geo, style_name, workspace):
+    """True iff the style exists in the workspace or globally on the server."""
+    for ws in (workspace, None):
+        try:
+            geo.get_style(style_name, workspace=ws)
+            return True
+        except Exception:
+            continue
+    return False
 
 
 def _verify_raster_layer(geo, workspace, layer_name):
@@ -489,8 +543,8 @@ def _geoserver_targets():
     from django.conf import settings
     from utilities.geoserver_utils import Geoserver
 
-    yield "local", Geoserver()
-
+    # PROD_GEOSERVER_* is the only GeoServer we publish to. The default
+    # GEOSERVER_URL instance is only a fallback when prod is not configured.
     prod_url = getattr(settings, "PROD_GEOSERVER_URL", "")
     if prod_url:
         yield (
@@ -501,11 +555,13 @@ def _geoserver_targets():
                 password=settings.PROD_GEOSERVER_PASSWORD,
             ),
         )
+    else:
+        yield "local", Geoserver()
 
 
 def _push_to_geoserver_targets(publish, layer_name, layer_type):
     responses = {"local": None, "prod": None}
-    statuses = {"local": False, "prod": None}
+    statuses = {"local": None, "prod": None}
 
     for target, geo in _geoserver_targets():
         try:
@@ -537,9 +593,7 @@ def _push_to_geoserver_targets(publish, layer_name, layer_type):
         responses[target] = response
         statuses[target] = ok
 
-    overall_ok = statuses["local"] and (
-        statuses["prod"] if statuses["prod"] is not None else True
-    )
+    overall_ok = all(ok for ok in statuses.values() if ok is not None)
     failure_status = None
     for target in ("local", "prod"):
         response = responses[target]
@@ -570,6 +624,139 @@ def push_local_vector_to_geoserver(path, layer_name, workspace, file_type="gpkg"
         layer_name,
         "vector",
     )
+
+
+def _resolve_local_admin_boundary_file(state, district, block):
+    # e.g. pune/mulshi_paud/pune_mulshi-paud.geojson
+    candidates = tehsil_file_candidates(
+        LOCAL_ADMIN_BOUNDARY_DIR,
+        state,
+        district,
+        block,
+        lambda d, t: f"{d}_{t}",
+        (".geojson",),
+    )
+    for path in candidates:
+        if path.exists():
+            return path
+    raise FileNotFoundError(
+        f"Admin boundary file not found for {state}/{district}/{block}. "
+        f"Expected one of: {[str(p) for p in candidates]}"
+    )
+
+
+def _layer_exists_on_all_targets(workspace, layer_name):
+    return all(
+        _verify_raster_layer(geo, workspace, layer_name)
+        for _, geo in _geoserver_targets()
+    )
+
+
+def _push_boundary_to_geoserver(source_path, workspace, layer_name, overwrite):
+    if not overwrite and _layer_exists_on_all_targets(workspace, layer_name):
+        logger.info("%s:%s already on GeoServer; skipping.", workspace, layer_name)
+        return None
+
+    gdf = read_validated_vector_file(
+        source_path, f"Boundary file has no valid geometries: {source_path}"
+    )
+    gdf = gdf.set_crs("EPSG:4326") if gdf.crs is None else gdf.to_crs("EPSG:4326")
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        gpkg_base = str(Path(tmp_dir) / layer_name)
+        gdf.to_file(gpkg_base + ".gpkg", driver="GPKG", layer=layer_name)
+        response = push_local_vector_to_geoserver(
+            gpkg_base, layer_name, workspace, "gpkg"
+        )
+    if response.get("status_code") not in (200, 201, 202):
+        raise RuntimeError(
+            f"Failed to push {workspace}:{layer_name} to GeoServer: {response}"
+        )
+    return response
+
+
+def sync_tehsil_boundaries_to_geoserver(state, district, block, overwrite=False):
+    """
+    Publishes the locally provisioned admin boundary
+    (panchayat_boundaries:{district}_{block}) and MWS boundary
+    (mws:mws_{district}_{block}) of a tehsil to GeoServer. Layers already on
+    GeoServer are skipped unless overwrite is true.
+    """
+    district_slug = _slug(district, "unknown_district")
+    block_slug = _slug(block, "unknown_tehsil")
+
+    admin_path = _resolve_local_admin_boundary_file(state, district, block)
+    mws_path = resolve_precomputed_vector_file(
+        state=state,
+        district=district,
+        block=block,
+        missing_file_label="Precomputed tehsil MWS file",
+    )
+    return {
+        "admin_boundary": _push_boundary_to_geoserver(
+            admin_path,
+            "panchayat_boundaries",
+            f"{district_slug}_{block_slug}",
+            overwrite,
+        ),
+        "mws": _push_boundary_to_geoserver(
+            mws_path,
+            "mws",
+            f"mws_{district_slug}_{block_slug}",
+            overwrite,
+        ),
+    }
+
+
+class TehsilBoundaryError(Exception):
+    """Raised when a tehsil's local boundaries are missing or fail to sync."""
+
+    def __init__(self, stage, message):
+        super().__init__(message)
+        self.stage = stage  # "boundary_check" or "boundary_sync"
+
+
+def prepare_local_tehsil_boundaries(state, district, block, overwrite=False):
+    """
+    First step of every local layer run for a tehsil: checks that the local
+    admin boundary and MWS boundary both exist, then publishes them to
+    GeoServer (panchayat_boundaries:{district}_{block}, mws:mws_{district}_{block}).
+    Raises TehsilBoundaryError naming the failing stage, so callers can stop
+    before any layer computation starts.
+    """
+    location = f"{state}/{district}/{block}"
+    missing = []
+    for resolve in (
+        lambda: _resolve_local_admin_boundary_file(state, district, block),
+        lambda: ensure_tehsil_watershed(state, district, block),
+    ):
+        try:
+            resolve()
+        except FileNotFoundError as exc:
+            missing.append(str(exc))
+    if missing:
+        raise TehsilBoundaryError(
+            "boundary_check",
+            f"Local boundaries missing for {location}: " + " | ".join(missing),
+        )
+
+    if should_skip_sync():
+        # Inactive tehsil (or sync not requested): keep the boundaries local.
+        # They are pushed with the tehsil's layers once it is active.
+        logger.info("Boundary sync to GeoServer skipped for %s", location)
+        return {"skipped": True}
+
+    try:
+        result = sync_tehsil_boundaries_to_geoserver(
+            state, district, block, overwrite=overwrite
+        )
+    except Exception as exc:
+        raise TehsilBoundaryError(
+            "boundary_sync",
+            f"Boundary sync to GeoServer failed for {location}: {exc}",
+        ) from exc
+    logger.info("Local boundaries ready and synced for %s", location)
+    return result
 
 
 def push_local_raster_to_geoserver(
@@ -604,6 +791,18 @@ def queue_local_layer_for_geoserver(
     verify=False,
 ):
     from computing.tasks import GEOSERVER_QUEUE, publish_local_layer
+
+    skipped = skip_and_record(
+        layer_type,
+        path,
+        layer_name,
+        workspace,
+        style_name,
+        file_type,
+        status_code=202,
+    )
+    if skipped:
+        return skipped
 
     result = publish_local_layer.apply_async(
         kwargs={
@@ -932,51 +1131,24 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
             working_gdf = working_gdf.to_crs(src.crs)
 
         nodata = src.nodata
-        computed_rows = []
+        computed_rows: list[TerrainProperties] = []
 
         total = len(working_gdf)
         for index, row in enumerate(working_gdf.itertuples(index=False), start=1):
             geom = row.geometry
             if geom is None or geom.is_empty:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             try:
                 clipped, _ = mask(src, [mapping(geom)], crop=True, filled=True)
             except ValueError:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             values = clipped[0]
             if values.size == 0:
-                computed_rows.append(
-                    {
-                        "plain_area": 0.0,
-                        "valley_area": 0.0,
-                        "hill_slopes_area": 0.0,
-                        "ridge_area": 0.0,
-                        "slopy_area": 0.0,
-                        "terrainClusters": -1,
-                    }
-                )
+                computed_rows.append(dummy_terrain_props())
                 continue
 
             values = np.rint(values).astype(np.int16, copy=False)
@@ -1034,6 +1206,34 @@ def resolve_lulc_raster_paths(
         ensure_file_exists(raster_path, f"LULC raster for {year}-{year + 1}")
         raster_paths.append(str(raster_path))
     return raster_paths
+
+
+# ── cropping intensity (shared by the watershed and farm pipelines) ─────────────
+
+CROPPING_INTENSITY_INITIAL_YEAR = 2017
+SINGLE_CROP_CLASSES = (LulcClass.SINGLE_KHARIF, LulcClass.SINGLE_NON_KHARIF)
+ALL_CROP_CLASSES = SINGLE_CROP_CLASSES + (
+    LulcClass.DOUBLE_CROPPING,
+    LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+)
+
+
+def compute_cropping_intensity(single_area, double_area, triple_area, denominator):
+    """
+    Cropping intensity = (single + 2*double + 3*triple) / denominator, where the
+    denominator is the area ever cropped. Element-wise on arrays; 0.0 where the
+    denominator is 0 (never cropped).
+    """
+    single = np.asarray(single_area, dtype="float64")
+    double = np.asarray(double_area, dtype="float64")
+    triple = np.asarray(triple_area, dtype="float64")
+    denominator = np.asarray(denominator, dtype="float64")
+    intensity = np.zeros(denominator.shape, dtype="float64")
+    nonzero = denominator > 0
+    intensity[nonzero] = (
+        single[nonzero] + 2.0 * double[nonzero] + 3.0 * triple[nonzero]
+    ) / denominator[nonzero]
+    return intensity
 
 
 def get_watershed_areas_in_hectares(watersheds_gdf):

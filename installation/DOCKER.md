@@ -142,22 +142,24 @@ Other settings are listed in [Settings](#settings).
 ## Data for local compute
 
 Local computation (`"compute": "local"` in a request) reads its inputs from
-`data/base_layers/`. Download what the APIs you use need and place it as
-shown.
+`data/base_layers/`. All of it is in
+[this Google Drive folder](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b),
+in the same layout as `data/base_layers/`. Download what you need and place
+it at the same path, for example as shown below.
 
-| Data | Download | Place at `data/base_layers/` | Needed by |
-| --- | --- | --- | --- |
-| Terrain (569 MB) | `<link>` | `terrain_raster_fabdam_pan_india.tif` | runoff |
-| Soil (6 MB) | `<link>` | `soil/hysogs_india_250m_4326.tif` | runoff |
-| LULC, one file per year (63 GB) | `<link>` | `lulc/lulc_v3_<year>_<year+1>.tif` | runoff, LULC |
-| India boundary (8 MB) | `<link>` | `PanIndia_Boundaries/india_state_outer_no_islands.geojson` | pan-India runoff |
-| Aquifer (102 MB) | `<link>` | `aquifer/aquifer.geojson` | pan-India hydrology |
-| Microwatersheds (5.4 GB) | `<link>` | `static_layers/mws/Microwatershed_v2_with_details.geojson` | MWS layers |
-| SOI tehsils (316 MB) | `<link>` | `admin_boundary/soi_tehsil.geojson` | tehsil watersheds |
-| Tehsil watersheds | `<link>` | `tehsil_watersheds/<state>/<district>/<tehsil>.gpkg` | every tehsil-level request |
-| Runoff (164 GB) | `<link>` | `hydrology/runoff/` | pan-India hydrology |
-| ET (114 GB) | `<link>` | `hydrology/et/` | pan-India hydrology |
-| Pan-India annual hydrology (20 GB) | `<link>` | `hydrology/annual/` | tehsil hydrology |
+| Data | Download | Place at `data/base_layers/` |
+| --- | --- | --- |
+| Terrain (569 MB) | [Download](https://drive.google.com/file/d/1PJG5pWOZSU6fp9YvtexBO_2AxdNABjpl/view) | `terrain_raster_fabdam_pan_india.tif` |
+| Soil (6 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `soil/hysogs_india_250m_4326.tif` |
+| LULC, one file per year (63 GB) | [Download](https://drive.google.com/file/d/1VO0iyDnLevTFqV-sk_apFUtkC8cuYnYP/view) | `lulc/lulc_v3_<year>_<year+1>.tif` |
+| India boundary (8 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `PanIndia_Boundaries/india_state_outer_no_islands.geojson` |
+| Aquifer (102 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `aquifer/aquifer.geojson` |
+| Microwatersheds (5.4 GB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `static_layers/mws/Microwatershed_v2_with_details.geojson` |
+| SOI tehsils (316 MB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `admin_boundary/soi_tehsil.geojson` |
+| Tehsil watersheds | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `tehsil_watersheds/<state>/<district>/<tehsil>.gpkg` |
+| Runoff (164 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/runoff/` |
+| ET (114 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/et/` |
+| Pan-India annual hydrology (20 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/annual/` |
 
 Files can be added while the stack runs; no restart is needed.
 

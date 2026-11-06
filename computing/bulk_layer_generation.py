@@ -1,4 +1,6 @@
+import glob
 import inspect
+import os
 from dataclasses import asdict, dataclass
 from functools import reduce
 from operator import or_
@@ -71,7 +73,7 @@ LOCAL_TASK_DATASETS = {
     "computing.misc.nrega_local_compute.generate_nrega_data_local": ("NREGA Assets",),
     "computing.lulc.lulc_v3_local.clip_lulc_v3": ("LULC_v3", "LULC_level_3"),
     "computing.lulc.lulc_vector_local.vectorise_lulc": ("LULC",),
-    "computing.cropping_intensity.cropping_intesity_local.generate_cropping_intensity": (
+    "computing.cropping_intensity.cropping_intensity_local.generate_cropping_intensity": (
         "Cropping Intensity",
     ),
     "computing.surface_water_bodies.swb_local.generate_swb_layer": (
@@ -131,6 +133,9 @@ LOCAL_TASK_DATASETS = {
         "Restoration Raster",
         "Restoration Vector",
     ),
+    "computing.plantation.site_suitability_local.generate_site_suitability_local": (
+        "Site Suitability",
+    ),
     "computing.mws.mws_connectivity_local_compute.mws_connectivity_vector": (
         "Mws Connectivity",
     ),
@@ -179,12 +184,16 @@ LOCAL_TASK_DATASETS = {
     ),
     "computing.soil_type.soil_type_local.generate_soil_type_local": ("Soil Type",),
     "computing.zoi_layers.zoi.generate_zoi": ("Surface Water Bodies",),
+    "computing.forest_fire.forest_fire_local_compute.generate_forest_fire_local": (
+        "Forest Fire",
+    ),
     "computing.forest_fringe.forest_fringe_local_compute.generate_forest_fringe_local": (
         "Forest Fringe",
     ),
     "computing.tree_in_grassland.tree_in_grassland_local_compute.generate_tree_in_grassland_local": (
         "Tree in Grassland",
     ),
+    "computing.drought.drought_causality.drought_causality": ("Drought Causality",),
 }
 
 
@@ -230,10 +239,83 @@ def get_regeneration_dataset_names(name: str) -> tuple[str, ...]:
 
     try:
         return LOCAL_TASK_DATASETS[pipeline.name]
-    except KeyError as exc:
+    except (AttributeError, KeyError) as exc:
         raise ValueError(
             f"Local regeneration datasets are not configured for pipeline '{name}'."
         ) from exc
+
+
+# Hydrology pipelines are plain-function runners writing one shared "Hydrology"
+# dataset; fortnightly and annual layers differ only by layer-name prefix (see
+# generate_hydrology_local._layer_name), so a sync filter needs both.
+HYDROLOGY_SYNC_DATASETS = ("Hydrology",)
+HYDROLOGY_SYNC_LAYER_PREFIXES = {
+    "hydrology_fortnightly": "deltaG_fortnight_",
+    "hydrology_annual": "deltaG_well_depth_",
+}
+
+
+def get_layer_sync_filter(name: str) -> tuple[tuple[str, ...], str | None]:
+    """
+    (dataset names, layer-name prefix or None) selecting the Layer rows a bulk
+    pipeline produces, for pushing them to GeoServer.
+    """
+    if name in HYDROLOGY_SYNC_LAYER_PREFIXES:
+        return HYDROLOGY_SYNC_DATASETS, HYDROLOGY_SYNC_LAYER_PREFIXES[name]
+    return get_regeneration_dataset_names(name), None
+
+
+def layer_exists_locally(name: str, location: Mapping[str, str]) -> bool:
+    """
+    True when every dataset of the pipeline already has a locally generated
+    Layer row for this tehsil and its output file is still on disk. Pipelines
+    without a dataset mapping (or that write no Layer row) never count as
+    existing, so they are always regenerated.
+    """
+    try:
+        dataset_names = get_regeneration_dataset_names(name)
+    except ValueError:
+        return False
+    return datasets_exist_locally(dataset_names, location)
+
+
+# Dataset names that are alternatives for the same layer (a task writes
+# whichever exists), so having either one counts.
+DATASET_ALIAS_GROUPS = (frozenset({"LULC_v3", "LULC_level_3"}),)
+
+
+def _required_dataset_groups(dataset_names):
+    groups = []
+    for name in dataset_names:
+        alias = next((g for g in DATASET_ALIAS_GROUPS if name in g), None)
+        group = set(alias) if alias else {name}
+        if group not in groups:
+            groups.append(group)
+    return groups
+
+
+def datasets_exist_locally(
+    dataset_names: tuple[str, ...], location: Mapping[str, str]
+) -> bool:
+    for group in _required_dataset_groups(dataset_names):
+        layers = Layer.objects.filter(
+            dataset__name__in=group,
+            misc__is_generated_locally=True,
+            state__state_name__iexact=location["state"],
+            district__district_name__iexact=location["district"],
+            block__tehsil_name__iexact=location["block"],
+        )
+        if not any(_layer_output_present(layer) for layer in layers):
+            return False
+    return True
+
+
+def _layer_output_present(layer: Layer) -> bool:
+    path = layer.gee_asset_path
+    if not path or not os.path.isabs(path):
+        # Not a local file path; the Layer row is the only evidence we have.
+        return True
+    return os.path.exists(path) or bool(glob.glob(glob.escape(path) + ".*"))
 
 
 def _legacy_runner_kwargs(
@@ -318,6 +400,12 @@ def run_pipeline(
     gee_account_id: str | None = None,
 ) -> Any:
     runner = get_pipeline(name, compute)
+    if str(compute).strip().lower() == "local":
+        from computing.local_compute_helper import prepare_local_tehsil_boundaries
+
+        prepare_local_tehsil_boundaries(
+            location["state"], location["district"], location["block"]
+        )
     if isinstance(runner, PipelineSpec):
         return runner.run(location, overwrite)
     kwargs = _legacy_runner_kwargs(
@@ -338,23 +426,23 @@ def get_active_locations(
     block: str | None = None,
     blocks: list[str] | None = None,
     limit: int | None = None,
+    only_active: bool = True,
 ) -> list[Location]:
     if block and blocks:
         raise ValueError("Use either block or blocks, not both.")
 
-    queryset = (
-        TehsilSOI.objects.filter(
+    queryset = TehsilSOI.objects.all()
+    if only_active:
+        queryset = queryset.filter(
             active_status=True,
             district__active_status=True,
             district__state__active_status=True,
         )
-        .select_related("district__state")
-        .order_by(
-            "district__state__state_name",
-            "district__district_name",
-            "tehsil_name",
-            "pk",
-        )
+    queryset = queryset.select_related("district__state").order_by(
+        "district__state__state_name",
+        "district__district_name",
+        "tehsil_name",
+        "pk",
     )
     if state:
         queryset = queryset.filter(district__state__state_name__iexact=state)
@@ -379,6 +467,11 @@ def get_active_locations(
         )
         for tehsil in queryset
     ]
+
+
+def get_all_locations(**filters) -> list[Location]:
+    """Every tehsil in the DB, active or not (same filters as get_active_locations)."""
+    return get_active_locations(only_active=False, **filters)
 
 
 def get_locally_generated_locations(

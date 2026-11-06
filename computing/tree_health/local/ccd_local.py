@@ -19,15 +19,13 @@ from computing.local_compute_helper import (
 )
 from computing.utils import save_layer_info_to_db
 from nrm_app.celery import app
+from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
 LOCAL_CCD_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ccd"
 LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
 GEOSERVER_WORKSPACE = "tree_ccd_raster"
 GEOSERVER_STYLE = "tree_ccd_style"
-
-# LULC class 6 is tree cover. CCD values are retained only where this mask is true.
-TREE_LULC_CLASS = 6
 
 
 def _slug(value, fallback):
@@ -135,7 +133,7 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
         )
 
     # Keep CCD values only for tree pixels. Everything else becomes nodata.
-    tree_mask = lulc_array == TREE_LULC_CLASS
+    tree_mask = lulc_array == LulcClass.TREES
 
     valid_ccd = ccd_array != nodata
     output_array = np.where(tree_mask & valid_ccd, ccd_array, nodata).astype(

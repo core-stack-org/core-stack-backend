@@ -49,7 +49,9 @@ from utilities.auth_check_decorator import api_security_check
 from utilities.constants import KML_PATH
 from utilities.gee_utils import check_gee_task_status, download_gee_layer
 from utilities.pipelines import api_request_payload
+from utilities.geoserver_sync_gate import parse_bool
 from utilities.layer_generation_mode import (
+    require_local_tehsil_boundaries,
     sync_layer_generation_if_enabled,
 )
 from utilities.layer_generation_logging import (
@@ -60,7 +62,7 @@ from .clart.clart import generate_clart_layer
 from .clart.fes_clart_to_geoserver import generate_fes_clart_layer
 from .crop_grid.crop_grid import create_crop_grids
 from .cropping_intensity.cropping_intensity import generate_cropping_intensity
-from .cropping_intensity.cropping_intesity_local import (
+from .cropping_intensity.cropping_intensity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local_task,
 )
 from .forest_fire.forest_fire import generate_forest_fire_layer
@@ -206,7 +208,7 @@ from .mws.mws_connectivity_local_compute import (
     mws_connectivity_vector as generate_mws_connectivity_local_task,
 )
 from .plantation.site_suitability import site_suitability
-from .spei.spei import (
+from .hazards.hazards import (
     generate_spei_pipeline,
     run_drought_resistance_resilience,
     run_rainfall_resistance_resilience,
@@ -274,6 +276,58 @@ from .views import (
     check_missing_excel_files,
 )
 from .zoi_layers.zoi import generate_zoi
+from .zoi_layers.zoi_local import generate_zoi as generate_zoi_local
+from .mws.mws_connectivity import generate_mws_connectivity_data
+from .mws.mws_centroid import generate_mws_centroid_data
+from .misc.facilities.pipeline import generate_facilities_proximity_task
+from .misc.antyodaya import generate_antyodaya_layer_task
+from .misc.livestocks import generate_livestocks_layer_task
+from .misc.digital_elevation_model import generate_dem_layer
+from .misc.canal_layer import canal_vector
+from .STAC_specs.stac_collection import generate_stac_collection_task
+from .farm_boundaries.farm_boundary import build_farm_boundary_map
+from .forest_fire.forest_fire_local_compute import generate_forest_fire_local
+
+
+@api_security_check(allowed_methods="POST")
+@schema(None)
+def generate_farm_boundaries(request):
+    print("Inside generate_farm_boundaries API.")
+    try:
+        state = request.data.get("state", "").lower().strip()
+        district = request.data.get("district", "").lower().strip()
+        block = request.data.get("block", "").lower().strip()
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        overwrite = request.data.get("overwrite", False)
+
+        if not all([state, district, block]):
+            return Response(
+                {"Error": "state, district, block are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        build_farm_boundary_map.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "start_year": start_year,
+                "end_year" : end_year,
+                "overwrite": overwrite,
+            },
+            queue="nrm",
+        )
+
+        msg = f"Farm boundary pipeline initiated for {start_year} to {end_year}"
+
+        return Response({"Success": msg}, status=status.HTTP_200_OK)
+    except Exception as e:
+        print("Exception in generate_farm_boundaries api :: ", e)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 logger = logging.getLogger(__name__)
 
@@ -344,6 +398,7 @@ def generate_admin_boundary(request):
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_nrega_layer(request):
     logger.info("Inside generate_nrega_layer API.")
@@ -377,6 +432,7 @@ def generate_nrega_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_drainage_layer(request):
     logger.info("Inside generate_drainage_layer API.")
@@ -488,9 +544,9 @@ def generate_mws_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_fortnightly_hydrology(request):
     logger.info("Inside generate_fortnightly_hydrology")
@@ -509,6 +565,7 @@ def generate_fortnightly_hydrology(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_annual_hydrology(request):
     logger.info("Inside generate_annual_hydrology")
@@ -626,9 +683,7 @@ def _ensure_local_hydrology_base_layers(start_year, end_year, is_annual):
 def _generate_pan_india_hydrology_base_layer(request, is_annual):
     compute = _get_compute_mode(request, default="local")
     if compute != "local":
-        raise ValueError(
-            "Pan-India hydrology generation supports compute='local' only"
-        )
+        raise ValueError("Pan-India hydrology generation supports compute='local' only")
     if _has_any_payload_field(request, PAN_INDIA_PAYLOAD_FIELDS):
         raise ValueError(
             "Do not pass pan_india to the Pan-India hydrology API; "
@@ -686,13 +741,18 @@ def generate_pan_india_fortnightly_hydrology(request):
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=False)
     except HeavyWorkerUnavailable as e:
-        logger.warning("Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api: %s", e)
+        logger.warning(
+            "Heavy worker unavailable in generate_pan_india_fortnightly_hydrology api: %s",
+            e,
+        )
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        logger.warning("Invalid request in generate_pan_india_fortnightly_hydrology api: %s", e)
+        logger.warning(
+            "Invalid request in generate_pan_india_fortnightly_hydrology api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_pan_india_fortnightly_hydrology api")
@@ -709,13 +769,17 @@ def generate_pan_india_annual_hydrology(request):
     try:
         return _generate_pan_india_hydrology_base_layer(request, is_annual=True)
     except HeavyWorkerUnavailable as e:
-        logger.warning("Heavy worker unavailable in generate_pan_india_annual_hydrology api: %s", e)
+        logger.warning(
+            "Heavy worker unavailable in generate_pan_india_annual_hydrology api: %s", e
+        )
         return Response(
             {"Exception": str(e)},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
     except ValueError as e:
-        logger.warning("Invalid request in generate_pan_india_annual_hydrology api: %s", e)
+        logger.warning(
+            "Invalid request in generate_pan_india_annual_hydrology api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_pan_india_annual_hydrology api")
@@ -727,6 +791,7 @@ def generate_pan_india_annual_hydrology(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries(default_compute="local")
 def generate_runoff_gpu(request):
     try:
         compute = _get_compute_mode(request, default="local")
@@ -813,7 +878,6 @@ def et_download(request):
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 
 @api_view(["POST"])
@@ -911,6 +975,7 @@ def lulc_v3_river_basin(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def lulc_v3(request):
     logger.info("Inside lulc_v3 api.")
@@ -944,6 +1009,7 @@ def lulc_v3(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def lulc_vector(request):
     logger.info("Inside lulc_vector")
@@ -1019,6 +1085,7 @@ def get_gee_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_ci_layer(request):
     logger.info("Inside generate_cropping_intensity_layer")
@@ -1051,7 +1118,9 @@ def generate_ci_layer(request):
             status=status.HTTP_200_OK,
         )
     except ValueError as e:
-        logger.warning("Invalid request in generate_cropping_intensity_layer api: %s", e)
+        logger.warning(
+            "Invalid request in generate_cropping_intensity_layer api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_cropping_intensity_layer api")
@@ -1060,6 +1129,7 @@ def generate_ci_layer(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_swb(request):
     logger.info("Inside generate_swf")
@@ -1310,6 +1380,7 @@ def generate_pan_india_drought(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_terrain_descriptor(request):
     logger.info("Inside generate_terrain_descriptor")
@@ -1371,6 +1442,7 @@ def generate_terrain_compute_all(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_terrain_raster(request):
     logger.info("Inside generate_terrain_raster")
@@ -1409,6 +1481,7 @@ def generate_terrain_raster(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def terrain_lulc_slope_cluster(request):
     logger.info("Inside terrain_lulc_slope_cluster")
@@ -1443,6 +1516,7 @@ def terrain_lulc_slope_cluster(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def terrain_lulc_plain_cluster(request):
     logger.info("Inside terrain_lulc_plain_cluster")
@@ -1499,6 +1573,7 @@ def generate_clart(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def change_detection(request):
     logger.info("Inside change_detection")
@@ -1533,6 +1608,7 @@ def change_detection(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def change_detection_vector(request):
     logger.info("Inside change_detection_vector")
@@ -1615,6 +1691,7 @@ def mws_drought_causality(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def tree_health_raster(request):
     logger.info("Inside tree_health_change API")
@@ -1681,6 +1758,7 @@ def tree_health_raster(request):
 
 @api_security_check(allowed_methods="POST")
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def tree_health_vector(request):
     logger.info("Inside Overall_change_vector")
@@ -1798,6 +1876,7 @@ def stream_order(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def restoration_opportunity(request):
     logger.info("Inside restoration_opportunity api")
@@ -1866,6 +1945,7 @@ def plantation_site_suitability(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def aquifer_vector(request):
     logger.info("Inside Aquifer vector layer api")
@@ -1895,6 +1975,7 @@ def aquifer_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def soge_vector(request):
     logger.info("Inside soge vector layer api")
@@ -2119,6 +2200,7 @@ def wells_compute(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_layer_in_order(request):
     logger.info("inside generate_layer_order_first")
@@ -2160,6 +2242,7 @@ def generate_layer_in_order(request):
                 "start_year": start_year,
                 "end_year": end_year,
                 "compute": compute,
+                "skip_existing": not parse_bool(request.data.get("regenerate_all")),
             },
             queue="nrm",
         )
@@ -2198,6 +2281,7 @@ def layer_status_dashboard(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_lcw(request):
     logger.info("Inside generate_lcw_conflict_data API.")
@@ -2223,6 +2307,7 @@ def generate_lcw(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_agroecological(request):
     logger.info("Inside generate_agroecological_data API.")
@@ -2248,6 +2333,7 @@ def generate_agroecological(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_factory_csr(request):
     logger.info("Inside generate_factory_csr_to_gee API.")
@@ -2273,6 +2359,7 @@ def generate_factory_csr(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_green_credit(request):
     logger.info("Inside generate_green_credit_to_gee API.")
@@ -2298,6 +2385,7 @@ def generate_green_credit(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_mining(request):
     logger.info("Inside generate_mining_to_gee API.")
@@ -2336,6 +2424,7 @@ def get_layers_for_workspace(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_natural_depression(request):
     logger.info("Inside generate_natural_depression_to_gee API.")
@@ -2361,6 +2450,7 @@ def generate_natural_depression(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_distance_nearest_upstream_DL(request):
     logger.info("Inside generate_distance_nearest_upstream_DL_to_gee API.")
@@ -2380,12 +2470,15 @@ def generate_distance_nearest_upstream_DL(request):
             {"Success": "Successfully initiated"}, status=status.HTTP_200_OK
         )
     except Exception as e:
-        logger.exception("Exception in generate_distance_nearest_upstream_DL_to_gee api")
+        logger.exception(
+            "Exception in generate_distance_nearest_upstream_DL_to_gee api"
+        )
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_catchment_area_SF(request):
     logger.info("Inside generate_catchment_area_SF_to_gee API.")
@@ -2411,6 +2504,7 @@ def generate_catchment_area_SF(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_slope_percentage(request):
     logger.info("Inside generate_slope_percentage_to_gee API.")
@@ -2473,6 +2567,7 @@ def generate_ndvi_timeseries(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_zoi_to_gee(request):
     logger.info("Inside generate zoi layers")
@@ -2520,7 +2615,10 @@ def generate_zoi_to_gee(request):
         district = district.lower()
         block = block.lower()
 
-        generate_zoi.apply_async(
+        compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
+        task = generate_zoi_local if compute == "local" else generate_zoi
+
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -2529,7 +2627,7 @@ def generate_zoi_to_gee(request):
                 "start_date": start_date,
                 "end_date": end_date,
             },
-            queue="waterbody",
+            queue="nrm" if compute == "local" else "waterbody",
         )
 
         return Response(
@@ -2547,6 +2645,7 @@ def generate_zoi_to_gee(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_mws_connectivity(request):
     logger.info("Inside generate_mws_connectivity API.")
@@ -2584,6 +2683,7 @@ def generate_mws_connectivity(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_mws_centroid(request):
     logger.info("Inside generate_mws_centroid API.")
@@ -2953,6 +3053,8 @@ def update_layer_sync_remote(request):
 
 
 @api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
 @schema(None)
 def sync_layer_remote(request):
     """
@@ -2993,6 +3095,87 @@ def sync_layer_remote(request):
         )
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def unsynced_local_layers(request):
+    """
+    Called by a local compute instance. Lists locally generated layers that are
+    not on GeoServer yet and whose tehsil is active on this (prod) backend.
+    Validates the request API key against PROD_BACKEND_API_KEY.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    from computing.pending_geoserver_sync import (
+        serialize_unsynced_layers,
+        unsynced_gee_layers_queryset,
+        unsynced_local_layers_queryset,
+    )
+
+    queryset_for = (
+        unsynced_gee_layers_queryset
+        if request.query_params.get("source") == "gee"
+        else unsynced_local_layers_queryset
+    )
+    force = parse_bool(request.query_params.get("force", False))
+    try:
+        queryset = queryset_for(
+            request.query_params.get("state"),
+            request.query_params.get("district"),
+            request.query_params.get("block"),
+            request.query_params.get("layer_type"),
+            force,
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    return Response({"layers": serialize_unsynced_layers(queryset)})
+
+
+@api_view(["POST"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+@schema(None)
+def sync_local_layers_to_geoserver(request):
+    """
+    Run on the local compute instance. Queues the GeoServer push of locally
+    generated and GEE-generated layers of active tehsils; all fields are
+    optional. GEE layers are reported under the "gee" key of the response.
+    Body: {"state", "district", "block", "layer_type", "dry_run",
+    "source": "all" | "local" | "gee", "gee_account_id", "force",
+    "skip_boundaries"}. ``force`` re-pushes layers already marked as synced;
+    ``skip_boundaries`` leaves the tehsil admin/MWS boundaries alone.
+    Requires the X-Api-Key header to match PROD_BACKEND_API_KEY.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if not api_key or request.headers.get("X-Api-Key") != api_key:
+        return Response({"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    from computing.pending_geoserver_sync import queue_unsynced_layers
+
+    d = request.data
+    try:
+        summary = queue_unsynced_layers(
+            d.get("state"),
+            d.get("district"),
+            d.get("block"),
+            layer_type=d.get("layer_type"),
+            dry_run=parse_bool(d.get("dry_run", False)),
+            source=d.get("source", "all"),
+            gee_account_id=d.get("gee_account_id"),
+            force=parse_bool(d.get("force", False)),
+            sync_boundaries=not parse_bool(d.get("skip_boundaries", False)),
+        )
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("sync_local_layers_to_geoserver failed")
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(summary, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])
@@ -3060,6 +3243,7 @@ def generate_spei(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_canal_vector(request):
     logger.info("Inside generate canal vector layer API.")
@@ -3177,6 +3361,7 @@ def high_wind_resilience_resistance(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_fabdem_raster_vector(request):
     logger.info("Inside generate DEM raster layer API.")
@@ -3207,6 +3392,7 @@ def generate_fabdem_raster_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_canal_vector(request):
     logger.info("Inside generate canal vector layer API.")
@@ -3238,6 +3424,7 @@ def generate_canal_vector(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_river_data(request):
     logger.info("Inside river data API.")
@@ -3269,6 +3456,7 @@ def generate_river_data(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_drainage_density_data(request):
     logger.info("Inside river data API.")
@@ -3300,6 +3488,7 @@ def generate_drainage_density_data(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_tree_in_grassland(request):
     logger.info("Inside generate_tree_in_grassland API.")
@@ -3314,9 +3503,7 @@ def generate_tree_in_grassland(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        compute = _normalize_layer_order_compute(
-            request.data.get("compute") or "gee"
-        )
+        compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
         task = (
             generate_tree_in_grassland_local
             if compute == "local"
@@ -3383,7 +3570,13 @@ def generate_forest_fire(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        generate_forest_fire_layer.apply_async(
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_forest_fire_layer,
+            generate_forest_fire_local,
+        )
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -3395,7 +3588,7 @@ def generate_forest_fire(request):
             queue="nrm",
         )
         return Response(
-            {"Success": "Forest Fire task initiated"},
+            {"Success": "forest_fire task initiated"},
             status=status.HTTP_200_OK,
         )
     except Exception as e:
@@ -3416,6 +3609,7 @@ def missing_excel(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries(default_compute="local")
 @sync_layer_generation_if_enabled
 def generate_soil_health(request):
     logger.info("Inside generate_soil_health API.")
@@ -3436,6 +3630,7 @@ def generate_soil_health(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_soil_type(request):
     try:
@@ -3515,6 +3710,7 @@ def generate_ltp_stp_change(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries(default_compute="local")
 @sync_layer_generation_if_enabled
 def generate_forest_fringe(request):
     logger.info("Inside generate_forest_fringe API.")

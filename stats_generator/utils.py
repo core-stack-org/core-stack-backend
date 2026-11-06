@@ -1,4 +1,5 @@
 import os
+import re
 import requests, json
 from django.http import HttpResponse, Http404
 from rest_framework.response import Response
@@ -6,7 +7,8 @@ import pandas as pd
 import geopandas as gpd
 from collections import defaultdict
 from datetime import datetime
-from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH
+from functools import lru_cache
+from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH, BASE_DIR
 import numpy as np
 from shapely.geometry import Point, shape
 from .models import LayerInfo
@@ -51,6 +53,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
     shrub_df = None
     tree_df = None
     crop_df = None
+    soge_dfs = []
 
     # Use append mode with if_sheet_exists='replace'
     with pd.ExcelWriter(
@@ -138,7 +141,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 create_excel_crop_inten(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
-            elif workspace == "drought":
+            elif workspace in {f"cropping_drought", "drought"}:
                 create_excel_crop_drou(
                     geojson_data, xlsx_file, writer, start_year, end_year
                 )
@@ -166,6 +169,8 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 )
             elif workspace == "panchayat_boundaries":
                 create_excel_for_village_boun(geojson_data, writer)
+                create_excel_for_village_gp_mapping(geojson_data, writer)
+
             elif workspace == "drought_causality":
                 create_excel_for_drought_causality(
                     geojson_data, xlsx_file, writer, start_year, end_year
@@ -223,7 +228,7 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
             elif workspace == "aquifer":
                 create_excel_for_aquifer(geojson_data, writer)
             elif workspace == "soge":
-                create_excel_for_soge(geojson_data, xlsx_file, writer)
+                soge_dfs.append(build_soge_df(geojson_data, start_year, layer_name))
             elif workspace == "lcw":
                 create_excel_for_lcw(geojson_data, writer)
             elif workspace == "agroecological":
@@ -279,9 +284,13 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 and layer_name == f"ndvi_timeseries_{district}_{block}_crop"
             ):
                 crop_df = create_excel_for_ndvi(geojson_data, "crop_trend")
+            elif workspace == "forest_fire":
+                create_excel_for_forest_fire(geojson_data, writer)
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
+        if soge_dfs:
+            create_excel_for_soge(soge_dfs, writer)
         ndvi_df = None
         if shrub_df is not None:
             ndvi_df = shrub_df
@@ -303,6 +312,37 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                     del writer.sheets["ndvi_shrub"]
                 print("Deleted existing 'ndvi_shrub' sheet")
     return results
+
+
+def create_excel_for_forest_fire(geojson_data, writer):
+    print("inside forest fire excel generation")
+    try:
+        features = geojson_data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = ["id"]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(
+            columns={
+                "uid": "UID",
+                "fire_count_per_year": "fire_count_per_year",
+                "fire_frp_max": "fire_frp_max_in_MW",
+                "fire_frp_mean": "fire_frp_mean_in_MW",
+            },
+            inplace=True,
+        )
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        df = df.fillna(-9999)
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name="forest_fire", index=False)
+        print("Excel file created for forest fire")
+    except Exception as e:
+        print("error while generating excel for forest fire")
 
 
 def create_excel_for_tree_in_grassland(geojson_data, writer):
@@ -348,6 +388,38 @@ def create_excel_for_forest_fringe(geojson_data, writer):
         exclude_cols = ["id"]
         df = df.drop(columns=exclude_cols, errors="ignore")
         df.rename(columns={"uid": "UID"}, inplace=True)
+        try:
+            wb = writer.book
+            if "lulc_vector" in wb.sheetnames:
+                ws = wb["lulc_vector"]
+                headers = [cell.value for cell in ws[1]]
+                header_idx = {h: i for i, h in enumerate(headers)}
+                uid_idx = header_idx["UID"]
+                years = range(2017, 2020)
+                tree_forest_cols = [f"tree_forest_area_in_ha_{y}" for y in years]
+                tree_forest_idxs = [
+                    header_idx[c] for c in tree_forest_cols if c in header_idx
+                ]
+                missing = [c for c in tree_forest_cols if c not in header_idx]
+                if missing:
+                    print("Warning - missing lulc columns:", missing)
+                lulc_rows = []
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    tree_forest_sum = sum((row[i] or 0) for i in tree_forest_idxs)
+                    area_under_tree_cover = tree_forest_sum / 3
+                    lulc_rows.append(
+                        {
+                            "UID": row[uid_idx],
+                            "area_under_tree_cover": area_under_tree_cover,
+                        }
+                    )
+                lulc_df = pd.DataFrame(lulc_rows)
+                df = df.merge(lulc_df, on="UID", how="left")
+
+            else:
+                print("Warning - lulc_vector sheet not found")
+        except Exception as e:
+            print(f"error get while calculating area_under_tree_cover {e}")
         priority_cols = ["UID", "mws_area_in_ha"]
         priority_cols = [c for c in priority_cols if c in df.columns]
         other_cols = [c for c in df.columns if c not in priority_cols]
@@ -567,7 +639,7 @@ def create_excel_for_antyodaya_20(data, writer):
             ]
 
         exclude_cols = [
-            "shg_pen_feat_value",
+            # "shg_pen_feat_value",
             "shg_fed_feat_value",
             "pg_pen_feat_value",
             "fpo_feat_value",
@@ -1185,22 +1257,41 @@ def create_excel_for_lcw(data, writer):
         print("lcw Layer not found :: ", e)
 
 
-def create_excel_for_soge(data, xlsx_file, writer):
+def build_soge_df(data, year=None, layer_name=None):
+    if year is None and layer_name:
+        match = re.search(r"_(\d{4})$", layer_name)
+        year = int(match.group(1)) if match else None
+    suffix = f"_{year}" if year else ""
+
     df_data = []
-    features = data["features"]
-
-    for feature in features:
+    for feature in data["features"]:
         properties = feature["properties"]
-        row = {
-            "UID": properties["uid"],
-            "area_in_ha": properties["area_in_ha"],
-            "soge_dev_percent": properties["sgw_dev_pe"],
-            "class_code": properties["code"],
-            "class_name": properties["class"],
-        }
+        df_data.append(
+            {
+                "UID": properties["uid"],
+                "area_in_ha": properties["area_in_ha"],
+                f"soge_dev_percent{suffix}": properties["sgw_dev_pe"],
+                f"class_name{suffix}": properties["class"],
+                f"extraction_for_irrigation_in_bcm{suffix}": properties["agwd_irr"],
+                f"extraction_for_domestic_and_industrial_in_bcm{suffix}": properties[
+                    "agwd_dom_i"
+                ],
+                f"total_extraction_in_bcm{suffix}": properties["agwd_tot"],
+                f"groundwater_recharge_in_bcm{suffix}": properties["ar_gwr_tot"],
+                f"natural_discharge_in_bcm{suffix}": properties["nat_discharge"],
+                f"groundwater_availability_in_bcm{suffix}": properties["na_gwa"],
+            }
+        )
+    return year or 0, pd.DataFrame(df_data)
 
-        df_data.append(row)
-    df = pd.DataFrame(df_data)
+
+def create_excel_for_soge(soge_dfs, writer):
+    """Merges the per-year SOGE dataframes on UID and writes the soge_vector sheet."""
+    # LayerInfo rows come newest-first; order columns oldest to newest.
+    soge_dfs = [df for _, df in sorted(soge_dfs, key=lambda item: item[0])]
+    df = soge_dfs[0]
+    for other in soge_dfs[1:]:
+        df = df.merge(other.drop(columns=["area_in_ha"]), on="UID", how="outer")
     df = df.sort_values(["UID"])
 
     ## for roundoff all numeric value upto 2 decimal
@@ -1292,10 +1383,10 @@ def create_excel_for_restoration(data, xlsx_file, writer):
         row = {
             "UID": properties["uid"],
             "area_in_ha": properties["area_in_ha"],
-            "wide_scale_restoration_area_in_ha": properties["Wide-scale"],
+            "wide_scale_restoration_area_in_ha": properties["Wide-scale Restoration"],
             "protection_area_in_ha": properties["Protection"],
-            "mosaic_restoration_area_in_ha": properties["Mosaic Res"],
-            "excluded_areas_in_ha": properties["Excluded A"],
+            "mosaic_restoration_area_in_ha": properties["Mosaic Restoration"],
+            "excluded_areas_in_ha": properties["Excluded Areas"],
         }
 
         df_data.append(row)
@@ -2650,25 +2741,27 @@ def create_excel_for_village_boun(old_geojson, writer):
         village_name = properties.get("vill_name", None)
 
         # Initialize village data using village_id as the key
-        if village_id not in village_data:
-            village_data[village_id] = {
-                "village_name": village_name,
-                "TOT_P": 0,
-                "P_LIT": 0,
-                "P_SC": 0,
-                "P_ST": 0,
-                "state_census_ID": state_census_ID,
-                "dist_census_ID": dist_census_ID,
-                "block_census_ID": block_census_ID,
-                "geometry": feature["geometry"],
-            }
+        if village_id is not None:
+            key = (village_id, village_name)
+            if key not in village_data:
+                village_data[key] = {
+                    "village_name": village_name,
+                    "TOT_P": 0,
+                    "P_LIT": 0,
+                    "P_SC": 0,
+                    "P_ST": 0,
+                    "state_census_ID": state_census_ID,
+                    "dist_census_ID": dist_census_ID,
+                    "block_census_ID": block_census_ID,
+                    "geometry": feature["geometry"],
+                }
 
-        village_data[village_id]["TOT_P"] += properties.get("TOT_P", 0)
-        village_data[village_id]["P_LIT"] += properties.get("P_LIT", 0)
-        village_data[village_id]["P_SC"] += properties.get("P_SC", 0)
-        village_data[village_id]["P_ST"] += properties.get("P_ST", 0)
+        village_data[key]["TOT_P"] += properties.get("TOT_P", 0)
+        village_data[key]["P_LIT"] += properties.get("P_LIT", 0)
+        village_data[key]["P_SC"] += properties.get("P_SC", 0)
+        village_data[key]["P_ST"] += properties.get("P_ST", 0)
 
-    for village_id, data in village_data.items():
+    for (village_id, village_name), data in village_data.items():
         total_popu = data["TOT_P"]
         literacy_rate = data["P_LIT"] * 100 / total_popu if total_popu > 0 else 0.0
         total_SC_popu = data["P_SC"]
@@ -2676,13 +2769,23 @@ def create_excel_for_village_boun(old_geojson, writer):
         sc_perce = (data["P_SC"] * 100 / total_popu) if total_popu > 0 else 0.0
         st_perce = (data["P_ST"] * 100 / total_popu) if total_popu > 0 else 0.0
 
+        if (
+            village_id == 0
+            and total_popu <= 0
+            and total_SC_popu <= 0
+            and total_ST_popu <= 0
+            and literacy_rate <= 0
+            and sc_perce <= 0
+            and st_perce <= 0
+        ):
+            continue
         results.append(
             {
                 "state_census_ID": data["state_census_ID"],
                 "dist_census_ID": data["dist_census_ID"],
                 "block_census_ID": data["block_census_ID"],
                 "village_id": village_id,
-                "village_name": data["village_name"],
+                "village_name": village_name,
                 "total_population_count": total_popu,
                 "total_SC_population_count": total_SC_popu,
                 "total_ST_population_count": total_ST_popu,
@@ -2696,6 +2799,138 @@ def create_excel_for_village_boun(old_geojson, writer):
     results_df.to_excel(writer, sheet_name="social_economic_indicator", index=False)
 
     print(f"Excel file created for social_economic_indicator")
+
+
+VILLAGE_GP_MAPPING_CSV = os.path.join(
+    BASE_DIR, "data/village_gp", "core_stack_gp_village_mapping.csv"
+)
+
+
+@lru_cache(maxsize=1)
+def _load_village_gp_source():
+    """Read the Pan-India village-GP mapping once"""
+    source_df = pd.read_csv(
+        VILLAGE_GP_MAPPING_CSV,
+        usecols=["village_id", "village_name", "gp_id", "gp_name"],
+        dtype=str,
+    )
+    # Convert to numeric so IDs match the integer/float values from geojson
+    source_df["village_id"] = pd.to_numeric(source_df["village_id"], errors="coerce")
+    source_df["gp_id"] = pd.to_numeric(source_df["gp_id"], errors="coerce")
+    return source_df
+
+
+def create_excel_for_village_gp_mapping(geojson_data, writer):
+    """
+    Scenarios covered (our villages = villages in social_economic_indicator or panchayat boundary):
+          1. Our village with a known GP in source      -> village + GP row
+          2. Our village with no known GP in source     -> village row, GP empty
+             (village absent from source OR present with an empty gp_id)
+          3. Village NOT in our data but in one of our GPs (GP expansion)-> village + GP row
+    """
+    print("Inside excel generation of village_gp_mapping")
+    try:
+        source_df = _load_village_gp_source()
+        village_props = pd.DataFrame(
+            [
+                {
+                    "village_id": feature.get("properties", {}).get("vill_ID"),
+                    "village_name": feature.get("properties", {}).get("vill_name"),
+                }
+                for feature in geojson_data["features"]
+            ],
+            columns=["village_id", "village_name"],
+        )
+        indicator_village_ids = village_props["village_id"]
+
+        # Scenario 1: source records for our villages that have a GP.
+        matched_villages = source_df[
+            source_df["village_id"].isin(indicator_village_ids)
+            & source_df["gp_id"].notna()
+        ]
+        matched_village_ids = set(matched_villages["village_id"])
+        unmatched_village_ids = set(indicator_village_ids) - matched_village_ids
+        known_gp_ids = set(matched_villages["gp_id"])
+
+        # Scenario 1: villages from our data that have a known GP
+        # LGD_village_id mirrors village_id (both come from source).
+        scenario1_df = matched_villages[
+            ["village_id", "village_name", "gp_id", "gp_name"]
+        ].copy()
+        scenario1_df["LGD_village_id"] = scenario1_df["village_id"]
+
+        # Scenario 3: GP expansion – villages in identified GPs but NOT in our original data.
+        # but LGD_village_id retains the real source village_id.
+        expansion_villages = source_df[
+            source_df["gp_id"].isin(known_gp_ids)
+            & ~source_df["village_id"].isin(indicator_village_ids)
+        ].copy()
+        expansion_villages["LGD_village_id"] = expansion_villages["village_id"]
+        expansion_villages["village_id"] = "Unknown"
+
+        # Scenario 2: villages from our data that don't have a GP in the source.
+        # LGD_village_id is "Unknown" as these villages are absent from the source.
+        unmatched_df = village_props[
+            village_props["village_id"].isin(unmatched_village_ids)
+        ].assign(gp_id="Unknown", gp_name="Unknown", LGD_village_id="Unknown")
+
+        output_cols = [
+            "village_id",
+            "village_name",
+            "gp_id",
+            "gp_name",
+            "LGD_village_id",
+        ]
+        mapping_df = pd.concat(
+            [
+                scenario1_df[output_cols],
+                expansion_villages[output_cols],
+                unmatched_df[output_cols],
+            ],
+            ignore_index=True,
+        )
+        # Validation summary
+        final_real_village_ids = set(
+            mapping_df.loc[mapping_df["village_id"] != "Unknown", "village_id"].dropna()
+        )
+        missing_original_villages = set(indicator_village_ids) - final_real_village_ids
+        expanded_villages_count = len(expansion_villages)
+
+        # Write IDs as integers to match social_economic_indicator.
+        # LGD_village_id is cast the same way: numeric where available, "Unknown" otherwise.
+        mapping_df["village_id"] = pd.to_numeric(
+            mapping_df["village_id"], errors="coerce"
+        ).astype("Int64")
+        mapping_df["LGD_village_id"] = (
+            pd.to_numeric(mapping_df["LGD_village_id"], errors="coerce")
+            .astype("Int64")
+            .astype(str)
+            .replace("<NA>", "Unknown")
+        )
+        mapping_df["gp_id"] = mapping_df["gp_id"].fillna("Unknown").astype(str)
+
+        mapping_df = mapping_df.sort_values(
+            by=["gp_id", "village_id"], na_position="last"
+        ).reset_index(drop=True)
+
+        mapping_df.to_excel(writer, sheet_name="village_GP", index=False)
+
+        print(
+            f"village_gp_mapping summary: original villages={len(indicator_village_ids)}, "
+            f"found in source={len(matched_village_ids)}, "
+            f"not found in source={len(unmatched_village_ids)}, "
+            f"relevant GPs={len(known_gp_ids)}, "
+            f"added through GP expansion={expanded_villages_count}, "
+            f"final rows={len(mapping_df)}"
+        )
+        if missing_original_villages:
+            print(
+                "WARNING: villages missing from village_gp_mapping: "
+                f"{sorted(missing_original_villages)}"
+            )
+        print("Excel file created for village_gp_mapping")
+    except Exception as e:
+        print(f"Error occurred while generating excel for village_gp_mapping {e}")
 
 
 def download_layers_excel_file(state, district, block):

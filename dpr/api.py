@@ -134,6 +134,8 @@ from .generate_yuktdhara_format import csv_to_kml, fetch_data
 import zipfile
 from geoadmin.models import GramPanchayat
 from plans.models import PlanApp
+from organization.models import Organization
+from .plans_export import export_plans_csv as build_plans_csv, parse_sections
 from utilities.gee_utils import valid_gee_text
 
 state_param = openapi.Parameter(
@@ -713,7 +715,6 @@ def generate_tehsil_report(request):
 @api_view(["GET"])
 @auth_free
 @schema(None)
-@api_security_check(auth_type="Auth_free")
 def generate_tehsil_patterns_data(request):
     try:
         # ? district, block, mwsId
@@ -1527,3 +1528,45 @@ def export_yuktdhara(request):
             )
 
             return response
+
+
+# api to download the section-wise DPR data of an organization as one csv
+@api_security_check(auth_type="JWT", allowed_methods=["GET"])
+@schema(None)
+def export_plans_csv(request):
+    org_id = request.query_params.get("organization_id")
+    if not org_id:
+        return Response(
+            {"error": "'organization_id' is required"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    try:
+        org_id = str(uuid.UUID(org_id))
+        sections = parse_sections(request.query_params.get("sections"))
+    except ValueError as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    user = request.user
+    if not (
+        user.is_superuser
+        or getattr(user, "is_superadmin", False)
+        or (user.organization_id and str(user.organization_id) == org_id)
+    ):
+        return Response(
+            {"error": "You do not have access to this organization"},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    org = Organization.objects.filter(id=org_id).first()
+    if org is None:
+        return Response(
+            {"error": "Organization not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    csv_bytes = build_plans_csv(org_id, sections)
+    safe_name = "".join(c if c.isalnum() else "-" for c in org.name).strip("-").lower()
+    response = HttpResponse(csv_bytes, content_type="text/csv; charset=utf-8")
+    response["Content-Disposition"] = (
+        f'attachment; filename="plans-{safe_name or org_id}-{date.today()}.csv"'
+    )
+    return response

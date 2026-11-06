@@ -41,14 +41,29 @@ def publish_local_layer(
     file_type="gpkg",
     layer_id=None,
     verify=False,
+    gpkg_layers=None,
+    store_name=None,
+    extra_layer_ids=None,
 ):
     from computing.local_compute_helper import (
         push_local_raster_to_geoserver,
         push_local_vector_to_geoserver,
     )
     from computing.utils import update_layer_sync_status
+    from utilities.pipelines.publish import publish_gpkg_layers
 
-    if layer_type == "raster":
+    if gpkg_layers:
+        # gpkg pipelines (facilities, antyodaya, livestock): publish the gpkg
+        # tables to one datastore and verify them through WFS.
+        publish_gpkg_layers(
+            f"{path}.{file_type}",
+            workspace=workspace,
+            store_name=store_name or layer_name,
+            layers=gpkg_layers,
+            overwrite=True,
+        )
+        response = {"status_code": 201}
+    elif layer_type == "raster":
         response = push_local_raster_to_geoserver(
             file_path=path,
             layer_name=layer_name,
@@ -71,14 +86,15 @@ def publish_local_layer(
             f"Failed to publish {workspace}:{layer_name}: {response}"
         )
 
-    if layer_id and update_layer_sync_status(
-        layer_id=layer_id,
-        sync_to_geoserver=True,
-        is_stac_specs_generated=False,
-    ) is None:
-        raise GeoServerPublishError(
-            f"Published {workspace}:{layer_name}, but metadata update failed"
-        )
+    for lid in [layer_id, *(extra_layer_ids or [])]:
+        if lid and update_layer_sync_status(
+            layer_id=lid,
+            sync_to_geoserver=True,
+            is_stac_specs_generated=False,
+        ) is None:
+            raise GeoServerPublishError(
+                f"Published {workspace}:{layer_name}, but metadata update failed"
+            )
 
     logger.info(
         "Published %s layer %s:%s from task %s",
@@ -90,6 +106,102 @@ def publish_local_layer(
     return response
 
 
+@app.task(
+    bind=True,
+    name="computing.tasks.publish_gee_layer",
+    autoretry_for=(GeoServerPublishError,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=5,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
+def publish_gee_layer(
+    self,
+    layer_type,
+    asset_id,
+    layer_name,
+    workspace,
+    state,
+    style_name=None,
+    layer_id=None,
+    gee_account_id=None,
+):
+    """
+    Push a GEE-generated layer that was kept off GeoServer: a vector is re-read
+    from its GEE asset, a raster is taken from the tif already in GCS.
+    """
+    import ee
+
+    from computing.utils import sync_fc_to_geoserver, update_layer_sync_status
+    from utilities.gee_utils import ee_initialize, sync_raster_gcs_to_geoserver
+
+    try:
+        if layer_type == "raster":
+            response = sync_raster_gcs_to_geoserver(
+                workspace, layer_name, layer_name, style_name=style_name
+            )
+        elif layer_type == "vector":
+            ee_initialize(gee_account_id)
+            response = sync_fc_to_geoserver(
+                ee.FeatureCollection(asset_id),
+                state,
+                layer_name,
+                workspace,
+                style_name,
+            )
+        else:
+            raise ValueError(f"Unsupported GeoServer layer type: {layer_type}")
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise GeoServerPublishError(
+            f"Failed to publish {workspace}:{layer_name}: {exc}"
+        ) from exc
+
+    if not response or (isinstance(response, dict) and response.get("skipped")):
+        raise GeoServerPublishError(
+            f"{workspace}:{layer_name} was not pushed: {response}"
+        )
+    if response == "No features in FeatureCollection":
+        logger.warning("Nothing to publish for %s:%s: %s", workspace, layer_name, response)
+        return response
+
+    if layer_id and update_layer_sync_status(
+        layer_id=layer_id,
+        sync_to_geoserver=True,
+        is_stac_specs_generated=False,
+    ) is None:
+        raise GeoServerPublishError(
+            f"Published {workspace}:{layer_name}, but metadata update failed"
+        )
+
+    logger.info(
+        "Published GEE %s layer %s:%s from task %s",
+        layer_type,
+        workspace,
+        layer_name,
+        self.request.id,
+    )
+    return response
+
+
+@app.task(name="computing.tasks.sync_unsynced_local_layers")
+def sync_unsynced_local_layers(state=None, district=None, block=None, layer_type=None):
+    """
+    Push locally generated layers that were kept off GeoServer, for tehsils that
+    are active now. Safe to run repeatedly; a failure to read prod changes nothing.
+    """
+    from computing.pending_geoserver_sync import queue_unsynced_layers
+
+    try:
+        return queue_unsynced_layers(state, district, block, layer_type)
+    except Exception:
+        logger.exception("Could not fetch unsynced local layers; nothing synced")
+        return {"error": "unsynced layers unavailable"}
+
+
 @app.task(name="computing.tasks.bulk_generate_layer")
 def bulk_generate_layer(
     pipeline,
@@ -99,7 +211,22 @@ def bulk_generate_layer(
     start_year=None,
     end_year=None,
     gee_account_id=None,
+    sync_to_geoserver=False,
+    skip_existing=False,
 ):
+    from computing.bulk_layer_generation import layer_exists_locally
+    from utilities.geoserver_sync_gate import geoserver_sync_context
+
+    if skip_existing and compute == "local" and layer_exists_locally(pipeline, location):
+        logger.info(
+            "Skipping bulk pipeline %s for %s/%s/%s: layer already exists",
+            pipeline,
+            location["state"],
+            location["district"],
+            location["block"],
+        )
+        return {"skipped": "exists"}
+
     logger.info(
         "Running bulk pipeline %s for %s/%s/%s",
         pipeline,
@@ -107,21 +234,31 @@ def bulk_generate_layer(
         location["district"],
         location["block"],
     )
-    return run_pipeline(
-        pipeline,
-        location,
-        overwrite=overwrite,
-        compute=compute,
-        start_year=start_year,
-        end_year=end_year,
-        gee_account_id=gee_account_id,
-    )
+    # Layers are only pushed when requested AND the tehsil is active; the rest
+    # stay on local disk and are pushed once the tehsil is activated.
+    with geoserver_sync_context(
+        sync_to_geoserver,
+        location["state"],
+        location["district"],
+        location["block"],
+    ):
+        return run_pipeline(
+            pipeline,
+            location,
+            overwrite=overwrite,
+            compute=compute,
+            start_year=start_year,
+            end_year=end_year,
+            gee_account_id=gee_account_id,
+        )
 
 
-__all__ = ["bulk_generate_layer", 
+__all__ = ["bulk_generate_layer",
+           "sync_unsynced_local_layers",
            "generate_stac_collection_task", 
            "et_download",
            "generate_hydrology",
            "generate_hydrology_base_layer",
            "generate_runoff_gpu",
-           "publish_local_layer"]
+           "publish_local_layer",
+           "publish_gee_layer"]

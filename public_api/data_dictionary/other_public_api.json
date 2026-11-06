@@ -1,0 +1,1107 @@
+{
+  "get_mws_kyl_indicators": {
+    "name": "Get MWS KYL Indicators",
+    "description": "Returns micro-watershed indicators covering rainfall and water balance, cropping and drought, NREGA works, land-cover change, restoration opportunities, groundwater and aquifer status, terrain, soil properties, vegetation, facilities, surface-water bodies, and fire activity.",
+    "type": "object",
+    "variables": {
+      "aquifer_class": {
+        "type": "integer",
+        "description": "Class of the principal aquifer associated with the micro-watershed: 0 = Hard Rock and 1 = Alluvial.",
+        "unit": "class"
+      },
+      "area_protection": {
+        "type": "number",
+        "description": "Area identified as suitable for protection under the restoration-opportunity classification.",
+        "unit": "ha"
+      },
+      "area_wide_scale_restoration": {
+        "type": "number",
+        "description": "Area identified as suitable for wide-scale restoration. In the WRI Restoration Opportunities Atlas, this generally refers to areas with tree-canopy cover density below 40%.",
+        "unit": "ha"
+      },
+      "avg_double_cropped": {
+        "type": "number",
+        "description": "Average annual percentage of total cropped area classified as double-cropped, calculated from the annual double-cropped areas and total cropped area.",
+        "unit": "%"
+      },
+      "avg_kharif_rainfall": {
+        "type": "number",
+        "description": "Average rainfall during the Kharif season across the available years.",
+        "unit": "mm"
+      },
+      "avg_kharif_surface_water_mws": {
+        "type": "number",
+        "description": "Average Kharif surface-water area as a percentage of the total mapped surface-water-body area, averaged across the available years.",
+        "unit": "%"
+      },
+      "avg_number_dry_spell": {
+        "type": "number",
+        "description": "Average count of dry-spell events per year, calculated from the source layer’s four-week dry-spell fields.",
+        "unit": "count"
+      },
+      "avg_precipitation": {
+        "type": "number",
+        "description": "Average annual precipitation across the micro-watershed over the available years.",
+        "unit": "mm"
+      },
+      "avg_rabi_surface_water_mws": {
+        "type": "number",
+        "description": "Average Rabi surface-water area as a percentage of the total mapped surface-water-body area, averaged across the available years.",
+        "unit": "%"
+      },
+      "avg_runoff": {
+        "type": "number",
+        "description": "Average annual runoff across the micro-watershed over the available years.",
+        "unit": "mm"
+      },
+      "avg_single_cropped": {
+        "type": "number",
+        "description": "Average annual percentage of total cropped area classified as single-cropped, calculated from the annual single-cropped areas and total cropped area.",
+        "unit": "%"
+      },
+      "avg_triple_cropped": {
+        "type": "number",
+        "description": "Average annual percentage of total cropped area classified as triple-cropped, calculated from the annual triple-cropped areas and total cropped area.",
+        "unit": "%"
+      },
+      "avg_wsr_ratio_kharif": {
+        "type": "number",
+        "description": "Kharif water-surface ratio calculated from summed Kharif surface-water area and summed Kharif cropped area across the available years, multiplied by 100 and divided by the number of Kharif surface-water-area columns.",
+        "unit": "%"
+      },
+      "avg_wsr_ratio_rabi": {
+        "type": "number",
+        "description": "Rabi water-surface ratio calculated from summed Rabi surface-water area and summed Rabi cropped area across the available years, multiplied by 100 and divided by the number of Rabi surface-water-area columns.",
+        "unit": "%"
+      },
+      "avg_wsr_ratio_zaid": {
+        "type": "number",
+        "description": "Zaid water-surface ratio calculated from summed Zaid surface-water area and summed Zaid cropped area across the available years, multiplied by 100 and divided by the number of Zaid surface-water-area columns.",
+        "unit": "%"
+      },
+      "avg_zaid_surface_water_mws": {
+        "type": "number",
+        "description": "Average Zaid surface-water area as a percentage of the total mapped surface-water-body area, averaged across the available years.",
+        "unit": "%"
+      },
+      "canal_available": {
+        "type": "boolean",
+        "description": "Indicates whether a canal feature is mapped within the micro-watershed: true if present, false otherwise.",
+        "unit": "flag"
+      },
+      "cropping_area": {
+        "type": "number",
+        "description": "Total cropped area in the micro-watershed, based on the annual cropping-intensity data.",
+        "unit": "ha"
+      },
+      "cropping_intensity_avg": {
+        "type": "number",
+        "description": "Mean annual cropping-intensity value across the available years; it represents the intensity of cultivation across crop cycles.",
+        "unit": "ratio"
+      },
+      "cropping_intensity_trend": {
+        "type": "string",
+        "description": "Trend in annual cropping intensity, encoded as 1 for increasing, -1 for decreasing, and 0 for no trend.",
+        "unit": "code"
+      },
+      "cropping_to_shrub_area": {
+        "type": "number",
+        "description": "Area of cropland that changed to scrub or shrubland in the land-cover change layer.",
+        "unit": "ha"
+      },
+      "decrease_in_tree_cover": {
+        "type": "number",
+        "description": "Total area classified as deforestation in the overall land-cover change output.",
+        "unit": "ha"
+      },
+      "degradation_cropping_intensity": {
+        "type": "number",
+        "description": "Area affected by a decline in cropping intensity, including double-to-single, triple-to-double, and triple-to-single cropping transitions.",
+        "unit": "ha"
+      },
+      "degradation_in_forests": {
+        "type": "number",
+        "description": "Area of forest degradation reported by the overall tree-change layer.",
+        "unit": "ha"
+      },
+      "degradation_land_area": {
+        "type": "number",
+        "description": "Combined area of cropland changing to barren land or scrubland and land changing from higher to lower cropping intensity.",
+        "unit": "ha"
+      },
+      "distance_to_bank": {
+        "type": "number",
+        "description": "Distance value in kilometres calculated from the bank-mitra, bank-branch, and ATM distance fields in the facilities-proximity data.",
+        "unit": "km"
+      },
+      "drainage_density": {
+        "type": "number",
+        "description": "Drainage-line length per square kilometre within the micro-watershed, as reported by the drainage-density layer.",
+        "unit": "km/km²"
+      },
+      "drought_category": {
+        "type": "integer",
+        "description": "Drought category based on the number of years in which moderate- and severe-drought weeks total at least five: 0 = no such years, 1 = one such year, and 2 = two or more such years.",
+        "unit": "category"
+      },
+      "factory_csr": {
+        "type": "integer",
+        "description": "Flag indicating whether the factory/CSR layer contains a record for the micro-watershed: 1 = present, 0 = not present.",
+        "unit": "flag"
+      },
+      "fire_count_per_year": {
+        "type": "number",
+        "description": "Fire detections per year for the micro-watershed, as reported by the forest-fire layer.",
+        "unit": "number"
+      },
+      "forest_to_farm": {
+        "type": "number",
+        "description": "Area that changed from forest to farmland in the deforestation change-detection layer.",
+        "unit": "ha"
+      },
+      "green_credit": {
+        "type": "integer",
+        "description": "Flag indicating whether the green-credit layer contains a record for the micro-watershed: 1 = present, 0 = not present.",
+        "unit": "flag"
+      },
+      "increase_canopy_density_height": {
+        "type": "number",
+        "description": "Percentage value for improvement in canopy density or height from the overall tree-change layer.",
+        "unit": "%"
+      },
+      "increase_in_tree_cover": {
+        "type": "number",
+        "description": "Total area classified as afforestation in the land-cover change output.",
+        "unit": "ha"
+      },
+      "lcw_conflict": {
+        "type": "integer",
+        "description": "Flag indicating whether the land-cover/water-conflict layer contains a record for the micro-watershed: 1 = conflict record present, 0 = none present.",
+        "unit": "flag"
+      },
+      "lulc_crop": {
+        "type": "number",
+        "description": "Percentage of the micro-watershed area classified as cropped land, calculated from total cropped area divided by micro-watershed area.",
+        "unit": "%"
+      },
+      "lulc_forest": {
+        "type": "number",
+        "description": "Percentage of the micro-watershed area under tree/forest cover, based on the mean mapped tree/forest area across the available LULC years.",
+        "unit": "%"
+      },
+      "lulc_plain_category": {
+        "type": "string",
+        "description": "Terrain-cluster name assigned to the plain terrain portion of the micro-watershed.",
+        "unit": "category"
+      },
+      "lulc_shrub": {
+        "type": "number",
+        "description": "Percentage of the micro-watershed area under shrub/scrub cover, based on the mean mapped shrub/scrub area across the available LULC years.",
+        "unit": "%"
+      },
+      "lulc_slope_category": {
+        "type": "integer",
+        "description": "Terrain-cluster name assigned to the sloping terrain portion of the micro-watershed.",
+        "unit": "category"
+      },
+      "max_drought_weeks": {
+        "type": "integer",
+        "description": "Sum of the maximum number of moderate-drought weeks and maximum number of severe-drought weeks recorded in the Kharif drought data.",
+        "unit": "weeks"
+      },
+      "max_monsoon_onset_day": {
+        "type": "integer",
+        "description": "Latest monsoon-onset day number within the calendar year (1–366), across the available years.",
+        "unit": "day_of_year"
+      },
+      "mean_annual_delta_g_mm": {
+        "type": "number",
+        "description": "Mean annual Delta G, representing the change in groundwater storage expressed as an equivalent water depth.",
+        "unit": "mm"
+      },
+      "mean_elevation": {
+        "type": "number",
+        "description": "Mean elevation of the micro-watershed from the digital elevation model, in metres.",
+        "unit": "m"
+      },
+      "mean_kharif_water_surface_area": {
+        "type": "number",
+        "description": "Mean mapped surface-water area during Kharif across the available years.",
+        "unit": "ha"
+      },
+      "min_monsoon_onset_day": {
+        "type": "integer",
+        "description": "Earliest monsoon-onset day number within the calendar year (1–366), across the available years.",
+        "unit": "day_of_year"
+      },
+      "mining": {
+        "type": "integer",
+        "description": "Flag indicating whether the mining layer contains a record for the micro-watershed: 1 = present, 0 = not present.",
+        "unit": "flag"
+      },
+      "mws_id": {
+        "type": "string",
+        "description": "Unique identifier of the micro-watershed.",
+        "unit": "id"
+      },
+      "mws_intersect_swb": {
+        "type": "array",
+        "description": "List of surface-water bodies intersecting the micro-watershed. Each entry includes the water-body ID, name when available, latitude, and longitude.",
+        "unit": "value",
+        "items": {
+          "type": "object",
+          "properties": {
+            "swbId": {
+              "type": "string",
+              "description": "Unique identifier of the intersecting surface-water body."
+            },
+            "swbName": {
+              "type": "string",
+              "description": "Name of the surface-water body, when available; may be an empty string."
+            },
+            "latitude": {
+              "type": "number",
+              "unit": "degrees",
+              "description": "Latitude of the surface-water body in decimal degrees."
+            },
+            "longitude": {
+              "type": "number",
+              "unit": "degrees",
+              "description": "Longitude of the surface-water body in decimal degrees."
+            }
+          }
+        }
+      },
+      "mws_intersect_villages": {
+        "type": "array",
+        "description": "List of village IDs for villages that intersect the micro-watershed.",
+        "unit": "list",
+        "items": {
+          "type": "integer",
+          "description": "Village identifier."
+        }
+      },
+      "nitrogen_levels": {
+        "type": "number",
+        "description": "Median estimated soil nitrogen content, in kilograms per hectare, from the soil-health layer.",
+        "unit": "kg/ha"
+      },
+      "nrega_irrigation": {
+        "type": "integer",
+        "description": "Total number of NREGA works classified as irrigation on farms across the available years.",
+        "unit": "count"
+      },
+      "nrega_plantations": {
+        "type": "integer",
+        "description": "Total number of NREGA works classified as plantations across the available years.",
+        "unit": "count"
+      },
+      "nrega_swc": {
+        "type": "integer",
+        "description": "Total number of NREGA works classified as soil and water conservation across the available years.",
+        "unit": "count"
+      },
+      "organic_carbon": {
+        "type": "number",
+        "description": "Median soil organic-carbon content over cropping pixels, expressed as a percentage, from the soil-health layer.",
+        "unit": "%"
+      },
+      "organic_carbon_tree_cover": {
+        "type": "number",
+        "description": "Median organic-carbon content over tree and shrub/scrub covers, expressed as a percentage, from the OpenLandMap Organic Carbon layer.",
+        "unit": "%"
+      },
+      "phosphoros_levels": {
+        "type": "number",
+        "description": "Median estimated soil phosphorus content, in kilograms per hectare, from the soil-health layer.",
+        "unit": "kg/ha"
+      },
+      "potassium_levels": {
+        "type": "number",
+        "description": "Median estimated soil potassium content, in kilograms per hectare, from the soil-health layer.",
+        "unit": "kg/ha"
+      },
+      "reduction_canopy_density_height": {
+        "type": "number",
+        "description": "Percentage value for degradation in canopy density or height from the overall tree-change layer.",
+        "unit": "%"
+      },
+      "reduction_in_shrubland_cover": {
+        "type": "number",
+        "description": "Area of change in shrubland cover reported by the shrub-change layer.",
+        "unit": "ha"
+      },
+      "relative_mean_elevation": {
+        "type": "number",
+        "description": "Difference in metres between the micro-watershed mean elevation and the mean elevation across the micro-watersheds of a tehsil.",
+        "unit": "m"
+      },
+      "relief": {
+        "type": "number",
+        "description": "Elevation range in metres within the micro-watershed, calculated as maximum elevation minus minimum elevation.",
+        "unit": "m"
+      },
+      "river_available": {
+        "type": "boolean",
+        "description": "Indicates whether a river feature is mapped within the micro-watershed: true if present, false otherwise.",
+        "unit": "flag"
+      },
+      "shg_penetration": {
+        "type": "number",
+        "description": "SHG penetration indicator value from the Antyodaya data for villages intersecting the micro-watershed.",
+        "unit": "value"
+      },
+      "shrub_trend": {
+        "type": "integer",
+        "description": "Trend in shrub cover from the NDVI layer, encoded as 1 for increasing, -1 for decreasing, and 0 for no trend.",
+        "unit": "code"
+      },
+      "soge_class": {
+        "type": "integer",
+        "description": "Stage of groundwater extraction: 0 = Safe, 1 = Semi-Critical, 2 = Critical, 3 = Over Exploited, and 4 = Not Assessed.",
+        "unit": "class"
+      },
+      "soil_drainage": {
+        "type": "integer",
+        "description": "Soil drainage class derived from the mapped soil drainage description: 0 = excessively or somewhat excessively drained, 1 = well or moderately well drained, 2 = poorly or very poorly drained, and 3 = imperfectly drained.",
+        "unit": "value"
+      },
+      "soil_ph": {
+        "type": "number",
+        "description": "Topsoil pH value, indicating soil acidity or alkalinity.",
+        "unit": "pH"
+      },
+      "soil_texture": {
+        "type": "integer",
+        "description": "Soil texture class derived from subsoil texture: 0 = sandy textures, 1 = silt/loam textures, 2 = clay-loam textures, and 3 = clay textures.",
+        "unit": "value"
+      },
+      "terraincluster_id": {
+        "type": "integer",
+        "description": "Identifier of the terrain cluster assigned to the micro-watershed.",
+        "unit": "id"
+      },
+      "total_nrega_assets": {
+        "type": "integer",
+        "description": "Total number of NREGA works recorded for the micro-watershed across all included work categories and years.",
+        "unit": "count"
+      },
+      "tree_cover_area": {
+        "type": "number",
+        "description": "Area under tree cover reported by the overall tree-change layer.",
+        "unit": "ha"
+      },
+      "trees_in_forest_fringe_loss": {
+        "type": "number",
+        "description": "Area of tree loss within the forest-fringe zone.",
+        "unit": "ha"
+      },
+      "trees_in_forest_loss": {
+        "type": "number",
+        "description": "Area of tree loss within the micro-watershed.",
+        "unit": "ha"
+      },
+      "trees_in_grassland_loss": {
+        "type": "number",
+        "description": "Area of tree loss within the tree-in-shrub-tree zone reported by the tree-in-grassland layer.",
+        "unit": "ha"
+      },
+      "trend_annual_rainfall": {
+        "type": "string",
+        "description": "Annual rainfall trend from the Mann–Kendall test, encoded as 1 for increasing, -1 for decreasing, and 0 for no trend.",
+        "unit": "code"
+      },
+      "trend_g": {
+        "type": "string",
+        "description": "Groundwater-storage trend from the annual hydrological time series, evaluated with the Mann–Kendall test and encoded as 1 for increasing, -1 for decreasing, and 0 for no trend.",
+        "unit": "code"
+      },
+      "trend_swb": {
+        "type": "string",
+        "description": "Trend in annual total surface-water area from the surface-water-bodies time series, encoded as 1 for increasing, -1 for decreasing, and 0 for no trend using the Mann–Kendall test.",
+        "unit": "code"
+      },
+      "upstream_mws": {
+        "type": "integer",
+        "description": "Number of upstream micro-watersheds connected to and draining into this micro-watershed.",
+        "unit": "count"
+      },
+      "urbanization_area": {
+        "type": "number",
+        "description": "Total area classified as urbanization in the change-detection layer, including transitions from barren/shrub, tree/farm, or water to built-up land.",
+        "unit": "ha"
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string|null",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_active_locations_api": {
+    "name": "Get Active Locations",
+    "description": "Returns the states, districts, and blocks or tehsils available for selection, including their identifiers and display labels.",
+    "type": "object",
+    "variables": {
+      "data": {
+        "description": "Response data.",
+        "type": "object",
+        "variables": {
+          "locations[]": {
+            "description": "List of available states and their nested districts and blocks/tehsils.",
+            "type": "object",
+            "variables": {
+              "block_id": {
+                "description": "Identifier of a block or tehsil.",
+                "type": "string",
+                "unit": ""
+              },
+              "district[]": {
+                "description": "Districts available under a state.",
+                "type": "object",
+                "variables": {
+                  "blocks[]": {
+                    "description": "Blocks/tehsils available under a district.",
+                    "type": "object",
+                    "variables": {
+                      "block_id": {
+                        "description": "Identifier of the block or tehsil.",
+                        "type": "string",
+                        "unit": ""
+                      },
+                      "label": {
+                        "description": "Display name of the block or tehsil.",
+                        "type": "string",
+                        "unit": ""
+                      },
+                      "tehsil_id": {
+                        "description": "Identifier of the tehsil, when provided.",
+                        "type": "string",
+                        "unit": ""
+                      }
+                    }
+                  },
+                  "district_id": {
+                    "description": "Identifier of the district.",
+                    "type": "string",
+                    "unit": ""
+                  },
+                  "label": {
+                    "description": "Display name of the district.",
+                    "type": "string",
+                    "unit": ""
+                  }
+                }
+              },
+              "district_id": {
+                "description": "Identifier of a district.",
+                "type": "string",
+                "unit": ""
+              },
+              "label": {
+                "description": "Display name shown in the location selector.",
+                "type": "string",
+                "unit": ""
+              },
+              "state_id": {
+                "description": "Identifier of the state.",
+                "type": "string",
+                "unit": ""
+              },
+              "value": {
+                "description": "Value used by the application for the location option, when provided.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          },
+          "location_field_hints": {
+            "description": "Field hints describing the location fields and nested hierarchy.",
+            "type": "object",
+            "variables": {
+              "block_id": {
+                "description": "Hint indicating a block/tehsil identifier.",
+                "type": "string",
+                "unit": ""
+              },
+              "blocks": {
+                "description": "Hint indicating the blocks/tehsils nested under a district.",
+                "type": "string",
+                "unit": ""
+              },
+              "district": {
+                "description": "Hint indicating the districts nested under a state.",
+                "type": "string",
+                "unit": ""
+              },
+              "district_id": {
+                "description": "Hint indicating a district identifier.",
+                "type": "string",
+                "unit": ""
+              },
+              "label": {
+                "description": "Hint indicating that the field contains a display name.",
+                "type": "string",
+                "unit": ""
+              },
+              "state_id": {
+                "description": "Hint indicating a state identifier.",
+                "type": "string",
+                "unit": ""
+              },
+              "value": {
+                "description": "Hint indicating the value used for a UI list option.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          }
+        }
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_admin_details_by_latlon_api": {
+    "name": "Get Admin Details by Latitude and Longitude",
+    "description": "Returns the state, district, and tehsil containing the supplied latitude and longitude.",
+    "type": "object",
+    "variables": {
+      "District": {
+        "description": "Name of the district containing the supplied coordinate.",
+        "type": "string",
+        "unit": ""
+      },
+      "State": {
+        "description": "Name of the state containing the supplied coordinate.",
+        "type": "string",
+        "unit": ""
+      },
+      "Tehsil": {
+        "description": "Name of the tehsil containing the supplied coordinate.",
+        "type": "string",
+        "unit": ""
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_generated_layer_urls_api": {
+    "name": "Get Generated Layer URLs",
+    "description": "Returns the geospatial layers available for a micro-watershed, including each layer’s name, type, service URL, version, style, and source asset path when available.",
+    "type": "object",
+    "variables": {
+      "data": {
+        "description": "Response data.",
+        "type": "object",
+        "variables": {
+          "layer_field_units": {
+            "description": "Field hints describing the meaning or expected format of layer metadata fields.",
+            "type": "object",
+            "variables": {
+              "dataset_name": {
+                "description": "Hint indicating a human-readable dataset name.",
+                "type": "string",
+                "unit": ""
+              },
+              "gee_asset_path": {
+                "description": "Hint indicating an Earth Engine asset ID or null.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_name": {
+                "description": "Hint indicating a layer name.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_type": {
+                "description": "Hint listing supported layer types.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_url": {
+                "description": "Hint indicating a GeoServer WFS/WCS URL.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_version": {
+                "description": "Hint indicating a version label.",
+                "type": "string",
+                "unit": ""
+              },
+              "style_url": {
+                "description": "Hint indicating a style URL or an empty value.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          },
+          "layers[]": {
+            "description": "List of generated layers. Each item describes one available layer.",
+            "type": "object",
+            "variables": {
+              "dataset_name": {
+                "description": "Human-readable dataset name.",
+                "type": "string",
+                "unit": ""
+              },
+              "gee_asset_path": {
+                "description": "Google Earth Engine asset ID or source data path associated with the layer; may be null or a local path.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_name": {
+                "description": "Internal layer name used by the geospatial service.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_type": {
+                "description": "Layer geometry/data type, such as vector, raster, point, or custom.",
+                "type": "string",
+                "unit": ""
+              },
+              "layer_url": {
+                "description": "URL used to access the layer through the relevant geospatial service.",
+                "type": "string",
+                "unit": "URL"
+              },
+              "layer_version": {
+                "description": "Version label for the layer.",
+                "type": "string",
+                "unit": ""
+              },
+              "style_url": {
+                "description": "URL of the layer style, or an empty string when no style URL is provided.",
+                "type": "string",
+                "unit": "URL or empty"
+              }
+            }
+          }
+        }
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_mws_report_api": {
+    "name": "Get MWS Report",
+    "description": "Returns the URL of the generated report for the requested micro-watershed and administrative location.",
+    "type": "object",
+    "variables": {
+      "data": {
+        "description": "Response data.",
+        "type": "object",
+        "variables": {
+          "report": {
+            "description": "Report information.",
+            "type": "object",
+            "variables": {
+              "Mws_report_url": {
+                "description": "URL of the generated MWS report in HTML or PDF form.",
+                "type": "string",
+                "unit": "URL"
+              }
+            }
+          },
+          "report_field_hints": {
+            "description": "Field hints that describe the meaning of report response fields.",
+            "type": "object",
+            "variables": {
+              "Mws_report_url": {
+                "description": "Semantic hint for the report URL field; identifies it as an MWS report URL.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          }
+        }
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_mwsid_by_latlon_api": {
+    "name": "Get MWS ID by Latitude and Longitude",
+    "description": "Returns the micro-watershed identifier and its state, district, and tehsil for the supplied latitude and longitude.",
+    "type": "object",
+    "variables": {
+      "data": {
+        "description": "Response data.",
+        "type": "object",
+        "variables": {
+          "mws_details": {
+            "description": "MWS identifier and administrative details.",
+            "type": "object",
+            "variables": {
+              "District": {
+                "description": "Name of the district containing the coordinate.",
+                "type": "string",
+                "unit": ""
+              },
+              "State": {
+                "description": "Name of the state containing the coordinate.",
+                "type": "string",
+                "unit": ""
+              },
+              "Tehsil": {
+                "description": "Name of the tehsil or block containing the coordinate.",
+                "type": "string",
+                "unit": ""
+              },
+              "uid": {
+                "description": "Unique identifier of the micro-watershed.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          },
+          "mws_field_hints": {
+            "description": "Field hints describing the MWS details.",
+            "type": "object",
+            "variables": {
+              "District": {
+                "description": "Hint indicating the district name.",
+                "type": "string",
+                "unit": ""
+              },
+              "State": {
+                "description": "Hint indicating the state name.",
+                "type": "string",
+                "unit": ""
+              },
+              "Tehsil": {
+                "description": "Hint indicating a tehsil or block name.",
+                "type": "string",
+                "unit": ""
+              },
+              "uid": {
+                "description": "Hint indicating the MWS identifier.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          }
+        }
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_village_geometries_api": {
+    "name": "Get Village Geometries",
+    "description": "Returns village boundary geometries and village attributes in GeoJSON format.",
+    "type": "object",
+    "variables": {
+      "crs": {
+        "description": "Coordinate reference system metadata.",
+        "type": "object",
+        "variables": {
+          "properties": {
+            "description": "CRS properties.",
+            "type": "object",
+            "variables": {
+              "name": {
+                "description": "CRS identifier, such as urn:ogc:def:crs:EPSG::4326.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          },
+          "type": {
+            "description": "CRS descriptor type.",
+            "type": "string",
+            "unit": ""
+          }
+        }
+      },
+      "features[]": {
+        "description": "Array of village features.",
+        "type": "object",
+        "variables": {
+          "geometry": {
+            "description": "Village boundary geometry.",
+            "type": "object",
+            "variables": {
+              "coordinates": {
+                "description": "Nested coordinate arrays defining the geometry. Coordinates are longitude/latitude for the supplied EPSG:4326 example.",
+                "type": "array<number>",
+                "unit": "degrees"
+              },
+              "type": {
+                "description": "Geometry type, for example MultiPolygon.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          },
+          "geometry_name": {
+            "description": "Name of the geometry field in the source service.",
+            "type": "string",
+            "unit": ""
+          },
+          "id": {
+            "description": "Feature identifier returned by the geospatial service.",
+            "type": "string",
+            "unit": ""
+          },
+          "properties": {
+            "description": "Village attributes.",
+            "type": "object",
+            "variables": {
+              "vill_ID": {
+                "description": "Village identifier.",
+                "type": "string",
+                "unit": ""
+              },
+              "vill_name": {
+                "description": "Village name.",
+                "type": "string",
+                "unit": ""
+              }
+            }
+          },
+          "type": {
+            "description": "GeoJSON feature type; normally Feature.",
+            "type": "string",
+            "unit": ""
+          }
+        }
+      },
+      "numberMatched": {
+        "description": "Number of features matching the request.",
+        "type": "integer",
+        "unit": "count"
+      },
+      "numberReturned": {
+        "description": "Number of features returned in this response.",
+        "type": "integer",
+        "unit": "count"
+      },
+      "timeStamp": {
+        "description": "Timestamp associated with the response.",
+        "type": "string",
+        "unit": "ISO 8601 datetime"
+      },
+      "totalFeatures": {
+        "description": "Total number of features reported by the service.",
+        "type": "integer",
+        "unit": "count"
+      },
+      "type": {
+        "description": "GeoJSON object type; typically FeatureCollection for the top-level response and Feature for each item.",
+        "type": "string",
+        "unit": ""
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_mws_time_series_api": {
+    "name": "Get MWS Time Series",
+    "description": "Returns fortnightly precipitation, evapotranspiration, and runoff values for a micro-watershed, with matching dates and units. These variables describe components of the water balance: precipitation minus runoff minus evapotranspiration.",
+    "type": "object",
+    "variables": {
+      "data": {
+        "type": "object",
+        "description": "Container for the API response data.",
+        "variables": {
+          "fortnight": {
+            "type": "object",
+            "description": "Fortnightly time-series values for the micro-watershed. Each metric array aligns position-by-position with the time array.",
+            "variables": {
+              "et": {
+                "type": "array<number>",
+                "description": "Evapotranspiration for each time step.",
+                "unit": "mm"
+              },
+              "precipitation": {
+                "type": "array<number>",
+                "description": "Precipitation for each time step.",
+                "unit": "mm"
+              },
+              "runoff": {
+                "type": "array<number>",
+                "description": "Runoff for each time step.",
+                "unit": "mm"
+              },
+              "time": {
+                "type": "array<string>",
+                "description": "Dates associated with the time-series values, formatted as ISO 8601 calendar dates (YYYY-MM-DD). Values at the same array index in et, runoff, and precipitation correspond to this date.",
+                "unit": "iso8601"
+              }
+            }
+          },
+          "fortnight_units": {
+            "type": "object",
+            "description": "Units and temporal resolution for the fortnightly time series.",
+            "variables": {
+              "et": {
+                "type": "string",
+                "description": "Unit used for evapotranspiration values.",
+                "value": "mm"
+              },
+              "precipitation": {
+                "type": "string",
+                "description": "Unit used for precipitation values.",
+                "value": "mm"
+              },
+              "runoff": {
+                "type": "string",
+                "description": "Unit used for runoff values.",
+                "value": "mm"
+              },
+              "time": {
+                "type": "string",
+                "description": "Format used for the dates in the time array.",
+                "value": "iso8601"
+              },
+              "time_step": {
+                "type": "string",
+                "description": "Temporal resolution of the time-series data.",
+                "value": "15_days"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Metadata identifying the requested micro-watershed.",
+            "variables": {
+              "mws_id": {
+                "type": "string",
+                "description": "Identifier of the micro-watershed for which the time series is returned."
+              }
+            }
+          }
+        }
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  },
+  "get_mws_geometries_api": {
+    "name": "Get MWS Geometries",
+    "description": "Returns a micro-watershed boundary as GeoJSON geometry together with its unique identifier and administrative details.",
+    "type": "object",
+    "variables": {
+      "data": {
+        "description": "Response data containing the micro-watershed details.",
+        "type": "object",
+        "variables": {
+          "mws_geometry": {
+            "description": "Micro-watershed identifier, administrative names, and polygon geometry.",
+            "type": "object",
+            "variables": {
+              "uid": {
+                "description": "Unique identifier of the micro-watershed.",
+                "type": "string",
+                "unit": ""
+              },
+              "state": {
+                "description": "Name of the state containing the micro-watershed.",
+                "type": "string",
+                "unit": ""
+              },
+              "district": {
+                "description": "Name of the district containing the micro-watershed.",
+                "type": "string",
+                "unit": ""
+              },
+              "tehsil": {
+                "description": "Name of the tehsil or block containing the micro-watershed.",
+                "type": "string",
+                "unit": ""
+              },
+              "geometry": {
+                "description": "GeoJSON geometry describing the micro-watershed boundary.",
+                "type": "object",
+                "variables": {
+                  "type": {
+                    "description": "GeoJSON geometry type, such as Polygon.",
+                    "type": "string",
+                    "unit": ""
+                  },
+                  "coordinates": {
+                    "description": "Nested coordinate arrays for the polygon boundary. Each coordinate position is represented as [longitude, latitude].",
+                    "type": "array<array<array<number>>>",
+                    "unit": "degrees (longitude, latitude)"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "error_message": {
+        "description": "Error details when the request fails; null when there is no error.",
+        "type": "string",
+        "unit": ""
+      },
+      "status": {
+        "description": "Indicates whether the API request succeeded.",
+        "type": "string",
+        "unit": ""
+      }
+    }
+  }
+}

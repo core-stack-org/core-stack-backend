@@ -49,22 +49,22 @@ class Command(BaseCommand):
             "--ensure-tehsil-watersheds",
             action="store_true",
             help=(
-                "Download per-tehsil watershed files for active tehsils from "
-                "the mws GeoServer workspace if they are missing."
+                "Check that a local MWS boundary exists in base_layers/tehsil_mws "
+                "for every active tehsil."
             ),
         )
         parser.add_argument(
             "--geoserver",
             action="store_true",
             help=(
-                "Deprecated no-op: tehsil watersheds are always downloaded "
-                "from GeoServer."
+                "Deprecated no-op: MWS boundaries are read from "
+                "base_layers/tehsil_mws."
             ),
         )
         parser.add_argument(
             "--force",
             action="store_true",
-            help="Replace existing tehsil watershed GPKGs.",
+            help="Deprecated no-op: MWS boundaries are no longer downloaded.",
         )
         parser.add_argument(
             "--ensure-village-boundaries",

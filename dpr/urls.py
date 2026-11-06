@@ -92,4 +92,9 @@ urlpatterns = [
         name="dpr_report_status",
     ),
     path("yuktdhara_data/", api.export_yuktdhara, name="yuktdhara_data"),
+    path(
+        "dpr_data/export_plans_csv/",
+        api.export_plans_csv,
+        name="dpr_export_plans_csv",
+    ),
 ]

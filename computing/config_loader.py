@@ -157,7 +157,8 @@ SOIL_RASTER_PATH: Path = _base_layer_path(
 
 AEZ_VECTOR_PATH: Path = _base_layer_path("aez")
 
-PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_watersheds"
+PRECOMPUTED_TEHSIL_WATERSHED_DIR: Path = DATA_DIR / "base_layers/tehsil_mws"
+LOCAL_ADMIN_BOUNDARY_DIR: Path = DATA_DIR / "base_layers/admin-boundary/output"
 
 MICROWATERSHED_PATH: Path = _base_layer_path("mws")
 
@@ -189,9 +190,7 @@ SOIL_TYPE_RASTER_PATHS: dict[str, Path] = {
     "topsoil_ph": SOIL_TYPE_BASE_DIR / "topsoil_pH.tif",
     "topsoil_texture": SOIL_TYPE_BASE_DIR / "topsoil_texture.tif",
 }
-PAN_INDIA_OUTER_BOUNDARY_PATH: Path = (
-    DATA_DIR / "india_state_outer_no_islands.geojson"
-)
+PAN_INDIA_OUTER_BOUNDARY_PATH: Path = DATA_DIR / "india_state_outer_no_islands.geojson"
 
 ADMIN_BOUNDARY_INPUT_DIR: Path = DATA_DIR / "admin-boundary/input"
 ADMIN_BOUNDARY_OUTPUT_DIR: Path = DATA_DIR / "admin-boundary/output"
@@ -269,7 +268,7 @@ PAN_INDIA_FACTORY_CSR_PATH = _base_layer_path(
 )
 LOCAL_FACTORY_CSR_OUTPUT = DATA_DIR / "layers/factory_csr"
 
-PAN_INDIA_GREEN_CREDIT_PATH = DATA_DIR / "base_layers/Pan_India_green_credit.geojson"
+PAN_INDIA_GREEN_CREDIT_PATH = DATA_DIR / "base_layers/Pan_India_green_credit_oct.geojson"
 LOCAL_GREEN_CREDIT_OUTPUT = DATA_DIR / "layers/green_credit"
 
 PAN_INDIA_MINING_PATH = _base_layer_path(
@@ -317,6 +316,20 @@ PAN_INDIA_RESTORATION_PATH = _base_layer_path(
 )
 LOCAL_RESTORATION_OUTPUT = DATA_DIR / "layers/restoration_opportunity"
 
+PAN_INDIA_SITE_SUITABILITY_PATH = _base_layer_path(
+    "site suitability",
+    fallback="{DATA_DIR}/base_layers/site_suitability_pan_india_cog.tif",
+)
+LOCAL_SITE_SUITABILITY_OUTPUT = DATA_DIR / "layers/site_suitability"
+
+PAN_INDIA_STREAM_ORDER_PATH = DATA_DIR / "base_layers/Pan_India_stream_order_raster.tif"
+PAN_INDIA_VILLAGE_PATH = DATA_DIR / "base_layers/Village_pan_India.geojson"
+# Field in PAN_INDIA_VILLAGE_PATH holding the village name.
+PAN_INDIA_VILLAGE_NAME_FIELD = "name"
+PAN_INDIA_WATERBODIES_CENSUS_PATH = (
+    DATA_DIR / "base_layers/Waterbodies_census_pan_india.geojson"
+)
+
 PAN_INDIA_RIVER_PATH = _base_layer_path(
     "river", fallback="{DATA_DIR}/river/River_pan_india.geojson"
 )
@@ -345,3 +358,9 @@ PAN_INDIA_TREE_IN_GRASSLAND = _base_layer_path(
 )
 LOCAL_TREE_IN_GRASSLAND_OUTPUT = _derived_output_dir("tree in grassland")
 LOCAL_DROUGHT_OUTPUT = _derived_output_dir("generate_drought_layer")
+
+PAN_INDIA_FOREST_FIRE = _base_layer_path(
+    "forest fire",
+    allowed_suffixes=(".geojson", ".gpkg", ".shp"),
+)
+LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fringe")

@@ -100,6 +100,11 @@ def lulc_on_plain_cluster(
             result_chunk = process_feature_collection(
                 plain_chunk, study_area_landforms, study_area_lulc, plain_centroids
             )
+            result_chunk = result_chunk.map(
+                lambda feature: feature.select(
+                    feature.propertyNames().remove("area")
+                )
+            )
 
             chunk_asset_id = (
                 get_gee_dir_path([state, district, block], GEE_ASSET_PATH) + desc

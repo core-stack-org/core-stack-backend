@@ -26,6 +26,7 @@ import subprocess
 from google.cloud import storage
 from google.api_core import retry
 from utilities.geoserver_utils import Geoserver
+from utilities.geoserver_sync_gate import skip_and_record
 from gee_computing.models import GEEAccount
 from google.oauth2 import service_account
 import numpy as np
@@ -635,6 +636,11 @@ def download_tif_from_gcs(source_blob_name, destination_file_name):
 
 def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_name=None):
     print("inside sync_raster_to_geoserver")
+    skipped = skip_and_record(
+        "gcs_raster", gcs_file_name, layer_name, workspace, style_name, "tif"
+    )
+    if skipped:
+        return skipped
     geo = Geoserver()
     geo.delete_raster_store(workspace=workspace, store=layer_name)
     bucket = gcs_config()

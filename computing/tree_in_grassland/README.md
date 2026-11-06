@@ -8,9 +8,10 @@ The current implementation in this module is designed to:
 
 - Identify tree pixels embedded within shrub-dominated grassland neighbourhoods
 - Capture adjacent shrub pixels associated with those tree patches
-- Compare start- and end-period context to detect loss of tree-grassland systems
-- Measure transition of those systems into barren land, built-up, water, or crop classes
-- Export the result as a GEE vector asset or a local GeoPackage output
+- Compare start- and end-period context to detect loss of tree pixels
+- Measure transitions from those tree pixels into barren land, built-up, water, shrub, tree, or crop classes
+- Export vector statistics and a categorical raster to GEE for validation
+- Export the result as a local GeoPackage when using the local workflow
 
 ---
 
@@ -141,27 +142,33 @@ This includes:
 
 ### 5. Detect losses and transitions
 
-The current implementation calculates:
+The current implementation restricts loss and transition masks to tree pixels in class 1. It does not treat shrub pixels as source pixels:
 
 ```python
-tree_loss = grassland_mask.And(context_end.eq(0))
-tree_to_barren = grassland_mask.And(lulc_end.eq(7))
+tree_in_shrubs = context_start.eq(1)
+tree_loss = tree_in_shrubs.And(context_end.eq(0))
+```
 
-to_built = grassland_mask.And(lulc_end.eq(1))
-to_kharif = grassland_mask.And(lulc_end.eq(2))
-to_kharif_rabi = grassland_mask.And(lulc_end.eq(3))
-to_zaid = grassland_mask.And(lulc_end.eq(4))
+The destination masks are therefore calculated from `tree_loss`, including shrub and tree destinations:
 
-to_crops = grassland_mask.And(
+```python
+tree_to_barren = tree_loss.And(lulc_end.eq(7))
+tree_to_built = tree_loss.And(lulc_end.eq(1))
+tree_to_kharif = tree_loss.And(lulc_end.eq(2))
+tree_to_kharif_rabi = tree_loss.And(lulc_end.eq(3))
+tree_to_zaid = tree_loss.And(lulc_end.eq(4))
+tree_to_crops = tree_loss.And(
     lulc_end.eq(5)
     .Or(lulc_end.eq(8))
     .Or(lulc_end.eq(9))
     .Or(lulc_end.eq(10))
     .Or(lulc_end.eq(11))
 )
+tree_to_shrub = tree_loss.And(lulc_end.eq(12))
+tree_to_tree = tree_loss.And(lulc_end.eq(6))
 ```
 
-These represent the tree-in-grassland system transitioning into barren land, built-up, water classes, and crop classes.
+`tree_loss_in_tree_in_shrub_area_in_ha` is therefore the area of isolated tree pixels that disappeared. The destination fields describe where those same tree pixels became.
 
 ### 6. Compute area statistics
 
@@ -199,6 +206,8 @@ The final feature collection includes the following attributes, using the revise
 | `tree_in_tree_in_shrub_to_kharif_rabi_water_area_in_ha` | Area of isolated tree pixels that turned into kharif-rabi water |
 | `tree_in_tree_in_shrub_to_kharif_rabi_zaid_water_area_in_ha` | Area of isolated tree pixels that turned into kharif-rabi-zaid water |
 | `tree_in_tree_in_shrub_to_crops_area_in_ha` | Area of isolated tree pixels that turned into crops |
+| `tree_in_tree_in_shrub_to_shrubs_area_in_ha` | Area of isolated tree pixels that turned into shrub |
+| `tree_in_tree_in_shrub_to_trees_area_in_ha` | Area of isolated tree pixels that turned into tree |
 
 ### Field semantics
 
@@ -206,8 +215,23 @@ The final feature collection includes the following attributes, using the revise
 - `isolated_shrub_area_in_ha` = shrub pixels (LULC class 12) that are not near tree pixels
 - `shrubs_trees_area_in_ha` = shrub and tree pixels for isolated tree pixels (> 50% shrubs around trees), in the first three years
 - `tree_in_shrubs_trees_area_in_ha` = isolated tree pixels inside shrub and tree pixels
-- `tree_loss_in_tree_in_shrub_area_in_ha` = how much of isolated tree pixels disappeared
-- `tree_in_tree_in_shrub_to_*_area_in_ha` = what the disappearing isolated tree pixels turned into
+- `tree_loss_in_tree_in_shrub_area_in_ha` = area of isolated tree pixels that disappeared
+- `tree_in_tree_in_shrub_to_*_area_in_ha` = area of disappearing isolated tree pixels that became each destination
+
+---
+
+## Validation raster
+
+The GEE pipeline exports a four-band raster with the following bands:
+
+| Band | Values | Meaning |
+|---|---:|---|
+| `start_context` | 0, 1, 2 | Context class in the start window: neither, tree-in-shrub, or shrub-associated with tree |
+| `end_context` | 0, 1, 2 | Context class in the end window using the same definitions |
+| `end_lulc` | 1-12 | Modal LULC class in the end window |
+| `transition` | 1-9 | Categorical result: 1 barren, 2 built-up, 3 crops, 4 water, 5 shrub, 6 tree, 7 tree loss, 8 tree context, 9 shrub context |
+
+The raster is exported as a separate public asset ending in `_raster` and is intended for visual validation in GEE Maps.
 
 ---
 

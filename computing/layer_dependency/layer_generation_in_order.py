@@ -1,5 +1,4 @@
 from nrm_app.celery import app
-from computing.base_layer_setup import with_tehsil_watershed
 from computing.misc.admin_boundary import generate_tehsil_shape_file_data
 from computing.misc.nrega import clip_nrega_district_block
 from computing.mws.mws import mws_layer
@@ -7,6 +6,7 @@ from computing.mws.generate_hydrology import generate_hydrology
 from computing.mws.generate_hydrology_local import (
     generate_hydrology as generate_hydrology_local,
 )
+
 from computing.lulc.lulc_v3 import clip_lulc_v3
 from computing.lulc.lulc_vector import vectorise_lulc
 from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
@@ -66,6 +66,7 @@ from computing.plantation.site_suitability import site_suitability
 from computing.mws.mws_connectivity import generate_mws_connectivity_data
 from computing.misc.ndvi_time_series import ndvi_timeseries
 from computing.zoi_layers.zoi import generate_zoi
+from computing.zoi_layers.zoi_local import generate_zoi as generate_zoi_local
 from computing.mws.mws_centroid import generate_mws_centroid_data
 from computing.change_detection.change_detection_local import (
     get_change_detection as get_change_detection_local,
@@ -73,7 +74,7 @@ from computing.change_detection.change_detection_local import (
 from computing.change_detection.change_detection_vector_local import (
     vectorise_change_detection as vectorise_change_detection_local,
 )
-from computing.cropping_intensity.cropping_intesity_local import (
+from computing.cropping_intensity.cropping_intensity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local,
 )
 from computing.lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local
@@ -107,6 +108,7 @@ from computing.misc.digital_elevation_model_local import (
 )
 from computing.misc.drainage_density_local_compute import drainage_density
 from computing.misc.livestocks.pipeline import generate_livestocks_layer_task
+from utilities.pipelines.admin import AdminScopeNotFound
 from computing.misc.river_local_compute import river_vector as river_vector_local
 from computing.misc.factory_csr_local_compute import generate_factory_csr_data_local
 from computing.misc.green_credit_local_compute import generate_green_credit_data_local
@@ -116,6 +118,7 @@ from computing.misc.naturaldepression_local_compute import (
     generate_natural_depression_data_local,
 )
 from computing.misc.nrega_local_compute import generate_nrega_data_local
+from computing.plantation.site_suitability_local import generate_site_suitability_local
 from computing.misc.restoration_opportunity_local_compute import (
     generate_restoration_opportunity_local,
 )
@@ -137,6 +140,9 @@ from computing.terrain_descriptor.terrain_compute_all_local import (
 from computing.terrain_descriptor.terrain_raster_fabdem_local import (
     generate_terrain_raster_clip as terrain_raster_local,
 )
+from computing.forest_fire.forest_fire_local_compute import (
+    generate_forest_fire_local,
+)
 from computing.forest_fringe.forest_fringe_local_compute import (
     generate_forest_fringe_local,
 )
@@ -151,6 +157,7 @@ from nrm_app.celery import app
 from computing.models import Layer
 from django.conf import settings
 import json
+from contextvars import ContextVar
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +259,34 @@ GEE_TASK_REGISTRY = {
     "generate_mws_centroid": generate_mws_centroid_data,
 }
 
+def _hydrology_local_runner(is_annual):
+    def runner(
+        state=None,
+        district=None,
+        block=None,
+        start_year=None,
+        end_year=None,
+        gee_account_id=None,
+        overwrite=False,
+    ):
+        return generate_hydrology_local(
+            state=state,
+            district=district,
+            block=block,
+            start_year=start_year,
+            end_year=end_year,
+            is_annual=is_annual,
+            gee_account_id=gee_account_id,
+            overwrite=overwrite,
+        )
+
+    return runner
+
+
+generate_hydrology_annual_local = _hydrology_local_runner(True)
+generate_hydrology_fortnightly_local = _hydrology_local_runner(False)
+
+
 LOCAL_TASK_REGISTRY = {
     "clip_nrega_district_block": generate_nrega_data_local,
     "generate_nrega_data": generate_nrega_data_local,
@@ -264,6 +299,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_ci_layer": generate_cropping_intensity_local,
     "generate_swb_layer": generate_swb_layer_local,
     "generate_swb": generate_swb_layer_local,
+    "generate_zoi": generate_zoi_local,
+    "generate_zoi_data": generate_zoi_local,
     "get_change_detection": get_change_detection_local,
     "change_detection": get_change_detection_local,
     "vectorise_change_detection": vectorise_change_detection_local,
@@ -302,6 +339,8 @@ LOCAL_TASK_REGISTRY = {
     "generate_mining": generate_mining_data_local,
     "generate_restoration_opportunity": generate_restoration_opportunity_local,
     "restoration_opportunity": generate_restoration_opportunity_local,
+    "site_suitability": generate_site_suitability_local,
+    "plantation_site_suitability": generate_site_suitability_local,
     "generate_mws_connectivity_data": mws_connectivity_vector,
     "generate_mws_connectivity": mws_connectivity_vector,
     "generate_facilities_proximity": generate_facilities_proximity_task,
@@ -322,17 +361,27 @@ LOCAL_TASK_REGISTRY = {
     "soil_health": soil_health_local,
     "generate_soil_type": generate_soil_type_local,
     "soil_type": generate_soil_type_local,
-    "generate_zoi": generate_zoi,
-    "generate_zoi_data": generate_zoi,
     "generate_hydrology": generate_hydrology_local,
-    "hydrology_fortnightly": generate_hydrology_local,
-    "hydrology_annual": generate_hydrology_local,
+    "hydrology_fortnightly": generate_hydrology_fortnightly_local,
+    "hydrology_annual": generate_hydrology_annual_local,
+    "forest_fire": generate_forest_fire_local,
+    "generate_forest_fire": generate_forest_fire_local,
     "forest_fringe": generate_forest_fringe_local,
     "generate_forest_fringe": generate_forest_fringe_local,
     "tree_in_grassland": generate_tree_in_grassland_local,
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
     "calculate_drought": calculate_drought_local,
     "generate_drought_layer": calculate_drought_local,
+    # GEE-backed tasks that can be triggered from the local map
+    # (nodes need "pass_gee_account_id": true).
+    "ndvi_timeseries": ndvi_timeseries,
+    "generate_ndvi_timeseries": ndvi_timeseries,
+    "drought_causality": drought_causality,
+    "mws_drought_causality": drought_causality,
+    "generate_stream_order": generate_stream_order,
+    "stream_order": generate_stream_order,
+    "generate_clart_layer": generate_clart_layer,
+    "generate_clart": generate_clart_layer,
 }
 
 TASK_REGISTRIES = {
@@ -342,7 +391,6 @@ TASK_REGISTRIES = {
 
 
 @app.task(bind=True)
-@with_tehsil_watershed
 def layer_generate_map(
     self,
     state,
@@ -353,6 +401,7 @@ def layer_generate_map(
     start_year=None,
     end_year=None,
     compute="gee",
+    skip_existing=False,
 ):
     """
     This function take state, district,block and map_order(map to trigger, it can be map_1, map_2_1, map_2_2, map_3, map_4). One map trigger more numbers of pipeline.
@@ -363,6 +412,20 @@ def layer_generate_map(
     compute = normalize_compute(compute)
     log_ctx = f"state={state}, district={district}, block={block}, map={map_order}, compute={compute}"
     status = {}
+
+    # Local runs: boundaries must exist locally and be on GeoServer before
+    # any layer in the map is generated.
+    if compute == "local":
+        from computing.local_compute_helper import (
+            TehsilBoundaryError,
+            prepare_local_tehsil_boundaries,
+        )
+
+        try:
+            prepare_local_tehsil_boundaries(state, district, block)
+        except TehsilBoundaryError as e:
+            logger.error(f"Boundary {e.stage} failed ({log_ctx}): {e}")
+            return f"{e.stage} failed for {district}_{block}: {e}"
 
     # checking:- is mws layer generated?
     try:
@@ -406,18 +469,22 @@ def layer_generate_map(
 
     logger.info(f"Starting layer generation ({log_ctx})")
     task_registry = TASK_REGISTRIES[compute]
-    for func in map_config:
-        run_node_tree(
-            node=func,
-            task_registry=task_registry,
-            compute=compute,
-            state=state,
-            district=district,
-            block=block,
-            global_args=global_args,
-            gee_account_id=gee_account_id,
-            status=status,
-        )
+    skip_token = _SKIP_EXISTING.set(bool(skip_existing) and compute == "local")
+    try:
+        for func in map_config:
+            run_node_tree(
+                node=func,
+                task_registry=task_registry,
+                compute=compute,
+                state=state,
+                district=district,
+                block=block,
+                global_args=global_args,
+                gee_account_id=gee_account_id,
+                status=status,
+            )
+    finally:
+        _SKIP_EXISTING.reset(skip_token)
 
     failed_nodes = sorted(name for name, ok in status.items() if not ok)
     succeeded_nodes = sorted(name for name, ok in status.items() if ok)
@@ -633,6 +700,23 @@ DependencyValidator.LOCAL_VALIDATORS = {
 }
 
 
+_SKIP_EXISTING = ContextVar("layer_map_skip_existing", default=False)
+
+
+def _layer_already_generated(node_func_obj, state, district, block):
+    from computing.bulk_layer_generation import (
+        LOCAL_TASK_DATASETS,
+        datasets_exist_locally,
+    )
+
+    dataset_names = LOCAL_TASK_DATASETS.get(getattr(node_func_obj, "name", None))
+    if not dataset_names:
+        return False
+    return datasets_exist_locally(
+        dataset_names, {"state": state, "district": district, "block": block}
+    )
+
+
 def run_node_tree(
     node,
     task_registry,
@@ -705,6 +789,12 @@ def run_layer_with_dependency(
             break
     else:
         try:
+            if _SKIP_EXISTING.get() and _layer_already_generated(
+                node_func_obj, state, district, block
+            ):
+                status[node_func_name] = True
+                logger.info(f"Skipping {node_func_name}, layer already exists ({log_ctx})")
+                return
             end_year_rules = load_end_year_rules(compute=compute)
             if node_func_name in end_year_rules:
                 args["end_year"] = end_year_rules[node_func_name]
@@ -729,6 +819,11 @@ def run_layer_with_dependency(
                 logger.warning(
                     f"{node_func_name} returned a falsy result, treating as failed ({log_ctx}): result={result}"
                 )
+        except AdminScopeNotFound as e:
+            status[node_func_name] = False
+            logger.warning(
+                f"Skipping {node_func_name}, location not in admin boundary ({log_ctx}): {e}"
+            )
         except Exception:
             status[node_func_name] = False
             logger.exception(f"{node_func_name} raised an error ({log_ctx})")
