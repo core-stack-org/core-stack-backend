@@ -56,8 +56,6 @@ dependencies:
   - pyarrow
   - rasterstats
   - pyogrio
-  - tippecanoe
-  - pmtiles
   - aiohttp
 
   - pip:
