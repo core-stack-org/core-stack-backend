@@ -1,0 +1,18 @@
+ROHINI_PANDE 
+full data with all columns - rohini.csv
+
+Source: The dataset full_applucation_envi_outcomes.dta is sourced from environmental clearnace applications compiled under the Rohini Pande research project on environmental governance and mining in India. 
+The accompanying code reads the Stata fle, extracts key fields as state, district, tehsil, village, proposal name, company details, sector type, and geographic coordinates(latitude, longitude), and saves them in a clean CSV format.
+
+Description: Contains geocoded locations of mining projects with administrative and company details.
+
+Key Variables:
+state, district, tehsil, village, latitude, longitude, sector_moefcc, proposal, company_name
+
+Units:
+Coordinates in decimal degrees (WGS84, EPSG:4326)
+
+Files:
+rohini_pande - input - full_application_envi_outcomes.dta    codes - rohini_pande.py geojson_rohini.py    output - rohini_mine_selected_data.csv  rohini_pandemines_india.geojson
+
+link - https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/NF5GZY
