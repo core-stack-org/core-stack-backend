@@ -1,3 +1,4 @@
+import datetime
 import json
 import inspect
 import logging
@@ -69,6 +70,24 @@ from .soil_health.soil_health import soil_health_local
 from .soil_type.soil_type_local import generate_soil_type_local
 
 from .drought.drought import calculate_drought
+from .drought.drought_local_compute import (
+    calculate_drought_local,
+    missing_drought_mws_layers,
+)
+from .drought.drought_pan_india import (
+    download_drought_inputs as download_drought_inputs_task,
+    generate_drought_pan_india as generate_drought_pan_india_task,
+)
+from .drought.local import status as drought_status
+from .drought.local.config import FIRST_SEASON as DROUGHT_FIRST_SEASON
+from .drought.local.config import Paths as DroughtPaths
+from .drought.local.download import PRODUCTS as DROUGHT_INPUT_PRODUCTS
+from .drought.local.download import download_in_progress as drought_download_in_progress
+from .drought.local.download import folders_not_writable as drought_inputs_not_writable
+from .drought.local.pipeline import STAGES as DROUGHT_STAGES
+from .drought.local.pipeline import stage_list as drought_stage_list
+from .drought.local.store import not_writable as drought_not_writable
+from .drought.local.store import run_in_progress as drought_run_in_progress
 from .drought.drought_causality import drought_causality
 from .et_downscale.et_downscale import generate_et_downscale
 from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
@@ -1170,7 +1189,20 @@ def generate_drought_layer(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        calculate_drought.apply_async(
+        compute = _get_compute_mode(request)
+        if compute == "local":
+            if not all([state, district, block]):
+                raise ValueError("state, district, and block are required")
+            missing = missing_drought_mws_layers(start_year, end_year)
+            if missing:
+                raise ValueError(
+                    "Missing pan-India drought MWS layer(s) for "
+                    f"{', '.join(map(str, missing))}. Make them first with "
+                    "utilities/scripts/generate_drought_layer.py --stages mws; "
+                    "Celery task was not queued."
+                )
+        task = _select_compute_task(compute, calculate_drought, calculate_drought_local)
+        task.apply_async(
             kwargs={
                 "state": state,
                 "district": district,
@@ -1185,9 +1217,165 @@ def generate_drought_layer(request):
             {"Success": "generate_drought_layer task initiated"},
             status=status.HTTP_200_OK,
         )
+    except (ValueError, FileNotFoundError) as e:
+        logger.warning("Invalid request in generate_drought_layer api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_drought_layer api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _payload_list(value):
+    """A list from a JSON list or a comma-separated string; None when not given."""
+    if value in (None, "", []):
+        return None
+    if isinstance(value, (list, tuple)):
+        return [str(v).strip().lower() for v in value if str(v).strip()]
+    return [v.strip().lower() for v in str(value).split(",") if v.strip()]
+
+
+def _payload_flag(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "y"}
+
+
+def _check_pan_india_drought_payload(request, name):
+    compute = _get_compute_mode(request, default="local")
+    if compute != "local":
+        raise ValueError(f"{name} supports compute='local' only")
+    if _has_any_payload_field(request, PAN_INDIA_PAYLOAD_FIELDS):
+        raise ValueError(
+            f"Do not pass pan_india to the {name} API; the /api/v1/pan-india/ route already defines the scope."
+        )
+    forbidden_fields = [field for field in PAN_INDIA_LOCATION_FIELDS if field in request.data]
+    if forbidden_fields:
+        raise ValueError(f"The {name} API is pan-India; do not pass {', '.join(forbidden_fields)}")
+    return compute
+
+
+@api_view(["POST"])
+@schema(None)
+def download_pan_india_drought_inputs(request):
+    logger.info("Inside download_pan_india_drought_inputs")
+    try:
+        compute = _check_pan_india_drought_payload(request, "drought input download")
+        products = _payload_list(request.data.get("products"))
+        if products:
+            unknown = sorted(set(products) - set(DROUGHT_INPUT_PRODUCTS))
+            if unknown:
+                raise ValueError(
+                    f"unknown product(s): {', '.join(unknown)}; available: {', '.join(DROUGHT_INPUT_PRODUCTS)}"
+                )
+        end_year = request.data.get("end_year")
+        end_year = int(end_year) if end_year not in (None, "") else None
+        dry_run = _payload_flag(request.data.get("dry_run", False))
+        queue = _heavy_queue()
+        if drought_download_in_progress():
+            return Response(
+                {"Exception": "A drought input download is already running; wait for it to finish."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        message = None if dry_run else drought_inputs_not_writable()
+        if message:
+            return Response({"Exception": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        task = download_drought_inputs_task.apply_async(
+            kwargs={"products": products, "end_year": end_year, "dry_run": dry_run},
+            queue=queue,
+        )
+        return Response(
+            {
+                "Success": "Pan-India drought input download initiated",
+                "task_id": task.id,
+                "compute": compute,
+                "scope": "pan_india",
+                "products": products or list(DROUGHT_INPUT_PRODUCTS),
+                "end_year": end_year,
+                "dry_run": dry_run,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        logger.warning("Heavy worker unavailable in download_pan_india_drought_inputs api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except ValueError as e:
+        logger.warning("Invalid request in download_pan_india_drought_inputs api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Exception in download_pan_india_drought_inputs api")
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_drought(request):
+    logger.info("Inside generate_pan_india_drought")
+    try:
+        compute = _check_pan_india_drought_payload(request, "pan-India drought")
+        start_year = request.data.get("start_year")
+        end_year = request.data.get("end_year")
+        start_year = int(start_year) if start_year not in (None, "") else DROUGHT_FIRST_SEASON
+        end_year = int(end_year) if end_year not in (None, "") else datetime.date.today().year
+        if start_year < DROUGHT_FIRST_SEASON:
+            raise ValueError(f"start_year must be {DROUGHT_FIRST_SEASON} or later")
+        if end_year < start_year:
+            raise ValueError("end_year must be greater than or equal to start_year")
+        stages = _payload_list(request.data.get("stages"))
+        stages = drought_stage_list(stages) if stages else list(DROUGHT_STAGES)
+        rerun_stages = _payload_list(request.data.get("rerun_stages"))
+        rerun_stages = drought_stage_list(rerun_stages) if rerun_stages else []
+        if set(rerun_stages) - set(stages):
+            raise ValueError("rerun_stages must be among the stages run")
+        queue = _heavy_queue()
+
+        paths = DroughtPaths.build()
+        if drought_run_in_progress(paths):
+            return Response(
+                {"Exception": "A pan-India drought run is already going; wait for it to finish."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        message = drought_not_writable(paths.base)
+        if message:
+            return Response({"Exception": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        seasons = list(range(start_year, end_year + 1))
+        drought_status._listdir.cache_clear()  # see the input folders as they are now
+        ready = [s for s in seasons if any(drought_status.stage_can_run(paths, stage, s) for stage in stages)]
+        waiting = {
+            season: detail
+            for season, state, detail in drought_status.season_states(paths, seasons)
+            if season not in ready
+        }
+        if not ready:
+            raise ValueError(
+                "No requested season has its inputs yet; Celery task was not queued. "
+                + "; ".join(f"{season}: {detail}" for season, detail in waiting.items())
+            )
+        task = generate_drought_pan_india_task.apply_async(
+            kwargs={"seasons": ready, "stages": stages, "rerun_stages": rerun_stages},
+            queue=queue,
+        )
+        return Response(
+            {
+                "Success": "Pan-India drought layer task initiated",
+                "task_id": task.id,
+                "compute": compute,
+                "scope": "pan_india",
+                "seasons": ready,
+                "waiting": waiting,
+                "stages": stages,
+                "rerun_stages": rerun_stages,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        logger.warning("Heavy worker unavailable in generate_pan_india_drought api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except ValueError as e:
+        logger.warning("Invalid request in generate_pan_india_drought api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Exception in generate_pan_india_drought api")
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
