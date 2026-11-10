@@ -52,6 +52,11 @@ dependencies:
   - cuda-version=12.9
   - cupy=13.6.*
   - cucim>=26.2.0
+  - s2sphere
+  - pyarrow
+  - rasterstats
+  - pyogrio
+  - aiohttp
 
   - pip:
       - django==5.2.9
