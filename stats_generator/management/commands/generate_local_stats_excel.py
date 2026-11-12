@@ -49,6 +49,7 @@ REPORT_FIELDS = [
     "state", "district", "block", "active", "workspace", "layer",
     "origin", "status", "path", "error",
 ]
+FILTERS_ROW = "_filter_jsons"  # report row (workspace column) for the filter JSONs
 
 
 def _format_layer_name(template, district, block):
@@ -57,13 +58,53 @@ def _format_layer_name(template, district, block):
     return template
 
 
-def _generate_one(loc, is_active, geoserver_fallback, skip_existing):
-    """Runs in a worker process. Returns (loc, is_active, rows, seconds, error)."""
+def build_filter_files(state, district, block):
+    """
+    The JSONs the generate_stats_excel_file API builds after the excel:
+    <d>_<b>.json, <d>_<b>_KYL_filter_data.json, <d>_<b>_KYL_village_data.json.
+    All three read the excel only. Returns "" on success, else an error text.
+    """
+    from public_api.views import get_tehsil_json
+    from stats_generator.mws_indicators import generate_mws_data_for_kyl_filters
+    from stats_generator.village_indicators import get_generate_filter_data_village
+
+    errors = []
+    steps = (
+        ("tehsil_json", lambda: get_tehsil_json(state, district, block, 1)),
+        ("kyl_mws", lambda: generate_mws_data_for_kyl_filters(state, district, block, "json", 1)),
+        ("kyl_village", lambda: get_generate_filter_data_village(state, district, block, 1)),
+    )
+    for name, step in steps:
+        try:
+            response = step()
+            code = getattr(response, "status_code", 200)
+            if code >= 400:
+                detail = getattr(response, "data", None) or getattr(response, "content", b"")[:200]
+                errors.append(f"{name}: HTTP {code} {detail}")
+        except Exception as exc:
+            logger.exception("[%s/%s/%s] %s failed", state, district, block, name)
+            errors.append(f"{name}: {exc!r}")
+    return "; ".join(errors)
+
+
+def _generate_one(loc, is_active, geoserver_fallback, skip_existing,
+                  with_filters=False, filters_only=False):
+    """
+    Runs in a worker process.
+    Returns (loc, is_active, rows, seconds, error, filters_error).
+    """
     state, district, block = loc
     started = time.monotonic()
     final = local_layers.stats_excel_path(state, district, block)
+
+    if filters_only:
+        if not final.exists():
+            return loc, is_active, [], 0.0, "skipped (no excel)", ""
+        filters_error = build_filter_files(state, district, block)
+        return loc, is_active, [], time.monotonic() - started, "", filters_error
+
     if skip_existing and final.exists():
-        return loc, is_active, [], 0.0, "skipped (exists)"
+        return loc, is_active, [], 0.0, "skipped (exists)", ""
 
     final.parent.mkdir(parents=True, exist_ok=True)
     tmp = final.with_name(f".{final.stem}.tmp.xlsx")
@@ -80,11 +121,13 @@ def _generate_one(loc, is_active, geoserver_fallback, skip_existing):
         if not tmp.exists():
             raise RuntimeError("no workbook was written")
         os.replace(tmp, final)
-        return loc, is_active, results, time.monotonic() - started, ""
     except Exception as exc:  # keep the batch going
         logger.exception("[%s/%s/%s] Stats excel generation failed", *loc)
         tmp.unlink(missing_ok=True)
-        return loc, is_active, [], time.monotonic() - started, repr(exc)
+        return loc, is_active, [], time.monotonic() - started, repr(exc), ""
+
+    filters_error = build_filter_files(state, district, block) if with_filters else ""
+    return loc, is_active, results, time.monotonic() - started, "", filters_error
 
 
 class Command(BaseCommand):
@@ -123,7 +166,22 @@ class Command(BaseCommand):
             "--no-probe", action="store_true",
             help="Skip learning blank-sheet headers from sample tehsils first.",
         )
+        parser.add_argument(
+            "--with-filters", action="store_true",
+            help=(
+                "After each excel, also build <d>_<b>.json, _KYL_filter_data.json "
+                "and _KYL_village_data.json (as the generate_stats_excel_file API does)."
+            ),
+        )
+        parser.add_argument(
+            "--filters-only", action="store_true",
+            help="Only (re)build the filter JSONs from existing excels; no excel generation.",
+        )
         parser.add_argument("--report", help="CSV report path.")
+        parser.add_argument(
+            "--retry-failed", metavar="REPORT_CSV",
+            help="Only rerun the tehsils that failed in an earlier run's report.",
+        )
 
     # ------------------------------------------------------------------
 
@@ -133,10 +191,19 @@ class Command(BaseCommand):
             blocks=opts["blocks"], limit=opts["limit"],
         )
         fallback = not opts["no_geoserver_fallback"]
-        locator = get_active_locations if opts["active_only"] else get_all_locations
-        locations = list(dict.fromkeys(
-            (slug(l.state), slug(l.district), slug(l.block)) for l in locator(**filters)
-        ))
+        if opts["retry_failed"]:
+            with open(opts["retry_failed"], newline="") as fh:
+                locations = list(dict.fromkeys(
+                    (r["state"], r["district"], r["block"])
+                    for r in csv.DictReader(fh)
+                    if r["status"] == "error" and not r["error"].startswith("skipped")
+                ))
+            self.stdout.write(f"Retrying {len(locations)} failed tehsils from {opts['retry_failed']}")
+        else:
+            locator = get_active_locations if opts["active_only"] else get_all_locations
+            locations = list(dict.fromkeys(
+                (slug(l.state), slug(l.district), slug(l.block)) for l in locator(**filters)
+            ))
         if not locations:
             raise CommandError("No tehsils matched the filters.")
         active = local_layers.active_location_slugs()
@@ -151,7 +218,7 @@ class Command(BaseCommand):
             self._coverage(locations, active, layers, fallback)
             return
 
-        if not opts["no_probe"]:
+        if not opts["no_probe"] and not opts["filters_only"]:
             self._probe_templates(layers, active, fallback)
 
         report_path = Path(opts["report"]) if opts["report"] else (
@@ -253,13 +320,18 @@ class Command(BaseCommand):
         failures = []
         done = 0
         started = time.monotonic()
-        jobs = [(loc, loc in active, fallback, opts["skip_existing"]) for loc in locations]
+        jobs = [
+            (loc, loc in active, fallback, opts["skip_existing"],
+             opts["with_filters"], opts["filters_only"])
+            for loc in locations
+        ]
+        filters_on = opts["with_filters"] or opts["filters_only"]
 
         with open(report_path, "w", newline="") as fh:
             writer = csv.DictWriter(fh, fieldnames=REPORT_FIELDS)
             writer.writeheader()
 
-            def record(loc, is_active, rows, seconds, error):
+            def record(loc, is_active, rows, seconds, error, filters_error):
                 nonlocal done
                 done += 1
                 base = dict(zip(("state", "district", "block"), loc), active=is_active)
@@ -276,16 +348,29 @@ class Command(BaseCommand):
                             **base, **{k: row.get(k, "") for k in
                                        ("workspace", "layer", "origin", "status", "path")},
                         })
+                if filters_on and not error:
+                    totals["filters_failed" if filters_error else "filters_ok"] += 1
+                    writer.writerow({
+                        **base, "workspace": FILTERS_ROW,
+                        "status": "failed" if filters_error else "success",
+                        "error": filters_error,
+                    })
                 fh.flush()
                 elapsed = time.monotonic() - started
                 eta = elapsed / done * (len(jobs) - done)
                 origins = Counter(r.get("origin") for r in rows)
-                self.stdout.write(
-                    f"[{done}/{len(jobs)}] {'/'.join(loc)} "
-                    + (error or f"local={origins[ORIGIN_LOCAL]} geoserver={origins[ORIGIN_GEOSERVER]} "
-                       f"blank={origins[ORIGIN_MISSING]} ({seconds:.0f}s)")
-                    + f"  eta {eta / 60:.0f}m"
-                )
+                if error:
+                    status = error
+                elif opts["filters_only"]:
+                    status = f"filters {'FAILED: ' + filters_error if filters_error else 'ok'} ({seconds:.0f}s)"
+                else:
+                    status = (
+                        f"local={origins[ORIGIN_LOCAL]} geoserver={origins[ORIGIN_GEOSERVER]} "
+                        f"blank={origins[ORIGIN_MISSING]}"
+                        + (f" filters={'FAILED' if filters_error else 'ok'}" if filters_on else "")
+                        + f" ({seconds:.0f}s)"
+                    )
+                self.stdout.write(f"[{done}/{len(jobs)}] {'/'.join(loc)} {status}  eta {eta / 60:.0f}m")
 
             if opts["workers"] <= 1:
                 for job in jobs:
@@ -303,7 +388,10 @@ class Command(BaseCommand):
             f"\nDone in {(time.monotonic() - started) / 60:.1f} min: "
             f"{totals['written']} written, {totals['skipped']} skipped, {totals['failed']} failed. "
             f"Layers: {totals[ORIGIN_LOCAL]} local, {totals[ORIGIN_GEOSERVER]} GeoServer, "
-            f"{totals[ORIGIN_MISSING]} blank.\nReport: {report_path}"
+            f"{totals[ORIGIN_MISSING]} blank."
+            + (f" Filter JSONs: {totals['filters_ok']} ok, {totals['filters_failed']} failed."
+               if filters_on else "")
+            + f"\nReport: {report_path}"
         ))
         for loc, error in failures[:20]:
             self.stdout.write(self.style.ERROR(f"  {'/'.join(loc)}: {error}"))

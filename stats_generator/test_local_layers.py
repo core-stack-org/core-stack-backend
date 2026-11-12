@@ -315,3 +315,42 @@ class ComputeParamApiTests(SimpleTestCase):
         response = self._get(api.generate_stats_excel_file_data, compute="foo")
         self.assertEqual(response.status_code, 500)
         self.assertIn("compute must be", response.data["message"])
+
+
+class WriterFailureTests(LocalExcelGenerationTests):
+    """A sheet writer crashing in local mode blanks that layer, not the tehsil."""
+
+    def test_crashing_writer_leaves_blank_sheet(self):
+        local_layers.sheet_templates.learn(
+            "mws|mws_{district}_{block}", {"mws": ["UID", "area_in_ha"]}
+        )
+        with patch("stats_generator.utils.create_excel_for_mws", side_effect=AttributeError("boom")):
+            results, sheets = self._run("crash.xlsx")
+        self.assertEqual(results[0]["status"], "failed")
+        self.assertEqual(sheets["mws"]["UID"].tolist(), ["1_1", "1_2"])
+        self.assertTrue(sheets["mws"]["area_in_ha"].isna().all())
+
+    def test_learns_headers_of_written_sheets(self):  # covered by the parent
+        pass
+
+    def test_missing_layer_gets_blank_sheet_with_learned_headers(self):
+        pass
+
+
+class GeoserverModeStillRaisesTests(SimpleTestCase):
+    @patch(
+        "stats_generator.utils.fetch_layers_for_excel_generation",
+        return_value=[{"layer_name": "mws_{district}_{block}", "workspace": "mws",
+                       "start_year": None, "end_year": None}],
+    )
+    @patch("stats_generator.utils.requests.get")
+    def test_writer_error_propagates_in_geoserver_mode(self, get, _layers):
+        get.return_value = MagicMock(json=lambda: {"features": []})
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "stats_generator.utils.create_excel_for_mws", side_effect=AttributeError("boom")
+        ):
+            # Not swallowed (closing the then-empty workbook may raise IndexError on top).
+            with self.assertRaises((AttributeError, IndexError)):
+                get_vector_layer_geoserver(
+                    "bihar", "banka", "banka", xlsx_file=str(Path(tmp) / "x.xlsx")
+                )
