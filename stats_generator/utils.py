@@ -2283,6 +2283,31 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
     logger.info("Excel file created for terrain_lulc_plain")
 
 
+def _swb_ored_area(properties, years):
+    """
+    Union ("ored") extent of a waterbody in ha. Falls back, like
+    computing.surface_water_bodies.area_utils.add_area_ored_to_gdf, to
+    area_<yy-yy> * 100 / k_<yy-yy> (the year's area is its kharif extent)
+    for features without area_ored.
+    """
+    try:
+        area_ored = float(properties.get("area_ored") or 0)
+    except (TypeError, ValueError):
+        area_ored = 0
+    if area_ored > 0:
+        return area_ored
+    for year in reversed(list(years)):
+        short_year = f"{str(year)[-2:]}-{str(year + 1)[-2:]}"
+        try:
+            area = float(properties.get(f"area_{short_year}") or 0)
+            kharif = float(properties.get(f"k_{short_year}") or 0)
+        except (TypeError, ValueError):
+            continue
+        if area > 0 and kharif > 0:
+            return area * 100 / kharif
+    return 0
+
+
 def create_excel_for_swb(data, output_file, writer, start_year, end_year):
     df_data = []
     features = data.get("features", [])
@@ -2302,12 +2327,17 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
             num_uid_parts_is = uid.split("|")
 
         def calculate_area(base_area, percentage):
-            if base_area == 0 or percentage == 0:
+            if not base_area or not percentage:
                 return 0
             return base_area * (percentage / 100)
 
         # Generate years dynamically based on start_year and end_year
         years = range(start_year, end_year + 1)
+
+        # k_/kr_/krz_ are percentages of the waterbody's union extent
+        # (area_ored), not of that year's area (see swb1.py), so seasonal
+        # hectares = area_ored * pct / 100.
+        ored_area = _swb_ored_area(properties, years)
 
         for num_uid_part in num_uid_parts_is:
             row = {"UID": num_uid_part}
@@ -2332,13 +2362,13 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
                     num_uid_parts_is
                 )
                 row[f"kharif_area_in_ha_{year}-{year + 1}"] = calculate_area(
-                    total_area, kharif_percentage
+                    ored_area, kharif_percentage
                 ) / len(num_uid_parts_is)
                 row[f"rabi_area_in_ha_{year}-{year + 1}"] = calculate_area(
-                    total_area, rabi_percentage
+                    ored_area, rabi_percentage
                 ) / len(num_uid_parts_is)
                 row[f"zaid_area_in_ha_{year}-{year + 1}"] = calculate_area(
-                    total_area, zaid_percentage
+                    ored_area, zaid_percentage
                 ) / len(num_uid_parts_is)
 
             # Add total SWB area

@@ -354,3 +354,36 @@ class GeoserverModeStillRaisesTests(SimpleTestCase):
                 get_vector_layer_geoserver(
                     "bihar", "banka", "banka", xlsx_file=str(Path(tmp) / "x.xlsx")
                 )
+
+
+class SwbSeasonalAreaTests(SimpleTestCase):
+    """k_/kr_/krz_ are % of area_ored, so ha = area_ored * pct / 100."""
+
+    def _sheet(self, properties):
+        from io import BytesIO
+
+        from stats_generator.utils import create_excel_for_swb
+
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            create_excel_for_swb(
+                {"features": [{"properties": {"MWS_UID": "1_1", **properties}}]},
+                None, writer, 2022, 2022,
+            )
+        buf.seek(0)
+        return pd.read_excel(buf, sheet_name="surfaceWaterBodies_annual").iloc[0]
+
+    def test_seasonal_hectares_use_area_ored(self):
+        row = self._sheet({
+            "area_ored": 10.0, "area_22-23": 6.0,
+            "k_22-23": 60.0, "kr_22-23": 30.0, "krz_22-23": 10.0,
+        })
+        self.assertAlmostEqual(row["total_area_in_ha_2022-2023"], 6.0)
+        self.assertAlmostEqual(row["kharif_area_in_ha_2022-2023"], 6.0)  # was 3.6
+        self.assertAlmostEqual(row["rabi_area_in_ha_2022-2023"], 3.0)    # was 1.8
+        self.assertAlmostEqual(row["zaid_area_in_ha_2022-2023"], 1.0)    # was 0.6
+        self.assertAlmostEqual(row["total_swb_area_in_ha"], 10.0)
+
+    def test_area_ored_derived_when_missing(self):
+        row = self._sheet({"area_22-23": 6.0, "k_22-23": 60.0, "kr_22-23": 30.0})
+        self.assertAlmostEqual(row["rabi_area_in_ha_2022-2023"], 3.0)
