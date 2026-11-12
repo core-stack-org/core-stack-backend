@@ -10,6 +10,14 @@ from utilities.gee_utils import (
 )
 
 
+def _compute_param(request):
+    """Optional `compute` query param: "local" or "gee" (default, GeoServer)."""
+    compute = request.query_params.get("compute", "gee").strip().lower() or "gee"
+    if compute not in ("local", "gee"):
+        raise ValueError(f"compute must be 'local' or 'gee', got {compute!r}")
+    return compute
+
+
 @api_view(["GET"])
 @auth_free
 @schema(None)
@@ -19,8 +27,9 @@ def download_stats_excel_file(request):
         state = valid_gee_text(request.query_params.get("state", "").lower())
         district = valid_gee_text(request.query_params.get("district", "").lower())
         block = valid_gee_text(request.query_params.get("block", "").lower())
+        compute = _compute_param(request)
 
-        return download_layers_excel_file(state, district, block)
+        return download_layers_excel_file(state, district, block, compute=compute)
 
     except Exception as e:
         return Response(
@@ -38,8 +47,11 @@ def generate_stats_excel_file_data(request):
         state = valid_gee_text(request.query_params.get("state", "").lower())
         district = valid_gee_text(request.query_params.get("district", "").lower())
         block = valid_gee_text(request.query_params.get("block", "").lower())
+        # Optional compute=local: build the layer sheets from locally generated
+        # layers instead of GeoServer.
+        compute = _compute_param(request)
 
-        return generate_stats_excel_file(state, district, block)
+        return generate_stats_excel_file(state, district, block, compute=compute)
 
     except Exception as e:
         return Response(
