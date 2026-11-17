@@ -48,6 +48,17 @@ Install:
 - `GET /layer-comparison/`
 - `GET /layer-comparison/api/mws/`
 - `GET /layer-comparison/api/config/?mws_id=<id>`
+- `GET /layer-comparison/api/excel-analysis/?state_id=&district_id=&block_id=` —
+  every shared sheet/metric of the GEE (`data/stats_excel_files_gee`) vs local
+  (`data/stats_excel_files`) stats workbooks:
+  agreement statistics per metric (least agreeing first) plus scatter data for
+  each sheet's worst metric. Powers the single-page Excel report.
+- `GET /layer-comparison/api/excel-scatter/?...&sheet=&metric=` — scatter data
+  for one metric (used when a metric row is clicked).
+- `GET /layer-comparison/api/excel-multi/?...&sheet=&period=` — aligned MWS ×
+  property slice for a sheet (and optional period such as `2023`), powering the
+  multi-property visualizations (Property × Period heatmap, Class trade-offs,
+  MWS × Property residual matrix, and Linked 1:1 small-multiples grid).
 
 Groups are derived from `LayerMapping.theme`; no group table is created.
 

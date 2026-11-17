@@ -22,6 +22,8 @@
     data-compare-url="{% url 'layer_comparison:compare' %}"
     data-excel-sheets-url="{% url 'layer_comparison:excel-sheets' %}"
     data-excel-scatter-url="{% url 'layer_comparison:excel-scatter' %}"
+    data-excel-analysis-url="{% url 'layer_comparison:excel-analysis' %}"
+    data-excel-multi-url="{% url 'layer_comparison:excel-multi' %}"
 >
     <header class="page-header">
         <h1>Layer Comparison</h1>
@@ -85,24 +87,175 @@
                 <p id="excel-comparison-status" role="status" aria-live="polite"></p>
             </div>
             <div class="excel-controls">
-                <label>Sheet
-                    <select id="excel-sheet-select" disabled></select>
-                </label>
-                <label>Metric
-                    <select id="excel-metric-select" disabled></select>
+                <label class="narrow">Tolerance
+                    <select id="excel-tolerance-select" disabled></select>
                 </label>
             </div>
         </div>
-        <div class="excel-chart-wrap">
-            <canvas id="excel-scatter-chart" aria-label="Scatter plot comparing old and current Excel values"></canvas>
+
+        <div id="excel-overview" class="excel-table-card" hidden>
+            <h3>All sheets at a glance</h3>
+            <p class="chart-hint">Sheets are listed alphabetically, in the same order as the sections below. "Worst metric" is the one with the fewest MWS inside the tolerance. Click a sheet name to jump to it.</p>
+            <div class="excel-table-wrap">
+                <table class="excel-data-table" id="excel-overview-table">
+                    <thead>
+                        <tr>
+                            <th>Sheet</th>
+                            <th>Verdict</th>
+                            <th>Matched by</th>
+                            <th>Metrics</th>
+                            <th>Metrics fully within tolerance</th>
+                            <th>Worst metric</th>
+                            <th>Worst: within tolerance</th>
+                            <th>Worst: R&sup2;</th>
+                            <th>MWS only in one file</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
         </div>
+
+        <div id="excel-sheets"></div>
     </section>
+
+    <template id="excel-sheet-template">
+        <article class="excel-sheet">
+            <header class="excel-sheet-header">
+                <span class="sheet-index"></span>
+                <div class="sheet-heading">
+                    <span class="sheet-kicker">Excel sheet</span>
+                    <h3 class="sheet-title"></h3>
+                    <p class="sheet-meta"></p>
+                </div>
+                <span class="sheet-verdict"></span>
+            </header>
+            <p class="excel-unmatched" hidden></p>
+
+            <section class="multi-property-panel" hidden>
+                <div class="multi-temporal-card excel-table-card" hidden>
+                    <div class="multi-card-header">
+                        <div>
+                            <h4>Property &times; Period overview</h4>
+                            <p class="chart-hint">Click a period column header to compare its properties below, or click any cell to open its scatter plot.</p>
+                        </div>
+                        <div class="pill-group temporal-mode-group" role="group" aria-label="Heatmap statistic"></div>
+                    </div>
+                    <div class="excel-table-wrap multi-heatmap-wrap">
+                        <table class="excel-data-table multi-heatmap-table">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="multi-slice-card excel-table-card">
+                    <div class="multi-card-header">
+                        <div>
+                            <h4 class="multi-slice-title">Multi-property comparison</h4>
+                            <p class="multi-slice-hint chart-hint"></p>
+                        </div>
+                        <div class="multi-controls">
+                            <div class="pill-group multi-submode-group" hidden></div>
+                            <div class="pill-group multi-tab-group" role="tablist" aria-label="Multi-property view"></div>
+                        </div>
+                    </div>
+                    <div class="multi-stage"></div>
+                </div>
+            </section>
+
+            <div class="excel-table-card">
+                <h4>Metrics (least agreeing first) &mdash; click a row to inspect it below</h4>
+                <div class="excel-table-wrap metric-table-wrap">
+                    <table class="excel-data-table metric-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>MWS</th>
+                                <th>Within tolerance</th>
+                                <th>Identical</th>
+                                <th>R&sup2;</th>
+                                <th>Bias (new &minus; old)</th>
+                                <th>MAE</th>
+                                <th>RMSE</th>
+                                <th>Max |&Delta;|</th>
+                                <th>MWS with max |&Delta;|</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="metric-detail">
+                <div class="detail-header">
+                    <div>
+                        <h4 class="detail-title"></h4>
+                        <p class="detail-status chart-hint"></p>
+                    </div>
+                    <div class="excel-controls">
+                        <label>Find MWS
+                            <input class="mws-search" type="search" placeholder="MWS id">
+                            <datalist class="mws-ids"></datalist>
+                        </label>
+                        <button class="secondary download-button" type="button" disabled>
+                            Download CSV
+                        </button>
+                    </div>
+                </div>
+
+                <div class="excel-summary"></div>
+
+                <div class="excel-charts">
+                    <div class="excel-chart-card">
+                        <h4>Old (GEE) vs New (local) &mdash; one dot per MWS</h4>
+                        <p class="chart-hint">Dots on the dashed 1:1 line are identical. Grey dotted lines mark the tolerance band. Click a dot to highlight that MWS.</p>
+                        <div class="excel-chart-wrap">
+                            <canvas class="scatter-canvas" aria-label="Scatter plot of old values (x) against new values (y), one point per MWS"></canvas>
+                        </div>
+                    </div>
+                    <div class="excel-chart-card">
+                        <h4>Distribution of differences (new &minus; old)</h4>
+                        <p class="chart-hint">One tall bar at 0 means the layers agree. A lopsided spread means one layer runs consistently higher or lower.</p>
+                        <div class="excel-chart-wrap">
+                            <canvas class="histogram-canvas" aria-label="Histogram of differences between new and old values"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="excel-table-card">
+                    <h4>Largest differences</h4>
+                    <div class="excel-table-wrap">
+                        <table class="excel-data-table diff-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>MWS id</th>
+                                    <th>Old (GEE)</th>
+                                    <th>New (local)</th>
+                                    <th>&Delta; (new &minus; old)</th>
+                                    <th>&Delta; %</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <section class="sheet-summary">
+                <h4>Summary: <span class="summary-sheet-name"></span></h4>
+                <p class="sheet-summary-text"></p>
+            </section>
+        </article>
+    </template>
 </main>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"
         crossorigin="anonymous"></script>
+<script src="{% static 'layer_comparison/js/excel_comparison.js' %}"></script>
 <script src="{% static 'layer_comparison/js/dashboard.js' %}"></script>
 </body>
 </html>

@@ -11,5 +11,7 @@ urlpatterns = [
     path("api/layers/", views.layers_api, name="layers"),
     path("api/compare/", views.compare_api, name="compare"),
     path("api/excel-sheets/", views.excel_sheets_api, name="excel-sheets"),
+    path("api/excel-analysis/", views.excel_analysis_api, name="excel-analysis"),
     path("api/excel-scatter/", views.excel_scatter_api, name="excel-scatter"),
+    path("api/excel-multi/", views.excel_multi_api, name="excel-multi"),
 ]

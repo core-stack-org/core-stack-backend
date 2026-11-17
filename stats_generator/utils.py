@@ -6,6 +6,8 @@ from rest_framework.response import Response
 import pandas as pd
 import geopandas as gpd
 from collections import defaultdict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime
 from functools import lru_cache
 from nrm_app.settings import GEOSERVER_URL, EXCEL_PATH, BASE_DIR
@@ -34,9 +36,49 @@ def get_url(workspace, layer_name):
     return geojson_url
 
 
-def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
+from .layer_sources import LayerUnavailable  # noqa: E402  (re-exported)
+
+
+# Optional replacement for GeoServer as the source of vector layers, e.g. the
+# original GEE assets (see stats_generator/gee_layer_source.py). A callable
+# (workspace, layer_name, start_year=None, end_year=None) -> GeoJSON dict.
+_layer_source = ContextVar("stats_layer_source", default=None)
+
+
+@contextmanager
+def use_layer_source(source):
+    """Route every layer fetch in this module through ``source``."""
+    token = _layer_source.set(source)
+    try:
+        yield
+    finally:
+        _layer_source.reset(token)
+
+
+def fetch_layer_geojson(
+    workspace, layer_name, start_year=None, end_year=None, timeout=None
+):
+    """Fetch a vector layer as GeoJSON from the active source (GeoServer by default)."""
+    source = _layer_source.get()
+    if source is not None:
+        return source(workspace, layer_name, start_year=start_year, end_year=end_year)
+    response = requests.get(get_url(workspace, layer_name), timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def get_vector_layer_geoserver(
+    state, district, block, specific_sheets=None, base_dir="data/stats_excel_files"
+):
+    """Build the stats workbook for one block.
+
+    Layers come from GeoServer unless another source is active via
+    ``use_layer_source`` (e.g. original GEE assets). ``base_dir`` (relative
+    to EXCEL_PATH) selects the output tree so alternative sources can be
+    written next to, not over, the regular workbooks.
+    """
     print(f"Generate Stats excel for {state}_{district}_{block}")
-    base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
+    base_path = os.path.join(EXCEL_PATH, base_dir)
     district_path = os.path.join(
         base_path, state.replace(" ", "_").upper(), district.replace(" ", "_").upper()
     )
@@ -81,211 +123,240 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
 
             geojson_data = None
             try:
-                url = get_url(workspace, layer_name)
-                response = requests.get(url)
-                response.raise_for_status()
-                geojson_data = response.json()
-            except requests.exceptions.RequestException as e:
+                geojson_data = fetch_layer_geojson(
+                    workspace, layer_name, start_year=start_year, end_year=end_year
+                )
+            except LayerUnavailable as e:
+                print(f"Skipping {layer_name}: {e}")
+                results.append(
+                    {
+                        "layer": layer_name,
+                        "status": "skipped",
+                        "workspace": workspace,
+                        "reason": str(e),
+                    }
+                )
+                continue
+            except Exception as e:
                 print(f"Failed to fetch data for {layer_name}: {e}")
                 results.append(
-                    {"layer": layer_name, "status": "failed", "workspace": workspace}
+                    {
+                        "layer": layer_name,
+                        "status": "failed",
+                        "workspace": workspace,
+                        "reason": str(e),
+                    }
                 )
                 continue
 
-            # Process the data based on workspace
-            if workspace == "terrain":
-                create_excel_for_terrain(geojson_data, xlsx_file, writer)
-            elif (
-                workspace == "terrain_lulc"
-                and layer_name == f"{district}_{block}_lulc_slope"
-            ):
-                create_excel_for_terrain_lulc_slope(geojson_data, xlsx_file, writer)
-            elif (
-                workspace == "terrain_lulc"
-                and layer_name == f"{district}_{block}_lulc_plain"
-            ):
-                create_excel_for_terrain_lulc_plain(geojson_data, xlsx_file, writer)
-            elif workspace == "swb":
-                create_excel_for_swb(
-                    geojson_data, xlsx_file, writer, start_year, end_year
-                )
-                create_excel_for_mws_intersect_swb(geojson_data, writer)
-            elif workspace == "nrega_assets":
-                mws_lay_name = f"deltaG_well_depth_{district}_{block}"
-                mws_file_url = get_url("mws_layers", mws_lay_name)
-
-                try:
-                    response = requests.get(mws_file_url)
-                    response.raise_for_status()
-                    mws_geojson_datas = response.json()
-                except requests.exceptions.RequestException as e:
-                    print(f"Failed to fetch MWS data: {e}")
-                    continue
-
-                create_excel_for_nrega_assets(
-                    geojson_data,
-                    mws_geojson_datas,
-                    xlsx_file,
-                    writer,
-                    start_year,
-                    end_year,
-                )
-                try:
-                    fetch_village_asset_count(
-                        state, district, block, writer, xlsx_file, start_year, end_year
+            try:
+                # Process the data based on workspace
+                if workspace == "terrain":
+                    create_excel_for_terrain(geojson_data, xlsx_file, writer)
+                elif (
+                    workspace == "terrain_lulc"
+                    and layer_name == f"{district}_{block}_lulc_slope"
+                ):
+                    create_excel_for_terrain_lulc_slope(geojson_data, xlsx_file, writer)
+                elif (
+                    workspace == "terrain_lulc"
+                    and layer_name == f"{district}_{block}_lulc_plain"
+                ):
+                    create_excel_for_terrain_lulc_plain(geojson_data, xlsx_file, writer)
+                elif workspace == "swb":
+                    create_excel_for_swb(
+                        geojson_data, xlsx_file, writer, start_year, end_year
                     )
-                except Exception as e:
-                    print("Exception as e", str(e))
+                    create_excel_for_mws_intersect_swb(geojson_data, writer)
+                elif workspace == "nrega_assets":
+                    mws_lay_name = f"deltaG_well_depth_{district}_{block}"
 
-            elif workspace == "crop_intensity":
-                create_excel_crop_inten(
-                    geojson_data, xlsx_file, writer, start_year, end_year
-                )
-            elif workspace in {f"cropping_drought", "drought"}:
-                create_excel_crop_drou(
-                    geojson_data, xlsx_file, writer, start_year, end_year
-                )
-            elif (
-                workspace == "mws_layers"
-                and layer_name == f"deltaG_well_depth_{district}_{block}"
-            ):
-                parsed_data_annual_mws = parse_geojson_annual_mws(geojson_data)
-                create_excel_annual_mws(parsed_data_annual_mws, xlsx_file, writer)
-                try:
-                    create_excel_mws_inters_villages(
-                        geojson_data, xlsx_file, writer, district, block
+                    try:
+                        mws_geojson_datas = fetch_layer_geojson("mws_layers", mws_lay_name)
+                    except Exception as e:
+                        print(f"Failed to fetch MWS data: {e}")
+                        continue
+
+                    create_excel_for_nrega_assets(
+                        geojson_data,
+                        mws_geojson_datas,
+                        xlsx_file,
+                        writer,
+                        start_year,
+                        end_year,
                     )
-                except Exception as e:
-                    print("Exception", str(e))
-            elif (
-                workspace == "mws_layers"
-                and layer_name == f"deltaG_fortnight_{district}_{block}"
-            ):
-                processed_data = [
-                    process_feature(feature) for feature in geojson_data["features"]
-                ]
-                create_excel_seas_mws(
-                    processed_data, xlsx_file, writer, start_year, end_year
-                )
-            elif workspace == "panchayat_boundaries":
-                create_excel_for_village_boun(geojson_data, writer)
-                create_excel_for_village_gp_mapping(geojson_data, writer)
+                    try:
+                        fetch_village_asset_count(
+                            state, district, block, writer, xlsx_file, start_year, end_year
+                        )
+                    except Exception as e:
+                        print("Exception as e", str(e))
 
-            elif workspace == "drought_causality":
-                create_excel_for_drought_causality(
-                    geojson_data, xlsx_file, writer, start_year, end_year
+                elif workspace == "crop_intensity":
+                    create_excel_crop_inten(
+                        geojson_data, xlsx_file, writer, start_year, end_year
+                    )
+                elif workspace in {f"cropping_drought", "drought"}:
+                    create_excel_crop_drou(
+                        geojson_data, xlsx_file, writer, start_year, end_year
+                    )
+                elif (
+                    workspace == "mws_layers"
+                    and layer_name == f"deltaG_well_depth_{district}_{block}"
+                ):
+                    parsed_data_annual_mws = parse_geojson_annual_mws(geojson_data)
+                    create_excel_annual_mws(parsed_data_annual_mws, xlsx_file, writer)
+                    try:
+                        create_excel_mws_inters_villages(
+                            geojson_data, xlsx_file, writer, district, block
+                        )
+                    except Exception as e:
+                        print("Exception", str(e))
+                elif (
+                    workspace == "mws_layers"
+                    and layer_name == f"deltaG_fortnight_{district}_{block}"
+                ):
+                    processed_data = [
+                        process_feature(feature) for feature in geojson_data["features"]
+                    ]
+                    create_excel_seas_mws(
+                        processed_data, xlsx_file, writer, start_year, end_year
+                    )
+                elif workspace == "panchayat_boundaries":
+                    create_excel_for_village_boun(geojson_data, writer)
+                    create_excel_for_village_gp_mapping(geojson_data, writer)
+
+                elif workspace == "drought_causality":
+                    create_excel_for_drought_causality(
+                        geojson_data, xlsx_file, writer, start_year, end_year
+                    )
+                elif workspace == "tree_ccd_vector":
+                    create_excel_for_ccd(
+                        geojson_data, xlsx_file, writer, start_year, end_year
+                    )
+                elif workspace == "canopy_height_vector":
+                    create_excel_for_ch(
+                        geojson_data, xlsx_file, writer, start_year, end_year
+                    )
+                elif workspace == "tree_overall_vector":
+                    create_excel_for_overall_tree_change(geojson_data, xlsx_file, writer)
+                elif (
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Afforestation"
+                ):
+                    create_excel_chan_detection_afforestation(
+                        geojson_data, xlsx_file, writer
+                    )
+                elif (
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_CropIntensity"
+                ):
+                    create_excel_chan_detection_cropintensity(
+                        geojson_data, xlsx_file, writer
+                    )
+                elif (
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Deforestation"
+                ):
+                    create_excel_chan_detection_deforestation(
+                        geojson_data, xlsx_file, writer
+                    )
+                elif (
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Degradation"
+                ):
+                    create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
+                elif (
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_Urbanization"
+                ):
+                    create_excel_chan_detection_urbanization(
+                        geojson_data, xlsx_file, writer
+                    )
+                elif (
+                    workspace == "change_detection"
+                    and layer_name == f"change_vector_{district}_{block}_ShrubChange"
+                ):
+                    create_excel_change_detection_ShrubChange(geojson_data, writer)
+                elif workspace == "restoration":
+                    create_excel_for_restoration(geojson_data, xlsx_file, writer)
+                elif workspace == "aquifer":
+                    create_excel_for_aquifer(geojson_data, writer)
+                elif workspace == "soge":
+                    soge_dfs.append(build_soge_df(geojson_data, start_year, layer_name))
+                elif workspace == "lcw":
+                    create_excel_for_lcw(geojson_data, writer)
+                elif workspace == "agroecological":
+                    create_excel_for_agroecological(geojson_data, writer)
+                elif workspace == "factory_csr":
+                    create_excel_for_factory_csr(geojson_data, writer)
+                elif workspace == "green_credit":
+                    create_excel_for_green_credit(geojson_data, writer)
+                elif workspace == "mining":
+                    create_excel_for_mining(geojson_data, writer)
+                elif workspace == "stream_order":
+                    create_excel_for_stream_order(geojson_data, writer)
+                elif workspace == "mws_connectivity":
+                    create_excel_for_mws_connectivity(geojson_data, writer)
+                elif workspace == "mws":
+                    create_excel_for_mws(geojson_data, writer)
+                elif workspace == "facilities_proximity":
+                    create_excel_for_facilities(geojson_data, writer)
+                elif workspace == "dem":
+                    create_excel_for_dem(geojson_data, writer)
+                elif workspace == "canal":
+                    create_excel_for_canal(geojson_data, writer)
+                elif workspace == "river":
+                    create_excel_for_river(geojson_data, writer)
+                elif workspace == "lulc_vector":
+                    create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
+                elif workspace == "drainage_density":
+                    create_excel_for_drainage_density(geojson_data, writer)
+                elif workspace == "antyodaya_2020":
+                    create_excel_for_antyodaya_20(geojson_data, writer)
+                elif workspace == "livestocks":
+                    create_excel_for_livestock(geojson_data, writer)
+                elif workspace == "soil_type":
+                    create_excel_for_soil_type(geojson_data, writer)
+                elif workspace == "soil_health_vector":
+                    create_excel_for_soil_health(geojson_data, writer)
+                elif workspace == "forest_fringes":
+                    create_excel_for_forest_fringe(geojson_data, writer)
+                elif workspace == "tree_in_grassland":
+                    create_excel_for_tree_in_grassland(geojson_data, writer)
+                elif (
+                    workspace == "ndvi_timeseries"
+                    and layer_name == f"ndvi_timeseries_{district}_{block}_shrub"
+                ):
+                    shrub_df = create_excel_for_ndvi(geojson_data, "shrub_trend")
+                elif (
+                    workspace == "ndvi_timeseries"
+                    and layer_name == f"ndvi_timeseries_{district}_{block}_tree"
+                ):
+                    tree_df = create_excel_for_ndvi(geojson_data, "tree_trend")
+                elif (
+                    workspace == "ndvi_timeseries"
+                    and layer_name == f"ndvi_timeseries_{district}_{block}_crop"
+                ):
+                    crop_df = create_excel_for_ndvi(geojson_data, "crop_trend")
+                elif workspace == "forest_fire":
+                    create_excel_for_forest_fire(geojson_data, writer)
+            except Exception as e:
+                # With an alternative source (e.g. GEE) a schema surprise in one
+                # layer must not abort the whole workbook; GeoServer runs keep
+                # the original fail-fast behaviour.
+                if _layer_source.get() is None:
+                    raise
+                print(f"Failed to build sheet for {layer_name}: {e}")
+                results.append(
+                    {
+                        "layer": layer_name,
+                        "status": "failed",
+                        "workspace": workspace,
+                        "reason": f"sheet builder error: {e}",
+                    }
                 )
-            elif workspace == "tree_ccd_vector":
-                create_excel_for_ccd(
-                    geojson_data, xlsx_file, writer, start_year, end_year
-                )
-            elif workspace == "canopy_height_vector":
-                create_excel_for_ch(
-                    geojson_data, xlsx_file, writer, start_year, end_year
-                )
-            elif workspace == "tree_overall_vector":
-                create_excel_for_overall_tree_change(geojson_data, xlsx_file, writer)
-            elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Afforestation"
-            ):
-                create_excel_chan_detection_afforestation(
-                    geojson_data, xlsx_file, writer
-                )
-            elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_CropIntensity"
-            ):
-                create_excel_chan_detection_cropintensity(
-                    geojson_data, xlsx_file, writer
-                )
-            elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Deforestation"
-            ):
-                create_excel_chan_detection_deforestation(
-                    geojson_data, xlsx_file, writer
-                )
-            elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Degradation"
-            ):
-                create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
-            elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_Urbanization"
-            ):
-                create_excel_chan_detection_urbanization(
-                    geojson_data, xlsx_file, writer
-                )
-            elif (
-                workspace == "change_detection"
-                and layer_name == f"change_vector_{district}_{block}_ShrubChange"
-            ):
-                create_excel_change_detection_ShrubChange(geojson_data, writer)
-            elif workspace == "restoration":
-                create_excel_for_restoration(geojson_data, xlsx_file, writer)
-            elif workspace == "aquifer":
-                create_excel_for_aquifer(geojson_data, writer)
-            elif workspace == "soge":
-                soge_dfs.append(build_soge_df(geojson_data, start_year, layer_name))
-            elif workspace == "lcw":
-                create_excel_for_lcw(geojson_data, writer)
-            elif workspace == "agroecological":
-                create_excel_for_agroecological(geojson_data, writer)
-            elif workspace == "factory_csr":
-                create_excel_for_factory_csr(geojson_data, writer)
-            elif workspace == "green_credit":
-                create_excel_for_green_credit(geojson_data, writer)
-            elif workspace == "mining":
-                create_excel_for_mining(geojson_data, writer)
-            elif workspace == "stream_order":
-                create_excel_for_stream_order(geojson_data, writer)
-            elif workspace == "mws_connectivity":
-                create_excel_for_mws_connectivity(geojson_data, writer)
-            elif workspace == "mws":
-                create_excel_for_mws(geojson_data, writer)
-            elif workspace == "facilities_proximity":
-                create_excel_for_facilities(geojson_data, writer)
-            elif workspace == "dem":
-                create_excel_for_dem(geojson_data, writer)
-            elif workspace == "canal":
-                create_excel_for_canal(geojson_data, writer)
-            elif workspace == "river":
-                create_excel_for_river(geojson_data, writer)
-            elif workspace == "lulc_vector":
-                create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
-            elif workspace == "drainage_density":
-                create_excel_for_drainage_density(geojson_data, writer)
-            elif workspace == "antyodaya_2020":
-                create_excel_for_antyodaya_20(geojson_data, writer)
-            elif workspace == "livestocks":
-                create_excel_for_livestock(geojson_data, writer)
-            elif workspace == "soil_type":
-                create_excel_for_soil_type(geojson_data, writer)
-            elif workspace == "soil_health_vector":
-                create_excel_for_soil_health(geojson_data, writer)
-            elif workspace == "forest_fringes":
-                create_excel_for_forest_fringe(geojson_data, writer)
-            elif workspace == "tree_in_grassland":
-                create_excel_for_tree_in_grassland(geojson_data, writer)
-            elif (
-                workspace == "ndvi_timeseries"
-                and layer_name == f"ndvi_timeseries_{district}_{block}_shrub"
-            ):
-                shrub_df = create_excel_for_ndvi(geojson_data, "shrub_trend")
-            elif (
-                workspace == "ndvi_timeseries"
-                and layer_name == f"ndvi_timeseries_{district}_{block}_tree"
-            ):
-                tree_df = create_excel_for_ndvi(geojson_data, "tree_trend")
-            elif (
-                workspace == "ndvi_timeseries"
-                and layer_name == f"ndvi_timeseries_{district}_{block}_crop"
-            ):
-                crop_df = create_excel_for_ndvi(geojson_data, "crop_trend")
-            elif workspace == "forest_fire":
-                create_excel_for_forest_fire(geojson_data, writer)
+                continue
             results.append(
                 {"layer": layer_name, "status": "success", "workspace": workspace}
             )
@@ -311,6 +382,10 @@ def get_vector_layer_geoserver(state, district, block, specific_sheets=None):
                 if hasattr(writer, "sheets") and "ndvi_shrub" in writer.sheets:
                     del writer.sheets["ndvi_shrub"]
                 print("Deleted existing 'ndvi_shrub' sheet")
+        if not writer.sheets:
+            pd.DataFrame(
+                {"Message": ["No data available for the selected layers."]}
+            ).to_excel(writer, sheet_name="No data", index=False)
     return results
 
 
@@ -1789,14 +1864,12 @@ def create_excel_change_detection_ShrubChange(data, writer):
 def create_excel_mws_inters_villages(mws_geojson, xlsx_file, writer, district, block):
     print("Inside create_excel_mws_inters_villages")
     admin_layer_name = district + "_" + block
-    admin_file_url = get_url("panchayat_boundaries", admin_layer_name)
 
-    response = requests.get(admin_file_url)
-    if response.status_code != 200:
-        print(f"Error fetching data: {response.status_code}")
+    try:
+        village_geojson = fetch_layer_geojson("panchayat_boundaries", admin_layer_name)
+    except Exception as e:
+        print(f"Error fetching data: {e}")
         return
-
-    village_geojson = response.json()
 
     def calculate_intersection_area_ha(village_geom, mws_geom, mws_area_ha):
         if village_geom.intersects(mws_geom):
@@ -2341,19 +2414,26 @@ def fetch_village_asset_count(
     state, district, block, writer, output_file, start_year, end_year
 ):
     # 1. Read village data
-    village_gdf = gpd.read_file(get_url("panchayat_boundaries", f"{district}_{block}"))[
-        ["vill_ID", "vill_name", "geometry"]
-    ].copy()
+    if _layer_source.get() is None:
+        village_gdf = gpd.read_file(
+            get_url("panchayat_boundaries", f"{district}_{block}")
+        )
+    else:
+        village_geojson = fetch_layer_geojson(
+            "panchayat_boundaries", f"{district}_{block}"
+        )
+        village_gdf = gpd.GeoDataFrame.from_features(
+            village_geojson["features"], crs="EPSG:4326"
+        )
+    village_gdf = village_gdf[["vill_ID", "vill_name", "geometry"]].copy()
     print("Village data loaded")
 
     # 2. Get NREGA data with timeout to prevent hanging
     try:
-        nrega_url = get_url("nrega_assets", f"{district}_{block}")
-        print(f"Fetching: {nrega_url}")
-
-        # Add timeout to prevent hanging
-        response = requests.get(nrega_url, timeout=120)
-        nrega_json = response.json()
+        print(f"Fetching NREGA assets for {district}_{block}")
+        nrega_json = fetch_layer_geojson(
+            "nrega_assets", f"{district}_{block}", timeout=120
+        )
         print("NREGA data fetched successfully")
 
     except Exception as e:

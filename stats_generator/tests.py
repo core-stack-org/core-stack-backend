@@ -1,9 +1,12 @@
 from io import BytesIO
+import os
+import tempfile
+from unittest.mock import patch
 
 import pandas as pd
 from django.test import SimpleTestCase
 
-from stats_generator.utils import create_excel_crop_inten
+from stats_generator.utils import create_excel_crop_inten, get_vector_layer_geoserver
 
 
 class CreateExcelCropIntensityTest(SimpleTestCase):
@@ -33,3 +36,30 @@ class CreateExcelCropIntensityTest(SimpleTestCase):
             areas_by_uid,
             {"gee": 75.0, "local": 125.5, "missing": 0.0},
         )
+
+
+class EmptyStatsWorkbookTest(SimpleTestCase):
+    def test_creates_informative_sheet_when_no_layers_are_written(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("stats_generator.utils.EXCEL_PATH", temp_dir):
+                with patch(
+                    "stats_generator.utils.fetch_layers_for_excel_generation",
+                    return_value=[],
+                ):
+                    results = get_vector_layer_geoserver(
+                        "jharkhand", "dumka", "masalia"
+                    )
+
+            workbook_path = os.path.join(
+                temp_dir,
+                "data",
+                "stats_excel_files",
+                "JHARKHAND",
+                "DUMKA",
+                "dumka_masalia.xlsx",
+            )
+            self.assertEqual(results, [])
+            with pd.ExcelFile(workbook_path) as workbook:
+                self.assertEqual(workbook.sheet_names, ["No data"])
+            message = pd.read_excel(workbook_path, sheet_name="No data").iloc[0, 0]
+            self.assertEqual(message, "No data available for the selected layers.")

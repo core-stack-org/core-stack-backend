@@ -19,7 +19,9 @@ from .services.gee_service import get_gee_map_config
 from .services.geoserver_service import get_geoserver_wms_config
 from .services.excel_comparison_service import (
     get_comparable_sheets,
+    get_multi_metric_slice,
     get_scatter_points,
+    get_workbook_analysis,
 )
 
 logger = logging.getLogger(__name__)
@@ -122,6 +124,20 @@ def excel_sheets_api(request):
 
 @login_required
 @require_GET
+def excel_analysis_api(request):
+    try:
+        state_id, district_id, block_id = _location_params(request)
+        location_names = _selected_location_names(state_id, district_id, block_id)
+        return JsonResponse(get_workbook_analysis(*location_names))
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        logger.exception("Could not analyse Excel files for selected location")
+        return JsonResponse({"error": "Could not analyse Excel files."}, status=500)
+
+
+@login_required
+@require_GET
 def excel_scatter_api(request):
     try:
         state_id, district_id, block_id = _location_params(request)
@@ -140,6 +156,28 @@ def excel_scatter_api(request):
     except Exception:
         logger.exception("Could not compare Excel values for selected location")
         return JsonResponse({"error": "Could not compare Excel values."}, status=500)
+
+
+@login_required
+@require_GET
+def excel_multi_api(request):
+    try:
+        state_id, district_id, block_id = _location_params(request)
+        sheet_name = request.GET.get("sheet", "").strip()
+        period = request.GET.get("period", "").strip() or None
+        if not sheet_name:
+            return JsonResponse({"error": "sheet is required."}, status=400)
+
+        location_names = _selected_location_names(state_id, district_id, block_id)
+        result = get_multi_metric_slice(*location_names, sheet_name, period=period)
+        return JsonResponse(result)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception:
+        logger.exception("Could not build multi-property slice for selected location")
+        return JsonResponse(
+            {"error": "Could not compare multi-property Excel values."}, status=500
+        )
 
 
 @login_required
