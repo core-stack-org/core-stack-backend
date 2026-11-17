@@ -122,6 +122,10 @@ Zonal reduction at 1 km MODIS scale:
 | Peak FRP | `Mean` applied to max image |
 | Fire Count | `Sum` |
 
+For fire count, annual averages are first summed spatially within each MWS.
+The MWS sum is set to `0` only when that average multiplied by the number of
+years is less than `1`; no cutoff is applied to individual pixels.
+
 Watersheds with no fire activity receive `0` (no null propagation):
 ```python
 ee.Algorithms.If(ee.Algorithms.IsEqual(val, None), 0, val)
