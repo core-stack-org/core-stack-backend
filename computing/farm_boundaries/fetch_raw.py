@@ -118,6 +118,10 @@ async def _fetch_one_cell_async(
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
+                # 404 = Google has no landscape data for this cell: a valid
+                # "nothing here" answer, not a failure to retry.
+                if response.status == 404:
+                    return {"token": token, "status": "empty"}
                 response.raise_for_status()
 
                 if not await response.read():
