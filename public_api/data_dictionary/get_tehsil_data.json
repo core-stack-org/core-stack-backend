@@ -5877,6 +5877,10 @@
       "village_name": {
         "type": "string",
         "description": "Village Name"
+      },
+      "LGD_village_id": {
+        "type": "integer",
+        "description": "LGD Village ID"
       }
     }
   }
