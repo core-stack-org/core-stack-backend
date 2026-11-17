@@ -14,6 +14,7 @@ from computing.soil_health.soil_health_helper import (
     lulc_area_stats_for_geometries,
 )
 from computing.utils import save_layer_info_to_db
+from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
     PROJECT_ROOT,
@@ -46,14 +47,19 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 def _get_lulc_mask_classes(nutrient):
     nutrient = str(nutrient).strip().upper()
     if nutrient == "OC_OLM":
-        return {6, 12}
+        return {LulcClass.TREES, LulcClass.SHRUBS_SCRUBS, LulcClass.PLANTATION}
     if nutrient in {
         "N",
         "P",
         "K",
         "OC",
     }:
-        return {8, 9, 10, 11}
+        return {
+            LulcClass.SINGLE_KHARIF,
+            LulcClass.SINGLE_NON_KHARIF,
+            LulcClass.DOUBLE_CROPPING,
+            LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+        }
     raise ValueError(f"Unsupported nutrient for LULC masking: {nutrient}")
 
 

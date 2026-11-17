@@ -235,7 +235,9 @@ def get_lulc_mode(lulc_sources, district, scale):
         )
 
     # Extract only tree class pixels as binary mask
-    tree = (modal == LulcClass.TREES).astype(np.uint8)
+    tree = ((modal == LulcClass.TREES) | (modal == LulcClass.PLANTATION)).astype(
+        np.uint8
+    )
     return tree, transform, profile
 
 
