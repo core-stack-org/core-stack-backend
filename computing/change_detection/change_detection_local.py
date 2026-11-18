@@ -103,7 +103,7 @@ SHRUB_REMAP = {
 }
 
 
-def _build_lookup_table(mapping, size=13):
+def _build_lookup_table(mapping, size=14):
     lookup = np.zeros(size, dtype=np.int16)
     for source_value, mapped_value in mapping.items():
         lookup[source_value] = mapped_value

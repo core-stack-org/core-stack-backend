@@ -10,7 +10,8 @@ from rasterio.features import shapes, rasterize
 from shapely.geometry import shape
 from rasterio.enums import Resampling
 from rasterio.warp import reproject
-from computing.config_loader import LULC_BASE_DIR, PROJECT_ROOT
+from computing.config_loader import PROJECT_ROOT
+from computing.local_compute_helper import resolve_lulc_raster_paths
 from rasterio.merge import merge
 from glob import glob
 from math import floor
@@ -120,11 +121,11 @@ def generate_ltp_stp_local(self, start_year, end_year, scale=25):
             os.makedirs(output_dir, exist_ok=True)
 
             # Open LULC source files for the 3-year window
-            lulc_sources = []
-
-            for y in lulc_years:
-                lulc_file = f"data/base_layers/lulc/lulc_v3_{y}_{y+1}.tif"
-                lulc_sources.append(rasterio.open(lulc_file))
+            lulc_paths = resolve_lulc_raster_paths(
+                start_year=min(lulc_years),
+                end_year=max(lulc_years),
+            )
+            lulc_sources = [rasterio.open(lulc_path) for lulc_path in lulc_paths]
 
             # Generate LTP/STP rasters for each district in the ACZ
             generate_district_tiff(

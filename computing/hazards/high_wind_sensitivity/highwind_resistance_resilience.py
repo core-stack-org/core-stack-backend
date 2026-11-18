@@ -1,7 +1,12 @@
 import ee
 from datetime import date
 
-from utilities.constants import AEZ
+from utilities.constants import (
+    AEZ,
+    HYBRID_TREE_MASK_GEE_PATH,
+    WIND_RT_RE_OUTPUT_GEE_PATH,
+    WIND_INDEX_OUTPUT_GEE_PATH,
+)
 from utilities.gee_utils import (
     is_gee_asset_exists,
     export_raster_asset_to_gee,
@@ -50,11 +55,11 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
             "cannot infer a safe default."
         )
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
-    WIND_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/wind_index/wind_index_AEZ_{aez}"
+    TREE_COVER_ASSET = f"{HYBRID_TREE_MASK_GEE_PATH}{aez}_{str(2004)}_{str(end_year)}"
+    WIND_INDEX_ASSET = f"{WIND_INDEX_OUTPUT_GEE_PATH}/wind_index_AEZ_{aez}"
 
     OUTPUT_DESC = f"wind_metrics_harmonized_kNDVI_AEZ_{aez}"
-    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/wind_Rt_Re/{OUTPUT_DESC}"
+    OUTPUT_ASSET_ID = f"{WIND_RT_RE_OUTPUT_GEE_PATH}/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID
@@ -117,12 +122,6 @@ def high_wind_sensitivity(aez, start_year=2004, end_year=None, gee_account_id=No
         )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
-    # Loading the assets :=
 
     treeMeta = ee.Image(TREE_COVER_ASSET)
     startYear = treeMeta.select("start_year")
@@ -385,10 +384,9 @@ def classify_wind_metrics(aez, start_year=2004, end_year=None, gee_account_id=No
     if end_year is None:
         raise ValueError("end_year must be specified explicitly.")
 
-    root = "projects/corestack-datasets-alpha/assets/datasets/hazards/wind_Rt_Re"
-    yearly_id = f"{root}/wind_metrics_harmonized_kNDVI_AEZ_{aez}"
+    yearly_id = f"{WIND_RT_RE_OUTPUT_GEE_PATH}/wind_metrics_harmonized_kNDVI_AEZ_{aez}"
     output_desc = f"wind_metrics_classmean_AEZ_{aez}"
-    output_id = f"{root}/{output_desc}"
+    output_id = f"{WIND_RT_RE_OUTPUT_GEE_PATH}/{output_desc}"
     if is_gee_asset_exists(output_id):
         return None
     if not is_gee_asset_exists(yearly_id):
@@ -396,11 +394,6 @@ def classify_wind_metrics(aez, start_year=2004, end_year=None, gee_account_id=No
 
     img = ee.Image(yearly_id)
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
     final_output = _mean_classes(img, start_year, end_year).clip(aoi)
     return export_raster_asset_to_gee(
         final_output, output_desc, output_id, scale=30, region=aoi

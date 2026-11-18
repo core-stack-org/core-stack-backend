@@ -1,7 +1,12 @@
 import ee
 from datetime import date
 
-from utilities.constants import AEZ
+from utilities.constants import (
+    AEZ,
+    HYBRID_TREE_MASK_GEE_PATH,
+    FIRE_INDEX_OUTPUT_GEE_PATH,
+    FIRE_RT_RE_OUTPUT_GEE_PATH,
+)
 from utilities.gee_utils import (
     export_raster_asset_to_gee,
     is_gee_asset_exists,
@@ -42,12 +47,12 @@ from utilities.gee_utils import (
 def forest_fire_sensitivity(aez, start_year=2004, end_year=2024, gee_account_id=None):
     ee_initialize(gee_account_id)
 
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
+    TREE_COVER_ASSET = f"{HYBRID_TREE_MASK_GEE_PATH}{aez}_{str(2004)}_{str(end_year)}"
 
-    FIRE_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/fire_index/fire_index_FRP30_AEZ_{aez}"
+    FIRE_INDEX_ASSET = f"{FIRE_INDEX_OUTPUT_GEE_PATH}/fire_index_FRP30_AEZ_{aez}"
 
     OUTPUT_DESC = f"fire_metrics_harmonized_kNDVI_AEZ_{aez}"
-    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/fire_Rt_Re/{OUTPUT_DESC}"
+    OUTPUT_ASSET_ID = f"{FIRE_RT_RE_OUTPUT_GEE_PATH}/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID
@@ -90,11 +95,7 @@ def forest_fire_sensitivity(aez, start_year=2004, end_year=2024, gee_account_id=
         )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
+
     # Tree-mask asset names embed end_year and auto-version; fire-index
     # asset names don't, and silently no-op on re-run unless deleted first
     # (see is_gee_asset_exists guard in fire_index). That mismatch means
@@ -387,10 +388,9 @@ def classify_fire_metrics(aez, start_year=2004, end_year=None, gee_account_id=No
     if end_year is None:
         raise ValueError("end_year must be specified explicitly.")
 
-    root = "projects/corestack-datasets-alpha/assets/datasets/hazards/fire_Rt_Re"
-    yearly_id = f"{root}/fire_metrics_harmonized_kNDVI_AEZ_{aez}"
+    yearly_id = f"{FIRE_RT_RE_OUTPUT_GEE_PATH}/fire_metrics_harmonized_kNDVI_AEZ_{aez}"
     output_desc = f"fire_metrics_classmean_AEZ_{aez}"
-    output_id = f"{root}/{output_desc}"
+    output_id = f"{FIRE_RT_RE_OUTPUT_GEE_PATH}/{output_desc}"
     if is_gee_asset_exists(output_id):
         return None
     if not is_gee_asset_exists(yearly_id):
@@ -398,11 +398,6 @@ def classify_fire_metrics(aez, start_year=2004, end_year=None, gee_account_id=No
 
     img = ee.Image(yearly_id)
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
     final_output = _mean_classes(img, start_year, end_year).clip(aoi)
     return export_raster_asset_to_gee(
         final_output, output_desc, output_id, scale=30, region=aoi
