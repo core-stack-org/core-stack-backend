@@ -1218,7 +1218,7 @@ def asset_config_namespace(
         overwrite=overwrite,
         reports_dir=(
             reports_dir_override
-            or Path(standard_override.get("reports_dir") or output.get("reports_dir", "data/admin-boundary/cs_asset_reports"))
+            or Path(standard_override.get("reports_dir") or output.get("reports_dir", "data/base_layers/admin-boundary/cs_asset_reports"))
         ),
         chunk_size=chunk_size_override or int(processing.get("chunk_size", DEFAULT_CHUNK_SIZE)),
         no_match_status=not bool(output.get("include_match_status", False)),

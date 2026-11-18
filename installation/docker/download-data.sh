@@ -7,7 +7,8 @@ DATA_DIR="${DATA_DIR:-/var/tmp/core-stack-data}"
 BACKEND_DIR="${BACKEND_DIR:-/app}"
 APP_ENV_FILE="${APP_ENV_FILE:-$BACKEND_DIR/nrm_app/.env}"
 ENV_TEMPLATE="${ENV_TEMPLATE:-$BACKEND_DIR/installation/docker/env.template}"
-ADMIN_DIR="$DATA_DIR/admin-boundary"
+ADMIN_DIR="$DATA_DIR/base_layers/admin-boundary"
+LEGACY_ADMIN_DIR="$DATA_DIR/admin-boundary"
 ARCHIVE="$DATA_DIR/dataset.7z"
 EXTRACT="$DATA_DIR/.admin-boundary-extract"
 FILE_ID="${ADMIN_BOUNDARY_GDRIVE_ID:-1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d}"
@@ -15,6 +16,19 @@ FILE_ID="${ADMIN_BOUNDARY_GDRIVE_ID:-1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d}"
 admin_boundary_ready() {
     [ -f "$ADMIN_DIR/input/soi_tehsil.geojson" ] \
         && find "$ADMIN_DIR/input" -mindepth 2 -name '*.geojson' -print -quit 2>/dev/null | grep -q .
+}
+
+# Older releases kept the dataset at $DATA_DIR/admin-boundary.
+migrate_legacy_layout() {
+    [ -d "$LEGACY_ADMIN_DIR" ] && [ -n "$(ls -A "$LEGACY_ADMIN_DIR" 2>/dev/null)" ] || return 0
+    if [ -d "$ADMIN_DIR" ] && [ -n "$(ls -A "$ADMIN_DIR" 2>/dev/null)" ]; then
+        echo "WARNING: both $LEGACY_ADMIN_DIR and $ADMIN_DIR exist; using $ADMIN_DIR."
+        return 0
+    fi
+    echo "Moving admin-boundary data from $LEGACY_ADMIN_DIR to $ADMIN_DIR ..."
+    mkdir -p "$(dirname "$ADMIN_DIR")"
+    rm -rf "$ADMIN_DIR"
+    mv "$LEGACY_ADMIN_DIR" "$ADMIN_DIR"
 }
 
 normalize_nested_layout() {
@@ -43,7 +57,7 @@ place_extraction() {
     fi
 
     rm -rf "$ADMIN_DIR"
-    mkdir -p "$DATA_DIR"
+    mkdir -p "$(dirname "$ADMIN_DIR")"
     if [ -z "$candidate" ]; then
         echo "ERROR: could not detect admin-boundary layout under $EXTRACT"
         return 1
@@ -96,6 +110,8 @@ download_admin_boundary() {
         return 0
     fi
 
+    migrate_legacy_layout
+
     if [ "${FORCE_DATA_DOWNLOAD:-0}" != "1" ] && admin_boundary_ready; then
         echo "Admin-boundary data already present at $ADMIN_DIR"
         return 0
@@ -116,7 +132,7 @@ download_admin_boundary() {
     if [ "${FORCE_DATA_DOWNLOAD:-0}" != "1" ] && [ -f "$ARCHIVE" ]; then
         echo "Using existing archive $ARCHIVE"
     else
-        echo "Downloading admin-boundary dataset (~600 MB, first run only)..."
+        echo "Downloading admin-boundary dataset (~8 GB extracted, first run only)..."
         python -c "import gdown" 2>/dev/null || python -m pip install --quiet --user gdown
         rm -f "$ARCHIVE" "$ARCHIVE.part"
         gdown "$FILE_ID" -O "$ARCHIVE.part"
