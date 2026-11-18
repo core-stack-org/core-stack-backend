@@ -765,13 +765,13 @@ function directory_has_contents() {
 }
 
 function admin_boundary_data_present() {
-    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/base_layers/admin-boundary"
     [ -f "$admin_boundary_dir/input/soi_tehsil.geojson" ] && \
         find "$admin_boundary_dir/input" -mindepth 2 -name '*.geojson' -print -quit 2>/dev/null | grep -q .
 }
 
 function nested_admin_boundary_data_present() {
-    local nested_admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary/admin-boundary"
+    local nested_admin_boundary_dir="$CORE_STACK_DATA_DIR/base_layers/admin-boundary/admin-boundary"
     [ -f "$nested_admin_boundary_dir/input/soi_tehsil.geojson" ] && \
         find "$nested_admin_boundary_dir/input" -mindepth 2 -name '*.geojson' -print -quit 2>/dev/null | grep -q .
 }
@@ -790,9 +790,29 @@ function move_directory_contents() {
     shopt -u dotglob nullglob
 }
 
+# Older releases kept the dataset at data/admin-boundary. Move it into
+# data/base_layers/admin-boundary instead of downloading it again.
+function migrate_legacy_admin_boundary_data() {
+    local legacy_dir="$CORE_STACK_DATA_DIR/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/base_layers/admin-boundary"
+
+    directory_has_contents "$legacy_dir" || return 0
+    if directory_has_contents "$admin_boundary_dir"; then
+        echo "WARNING: both $legacy_dir and $admin_boundary_dir exist; using $admin_boundary_dir."
+        return 0
+    fi
+
+    echo "Moving admin-boundary data from $legacy_dir to $admin_boundary_dir ..."
+    mkdir -p "$(dirname "$admin_boundary_dir")"
+    rm -rf "$admin_boundary_dir"
+    mv "$legacy_dir" "$admin_boundary_dir"
+}
+
 function normalize_existing_admin_boundary_data() {
-    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/base_layers/admin-boundary"
     local nested_admin_boundary_dir="$admin_boundary_dir/admin-boundary"
+
+    migrate_legacy_admin_boundary_data
 
     if admin_boundary_data_present; then
         mark_step_complete "admin_boundary_data"
@@ -830,7 +850,7 @@ function normalize_existing_admin_boundary_data() {
 
 function finalize_admin_boundary_extraction() {
     local extracted_root="$1"
-    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/base_layers/admin-boundary"
     local candidate_dir=""
     local first_child=""
 
@@ -2138,7 +2158,7 @@ function install_gdown_if_missing() {
 
 function download_admin_boundary_data() {
     local force="${1:-0}"
-    local admin_boundary_dir="$CORE_STACK_DATA_DIR/admin-boundary"
+    local admin_boundary_dir="$CORE_STACK_DATA_DIR/base_layers/admin-boundary"
     local archive_path="$CORE_STACK_DATA_DIR/dataset.7z"
     local extraction_root="$CORE_STACK_DATA_DIR/.admin-boundary-extract"
     local fileid="1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d"

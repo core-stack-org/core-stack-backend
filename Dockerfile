@@ -24,6 +24,7 @@ COPY installation/environment.yml /tmp/environment.yml
 RUN micromamba create -y -n corestackenv -f /tmp/environment.yml \
     && micromamba clean --all --yes \
     && rm -f /tmp/environment.yml
+RUN micromamba run -n corestackenv python -m pip install --no-cache-dir whitenoise==6.9.0
 
 ENV PATH="/opt/conda/envs/corestackenv/bin:${PATH}" \
     MAMBA_DEFAULT_ENV=corestackenv

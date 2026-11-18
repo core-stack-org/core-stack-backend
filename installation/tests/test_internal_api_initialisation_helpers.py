@@ -36,7 +36,7 @@ class InternalApiInitialisationHelperTests(unittest.TestCase):
             state="assam",
             district="baksa",
             block="tamulpur",
-            source_file=init_test.ROOT_DIR / "data" / "admin-boundary" / "input" / "assam" / "baksa.geojson",
+            source_file=init_test.ADMIN_BOUNDARY_INPUT_DIR / "assam" / "baksa.geojson",
         )
         result = init_test.build_next_step_guidance(
             require_gee=True,

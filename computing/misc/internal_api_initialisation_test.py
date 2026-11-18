@@ -14,7 +14,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
-from utilities.constants import FIRST_COMPUTING_API_PATH, ADMIN_BOUNDARY_INPUT_DIR
+from utilities.constants import FIRST_COMPUTING_API_PATH
+from computing.config_loader import ADMIN_BOUNDARY_INPUT_DIR, ADMIN_BOUNDARY_OUTPUT_DIR
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -32,8 +33,6 @@ for env_name in (
     os.environ.setdefault(env_name, "1")
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "nrm_app.settings")
-
-ADMIN_BOUNDARY_INPUT_DIR = ROOT_DIR / "data" / "admin-boundary" / "input"
 
 SUCCESS_STATUSES = {200, 201, 202, 204, 301, 302, 400, 401, 403, 404, 405}
 
@@ -547,7 +546,7 @@ def run_admin_boundary_compute_check() -> tuple[CheckResult, SampleLocation | No
             CheckResult(
                 "FAIL",
                 "admin-boundary-compute",
-                "No usable admin-boundary sample was found under data/admin-boundary/input. "
+                "No usable admin-boundary sample was found under data/base_layers/admin-boundary/input. "
                 "Confirm that the installer finished the admin boundary step and that district "
                 "GeoJSON files are present.",
             ),
@@ -724,7 +723,7 @@ def run_first_computing_api_check(
 
     client = Client()
     client.raise_request_exception = False
-    output_state_dir = ROOT_DIR / "data" / "admin-boundary" / "output" / sample.state
+    output_state_dir = ADMIN_BOUNDARY_OUTPUT_DIR / sample.state
     output_prefix = (
         f"{valid_gee_text(sample.district.lower())}_"
         f"{valid_gee_text(sample.block.lower())}"
@@ -842,7 +841,7 @@ def build_next_step_guidance(
             "FAIL",
             "setup-next-step",
             "Finish the admin boundary setup first. Confirm that "
-            "`data/admin-boundary/input/soi_tehsil.geojson` and state-wise district files "
+            "`data/base_layers/admin-boundary/input/soi_tehsil.geojson` and state-wise district files "
             "exist, then rerun the installer or this initialisation test.",
         )
 

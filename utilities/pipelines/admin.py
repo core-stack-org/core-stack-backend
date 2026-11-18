@@ -355,7 +355,7 @@ class AdminSelection:
 
 
 class CSAdminSource:
-    """Fast selector for `data/admin-boundary/cs_admin_standard.gpkg`."""
+    """Fast selector for `data/base_layers/admin-boundary/cs_admin_standard.gpkg`."""
 
     def __init__(
         self,

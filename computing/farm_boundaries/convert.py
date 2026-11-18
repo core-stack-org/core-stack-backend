@@ -32,7 +32,10 @@ import pandas as pd
 from shapely.geometry import shape
 from shapely.validation import make_valid
 
-from utilities.constants import FARM_BOUNDARIES_PATH, SOI_TEHSIL
+from computing.farm_boundaries.tehsil_boundary import (
+    get_tehsil_polygon as _get_tehsil_polygon,
+)
+from utilities.constants import FARM_BOUNDARIES_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -55,22 +58,6 @@ DROUGHT_INDICATOR_COLUMNS = [
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-
-
-def _get_tehsil_polygon(state: str, district: str, block: str):
-    """Re-load the tehsil polygon (shared with fetch_raw.py)."""
-    soi = gpd.read_file(SOI_TEHSIL)
-    mask = (
-        (soi["STATE"].str.lower() == state)
-        & (soi["District"].str.lower() == district)
-        & (soi["TEHSIL"].str.lower() == block)
-    )
-    subset = soi[mask]
-    if subset.empty:
-        raise ValueError(
-            f"Tehsil not found: state={state}, district={district}, block={block}"
-        )
-    return subset.dissolve().geometry.iloc[0]
 
 
 def _raw_dir(state: str, district: str, block: str) -> str:
