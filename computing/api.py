@@ -98,7 +98,7 @@ from .local_compute_helper import (
     select_compute_task as _select_compute_task,
 )
 from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
-from .lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local_task
+from .lulc.clip_lulc_local import clip_lulc_local as clip_lulc_local_task
 from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
 from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
@@ -976,8 +976,8 @@ def lulc_v3_river_basin(request):
 @schema(None)
 @require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
-def lulc_v3(request):
-    logger.info("Inside lulc_v3 api.")
+def lulc_clip(request):
+    logger.info("Inside lulc_clip api.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -989,7 +989,7 @@ def lulc_v3(request):
         task = _select_compute_task(
             compute,
             clip_lulc_v3_gee_task,
-            clip_lulc_v3_local_task,
+            clip_lulc_local_task,
         )
         task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
@@ -999,10 +999,10 @@ def lulc_v3(request):
             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        logger.warning("Invalid request in lulc_v3 api: %s", e)
+        logger.warning("Invalid request in lulc_clip api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        logger.exception("Exception in lulc_v3 api")
+        logger.exception("Exception in lulc_clip api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

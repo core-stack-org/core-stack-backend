@@ -36,7 +36,7 @@ LULC_VECTOR_CLASS_DEFINITIONS = (
     {"value": 10, "label": "doubly_cropped_area_"},
     {"value": 11, "label": "triply_cropped_area_"},
     {"value": 12, "label": "shrub_scrub_area_"},
-    {"label": 13, "txt": "plantation_area_"},
+    {"value": 13, "label": "plantation_area_"},
 )
 
 
