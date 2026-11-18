@@ -156,7 +156,7 @@ it at the same path, for example as shown below.
 | Aquifer (102 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `aquifer/aquifer.geojson` |
 | Microwatersheds (5.4 GB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `static_layers/mws/Microwatershed_v2_with_details.geojson` |
 | SOI tehsils (316 MB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `admin_boundary/soi_tehsil.geojson` |
-| Tehsil watersheds | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `tehsil_watersheds/<state>/<district>/<tehsil>.gpkg` |
+| Tehsil mws | [Download](https://drive.google.com/drive/folders/1a88TsSH3wX16TXRgSnBNILyXj6DIuD6I) | `tehsil_mws/<state>/<district>/<block>/filtered_mws_<district>_<block>_uid.geojson` |
 | Runoff (164 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/runoff/` |
 | ET (114 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/et/` |
 | Pan-India annual hydrology (20 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/annual/` |
