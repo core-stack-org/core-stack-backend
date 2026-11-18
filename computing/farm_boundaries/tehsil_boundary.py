@@ -28,14 +28,8 @@ logger = logging.getLogger(__name__)
 GAP_CLOSE_TOLERANCE_DEG = 1e-5
 
 
-def get_tehsil_polygon(state: str, district: str, block: str):
-    """
-    Return the tehsil boundary as a single Shapely geometry in EPSG:4326
-    (all MWS polygons of the tehsil dissolved, hairline gaps closed).
-
-    Raises FileNotFoundError if the MWS file is missing, ValueError if it has
-    no features.
-    """
+def _resolve_mws_file(state: str, district: str, block: str):
+    """Path of the tehsil's MWS GeoJSON; FileNotFoundError listing candidates if absent."""
     candidates = tehsil_mws_file_candidates(
         os.path.join(BASE_DATA_DIR, "tehsil_mws"),
         state,
@@ -49,12 +43,39 @@ def get_tehsil_polygon(state: str, district: str, block: str):
             f"MWS boundary not found for {state}/{district}/{block}. "
             f"Expected one of: {[str(p) for p in candidates]}"
         )
+    return mws_path
 
+
+def _read_mws(state: str, district: str, block: str):
+    mws_path = _resolve_mws_file(state, district, block)
     mws = gpd.read_file(mws_path)
     if mws.empty:
         raise ValueError(f"MWS boundary file has no features: {mws_path}")
     if mws.crs is not None and mws.crs.to_epsg() != 4326:
         mws = mws.to_crs(4326)
+    return mws_path, mws
+
+
+def get_tehsil_bounds(state: str, district: str, block: str):
+    """
+    (minx, miny, maxx, maxy) of the tehsil's MWS layer in EPSG:4326 — the same
+    extent get_tehsil_polygon(...).bounds gives (gap closing does not move the
+    outer boundary) without the dissolve, so it is cheap enough to scan every
+    location.
+    """
+    _, mws = _read_mws(state, district, block)
+    return tuple(float(x) for x in mws.total_bounds)
+
+
+def get_tehsil_polygon(state: str, district: str, block: str):
+    """
+    Return the tehsil boundary as a single Shapely geometry in EPSG:4326
+    (all MWS polygons of the tehsil dissolved, hairline gaps closed).
+
+    Raises FileNotFoundError if the MWS file is missing, ValueError if it has
+    no features.
+    """
+    mws_path, mws = _read_mws(state, district, block)
 
     geom = mws.dissolve().geometry.iloc[0]
     closed = geom.buffer(GAP_CLOSE_TOLERANCE_DEG, join_style="mitre", mitre_limit=2.0).buffer(
