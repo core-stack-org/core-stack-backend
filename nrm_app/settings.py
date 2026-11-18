@@ -391,6 +391,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "stats_generator": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 

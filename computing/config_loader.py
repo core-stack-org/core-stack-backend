@@ -127,6 +127,11 @@ def _derived_layer(name: str) -> dict | None:
     return None
 
 
+def derived_layers() -> list[dict]:
+    """Raw `derived_layers` entries from config.yaml (read-only copy)."""
+    return [dict(layer) for layer in _cfg.get("derived_layers", [])]
+
+
 def _derived_output_dir(name: str) -> Path:
     layer = _derived_layer(name)
     if not layer:
