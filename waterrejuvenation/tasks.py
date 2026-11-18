@@ -389,6 +389,79 @@ def Upload_Desilting_Points(
             return None
         return val
 
+    def point_key(lat, lon, waterbody_name, intervention_year):
+        def coord(value):
+            if value is None:
+                return None
+            try:
+                return round(float(value), 6)
+            except (TypeError, ValueError):
+                return None
+
+        def text(value):
+            if value is None:
+                return ""
+            return str(value).strip().lower()
+
+        return (
+            coord(lat),
+            coord(lon),
+            text(waterbody_name),
+            text(intervention_year),
+        )
+
+    wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
+    proj_obj = Project.objects.get(pk=wb_obj.project_id)
+
+    df = pd.read_excel(wb_obj.file)
+    successful_keys = set()
+    failed_ids = {}
+    for log in WaterbodiesDesiltingLog.objects.filter(project=proj_obj).only(
+        "id", "lat", "lon", "waterbody_name", "intervention_year", "process"
+    ):
+        key = point_key(log.lat, log.lon, log.waterbody_name, log.intervention_year)
+        if log.process:
+            successful_keys.add(key)
+        else:
+            failed_ids[key] = log.id
+
+    new_rows = []
+    skipped_rows = 0
+    for index, row in df.iterrows():
+        lat = normalize(row.get("Latitude"))
+        lon = normalize(row.get("Longitude"))
+        waterbody_name = normalize(row.get("Name of the waterbody "))
+        intervention_year = normalize(row.get("Intervention_year"))
+        key = point_key(lat, lon, waterbody_name, intervention_year)
+        if key in successful_keys:
+            skipped_rows += 1
+            logger.info(
+                "Skipping desilting row %s for project %s; it is already processed.",
+                index,
+                proj_obj.id,
+            )
+            continue
+        existing_id = failed_ids.pop(key, None)
+        successful_keys.add(key)
+        new_rows.append(
+            (index, row, lat, lon, waterbody_name, intervention_year, existing_id)
+        )
+
+    if not new_rows:
+        logger.info(
+            "No new desilting rows for project %s. Marking upload %s processed.",
+            proj_obj.id,
+            wb_obj.id,
+        )
+        wb_obj.process = True
+        wb_obj.save(update_fields=["process"])
+        return {
+            "status": "no_new_rows",
+            "new_rows": 0,
+            "retried_rows": 0,
+            "skipped_rows": skipped_rows,
+        }
+
     if (is_processing_required or is_closest_wp) and (not start_date or not end_date):
         raise ValueError(
             "start_date and end_date are required when processing desilting points "
@@ -399,38 +472,39 @@ def Upload_Desilting_Points(
     if start_date and end_date:
         _, _, start_year, end_year = _resolve_zoi_time_window(start_date, end_date)
 
-    ee_initialize(gee_account_id)
+    ee_initialize(gee_account_id, strict=True)
 
-    wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
-    proj_obj = Project.objects.get(pk=wb_obj.project_id)
-
-    if wb_obj.process:
-        logger.warning("File already processed. Skipping.")
-        return
-
-    df = pd.read_excel(wb_obj.file)
     merged_features = []
+    created_rows = 0
+    retried_rows = 0
 
-    for index, row in df.iterrows():
+    for index, row, lat, lon, waterbody_name, intervention_year, existing_id in new_rows:
         print(row)
-        # -----------------------------
-        # Create DB row FIRST (lossless)
-        # -----------------------------
-        dsilting_obj_log = WaterbodiesDesiltingLog.objects.create(
-            name_of_ngo=normalize(row.get("Name of NGO")),
-            State=normalize(row.get("State")),
-            District=normalize(row.get("District")),
-            Taluka=normalize(row.get("Taluka")),
-            Village=normalize(row.get("Village")),
-            waterbody_name=normalize(row.get("Name of the waterbody ")),
-            lat=normalize(row.get("Latitude")),
-            lon=normalize(row.get("Longitude")),
-            slit_excavated=normalize(row.get("Silt Excavated as per App")),
-            intervention_year=normalize(row.get("Intervention_year")),
-            excel_hash=wb_obj.excel_hash,
-            project=proj_obj,
-            process=False,
-        )
+        row_values = {
+            "name_of_ngo": normalize(row.get("Name of NGO")),
+            "State": normalize(row.get("State")),
+            "District": normalize(row.get("District")),
+            "Taluka": normalize(row.get("Taluka")),
+            "Village": normalize(row.get("Village")),
+            "waterbody_name": waterbody_name,
+            "lat": lat,
+            "lon": lon,
+            "slit_excavated": normalize(row.get("Silt Excavated as per App")),
+            "intervention_year": intervention_year,
+            "excel_hash": wb_obj.excel_hash,
+            "project": proj_obj,
+            "process": False,
+            "failure_reason": None,
+        }
+        if existing_id:
+            dsilting_obj_log = WaterbodiesDesiltingLog.objects.get(pk=existing_id)
+            for field, value in row_values.items():
+                setattr(dsilting_obj_log, field, value)
+            dsilting_obj_log.save()
+            retried_rows += 1
+        else:
+            dsilting_obj_log = WaterbodiesDesiltingLog.objects.create(**row_values)
+            created_rows += 1
 
         # -----------------------------
         # Validate lat / lon
@@ -510,11 +584,10 @@ def Upload_Desilting_Points(
     # -----------------------------
     print(merged_features)
 
-    intersecting_mws_asset = (
-        ee.FeatureCollection(merged_features).flatten().distinct("uid")
-    )
-
-    if is_processing_required:
+    if is_processing_required and merged_features:
+        intersecting_mws_asset = (
+            ee.FeatureCollection(merged_features).flatten().distinct("uid")
+        )
         Generate_lulc_mws(
             intersecting_mws_asset=intersecting_mws_asset,
             is_lulc_required=is_lulc_required,
@@ -526,6 +599,12 @@ def Upload_Desilting_Points(
 
     wb_obj.process = True
     wb_obj.save(update_fields=["process"])
+    return {
+        "status": "processed",
+        "new_rows": created_rows,
+        "retried_rows": retried_rows,
+        "skipped_rows": skipped_rows,
+    }
 
 
 def Generate_lulc_mws(
