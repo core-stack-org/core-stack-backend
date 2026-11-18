@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import time
 import zipfile
 from datetime import datetime, timedelta
@@ -142,8 +143,9 @@ def convert_kml_to_shapefile(kml_path, output_dir, shapefile_name):
         output_dir + "/" + shapefile_name, shapefile_name + ".shp"
     )
     print("path path", shapefile_path)
-    cmd = f"ogr2ogr -f 'ESRI Shapefile' {shapefile_path} {kml_path}"  # output.shp input.kml
-    os.system(command=cmd)
+    subprocess.run(
+        ["ogr2ogr", "-f", "ESRI Shapefile", shapefile_path, kml_path], check=True
+    )
 
     return output_dir + "/" + shapefile_name
 

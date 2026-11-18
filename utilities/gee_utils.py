@@ -712,8 +712,20 @@ def upload_tif_to_gcs(gcs_file_name, local_file_path):
         + "_comp.tif"
     )
     print(out_path)
-    cmd = f"gdal_translate {local_file_path} {out_path} -co TILED=YES -co COPY_SRC_OVERVIEWS=YES -co COMPRESS=LZW"
-    os.system(command=cmd)
+    subprocess.run(
+        [
+            "gdal_translate",
+            local_file_path,
+            out_path,
+            "-co",
+            "TILED=YES",
+            "-co",
+            "COPY_SRC_OVERVIEWS=YES",
+            "-co",
+            "COMPRESS=LZW",
+        ],
+        check=True,
+    )
 
     blob.upload_from_filename(out_path)
 
