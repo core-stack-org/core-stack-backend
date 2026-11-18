@@ -85,7 +85,7 @@ def _resolve_latest_lulc_raster_paths(count=3, lulc_dir=LULC_BASE_DIR):
     if not lulc_dir.exists():
         return []
 
-    candidates = sorted(lulc_dir.glob("lulc_v3_*.tif"))
+    candidates = sorted(lulc_dir.glob("lulc_v4_*.tif"))
     if not candidates:
         return []
 
