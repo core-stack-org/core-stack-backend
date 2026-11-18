@@ -72,11 +72,17 @@ Leave everything else as it is for now.
 
 **4. Optional: download the admin boundaries yourself**
 
-The first start downloads the admin-boundary archive (about 600 MB) from
-Google Drive. To use a browser download instead, which is often faster,
-download it from
+The first start downloads the admin-boundary archive from Google Drive and
+extracts it to `data/base_layers/admin-boundary/` (`input/` and `output/`,
+about 8 GB). To use a browser download instead, which is often
+faster, download it from
 [here](https://drive.google.com/file/d/1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d/view)
-and save it as `data/dataset.7z` in the repository.
+and save it as `data/dataset.7z` in the repository. The unpacked dataset is
+also browsable in
+[this folder](https://drive.google.com/drive/folders/1t5Ibvt5Vc0GGcKljOolkPJN2yWrpA21_);
+copy its `input/` and `output/` into `data/base_layers/admin-boundary/` if you
+fetch it that way. Data left at the old `data/admin-boundary/` location is
+moved there automatically.
 
 **5. Build and start**
 
@@ -155,7 +161,8 @@ it at the same path, for example as shown below.
 | India boundary (8 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `PanIndia_Boundaries/india_state_outer_no_islands.geojson` |
 | Aquifer (102 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `aquifer/aquifer.geojson` |
 | Microwatersheds (5.4 GB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `static_layers/mws/Microwatershed_v2_with_details.geojson` |
-| SOI tehsils (316 MB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `admin_boundary/soi_tehsil.geojson` |
+| Admin boundary (8 GB) | [Download](https://drive.google.com/drive/folders/1t5Ibvt5Vc0GGcKljOolkPJN2yWrpA21_) | `admin-boundary/input/`, `admin-boundary/output/` |
+| SOI tehsils only (316 MB, already in Admin boundary) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `admin-boundary/input/soi_tehsil.geojson` |
 | Tehsil mws | [Download](https://drive.google.com/drive/folders/1a88TsSH3wX16TXRgSnBNILyXj6DIuD6I) | `tehsil_mws/<state>/<district>/<block>/filtered_mws_<district>_<block>_uid.geojson` |
 | Runoff (164 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/runoff/` |
 | ET (114 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/et/` |

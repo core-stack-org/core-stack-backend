@@ -108,7 +108,7 @@ runtime_dirs=(
     "$BACKEND_DIR/bot_interface/whatsapp_media"
     "$DATA_DIR/activated_locations"
     "$DATA_DIR/excel_files"
-    "$DATA_DIR/admin-boundary"
+    "$DATA_DIR/base_layers/admin-boundary"
     "$DATA_DIR/base_layers/tehsil_watersheds"
 )
 mkdir -p "${runtime_dirs[@]}"

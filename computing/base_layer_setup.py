@@ -1,4 +1,5 @@
 import logging
+import shutil
 import subprocess
 from functools import wraps
 from pathlib import Path
@@ -8,11 +9,11 @@ import requests
 import yaml
 
 from computing.config_loader import (
+    ADMIN_BOUNDARY_DIR,
     ADMIN_BOUNDARY_INPUT_DIR,
     ADMIN_BOUNDARY_OUTPUT_DIR,
     DATA_DIR,
     MICROWATERSHED_PATH,
-    PROJECT_ROOT,
     SOI_TEHSIL_PATH,
     VILLAGE_BOUNDARIES_DIR,
 )
@@ -42,10 +43,6 @@ _SOI_WFS_PARAMS = {
     "typeName": "pan_india_asset:SOI_tehsil_pan_india_dataset",
     "outputFormat": "application/json",
 }
-
-
-def _is_dir_populated(path: Path) -> bool:
-    return path.is_dir() and any(path.iterdir())
 
 
 def _layer_key(name: str) -> str:
@@ -261,12 +258,51 @@ def ensure_manifest_base_layers(*layers):
                 )
 
 
+# Older releases kept the dataset at data/admin-boundary and a second SOI tehsil
+# copy at base_layers/admin_boundary. Both are folded into ADMIN_BOUNDARY_DIR.
+_LEGACY_ADMIN_BOUNDARY_DIR = DATA_DIR / "admin-boundary"
+_LEGACY_SOI_TEHSIL_PATH = DATA_DIR / "base_layers" / "admin_boundary" / "SOI_tehsil.geojson"
+
+
+def _migrate_legacy_admin_boundary():
+    if any(_LEGACY_ADMIN_BOUNDARY_DIR.glob("input/*/*.geojson")) and not any(
+        ADMIN_BOUNDARY_INPUT_DIR.glob("*/*.geojson")
+    ):
+        logger.info(
+            "Moving admin boundary data from %s to %s",
+            _LEGACY_ADMIN_BOUNDARY_DIR,
+            ADMIN_BOUNDARY_DIR,
+        )
+        _merge_move(_LEGACY_ADMIN_BOUNDARY_DIR, ADMIN_BOUNDARY_DIR)
+        _LEGACY_ADMIN_BOUNDARY_DIR.rmdir()
+
+    if _LEGACY_SOI_TEHSIL_PATH.exists() and not SOI_TEHSIL_PATH.exists():
+        logger.info(
+            "Moving SOI tehsil layer from %s to %s", _LEGACY_SOI_TEHSIL_PATH, SOI_TEHSIL_PATH
+        )
+        SOI_TEHSIL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _LEGACY_SOI_TEHSIL_PATH.replace(SOI_TEHSIL_PATH)
+        try:
+            _LEGACY_SOI_TEHSIL_PATH.parent.rmdir()
+        except OSError:
+            pass  # not empty: leave anything else there alone
+    elif _LEGACY_SOI_TEHSIL_PATH.exists():
+        logger.warning(
+            "%s is no longer used (%s is). It can be deleted.",
+            _LEGACY_SOI_TEHSIL_PATH,
+            SOI_TEHSIL_PATH,
+        )
+
+
 def ensure_soi_tehsil():
     """
-    Downloads the SOI tehsil GeoJSON from GeoServer if not already present.
-    This is a lightweight bootstrap; the full admin-boundary archive includes
-    more data but takes much longer to acquire.
+    Ensures the SOI tehsil GeoJSON exists at SOI_TEHSIL_PATH
+    (base_layers/admin-boundary/input/soi_tehsil.geojson).
+
+    The full admin-boundary archive already contains it; when it is missing this
+    fetches just this layer from GeoServer, which is much faster.
     """
+    _migrate_legacy_admin_boundary()
     if SOI_TEHSIL_PATH.exists():
         logger.info("SOI tehsil layer already exists at %s, skipping.", SOI_TEHSIL_PATH)
         return
@@ -286,9 +322,12 @@ def ensure_soi_tehsil():
         logger.error("Failed to download SOI tehsil layer: %s", e)
         return
 
-    with open(SOI_TEHSIL_PATH, "wb") as f:
+    # Write to a temp file first so an interrupted download is never taken as complete.
+    part_path = SOI_TEHSIL_PATH.with_name(SOI_TEHSIL_PATH.name + ".part")
+    with open(part_path, "wb") as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
+    part_path.replace(SOI_TEHSIL_PATH)
 
     logger.info("SOI tehsil layer saved to %s", SOI_TEHSIL_PATH)
 
@@ -296,41 +335,104 @@ def ensure_soi_tehsil():
 def ensure_admin_boundary_data():
     """
     Downloads and extracts the full admin-boundary archive (~8 GB) from Google Drive.
-    Skipped if the input directory is already populated.
+    Skipped if the state-wise district files are already present (soi_tehsil.geojson
+    alone, e.g. from ensure_soi_tehsil(), does not count).
     Requires `gdown` and `7z` to be available on PATH.
     """
-    if _is_dir_populated(ADMIN_BOUNDARY_INPUT_DIR):
+    _migrate_legacy_admin_boundary()
+    if any(ADMIN_BOUNDARY_INPUT_DIR.glob("*/*.geojson")):
         logger.info("Admin boundary data already exists, skipping.")
         return
 
-    ADMIN_BOUNDARY_INPUT_DIR.mkdir(parents=True, exist_ok=True)
-    ADMIN_BOUNDARY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # Same archive location as installation/install.sh and docker/download-data.sh,
+    # so a browser download saved as data/dataset.7z is reused.
+    archive_path = DATA_DIR / "dataset.7z"
+    if archive_path.exists():
+        logger.info("Using existing archive %s", archive_path)
+    else:
+        part_path = archive_path.with_name(archive_path.name + ".part")
+        logger.info("Downloading admin boundary data (~8 GB) from Google Drive...")
+        try:
+            subprocess.run(
+                ["gdown", _GDRIVE_ADMIN_BOUNDARY_FILE_ID, "-O", str(part_path)],
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            logger.error("Failed to download admin boundary archive: %s", e)
+            return
+        part_path.replace(archive_path)
 
-    archive_path = PROJECT_ROOT / "dataset.7z"
-    logger.info("Downloading admin boundary data (~8 GB) from Google Drive...")
-    try:
-        subprocess.run(
-            ["gdown", _GDRIVE_ADMIN_BOUNDARY_FILE_ID, "-O", str(archive_path)],
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        logger.error("Failed to download admin boundary archive: %s", e)
-        return
-
+    extract_root = DATA_DIR / ".admin-boundary-extract"
+    shutil.rmtree(extract_root, ignore_errors=True)
     logger.info("Extracting admin boundary data...")
     try:
         subprocess.run(
-            ["7z", "x", str(archive_path), f"-o{DATA_DIR / 'admin-boundary'}"],
-            check=True,
+            ["7z", "x", "-y", str(archive_path), f"-o{extract_root}"], check=True
         )
+        dataset_root = _find_admin_boundary_root(extract_root)
+        if dataset_root is None:
+            logger.error(
+                "Could not find input/ or output/ in the admin boundary archive at %s",
+                archive_path,
+            )
+            return
+        _merge_move(dataset_root, ADMIN_BOUNDARY_DIR)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        logger.error("Failed to extract admin boundary archive: %s", e)
+        logger.error(
+            "Failed to extract %s (%s). Delete it and rerun to download it again.",
+            archive_path,
+            e,
+        )
         return
     finally:
-        if archive_path.exists():
-            archive_path.unlink()
+        shutil.rmtree(extract_root, ignore_errors=True)
 
-    logger.info("Admin boundary data ready at %s", ADMIN_BOUNDARY_INPUT_DIR)
+    archive_path.unlink()
+    ADMIN_BOUNDARY_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if not SOI_TEHSIL_PATH.exists() or not any(ADMIN_BOUNDARY_INPUT_DIR.glob("*/*.geojson")):
+        logger.error(
+            "Admin boundary archive extracted, but %s or the state-wise district "
+            "files are missing.",
+            SOI_TEHSIL_PATH,
+        )
+        return
+    logger.info("Admin boundary data ready at %s", ADMIN_BOUNDARY_DIR)
+
+
+def _find_admin_boundary_root(extract_root: Path) -> Path | None:
+    """Return the extracted folder that holds input/ and output/.
+
+    Handles the layouts the shell installers accept: ``admin-boundary/`` at the
+    archive root, ``input/``/``output/`` at the root, or one wrapper folder.
+    """
+    def has_dataset(path: Path) -> bool:
+        return (path / "input").is_dir() or (path / "output").is_dir()
+
+    candidates = [extract_root / "admin-boundary", extract_root]
+    candidates += sorted(p for p in extract_root.iterdir() if p.is_dir())
+    for candidate in candidates:
+        # An archive of the admin-boundary folder can itself contain admin-boundary/.
+        nested = candidate / "admin-boundary"
+        if has_dataset(nested):
+            return nested
+        if has_dataset(candidate):
+            return candidate
+    return None
+
+
+def _merge_move(src: Path, dst: Path) -> None:
+    """Move src's contents into dst, merging folders and replacing files."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        target = dst / item.name
+        if item.is_dir() and target.is_dir():
+            _merge_move(item, target)
+            continue
+        if target.is_dir():
+            shutil.rmtree(target)
+        elif target.exists():
+            target.unlink()
+        shutil.move(str(item), str(target))
 
 
 def ensure_lulc_rasters():
