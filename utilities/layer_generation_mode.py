@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from functools import wraps
 from unittest.mock import patch
 import logging
@@ -426,6 +427,28 @@ def is_sync_layer_generation_request(request=None):
 
 def is_sync_layer_generation_context_active():
     return bool(_SYNC_LAYER_GENERATION_CONTEXT.get())
+
+
+def layer_generation_sync_enabled():
+    """True when LAYER_GENERATION_SYNC_MODE says tasks should run in-process."""
+    return _sync_layer_generation_enabled()
+
+
+@contextmanager
+def layer_generation_sync_if_enabled():
+    """
+    While LAYER_GENERATION_SYNC_MODE is on, run every Celery dispatch in this
+    block immediately, including tasks started by the task itself.
+    """
+    if not _sync_layer_generation_enabled():
+        yield
+        return
+    token = _SYNC_LAYER_GENERATION_CONTEXT.set(True)
+    try:
+        with patch.object(Task, "apply_async", _apply_async_in_process):
+            yield
+    finally:
+        _SYNC_LAYER_GENERATION_CONTEXT.reset(token)
 
 
 def _apply_async_in_process(
