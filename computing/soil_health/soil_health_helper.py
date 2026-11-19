@@ -1,12 +1,11 @@
 import rasterio
 from rasterio.mask import mask
 from shapely.geometry import mapping
-
-
-from computing.local_compute_helper import ensure_file_exists
-
 from pyproj import Geod
 import numpy as np
+
+from computing.local_compute_helper import ensure_file_exists
+from utilities.constants import LulcClass
 
 
 def _compute_row_area(transform, height):
@@ -140,13 +139,19 @@ def lulc_area_stats_for_geometries(
             invert=True,
         )
 
-        # crop_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [8, 9, 10, 11]))
+        crop_mask = mask_arr & np.isin(
+            lulc_mode,
+            [
+                LulcClass.SINGLE_KHARIF,
+                LulcClass.SINGLE_NON_KHARIF,
+                LulcClass.DOUBLE_CROPPING,
+                LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+            ],
+        )
 
-        # tree_pixels = np.count_nonzero(mask_arr & np.isin(lulc_mode, [6, 12]))
-
-        crop_mask = mask_arr & np.isin(lulc_mode, [8, 9, 10, 11])
-
-        tree_mask = mask_arr & np.isin(lulc_mode, [6, 12])
+        tree_mask = mask_arr & np.isin(
+            lulc_mode, [LulcClass.TREES, LulcClass.SHRUBS_SCRUBS, LulcClass.PLANTATION]
+        )
 
         crop_area = 0.0
         tree_area = 0.0

@@ -1,4 +1,4 @@
-from computing.config_loader import LULC_V3_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
+from computing.config_loader import LULC_V4_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
 from computing.local_compute_helper import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
@@ -16,7 +16,7 @@ from utilities.gee_utils import valid_gee_text
 
 GEOSERVER_WORKSPACE = "LULC_level_3"
 GEOSERVER_STYLE = "lulc_level_3_style"
-LOCAL_ALGORITHM = "local_lulc_v3_clip"
+LOCAL_ALGORITHM = "local_lulc_v4_clip"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
 
 
@@ -73,7 +73,7 @@ def _resolve_dataset_name():
     )
 
 
-def run_lulc_v3_local(
+def run_lulc_local(
     state=None,
     district=None,
     block=None,
@@ -180,7 +180,7 @@ def run_lulc_v3_local(
     return layer_at_geoserver if push_to_geoserver else True
 
 
-def _clip_lulc_v3_local_task(
+def _clip_lulc_local_task(
     state=None,
     district=None,
     block=None,
@@ -194,7 +194,7 @@ def _clip_lulc_v3_local_task(
     app_type="MWS",
 ):
     _ = gee_account_id, asset_folder, app_type
-    return run_lulc_v3_local(
+    return run_lulc_local(
         state=state,
         district=district,
         block=block,
@@ -209,7 +209,7 @@ def _clip_lulc_v3_local_task(
 
 
 @app.task(bind=True)
-def clip_lulc_v3(
+def clip_lulc_local(
     self,
     state=None,
     district=None,
@@ -224,7 +224,7 @@ def clip_lulc_v3(
     app_type="MWS",
 ):
     _ = self
-    return _clip_lulc_v3_local_task(
+    return _clip_lulc_local_task(
         state=state,
         district=district,
         block=block,

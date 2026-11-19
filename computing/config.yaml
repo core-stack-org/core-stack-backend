@@ -448,6 +448,9 @@ derived_layers:
       layer_type: raster
 
     - name: lulc v4
+      filename: "{district}_{block}_{start_year}-07-01_{end_year}-06-30_LULCmap_10m.tif"
+      local_path: "{DATA_DIR}/lulc/lulc_v4_local/{state}/{district}/{block}/{filename}"
+      layer_type: raster
 
     - name: generate_ci_layer
 

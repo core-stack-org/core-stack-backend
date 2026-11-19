@@ -77,7 +77,7 @@ from computing.change_detection.change_detection_vector_local import (
 from computing.cropping_intensity.cropping_intensity_local import (
     generate_cropping_intensity as generate_cropping_intensity_local,
 )
-from computing.lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local
+from computing.lulc.clip_lulc_local import clip_lulc_local
 from computing.lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local
 from computing.lulc_X_terrain.lulc_on_plain_cluster_local import (
     lulc_on_plain_cluster_local,
@@ -259,6 +259,7 @@ GEE_TASK_REGISTRY = {
     "generate_mws_centroid": generate_mws_centroid_data,
 }
 
+
 def _hydrology_local_runner(is_annual):
     def runner(
         state=None,
@@ -291,8 +292,8 @@ LOCAL_TASK_REGISTRY = {
     "clip_nrega_district_block": generate_nrega_data_local,
     "generate_nrega_data": generate_nrega_data_local,
     "generate_nrega_layer": generate_nrega_data_local,
-    "clip_lulc_v3": clip_lulc_v3_local,
-    "lulc_v3": clip_lulc_v3_local,
+    "clip_lulc_v3": clip_lulc_local,
+    "lulc_v3": clip_lulc_local,
     "vectorise_lulc": vectorise_lulc_local,
     "lulc_vector": vectorise_lulc_local,
     "generate_cropping_intensity": generate_cropping_intensity_local,
@@ -539,9 +540,7 @@ def load_end_year_rules(compute="gee"):
     Load end year rules from JSON.
     """
     compute = normalize_compute(compute)
-    return _load_json_config(
-        END_YEAR_RULE_FILES[compute], compute=compute, default={}
-    )
+    return _load_json_config(END_YEAR_RULE_FILES[compute], compute=compute, default={})
 
 
 def flatten_map_nodes(map_config):
@@ -793,7 +792,9 @@ def run_layer_with_dependency(
                 node_func_obj, state, district, block
             ):
                 status[node_func_name] = True
-                logger.info(f"Skipping {node_func_name}, layer already exists ({log_ctx})")
+                logger.info(
+                    f"Skipping {node_func_name}, layer already exists ({log_ctx})"
+                )
                 return
             end_year_rules = load_end_year_rules(compute=compute)
             if node_func_name in end_year_rules:

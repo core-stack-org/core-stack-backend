@@ -7,7 +7,7 @@ using LULC raster data from Google Earth Engine.
 
 import ee
 
-from utilities.constants import LulcClass, PAN_INDIA_LULC_V3_DATASET
+from utilities.constants import LulcClass, PAN_INDIA_LULC_V4_DATASET
 
 # ----------------------------------------
 # PARAMETERS / CONSTANTS
@@ -22,10 +22,10 @@ THRESHOLD = 0.5  # strictly > 50%
 
 def load_pan_india_lulc(year):
     """
-    Load a pan-India LULC v3 image for a given year.
+    Load a pan-India LULC v4 image for a given year.
 
     The GEE naming convention uses agricultural years:
-        key year Y => path pan_india_lulc_v3_{Y-1}_{Y}
+        key year Y => path pan_india_lulc_v4_{Y-1}_{Y}
 
     Args:
         year: int, the year key (e.g., 2018 loads the 2017-2018 agri-year image).
@@ -34,7 +34,7 @@ def load_pan_india_lulc(year):
         ee.Image with the 'predicted_label' band, unmasked and cast to Int.
     """
     return (
-        ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}_{year + 1}")
+        ee.Image(f"{PAN_INDIA_LULC_V4_DATASET}{year}_{year + 1}")
         .select("predicted_label")
         .unmask(0)
         .toInt()
@@ -63,7 +63,7 @@ def tree_context_all(lulc, aoi):
     kernel = ee.Kernel.circle(RADIUS_M, "meters")
     lulc_img = lulc.clip(aoi.buffer(110))
 
-    tree_mask = lulc_img.eq(LulcClass.TREES)
+    tree_mask = lulc_img.eq(LulcClass.TREES).Or(lulc_img.eq(LulcClass.PLANTATION))
     shrub_mask = lulc_img.eq(LulcClass.SHRUBS_SCRUBS)
 
     total_px = (

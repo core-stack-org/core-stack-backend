@@ -1,7 +1,12 @@
 import ee
 from datetime import date
 
-from utilities.constants import AEZ
+from utilities.constants import (
+    AEZ,
+    HYBRID_TREE_MASK_GEE_PATH,
+    RAIN_INDEX_OUTPUT_GEE_PATH,
+    RAIN_RT_RE_OUTPUT_GEE_PATH,
+)
 from utilities.gee_utils import (
     ee_initialize,
     is_gee_asset_exists,
@@ -44,11 +49,11 @@ def generate_rainfall_resilience(
     """
 
     ee_initialize(gee_account_id)
-    TREE_COVER_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/Hybrid_Tree_AEZ_{aez}_{str(2004)}_{str(end_year)}"
-    RAIN_INDEX_ASSET = f"projects/corestack-datasets-alpha/assets/datasets/hazards/rainfall_index/rain_index_AEZ_{aez}"
+    TREE_COVER_ASSET = f"{HYBRID_TREE_MASK_GEE_PATH}{aez}_{str(2004)}_{str(end_year)}"
+    RAIN_INDEX_ASSET = f"{RAIN_INDEX_OUTPUT_GEE_PATH}/rain_index_AEZ_{aez}"
 
     OUTPUT_DESC = f"Rain_Metrics_{aez}"  # f"Rain_Metrics_AEZ_{aez}"
-    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/rainfall_Rt_Re/{OUTPUT_DESC}"
+    OUTPUT_ASSET_ID = f"{RAIN_RT_RE_OUTPUT_GEE_PATH}/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID
@@ -74,11 +79,6 @@ def generate_rainfall_resilience(
     BASELINE_END_YEAR = 2024
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
 
     # zScoreCol needs bands up through zMaxYear from the 3a asset, and
     # kndviCol needs data one year further out than that for resilience on
@@ -389,10 +389,9 @@ def classify_rainfall_metrics(aez, start_year=2004, end_year=None, gee_account_i
     if end_year is None:
         raise ValueError("end_year must be specified explicitly.")
 
-    root = "projects/corestack-datasets-alpha/assets/datasets/hazards/rainfall_Rt_Re"
-    yearly_id = f"{root}/Rain_Metrics_{aez}"
+    yearly_id = f"{RAIN_RT_RE_OUTPUT_GEE_PATH}/Rain_Metrics_{aez}"
     output_desc = f"Rain_Metrics_ClassMean_AEZ_{aez}"
-    output_id = f"{root}/{output_desc}"
+    output_id = f"{RAIN_RT_RE_OUTPUT_GEE_PATH}/{output_desc}"
     if is_gee_asset_exists(output_id):
         return None
     if not is_gee_asset_exists(yearly_id):
@@ -400,11 +399,6 @@ def classify_rainfall_metrics(aez, start_year=2004, end_year=None, gee_account_i
 
     img = ee.Image(yearly_id)
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
     final_output = _mean_classes(img, start_year, end_year).clip(aoi)
     return export_raster_asset_to_gee(
         final_output, output_desc, output_id, scale=30, region=aoi

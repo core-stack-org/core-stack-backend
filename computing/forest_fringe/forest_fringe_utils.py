@@ -8,7 +8,7 @@ construction for forest-edge analysis using Google Earth Engine.
 import ee
 from utilities.constants import (
     TREE_OVERALL_CHANGE,
-    PAN_INDIA_LULC_V3_DATASET,
+    PAN_INDIA_LULC_V4_DATASET,
     LTP_STP_CHANGE,
     LulcClass,
 )
@@ -39,9 +39,9 @@ def load_tree_mode():
     """
     lulc_imgs = ee.ImageCollection(
         [
-            ee.Image(f"{PAN_INDIA_LULC_V3_DATASET}{year}_{year + 1}")
+            ee.Image(f"{PAN_INDIA_LULC_V4_DATASET}{year}_{year + 1}")
             .select("predicted_label")
-            .eq(LulcClass.TREES)
+            .remap([LulcClass.TREES, LulcClass.PLANTATION], [1, 1], 0)
             for year in LULC_YEARS
         ]
     )
