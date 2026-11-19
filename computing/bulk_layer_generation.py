@@ -184,6 +184,7 @@ LOCAL_TASK_DATASETS = {
     ),
     "computing.soil_type.soil_type_local.generate_soil_type_local": ("Soil Type",),
     "computing.zoi_layers.zoi.generate_zoi": ("Surface Water Bodies",),
+    "computing.zoi_layers.zoi_local.generate_zoi": ("Surface Water Bodies",),
     "computing.forest_fire.forest_fire_local_compute.generate_forest_fire_local": (
         "Forest Fire",
     ),

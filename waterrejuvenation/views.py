@@ -1,5 +1,6 @@
 import os
 import hashlib
+import logging
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError
@@ -18,6 +19,7 @@ from rest_framework.views import APIView
 from .utils import get_merged_waterbodies_with_zoi
 import pandas as pd
 from .utils import validate_excel_headers, EXPECTED_EXCEL_HEADERS
+logger = logging.getLogger(__name__)
 
 
 class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
@@ -37,7 +39,7 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
             # Get the plantation project
             try:
                 project = Project.objects.get(
-                    id=project_id, app_type=AppType.WATERBODY_REJ, enabled=True
+                    id=project_id, app_type=AppType.WATERBODY_REJ
                 )
                 return WaterbodiesFileUploadLog.objects.filter(project=project)
             except Project.DoesNotExist:
@@ -56,12 +58,12 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Get project and check if it's a plantation project and enabled
+        # Disabled projects are allowed. enabled only controls project listing.
         try:
             project = Project.objects.get(id=project_id, app_type=AppType.WATERBODY_REJ)
         except Project.DoesNotExist:
             return Response(
-                {"detail": "Plantation project not found or not enabled."},
+                {"detail": "Waterbody project not found."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -90,6 +92,13 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         created_files = []
         errors = []
 
+        def _as_bool(val, default=False):
+            if val is None:
+                return default
+            if isinstance(val, bool):
+                return val
+            return str(val).lower() in ("true", "1", "yes")
+
         for uploaded_file in files:
             # Validate file extension
             if not uploaded_file.name.lower().endswith(".xlsx"):
@@ -105,11 +114,13 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                 file_hash.update(chunk)
             excel_hash = file_hash.hexdigest()
             print(excel_hash)
-            # Check if file with same hash already exists
-            if WaterbodiesFileUploadLog.objects.filter(
-                project=project, excel_hash=excel_hash
-            ).exists():
-                errors.append(f"File '{uploaded_file.name}' has already been uploaded.")
+            existing_upload = WaterbodiesFileUploadLog.objects.filter(
+                excel_hash=excel_hash
+            ).first()
+            if existing_upload and existing_upload.project_id != project.id:
+                errors.append(
+                    f"File '{uploaded_file.name}' is already linked to another project."
+                )
                 continue
 
             # Prepare data for serializer
@@ -117,13 +128,6 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
             is_processing_required = request.data.get("is_processing_required", True)
             start_date = request.data.get("start_date") or request.data.get("startDate")
             end_date = request.data.get("end_date") or request.data.get("endDate")
-
-            def _as_bool(val, default=False):
-                if val is None:
-                    return default
-                if isinstance(val, bool):
-                    return val
-                return str(val).lower() in ("true", "1", "yes")
 
             compute_enabled = _as_bool(is_compute, False)
             processing_enabled = _as_bool(is_processing_required, True)
@@ -162,6 +166,33 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
 
                 # VERY IMPORTANT
                 uploaded_file.seek(0)
+                if existing_upload:
+                    # Same file bytes for this project. Keep the stored file and
+                    # run processing again; the task loads only new rows.
+                    gee_account_id = request.data.get("gee_account_id")
+                    if gee_account_id not in (None, ""):
+                        existing_upload.gee_account_id = int(gee_account_id)
+                    if request.data.get("name"):
+                        existing_upload.name = request.data.get("name")
+                    existing_upload.is_lulc_required = _as_bool(
+                        request.data.get("is_lulc_required", True), True
+                    )
+                    existing_upload.is_processing_required = processing_enabled
+                    existing_upload.is_closest_wp = _as_bool(
+                        request.data.get("is_closest_wp", True), True
+                    )
+                    existing_upload.is_compute = compute_enabled
+                    existing_upload.process = False
+                    existing_upload.uploaded_by = request.user
+                    existing_upload.save(
+                        start_date=start_date,
+                        end_date=end_date,
+                    )
+                    created_files.append(
+                        self._upload_payload(existing_upload, reupload=True)
+                    )
+                    continue
+
                 if serializer.is_valid():
                     print("inside serailizer sv")
                     # Save excel file
@@ -182,7 +213,9 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
                     #     kml_file.geojson_data = geojson_data
                     #     kml_file.save(update_fields=["geojson_data"])
 
-                    created_files.append(serializer.data)
+                    created_files.append(
+                        self._upload_payload(excel_file, reupload=False)
+                    )
                     print(created_files)
                 else:
                     errors.append(
@@ -191,13 +224,24 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
             except IntegrityError as e:
                 errors.append(f"Error saving file '{uploaded_file.name}': {str(e)}")
                 continue
+            except Exception as e:
+                logger.exception(
+                    "Waterbody excel processing failed for %s", uploaded_file.name
+                )
+                errors.append(
+                    f"Error processing file '{uploaded_file.name}': {e}"
+                )
+                continue
 
         # # Update the merged GeoJSON file for the project if any files were created
         # if created_files:
         #     self.update_project_geojson(project)
 
         # Prepare response
-        response_data = {"files_created": len(created_files), "files": created_files}
+        response_data = {
+            "files_created": len(created_files),
+            "files": created_files,
+        }
 
         if errors:
             response_data["errors"] = errors
@@ -208,6 +252,22 @@ class WaterRejExcelFileViewSet(viewsets.ModelViewSet):
         )
 
         return Response(response_data, status=status_code)
+
+    def _upload_payload(self, upload, reupload):
+        payload = ExcelFileSerializer(upload).data
+        payload["reupload"] = reupload
+        result = getattr(upload, "processing_result", None)
+        if isinstance(result, dict):
+            for key in (
+                "status",
+                "new_rows",
+                "retried_rows",
+                "skipped_rows",
+                "task_id",
+            ):
+                if key in result:
+                    payload[key] = result[key]
+        return payload
 
 
 # Import your merging function (adjust path as needed)

@@ -218,6 +218,9 @@ SIMPLE_JWT = {
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves STATIC_ROOT (filled by collectstatic) from gunicorn, which has
+    # no static file handling of its own.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -346,6 +349,8 @@ EXCEL_DIR = resolve_env_path(
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+TEST_RUNNER = "nrm_app.test_runner.OfflineTestRunner"
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,  # keep Django's default loggers
@@ -382,6 +387,11 @@ LOGGING = {
             "propagate": False,
         },
         "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "stats_generator": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,

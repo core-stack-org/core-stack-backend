@@ -4,7 +4,7 @@
 The script has two independent pieces:
 
 1. Build a cached, sanitised all-India admin boundary GeoPackage from the
-   district GeoJSON files under ``data/admin-boundary/input``.
+   district GeoJSON files under ``data/base_layers/admin-boundary/input``.
 2. Left-join CSV/JSON village properties onto that cached GeoPackage while
    retaining every row from the sanitised admin layer.
 
@@ -28,7 +28,7 @@ counts:
 
 python utilities/scripts/build_admin_boundary_assets.py livestock \
   --overwrite \
-  --admin-gpkg data/admin-boundary/cs_admin_sanitised.gpkg \
+  --admin-gpkg data/base_layers/admin-boundary/cs_admin_sanitised.gpkg \
   --output data/livestock/livestock.gpkg \
   --output-layer livestock \
   --no-match-status \
@@ -53,7 +53,7 @@ Create only GeoJSON directly from the livestock join:
 
     python utilities/scripts/build_admin_boundary_assets.py livestock \
       --overwrite \
-      --admin-gpkg data/admin-boundary/cs_admin_sanitised.gpkg \
+      --admin-gpkg data/base_layers/admin-boundary/cs_admin_sanitised.gpkg \
       --output data/livestock/livestock_asset.gpkg \
       --output-layer livestock \
       --output-formats geojson \
@@ -65,7 +65,7 @@ Create both GPKG and GeoJSON from the livestock join:
 
     python utilities/scripts/build_admin_boundary_assets.py livestock \
       --overwrite \
-      --admin-gpkg data/admin-boundary/cs_admin_sanitised.gpkg \
+      --admin-gpkg data/base_layers/admin-boundary/cs_admin_sanitised.gpkg \
       --output data/livestock/livestock_asset.gpkg \
       --output-layer livestock \
       --output-formats gpkg,geojson \
@@ -136,10 +136,10 @@ except Exception:  # pragma: no cover - compatibility fallback
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
-DEFAULT_ADMIN_INPUT_DIR = Path("data/admin-boundary/input")
-DEFAULT_ADMIN_GPKG = Path("data/admin-boundary/cs_admin_sanitised.gpkg")
+DEFAULT_ADMIN_INPUT_DIR = Path("data/base_layers/admin-boundary/input")
+DEFAULT_ADMIN_GPKG = Path("data/base_layers/admin-boundary/cs_admin_sanitised.gpkg")
 DEFAULT_ADMIN_LAYER = "cs_admin_sanitised"
-DEFAULT_ADMIN_REPORTS_DIR = Path("data/admin-boundary/cs_admin_sanitised_reports")
+DEFAULT_ADMIN_REPORTS_DIR = Path("data/base_layers/admin-boundary/cs_admin_sanitised_reports")
 
 DEFAULT_LIVESTOCK_INPUT = Path("data/livestock/processed/livestock_pan_india.csv")
 DEFAULT_LIVESTOCK_OUTPUT = Path("data/livestock/livestock_asset.gpkg")
@@ -3100,7 +3100,7 @@ def asset_config_namespace(
         prefix=str(source.get("prefix", "")),
         overwrite=overwrite,
         reports_dir=Path(
-            output.get("reports_dir", "data/admin-boundary/join_reports")
+            output.get("reports_dir", "data/base_layers/admin-boundary/join_reports")
         ),
         chunk_size=chunk_size_override or int(processing.get("chunk_size", DEFAULT_GPKG_CHUNK_SIZE)),
         no_match_status=not bool(output.get("include_match_status", True)),
@@ -3536,7 +3536,7 @@ def add_join_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--exclude-columns", help="Comma-separated source columns to exclude")
     parser.add_argument("--prefix", default="", help="Prefix for joined output columns")
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--reports-dir", type=Path, default=Path("data/admin-boundary/join_reports"))
+    parser.add_argument("--reports-dir", type=Path, default=Path("data/base_layers/admin-boundary/join_reports"))
     parser.add_argument("--chunk-size", type=int, default=DEFAULT_GPKG_CHUNK_SIZE)
     parser.add_argument("--no-match-status", action="store_true")
     parser.add_argument("--match-status-column", default="property_join_matched")
@@ -3663,7 +3663,7 @@ def add_export_layer_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--geojson-output", type=Path, required=True)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--chunk-size", type=int, default=DEFAULT_GPKG_CHUNK_SIZE)
-    parser.add_argument("--reports-dir", type=Path, default=Path("data/admin-boundary/export_reports"))
+    parser.add_argument("--reports-dir", type=Path, default=Path("data/base_layers/admin-boundary/export_reports"))
     parser.add_argument(
         "--keep-output-columns",
         help="Comma-separated final attribute columns to keep. Geometry is always retained.",

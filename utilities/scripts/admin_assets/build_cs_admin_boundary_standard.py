@@ -2,15 +2,15 @@
 """Build the Core Stack standardized village admin boundary asset.
 
 This script is intentionally separate from ``build_admin_boundary_assets.py``.
-It reads the district GeoJSON files under ``data/admin-boundary/input`` and
+It reads the district GeoJSON files under ``data/base_layers/admin-boundary/input`` and
 keeps a source-row trace from those raw files into the final standard asset.
 
 Default outputs:
 
-    data/admin-boundary/cs_admin_standard.gpkg
-    data/admin-boundary/cs_admin_standard.geojson
-    data/admin-boundary/cs_admin_standard.csv
-    data/admin-boundary/cs_admin_standard_reports/*
+    data/base_layers/admin-boundary/cs_admin_standard.gpkg
+    data/base_layers/admin-boundary/cs_admin_standard.geojson
+    data/base_layers/admin-boundary/cs_admin_standard.csv
+    data/base_layers/admin-boundary/cs_admin_standard_reports/*
 
 The GeoPackage remains the primary output. The CSV is an attribute-only sibling
 for review, joins, and quick QA.
@@ -70,13 +70,13 @@ except Exception:  # pragma: no cover - compatibility fallback
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 
-DEFAULT_ADMIN_INPUT_DIR = Path("data/admin-boundary/input")
-DEFAULT_MULTIPART_ANALYSIS = Path("data/admin-boundary/multi_part_village_analysis.csv")
-DEFAULT_OUTPUT_GPKG = Path("data/admin-boundary/cs_admin_standard.gpkg")
+DEFAULT_ADMIN_INPUT_DIR = Path("data/base_layers/admin-boundary/input")
+DEFAULT_MULTIPART_ANALYSIS = Path("data/base_layers/admin-boundary/multi_part_village_analysis.csv")
+DEFAULT_OUTPUT_GPKG = Path("data/base_layers/admin-boundary/cs_admin_standard.gpkg")
 DEFAULT_OUTPUT_LAYER = "cs_admin_standard"
-DEFAULT_OUTPUT_GEOJSON = Path("data/admin-boundary/cs_admin_standard.geojson")
-DEFAULT_OUTPUT_CSV = Path("data/admin-boundary/cs_admin_standard.csv")
-DEFAULT_REPORTS_DIR = Path("data/admin-boundary/cs_admin_standard_reports")
+DEFAULT_OUTPUT_GEOJSON = Path("data/base_layers/admin-boundary/cs_admin_standard.geojson")
+DEFAULT_OUTPUT_CSV = Path("data/base_layers/admin-boundary/cs_admin_standard.csv")
+DEFAULT_REPORTS_DIR = Path("data/base_layers/admin-boundary/cs_admin_standard_reports")
 DEFAULT_CHUNK_SIZE = 50_000
 SQLITE_BATCH_SIZE = 5_000
 GEOMETRY_OVERLAP_AREA_EPSILON = 0.0

@@ -1,3 +1,4 @@
+import hashlib
 import logging
 from email.policy import default
 
@@ -42,7 +43,7 @@ class WaterbodiesFileUploadLog(models.Model):
         Project,
         on_delete=models.CASCADE,
         related_name="wate_rej_excel_files",
-        limit_choices_to={"app_type": AppType.WATERBODY_REJ, "enabled": True},
+        limit_choices_to={"app_type": AppType.WATERBODY_REJ},
         null=True,
     )
     name = models.CharField(max_length=255)
@@ -64,6 +65,7 @@ class WaterbodiesFileUploadLog(models.Model):
         """Override save to calculate file hash before saving"""
         start_date = kwargs.pop("start_date", None)
         end_date = kwargs.pop("end_date", None)
+        update_fields = kwargs.get("update_fields")
 
         if not self.excel_hash and self.file:
             # Calculate hash for new file
@@ -74,6 +76,10 @@ class WaterbodiesFileUploadLog(models.Model):
             self.excel_hash = file_hash.hexdigest()
 
         super().save(*args, **kwargs)
+        # Partial updates (for example marking process=True) must not re-run upload work.
+        if update_fields is not None:
+            return
+
         print(f"is processing required: {self.is_processing_required}")
         print(f"is lullc required: {self.is_lulc_required}")
         if self.is_compute:
@@ -82,18 +88,34 @@ class WaterbodiesFileUploadLog(models.Model):
                     "start_date and end_date are required when is_compute and "
                     "is_processing_required are true (YYYY-MM-DD)."
                 )
-            Upload_Desilting_Points.apply_async(
-                kwargs={
-                    "file_obj_id": self.id,
-                    "gee_account_id": self.gee_account_id,
-                    "is_lulc_required": self.is_lulc_required,
-                    "is_processing_required": self.is_processing_required,
-                    "is_closest_wp": self.is_closest_wp,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                },
-                queue="waterbody1",
+            task_kwargs = {
+                "file_obj_id": self.id,
+                "gee_account_id": self.gee_account_id,
+                "is_lulc_required": self.is_lulc_required,
+                "is_processing_required": self.is_processing_required,
+                "is_closest_wp": self.is_closest_wp,
+                "start_date": start_date,
+                "end_date": end_date,
+            }
+            from utilities.layer_generation_mode import (
+                layer_generation_sync_enabled,
+                layer_generation_sync_if_enabled,
             )
+
+            with layer_generation_sync_if_enabled():
+                dispatched = Upload_Desilting_Points.apply_async(
+                    kwargs=task_kwargs,
+                    queue="waterbody1",
+                )
+            if layer_generation_sync_enabled():
+                self.processing_result = getattr(dispatched, "result", None) or {
+                    "status": "processed"
+                }
+            else:
+                self.processing_result = {
+                    "status": "queued",
+                    "task_id": dispatched.id,
+                }
         else:
             logger.info(
                 f"File uploaded by user {self.uploaded_by.username}. Triggering email to superadmins and support"
@@ -145,7 +167,7 @@ class WaterbodiesDesiltingLog(models.Model):
         Project,
         on_delete=models.CASCADE,
         related_name="wate_dslit",
-        limit_choices_to={"app_type": AppType.WATERBODY_REJ, "enabled": True},
+        limit_choices_to={"app_type": AppType.WATERBODY_REJ},
         null=True,
     )
     name_of_ngo = models.CharField(max_length=255, null=True)
