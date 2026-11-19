@@ -32,3 +32,12 @@ class ExcelFileSerializer(serializers.ModelSerializer):
             "is_compute",
         ]
         read_only_fields = ["id", "uploaded_by", "created_at"]
+
+    def create(self, validated_data):
+        # These are not model fields. The upload view passes them through save()
+        # so WaterbodiesFileUploadLog.save() can run or queue processing.
+        start_date = validated_data.pop("start_date", None)
+        end_date = validated_data.pop("end_date", None)
+        instance = WaterbodiesFileUploadLog(**validated_data)
+        instance.save(start_date=start_date, end_date=end_date)
+        return instance

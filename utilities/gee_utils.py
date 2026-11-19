@@ -108,10 +108,13 @@ def ee_initialize(
 
         return True
     except Exception as exc:
+        message = str(exc).strip() or (
+            f"{exc.__class__.__name__} while reading Earth Engine credentials"
+        )
         if strict:
-            raise
+            raise GEEInitializationError(message) from exc
         if log_failure:
-            print(f"Skipping Earth Engine initialization: {exc}")
+            print(f"Skipping Earth Engine initialization: {message}")
         return False
 
 

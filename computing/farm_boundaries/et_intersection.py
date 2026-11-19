@@ -66,11 +66,13 @@ from rasterio.windows import Window
 from shapely.geometry import box
 
 from computing.farm_boundaries.convert import _drop_duplicate_farm_ids
+from computing.farm_boundaries.tehsil_boundary import (
+    get_tehsil_polygon as _get_tehsil_polygon,
+)
 from utilities.constants import (
     AEZ_GEOJSON,
     FARM_BOUNDARIES_PATH,
     LOCAL_ET_RASTERS_PATH,
-    SOI_TEHSIL,
     LulcClass,
 )
 
@@ -142,26 +144,6 @@ def _local_pet_path(aez, year):
 
 def _manifest_path(state: str, district: str, block: str) -> str:
     return os.path.join(FARM_BOUNDARIES_PATH, state, district, block, "manifest.json")
-
-def _get_tehsil_polygon(state, district, block):
-    """
-    Load the tehsil polygon from the shared SOI tehsil boundaries GeoJSON
-    (SOI_TEHSIL), matched case-insensitively on state/district/tehsil name.
-    Dissolves to a single geometry in case the tehsil has multiple rows.
-    """
-    soi = gpd.read_file(SOI_TEHSIL)
-    mask = (
-        (soi["STATE"].str.lower() == state)
-        & (soi["District"].str.lower() == district)
-        & (soi["TEHSIL"].str.lower() == block)
-    )
-    subset = soi[mask]
-    if subset.empty:
-        raise ValueError(
-            f"Tehsil not found in {SOI_TEHSIL}: state={state}, district={district}, block={block}"
-        )
-    return subset.dissolve().geometry.iloc[0]
-
 
 AEZ_MIN_OVERLAP_FRAC = 0.001  # 0.1% of tehsil area — filters boundary-snapping slivers
 
@@ -352,7 +334,7 @@ def _get_aez_zones(state, district, block, min_overlap_frac=AEZ_MIN_OVERLAP_FRAC
 
     `min_overlap_frac` filters out negligible sliver overlaps caused by
     boundary-snapping/precision mismatches between the independently
-    digitized SOI tehsil and AEZ datasets — not genuine multi-zone tehsils.
+    digitized tehsil (MWS) and AEZ datasets — not genuine multi-zone tehsils.
 
     Returns
     -------

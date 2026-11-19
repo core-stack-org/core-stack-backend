@@ -182,12 +182,41 @@ class InstallScriptTests(unittest.TestCase):
                     f"""
                     source "{INSTALL_SCRIPT}"
                     BACKEND_DIR="{backend_dir}"
+                    CORE_STACK_DATA_DIR="$BACKEND_DIR/data"
                     INSTALL_STATE_DIR="$BACKEND_DIR/.installation_state"
                     mkdir -p "$BACKEND_DIR/data"
                     finalize_admin_boundary_extraction "{extract_root}"
-                    test -f "$BACKEND_DIR/data/admin-boundary/input/soi_tehsil.geojson"
-                    test -f "$BACKEND_DIR/data/admin-boundary/input/assam/baksa.geojson"
-                    test ! -d "$BACKEND_DIR/data/admin-boundary/admin-boundary"
+                    test -f "$BACKEND_DIR/data/base_layers/admin-boundary/input/soi_tehsil.geojson"
+                    test -f "$BACKEND_DIR/data/base_layers/admin-boundary/input/assam/baksa.geojson"
+                    test ! -d "$BACKEND_DIR/data/base_layers/admin-boundary/admin-boundary"
+                    echo ok
+                    """
+                )
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("ok", result.stdout)
+
+    def test_normalize_moves_legacy_admin_boundary_dir_into_base_layers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            backend_dir = Path(tmp_dir) / "backend"
+            legacy_input_dir = backend_dir / "data" / "admin-boundary" / "input"
+            (legacy_input_dir / "assam").mkdir(parents=True)
+            (backend_dir / "data" / "admin-boundary" / "output").mkdir(parents=True)
+            (legacy_input_dir / "soi_tehsil.geojson").write_text("{}", encoding="utf-8")
+            (legacy_input_dir / "assam" / "baksa.geojson").write_text("{}", encoding="utf-8")
+
+            result = run_bash(
+                textwrap.dedent(
+                    f"""
+                    source "{INSTALL_SCRIPT}"
+                    BACKEND_DIR="{backend_dir}"
+                    CORE_STACK_DATA_DIR="$BACKEND_DIR/data"
+                    INSTALL_STATE_DIR="$BACKEND_DIR/.installation_state"
+                    normalize_existing_admin_boundary_data
+                    test -f "$BACKEND_DIR/data/base_layers/admin-boundary/input/soi_tehsil.geojson"
+                    test -f "$BACKEND_DIR/data/base_layers/admin-boundary/input/assam/baksa.geojson"
+                    test ! -e "$BACKEND_DIR/data/admin-boundary"
                     echo ok
                     """
                 )

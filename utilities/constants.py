@@ -10,9 +10,15 @@ from nrm_app.settings import (
     BASE_DATA_DIR
 )
 
-# Directory Path
-ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
-ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
+from computing.config_loader import (
+    ADMIN_BOUNDARY_INPUT_DIR as _ADMIN_BOUNDARY_INPUT_DIR,
+    ADMIN_BOUNDARY_OUTPUT_DIR as _ADMIN_BOUNDARY_OUTPUT_DIR,
+    SOI_TEHSIL_PATH as _SOI_TEHSIL_PATH,
+)
+
+# Directory Path (resolved from DATA_DIR, see computing/config_loader.py)
+ADMIN_BOUNDARY_INPUT_DIR = str(_ADMIN_BOUNDARY_INPUT_DIR)
+ADMIN_BOUNDARY_OUTPUT_DIR = str(_ADMIN_BOUNDARY_OUTPUT_DIR)
 
 # Canonical local pipeline resources. Runtime pipelines read these defaults
 # directly; their YAML `sources` entries are optional test overrides.
@@ -343,7 +349,7 @@ INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
 ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
 WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
-SOI_TEHSIL = f"{BASE_DATA_DIR}/admin-boundary/input/soi_tehsil.geojson"
+SOI_TEHSIL = str(_SOI_TEHSIL_PATH)
 AEZ_GEOJSON = f"{BASE_DATA_DIR}/AEZ_GeoJSON.geojson"
 FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"

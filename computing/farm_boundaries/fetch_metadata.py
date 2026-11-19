@@ -5,13 +5,14 @@ import os
 import time
 
 import aiohttp
-import geopandas as gpd
 import s2sphere
-from shapely.geometry import box
 
 import environ
 
-from utilities.constants import FARM_BOUNDARIES_PATH, SOI_TEHSIL
+from computing.farm_boundaries.tehsil_boundary import (
+    get_tehsil_polygon as _get_tehsil_polygon,
+)
+from utilities.constants import FARM_BOUNDARIES_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -38,28 +39,6 @@ MANIFEST_FLUSH_INTERVAL = 25
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-
-
-def _get_tehsil_polygon(state: str, district: str, block: str):
-    """
-    Load the tehsil polygon from the shared SOI shapefile.
-    Returns a single Shapely geometry in EPSG:4326.
-    Raises ValueError if the tehsil is not found.
-    """
-    soi = gpd.read_file(SOI_TEHSIL)
-    mask = (
-        (soi["STATE"].str.lower() == state)
-        & (soi["District"].str.lower() == district)
-        & (soi["TEHSIL"].str.lower() == block)
-    )
-    subset = soi[mask]
-    if subset.empty:
-        raise ValueError(
-            f"Tehsil not found in SOI shapefile: state={state}, "
-            f"district={district}, block={block}"
-        )
-    # Dissolve to a single geometry in case the tehsil has multiple rows.
-    return subset.dissolve().geometry.iloc[0]
 
 
 def _get_s2_cells_for_bbox(tehsil_geom) -> list:
@@ -134,6 +113,10 @@ async def _fetch_one_cell_async(
                 json=payload,
                 timeout=aiohttp.ClientTimeout(total=120),
             ) as response:
+                # 404 = Google has no landscape data for this cell: a valid
+                # "nothing here" answer, not a failure to retry.
+                if response.status == 404:
+                    return {"token": token, "status": "empty"}
                 response.raise_for_status()
 
                 if not await response.read():

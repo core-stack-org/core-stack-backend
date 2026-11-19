@@ -28,6 +28,16 @@ urlpatterns = [
         api.generate_pan_india_annual_hydrology,
         name="pan_india_hydrology_annual",
     ),
+    path(
+        "pan-india/drought_inputs/",
+        api.download_pan_india_drought_inputs,
+        name="pan_india_drought_inputs",
+    ),
+    path(
+        "pan-india/drought/",
+        api.generate_pan_india_drought,
+        name="pan_india_drought",
+    ),
     path("runoff_gpu/", api.generate_runoff_gpu, name="runoff_gpu"),
     path("et_download/", api.et_download, name="et_download"),
     path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),
