@@ -8,14 +8,15 @@ from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
 
-from computing.config_loader import LULC_BASE_DIR
 from computing.soil_health.soil_health_helper import (
     nutrient_stats_for_geometries,
     lulc_area_stats_for_geometries,
 )
 from computing.utils import save_layer_info_to_db
+from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
+    LULC_BASE_DIR,
     PROJECT_ROOT,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
@@ -27,6 +28,7 @@ from computing.local_compute_helper import (
     queue_local_vector_for_geoserver,
     queue_local_raster_for_geoserver,
     load_precomputed_roi,
+    resolve_lulc_raster_paths,
 )
 
 from nrm_app.celery import app
@@ -46,14 +48,19 @@ LOCAL_ALGORITHM_VERSION = "local-1.0"
 def _get_lulc_mask_classes(nutrient):
     nutrient = str(nutrient).strip().upper()
     if nutrient == "OC_OLM":
-        return {6, 12}
+        return {LulcClass.TREES, LulcClass.SHRUBS_SCRUBS, LulcClass.PLANTATION}
     if nutrient in {
         "N",
         "P",
         "K",
         "OC",
     }:
-        return {8, 9, 10, 11}
+        return {
+            LulcClass.SINGLE_KHARIF,
+            LulcClass.SINGLE_NON_KHARIF,
+            LulcClass.DOUBLE_CROPPING,
+            LulcClass.TRIPLE_ANNUAL_PERENNIAL,
+        }
     raise ValueError(f"Unsupported nutrient for LULC masking: {nutrient}")
 
 
@@ -78,11 +85,17 @@ def _resolve_latest_lulc_raster_paths(count=3, lulc_dir=LULC_BASE_DIR):
     if not lulc_dir.exists():
         return []
 
-    candidates = sorted(lulc_dir.glob("lulc_v3_*.tif"))
+    candidates = sorted(lulc_dir.glob("lulc_v4_*.tif"))
     if not candidates:
         return []
-    selected = candidates[-count:] if len(candidates) >= count else candidates
-    return [str(path) for path in selected]
+
+    latest_start_year = int(candidates[-1].stem.split("_")[-2])
+    start_year = latest_start_year - count + 1
+    return resolve_lulc_raster_paths(
+        start_year=start_year,
+        end_year=latest_start_year,
+        lulc_dir=lulc_dir,
+    )
 
 
 def _clip_raster_to_roi(

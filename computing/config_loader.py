@@ -231,6 +231,7 @@ CHANGE_DETECTION_VECTOR_OUTPUT_DIR: Path = _derived_output_dir(
 )
 LULC_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("lulc vector")
 LULC_V3_OUTPUT_DIR: Path = _derived_output_dir("lulc v3")
+LULC_V4_OUTPUT_DIR: Path = _derived_output_dir("lulc v4")
 LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc slope clusters")
 LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
@@ -276,7 +277,9 @@ PAN_INDIA_FACTORY_CSR_PATH = _base_layer_path(
 )
 LOCAL_FACTORY_CSR_OUTPUT = DATA_DIR / "layers/factory_csr"
 
-PAN_INDIA_GREEN_CREDIT_PATH = DATA_DIR / "base_layers/Pan_India_green_credit_oct.geojson"
+PAN_INDIA_GREEN_CREDIT_PATH = (
+    DATA_DIR / "base_layers/Pan_India_green_credit_oct.geojson"
+)
 LOCAL_GREEN_CREDIT_OUTPUT = DATA_DIR / "layers/green_credit"
 
 PAN_INDIA_MINING_PATH = _base_layer_path(

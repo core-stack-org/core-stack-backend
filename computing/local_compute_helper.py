@@ -1196,13 +1196,11 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
 
 
 def resolve_lulc_raster_paths(
-    start_year,
-    end_year,
-    lulc_dir=LULC_BASE_DIR,
+    start_year, end_year, lulc_dir=LULC_BASE_DIR, lulc_version="v4"
 ):
     raster_paths = []
     for year in range(int(start_year), int(end_year) + 1):
-        raster_path = Path(lulc_dir) / f"lulc_v3_{year}_{year + 1}.tif"
+        raster_path = Path(lulc_dir) / f"lulc_{lulc_version}_{year}_{year + 1}.tif"
         ensure_file_exists(raster_path, f"LULC raster for {year}-{year + 1}")
         raster_paths.append(str(raster_path))
     return raster_paths

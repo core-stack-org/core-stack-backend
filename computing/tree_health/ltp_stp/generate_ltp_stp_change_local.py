@@ -108,7 +108,7 @@ def generate_ltp_stp_change_local(self, year_1: int, year_2: int, scale=25):
         print("Saved:", outfile)
 
 
-# To merge the files in the output directory and run the following command in terminal:
+# To merge the files in the output directory for creating a pan India asset, run the following command in terminal:
 # gdal_merge.py \
 # -o ltp_stp_change_2017_2024.tif \
 # -co COMPRESS=LZW \

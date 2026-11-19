@@ -7,7 +7,7 @@ from nrm_app.settings import (
     GEE_STORAGE_PROJECT_HELPER,
     GEOSERVER_URL,
     ARCHIVE_DATA_DIR,
-    BASE_DATA_DIR
+    BASE_DATA_DIR,
 )
 
 from computing.config_loader import (
@@ -358,6 +358,9 @@ WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
 PAN_INDIA_LULC_V3_DATASET = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
 )
+PAN_INDIA_LULC_V4_DATASET = (
+    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
+)
 DISTANCE_TO_UPSTREAM_DL = (
     "projects/ext-datasets/assets/datasets/distance_to_nearest_upstream_DL_raster"
 )
@@ -418,3 +421,22 @@ LTP_STP_CHANGE = (
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
 SOI_DISTRICT = "projects/ext-datasets/assets/datasets/SOI_districts"
+
+
+# Hazard
+SPEI3_ASSET_GEE_PATH = (
+    "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/SPEI3"
+)
+HYBRID_TREE_MASK_GEE_PATH = (
+    "projects/corestack-trees/assets/hazards/tree_mask/Hybrid_Tree_AEZ_"
+)
+
+DROUGHT_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/drought_Rt_Re"
+WIND_INDEX_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/wind_index"
+WIND_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/wind_Rt_Re"
+
+FIRE_INDEX_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/fire_index"
+FIRE_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/fire_Rt_Re"
+
+RAIN_INDEX_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/rainfall_index"
+RAIN_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/rainfall_Rt_Re"

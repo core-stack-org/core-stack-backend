@@ -398,6 +398,13 @@ copy.
 | `Permission denied` on files in the repository | Left by an older setup that ran as root. `docker compose --env-file nrm_app/.env up -d` gives them back to you. |
 | A second copy of the repository uses the first one's database | All copies share the Compose project name `core-stack`. Run one installation per machine. |
 
+If the general, NRM, or layer bulk Celery workers are stuck, this command
+force-stops all three containers and interrupts any tasks they are running.
+
+```bash
+docker kill core-stack-celery-general-1 core-stack-celery-nrm-1 core-stack-celery-layer-bulk-1
+```
+
 To stop a long job that is running on `celery-heavy`:
 
 ```bash
