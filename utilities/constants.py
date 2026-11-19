@@ -359,7 +359,7 @@ PAN_INDIA_LULC_V3_DATASET = (
     "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
 )
 PAN_INDIA_LULC_V4_DATASET = (
-    "projects/corestack-datasets/assets/datasets/LULC_v4_river_basin/pan_india_lulc_v4_"
+    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
 )
 DISTANCE_TO_UPSTREAM_DL = (
     "projects/ext-datasets/assets/datasets/distance_to_nearest_upstream_DL_raster"
