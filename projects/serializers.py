@@ -48,7 +48,13 @@ class ProjectSerializer(serializers.ModelSerializer):
             "total_plan",
             "completed_plan",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "updated_at",
+            "created_by",
+            "updated_by",
+        ]
 
 
 class ProjectDetailSerializer(serializers.ModelSerializer):

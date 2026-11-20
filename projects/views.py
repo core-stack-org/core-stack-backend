@@ -79,10 +79,13 @@ class ProjectViewSet(viewsets.ModelViewSet):
                         "organization": "Organization ID is required for superadmin users."
                     }
                 )
-            serializer.save()
+            serializer.save(created_by=user, updated_by=user)
         else:
             organization = user.organization
-            serializer.save(organization=organization)
+            serializer.save(organization=organization, created_by=user, updated_by=user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
 
     @action(detail=True, methods=["patch"])
     def update_app_type(self, request, pk=None):
