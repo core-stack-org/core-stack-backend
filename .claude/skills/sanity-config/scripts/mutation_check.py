@@ -37,7 +37,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 logging.disable(logging.CRITICAL)
 from run_validation import _load_config, _resolve_sheet_name  # noqa: E402
 from validator import VectorValidator  # noqa: E402
-from validate import rule_fields  # noqa: E402
+from validate import expression_groups, rule_fields  # noqa: E402
+
+
+def usable_rows(df: pd.DataFrame, cfg: dict, fields: list) -> pd.Index:
+    """Rows where every field holds a real value (not null, blank or ignored)."""
+    ok = pd.Series(True, index=df.index)
+    for f in fields:
+        ok &= df[f].notna() & (df[f].astype(str).str.strip() != "")
+        ok &= ~df[f].isin(cfg.get("ignore_values") or [])
+    return df.index[ok]
 
 
 def mutate(df: pd.DataFrame, cfg: dict, fields: list) -> pd.DataFrame:
@@ -47,6 +56,29 @@ def mutate(df: pd.DataFrame, cfg: dict, fields: list) -> pd.DataFrame:
     field, kind = fields[0], cfg["type"]
     if kind in ("required_fields", "required_any_field_pattern"):
         return broken.drop(columns=fields)
+    if kind == "unique":
+        rows = usable_rows(broken, cfg, fields)
+        broken.loc[rows[1], fields] = broken.loc[rows[0], fields].values
+        return broken
+    if kind == "max_null_fraction":
+        broken[field] = None
+        return broken
+    if kind == "distinct_columns":
+        broken[fields[1]] = broken[fields[0]]
+        return broken
+    if kind == "expression":
+        # Break the relation in one row where it is checkable: scale the
+        # first referenced number, or relabel the first referenced string.
+        row = usable_rows(broken, cfg, fields)[0]
+        value = broken.loc[row, field]
+        numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+        if pd.isna(numeric):
+            broken[field] = broken[field].astype(object)
+            broken.loc[row, field] = "__mutated__"
+        else:
+            broken[field] = pd.to_numeric(broken[field], errors="coerce").astype(float)
+            broken.loc[row, field] = float(numeric) * 10 + 1000
+        return broken
     row = broken.index[0]
     if kind == "min_value":
         broken[field] = pd.to_numeric(broken[field], errors="coerce").astype(float)
@@ -81,8 +113,17 @@ def check(label: str, df: pd.DataFrame, config: dict, context: str) -> list:
         if not fields:
             outcome = "NO FIELDS"
         else:
-            # One mutation per field, except required_any (any match passes).
-            groups = [fields] if cfg["type"] == "required_any_field_pattern" else [[f] for f in fields]
+            # One mutation per field, except: required_any (any match passes),
+            # unique (one composite key), distinct_columns (one pair), and
+            # expression (one per suffix it expands to).
+            if cfg["type"] in ("required_any_field_pattern", "unique"):
+                groups = [fields]
+            elif cfg["type"] == "distinct_columns":
+                groups = [[a, b] for i, a in enumerate(fields) for b in fields[i + 1:]][:10]
+            elif cfg["type"] == "expression":
+                groups = expression_groups(rule, df)
+            else:
+                groups = [[f] for f in fields]
             for group in groups:
                 result = rule.validate(mutate(df, cfg, group))
                 if all(r["passed"] for r in result["results"]):

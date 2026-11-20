@@ -9,8 +9,9 @@ stats.xlsx (excel rules), then reports:
                      without checking anything (usually a stale field name or
                      pattern, or a rule meant for the other context)
   unchecked fields   data columns no rule looks at (candidates for new rules)
-  uid coverage       ids present in only one of the vector and the Excel sheet
-                     (usually a stale sheet built from an older layer)
+  pair               the config's pair rules (applies_to: [pair]), which compare
+                     the vector with the Excel sheet: same ids, same shared
+                     values (a mismatch usually means a stale sheet)
 
 Run inside the conda env, from the repo root:
   conda run -n corestackenv python .claude/skills/sanity-config/scripts/validate.py \
@@ -34,19 +35,22 @@ DEFAULT_CACHE = Path.home() / ".cache" / "core-stack-sanity"
 
 sys.path.insert(0, str(REPO_DIR / "computing" / "sanity"))
 logging.disable(logging.CRITICAL)
+from report import summarize  # noqa: E402
+from rules import PAIR_RULE_MAP  # noqa: E402
 from run_validation import _load_config, _resolve_sheet_name, _summarize_frame  # noqa: E402
 from validator import VectorValidator  # noqa: E402
 
 IGNORED_COLUMNS = {"geometry", "id", "fid", "uid", "UID"}
-# The API lowercases Excel headers, so match id columns case-insensitively.
-UID_COLUMNS = ("uid", "mws_id", "mws uid")
-
-
-def uid_set(df: pd.DataFrame):
-    for col in df.columns:
-        if col.lower() in UID_COLUMNS:
-            return {str(v) for v in df[col].dropna()}
-    return None
+def expression_groups(rule, df: pd.DataFrame) -> list:
+    """Columns referenced by an expression rule, one list per suffix it expands to."""
+    columns = [str(c) for c in df.columns]
+    groups = []
+    for suffix in rule._suffixes(df):
+        expression = rule.value.format(**suffix) if suffix else rule.value
+        referenced = rule._referenced(expression, columns)
+        if referenced:
+            groups.append(referenced)
+    return groups
 
 
 def rule_fields(rule, cfg: dict, df: pd.DataFrame) -> list:
@@ -54,6 +58,8 @@ def rule_fields(rule, cfg: dict, df: pd.DataFrame) -> list:
     if cfg["type"] == "required_any_field_pattern":
         patterns = [p.lower() for p in cfg.get("value") or []]
         return [c for c in df.columns if any(fnmatch.fnmatchcase(c.lower(), p) for p in patterns)]
+    if cfg["type"] == "expression":
+        return [c for group in expression_groups(rule, df) for c in group]
     if cfg["type"] == "required_fields":
         wanted = cfg.get("value") or cfg.get("fields") or []
         return [c for c in wanted if c in df.columns]
@@ -62,7 +68,10 @@ def rule_fields(rule, cfg: dict, df: pd.DataFrame) -> list:
 
 def coverage(df: pd.DataFrame, config: dict, context: str):
     validator = VectorValidator(config=config, validation_context=context)
-    cfgs = [c for c in config["rules"] if validator._rule_applies_to_context(c)]
+    cfgs = [
+        c for c in config["rules"]
+        if validator._rule_applies_to_context(c) and c["type"] not in PAIR_RULE_MAP
+    ]
     rules = validator.build_rules()
     vacuous, checked = [], set()
     for cfg, rule in zip(cfgs, rules):
@@ -129,13 +138,14 @@ def main() -> None:
                     report("excel", excel_df, config, "excel")
                 except Exception as exc:  # sheet not in this tehsil's data
                     print(f"  excel  (no data: {exc})")
-            if vector_df is not None and excel_df is not None:
-                v_ids, x_ids = uid_set(vector_df), uid_set(excel_df)
-                if v_ids is not None and x_ids is not None and v_ids != x_ids:
-                    only_v, only_x = sorted(v_ids - x_ids), sorted(x_ids - v_ids)
-                    print(f"  uid coverage differs: {len(only_v)} only in vector (e.g. {only_v[:3]}), "
-                          f"{len(only_x)} only in excel (e.g. {only_x[:3]})")
-
+            pair_rules = [c for c in config["rules"] if c["type"] in PAIR_RULE_MAP]
+            if pair_rules and vector_df is not None and excel_df is not None:
+                validator = VectorValidator(config=config, validation_context="pair")
+                result = summarize(validator.validate_pair(vector_df, excel_df))
+                print(f"  pair   {result['status']:6} rules={len(pair_rules)}")
+                for err in result["errors"]:
+                    print(f"         ERROR {err['rule']} field={err.get('field')} invalid={err.get('invalid_count')}"
+                          f" ({err.get('message')}) ids e.g. {(err.get('invalid_uids') or [])[:3]}")
 
 if __name__ == "__main__":
     main()

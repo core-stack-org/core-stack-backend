@@ -23,3 +23,9 @@ rules:
     applies_to: [excel]
     type: not_null
     field: river_name
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: river_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage

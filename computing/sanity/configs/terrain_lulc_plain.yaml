@@ -147,3 +147,27 @@ rules:
     type: max_value
     field_pattern: "*_area_percent"
     value: 100
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: terrain_lulc_plain_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage
+
+  # Each class is its own column; identical columns mean the export wrote one
+  # class into another.
+  - name: terrain_lulc_plain_excel_classes_distinct
+    applies_to: [excel]
+    type: distinct_columns
+    field_pattern: "*_area_percent"
+
+  - name: terrain_lulc_plain_vector_forest_shrub_distinct
+    applies_to: [vector]
+    type: distinct_columns
+    fields: [forest, shrubs_scrubs]
+
+  # Shares of one MWS's area cannot add up to more than 100%.
+  - name: terrain_lulc_plain_excel_percent_sum_max
+    applies_to: [excel]
+    type: expression
+    value: "barren_area_percent + forests_area_percent + shrub_scrubs_area_percent + single_kharif_area_percent + single_non_kharif_area_percent + double_cropping_area_percent + triple_cropping_area_percent <= 100.5"

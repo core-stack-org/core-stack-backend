@@ -123,3 +123,9 @@ rules:
     type: max_value
     field_pattern: "*_in_percent"
     value: 100
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: overall_tree_change_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage

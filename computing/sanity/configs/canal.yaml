@@ -46,3 +46,9 @@ rules:
       - project_name
       - canal_code
       - canal_name
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: canal_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage

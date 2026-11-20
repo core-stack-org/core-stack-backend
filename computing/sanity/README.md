@@ -66,7 +66,10 @@ Each YAML rule can include `applies_to`:
 applies_to: [excel]
 applies_to: [vector]
 applies_to: [excel, vector]
+applies_to: [pair]
 ```
+
+`pair` rules compare a vector layer with the Excel sheet built from it (same ids, same shared values). They only run through `run_pair_validation`, and catch sheets that were built from an older generation of the layer.
 
 This matters because vector and Excel outputs often use different schemas. During Excel validation, vector-only rules are skipped. During vector validation, Excel-only rules are skipped.
 
@@ -110,6 +113,9 @@ Important fields:
 - `value`: Rule-specific threshold or allowed values.
 - `expected_type`: Expected type for `data_type`.
 - `allow_missing_fields`: Allows optional field families to be absent.
+- `ignore_values`: Values a rule skips, e.g. `[-9999]` (no-data) or `[0]` (placeholder ids). Supported by `min_value`, `max_value`, `unique`, `max_null_fraction` and `expression`.
+- `allow_empty_strings`: For `not_null`, accept `""` as a value (by default blank strings count as missing).
+- `suffix_from`, `suffix_min`: For `expression`, expand `{year}`-style placeholders over every matching column family.
 
 ## Supported Rules
 
@@ -117,13 +123,34 @@ The current rule types live in `rules.py`.
 
 | Rule type | Purpose |
 |---|---|
-| `not_null` | Fails rows where matched fields are null |
+| `not_null` | Fails rows where matched fields are null or blank strings |
 | `data_type` | Checks pandas dtype family: `integer`, `float`, `numeric`, `string`, `boolean` |
 | `min_value` | Fails numeric values below `value` |
 | `max_value` | Fails numeric values above `value` |
 | `allowed_values` | Fails non-null values outside the configured allowed list |
 | `required_fields` | Fails when explicit fields are missing |
 | `required_any_field_pattern` | Fails when no configured wildcard pattern matches any column |
+| `unique` | Fails rows whose key (all matched fields together) repeats; `ignore_values` skips placeholder keys |
+| `max_null_fraction` | Fails a field whose share of null, blank or `ignore_values` rows exceeds `value` (catches all-no-data columns) |
+| `distinct_columns` | Fails a pair of fields that are identical in every row (one column written into another) |
+| `expression` | Row-level cross-field check written as a pandas expression, e.g. `TOT_M + TOT_F == TOT_P` |
+| `id_coverage` (pair) | Fails ids present in only one of the vector and the sheet |
+| `field_match` (pair) | Fails ids whose shared field differs between the vector and the sheet |
+
+Cross-field example, checked once per year column:
+
+```yaml
+  - name: soge_excel_total_extraction_sum
+    applies_to: [excel]
+    type: expression
+    suffix_from: "total_extraction_in_bcm_{year}"
+    value: "abs(total_extraction_in_bcm_{year} - (extraction_for_irrigation_in_bcm_{year} + extraction_for_domestic_and_industrial_in_bcm_{year})) <= 0.02 * total_extraction_in_bcm_{year}"
+    ignore_values: [-9999]
+```
+
+Column names that are not Python identifiers go in backticks (`` `built-up_area_2017` ``). Rows where any referenced value is null or ignored are skipped.
+
+Configs can also validate pipeline inputs: `admin_boundary_census_input` checks the district census files that the admin boundary pipeline clips.
 
 ## Running Validation
 
@@ -160,11 +187,13 @@ from computing.sanity.run_validation import (
     run_layer_validation,
     run_excel_validation,
     run_excel_workbook_validation,
+    run_pair_validation,
 )
 
 vector_report = run_layer_validation("data/layer.geojson", "cropping_intensity")
 sheet_report = run_excel_validation("data/output.xlsx", "cropping_intensity")
 workbook_report = run_excel_workbook_validation("data/output.xlsx")
+pair_report = run_pair_validation("data/layer.geojson", "data/output.xlsx", "mws")
 ```
 
 ## How Configs Were Created

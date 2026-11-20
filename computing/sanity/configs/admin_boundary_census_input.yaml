@@ -1,0 +1,35 @@
+layer_name: admin_boundary_census_input
+# Validates a pipeline INPUT, not an output: the district census files in
+# data/admin-boundary/input/<state>/<district>.geojson that
+# computing/misc/admin_boundary.py clips into the administrative_boundaries
+# layer. The pipeline copies one output polygon per input row without checking
+# ids, so problems here go straight into every tehsil layer built from them.
+#   run_layer_validation("data/admin-boundary/input/andhra_pradesh/anantapur.geojson",
+#                        "admin_boundary_census_input")
+
+rules:
+  - name: census_input_schema_present
+    applies_to: [vector]
+    type: required_fields
+    value: [pc11_village_id, pc11_subdistrict_id, NAME, TOT_P, TOT_M, TOT_F]
+
+  # One row per census village or town. Placeholder polygons (forest, water
+  # tank) carry id 0. Repeats mean census records were joined many-to-many
+  # onto polygons (e.g. a town's ward records copied onto every polygon that
+  # shares its SHRUG id).
+  - name: census_input_village_id_unique
+    applies_to: [vector]
+    type: unique
+    fields: [pc11_village_id]
+    ignore_values: [0]
+
+  - name: census_input_population_sum
+    applies_to: [vector]
+    type: expression
+    value: "TOT_M + TOT_F == TOT_P"
+
+  - name: census_input_population_min
+    applies_to: [vector]
+    type: min_value
+    fields: [TOT_P, TOT_M, TOT_F, No_HH]
+    value: 0

@@ -103,3 +103,34 @@ rules:
     type: max_value
     field_pattern: "*_percent"
     value: 100
+
+  # One polygon per census village. Placeholders (forest, water) carry id 0.
+  - name: admin_vector_village_id_unique
+    applies_to: [vector]
+    type: unique
+    fields: [vill_ID]
+    ignore_values: [0]
+
+  - name: admin_excel_village_id_unique
+    applies_to: [excel]
+    type: unique
+    fields: [village_id]
+
+  - name: admin_vector_population_sum
+    applies_to: [vector]
+    type: expression
+    value: "TOT_M + TOT_F == TOT_P"
+
+  # India's largest villages have well under 300,000 people; a larger value
+  # means rows were summed (e.g. duplicated polygons).
+  - name: admin_excel_population_max
+    applies_to: [excel]
+    type: max_value
+    fields: [total_population_count]
+    value: 300000
+
+  - name: admin_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage
+    vector_key: vill_ID
+    excel_key: village_id

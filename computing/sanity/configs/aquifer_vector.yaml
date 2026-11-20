@@ -116,3 +116,9 @@ rules:
     fields: [aquifer_class]
     value: [Alluvium, Hard Rock]
     allow_missing_fields: true
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: aquifer_vector_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage

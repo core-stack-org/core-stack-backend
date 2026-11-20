@@ -116,3 +116,9 @@ rules:
     field_pattern: "runoff_*_in_mm_*"
     value: 0
     allow_missing_fields: true
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: hydrological_seasonal_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage

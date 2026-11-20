@@ -4,12 +4,19 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 try:
-    from .rules import RULE_MAP
+    from .rules import PAIR_RULE_MAP, RULE_MAP
 except ImportError:
-    from rules import RULE_MAP
+    from rules import PAIR_RULE_MAP, RULE_MAP
 
 
 logger = logging.getLogger(__name__)
+
+# Keys every rule entry may carry; anything else is passed to the rule class.
+BASE_RULE_KEYS = {
+    "name", "type", "applies_to", "field", "field_pattern", "value",
+    "expected_type", "severity", "fields", "exclude_field_patterns",
+    "allow_missing_fields",
+}
 
 
 class VectorValidator:
@@ -102,6 +109,9 @@ class VectorValidator:
                 )
                 continue
 
+            if rule_cfg["type"] in PAIR_RULE_MAP:
+                continue
+
             rule_class = RULE_MAP[rule_cfg["type"]]
             logger.debug(
                 "Building rule '%s' of type '%s'",
@@ -120,6 +130,13 @@ class VectorValidator:
                     fields=rule_cfg.get("fields"),
                     exclude_field_patterns=rule_cfg.get("exclude_field_patterns"),
                     allow_missing_fields=rule_cfg.get("allow_missing_fields", False),
+                    # Remaining keys are rule-type options (ignore_values,
+                    # suffix_from, ...); see the rule classes.
+                    **{
+                        key: value
+                        for key, value in rule_cfg.items()
+                        if key not in BASE_RULE_KEYS
+                    },
                 )
             )
 
@@ -174,4 +191,34 @@ class VectorValidator:
             len(results),
             self.config.get("layer_name"),
         )
+        return results
+
+    def validate_pair(self, vector_df: Any, excel_df: Any) -> List[Dict[str, Any]]:
+        """
+        Run the config's pair rules, which compare the vector layer with its
+        Excel sheet (e.g. same MWS ids, same area_in_ha).
+
+        Args:
+            vector_df: The vector layer as a (geo)dataframe.
+            excel_df: The matching stats-generator sheet as a dataframe.
+
+        Returns:
+            A list of rule result dictionaries, empty when the config has no
+            pair rules.
+        """
+        results = []
+        for rule_cfg in self.config["rules"]:
+            rule_class = PAIR_RULE_MAP.get(rule_cfg["type"])
+            if rule_class is None:
+                continue
+            rule = rule_class(
+                name=rule_cfg["name"],
+                value=rule_cfg.get("value"),
+                **{
+                    key: value
+                    for key, value in rule_cfg.items()
+                    if key not in BASE_RULE_KEYS
+                },
+            )
+            results.append(rule.validate_pair(vector_df, excel_df))
         return results

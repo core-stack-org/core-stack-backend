@@ -109,3 +109,20 @@ rules:
     type: min_value
     field_pattern: "*area*in_ha"
     value: 0
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: wri_restoration_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage
+
+  # The four restoration classes partition the MWS.
+  - name: restoration_excel_classes_sum_to_area
+    applies_to: [excel]
+    type: expression
+    value: "abs(wide_scale_restoration_area_in_ha + protection_area_in_ha + mosaic_restoration_area_in_ha + excluded_areas_in_ha - area_in_ha) <= 0.015 * area_in_ha"
+
+  - name: restoration_vector_classes_sum_to_area
+    applies_to: [vector]
+    type: expression
+    value: "abs(`Wide-scale Restoration` + Protection + `Mosaic Restoration` + `Excluded Areas` - area_in_ha) <= 0.015 * area_in_ha"

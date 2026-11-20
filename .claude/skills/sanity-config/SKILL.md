@@ -34,7 +34,10 @@ missing its key fields sails through. This workflow is built to catch that.
 Rule types (`computing/sanity/rules.py`): `data_type`
 (integer/float/numeric/string/boolean, judged on the whole column's dtype),
 `min_value`, `max_value`, `not_null`, `allowed_values`, `required_fields`,
-`required_any_field_pattern`. Fields are picked with `field`, `fields` or
+`required_any_field_pattern`, `unique`, `max_null_fraction`,
+`distinct_columns`, `expression` (cross-field), and the pair types
+`id_coverage` and `field_match` (`applies_to: [pair]`, vector vs sheet).
+`ignore_values: [-9999]` makes bounds skip a no-data sentinel. Fields are picked with `field`, `fields` or
 `field_pattern` (fnmatch, case-insensitive) plus `exclude_field_patterns`.
 Quirks that have bitten before:
 
@@ -49,7 +52,8 @@ Quirks that have bitten before:
 - `allow_missing_fields: true` on everything makes a config pass on a layer that
   lacks the fields entirely. Use it only for fields that legitimately exist in
   some layer versions and not others.
-- `not_null` does not see empty strings `""`.
+- `not_null` treats `""` as missing; set `allow_empty_strings: true` where a
+  blank is meaningful (e.g. an outlet MWS has no `downstream`).
 - Broad patterns like `"*"` catch id/code columns (`bacode`, `sbcode`, `wsconc`
   are strings) — list fields or narrow the pattern instead.
 - GeoJSON values that look like JSON (e.g. hydrology's per-year metric blobs)
@@ -57,8 +61,12 @@ Quirks that have bitten before:
   don't type-check them, check presence/not-null.
 - Row ids in error output come only from columns named UID/uid/MWS UID/mws_id/
   vill_id/village_id; other layers report no sample ids.
-- There is no cross-field, uniqueness or "value or no-data sentinel" rule
-  (e.g. SOGE uses -9999 for no data, so its quantities can only be `>= -9999`).
+- Check every relationship with real data before encoding it. Not every
+  "obvious" one holds: k/kr/krz water areas are separate classes, not
+  nested, so `k <= kr <= krz` fails on correct data.
+- `expression` rules skip rows where a referenced value is null or ignored,
+  so they never flag no-data; pair them with `max_null_fraction` to catch
+  columns that are entirely no-data.
 
 ## 1. Learn what the pipeline actually writes
 
@@ -128,7 +136,8 @@ For each tehsil and form it prints the framework's status and errors, plus:
   stale, or the rule targets the other form and should change `applies_to`.
 - **unchecked fields** — columns no rule inspects. Decide per field whether it
   deserves a rule; leftovers and metadata usually don't.
-- **uid coverage** — ids present in only one of the two forms.
+- **pair** — the config's pair rules: ids present in only one of the two
+  forms (`id_coverage`) and shared fields that disagree (`field_match`).
 
 The "row ids e.g." in error lines are the failing rows' ids, not the bad values;
 look the rows up in the data to see what's wrong.
@@ -174,10 +183,10 @@ afterwards: real data must still pass, apart from genuine data problems.
 ## 6. Cross-field checks (optional, when the pipeline has arithmetic)
 
 Relationships like "parts sum to total" or "cropped area <= croppable area"
-can't be expressed as rules. Derive them from the pipeline code and test them
-with a short script; `references/cross_field_example.py` shows the pattern for
-cropping intensity. Report violations as pipeline bugs; if a relationship is
-important and holds, suggest it as a future rule type rather than hacking it in.
+are `expression` rules; year-suffixed families use `suffix_from:
+"name_{year}"`. Derive them from the pipeline code and test them on real data
+first (`references/cross_field_example.py` shows a script for cropping
+intensity). Keep a rule that fails on prod only when the data is wrong.
 
 ## 7. Report and commit
 

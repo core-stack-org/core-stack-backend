@@ -53,3 +53,18 @@ rules:
       - basin_code
       - sub_basin_code
       - watershed_code
+
+  # Pair: the sheet must describe the same MWS as the vector: same ids, same
+  # area and the same basin/sub-basin/watershed codes.
+  - name: mws_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage
+
+  - name: mws_pair_fields_match
+    applies_to: [pair]
+    type: field_match
+    value:
+      - {vector: area_in_ha, excel: area_in_ha, tolerance: 0.01}
+      - {vector: bacode, excel: basin_code}
+      - {vector: sbcode, excel: sub_basin_code}
+      - {vector: wsconc, excel: watershed_code}

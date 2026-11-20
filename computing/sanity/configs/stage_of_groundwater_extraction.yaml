@@ -118,14 +118,16 @@ rules:
     applies_to: [excel]
     type: min_value
     field_pattern: "soge_dev_percent*"
-    value: -9999
+    value: 0
+    ignore_values: [-9999]
     allow_missing_fields: true
 
   - name: soge_excel_quantities_min
     applies_to: [excel]
     type: min_value
     field_pattern: "*_in_bcm*"
-    value: -9999
+    value: 0
+    ignore_values: [-9999]
     allow_missing_fields: true
 
   - name: soge_excel_area_min
@@ -141,3 +143,69 @@ rules:
     field_pattern: "class_name*"
     value: [Safe, Semi-Critical, Critical, Over Exploited, Saline, Not Assessed, No Data]
     allow_missing_fields: true
+
+  # Pair: the sheet must cover the same MWS as the vector it summarises.
+  # A mismatch means the sheet was built from an older generation of the layer.
+  - name: stage_of_groundwater_extraction_pair_id_coverage
+    applies_to: [pair]
+    type: id_coverage
+
+  # Units: a block's annual recharge or extraction is far below 50 billion m3
+  # (all of India recharges a few hundred). Larger values mean the column is
+  # in another unit (CGWB reports hectare-metres).
+  - name: soge_excel_quantities_unit_scale
+    applies_to: [excel]
+    type: max_value
+    field_pattern: "*_in_bcm*"
+    value: 50
+    allow_missing_fields: true
+
+  # -9999 is the no-data value for an MWS without a SOGE block. A column that
+  # is mostly -9999 means the source year lacks that quantity; the export
+  # should drop it instead of averaging the sentinel.
+  - name: soge_excel_quantities_mostly_present
+    applies_to: [excel]
+    type: max_null_fraction
+    field_pattern: "*_in_bcm*"
+    value: 0.5
+    ignore_values: [-9999]
+    allow_missing_fields: true
+
+  # CGWB arithmetic, checked per assessment year (rows with -9999 skipped).
+  - name: soge_excel_total_extraction_sum
+    applies_to: [excel]
+    type: expression
+    suffix_from: "total_extraction_in_bcm_{year}"
+    value: "abs(total_extraction_in_bcm_{year} - (extraction_for_irrigation_in_bcm_{year} + extraction_for_domestic_and_industrial_in_bcm_{year})) <= 0.02 * total_extraction_in_bcm_{year}"
+    ignore_values: [-9999]
+
+  - name: soge_excel_availability_is_recharge_minus_discharge
+    applies_to: [excel]
+    type: expression
+    suffix_from: "groundwater_availability_in_bcm_{year}"
+    value: "abs(groundwater_availability_in_bcm_{year} - (groundwater_recharge_in_bcm_{year} - natural_discharge_in_bcm_{year})) <= 0.02 * groundwater_availability_in_bcm_{year}"
+    ignore_values: [-9999]
+
+  - name: soge_excel_availability_le_recharge
+    applies_to: [excel]
+    type: expression
+    suffix_from: "groundwater_availability_in_bcm_{year}"
+    value: "groundwater_availability_in_bcm_{year} <= groundwater_recharge_in_bcm_{year}"
+    ignore_values: [-9999]
+
+  - name: soge_excel_stage_is_extraction_over_availability
+    applies_to: [excel]
+    type: expression
+    suffix_from: "soge_dev_percent_{year}"
+    value: "abs(soge_dev_percent_{year} - 100 * total_extraction_in_bcm_{year} / groundwater_availability_in_bcm_{year}) <= 1"
+    ignore_values: [-9999]
+
+  # Classes follow the stage % only from the GEC-2015 method (2017 onwards);
+  # earlier assessments also weighed water-level trends.
+  - name: soge_excel_safe_class_matches_stage
+    applies_to: [excel]
+    type: expression
+    suffix_from: "class_name_{year}"
+    suffix_min: 2017
+    value: "(class_name_{year} == 'Safe') == (soge_dev_percent_{year} <= 70)"
+    ignore_values: [-9999]
