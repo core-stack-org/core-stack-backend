@@ -80,3 +80,17 @@ rules:
     type: min_value
     field_pattern: "*area*"
     value: 0
+
+  # The 11 classes partition the MWS (cropland is the sum of the four crop
+  # classes, so it is left out), so they must add up to area_in_ha.
+  - name: lulc_excel_classes_sum_to_area
+    applies_to: [excel]
+    type: expression
+    suffix_from: "barrenlands_area_in_ha_{year}"
+    value: "abs(`built-up_area_in_ha_{year}` + k_water_area_in_ha_{year} + kr_water_area_in_ha_{year} + krz_water_area_in_ha_{year} + tree_forest_area_in_ha_{year} + barrenlands_area_in_ha_{year} + shrub_scrub_area_in_ha_{year} + single_kharif_cropped_area_in_ha_{year} + single_non_kharif_cropped_area_in_ha_{year} + doubly_cropped_area_in_ha_{year} + triply_cropped_area_in_ha_{year} - area_in_ha) <= 0.02 * area_in_ha"
+
+  - name: lulc_vector_classes_sum_to_area
+    applies_to: [vector]
+    type: expression
+    suffix_from: "barrenlands_area_{year}"
+    value: "abs(`built-up_area_{year}` + k_water_area_{year} + kr_water_area_{year} + krz_water_area_{year} + tree_forest_area_{year} + barrenlands_area_{year} + shrub_scrub_area_{year} + single_kharif_cropped_area_{year} + single_non_kharif_cropped_area_{year} + doubly_cropped_area_{year} + triply_cropped_area_{year} - area_in_ha) <= 0.02 * area_in_ha"

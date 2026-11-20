@@ -49,11 +49,39 @@ def uid_set(df: pd.DataFrame):
     return None
 
 
+def mws_ids(ids: set) -> set:
+    """Reduce feature ids like 12_305795_1377 (water body 1377 in MWS 12_305795) to the MWS id."""
+    return {"_".join(i.split("_")[:2]) for i in ids}
+
+
+def comparable(v_ids: set, x_ids: set):
+    """Compare at MWS level when one side is keyed finer (e.g. per water body)."""
+    def depth(ids):
+        return max((i.count("_") for i in ids), default=0)
+    if depth(v_ids) != depth(x_ids):
+        return mws_ids(v_ids), mws_ids(x_ids)
+    return v_ids, x_ids
+
+
+def expression_groups(rule, df: pd.DataFrame) -> list:
+    """Columns referenced by an expression rule, one list per suffix it expands to."""
+    columns = [str(c) for c in df.columns]
+    groups = []
+    for suffix in rule._suffixes(df):
+        expression = rule.value.format(**suffix) if suffix else rule.value
+        referenced = rule._referenced(expression, columns)
+        if referenced:
+            groups.append(referenced)
+    return groups
+
+
 def rule_fields(rule, cfg: dict, df: pd.DataFrame) -> list:
     """Columns a rule actually inspects in df (required_* rules included)."""
     if cfg["type"] == "required_any_field_pattern":
         patterns = [p.lower() for p in cfg.get("value") or []]
         return [c for c in df.columns if any(fnmatch.fnmatchcase(c.lower(), p) for p in patterns)]
+    if cfg["type"] == "expression":
+        return [c for group in expression_groups(rule, df) for c in group]
     if cfg["type"] == "required_fields":
         wanted = cfg.get("value") or cfg.get("fields") or []
         return [c for c in wanted if c in df.columns]
@@ -131,6 +159,8 @@ def main() -> None:
                     print(f"  excel  (no data: {exc})")
             if vector_df is not None and excel_df is not None:
                 v_ids, x_ids = uid_set(vector_df), uid_set(excel_df)
+                if v_ids is not None and x_ids is not None:
+                    v_ids, x_ids = comparable(v_ids, x_ids)
                 if v_ids is not None and x_ids is not None and v_ids != x_ids:
                     only_v, only_x = sorted(v_ids - x_ids), sorted(x_ids - v_ids)
                     print(f"  uid coverage differs: {len(only_v)} only in vector (e.g. {only_v[:3]}), "

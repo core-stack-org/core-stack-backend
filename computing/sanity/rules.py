@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import fnmatch
 import logging
+import re
 from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
@@ -15,6 +16,52 @@ from pandas.api.types import (
 
 logger = logging.getLogger(__name__)
 
+# Columns used to report which rows failed, matched case-insensitively.
+ID_COLUMNS = (
+    "uid",
+    "mws uid",
+    "mws_id",
+    "vill_id",
+    "village_id",
+    "asset_id",
+    "pc11_village_id",
+    "objectid",
+)
+
+
+def numeric_values(series: pd.Series, ignore_values: List[Any]) -> pd.Series:
+    """
+    Convert a column to numbers, treating ignored sentinel values as missing.
+
+    Args:
+        series: Column to convert. Excel imports may hold numbers as objects.
+        ignore_values: Values to drop before comparing, e.g. a -9999 no-data
+            sentinel.
+
+    Returns:
+        Numeric series with non-numeric and ignored values set to NaN.
+    """
+    values = pd.to_numeric(series, errors="coerce")
+    if ignore_values:
+        values = values.mask(values.isin(ignore_values))
+    return values
+
+
+def blank_mask(series: pd.Series) -> pd.Series:
+    """
+    Flag null values and strings that are empty or whitespace only.
+
+    Args:
+        series: Column to inspect.
+
+    Returns:
+        Boolean series, True where the value is missing or blank.
+    """
+    blank = series.isna()
+    if series.dtype == object or pd.api.types.is_string_dtype(series):
+        blank = blank | series.astype(str).str.strip().eq("")
+    return blank
+
 
 class Rule(ABC):
     def __init__(
@@ -28,6 +75,7 @@ class Rule(ABC):
         fields: Optional[List[str]] = None,
         exclude_field_patterns: Optional[List[str]] = None,
         allow_missing_fields: bool = False,
+        **options: Any,
     ) -> None:
         """
         Store common rule configuration used by all concrete rules.
@@ -42,6 +90,9 @@ class Rule(ABC):
             fields: Explicit list of fields to validate.
             exclude_field_patterns: Wildcard patterns to remove from matches.
             allow_missing_fields: Whether no matching fields should pass.
+            **options: Rule-type specific settings from the YAML entry, e.g.
+                ignore_values (values a rule skips, such as a -9999 no-data
+                sentinel), allow_empty_strings, suffix_min.
 
         Returns:
             None. The normalized rule configuration is stored on self.
@@ -55,6 +106,8 @@ class Rule(ABC):
         self.fields = fields or []
         self.exclude_field_patterns = exclude_field_patterns or []
         self.allow_missing_fields = allow_missing_fields
+        self.options = options
+        self.ignore_values = list(options.get("ignore_values") or [])
 
     def get_fields(self, gdf: pd.DataFrame) -> List[str]:
         """
@@ -101,9 +154,10 @@ class Rule(ABC):
         Returns:
             Name of the first known ID column, or None when no ID column exists.
         """
-        for uid_column in ("UID", "uid", "MWS UID", "mws_id", "vill_id", "village_id"):
-            if uid_column in gdf.columns:
-                return uid_column
+        lookup = {str(col).lower(): col for col in gdf.columns}
+        for uid_column in ID_COLUMNS:
+            if uid_column in lookup:
+                return lookup[uid_column]
         return None
 
     def get_uids(self, gdf: pd.DataFrame) -> List[Any]:
@@ -281,7 +335,7 @@ class MaxValueRule(Rule):
                 continue
 
             # Excel imports may read numeric-looking cells as objects.
-            values = pd.to_numeric(gdf[field], errors="coerce")
+            values = numeric_values(gdf[field], self.ignore_values)
             invalid = gdf[values.notna() & (values > self.value)]
             results.append(
                 {
@@ -336,7 +390,7 @@ class MinValueRule(Rule):
                 continue
 
             # Excel imports may read numeric-looking cells as objects.
-            values = pd.to_numeric(gdf[field], errors="coerce")
+            values = numeric_values(gdf[field], self.ignore_values)
             invalid = gdf[values.notna() & (values < self.value)]
             results.append(
                 {
@@ -390,7 +444,12 @@ class NotNullRule(Rule):
                 )
                 continue
 
-            invalid = gdf[gdf[field].isna()]
+            # Blank strings are missing values too, unless the config says
+            # they are meaningful for this field.
+            if self.options.get("allow_empty_strings"):
+                invalid = gdf[gdf[field].isna()]
+            else:
+                invalid = gdf[blank_mask(gdf[field])]
             results.append(
                 {
                     "field": field,
@@ -544,6 +603,275 @@ class RequiredAnyFieldPatternRule(Rule):
         }
 
 
+class UniqueRule(Rule):
+    def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Validate that the matched fields, taken together, identify one row.
+
+        Every matched field forms part of one composite key. Rows whose key
+        contains a null or an ignored value (e.g. a placeholder id 0) are
+        skipped.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary listing the repeated keys.
+        """
+        fields = self.get_fields(gdf)
+        if not fields:
+            return self.no_fields_result()
+
+        missing = [field for field in fields if field not in gdf.columns]
+        if missing:
+            return {
+                "rule": self.name,
+                "results": [
+                    {
+                        "field": field,
+                        "passed": False,
+                        "invalid_count": 1,
+                        "uids": [],
+                        "message": "Field is missing",
+                    }
+                    for field in missing
+                ],
+            }
+
+        keys = gdf[fields]
+        usable = ~keys.isna().any(axis=1)
+        for field in fields:
+            usable &= ~keys[field].isin(self.ignore_values)
+        duplicated = keys[usable].duplicated(keep=False)
+        invalid = gdf[usable][duplicated]
+        repeated = (
+            invalid[fields].astype(str).agg("|".join, axis=1).value_counts()
+            if len(invalid)
+            else pd.Series(dtype=int)
+        )
+        logger.info(
+            "Unique rule '%s' found %d repeated keys in %d rows",
+            self.name,
+            len(repeated),
+            len(invalid),
+        )
+        return {
+            "rule": self.name,
+            "results": [
+                {
+                    "field": ", ".join(fields),
+                    "passed": len(invalid) == 0,
+                    "invalid_count": len(invalid),
+                    "uids": self.get_uids(invalid),
+                    "message": None
+                    if len(invalid) == 0
+                    else "Repeated keys (rows): "
+                    + ", ".join(f"{k} ({n})" for k, n in repeated.head(5).items()),
+                }
+            ],
+        }
+
+
+class MaxNullFractionRule(Rule):
+    def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Validate that no matched field is mostly missing.
+
+        Null values, blank strings and ignored sentinel values (e.g. -9999)
+        count as missing. A field fails when its missing share exceeds value,
+        which catches columns a pipeline filled entirely with no-data.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with the missing share per field.
+        """
+        fields = self.get_fields(gdf)
+        if not fields:
+            return self.no_fields_result()
+
+        limit = 0.0 if self.value is None else float(self.value)
+        results = []
+        for field in fields:
+            if field not in gdf.columns:
+                results.append(
+                    {
+                        "field": field,
+                        "passed": False,
+                        "invalid_count": 1,
+                        "uids": [],
+                        "message": "Field is missing",
+                    }
+                )
+                continue
+            missing = blank_mask(gdf[field]) | gdf[field].isin(self.ignore_values)
+            share = float(missing.mean()) if len(gdf) else 0.0
+            passed = share <= limit
+            results.append(
+                {
+                    "field": field,
+                    "passed": passed,
+                    "invalid_count": 0 if passed else int(missing.sum()),
+                    "uids": [],
+                    "message": None
+                    if passed
+                    else f"{share:.0%} of rows are missing or no-data (limit {limit:.0%})",
+                }
+            )
+        return {"rule": self.name, "results": results}
+
+
+class DistinctColumnsRule(Rule):
+    def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Validate that two or more fields are not copies of each other.
+
+        Fails when a pair of matched fields holds identical values in every
+        row, which usually means an export wrote one column into another.
+        Pairs that are entirely zero or null are not flagged.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with one entry per identical pair.
+        """
+        fields = [field for field in self.get_fields(gdf) if field in gdf.columns]
+        if len(fields) < 2:
+            return self.no_fields_result()
+
+        min_rows = int(self.options.get("min_rows", 3))
+        results = []
+        for i, left in enumerate(fields):
+            for right in fields[i + 1:]:
+                a, b = gdf[left], gdf[right]
+                both = a.notna() & b.notna()
+                informative = both & ~((a == 0) & (b == 0))
+                identical = (
+                    informative.sum() >= min_rows and (a[both] == b[both]).all()
+                )
+                results.append(
+                    {
+                        "field": f"{left}, {right}",
+                        "passed": not identical,
+                        "invalid_count": int(both.sum()) if identical else 0,
+                        "uids": [],
+                        "message": "Fields are identical in every row"
+                        if identical
+                        else None,
+                    }
+                )
+        return {"rule": self.name, "results": results}
+
+
+class ExpressionRule(Rule):
+    """
+    Row-level check written as a pandas expression over several fields.
+
+    value is the expression, e.g. "total = a + b" written as
+    "abs(total - (a + b)) <= 0.02 * total". Column names that are not valid
+    Python names go in backticks. Year- or season-suffixed column families
+    use a placeholder: "{year}" in the expression is filled in from every
+    column matching suffix_from (e.g. "soge_dev_percent_{year}"), and the
+    expression is checked once per suffix. suffix_min skips smaller numeric
+    suffixes (e.g. years before a method change).
+
+    Rows where any referenced value is null or an ignored sentinel are
+    skipped, so no-data never counts as a violation here.
+    """
+
+    PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
+    def _suffixes(self, gdf: pd.DataFrame) -> List[Dict[str, str]]:
+        source = self.options.get("suffix_from")
+        if not source:
+            return [{}]
+        names = self.PLACEHOLDER.findall(source)
+        pattern = re.escape(source)
+        for name in names:
+            pattern = pattern.replace(
+                re.escape("{" + name + "}"), f"(?P<{name}>[^_]+?)"
+            )
+        regex = re.compile(f"^{pattern}$", re.IGNORECASE)
+        found = []
+        for col in gdf.columns:
+            match = regex.match(str(col))
+            if match and match.groupdict() not in found:
+                found.append(match.groupdict())
+        suffix_min = self.options.get("suffix_min")
+        if suffix_min is not None:
+            found = [
+                groups
+                for groups in found
+                if all(
+                    not str(v).isdigit() or int(v) >= int(suffix_min)
+                    for v in groups.values()
+                )
+            ]
+        return found
+
+    @staticmethod
+    def _referenced(expression: str, columns: List[str]) -> List[str]:
+        quoted = re.findall(r"`([^`]+)`", expression)
+        bare = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", re.sub(r"`[^`]+`", " ", expression))
+        return [col for col in dict.fromkeys(quoted + bare) if col in columns]
+
+    def validate(self, gdf: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Evaluate the expression per row and report rows where it is false.
+
+        Args:
+            gdf: DataFrame or GeoDataFrame containing layer rows.
+
+        Returns:
+            Rule result dictionary with one entry per suffix checked.
+        """
+        if not self.value:
+            raise ValueError(f"Rule '{self.name}' requires an expression in value")
+
+        results = []
+        columns = [str(col) for col in gdf.columns]
+        for groups in self._suffixes(gdf):
+            expression = self.value.format(**groups) if groups else self.value
+            label = expression if len(expression) <= 80 else expression[:77] + "..."
+            referenced = self._referenced(expression, columns)
+            frame = gdf.drop(columns="geometry", errors="ignore")
+            try:
+                outcome = frame.eval(expression, engine="python")
+            except Exception as exc:  # unknown column or bad syntax
+                results.append(
+                    {
+                        "field": label,
+                        "passed": False,
+                        "invalid_count": 1,
+                        "uids": [],
+                        "message": f"Expression could not be evaluated: {exc}",
+                    }
+                )
+                continue
+
+            usable = pd.Series(True, index=gdf.index)
+            for col in referenced:
+                values = gdf[col]
+                usable &= values.notna()
+                if self.ignore_values:
+                    usable &= ~values.isin(self.ignore_values)
+            invalid = gdf[usable & ~outcome.astype(bool)]
+            results.append(
+                {
+                    "field": label,
+                    "passed": len(invalid) == 0,
+                    "invalid_count": len(invalid),
+                    "uids": self.get_uids(invalid),
+                }
+            )
+
+        if not results:
+            return self.no_fields_result()
+        return {"rule": self.name, "results": results}
+
+
 RULE_MAP = {
     "max_value": MaxValueRule,
     "min_value": MinValueRule,
@@ -552,4 +880,8 @@ RULE_MAP = {
     "data_type": DataTypeRule,
     "required_fields": RequiredFieldsRule,
     "required_any_field_pattern": RequiredAnyFieldPatternRule,
+    "unique": UniqueRule,
+    "max_null_fraction": MaxNullFractionRule,
+    "distinct_columns": DistinctColumnsRule,
+    "expression": ExpressionRule,
 }

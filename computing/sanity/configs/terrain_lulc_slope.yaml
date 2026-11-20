@@ -147,3 +147,21 @@ rules:
     type: max_value
     field_pattern: "*_area_percent"
     value: 100
+
+  # Each class is its own column; identical columns mean the export wrote one
+  # class into another.
+  - name: terrain_lulc_slope_excel_classes_distinct
+    applies_to: [excel]
+    type: distinct_columns
+    field_pattern: "*_area_percent"
+
+  - name: terrain_lulc_slope_vector_forest_shrub_distinct
+    applies_to: [vector]
+    type: distinct_columns
+    fields: [forests, shrub_scrub]
+
+  # Shares of one MWS's area cannot add up to more than 100%.
+  - name: terrain_lulc_slope_excel_percent_sum_max
+    applies_to: [excel]
+    type: expression
+    value: "barren_area_percent + forests_area_percent + shrub_scrubs_area_percent + single_kharif_area_percent + single_non_kharif_area_percent + double_cropping_area_percent + triple_cropping_area_percent <= 100.5"

@@ -33,13 +33,16 @@ rules:
     value: [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
   # Downstream / upstream links: raw names in the vector, *_mws in Excel.
-  # upstream is a list literal and may be "[]"; downstream must be set.
+  # upstream is a list literal and may be "[]". downstream is "" for an MWS
+  # whose flow leaves the tehsil (the export writes "unknown"), so blanks are
+  # allowed here; only true nulls fail.
   - name: mws_connectivity_vector_links_not_null
     applies_to: [vector]
     type: not_null
     fields:
       - downstream
       - upstream
+    allow_empty_strings: true
 
   - name: mws_connectivity_excel_links_not_null
     applies_to: [excel]
