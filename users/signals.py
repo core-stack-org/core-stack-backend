@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
-
+from django.db import transaction
 from users.models import AccountType
 
 User = get_user_model()
@@ -19,10 +19,12 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
             print("adding account to admin")
             group = Group.objects.get(pk=ADMIN_GROUP_ID)
             instance.groups.add(group)
-        subject = f"New User Registered – Assign to Project"
-        user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
 
-        message = f"""
+        def _send_email():
+          subject = f"New User Registered – Assign to Project"
+          user_approval_url = f"{BASE_URL}admin/users/userprojectgroup/"
+
+          message = f"""
         <html>
   <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6; background-color: #f4f4f4; margin: 0; padding: 0;">
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" width="100%" style="max-width: 600px; margin: auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px;">
@@ -109,5 +111,7 @@ def send_email_to_org_admin(sender, instance, created, **kwargs):
 </html>
         """
 
-        recipients = ["support@core-stack.org"]
-        send_email_notification.delay(subject, "", message, recipients)
+          recipients = ["support@core-stack.org"]
+          print("sending to", recipients, "org:", instance.organization)
+          send_email_notification.delay(subject, "", message, recipients)
+        transaction.on_commit(_send_email)
