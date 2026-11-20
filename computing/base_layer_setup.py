@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import requests
 import yaml
 
+from computing.config_loader import layer_dir
 from computing.config_loader import (
     ADMIN_BOUNDARY_DIR,
     ADMIN_BOUNDARY_INPUT_DIR,

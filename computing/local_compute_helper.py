@@ -24,6 +24,7 @@ from computing.config_loader import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
+    layer_dir,
 )
 from computing.base_layer_setup import (
     ensure_tehsil_watershed,
@@ -310,11 +311,11 @@ def _build_output_dir(
 ):
     output_base_dir = Path(output_base_dir)
     if state and district and block:
-        output_dir = (
-            output_base_dir
-            / _slug(state, "unknown_state")
-            / _slug(district, "unknown_district")
-            / _slug(block, block_fallback)
+        output_dir = layer_dir(
+            output_base_dir,
+            _slug(state, "unknown_state"),
+            _slug(district, "unknown_district"),
+            _slug(block, block_fallback),
         )
     else:
         output_dir = output_base_dir / custom_subdir
@@ -1089,10 +1090,12 @@ def resolve_clipped_terrain_raster_path(
 ):
     layer_stub = f"{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_tehsil')}_terrain_raster"
     raster_path = (
-        Path(clipped_raster_dir)
-        / _slug(state, "unknown_state")
-        / _slug(district, "unknown_district")
-        / _slug(block, "unknown_tehsil")
+        layer_dir(
+            clipped_raster_dir,
+            _slug(state, "unknown_state"),
+            _slug(district, "unknown_district"),
+            _slug(block, "unknown_tehsil"),
+        )
         / f"{layer_stub}.tif"
     )
     ensure_file_exists(raster_path, "Clipped terrain raster")
