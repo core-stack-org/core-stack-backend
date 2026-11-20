@@ -1,9 +1,8 @@
 import datetime
 import time
 from datetime import timedelta
-import ee
 from dateutil.relativedelta import relativedelta
-
+import ee
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import (
     ee_initialize,
@@ -19,18 +18,18 @@ from utilities.gee_utils import (
     gcs_file_exists,
 )
 from nrm_app.celery import app
-from .cropping_frequency import *
+
 from computing.utils import (
     save_layer_info_to_db,
     update_layer_sync_status,
     get_layer_object,
 )
 
-from utilities.constants import PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH
+from utilities.constants import PAN_INDIA_LULC_V4_DATASET
 
 
 @app.task(bind=True)
-def clip_lulc_v3(
+def clip_lulc(
     self,
     state=None,
     district=None,
@@ -125,7 +124,7 @@ def clip_lulc_v3(
         final_output_assetid_array_new.append(final_output_assetid)
         if not new_loop_start or loop_start >= new_loop_start:
             pan_india = ee.Image(
-                f"{PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH}_{curr_start_year}_{curr_end_year}"
+                f"{PAN_INDIA_LULC_V4_DATASET}{curr_start_year}_{curr_end_year}"
             )
             clipped_lulc = pan_india.clip(roi.geometry())
             l1_asset_new.append(clipped_lulc)
@@ -190,22 +189,22 @@ def clip_lulc_v3(
                     print("saved info to db at the gee level...")
                 make_asset_public(final_output_assetid_array_new[i])
 
-    sync_lulc_to_gcs(
-        final_output_filename_array_new,
-        final_output_assetid_array_new,
-        scale,
-    )
-
-    layer_at_geoserver = sync_lulc_to_geoserver(
-        final_output_filename_array_new,
-        state,
-        district,
-        block,
-        layer_ids,
-        asset_suffix,
-    )
-
-    return layer_at_geoserver
+    # sync_lulc_to_gcs(
+    #     final_output_filename_array_new,
+    #     final_output_assetid_array_new,
+    #     scale,
+    # )
+    #
+    # layer_at_geoserver = sync_lulc_to_geoserver(
+    #     final_output_filename_array_new,
+    #     state,
+    #     district,
+    #     block,
+    #     layer_ids,
+    #     asset_suffix,
+    # )
+    #
+    # return layer_at_geoserver
 
 
 def sync_lulc_to_gcs(

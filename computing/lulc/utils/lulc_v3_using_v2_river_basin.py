@@ -1,6 +1,5 @@
 import datetime
 from datetime import timedelta
-import ee
 from dateutil.relativedelta import relativedelta
 
 from utilities.gee_utils import (
@@ -13,7 +12,7 @@ from utilities.gee_utils import (
     make_asset_public,
 )
 from nrm_app.celery import app
-from computing.lulc.cropping_frequency import *
+from computing.lulc.utils.cropping_frequency import *
 from computing.lulc.misc import clip_lulc_from_river_basin
 from utilities.constants import (
     CGWB_BASIN,
