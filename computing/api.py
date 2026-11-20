@@ -498,6 +498,17 @@ def delete_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def _location_path_error(**names):
+    """Location names become folder and file names, so they can't hold path parts."""
+    for field, value in names.items():
+        if any(part in value for part in ("/", "\\", "..", "\x00")):
+            return Response(
+                {"error": f"{field} must not contain '/', '\\' or '..'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    return None
+
+
 @api_view(["POST"])
 @schema(None)
 def upload_kml(request):
@@ -507,6 +518,9 @@ def upload_kml(request):
         state = req_body.get("state").lower()
         district = req_body.get("district").lower()
         block = req_body.get("block").lower()
+        error = _location_path_error(state=state, district=district, block=block)
+        if error:
+            return error
         kml_file = request.FILES["file"]
 
         fs = FileSystemStorage(KML_PATH)
@@ -2020,6 +2034,10 @@ def fes_clart_upload_layer(request):
         block = request.data.get("block", "").lower()
         gee_account_id = request.data.get("gee_account_id").lower()
         uploaded_file = request.FILES.get("clart_file")
+
+        error = _location_path_error(state=state, district=district, block=block)
+        if error:
+            return error
 
         if not uploaded_file:
             return Response(
