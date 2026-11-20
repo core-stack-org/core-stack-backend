@@ -16,6 +16,7 @@ from .views import (
     TokenRefreshView,
     UserProjectGroupViewSet,
     UserViewSet,
+    SendOtpView,
 )
 
 router = DefaultRouter()
@@ -43,4 +44,5 @@ urlpatterns = [
     path("auth/reset-password/<uidb64>/<token>/", ResetPasswordView.as_view(), name="reset-password"),
     path("", include(router.urls)),
     path("", include(projects_user_router.urls)),
+    path("auth/register/send_otp/", SendOtpView.as_view(), name="send-otp"),
 ]
