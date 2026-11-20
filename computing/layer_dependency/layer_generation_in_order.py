@@ -7,7 +7,7 @@ from computing.mws.generate_hydrology_local import (
     generate_hydrology as generate_hydrology_local,
 )
 
-from computing.lulc.lulc_v3 import clip_lulc_v3
+from computing.lulc.clip_lulc import clip_lulc
 from computing.lulc.lulc_vector import vectorise_lulc
 from computing.cropping_intensity.cropping_intensity import generate_cropping_intensity
 from computing.surface_water_bodies.swb import generate_swb_layer
@@ -186,8 +186,8 @@ GEE_TASK_REGISTRY = {
     "mws_layer": mws_layer,
     "generate_mws_layer": mws_layer,
     "generate_hydrology": generate_hydrology,
-    "clip_lulc_v3": clip_lulc_v3,
-    "lulc_v3": clip_lulc_v3,
+    "clip_lulc_v3": clip_lulc,
+    "lulc_v3": clip_lulc,
     "vectorise_lulc": vectorise_lulc,
     "lulc_vector": vectorise_lulc,
     "generate_cropping_intensity": generate_cropping_intensity,
