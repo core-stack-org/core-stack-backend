@@ -93,7 +93,7 @@ class User(AbstractUser):
             and project
             and project.organization == self.organization
             and self.groups.filter(
-                name_in=["Organization Admin", "Org Admin", "Administrator"]
+                name__in=["Organization Admin", "Org Admin", "Administrator"]
             ).exists()
         ):
             return True
