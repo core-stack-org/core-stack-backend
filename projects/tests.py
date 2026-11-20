@@ -13,6 +13,12 @@ class ProjectModelTest(TestCase):
         self.organization = Organization.objects.create(
             name="Test Organization", description="Test Description"
         )
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="test@example.com",
+            password="password123",
+            organization=self.organization,
+        )
 
     def test_project_creation(self):
         project = Project.objects.create(
@@ -20,6 +26,8 @@ class ProjectModelTest(TestCase):
             organization=self.organization,
             description="Test Project Description",
             geojson_path="/path/to/geojson",
+            created_by=self.user,
+            updated_by=self.user,
         )
         self.assertEqual(project.name, "Test Project")
         self.assertEqual(project.organization, self.organization)
@@ -32,6 +40,8 @@ class ProjectModelTest(TestCase):
             organization=self.organization,
             app_type=AppType.PLANTATION,
             enabled=True,
+            created_by=self.user,
+            updated_by=self.user,
         )
 
         self.assertEqual(project.app_type, AppType.PLANTATION)
@@ -69,6 +79,8 @@ class ProjectAPITest(APITestCase):
             description="Test description",
             app_type=AppType.WATERSHED,
             enabled=True,
+            created_by=self.admin_user,
+            updated_by=self.admin_user,
         )
 
         # URLs
