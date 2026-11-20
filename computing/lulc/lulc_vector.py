@@ -152,6 +152,7 @@ def generate_vector(
         {"label": 10, "txt": "doubly_cropped_area_"},
         {"label": 11, "txt": "triply_cropped_area_"},
         {"label": 12, "txt": "shrub_scrub_area_"},
+        {"label": 13, "txt": "plantation_area_"},
     ]
 
     def res(feature):

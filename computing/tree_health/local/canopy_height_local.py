@@ -142,7 +142,7 @@ def _clip_and_mask_ch(ch_path, lulc_path, roi_gdf, output_path):
             resampling=Resampling.mode,
         )
 
-    tree_mask = lulc_array == LulcClass.TREES
+    tree_mask = (lulc_array == LulcClass.TREES) | (lulc_array == LulcClass.PLANTATION)
     valid_ch = ch_array != nodata
     output_array = np.where(tree_mask & valid_ch, ch_array, nodata).astype(
         ch_array.dtype,
@@ -184,8 +184,7 @@ def tree_health_ch_raster_local(
     # Admin runs use the precomputed watershed boundary. Custom runs use the ROI path.
     if state and district and block:
         asset_suffix = (
-            f"{_slug(district, 'unknown_district')}_"
-            f"{_slug(block, 'unknown_block')}"
+            f"{_slug(district, 'unknown_district')}_" f"{_slug(block, 'unknown_block')}"
         )
         roi_gdf = load_precomputed_roi(
             state=state,
@@ -226,7 +225,7 @@ def tree_health_ch_raster_local(
         )
 
         # Local replacement for:
-        # ImageCollection(CH).mean().clip(roi).updateMask(lulc.eq(6))
+        # ImageCollection(CH).mean().clip(roi).updateMask(lulc.eq(6).Or(lulc.eq(13)))
         raster_path = _clip_and_mask_ch(
             ch_path=ch_path,
             lulc_path=lulc_path,

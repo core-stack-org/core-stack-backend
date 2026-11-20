@@ -166,7 +166,16 @@ CORS_ALLOW_METHODS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "https://www.cse.iitd.ernet.in", "https://cse.iitd.ernet.in"]
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "https://www.cse.iitd.ac.in",
+        "https://cse.iitd.ac.in",
+        "https://www.cse.iitd.ernet.in",
+        "https://cse.iitd.ernet.in",
+    ]
+)
 
 # MARK: REST Framework
 

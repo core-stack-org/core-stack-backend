@@ -1,7 +1,7 @@
 import ee
 from datetime import date
 
-from utilities.constants import AEZ
+from utilities.constants import AEZ, PAN_INDIA_LULC_V4_DATASET
 from utilities.gee_utils import (
     export_raster_asset_to_gee,
     ee_initialize,
@@ -69,7 +69,7 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
     LULC_START_YEAR = 2017
 
     OUTPUT_DESC = f"Hybrid_Tree_AEZ_{aez}_{str(start_year)}_{str(end_year)}"
-    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/tree_mask/{OUTPUT_DESC}"
+    OUTPUT_ASSET_ID = f"projects/corestack-trees/assets/hazards/tree_mask/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None, OUTPUT_ASSET_ID
@@ -93,11 +93,6 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
         )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
 
     # --- GLC-FCS30D ---
     glcMosaic = ee.ImageCollection(
@@ -111,9 +106,7 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
     indiaSatList = []
     for year in range(LULC_START_YEAR, end_year + 1):
         indiaSatList.append(
-            ee.Image(
-                f"projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_{year}_{year + 1}"
-            ).set("year", year)
+            ee.Image(f"{PAN_INDIA_LULC_V4_DATASET}{year}_{year + 1}").set("year", year)
         )
 
     indiaSatCol = ee.ImageCollection(indiaSatList)
@@ -123,7 +116,10 @@ def generate_hybrid_tree_mask(aez, start_year=2004, end_year=None, gee_account_i
         return ee.Image(
             ee.Algorithms.If(
                 img,
-                ee.Image(img).select("predicted_label").eq(6).unmask(0),
+                ee.Image(img)
+                .select("predicted_label")
+                .remap([6, 13], [1, 1], 0)
+                .unmask(0),
                 ee.Image(0),
             )
         ).rename("tree")

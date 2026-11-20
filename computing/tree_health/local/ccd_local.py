@@ -133,7 +133,7 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
         )
 
     # Keep CCD values only for tree pixels. Everything else becomes nodata.
-    tree_mask = lulc_array == LulcClass.TREES
+    tree_mask = (lulc_array == LulcClass.TREES) | (lulc_array == LulcClass.PLANTATION)
 
     valid_ccd = ccd_array != nodata
     output_array = np.where(tree_mask & valid_ccd, ccd_array, nodata).astype(

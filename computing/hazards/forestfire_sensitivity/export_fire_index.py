@@ -1,7 +1,7 @@
 import ee
 from datetime import date
 
-from utilities.constants import AEZ
+from utilities.constants import AEZ, FIRE_INDEX_OUTPUT_GEE_PATH
 from utilities.gee_utils import (
     export_raster_asset_to_gee,
     ee_initialize,
@@ -46,7 +46,7 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
     """
     ee_initialize(gee_account_id)
     OUTPUT_DESC = f"fire_index_FRP30_AEZ_{aez}"
-    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/fire_index/{OUTPUT_DESC}"
+    OUTPUT_ASSET_ID = f"{FIRE_INDEX_OUTPUT_GEE_PATH}/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
@@ -58,11 +58,7 @@ def fire_index(aez, start_year=2004, end_year=2024, gee_account_id=None):
         )
 
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
+
     FRP_SCALE = 0.1
     FRP_THRESHOLD = 30  # MW. Raw MaxFRP cut is 30 / 0.1 = 300.
     """

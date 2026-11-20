@@ -1,7 +1,7 @@
 import ee
 from datetime import date
 
-from utilities.constants import AEZ
+from utilities.constants import AEZ, RAIN_INDEX_OUTPUT_GEE_PATH
 from utilities.gee_utils import (
     ee_initialize,
     is_gee_asset_exists,
@@ -40,7 +40,7 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
 
     ee_initialize(gee_account_id)
     OUTPUT_DESC = f"rain_index_AEZ_{aez}"
-    OUTPUT_ASSET_ID = f"projects/corestack-datasets-alpha/assets/datasets/hazards/rainfall_index/{OUTPUT_DESC}"
+    OUTPUT_ASSET_ID = f"{RAIN_INDEX_OUTPUT_GEE_PATH}/{OUTPUT_DESC}"
 
     if is_gee_asset_exists(OUTPUT_ASSET_ID):
         return None
@@ -69,11 +69,6 @@ def rainfall_index(aez, start_year=2004, end_year=None, gee_account_id=None):
 
     # 1. AOI
     aoi = ee.FeatureCollection(AEZ).filter(ee.Filter.eq("ae_regcode", aez)).geometry()
-    # aoi = (
-    #     ee.FeatureCollection("projects/ext-datasets/assets/datasets/State_pan_india")
-    #     .filter(ee.Filter.eq("Name", "Odisha"))
-    #     .geometry()
-    # )
 
     # 2. FULL CHIRPS COLLECTION
     # Deliberately unbounded on the end date. This collection feeds BOTH the
