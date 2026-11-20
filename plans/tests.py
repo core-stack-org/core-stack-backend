@@ -11,7 +11,8 @@ from rest_framework.test import APITestCase, APIClient
 from rest_framework import status
 
 from dpr.models import ODK_settlement
-from .models import Plan
+from .models import PlanApp
+from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI
 from .utils import fetch_db_data
 from projects.models import Project, AppType
 from organization.models import Organization
@@ -24,14 +25,6 @@ class PlanModelTest(TestCase):
         # Create organization
         self.organization = Organization.objects.create(name="Test Organization")
 
-        # Create project with app_type
-        self.project = Project.objects.create(
-            name="Test Project",
-            organization=self.organization,
-            app_type=AppType.WATERSHED,
-            enabled=True,
-        )
-
         # Create user
         self.user = User.objects.create_user(
             username="testuser",
@@ -40,25 +33,30 @@ class PlanModelTest(TestCase):
             organization=self.organization,
         )
 
+        # Create project with app_type
+        self.project = Project.objects.create(
+            name="Test Project",
+            organization=self.organization,
+            app_type=AppType.WATERSHED,
+            enabled=True,
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
     def test_plan_creation(self):
-        plan = Plan.objects.create(
-            name="Test Watershed Plan",
+        plan = PlanApp.objects.create(
+            plan="Test Watershed Plan",
             project=self.project,
             organization=self.organization,
-            state="Test State",
-            district="Test District",
-            block="Test Block",
-            village="Test Village",
+            village_name="Test Village",
             gram_panchayat="Test GP",
             created_by=self.user,
         )
 
         # Check model attributes
-        self.assertEqual(plan.name, "Test Watershed Plan")
+        self.assertEqual(plan.plan, "Test Watershed Plan")
         self.assertEqual(plan.project, self.project)
         self.assertEqual(plan.organization, self.organization)
-        self.assertEqual(plan.state, "Test State")
-        self.assertEqual(plan.district, "Test District")
         self.assertEqual(plan.created_by, self.user)
 
 
@@ -69,12 +67,15 @@ class PlanAPITest(APITestCase):
         # Create organization
         self.organization = Organization.objects.create(name="Test Organization")
 
-        # Create project with app_type
-        self.project = Project.objects.create(
-            name="Test Project",
-            organization=self.organization,
-            app_type=AppType.WATERSHED,
-            enabled=True,
+        # New plans need an active SOI state, district and tehsil
+        self.state_soi = StateSOI.objects.create(
+            state_name="Test State", active_status=True
+        )
+        self.district_soi = DistrictSOI.objects.create(
+            state=self.state_soi, district_name="Test District", active_status=True
+        )
+        self.tehsil_soi = TehsilSOI.objects.create(
+            district=self.district_soi, tehsil_name="Test Tehsil", active_status=True
         )
 
         # Create admin user
@@ -84,6 +85,16 @@ class PlanAPITest(APITestCase):
             password="password123",
             organization=self.organization,
             is_superadmin=True,
+        )
+
+        # Create project with app_type
+        self.project = Project.objects.create(
+            name="Test Project",
+            organization=self.organization,
+            app_type=AppType.WATERSHED,
+            enabled=True,
+            created_by=self.admin_user,
+            updated_by=self.admin_user,
         )
 
         # Create edit user
@@ -152,14 +163,11 @@ class PlanAPITest(APITestCase):
         )
 
         # Create a test plan
-        self.plan = Plan.objects.create(
-            name="Test Watershed Plan",
+        self.plan = PlanApp.objects.create(
+            plan="Test Watershed Plan",
             project=self.project,
             organization=self.organization,
-            state="Test State",
-            district="Test District",
-            block="Test Block",
-            village="Test Village",
+            village_name="Test Village",
             gram_panchayat="Test GP",
             created_by=self.admin_user,
         )
@@ -197,31 +205,32 @@ class PlanAPITest(APITestCase):
     def test_create_plan_as_admin(self):
         self.client.force_authenticate(user=self.admin_user)
         data = {
-            "name": "New Watershed Plan",
-            "state": "New State",
-            "district": "New District",
-            "block": "New Block",
-            "village": "New Village",
+            "plan": "New Watershed Plan",
+            "state_soi": self.state_soi.pk,
+            "district_soi": self.district_soi.pk,
+            "tehsil_soi": self.tehsil_soi.pk,
+            "facilitator_name": "Test Facilitator",
+            "village_name": "New Village",
             "gram_panchayat": "New GP",
         }
 
         response = self.client.post(self.plans_list_url, data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["name"], "New Watershed Plan")
-        self.assertEqual(response.data["state"], "New State")
+        self.assertEqual(response.data["plan_data"]["plan"], "New Watershed Plan")
 
         # Check plan was created in database
-        self.assertEqual(Plan.objects.count(), 2)
+        self.assertEqual(PlanApp.objects.count(), 2)
 
     def test_create_plan_as_editor(self):
         self.client.force_authenticate(user=self.edit_user)
         data = {
-            "name": "Editor Plan",
-            "state": "Editor State",
-            "district": "Editor District",
-            "block": "Editor Block",
-            "village": "Editor Village",
+            "plan": "Editor Plan",
+            "state_soi": self.state_soi.pk,
+            "district_soi": self.district_soi.pk,
+            "tehsil_soi": self.tehsil_soi.pk,
+            "facilitator_name": "Test Facilitator",
+            "village_name": "Editor Village",
             "gram_panchayat": "Editor GP",
         }
 
@@ -229,16 +238,17 @@ class PlanAPITest(APITestCase):
 
         # Editor should be able to create plans
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["name"], "Editor Plan")
+        self.assertEqual(response.data["plan_data"]["plan"], "Editor Plan")
 
     def test_create_plan_as_viewer(self):
         self.client.force_authenticate(user=self.view_user)
         data = {
-            "name": "Viewer Plan",
-            "state": "Viewer State",
-            "district": "Viewer District",
-            "block": "Viewer Block",
-            "village": "Viewer Village",
+            "plan": "Viewer Plan",
+            "state_soi": self.state_soi.pk,
+            "district_soi": self.district_soi.pk,
+            "tehsil_soi": self.tehsil_soi.pk,
+            "facilitator_name": "Test Facilitator",
+            "village_name": "Viewer Village",
             "gram_panchayat": "Viewer GP",
         }
 
@@ -250,43 +260,31 @@ class PlanAPITest(APITestCase):
     def test_update_plan_as_admin(self):
         self.client.force_authenticate(user=self.admin_user)
         data = {
-            "name": "Updated Plan",
-            "state": "Updated State",
-            "district": "Updated District",
-            "block": "Updated Block",
-            "village": "Updated Village",
+            "plan": "Updated Plan",
+            "village_name": "Updated Village",
             "gram_panchayat": "Updated GP",
         }
 
         response = self.client.put(self.plan_detail_url, data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["name"], "Updated Plan")
+        self.assertEqual(response.data["plan_data"]["plan"], "Updated Plan")
 
         # Verify database was updated
-        updated_plan = Plan.objects.get(pk=self.plan.pk)
-        self.assertEqual(updated_plan.name, "Updated Plan")
+        updated_plan = PlanApp.objects.get(pk=self.plan.pk)
+        self.assertEqual(updated_plan.plan, "Updated Plan")
 
     def test_update_plan_as_editor(self):
         self.client.force_authenticate(user=self.edit_user)
-        data = {
-            "name": "Editor Updated",
-            "state": self.plan.state,
-            "district": self.plan.district,
-            "block": self.plan.block,
-            "village": self.plan.village,
-            "gram_panchayat": self.plan.gram_panchayat,
-        }
-
-        response = self.client.patch(self.plan_detail_url, {"name": "Editor Updated"})
+        response = self.client.patch(self.plan_detail_url, {"plan": "Editor Updated"})
 
         # Editor should be able to update plans
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["name"], "Editor Updated")
+        self.assertEqual(response.data["plan_data"]["plan"], "Editor Updated")
 
     def test_update_plan_as_viewer(self):
         self.client.force_authenticate(user=self.view_user)
-        data = {"name": "Viewer Updated"}
+        data = {"plan": "Viewer Updated"}
 
         response = self.client.patch(self.plan_detail_url, data)
 
@@ -300,7 +298,7 @@ class PlanAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
         # Verify plan was deleted
-        self.assertEqual(Plan.objects.count(), 0)
+        self.assertEqual(PlanApp.objects.count(), 0)
 
     def test_delete_plan_as_editor(self):
         self.client.force_authenticate(user=self.edit_user)
@@ -310,7 +308,7 @@ class PlanAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         # Verify plan was not deleted
-        self.assertEqual(Plan.objects.count(), 1)
+        self.assertEqual(PlanApp.objects.count(), 1)
 
     def test_delete_plan_as_viewer(self):
         self.client.force_authenticate(user=self.view_user)
@@ -320,7 +318,7 @@ class PlanAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
         # Verify plan was not deleted
-        self.assertEqual(Plan.objects.count(), 1)
+        self.assertEqual(PlanApp.objects.count(), 1)
 
 
 # Minimal valid ODK settlement JSON (same structure as ODK submissions stored in data_settlement)
