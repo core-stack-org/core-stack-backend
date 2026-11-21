@@ -1,6 +1,7 @@
 import os
 
 import pandas as pd
+from computing.config_loader import DATA_DIR
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -25,7 +26,7 @@ from utilities.constants import LulcClass
 
 
 LOCAL_OUTPUT_BASE_DIR = (
-    PROJECT_ROOT / "data/cropping_intensity/cropping_intensity_local"
+    DATA_DIR / "cropping_intensity/cropping_intensity_local"
 )
 GEOSERVER_WORKSPACE = "crop_intensity"
 LOCAL_ALGORITHM = "local_cropping_intensity"
