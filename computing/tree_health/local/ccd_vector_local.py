@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from computing.config_loader import PROJECT_ROOT
+from computing.config_loader import DATA_DIR, PROJECT_ROOT, layer_dir
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
@@ -17,7 +17,7 @@ from utilities.gee_utils import valid_gee_text
 from computing.tree_health.local.ccd_local import LOCAL_OUTPUT_BASE_DIR as CCD_RASTER_DIR
 
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
+LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "tree_ccd_vector"
 
 CCD_CLASSES = [
@@ -37,10 +37,12 @@ def _resolve_ccd_output_raster(asset_suffix, year, state=None, district=None, bl
     raster_name = f"ccd_raster_{asset_suffix}_{year}.tif"
     if state and district and block:
         path = (
-            Path(CCD_RASTER_DIR)
-            / _slug(state, "unknown_state")
-            / _slug(district, "unknown_district")
-            / _slug(block, "unknown_block")
+            layer_dir(
+            CCD_RASTER_DIR,
+            _slug(state, "unknown_state"),
+            _slug(district, "unknown_district"),
+            _slug(block, "unknown_block"),
+        )
             / raster_name
         )
     else:
