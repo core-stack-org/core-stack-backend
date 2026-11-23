@@ -216,6 +216,29 @@ class RelativePathAndRoutingTests(SimpleTestCase):
         self.assertEqual(args["path"], str(Path(tmp) / "terrain" / "x"))
         self.assertEqual(args["file_type"], "gpkg")
 
+    def test_tree_health_raster_placeholder_style_is_replaced(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "tree_health" / "ch.tif"
+            target.parent.mkdir()
+            target.touch()
+            entry = self._entry(
+                path="data/tree_health/ch.tif",
+                layer_type="raster",
+                workspace="tree_ch_raster",
+                style_name="default_style",
+            )
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                args = _publish_args(entry)
+                explicit = _publish_args({**entry, "style_name": "custom_style"})
+        self.assertEqual(args["style_name"], "tree_ch_style")
+        self.assertEqual(explicit["style_name"], "custom_style")
+
     def test_missing_relative_file_is_unusable(self):
         from computing.pending_geoserver_sync import _publish_args
 
