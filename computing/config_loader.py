@@ -148,6 +148,9 @@ LULC_BASE_DIR: Path = _abs(
     )
 ).parent
 
+LULC_TEMPORAL_CORRECTION_INPUT_DIR: Path = _base_layer_path("lulc_v4_raw")
+LULC_TEMPORAL_CORRECTION_OUTPUT_DIR: Path = _base_layer_path("lulc_v4_temporal_corrected")
+
 TERRAIN_RASTER_PATH: Path = _base_layer_path("terrain")
 
 SOIL_RASTER_PATH: Path = _base_layer_path(

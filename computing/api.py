@@ -3,6 +3,7 @@ import json
 import inspect
 import logging
 import os
+from pathlib import Path
 
 import requests
 from django.conf import settings
@@ -106,6 +107,16 @@ from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
 from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
 from .lulc.v4.lulc_v4 import generate_lulc_v4
+from .lulc.v4.temporal_correction import runner as temporal_correction
+from .lulc.v4.temporal_correction.tasks import (
+    lulc_temporal_correction_incremental as lulc_temporal_correction_incremental_task,
+    lulc_temporal_correction_six_year as lulc_temporal_correction_six_year_task,
+)
+from .config_loader import (
+    DATA_DIR as CONFIG_DATA_DIR,
+    LULC_TEMPORAL_CORRECTION_INPUT_DIR,
+    LULC_TEMPORAL_CORRECTION_OUTPUT_DIR,
+)
 from .lulc_X_terrain.lulc_on_plain_cluster import (
     lulc_on_plain_cluster as lulc_on_plain_cluster_gee_task,
 )
@@ -1375,6 +1386,154 @@ def generate_pan_india_drought(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_pan_india_drought api")
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _data_dir_payload(request, field, default):
+    """A folder from the payload, relative to DATA_DIR or absolute inside it; default when not given."""
+    value = request.data.get(field)
+    if value in (None, ""):
+        return default
+    path = Path(str(value)).expanduser()
+    if not path.is_absolute():
+        path = CONFIG_DATA_DIR / path
+    path = path.resolve()
+    if path != CONFIG_DATA_DIR and CONFIG_DATA_DIR not in path.parents:
+        raise ValueError(f"{field} must be a folder inside {CONFIG_DATA_DIR}")
+    return path
+
+
+def _temporal_correction_request(request):
+    """(compute, input_dir, output_dir, workers) from a temporal-correction request."""
+    compute = _check_pan_india_drought_payload(request, "LULC temporal correction")
+    input_dir = _data_dir_payload(request, "input_dir", LULC_TEMPORAL_CORRECTION_INPUT_DIR)
+    output_dir = _data_dir_payload(request, "output_dir", LULC_TEMPORAL_CORRECTION_OUTPUT_DIR)
+    workers = request.data.get("workers")
+    workers = int(workers) if workers not in (None, "") else temporal_correction.DEFAULT_WORKERS
+    max_workers = os.cpu_count() or 1
+    if not 1 <= workers <= max_workers:
+        raise ValueError(f"workers must be between 1 and {max_workers}")
+    return compute, input_dir, output_dir, workers
+
+
+def _temporal_correction_busy(output_dir):
+    if temporal_correction.run_in_progress(output_dir):
+        return Response(
+            {"Exception": f"A temporal-correction run is already writing into {output_dir}; wait for it to finish."},
+            status=status.HTTP_409_CONFLICT,
+        )
+    return None
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_lulc_temporal_correction_six_year(request):
+    """Correct six raw LULC v4 years as one window (years Y..Y+4 final, Y+5 provisional).
+
+    Payload (all optional): start_year (default: the earliest input year), input_dir and
+    output_dir (inside DATA_DIR; default: the config.yaml folders), workers (default 6),
+    overwrite (needed when the output folder already holds any of the six years).
+    """
+    logger.info("Inside generate_pan_india_lulc_temporal_correction_six_year")
+    try:
+        compute, input_dir, output_dir, workers = _temporal_correction_request(request)
+        start_year = request.data.get("start_year")
+        start_year = int(start_year) if start_year not in (None, "") else None
+        overwrite = _payload_flag(request.data.get("overwrite", False))
+        queue = _heavy_queue()
+        busy = _temporal_correction_busy(output_dir)
+        if busy:
+            return busy
+        plan = temporal_correction.plan_six_year(input_dir, start_year)
+        existing = sorted(set(plan["years"]) & set(temporal_correction.year_states(output_dir)))
+        if existing and not overwrite:
+            raise ValueError(
+                f"{output_dir} already holds corrected {existing}; pass overwrite=true to redo the six-year run"
+            )
+        task = lulc_temporal_correction_six_year_task.apply_async(
+            kwargs={
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "start_year": plan["years"][0],
+                "workers": workers,
+            },
+            queue=queue,
+        )
+        return Response(
+            {
+                "Success": "Pan-India LULC temporal correction (six-year) task initiated",
+                "task_id": task.id,
+                "compute": compute,
+                "scope": "pan_india",
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "years": plan["years"],
+                "final": plan["years"][:-1],
+                "provisional": plan["years"][-1],
+                "workers": workers,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        logger.warning("Heavy worker unavailable in generate_pan_india_lulc_temporal_correction_six_year api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except ValueError as e:
+        logger.warning("Invalid request in generate_pan_india_lulc_temporal_correction_six_year api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Exception in generate_pan_india_lulc_temporal_correction_six_year api")
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_lulc_temporal_correction_incremental(request):
+    """Finalise the oldest provisional year N from corrected N-1, raw N and raw N+1; raw N+1 is
+    written uncorrected as the new provisional year. Run the six-year API first.
+
+    Payload (all optional): all (true: finalise every year whose next raw year exists),
+    input_dir and output_dir (inside DATA_DIR; default: the config.yaml folders), workers.
+    """
+    logger.info("Inside generate_pan_india_lulc_temporal_correction_incremental")
+    try:
+        compute, input_dir, output_dir, workers = _temporal_correction_request(request)
+        all_years = _payload_flag(request.data.get("all", False))
+        queue = _heavy_queue()
+        busy = _temporal_correction_busy(output_dir)
+        if busy:
+            return busy
+        plan = temporal_correction.plan_incremental(input_dir, output_dir, all_years)
+        task = lulc_temporal_correction_incremental_task.apply_async(
+            kwargs={
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "all_years": all_years,
+                "workers": workers,
+            },
+            queue=queue,
+        )
+        return Response(
+            {
+                "Success": "Pan-India LULC temporal correction (incremental) task initiated",
+                "task_id": task.id,
+                "compute": compute,
+                "scope": "pan_india",
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "finalising": plan["steps"],
+                "provisional": plan["provisional"],
+                "workers": workers,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        logger.warning("Heavy worker unavailable in generate_pan_india_lulc_temporal_correction_incremental api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except ValueError as e:
+        logger.warning("Invalid request in generate_pan_india_lulc_temporal_correction_incremental api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Exception in generate_pan_india_lulc_temporal_correction_incremental api")
         return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

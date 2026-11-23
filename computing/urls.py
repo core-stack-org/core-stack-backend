@@ -38,6 +38,16 @@ urlpatterns = [
         api.generate_pan_india_drought,
         name="pan_india_drought",
     ),
+    path(
+        "pan-india/lulc_temporal_correction_six_year/",
+        api.generate_pan_india_lulc_temporal_correction_six_year,
+        name="pan_india_lulc_temporal_correction_six_year",
+    ),
+    path(
+        "pan-india/lulc_temporal_correction_incremental/",
+        api.generate_pan_india_lulc_temporal_correction_incremental,
+        name="pan_india_lulc_temporal_correction_incremental",
+    ),
     path("runoff_gpu/", api.generate_runoff_gpu, name="runoff_gpu"),
     path("et_download/", api.et_download, name="et_download"),
     path("lulc_for_tehsil/", api.lulc_for_tehsil, name="lulc_for_tehsil"),

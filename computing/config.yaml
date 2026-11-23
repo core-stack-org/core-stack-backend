@@ -285,6 +285,19 @@ base_layers:
           source: ""
           type: file
 
+        # Pan-India temporal correction (pan-india/lulc_temporal_correction_six_year/ and
+        # .../incremental/): raw yearly LULC v4 rasters in, corrected rasters and the
+        # final/provisional manifest out. Keep the raw years; the incremental run reads them.
+        - name: lulc_v4_raw
+          local_path: "{DATA_DIR}/base_layers/periodic/lulc_v4_raw/"
+          source: ""
+          type: file
+
+        - name: lulc_v4_temporal_corrected
+          local_path: "{DATA_DIR}/base_layers/periodic/lulc_v4_temporal_corrected/"
+          source: ""
+          type: file
+
         - name: rainfall jaxa
           local_path: "{DATA_DIR}/base_layers/periodic/rainfall_jaxa/"
           source: ""
