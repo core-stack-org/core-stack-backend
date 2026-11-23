@@ -4,7 +4,9 @@ Run from the repo root:
     python -m unittest computing.drought.local.test_cropland -v
 """
 
+import json
 import math
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,7 +17,9 @@ from rasterio.transform import Affine, from_origin
 from rasterio.windows import Window
 
 from computing.drought.local import cropland as cl
+from computing.drought.local.config import Paths
 from computing.drought.local.grid import EARTH_RADIUS
+from computing.drought.local.store import write_stack
 
 PIXEL = 1111950.5196666666 / 2400
 GRID_TRANSFORM = Affine(PIXEL, 0, 6498424.162018612, 0, -PIXEL, 4133212.7441443047)  # the real India grid
@@ -23,8 +27,12 @@ GRID_TRANSFORM = Affine(PIXEL, 0, 6498424.162018612, 0, -PIXEL, 4133212.74414430
 
 class ClassTests(unittest.TestCase):
     def test_lulc_classes(self):
-        got = cl.lulc_classes(np.array([np.nan, 8.0, 7.6, 13.0, 0.0, 12.2]))
-        self.assertEqual(got.tolist(), [0, 8, 8, 0, 0, 12])
+        got = cl.lulc_classes(np.array([np.nan, 8.0, 7.6, 13.0, 0.0, 12.2, 14.0]))
+        self.assertEqual(got.tolist(), [0, 8, 8, 6, 0, 12, 0])  # plantation (13) counts as tree (6)
+
+    def test_lulc_v4_uint8(self):
+        got = cl.lulc_classes(np.array([0, 1, 8, 9, 10, 11, 13], dtype=np.uint8))
+        self.assertEqual(got.tolist(), [0, 1, 8, 9, 10, 11, 6])
 
     def test_most_common_category(self):
         shares = np.zeros((13, 3))
@@ -65,6 +73,55 @@ class CountTests(unittest.TestCase):
         self.assertEqual(int(counts[[1, 2, 3, 4, 5, 7, 9, 10, 11, 12]].sum()), 0)
         self.assertGreater(int(counts[8].sum()), 0)
         self.assertGreater(int(counts[6].sum()), 0)
+
+
+def write_lulc(path):
+    with rasterio.open(path, "w", driver="GTiff", width=2, height=2, count=1, dtype="uint8",
+                       crs="EPSG:4326", transform=from_origin(80, 20, 0.0001, 0.0001), nodata=0) as dst:
+        dst.write(np.full((1, 2, 2), 8, dtype=np.uint8))
+
+
+class LulcFileTests(unittest.TestCase):
+    """Finding the LULC v4 files, and redoing cropland files made from other LULC files."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.lulc = Path(tmp.name) / "lulc"
+        self.lulc.mkdir()
+        self.paths = Paths(Path(tmp.name), self.lulc)
+        for year in (2022, 2023):
+            write_lulc(self.lulc / f"LULC_v4_india_{year}-07-01_{year + 1}-06-30_temporal_corrected.tif")
+        manifest = {"name": "LULC_v4_india", "years": {"2023": {
+            "status": "provisional", "file": "LULC_v4_india_2023-07-01_2024-06-30_temporal_corrected.tif"}}}
+        (self.lulc / "temporal_correction_manifest.json").write_text(json.dumps(manifest))
+
+    def test_lulc_file_and_status(self):
+        self.assertEqual(self.paths.lulc_file(2023).name, "LULC_v4_india_2023-07-01_2024-06-30_temporal_corrected.tif")
+        self.assertEqual(self.paths.lulc_status(2023), "provisional")
+        self.assertTrue(self.paths.lulc_file(2022).is_file())  # not in the manifest: found by its span
+        self.assertIsNone(self.paths.lulc_status(2022))
+        missing = self.paths.lulc_file(2026)
+        self.assertFalse(missing.is_file())
+        self.assertEqual(missing.name, "LULC_v4_india_2026-07-01_2027-06-30_temporal_corrected.tif")
+
+    def test_share_made_from_other_lulc_is_made_again(self):
+        share = cl.share_file(self.paths, 2023)
+        tags = {"lulc": cl.lulc_stamp(self.paths, 2023), "normal_lulc": "normal-a"}
+        write_stack(share, np.zeros((3, 1, 1), np.uint16), from_origin(0, 1, 1, 1), "EPSG:4326",
+                    ["kharif_cells", "valid_cells", "area_sown_pct"], 65535, tags)
+        self.assertTrue(cl.share_current(self.paths, 2023, "normal-a"))
+        self.assertFalse(cl.share_current(self.paths, 2023, "normal-b"))  # the normal was made again
+        lulc = self.paths.lulc_file(2023)
+        os.utime(lulc, ns=(lulc.stat().st_atime_ns, lulc.stat().st_mtime_ns + 10**9))  # the year was finalised
+        self.assertFalse(cl.share_current(self.paths, 2023, "normal-a"))
+
+    def test_share_without_lulc_tag_is_made_again(self):
+        """Files made from LULC v3 have no lulc tag."""
+        share = cl.share_file(self.paths, 2022)
+        write_stack(share, np.zeros((3, 1, 1), np.uint16), from_origin(0, 1, 1, 1), "EPSG:4326",
+                    ["kharif_cells", "valid_cells", "area_sown_pct"], 65535, {"season": 2022})
+        self.assertFalse(cl.share_current(self.paths, 2022, "anything"))
 
 
 if __name__ == "__main__":

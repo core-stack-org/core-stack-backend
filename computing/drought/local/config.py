@@ -4,13 +4,21 @@ The method is the CoRE v3 writeup (section 3.2.2.1) with the thresholds and
 severity rule of the Manual for Drought Management, updated to December 2020.
 """
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from computing.config_loader import DATA_DIR, LULC_BASE_DIR
+from computing.config_loader import DATA_DIR, LULC_TEMPORAL_CORRECTION_OUTPUT_DIR
 
 METHOD_VERSION = "v1"
 MANUAL_EDITION = "Manual for Drought Management, updated to December 2020"
+
+# LULC: the temporally corrected LULC v4 (pan-india/lulc_temporal_correction_* APIs), one file
+# per year, <prefix>_<Y>-07-01_<Y+1>-06-30_temporal_corrected.tif. Its manifest marks the newest
+# year provisional until the next year's raw layer is added.
+LULC_VERSION = "v4"
+LULC_SUFFIX = "temporal_corrected.tif"
+LULC_MANIFEST = "temporal_correction_manifest.json"
 
 FIRST_SEASON = 2017
 RAIN_RECORD_START = 1981  # CHIRPS's first year
@@ -45,9 +53,9 @@ class Paths:
         data_dir = Path(data_dir or DATA_DIR)
         if lulc_dir is None:
             try:
-                lulc_dir = data_dir / LULC_BASE_DIR.relative_to(DATA_DIR)
+                lulc_dir = data_dir / LULC_TEMPORAL_CORRECTION_OUTPUT_DIR.relative_to(DATA_DIR)
             except ValueError:
-                lulc_dir = LULC_BASE_DIR
+                lulc_dir = LULC_TEMPORAL_CORRECTION_OUTPUT_DIR
         return cls(data_dir, Path(lulc_dir), region)
 
     @property
@@ -109,8 +117,30 @@ class Paths:
     def lock_file(self):
         return self.base / ".lock"
 
+    def lulc_manifest(self):
+        try:
+            return json.loads((self.lulc_dir / LULC_MANIFEST).read_text())
+        except (OSError, ValueError):
+            return {}
+
     def lulc_file(self, year):
-        return self.lulc_dir / f"lulc_v3_{year}_{year + 1}.tif"
+        """The year's LULC v4 file: the one the manifest names, else the only file with the year's
+        span; when there is none, the name it would have (for messages)."""
+        span = f"{year}-07-01_{year + 1}-06-30"
+        manifest = self.lulc_manifest()
+        listed = manifest.get("years", {}).get(str(year), {}).get("file")
+        if listed and (self.lulc_dir / listed).is_file():
+            return self.lulc_dir / listed
+        found = sorted(self.lulc_dir.glob(f"*_{span}_{LULC_SUFFIX}"))
+        if len(found) > 1:
+            raise ValueError(f"two LULC files for {year} in {self.lulc_dir}: {found[0].name}, {found[1].name}")
+        if found:
+            return found[0]
+        return self.lulc_dir / f"{manifest.get('name') or 'LULC_v4'}_{span}_{LULC_SUFFIX}"
+
+    def lulc_status(self, year):
+        """"final" or "provisional" from the manifest; None when it does not list the year."""
+        return self.lulc_manifest().get("years", {}).get(str(year), {}).get("status")
 
     def chirps_day(self, day):
         return self.chirps / "daily" / str(day.year) / f"chirps_{day:%Y_%m_%d}.tif"

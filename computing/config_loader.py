@@ -361,6 +361,7 @@ PAN_INDIA_TREE_IN_GRASSLAND = _base_layer_path(
 )
 LOCAL_TREE_IN_GRASSLAND_OUTPUT = _derived_output_dir("tree in grassland")
 LOCAL_DROUGHT_OUTPUT = _derived_output_dir("generate_drought_layer")
+LOCAL_DROUGHT_CAUSALITY_OUTPUT = _derived_output_dir("mws_drought_causality")
 
 PAN_INDIA_FOREST_FIRE = _base_layer_path(
     "forest fire",

@@ -1575,11 +1575,12 @@ def create_excel_for_drought_causality(data, xlsx_file, writer, start_year, end_
         }
 
         for year in range(start_year, end_year + 1):
-            row["severe_moderate_drought_causality_" + str(year)] = properties.get(
-                "se_mo_" + str(year), None
+            # Local layers use the long names; layers made by the GEE task, se_mo_ and mild_.
+            row["severe_moderate_drought_causality_" + str(year)] = _drought_property(
+                properties, f"severe_moderate_drought_causality_{year}", f"se_mo_{year}", None
             )
-            row["mild_drought_causality_" + str(year)] = properties.get(
-                "mild_" + str(year), None
+            row["mild_drought_causality_" + str(year)] = _drought_property(
+                properties, f"mild_drought_causality_{year}", f"mild_{year}", None
             )
 
         df_data.append(row)
@@ -2528,6 +2529,13 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
     print("Excel file created for cropping intensity.")
 
 
+def _drought_property(properties, long_key, short_key, default):
+    """A drought (or drought causality) layer property under its long name, else its short name."""
+    if long_key in properties:
+        return properties[long_key]
+    return properties.get(short_key, default)
+
+
 def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
     df_data = []
 
@@ -2537,26 +2545,24 @@ def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
         row = {"UID": properties.get("uid", "Unknown ID")}
 
         for year in range(start_year, end_year + 1):
-            drlb_key = f"drlb_{year}"
-            drysp_key = f"drysp_{year}"
-            kh_cr_key = f"kh_cr_{year}"
-            m_ons_key = f"m_ons_{year}"
-            pcr_k_key = f"pcr_k_{year}"
-            t_wks_key = f"t_wks_{year}"
+            # Local layers use the long names of the GEE yearly asset; layers made by the GEE task
+            # have the short names of its merge.
+            def value(long_name, short_name, default="0"):
+                return _drought_property(properties, f"{long_name}_{year}", f"{short_name}_{year}", default)
 
-            # Get drought levels (drlb) and count occurrences
-            drlb_value = properties.get(drlb_key, "")
+            # Get drought levels (drought_labels) and count occurrences
+            drlb_value = value("drought_labels", "drlb", "") or ""
             row[f"No_Drought_in_weeks_{year}"] = drlb_value.count("0")
             row[f"Mild_in_weeks_{year}"] = drlb_value.count("1")
             row[f"Moderate_in_weeks_{year}"] = drlb_value.count("2")
             row[f"Severe_in_weeks_{year}"] = drlb_value.count("3")
 
             # Add other properties
-            row[f"drysp_unit_4_weeks_{year}"] = properties.get(drysp_key, "0")
-            row[f"kharif_cropped_sqkm_{year}"] = properties.get(kh_cr_key, "0")
-            row[f"monsoon_onset_{year}"] = properties.get(m_ons_key, "0")
-            row[f"kharif_cropped_area_percent_{year}"] = properties.get(pcr_k_key, "0")
-            row[f"total_weeks_{year}"] = properties.get(t_wks_key, "0")
+            row[f"drysp_unit_4_weeks_{year}"] = value("dryspell_length", "drysp")
+            row[f"kharif_cropped_sqkm_{year}"] = value("kharif_cropped_sqkm", "kh_cr")
+            row[f"monsoon_onset_{year}"] = value("monsoon_onset", "m_ons")
+            row[f"kharif_cropped_area_percent_{year}"] = value("percent_of_area_cropped_kharif", "pcr_k")
+            row[f"total_weeks_{year}"] = value("total_weeks", "t_wks")
 
         df_data.append(row)
 

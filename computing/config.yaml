@@ -659,6 +659,9 @@ derived_layers:
       layer_type: vector
 
     - name: mws_drought_causality
+      local_path: "{DATA_DIR}/drought/causality/"
+      geoserver_workspace: drought_causality
+      layer_type: vector
 
     - name: clip_drought_spei
 

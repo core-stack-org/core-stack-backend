@@ -90,6 +90,10 @@ from .drought.local.pipeline import stage_list as drought_stage_list
 from .drought.local.store import not_writable as drought_not_writable
 from .drought.local.store import run_in_progress as drought_run_in_progress
 from .drought.drought_causality import drought_causality
+from .drought.drought_causality_local import (
+    drought_causality_local,
+    seasons_without_causality,
+)
 from .et_downscale.et_downscale import generate_et_downscale
 from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 from .local_compute_helper import (
@@ -1190,6 +1194,7 @@ def generate_swb(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_drought_layer(request):
     logger.info("Inside generate_drought_layer")
@@ -1825,27 +1830,62 @@ def crop_grid(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def mws_drought_causality(request):
+    """Drought causality layer of a tehsil. compute "gee" (default) runs the GEE task; "local" cuts
+    the tehsil out of the pan-India MWS drought layers, which hold drought causality."""
     logger.info("Inside Drought Causality API")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        if not all([state, district, block]):
+            raise ValueError("state, district, and block are required")
+        state, district, block = (str(v).strip().lower() for v in (state, district, block))
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        drought_causality.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
-        )
+        compute = _get_compute_mode(request)
+        if compute == "local":
+            missing = missing_drought_mws_layers(start_year, end_year)
+            if missing:
+                raise ValueError(
+                    "Missing pan-India drought MWS layer(s) for "
+                    f"{', '.join(map(str, missing))}. Make them first with "
+                    "utilities/scripts/generate_drought_layer.py --stages mws; "
+                    "Celery task was not queued."
+                )
+            without = seasons_without_causality(start_year, end_year)
+            if without:
+                raise ValueError(
+                    "The pan-India drought MWS layer(s) for "
+                    f"{', '.join(map(str, without))} were made before drought causality was added. "
+                    "Make them again with utilities/scripts/generate_drought_layer.py --stages mws; "
+                    "Celery task was not queued."
+                )
+            drought_causality_local.apply_async(
+                kwargs={"state": state, "district": district, "block": block,
+                        "start_year": start_year, "end_year": end_year},
+                queue="nrm",
+            )
+        else:
+            if start_year in (None, "") or end_year in (None, ""):
+                raise ValueError("start_year and end_year are required")
+            drought_causality.apply_async(
+                args=[state, district, block, int(start_year), int(end_year), gee_account_id],
+                queue="nrm",
+            )
         return Response(
-            {"Success": "Drought Causality task initiated"},
+            {"Success": "Drought Causality task initiated", "compute": compute},
             status=status.HTTP_200_OK,
         )
+    except (ValueError, FileNotFoundError) as e:
+        logger.warning("Invalid request in Drought Causality api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in Drought Causality api")
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
