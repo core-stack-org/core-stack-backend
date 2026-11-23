@@ -97,7 +97,7 @@ from .local_compute_helper import (
 from .local_compute_helper import (
     select_compute_task as _select_compute_task,
 )
-from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
+from .lulc.clip_lulc import clip_lulc as clip_lulc_gee_task
 from .lulc.clip_lulc_local import clip_lulc_local as clip_lulc_local_task
 from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
 from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
@@ -988,7 +988,7 @@ def lulc_clip(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
-            clip_lulc_v3_gee_task,
+            clip_lulc_gee_task,
             clip_lulc_local_task,
         )
         task.apply_async(

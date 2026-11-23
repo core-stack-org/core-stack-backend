@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from computing.config_loader import PROJECT_ROOT
+from computing.config_loader import DATA_DIR, PROJECT_ROOT, layer_dir
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
@@ -19,7 +19,7 @@ from computing.tree_health.local.canopy_height_local import (
 )
 
 
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
+LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "canopy_height_vector"
 
 CH_CLASSES = [
@@ -40,10 +40,12 @@ def _resolve_ch_output_raster(asset_suffix, year, state=None, district=None, blo
     raster_name = f"ch_raster_{asset_suffix}_{year}.tif"
     if state and district and block:
         path = (
-            Path(CH_RASTER_DIR)
-            / _slug(state, "unknown_state")
-            / _slug(district, "unknown_district")
-            / _slug(block, "unknown_block")
+            layer_dir(
+            CH_RASTER_DIR,
+            _slug(state, "unknown_state"),
+            _slug(district, "unknown_district"),
+            _slug(block, "unknown_block"),
+        )
             / raster_name
         )
     else:

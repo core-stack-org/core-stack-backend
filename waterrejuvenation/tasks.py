@@ -5,7 +5,7 @@ import time
 from celery import shared_task
 
 
-from computing.lulc.lulc_v3 import clip_lulc_v3
+from computing.lulc.clip_lulc import clip_lulc
 from computing.misc.catchment_area import (
     generate_catchment_area_singleflow,
 )
@@ -141,7 +141,12 @@ def _gee_safe_property(value, prop_name=None):
         stripped = value.strip()
         if not stripped or stripped.upper() in ("N/A", "NAN", "NONE"):
             return None
-        if prop_name and prop_name.lower() in {"area_ored", "zoi", "zoi_wb", "zoi_area"}:
+        if prop_name and prop_name.lower() in {
+            "area_ored",
+            "zoi",
+            "zoi_wb",
+            "zoi_area",
+        }:
             try:
                 return float(stripped)
             except ValueError:
@@ -280,11 +285,7 @@ def _merge_matched_desilt_with_swb(desilt_row, wb_row):
     if geometry is None:
         return None
 
-    wb_props = {
-        col: wb_row[col]
-        for col in wb_row.index
-        if col != "geometry"
-    }
+    wb_props = {col: wb_row[col] for col in wb_row.index if col != "geometry"}
     desilt_props = {
         col: desilt_row[col]
         for col in desilt_row.index
@@ -478,7 +479,15 @@ def Upload_Desilting_Points(
     created_rows = 0
     retried_rows = 0
 
-    for index, row, lat, lon, waterbody_name, intervention_year, existing_id in new_rows:
+    for (
+        index,
+        row,
+        lat,
+        lon,
+        waterbody_name,
+        intervention_year,
+        existing_id,
+    ) in new_rows:
         print(row)
         row_values = {
             "name_of_ngo": normalize(row.get("Name of NGO")),
@@ -642,7 +651,7 @@ def Generate_lulc_mws(
         logger.info(f"is lulc required: {is_lulc_required}")
         make_asset_public(mws_asset_id)
         if is_lulc_required:
-            clip_lulc_v3(
+            clip_lulc(
                 start_year=start_year,
                 end_year=end_year,
                 gee_account_id=gee_account_id,

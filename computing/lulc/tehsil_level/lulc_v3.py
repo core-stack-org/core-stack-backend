@@ -1,7 +1,6 @@
 import datetime
 from datetime import timedelta
 
-import ee
 from dateutil.relativedelta import relativedelta
 
 from computing.utils import update_layer_sync_status, save_layer_info_to_db
@@ -17,10 +16,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
 )
 from nrm_app.celery import app
-from computing.lulc.utils.built_up import *
-from computing.lulc.utils.cropland import *
-from computing.lulc.cropping_frequency import *
-from computing.lulc.utils.water_body import *
+from computing.lulc.utils.cropping_frequency import *
 from computing.lulc.misc import *
 
 

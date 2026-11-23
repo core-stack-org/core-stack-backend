@@ -6,7 +6,7 @@ from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
 
-from computing.config_loader import LULC_BASE_DIR, PROJECT_ROOT
+from computing.config_loader import DATA_DIR, LULC_BASE_DIR, PROJECT_ROOT, layer_dir
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
@@ -24,7 +24,7 @@ from utilities.gee_utils import valid_gee_text
 
 
 LOCAL_CH_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ch"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
+LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "tree_ch_raster"
 GEOSERVER_STYLE = "tree_ch_style"
 

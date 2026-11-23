@@ -233,15 +233,20 @@ GEE_PATHS = {
     },
 }
 
-PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
-)
-
 LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
     "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
 )
-
+PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
 LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+PAN_INDIA_LULC_V3_DATASET = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+)
+PAN_INDIA_LULC_V4_DATASET = (
+    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
+)
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
 
 
 class LulcClass(IntEnum):
@@ -355,12 +360,7 @@ FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
 WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-PAN_INDIA_LULC_V3_DATASET = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
-)
-PAN_INDIA_LULC_V4_DATASET = (
-    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
-)
+
 DISTANCE_TO_UPSTREAM_DL = (
     "projects/ext-datasets/assets/datasets/distance_to_nearest_upstream_DL_raster"
 )
@@ -373,7 +373,7 @@ NATURAL_DEPRESSION = (
     "projects/corestack-datasets/assets/datasets/Natural_depression_raster"
 )
 CATCHMENT_AREA = "projects/ext-datasets/assets/datasets/catchment_area_singleflow"
-PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
+
 # CRS
 CRS_4326 = "EPSG:4326"
 
