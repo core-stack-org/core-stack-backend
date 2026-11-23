@@ -121,6 +121,11 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
           type: file
 
+        - name: mws connectivity
+          local_path: "{DATA_DIR}/base_layers/Pan_India_mws_connectivity.geojson"
+          source: ""
+          type: file
+
         - name: stream order
           local_path: "{DATA_DIR}/base_layers/stream_order/stream_order.tif"
           source: ""

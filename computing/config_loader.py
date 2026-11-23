@@ -284,7 +284,7 @@ PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
 )
 
 PAN_INDIA_DRAINAGE_LINES_PATH = (
-    DATA_DIR / "layers/drainage_lines/Pan_India_drainage_lines.gpkg"
+    DATA_DIR / "base_layers/Pan_India_drainage_lines.gpkg"
 )
 LOCAL_DRAINAGE_LINES_OUTPUT = _derived_output_dir("generate_drainage_layer")
 
@@ -350,8 +350,9 @@ PAN_INDIA_SLOPE_PERCENTAGE_PATH = _base_layer_path(
 )
 LOCAL_SLOPE_PERCENTAGE_OUTPUT = DATA_DIR / "layers/slope_percentage"
 
-PAN_INDIA_MWS_CONNECTIVITY_PATH = (
-    DATA_DIR / "layers/mws_connectivity/Pan_India_mws_connectivity.geojson"
+PAN_INDIA_MWS_CONNECTIVITY_PATH = _base_layer_path(
+    "mws connectivity",
+    fallback="{DATA_DIR}/base_layers/Pan_India_mws_connectivity.geojson",
 )
 LOCAL_MWS_CONNECTIVITY_OUTPUT = _derived_output_dir("generate_mws_connectivity_data")
 

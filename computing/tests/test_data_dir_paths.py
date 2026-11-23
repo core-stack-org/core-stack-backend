@@ -127,6 +127,14 @@ class DataDirAndLocalOutputPathsTests(TestCase):
                         importlib.reload(mod)
 
                     self.assertEqual(
+                        config_loader.PAN_INDIA_DRAINAGE_LINES_PATH,
+                        custom_data_dir / "base_layers/Pan_India_drainage_lines.gpkg",
+                    )
+                    self.assertEqual(
+                        config_loader.PAN_INDIA_MWS_CONNECTIVITY_PATH,
+                        custom_data_dir / "base_layers/Pan_India_mws_connectivity.geojson",
+                    )
+                    self.assertEqual(
                         Path(constants.BASE_RESOURCES_DIR),
                         custom_data_dir / "base_resources",
                     )
