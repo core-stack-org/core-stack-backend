@@ -1421,6 +1421,7 @@ def _temporal_correction_request(request):
     compute = _check_pan_india_drought_payload(request, "LULC temporal correction")
     input_dir = _data_dir_payload(request, "input_dir", LULC_TEMPORAL_CORRECTION_INPUT_DIR)
     output_dir = _data_dir_payload(request, "output_dir", LULC_TEMPORAL_CORRECTION_OUTPUT_DIR)
+    temporal_correction.check_folders(input_dir, output_dir)
     workers = request.data.get("workers")
     workers = int(workers) if workers not in (None, "") else temporal_correction.DEFAULT_WORKERS
     max_workers = os.cpu_count() or 1

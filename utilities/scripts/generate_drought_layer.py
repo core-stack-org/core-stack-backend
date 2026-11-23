@@ -97,8 +97,7 @@ def main():
     parser.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 1), help="parallel processes")
     parser.add_argument("--data-dir", help="data folder (default: $DATA_DIR or ./data)")
     parser.add_argument("--lulc-dir", help="folder with the temporally corrected LULC v4, "
-                                           "<prefix>_<year>-07-01_<year+1>-06-30_temporal_corrected.tif "
-                                           "(default: lulc_v4_temporal_corrected in config.yaml)")
+                                           "lulc_v4_<year>_<year+1>.tif (default: data/base_layers/lulc)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")

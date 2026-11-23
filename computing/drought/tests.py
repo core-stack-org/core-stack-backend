@@ -362,7 +362,7 @@ class PanIndiaDroughtAPITests(APISimpleTestCase):
     def post(self, payload):
         return self.client.post(reverse("pan_india_drought"), payload, format="json")
 
-    @patch("computing.api.drought_status.season_states", return_value=[(2025, "waiting", "LULC: LULC_v4_new_panindia_2025-07-01_2026-06-30_temporal_corrected.tif not found")])
+    @patch("computing.api.drought_status.season_states", return_value=[(2025, "waiting", "LULC: lulc_v4_2025_2026.tif not found")])
     @patch("computing.api.drought_status.stage_can_run", side_effect=lambda paths, stage, season: season <= 2024)
     @patch("computing.api.generate_drought_pan_india_task.apply_async")
     def test_queues_the_ready_seasons(self, apply_async, _, __):
@@ -376,13 +376,13 @@ class PanIndiaDroughtAPITests(APISimpleTestCase):
                     "rerun_stages": ["mws"]},
             queue="heavy")
 
-    @patch("computing.api.drought_status.season_states", return_value=[(2025, "waiting", "LULC: LULC_v4_new_panindia_2025-07-01_2026-06-30_temporal_corrected.tif not found")])
+    @patch("computing.api.drought_status.season_states", return_value=[(2025, "waiting", "LULC: lulc_v4_2025_2026.tif not found")])
     @patch("computing.api.drought_status.stage_can_run", return_value=False)
     @patch("computing.api.generate_drought_pan_india_task.apply_async")
     def test_no_ready_season_is_400(self, apply_async, _, __):
         response = self.post({"start_year": 2025, "end_year": 2025})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("LULC_v4_new_panindia_2025-07-01_2026-06-30", response.data["Exception"])
+        self.assertIn("lulc_v4_2025_2026", response.data["Exception"])
         apply_async.assert_not_called()
 
     @patch("computing.api.generate_drought_pan_india_task.apply_async")

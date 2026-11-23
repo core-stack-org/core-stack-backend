@@ -46,12 +46,12 @@ def write_year(folder, year, label, cluster, name="test_lulc"):
     return path
 
 
-def write_inputs(folder, years, labels=None):
+def write_inputs(folder, years, labels=None, name="test_lulc"):
     """Raw 2 x 2 inputs; labels maps year -> 2 x 2 labels (default all crop)."""
     Path(folder).mkdir(parents=True, exist_ok=True)
     for year in years:
         label = (labels or {}).get(year, np.full((2, 2), CROP))
-        write_year(folder, year, label, np.full((2, 2), CROP_DOUBLE))
+        write_year(folder, year, label, np.full((2, 2), CROP_DOUBLE), name=name)
 
 
 def read(path):
@@ -109,6 +109,31 @@ class RunnerTests(TestCase):
             runner.run_incremental(self.inputs, self.out, workers=1)
         manifest = json.loads(runner.manifest_path(self.out).read_text())
         self.assertEqual([h["mode"] for h in manifest["history"]], ["batch6", "incremental", "incremental"])
+
+    def test_outputs_take_the_raw_names_at_the_lulc_address(self):
+        write_inputs(self.inputs, range(2017, 2023), name="lulc_v4")
+        runner.run_six_year(self.inputs, self.out, workers=1)
+        self.assertEqual(sorted(p.name for p in self.out.glob("*.tif")),
+                         [f"lulc_v4_{y}_{y + 1}.tif" for y in range(2017, 2023)])
+        manifest = json.loads(runner.manifest_path(self.out).read_text())
+        self.assertEqual((manifest["name"], manifest["years"]["2022"]["status"]), ("lulc_v4", "provisional"))
+
+    def test_handoff_names_are_read_too(self):
+        Path(self.inputs).mkdir(parents=True)
+        for year in range(2017, 2023):
+            path = write_year(self.inputs, year, np.full((2, 2), CROP), np.full((2, 2), CROP_DOUBLE))
+            path.rename(path.with_name(f"handoff_{year}-07-01_{year + 1}-06-30.tif"))
+        runner.run_six_year(self.inputs, self.out, workers=1)
+        self.assertTrue(runner.out_path(self.out, "handoff", 2017).is_file())
+        self.assertEqual(runner.out_path(self.out, "handoff", 2017).name, "handoff_2017_2018.tif")
+
+    def test_output_folder_must_not_be_the_input_folder(self):
+        # the corrected files take the raw names: writing them into the raw folder would replace the raw years
+        write_inputs(self.inputs, range(2017, 2023))
+        with self.assertRaisesRegex(runner.TemporalCorrectionError, "output folder is the input folder"):
+            runner.run_six_year(self.inputs, self.inputs, workers=1)
+        with self.assertRaisesRegex(runner.TemporalCorrectionError, "output folder is the input folder"):
+            runner.run_incremental(self.inputs, self.inputs, workers=1)
 
     def test_no_data_is_never_filled(self):
         hole = np.full((2, 2), CROP)
@@ -201,6 +226,14 @@ class TemporalCorrectionAPITests(APISimpleTestCase):
         for payload in ({}, {"start_year": 2016}, {"input_dir": "/etc"}, {"output_dir": "../elsewhere"},
                         {"workers": 0}, {"district": "raichur"}, {"pan_india": True}, {"compute": "gee"}):
             self.assertEqual(self.post("pan_india_lulc_temporal_correction_six_year", payload).status_code, 400, payload)
+        apply_async.assert_not_called()
+
+    @patch("computing.api.lulc_temporal_correction_six_year_task.apply_async")
+    def test_output_folder_must_differ_from_the_input_folder(self, apply_async):
+        write_inputs(self.inputs, range(2017, 2023))
+        response = self.post("pan_india_lulc_temporal_correction_six_year", {"output_dir": "in"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("output folder is the input folder", response.data["Exception"])
         apply_async.assert_not_called()
 
     @patch("computing.api.lulc_temporal_correction_incremental_task.apply_async")

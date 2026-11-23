@@ -4,13 +4,15 @@ The rules are in rules.py. This module reads the raw yearly rasters block by blo
 the rules and writes one corrected raster per year, the way 4_temporal_correction.py does
 for `--inputs DIR`, so both produce the same pixels.
 
-Inputs: one GeoTIFF per year in one folder, all on one grid, named with
-<YYYY>-07-01_<YYYY+1>-06-30. Band 1 is predicted_label, band 2 predicted_cluster. No data
-is 0 (or the nodata value) in integer rasters and NaN in float ones.
+Inputs: one GeoTIFF per year in one folder, all on one grid, named <prefix>_<YYYY>_<YYYY+1>.tif
+(the raw LULC v4 is base_layers/lulc/raw/lulc_v4_<YYYY>_<YYYY+1>.tif); the handoff's
+<prefix>_<YYYY>-07-01_<YYYY+1>-06-30.tif names work too. Band 1 is predicted_label, band 2
+predicted_cluster. No data is 0 (or the nodata value) in integer rasters and NaN in float ones.
 
-Outputs: <prefix>_<YYYY>-07-01_<YYYY+1>-06-30_temporal_corrected.tif, one band, uint8 with
-nodata 0 for integer inputs, float32 with NaN for float inputs. temporal_correction_manifest.json
-in the output folder records each year as final or provisional.
+Outputs: <prefix>_<YYYY>_<YYYY+1>.tif, the inputs' names, in another folder (by default
+base_layers/lulc/, where every local pipeline reads lulc_v4_<YYYY>_<YYYY+1>.tif). One band, uint8
+with nodata 0 for integer inputs, float32 with NaN for float inputs.
+temporal_correction_manifest.json in the output folder records each year as final or provisional.
 
   six-year      years Y..Y+5 corrected together. Y..Y+4 are final; Y+5 is provisional, since
                 it was never tested against a following year.
@@ -41,7 +43,8 @@ from .rules import BAND_CLUSTER, BAND_LABEL, correct_block_6yr, correct_block_in
 
 logger = logging.getLogger(__name__)
 
-INPUT_RE = re.compile(r"(?P<y1>\d{4})-07-01_(?P<y2>\d{4})-06-30")
+# the year span in a file name: _<YYYY>_<YYYY+1> or the handoff's _<YYYY>-07-01_<YYYY+1>-06-30
+INPUT_RE = re.compile(r"(?P<y1>\d{4})(?:-07-01)?_(?P<y2>\d{4})(?:-06-30)?(?=[_.])")
 MANIFEST_NAME = "temporal_correction_manifest.json"
 LOCK_NAME = ".temporal_correction.lock"
 WINDOW_YEARS = 6
@@ -65,7 +68,16 @@ class RunInProgress(RuntimeError):
 # Inputs
 # ---------------------------------------------------------------------------
 def span_for(year):
-    return f"{year}-07-01_{year + 1}-06-30"
+    return f"{year}_{year + 1}"
+
+
+def check_folders(input_dir, out_dir):
+    """The corrected files take the raw files' names, so they must go to another folder."""
+    if Path(input_dir).resolve() == Path(out_dir).resolve():
+        raise TemporalCorrectionError(
+            f"the output folder is the input folder ({input_dir}); the corrected files have the raw "
+            "files' names and would replace them"
+        )
 
 
 def discover_inputs(input_dir):
@@ -76,14 +88,14 @@ def discover_inputs(input_dir):
     found = {}
     for path in sorted(input_dir.glob("*.tif")):
         match = INPUT_RE.search(path.name)
-        if not match:
+        if not match or int(match.group("y2")) != int(match.group("y1")) + 1:
             continue
         year = int(match.group("y1"))
         if year in found:
             raise TemporalCorrectionError(f"two inputs for {year}: {found[year].name} and {path.name}")
         found[year] = path.resolve()
     if not found:
-        raise TemporalCorrectionError(f"no <YYYY>-07-01_<YYYY+1>-06-30 GeoTIFFs in {input_dir}")
+        raise TemporalCorrectionError(f"no <prefix>_<YYYY>_<YYYY+1>.tif GeoTIFFs in {input_dir}")
     return dict(sorted(found.items()))
 
 
@@ -124,7 +136,7 @@ def output_dtype(ref):
 
 
 def out_path(out_dir, name, year):
-    return Path(out_dir) / f"{name}_{span_for(year)}_temporal_corrected.tif"
+    return Path(out_dir) / f"{name}_{span_for(year)}.tif"
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +362,7 @@ def _six_year_block(job):
 def run_six_year(input_dir, out_dir, start_year=None, workers=DEFAULT_WORKERS, block=DEFAULT_BLOCK):
     """Correct six years as one window. Returns a summary of what was written."""
     out_dir = Path(out_dir)
+    check_folders(input_dir, out_dir)
     with run_lock(out_dir):
         plan = plan_six_year(input_dir, start_year)
         name, window = plan["name"], plan["years"]
@@ -475,6 +488,7 @@ def _write_uncorrected(out_dir, src, name, dtype, year, workers, block):
 def run_incremental(input_dir, out_dir, all_years=False, workers=DEFAULT_WORKERS, block=DEFAULT_BLOCK):
     """Finalise the oldest provisional year (all_years: every year that can be). Returns a summary."""
     out_dir = Path(out_dir)
+    check_folders(input_dir, out_dir)
     with run_lock(out_dir):
         plan = plan_incremental(input_dir, out_dir, all_years)
         name, steps, newest = plan["name"], plan["steps"], plan["provisional"]

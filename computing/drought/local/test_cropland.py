@@ -17,7 +17,7 @@ from rasterio.transform import Affine, from_origin
 from rasterio.windows import Window
 
 from computing.drought.local import cropland as cl
-from computing.drought.local.config import Paths
+from computing.drought.local.config import LULC_VERSION, Paths
 from computing.drought.local.grid import EARTH_RADIUS
 from computing.drought.local.store import write_stack
 
@@ -91,19 +91,20 @@ class LulcFileTests(unittest.TestCase):
         self.lulc.mkdir()
         self.paths = Paths(Path(tmp.name), self.lulc)
         for year in (2022, 2023):
-            write_lulc(self.lulc / f"LULC_v4_india_{year}-07-01_{year + 1}-06-30_temporal_corrected.tif")
-        manifest = {"name": "LULC_v4_india", "years": {"2023": {
-            "status": "provisional", "file": "LULC_v4_india_2023-07-01_2024-06-30_temporal_corrected.tif"}}}
+            write_lulc(self.lulc / f"lulc_{LULC_VERSION}_{year}_{year + 1}.tif")
+        manifest = {"name": f"lulc_{LULC_VERSION}", "years": {"2023": {
+            "status": "provisional", "file": f"lulc_{LULC_VERSION}_2023_2024.tif"}}}
         (self.lulc / "temporal_correction_manifest.json").write_text(json.dumps(manifest))
 
     def test_lulc_file_and_status(self):
-        self.assertEqual(self.paths.lulc_file(2023).name, "LULC_v4_india_2023-07-01_2024-06-30_temporal_corrected.tif")
+        # the address every local pipeline reads: lulc_<LULC_VERSION>_<year>_<year+1>.tif
+        self.assertEqual(self.paths.lulc_file(2023).name, f"lulc_{LULC_VERSION}_2023_2024.tif")
         self.assertEqual(self.paths.lulc_status(2023), "provisional")
-        self.assertTrue(self.paths.lulc_file(2022).is_file())  # not in the manifest: found by its span
-        self.assertIsNone(self.paths.lulc_status(2022))
+        self.assertTrue(self.paths.lulc_file(2022).is_file())
+        self.assertIsNone(self.paths.lulc_status(2022))  # not in the manifest
         missing = self.paths.lulc_file(2026)
         self.assertFalse(missing.is_file())
-        self.assertEqual(missing.name, "LULC_v4_india_2026-07-01_2027-06-30_temporal_corrected.tif")
+        self.assertEqual(missing.name, f"lulc_{LULC_VERSION}_2026_2027.tif")
 
     def test_share_made_from_other_lulc_is_made_again(self):
         share = cl.share_file(self.paths, 2023)

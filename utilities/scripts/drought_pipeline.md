@@ -19,10 +19,11 @@ folder, with the Docker stack up. The method and its rules are described in the 
 2. Add an Earthdata login to `nrm_app/.env`; the MODIS download needs it. Create a free account at
    https://urs.earthdata.nasa.gov, then add `USERNAME_GESDISC=<user>` and `PASSWORD_GESDISC='<password>'`
    (keep the quotes if the password has a `$`).
-3. Check that the temporally corrected LULC v4 is in `data/base_layers/periodic/lulc_v4_temporal_corrected/`,
-   one `<prefix>_<year>-07-01_<year+1>-06-30_temporal_corrected.tif` per year with
+3. Check that the temporally corrected LULC v4 is in `data/base_layers/lulc/`, one
+   `lulc_v4_<year>_<year+1>.tif` per year (the address every local pipeline reads) with
    `temporal_correction_manifest.json`. The `pan-india/lulc_temporal_correction_six_year/` and
-   `.../incremental/` APIs make them; the drought layer's cropland mask and area sown come from them.
+   `.../incremental/` APIs make them from the raw layers in `data/base_layers/lulc/raw/`; the drought
+   layer's cropland mask and area sown come from them.
 4. Check that the hydrology tehsil watersheds are in `data/base_layers/hydrology/runoff/commons/tehsil_watersheds/`,
    with `tehsil_watershed_manifest.csv`. The MWS layers use the same micro-watersheds as the hydrology layers.
 5. Check disk space: the inputs keep about 105 GB and the outputs need about 70 GB, of which about 25 GB is
@@ -202,7 +203,7 @@ The server's GeoServer listens only on its own port 8080, so open a tunnel from 
 | When | Run |
 |---|---|
 | New CHIRPS or MODIS data is out (CHIRPS about a month after the day; MOD16A2GF once a year, early in the next year) | Step 1 |
-| A new season's inputs are all on disk, including its LULC (`..._<year>-07-01_<year+1>-06-30_temporal_corrected.tif`) | Step 2: only the new season runs. Then Step 3 for each tehsil with the new `end_year` |
+| A new season's inputs are all on disk, including its LULC (`data/base_layers/lulc/lulc_v4_<year>_<year+1>.tif`) | Step 2: only the new season runs. Then Step 3 for each tehsil with the new `end_year` |
 | A provisional LULC year is finalised (the incremental temporal-correction API, after the next year's raw layer) | Step 2: that season's cropland, classes and MWS layer are made again. Then Step 3 for the tehsils |
 | The rainfall rules change (onset or normals) | Step 2: the rain stage redoes the seasons made under the old rule, and `classify` and `mws` follow |
 | Another stage's code changes | Delete that stage's files for the seasons concerned (for example `v1/moisture/mai_2023.tif`), then Step 2 |

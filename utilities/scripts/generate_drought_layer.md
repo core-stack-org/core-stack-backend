@@ -22,10 +22,10 @@ runs add seasons whose inputs have arrived.
 ## Before you start
 
 1. Download the inputs with [download_drought_inputs.py](download_drought_inputs.md).
-2. The cropland stage reads the temporally corrected LULC v4 in
-   `data/base_layers/periodic/lulc_v4_temporal_corrected/`, which the `pan-india/lulc_temporal_correction_six_year/`
-   and `.../incremental/` APIs make: one file per year,
-   `<prefix>_<year>-07-01_<year+1>-06-30_temporal_corrected.tif`, and `temporal_correction_manifest.json`.
+2. The cropland stage reads the temporally corrected LULC v4 at the address every local pipeline reads,
+   `data/base_layers/lulc/lulc_v4_<year>_<year+1>.tif` (`LULC_VERSION`, default `v4`), with
+   `temporal_correction_manifest.json` beside it. The `pan-india/lulc_temporal_correction_six_year/` and
+   `.../incremental/` APIs make them from the raw layers in `data/base_layers/lulc/raw/`.
    The newest year is provisional until the next year's raw layer is added; a season made with it is made
    again, by the next run, once the incremental API has finalised it.
 3. The `mws` stage needs the hydrology tehsil watersheds in
@@ -43,7 +43,7 @@ Run these from the repo folder. The repo is mounted at `/app` and the data at `$
    ```
 
    Each season shows `ready`, `waiting` (with the missing input, such as
-   `LULC_v4_new_panindia_2026-07-01_2027-06-30_temporal_corrected.tif`), or `done`. A `done` season also says
+   `lulc_v4_2026_2027.tif`), or `done`. A `done` season also says
    whether its MWS layer is made, and `LULC provisional` when its LULC year is not final yet.
 
 2. Try one MODIS tile first (about 15 minutes; outputs go to `drought/tiles/h25v07/`):
@@ -222,7 +222,7 @@ The largest stages hold up to about 20 GB in memory.
 | `--stages` | all | e.g. `rain,cropland` or `mws` |
 | `--tile` | all of India | one MODIS tile, e.g. `h25v07` |
 | `--workers` | 16 (or the number of cores) | parallel processes |
-| `--lulc-dir` | `lulc_v4_temporal_corrected` in `computing/config.yaml` | folder with `<prefix>_<year>-07-01_<year+1>-06-30_temporal_corrected.tif` |
+| `--lulc-dir` | `data/base_layers/lulc/` (the `lulc` entries in `computing/config.yaml`) | folder with `lulc_v4_<year>_<year+1>.tif` |
 | `--data-dir` | `$DATA_DIR`, else `./data` | data folder |
 
 ## Problems
@@ -232,7 +232,7 @@ The largest stages hold up to about 20 GB in memory.
 | `Another run is using ... drought` | another run is still going; check with `docker compose exec backend pgrep -af generate_drought_layer` |
 | `modis_india_mask.tif not found` | run the download script first |
 | A season stays `waiting` | its detail names the missing input; download it, then run again |
-| `LULC not found: ..._temporal_corrected.tif` | the LULC year is missing from the LULC folder (run the temporal-correction APIs), or `--lulc-dir` points to the wrong folder |
+| `LULC not found: ...lulc_v4_<year>_<year+1>.tif` | the LULC year is missing from the LULC folder (run the temporal-correction APIs), or `--lulc-dir` points to the wrong folder |
 | `MWS <year>: mai_<year>.tif has no window ET and PET yet` | run with the `mai` stage too (a full run does it) |
 | `MWS stage skipped: ... tehsil_watershed_manifest.csv not found` | the hydrology tehsil watersheds are missing (see Before you start) |
 | `Could not find written pan-India watersheds`, or `MWS: <n> watersheds copied` with far fewer than 260,072 | the manifest's paths do not point to the tehsil files; check `tehsil_watershed_manifest.csv` |
