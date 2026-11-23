@@ -132,13 +132,42 @@ def derived_layers() -> list[dict]:
     return [dict(layer) for layer in _cfg.get("derived_layers", [])]
 
 
+def layer_dir(root, *slugs) -> Path:
+    """
+    Per-location directory of a derived layer:
+    {DATA_DIR}/layers/{state}/{district}/{block}/<layer subdir>, where the layer
+    subdir is `root` relative to DATA_DIR. Roots outside DATA_DIR keep the
+    legacy `root/<slugs>` layout.
+    """
+    root = Path(root)
+    try:
+        rel = root.relative_to(DATA_DIR)
+    except ValueError:
+        return root.joinpath(*slugs)
+    if rel.parts and rel.parts[0] == "layers":
+        rel = Path(*rel.parts[1:])  # "layers" is already the leading prefix
+    return DATA_DIR.joinpath("layers", *slugs, rel)
+
+
+_LOCATION_PREFIX = "{DATA_DIR}/layers/{state}/{district}/{block}/"
+
+
 def _derived_output_dir(name: str) -> Path:
+    """
+    Layer subdir under DATA_DIR (e.g. DATA_DIR/lulc/lulc_vector_local) taken
+    from `{DATA_DIR}/layers/{state}/{district}/{block}/<subdir>/{filename}`. Pass it
+    to layer_dir() to get the per-location directory.
+    """
     layer = _derived_layer(name)
     if not layer:
         raise KeyError(
             f"No derived layer found in {_CONFIG_PATH.name} for name: {name}"
         )
-    return _abs(layer["local_path"])
+    local_path = layer["local_path"]
+    if local_path.startswith(_LOCATION_PREFIX):
+        subdir = local_path[len(_LOCATION_PREFIX):].split("{")[0].rstrip("/")
+        return DATA_DIR / subdir
+    return _abs(local_path)
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +183,9 @@ LULC_BASE_DIR: Path = _abs(
 ).parent
 
 TERRAIN_RASTER_PATH: Path = _base_layer_path("terrain")
+
+# Directory holding soil_health_{N,K,P,OC,OC_OLM}.tif (from the base layer entry).
+SOIL_HEALTH_BASE_DIR: Path = _base_layer_path("soil_health").parent
 
 SOIL_RASTER_PATH: Path = _base_layer_path(
     "hydrological soil group",
@@ -229,6 +261,11 @@ CHANGE_DETECTION_RASTER_OUTPUT_DIR: Path = _derived_output_dir("change detection
 CHANGE_DETECTION_VECTOR_OUTPUT_DIR: Path = _derived_output_dir(
     "change detection vector"
 )
+TERRAIN_RASTER_OUTPUT_DIR: Path = _derived_output_dir("generate_terrain_raster")
+TERRAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("generate_terrain_descriptor")
+SOIL_HEALTH_RASTER_OUTPUT_DIR: Path = _derived_output_dir("clip_soil_health")
+SOIL_HEALTH_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("soil_health_vector")
+CROPPING_INTENSITY_OUTPUT_DIR: Path = _derived_output_dir("cropping intensity")
 LULC_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("lulc vector")
 LULC_V3_OUTPUT_DIR: Path = _derived_output_dir("lulc v3")
 LULC_V4_OUTPUT_DIR: Path = _derived_output_dir("lulc v4")
@@ -302,7 +339,7 @@ LOCAL_DISTANCETONEARESTDRAINAGE_OUTPUT = (
 PAN_INDIA_FACILITIES_PATH = _base_layer_path(
     "facilities", fallback="{DATA_DIR}/base_layers/Pan_India_facilities_polygon.geojson"
 )
-LOCAL_FACILITIES_OUTPUT = DATA_DIR / "layers/facilities"
+LOCAL_FACILITIES_OUTPUT = DATA_DIR / "outputs/facilities"
 PAN_INDIA_CATCHMENT_AREA_PATH = DATA_DIR / "base_layers/Pan_India_catchment_area.tif"
 LOCAL_CATCHMENT_AREA_OUTPUT = DATA_DIR / "layers/catchment_area_singleflow"
 
@@ -352,10 +389,10 @@ PAN_INDIA_FABDEM_PATH = _base_layer_path(
 LOCAL_FABDEM_OUTPUT = DATA_DIR / "fabdem/fabdem_local"
 
 PAN_INDIA_ANTYODAYA_2020 = DATA_DIR / "base_layers/pan_india_antyodaya_2020.gpkg"
-LOCAL_ANTYODAYA_2020_OUTPUT = DATA_DIR / "antyodaya/output/antyodaya_local"
+LOCAL_ANTYODAYA_2020_OUTPUT = DATA_DIR / "outputs/antyodaya20"
 
 PAN_INDIA_LIVESTOCKS = DATA_DIR / "base_layers/pan_india_livestock.gpkg"
-LOCAL_LIVESTOCKS_OUTPUT = DATA_DIR / "livestock/output/livestock_local"
+LOCAL_LIVESTOCKS_OUTPUT = DATA_DIR / "outputs/livestocks20"
 
 
 PAN_INDIA_FOREST_FRINGE = _base_layer_path(

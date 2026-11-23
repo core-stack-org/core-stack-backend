@@ -67,10 +67,16 @@ def export_plans_csv(org_id, sections=ALL_SECTIONS):
             [sections],
         )
 
-        # raw psycopg2 cursor: server-side COPY ... TO file would need superuser
-        cur.cursor.copy_expert(
+        # server-side COPY ... TO file would need superuser; stream via STDOUT
+        copy_sql = (
             f"COPY (SELECT * FROM pradan_dpr_out ORDER BY {_ORDER_BY}) "
-            "TO STDOUT WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')",
-            buf,
+            "TO STDOUT WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')"
         )
+        raw_cur = cur.cursor
+        if hasattr(raw_cur, "copy_expert"):  # psycopg2
+            raw_cur.copy_expert(copy_sql, buf)
+        else:  # psycopg3
+            with raw_cur.copy(copy_sql) as copy:
+                for data in copy:
+                    buf.write(data)
     return buf.getvalue()
