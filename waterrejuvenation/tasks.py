@@ -5,7 +5,7 @@ import time
 from celery import shared_task
 
 
-from computing.lulc.lulc_v3 import clip_lulc_v3
+from computing.lulc.clip_lulc import clip_lulc
 from computing.misc.catchment_area import (
     generate_catchment_area_singleflow,
 )
@@ -141,7 +141,12 @@ def _gee_safe_property(value, prop_name=None):
         stripped = value.strip()
         if not stripped or stripped.upper() in ("N/A", "NAN", "NONE"):
             return None
-        if prop_name and prop_name.lower() in {"area_ored", "zoi", "zoi_wb", "zoi_area"}:
+        if prop_name and prop_name.lower() in {
+            "area_ored",
+            "zoi",
+            "zoi_wb",
+            "zoi_area",
+        }:
             try:
                 return float(stripped)
             except ValueError:
@@ -280,11 +285,7 @@ def _merge_matched_desilt_with_swb(desilt_row, wb_row):
     if geometry is None:
         return None
 
-    wb_props = {
-        col: wb_row[col]
-        for col in wb_row.index
-        if col != "geometry"
-    }
+    wb_props = {col: wb_row[col] for col in wb_row.index if col != "geometry"}
     desilt_props = {
         col: desilt_row[col]
         for col in desilt_row.index
@@ -389,6 +390,111 @@ def Upload_Desilting_Points(
             return None
         return val
 
+    def coord(value):
+        if value is None:
+            return None
+        try:
+            return round(float(value), 6)
+        except (TypeError, ValueError):
+            return None
+
+    def text(value):
+        if value is None:
+            return ""
+        return str(value).strip().lower()
+
+    def point_key(lat, lon, waterbody_name, intervention_year):
+        return (
+            coord(lat),
+            coord(lon),
+            text(waterbody_name),
+            text(intervention_year),
+        )
+
+    def excel_cell(row, header):
+        # Header checks ignore case and surrounding space. The old lookup
+        # required "Name of the waterbody " with a trailing space, so a normal
+        # column was skipped and the name was stored as empty.
+        wanted = str(header).strip().lower()
+        for col in row.index:
+            if str(col).strip().lower() == wanted:
+                return normalize(row[col])
+        return None
+
+    wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
+    proj_obj = Project.objects.get(pk=wb_obj.project_id)
+
+    df = pd.read_excel(wb_obj.file)
+    successful_keys = set()
+    failed_ids = {}
+    processed_without_name = {}
+    failed_without_name = {}
+    for log in WaterbodiesDesiltingLog.objects.filter(project=proj_obj).only(
+        "id", "lat", "lon", "waterbody_name", "intervention_year", "process"
+    ):
+        key = point_key(log.lat, log.lon, log.waterbody_name, log.intervention_year)
+        location = (coord(log.lat), coord(log.lon), text(log.intervention_year))
+        if log.process:
+            successful_keys.add(key)
+            if not text(log.waterbody_name):
+                processed_without_name[location] = log.id
+        else:
+            failed_ids[key] = log.id
+            if not text(log.waterbody_name):
+                failed_without_name[location] = log.id
+
+    new_rows = []
+    skipped_rows = 0
+    for index, row in df.iterrows():
+        lat = excel_cell(row, "Latitude")
+        lon = excel_cell(row, "Longitude")
+        waterbody_name = excel_cell(row, "Name of the waterbody")
+        intervention_year = excel_cell(row, "Intervention_year")
+        key = point_key(lat, lon, waterbody_name, intervention_year)
+        if key in successful_keys:
+            skipped_rows += 1
+            logger.info(
+                "Skipping desilting row %s for project %s; it is already processed.",
+                index,
+                proj_obj.id,
+            )
+            continue
+        existing_id = failed_ids.pop(key, None)
+        if existing_id is None and waterbody_name:
+            location = (coord(lat), coord(lon), text(intervention_year))
+            processed_id = processed_without_name.pop(location, None)
+            if processed_id:
+                WaterbodiesDesiltingLog.objects.filter(pk=processed_id).update(
+                    waterbody_name=waterbody_name
+                )
+                skipped_rows += 1
+                logger.info(
+                    "Set waterbody name on already processed row %s for project %s.",
+                    processed_id,
+                    proj_obj.id,
+                )
+                continue
+            existing_id = failed_without_name.pop(location, None)
+        successful_keys.add(key)
+        new_rows.append(
+            (index, row, lat, lon, waterbody_name, intervention_year, existing_id)
+        )
+
+    if not new_rows:
+        logger.info(
+            "No new desilting rows for project %s. Marking upload %s processed.",
+            proj_obj.id,
+            wb_obj.id,
+        )
+        wb_obj.process = True
+        wb_obj.save(update_fields=["process"])
+        return {
+            "status": "no_new_rows",
+            "new_rows": 0,
+            "retried_rows": 0,
+            "skipped_rows": skipped_rows,
+        }
+
     if (is_processing_required or is_closest_wp) and (not start_date or not end_date):
         raise ValueError(
             "start_date and end_date are required when processing desilting points "
@@ -399,38 +505,47 @@ def Upload_Desilting_Points(
     if start_date and end_date:
         _, _, start_year, end_year = _resolve_zoi_time_window(start_date, end_date)
 
-    ee_initialize(gee_account_id)
+    ee_initialize(gee_account_id, strict=True)
 
-    wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
-    proj_obj = Project.objects.get(pk=wb_obj.project_id)
-
-    if wb_obj.process:
-        logger.warning("File already processed. Skipping.")
-        return
-
-    df = pd.read_excel(wb_obj.file)
     merged_features = []
+    created_rows = 0
+    retried_rows = 0
 
-    for index, row in df.iterrows():
+    for (
+        index,
+        row,
+        lat,
+        lon,
+        waterbody_name,
+        intervention_year,
+        existing_id,
+    ) in new_rows:
         print(row)
-        # -----------------------------
-        # Create DB row FIRST (lossless)
-        # -----------------------------
-        dsilting_obj_log = WaterbodiesDesiltingLog.objects.create(
-            name_of_ngo=normalize(row.get("Name of NGO")),
-            State=normalize(row.get("State")),
-            District=normalize(row.get("District")),
-            Taluka=normalize(row.get("Taluka")),
-            Village=normalize(row.get("Village")),
-            waterbody_name=normalize(row.get("Name of the waterbody ")),
-            lat=normalize(row.get("Latitude")),
-            lon=normalize(row.get("Longitude")),
-            slit_excavated=normalize(row.get("Silt Excavated as per App")),
-            intervention_year=normalize(row.get("Intervention_year")),
-            excel_hash=wb_obj.excel_hash,
-            project=proj_obj,
-            process=False,
-        )
+        row_values = {
+            "name_of_ngo": excel_cell(row, "Name of NGO"),
+            "State": excel_cell(row, "State"),
+            "District": excel_cell(row, "District"),
+            "Taluka": excel_cell(row, "Taluka"),
+            "Village": excel_cell(row, "Village"),
+            "waterbody_name": waterbody_name,
+            "lat": lat,
+            "lon": lon,
+            "slit_excavated": excel_cell(row, "Silt Excavated as per App"),
+            "intervention_year": intervention_year,
+            "excel_hash": wb_obj.excel_hash,
+            "project": proj_obj,
+            "process": False,
+            "failure_reason": None,
+        }
+        if existing_id:
+            dsilting_obj_log = WaterbodiesDesiltingLog.objects.get(pk=existing_id)
+            for field, value in row_values.items():
+                setattr(dsilting_obj_log, field, value)
+            dsilting_obj_log.save()
+            retried_rows += 1
+        else:
+            dsilting_obj_log = WaterbodiesDesiltingLog.objects.create(**row_values)
+            created_rows += 1
 
         # -----------------------------
         # Validate lat / lon
@@ -510,11 +625,10 @@ def Upload_Desilting_Points(
     # -----------------------------
     print(merged_features)
 
-    intersecting_mws_asset = (
-        ee.FeatureCollection(merged_features).flatten().distinct("uid")
-    )
-
-    if is_processing_required:
+    if is_processing_required and merged_features:
+        intersecting_mws_asset = (
+            ee.FeatureCollection(merged_features).flatten().distinct("uid")
+        )
         Generate_lulc_mws(
             intersecting_mws_asset=intersecting_mws_asset,
             is_lulc_required=is_lulc_required,
@@ -526,6 +640,12 @@ def Upload_Desilting_Points(
 
     wb_obj.process = True
     wb_obj.save(update_fields=["process"])
+    return {
+        "status": "processed",
+        "new_rows": created_rows,
+        "retried_rows": retried_rows,
+        "skipped_rows": skipped_rows,
+    }
 
 
 def Generate_lulc_mws(
@@ -563,7 +683,7 @@ def Generate_lulc_mws(
         logger.info(f"is lulc required: {is_lulc_required}")
         make_asset_public(mws_asset_id)
         if is_lulc_required:
-            clip_lulc_v3(
+            clip_lulc(
                 start_year=start_year,
                 end_year=end_year,
                 gee_account_id=gee_account_id,

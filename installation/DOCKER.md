@@ -72,11 +72,17 @@ Leave everything else as it is for now.
 
 **4. Optional: download the admin boundaries yourself**
 
-The first start downloads the admin-boundary archive (about 600 MB) from
-Google Drive. To use a browser download instead, which is often faster,
-download it from
+The first start downloads the admin-boundary archive from Google Drive and
+extracts it to `data/base_layers/admin-boundary/` (`input/` and `output/`,
+about 8 GB). To use a browser download instead, which is often
+faster, download it from
 [here](https://drive.google.com/file/d/1VqIhB6HrKFDkDnlk1vedcEHhh5fk4f1d/view)
-and save it as `data/dataset.7z` in the repository.
+and save it as `data/dataset.7z` in the repository. The unpacked dataset is
+also browsable in
+[this folder](https://drive.google.com/drive/folders/1t5Ibvt5Vc0GGcKljOolkPJN2yWrpA21_);
+copy its `input/` and `output/` into `data/base_layers/admin-boundary/` if you
+fetch it that way. Data left at the old `data/admin-boundary/` location is
+moved there automatically.
 
 **5. Build and start**
 
@@ -155,8 +161,9 @@ it at the same path, for example as shown below.
 | India boundary (8 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `PanIndia_Boundaries/india_state_outer_no_islands.geojson` |
 | Aquifer (102 MB) | [Download](https://drive.google.com/drive/folders/1DSjWNYBubQtcgQ1HdqDWgFI_crtJqK-E) | `aquifer/aquifer.geojson` |
 | Microwatersheds (5.4 GB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `static_layers/mws/Microwatershed_v2_with_details.geojson` |
-| SOI tehsils (316 MB) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `admin_boundary/soi_tehsil.geojson` |
-| Tehsil watersheds | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `tehsil_watersheds/<state>/<district>/<tehsil>.gpkg` |
+| Admin boundary (8 GB) | [Download](https://drive.google.com/drive/folders/1t5Ibvt5Vc0GGcKljOolkPJN2yWrpA21_) | `admin-boundary/input/`, `admin-boundary/output/` |
+| SOI tehsils only (316 MB, already in Admin boundary) | [Download](https://drive.google.com/drive/folders/1MpWl10qo8-x_GsTnD7Z1S0XLHwUQC37b) | `admin-boundary/input/soi_tehsil.geojson` |
+| Tehsil mws | [Download](https://drive.google.com/drive/folders/1a88TsSH3wX16TXRgSnBNILyXj6DIuD6I) | `tehsil_mws/<state>/<district>/<block>/filtered_mws_<district>_<block>_uid.geojson` |
 | Runoff (164 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/runoff/` |
 | ET (114 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/et/` |
 | Pan-India annual hydrology (20 GB) | [Download](https://drive.google.com/file/d/1kUM0wUcpbx8XdM-ZbZOTQW770EGYAD22/view) | `hydrology/annual/` |
@@ -387,9 +394,16 @@ copy.
 | The four long-job endpoints return `503` | `COMPOSE_PROFILES=heavy` is not set. See [GPU and long jobs](#gpu-and-long-jobs). |
 | `Earth Engine client library not initialized` in logs | Earth Engine is not set up. Harmless for local compute. |
 | `401` from `geoserver.core-stack.org` in logs | The STAC catalog step uses the public CoRE Stack GeoServer. The layer itself is saved and published locally. |
-| Admin page has no styling | Static files are not served by the web server. The admin still works. |
+| Admin page has no styling | The CSS and JS under `/static/` are not being served. See [Static files](#static-files). |
 | `Permission denied` on files in the repository | Left by an older setup that ran as root. `docker compose --env-file nrm_app/.env up -d` gives them back to you. |
 | A second copy of the repository uses the first one's database | All copies share the Compose project name `core-stack`. Run one installation per machine. |
+
+If the general, NRM, or layer bulk Celery workers are stuck, this command
+force-stops all three containers and interrupts any tasks they are running.
+
+```bash
+docker kill core-stack-celery-general-1 core-stack-celery-nrm-1 core-stack-celery-layer-bulk-1
+```
 
 To stop a long job that is running on `celery-heavy`:
 
@@ -405,6 +419,48 @@ restarts.
 The `redis-cli` step also drops tasks started but not finished on other
 workers.
 
+### Static files
+
+`database-init` runs `collectstatic` on every start, which copies the admin,
+Swagger and REST framework assets into `static/` in the repository. The
+`backend` container serves them from there through WhiteNoise, because
+gunicorn does not serve static files by itself.
+
+If the admin at <http://localhost:8000/admin/> has no styling, check each
+step in turn:
+
+```bash
+# 1. Did collectstatic run? Look for "N static files copied to '/app/static'".
+docker compose --env-file nrm_app/.env logs database-init | grep -i "static files"
+
+# 2. Are the files on the host?
+ls static/admin/css/base.css
+
+# 3. Are they served? Expect 200.
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/static/admin/css/base.css
+
+# 4. Is WhiteNoise in the image? Expect a version number.
+docker compose --env-file nrm_app/.env exec backend python -c "import whitenoise; print(whitenoise.__version__)"
+```
+
+- Step 1 or 2 fails: run collectstatic yourself, then restart the backend:
+
+  ```bash
+  docker compose --env-file nrm_app/.env exec --user "$(id -u):$(id -g)" backend python manage.py collectstatic --noinput
+  docker compose --env-file nrm_app/.env restart backend
+  ```
+
+- Step 3 returns `404` and step 4 fails with `ModuleNotFoundError`: the image
+  was built before WhiteNoise was added. Rebuild it:
+
+  ```bash
+  docker compose --env-file nrm_app/.env up -d --build --force-recreate
+  ```
+
+- Step 3 returns `404` and step 4 works: WhiteNoise looks for the files when
+  the backend starts, so files collected after that are not served yet. Run
+  `docker compose --env-file nrm_app/.env restart backend`.
+
 ## Running on a server
 
 - Change `DB_PASSWORD`, `GEOSERVER_PASSWORD` and the admin password before
@@ -416,3 +472,137 @@ workers.
 - Back up the database regularly:
   `docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup`
   writes a dump to `backups/postgres/`.
+
+## After a Git pull or code change
+
+The code is bind-mounted, so edited files become visible inside containers
+immediately. However, Gunicorn and Celery load Python code at startup and must
+be restarted to run updated code.
+
+A plain `docker compose up -d` does **not** restart services when their
+configuration and image have not changed.
+
+### Which command should I run?
+
+| What changed? | Action | Why? |
+| --- | --- | --- |
+| Python code only (views, tasks, utilities) | Restart application services | Reloads Python code quickly |
+| Django models (`models.py`), or unsure what changed | Recreate services | Reruns `database-init` (`makemigrations`, `migrate`, `collectstatic`) |
+| `docker-compose.yml` or `nrm_app/.env` | `up -d` | Recreates services affected by configuration changes |
+| `environment.yml`, `Dockerfile`, or `installation/docker/*.sh` | Rebuild and recreate | Applies dependency or image build changes |
+
+**Python code only:**
+
+```bash
+docker compose --env-file nrm_app/.env restart \
+  backend celery-nrm celery-general celery-geoserver celery-layer-bulk
+```
+
+Add `celery-heavy` or `celery-beat` if you enabled the `heavy` or `periodic`
+profile.
+
+**Models changed, or unsure what changed:**
+
+```bash
+docker compose --env-file nrm_app/.env up -d --force-recreate
+```
+
+**Compose configuration or `.env` changed:**
+
+```bash
+docker compose --env-file nrm_app/.env up -d
+```
+
+**Dependencies or image build changed:**
+
+```bash
+docker compose --env-file nrm_app/.env up -d --build --force-recreate
+```
+
+> [!NOTE]
+> `database-init` runs migrations and collects static files only when services
+> are recreated. A plain `restart` does not rerun the one-shot init jobs.
+
+### Default workflow after `git pull`
+
+```bash
+docker compose --env-file nrm_app/.env up -d --force-recreate
+```
+
+Only add `--build` when dependencies or build instructions changed. Check what
+the last pull changed:
+
+```bash
+git diff --stat HEAD@{1} HEAD -- \
+  installation/environment.yml Dockerfile installation/docker/
+```
+
+If this shows nothing, a rebuild is unnecessary. An unnecessary rebuild is
+usually quick when the Docker build cache is valid, but this is not
+guaranteed.
+
+### Updating `environment.yml`
+
+Changing `environment.yml` invalidates the cached Conda environment layer, so
+the next build downloads the whole environment again, roughly **2 GB**. This is
+slow and can fail on slower connections with
+`Download error (28) Timeout was reached`.
+
+To add a single package, prefer a separate `RUN ... pip install` step in the
+`Dockerfile`, after the `micromamba create` step, rather than modifying the
+Conda environment. WhiteNoise is installed this way.
+
+> [!TIP]
+> If you must change `environment.yml`, make the Conda step more tolerant of
+> slow downloads first: raise the download timeout with
+> `MAMBA_REMOTE_CONNECT_TIMEOUT_SECS=1800` on that `RUN` line, and add
+> `--mount=type=cache,target=/opt/conda/pkgs` (dropping `micromamba clean`) so
+> packages downloaded by a failed attempt are kept for the next one.
+
+## Troubleshooting failed initialization
+
+If an init job fails after a pull, `docker compose --env-file nrm_app/.env ps -a`
+shows it as `Exited (1)` and the services that depend on it do not start.
+
+Inspect its logs:
+
+```bash
+docker compose --env-file nrm_app/.env logs database-init
+```
+
+A common cause is a model change that `makemigrations` cannot handle without an
+interactive answer, for example adding a required field without a default.
+
+Fix the model or migration issue, then recreate:
+
+```bash
+docker compose --env-file nrm_app/.env up -d --force-recreate
+```
+
+## PostgreSQL data persistence
+
+PostgreSQL data lives in the `postgres_data` Docker volume, not in the
+container, so recreating the container keeps it. Changes made by hand inside a
+container outside its volumes and mounts, such as `apt install` or `pip install`,
+are lost when the container is recreated.
+
+### Safe operations vs. destructive operations
+
+| Preserves persistent data | Can delete data or volumes |
+| --- | --- |
+| `up -d --force-recreate` | `docker compose ... down -v` |
+| `up -d --build` | `docker volume rm core-stack_postgres_data` |
+| `restart`, `stop`, `start` | `docker system prune --volumes` (may remove unused volumes) |
+| `down` without `-v` | [Remove an earlier installation](#remove-an-earlier-installation) |
+| Reboot or Docker restart | |
+
+> [!CAUTION]
+> `docker compose down -v` removes the Compose project's named volumes,
+> including the database, GeoServer and Redis data. Do not use it when you need
+> the existing database, and do not remove the PostgreSQL data volume by hand.
+
+Back up the database before anything risky:
+
+```bash
+docker compose --env-file nrm_app/.env --profile maintenance run --rm database-backup
+```

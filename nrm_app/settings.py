@@ -166,7 +166,16 @@ CORS_ALLOW_METHODS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = ["http://localhost:3000", "https://www.cse.iitd.ernet.in", "https://cse.iitd.ernet.in"]
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS",
+    default=[
+        "http://localhost:3000",
+        "https://www.cse.iitd.ac.in",
+        "https://cse.iitd.ac.in",
+        "https://www.cse.iitd.ernet.in",
+        "https://cse.iitd.ernet.in",
+    ]
+)
 
 # MARK: REST Framework
 
@@ -218,6 +227,9 @@ SIMPLE_JWT = {
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves STATIC_ROOT (filled by collectstatic) from gunicorn, which has
+    # no static file handling of its own.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -384,6 +396,11 @@ LOGGING = {
             "propagate": False,
         },
         "core_stack.layer_generation": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "stats_generator": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,

@@ -11,7 +11,9 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
-from computing.config_loader import LULC_PLAIN_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
+from computing.config_loader import (
+    LULC_PLAIN_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
+)
 from computing.config_loader import TERRAIN_RASTER_PATH
 from computing.local_compute_helper import (
     AEZ_VECTOR_PATH,
@@ -47,7 +49,7 @@ PLAIN_LULC_FIELD_MAPPING = {
     "shrubs_scrubs": 12,
     "sing_crop": 8,
     "sing_non_kharif_crop": 9,
-    "forest": 6,
+    "forest": [6, 13],
     "triple_crop": 11,
 }
 
@@ -111,7 +113,10 @@ def _compute_plain_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
 
     proportions = {}
     for field_name, lulc_class in PLAIN_LULC_FIELD_MAPPING.items():
-        class_pixels = int((plains_mask & (lulc_mode == lulc_class)).sum())
+        if isinstance(lulc_class, list):
+            class_pixels = int((plains_mask & np.isin(lulc_mode, lulc_class)).sum())
+        else:
+            class_pixels = int((plains_mask & (lulc_mode == lulc_class)).sum())
         proportions[field_name] = class_pixels / float(plain_plus_slope_pixels)
 
     return proportions
@@ -134,8 +139,7 @@ def _assign_plain_clusters(
     computed_rows = []
     with rasterio.open(terrain_raster_path) as terrain_src, ExitStack() as stack:
         lulc_sources = [
-            stack.enter_context(rasterio.open(path))
-            for path in lulc_raster_paths
+            stack.enter_context(rasterio.open(path)) for path in lulc_raster_paths
         ]
         total = len(plain_watersheds_gdf)
 
@@ -203,7 +207,9 @@ def _assign_plain_clusters(
                 )
 
             if index % 200 == 0 or index == total:
-                logger.info("Computed plain LULC clusters for %d/%d watersheds", index, total)
+                logger.info(
+                    "Computed plain LULC clusters for %d/%d watersheds", index, total
+                )
 
     result = plain_watersheds_gdf.copy()
     computed_df = pd.DataFrame(computed_rows)
@@ -289,9 +295,7 @@ def run_lulc_on_plain_cluster_local(
     ]
     plain_watersheds.drop(
         columns=[
-            column
-            for column in temp_columns
-            if column in plain_watersheds.columns
+            column for column in temp_columns if column in plain_watersheds.columns
         ],
         inplace=True,
     )
@@ -332,15 +336,16 @@ def run_lulc_on_plain_cluster_local(
             layer_name=layer_name,
             file_type="gpkg",
         )
-        geoserver_ok = (
-            isinstance(geoserver_response, dict)
-            and geoserver_response.get("status_code") in (200, 201)
-        )
+        geoserver_ok = isinstance(geoserver_response, dict) and geoserver_response.get(
+            "status_code"
+        ) in (200, 201)
         if geoserver_ok:
             logger.info("GeoServer upload succeeded for layer %s", layer_name)
         else:
             logger.error(
-                "GeoServer upload failed for layer %s: %s", layer_name, geoserver_response
+                "GeoServer upload failed for layer %s: %s",
+                layer_name,
+                geoserver_response,
             )
 
     layer_id = None

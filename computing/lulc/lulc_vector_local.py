@@ -36,6 +36,7 @@ LULC_VECTOR_CLASS_DEFINITIONS = (
     {"value": 10, "label": "doubly_cropped_area_"},
     {"value": 11, "label": "triply_cropped_area_"},
     {"value": 12, "label": "shrub_scrub_area_"},
+    {"value": 13, "label": "plantation_area_"},
 )
 
 
@@ -95,7 +96,12 @@ def run_lulc_vector_local(
     )
 
     for year, raster_path in zip(range(start_year, end_year + 1), raster_paths):
-        logger.info("Computing LULC vector properties for %d-%d: %s", year, year + 1, raster_path)
+        logger.info(
+            "Computing LULC vector properties for %d-%d: %s",
+            year,
+            year + 1,
+            raster_path,
+        )
         year_result = compute_categorical_raster_areas_for_watersheds(
             watersheds_gdf=result_gdf,
             raster_path=raster_path,

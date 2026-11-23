@@ -71,7 +71,7 @@ flowchart TD
     I -->|No| J[Print the exact next missing setup step]
     I -->|Yes| K[Call POST /api/v1/generate_block_layer/]
     K --> L[Run the Celery task in eager mode inside the test process]
-    L --> M[Verify output artifacts under data/admin-boundary/output/...]
+    L --> M[Verify output artifacts under data/base_layers/admin-boundary/output/...]
     M --> N[Resolve URL tree and probe internal routes]
     N --> O[Print pass/fail summary and next step]
 ```
@@ -194,7 +194,7 @@ The installation script automatically performs the following:
 | Static Files | Runs `collectstatic` |
 | Migrations | Runs database migrations |
 | GEE Import | Optionally stages GEE JSONs into `data/gee_confs/` and imports them |
-| Admin Boundary | Downloads and normalizes the admin-boundary dataset into `data/admin-boundary/` |
+| Admin Boundary | Downloads and normalizes the admin-boundary dataset into `data/base_layers/admin-boundary/` |
 | Validation | Runs `computing/misc/internal_api_initialisation_test.py` |
 
 ### 2.5 Script Output

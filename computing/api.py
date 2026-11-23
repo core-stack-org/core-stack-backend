@@ -102,15 +102,14 @@ from .local_compute_helper import (
 from .local_compute_helper import (
     select_compute_task as _select_compute_task,
 )
-from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
-from .lulc.lulc_v3_local import clip_lulc_v3 as clip_lulc_v3_local_task
+from .lulc.clip_lulc import clip_lulc as clip_lulc_gee_task
+from .lulc.clip_lulc_local import clip_lulc_local as clip_lulc_local_task
 from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
 from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
 from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
 from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
-from .lulc.v4.lulc_v4 import generate_lulc_v4
 from .lulc.v4.temporal_correction import runner as temporal_correction
 from .lulc.v4.temporal_correction.tasks import (
     lulc_temporal_correction_incremental as lulc_temporal_correction_incremental_task,
@@ -314,7 +313,7 @@ def generate_farm_boundaries(request):
         block = request.data.get("block", "").lower().strip()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        overwrite = request.data.get("overwrite", False)
+        overwrite = parse_bool(request.data.get("overwrite", False))
 
         if not all([state, district, block]):
             return Response(
@@ -328,7 +327,7 @@ def generate_farm_boundaries(request):
                 "district": district,
                 "block": block,
                 "start_year": start_year,
-                "end_year" : end_year,
+                "end_year": end_year,
                 "overwrite": overwrite,
             },
             queue="nrm",
@@ -650,7 +649,7 @@ def _generate_tehsil_hydrology(request, is_annual):
                 "end_year": end_year,
                 "is_annual": is_annual,
                 "pan_india": False,
-                "overwrite": request.data.get("overwrite", False),
+                "overwrite": parse_bool(request.data.get("overwrite", False)),
             },
             queue="nrm",
         )
@@ -730,7 +729,7 @@ def _generate_pan_india_hydrology_base_layer(request, is_annual):
             "start_year": start_year,
             "end_year": end_year,
             "is_annual": is_annual,
-            "overwrite": request.data.get("overwrite", False),
+            "overwrite": parse_bool(request.data.get("overwrite", False)),
         },
         queue=_heavy_queue(),
     )
@@ -867,7 +866,7 @@ def et_download(request):
                 "end_date": request.data.get("end_date"),
                 "start_year": request.data.get("start_year"),
                 "end_year": request.data.get("end_year"),
-                "overwrite": request.data.get("overwrite", False),
+                "overwrite": parse_bool(request.data.get("overwrite", False)),
                 "patch_fill": request.data.get("patch_fill", True),
             },
             queue=_heavy_queue(),
@@ -992,8 +991,8 @@ def lulc_v3_river_basin(request):
 @schema(None)
 @require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
-def lulc_v3(request):
-    logger.info("Inside lulc_v3 api.")
+def lulc_clip(request):
+    logger.info("Inside lulc_clip api.")
     try:
         state = request.data.get("state").lower()
         district = request.data.get("district").lower()
@@ -1004,8 +1003,8 @@ def lulc_v3(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
-            clip_lulc_v3_gee_task,
-            clip_lulc_v3_local_task,
+            clip_lulc_gee_task,
+            clip_lulc_local_task,
         )
         task.apply_async(
             args=[state, district, block, start_year, end_year, gee_account_id],
@@ -1015,10 +1014,10 @@ def lulc_v3(request):
             {"Success": "LULC v3 task initiated"}, status=status.HTTP_200_OK
         )
     except ValueError as e:
-        logger.warning("Invalid request in lulc_v3 api: %s", e)
+        logger.warning("Invalid request in lulc_clip api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        logger.exception("Exception in lulc_v3 api")
+        logger.exception("Exception in lulc_clip api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1054,31 +1053,6 @@ def lulc_vector(request):
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in lulc_vector api")
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-@api_view(["POST"])
-@schema(None)
-@sync_layer_generation_if_enabled
-def lulc_v4(request):
-    logger.info("Inside lulc_time_series")
-    try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
-        start_year = request.data.get("start_year")
-        end_year = request.data.get("end_year")
-        gee_account_id = request.data.get("gee_account_id")
-        generate_lulc_v4.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
-        )
-        return Response(
-            {"Success": "lulc_time_series task initiated"},
-            status=status.HTTP_200_OK,
-        )
-    except Exception as e:
-        logger.exception("Exception in lulc_time_series api")
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -1264,9 +1238,13 @@ def _check_pan_india_drought_payload(request, name):
         raise ValueError(
             f"Do not pass pan_india to the {name} API; the /api/v1/pan-india/ route already defines the scope."
         )
-    forbidden_fields = [field for field in PAN_INDIA_LOCATION_FIELDS if field in request.data]
+    forbidden_fields = [
+        field for field in PAN_INDIA_LOCATION_FIELDS if field in request.data
+    ]
     if forbidden_fields:
-        raise ValueError(f"The {name} API is pan-India; do not pass {', '.join(forbidden_fields)}")
+        raise ValueError(
+            f"The {name} API is pan-India; do not pass {', '.join(forbidden_fields)}"
+        )
     return compute
 
 
@@ -1289,12 +1267,16 @@ def download_pan_india_drought_inputs(request):
         queue = _heavy_queue()
         if drought_download_in_progress():
             return Response(
-                {"Exception": "A drought input download is already running; wait for it to finish."},
+                {
+                    "Exception": "A drought input download is already running; wait for it to finish."
+                },
                 status=status.HTTP_409_CONFLICT,
             )
         message = None if dry_run else drought_inputs_not_writable()
         if message:
-            return Response({"Exception": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"Exception": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         task = download_drought_inputs_task.apply_async(
             kwargs={"products": products, "end_year": end_year, "dry_run": dry_run},
             queue=queue,
@@ -1312,14 +1294,22 @@ def download_pan_india_drought_inputs(request):
             status=status.HTTP_200_OK,
         )
     except HeavyWorkerUnavailable as e:
-        logger.warning("Heavy worker unavailable in download_pan_india_drought_inputs api: %s", e)
-        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        logger.warning(
+            "Heavy worker unavailable in download_pan_india_drought_inputs api: %s", e
+        )
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
     except ValueError as e:
-        logger.warning("Invalid request in download_pan_india_drought_inputs api: %s", e)
+        logger.warning(
+            "Invalid request in download_pan_india_drought_inputs api: %s", e
+        )
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in download_pan_india_drought_inputs api")
-        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(["POST"])
@@ -1330,8 +1320,12 @@ def generate_pan_india_drought(request):
         compute = _check_pan_india_drought_payload(request, "pan-India drought")
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        start_year = int(start_year) if start_year not in (None, "") else DROUGHT_FIRST_SEASON
-        end_year = int(end_year) if end_year not in (None, "") else datetime.date.today().year
+        start_year = (
+            int(start_year) if start_year not in (None, "") else DROUGHT_FIRST_SEASON
+        )
+        end_year = (
+            int(end_year) if end_year not in (None, "") else datetime.date.today().year
+        )
         if start_year < DROUGHT_FIRST_SEASON:
             raise ValueError(f"start_year must be {DROUGHT_FIRST_SEASON} or later")
         if end_year < start_year:
@@ -1347,15 +1341,23 @@ def generate_pan_india_drought(request):
         paths = DroughtPaths.build()
         if drought_run_in_progress(paths):
             return Response(
-                {"Exception": "A pan-India drought run is already going; wait for it to finish."},
+                {
+                    "Exception": "A pan-India drought run is already going; wait for it to finish."
+                },
                 status=status.HTTP_409_CONFLICT,
             )
         message = drought_not_writable(paths.base)
         if message:
-            return Response({"Exception": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"Exception": message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
         seasons = list(range(start_year, end_year + 1))
         drought_status._listdir.cache_clear()  # see the input folders as they are now
-        ready = [s for s in seasons if any(drought_status.stage_can_run(paths, stage, s) for stage in stages)]
+        ready = [
+            s
+            for s in seasons
+            if any(drought_status.stage_can_run(paths, stage, s) for stage in stages)
+        ]
         waiting = {
             season: detail
             for season, state, detail in drought_status.season_states(paths, seasons)
@@ -1384,14 +1386,20 @@ def generate_pan_india_drought(request):
             status=status.HTTP_200_OK,
         )
     except HeavyWorkerUnavailable as e:
-        logger.warning("Heavy worker unavailable in generate_pan_india_drought api: %s", e)
-        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        logger.warning(
+            "Heavy worker unavailable in generate_pan_india_drought api: %s", e
+        )
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
     except ValueError as e:
         logger.warning("Invalid request in generate_pan_india_drought api: %s", e)
         return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in generate_pan_india_drought api")
-        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(
+            {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 def _data_dir_payload(request, field, default):
@@ -3040,8 +3048,8 @@ def generate_stac_collection(request):
         start_year = request.data.get("start_year", "")
         end_year = request.data.get("end_year", "")
         upload_to_s3 = request.data.get("upload_to_s3", False)
-        overwrite = request.data.get("overwrite", False)
-        overwrite_metadata = request.data.get("overwrite_metadata", False)
+        overwrite = parse_bool(request.data.get("overwrite", False))
+        overwrite_metadata = parse_bool(request.data.get("overwrite_metadata", False))
 
         if not all([state, district, block, layer_name, layer_type]):
             return Response(
@@ -3426,7 +3434,7 @@ def generate_spei(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        overwrite = request.data.get("overwrite") or False
+        overwrite = parse_bool(request.data.get("overwrite", False))
 
         generate_spei_pipeline.apply_async(
             args=[aez, start_year, end_year, gee_account_id, overwrite], queue="nrm"

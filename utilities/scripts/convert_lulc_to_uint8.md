@@ -55,7 +55,7 @@ The script prints, per file, how many pixels were NaN, rounded, and snapped.
 ## After converting
 
 1. Move the originals to a backup folder **outside** `data/base_layers/lulc/`.
-   Soil health uses the last three `lulc_v3_*.tif` files in that folder, so any extra file there gets picked up.
+   Soil health uses the latest three consecutive LULC years in that folder and requires all three files to be present.
 2. Move the converted files into `data/base_layers/lulc/` under the same names.
 3. Upload them to `s3://corestack-datasets/base_layers/periodic_layers/lulc/lulc_v3/`.
 

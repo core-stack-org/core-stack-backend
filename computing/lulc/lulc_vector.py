@@ -138,6 +138,7 @@ def generate_vector(
     # 10 - Double cropping cropland
     # 11 - Triple cropping cropland
     # 12 - Shrub_Scrub
+    # 13 - Plantation
 
     args = [
         {"label": 1, "txt": "built-up_area_"},
@@ -152,6 +153,7 @@ def generate_vector(
         {"label": 10, "txt": "doubly_cropped_area_"},
         {"label": 11, "txt": "triply_cropped_area_"},
         {"label": 12, "txt": "shrub_scrub_area_"},
+        {"label": 13, "txt": "plantation_area_"},
     ]
 
     def res(feature):

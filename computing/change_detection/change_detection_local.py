@@ -39,6 +39,7 @@ BUILT_UP_REMAP = {
     10: 3,
     11: 3,
     12: 4,
+    13: 3,
 }
 
 DEGRADATION_REMAP = {
@@ -53,6 +54,7 @@ DEGRADATION_REMAP = {
     10: 3,
     11: 3,
     12: 6,
+    13: 4,
 }
 
 DEFORESTATION_AFFORESTATION_REMAP = {
@@ -67,6 +69,7 @@ DEFORESTATION_AFFORESTATION_REMAP = {
     10: 4,
     11: 4,
     12: 6,
+    13: 3,
 }
 
 CROP_INTENSITY_REMAP = {
@@ -81,6 +84,7 @@ CROP_INTENSITY_REMAP = {
     10: 6,
     11: 7,
     12: 8,
+    13: 3,
 }
 
 SHRUB_REMAP = {
@@ -95,10 +99,11 @@ SHRUB_REMAP = {
     10: 5,
     11: 5,
     12: 6,
+    13: 3,
 }
 
 
-def _build_lookup_table(mapping, size=13):
+def _build_lookup_table(mapping, size=14):
     lookup = np.zeros(size, dtype=np.int16)
     for source_value, mapped_value in mapping.items():
         lookup[source_value] = mapped_value

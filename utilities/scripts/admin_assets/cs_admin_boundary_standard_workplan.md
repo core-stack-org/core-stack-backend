@@ -11,24 +11,24 @@ Working branch at start: `feat/facilities_v2`
 - Add new scripts for the new standard path:
   - `utilities/scripts/admin_assets/build_cs_admin_boundary_standard.py`
   - `utilities/scripts/admin_assets/build_cs_admin_boundary_assets.py`
-- Keep `data/admin-boundary/cs_admin_standard.gpkg` as the primary standard asset.
+- Keep `data/base_layers/admin-boundary/cs_admin_standard.gpkg` as the primary standard asset.
 - Also export:
-  - `data/admin-boundary/cs_admin_standard.geojson`
-  - `data/admin-boundary/cs_admin_standard.csv`
+  - `data/base_layers/admin-boundary/cs_admin_standard.geojson`
+  - `data/base_layers/admin-boundary/cs_admin_standard.csv`
 - Maintain consistent village identifiers and dtypes across admin, facilities, livestock, and Antyodaya outputs.
 
 ## Admin Boundary Standard
 
 Primary inputs to inspect before implementation:
 
-- `data/admin-boundary/input/`
-- `data/admin-boundary/multi_part_village_analysis.csv`
-- `data/admin-boundary/multi_part_village_analysis_file_data.csv`
-- `data/admin-boundary/cs_admin_boundary_village_shapes_analysis.py`
-- `data/admin-boundary/cs_admin_boundary_village_shapes_analysis.geojson`
+- `data/base_layers/admin-boundary/input/`
+- `data/base_layers/admin-boundary/multi_part_village_analysis.csv`
+- `data/base_layers/admin-boundary/multi_part_village_analysis_file_data.csv`
+- `data/base_layers/admin-boundary/cs_admin_boundary_village_shapes_analysis.py`
+- `data/base_layers/admin-boundary/cs_admin_boundary_village_shapes_analysis.geojson`
 - `utilities/scripts/admin_assets/build_admin_boundary_assets.py`
 
-`data/admin-boundary/cs_admin_sanitised.gpkg` is useful as a previous-build reference only. The new standard asset must maintain traceability from raw `data/admin-boundary/input/` rows to `data/admin-boundary/cs_admin_standard.gpkg`, not from `cs_admin_sanitised.gpkg`.
+`data/base_layers/admin-boundary/cs_admin_sanitised.gpkg` is useful as a previous-build reference only. The new standard asset must maintain traceability from raw `data/base_layers/admin-boundary/input/` rows to `data/base_layers/admin-boundary/cs_admin_standard.gpkg`, not from `cs_admin_sanitised.gpkg`.
 
 Expected behavior:
 
@@ -46,7 +46,7 @@ Branch-aware work:
 - Facilities rebuild work spans `feat/facilities_v2` and `feat/facilities_data_processing`.
 - Rebuild proximity using:
   - `data/facilities/outputs/pan_india_facilities.gpkg`
-  - `data/admin-boundary/cs_admin_standard.gpkg`
+  - `data/base_layers/admin-boundary/cs_admin_standard.gpkg`
 - Target proximity output:
   - `data/facilities/outputs/cs_village_facility_proximity.gpkg`
   - plus a useful CSV sibling for local inspection/API parity.
@@ -66,7 +66,7 @@ Targets:
   - `data/antyodaya/output/cs_antyodaya_2020.geojson`
 
 The new builder resolves legacy config references to
-`data/admin-boundary/cs_admin_standard.gpkg` / layer `cs_admin_standard` by
+`data/base_layers/admin-boundary/cs_admin_standard.gpkg` / layer `cs_admin_standard` by
 default. It prepends the standard identity columns (`cs_feature_id`,
 `cs_admin_uid`, `core_admin_uid`, `pc11_village_id`, `village_id`) before the
 configured joined columns and writes unmatched-admin and unmatched-source CSV
@@ -96,7 +96,7 @@ should not introduce a `pyogrio` dependency.
 
 Completed and validated:
 
-- `data/admin-boundary/cs_admin_standard.gpkg`
+- `data/base_layers/admin-boundary/cs_admin_standard.gpkg`
   - Layer rows: `630,898`
   - Raw source-trace rows: `983,551`
   - Trace status counts: `971,657` output, `11,894` omitted

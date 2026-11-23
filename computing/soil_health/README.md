@@ -24,7 +24,7 @@ The pipeline depends on the following files and derived products:
 - `data/base_layers/soil_health/soil_health_P.tif`
 - `data/base_layers/soil_health/soil_health_OC.tif`
 - `data/base_layers/soil_health/soil_health_OC_OLM.tif`
-- Latest LULC rasters under the configured `LULC_BASE_DIR`, selected as the newest 3 available rasters (`lulc_v3_*.tif`)
+- The latest 3 consecutive LULC rasters under the configured `LULC_BASE_DIR` (`lulc_v3_*.tif`); missing years in that range are reported as errors
 - ROI geometry from either:
   - precomputed state/district/block watershed boundary, or
   - a user-supplied vector file and `asset_suffix`
@@ -41,7 +41,7 @@ The code uses the nitrogen raster (`soil_health_N.tif`) as the reference grid fo
 
 ### 2. Build a three-year LULC mode image
 
-The pipeline searches for the latest LULC rasters and reprojects each one to the reference soil grid using the same transform and CRS. The generated arrays are combined with the local `compute_mode_lulc_array(...)` function to produce a 3-year modal LULC dataset.
+The pipeline finds the newest LULC year and resolves the corresponding latest 3 consecutive rasters with `resolve_lulc_raster_paths(...)`. Missing files in that range are reported as errors. Each raster is reprojected to the reference soil grid using the same transform and CRS. The generated arrays are combined with the local `compute_mode_lulc_array(...)` function to produce a 3-year modal LULC dataset.
 
 This is intended to smooth year-to-year variation and create a stable land-cover context before soil-health filtering.
 

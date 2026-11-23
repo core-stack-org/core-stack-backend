@@ -77,7 +77,7 @@ class Paths:
 
     @property
     def soi_tehsils(self):
-        return self.data_dir / "base_layers" / "admin_boundary" / "SOI_tehsil.geojson"
+        return self.data_dir / "base_layers" / "admin-boundary" / "input" / "soi_tehsil.geojson"
 
     @property
     def tehsil_watersheds(self):

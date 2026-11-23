@@ -7,16 +7,23 @@ from nrm_app.settings import (
     GEE_STORAGE_PROJECT_HELPER,
     GEOSERVER_URL,
     ARCHIVE_DATA_DIR,
-    BASE_DATA_DIR
+    BASE_DATA_DIR,
 )
 
-# Directory Path
-ADMIN_BOUNDARY_INPUT_DIR = "data/admin-boundary/input"
-ADMIN_BOUNDARY_OUTPUT_DIR = "data/admin-boundary/output"
+from computing.config_loader import (
+    ADMIN_BOUNDARY_INPUT_DIR as _ADMIN_BOUNDARY_INPUT_DIR,
+    ADMIN_BOUNDARY_OUTPUT_DIR as _ADMIN_BOUNDARY_OUTPUT_DIR,
+    DATA_DIR as _DATA_DIR,
+    SOI_TEHSIL_PATH as _SOI_TEHSIL_PATH,
+)
+
+# Directory Path (resolved from DATA_DIR, see computing/config_loader.py)
+ADMIN_BOUNDARY_INPUT_DIR = str(_ADMIN_BOUNDARY_INPUT_DIR)
+ADMIN_BOUNDARY_OUTPUT_DIR = str(_ADMIN_BOUNDARY_OUTPUT_DIR)
 
 # Canonical local pipeline resources. Runtime pipelines read these defaults
 # directly; their YAML `sources` entries are optional test overrides.
-BASE_RESOURCES_DIR = "data/base_resources"
+BASE_RESOURCES_DIR = str(_DATA_DIR / "base_resources")
 ADMIN_BOUNDARY_GPKG = f"{BASE_RESOURCES_DIR}/cs_admin_standard.gpkg"
 FACILITIES_GPKG = f"{BASE_RESOURCES_DIR}/cs_pan_india_facilities.gpkg"
 ANTYODAYA_2020_CSV = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020_cluster_analysis.csv"
@@ -227,15 +234,20 @@ GEE_PATHS = {
     },
 }
 
-PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
-)
-
 LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
     "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
 )
-
+PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
 LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+PAN_INDIA_LULC_V3_DATASET = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+)
+PAN_INDIA_LULC_V4_DATASET = (
+    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
+)
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
 
 
 class LulcClass(IntEnum):
@@ -343,15 +355,13 @@ INDIA_SAT_LULC_V3_PAN_INDIA = "/LULC_v3_river_basin/pan_india_lulc_v3_"
 ROAD_DRRP = "projects/ext-datasets/assets/datasets/Road_DRRP/"
 WWF_HYDROSHEDS_DRAINAGE_DIRECTION = "WWF/HydroSHEDS/03DIR"
 PAN_INDIA_RASTER_FABDEM = "projects/corestack-datasets/assets/datasets/terrain/pan_india_terrain_raster_fabdem"
-SOI_TEHSIL = f"{BASE_DATA_DIR}/admin-boundary/input/soi_tehsil.geojson"
+SOI_TEHSIL = str(_SOI_TEHSIL_PATH)
 AEZ_GEOJSON = f"{BASE_DATA_DIR}/AEZ_GeoJSON.geojson"
 FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
 WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-PAN_INDIA_LULC_V3_DATASET = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
-)
+
 DISTANCE_TO_UPSTREAM_DL = (
     "projects/ext-datasets/assets/datasets/distance_to_nearest_upstream_DL_raster"
 )
@@ -364,7 +374,7 @@ NATURAL_DEPRESSION = (
     "projects/corestack-datasets/assets/datasets/Natural_depression_raster"
 )
 CATCHMENT_AREA = "projects/ext-datasets/assets/datasets/catchment_area_singleflow"
-PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
+
 # CRS
 CRS_4326 = "EPSG:4326"
 
@@ -412,3 +422,22 @@ LTP_STP_CHANGE = (
 
 CANAL_PAN_INDIA_ASSET = "projects/ext-datasets/assets/datasets/Canal_pan_india"
 SOI_DISTRICT = "projects/ext-datasets/assets/datasets/SOI_districts"
+
+
+# Hazard
+SPEI3_ASSET_GEE_PATH = (
+    "projects/corestack-datasets-alpha/assets/datasets/SPEI_updated/SPEI3"
+)
+HYBRID_TREE_MASK_GEE_PATH = (
+    "projects/corestack-trees/assets/hazards/tree_mask/Hybrid_Tree_AEZ_"
+)
+
+DROUGHT_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/drought_Rt_Re"
+WIND_INDEX_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/wind_index"
+WIND_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/wind_Rt_Re"
+
+FIRE_INDEX_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/fire_index"
+FIRE_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/fire_Rt_Re"
+
+RAIN_INDEX_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/rainfall_index"
+RAIN_RT_RE_OUTPUT_GEE_PATH = "projects/corestack-trees/assets/hazards/rainfall_Rt_Re"

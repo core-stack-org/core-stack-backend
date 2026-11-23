@@ -10,7 +10,9 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
-from computing.config_loader import LULC_SLOPE_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
+from computing.config_loader import (
+    LULC_SLOPE_CLUSTER_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
+)
 from computing.config_loader import TERRAIN_RASTER_PATH
 from computing.local_compute_helper import (
     AEZ_VECTOR_PATH,
@@ -45,7 +47,7 @@ SLOPE_LULC_FIELD_MAPPING = {
     "shrub_scrub": 12,
     "sing_kharif": 8,
     "sing_non_kharif": 9,
-    "forests": 6,
+    "forests": [6, 13],
     "triple": 11,
 }
 
@@ -109,7 +111,10 @@ def _compute_slope_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
 
     proportions = {}
     for field_name, lulc_class in SLOPE_LULC_FIELD_MAPPING.items():
-        class_pixels = int((slopy_mask & (lulc_mode == lulc_class)).sum())
+        if isinstance(lulc_class, list):
+            class_pixels = int((slopy_mask & np.isin(lulc_mode, lulc_class)).sum())
+        else:
+            class_pixels = int((slopy_mask & (lulc_mode == lulc_class)).sum())
         proportions[field_name] = class_pixels / float(plain_plus_slope_pixels)
 
     return proportions
@@ -185,16 +190,18 @@ def _assign_slope_clusters(
                             "double": properties["double"] * 100.0,
                             "shrub_scrub": properties["shrub_scrub"] * 100.0,
                             "sing_kharif": properties["sing_kharif"] * 100.0,
-                            "sing_non_kharif": (
-                                properties["sing_non_kharif"] * 100.0
-                            ),
+                            "sing_non_kharif": (properties["sing_non_kharif"] * 100.0),
                             "forests": properties["forests"] * 100.0,
                             "triple": properties["triple"] * 100.0,
                         }
                     )
 
                 if index % 200 == 0 or index == total:
-                    logger.info("Computed slope LULC clusters for %d/%d watersheds", index, total)
+                    logger.info(
+                        "Computed slope LULC clusters for %d/%d watersheds",
+                        index,
+                        total,
+                    )
         finally:
             for lulc_src in lulc_sources:
                 lulc_src.close()
@@ -283,9 +290,7 @@ def run_lulc_on_slope_cluster_local(
     ]
     slope_watersheds.drop(
         columns=[
-            column
-            for column in temp_columns
-            if column in slope_watersheds.columns
+            column for column in temp_columns if column in slope_watersheds.columns
         ],
         inplace=True,
     )
@@ -326,15 +331,16 @@ def run_lulc_on_slope_cluster_local(
             layer_name=layer_name,
             file_type="gpkg",
         )
-        geoserver_ok = (
-            isinstance(geoserver_response, dict)
-            and geoserver_response.get("status_code") in (200, 201)
-        )
+        geoserver_ok = isinstance(geoserver_response, dict) and geoserver_response.get(
+            "status_code"
+        ) in (200, 201)
         if geoserver_ok:
             logger.info("GeoServer upload succeeded for layer %s", layer_name)
         else:
             logger.error(
-                "GeoServer upload failed for layer %s: %s", layer_name, geoserver_response
+                "GeoServer upload failed for layer %s: %s",
+                layer_name,
+                geoserver_response,
             )
 
     layer_id = None
