@@ -22,8 +22,10 @@ from computing.config_loader import (
     AEZ_VECTOR_PATH,
     LOCAL_ADMIN_BOUNDARY_DIR,
     LULC_BASE_DIR,
+    LULC_VERSION,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
+    VILLAGE_BOUNDARIES_DIR,
     layer_dir,
 )
 from computing.base_layer_setup import (
@@ -33,7 +35,7 @@ from computing.base_layer_setup import (
 )
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 
-PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
+PRECOMPUTED_PANCHAYAT_DIR = VILLAGE_BOUNDARIES_DIR
 
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
 VALID_COMPUTE_TYPES = {"gee", "local"}
@@ -1199,7 +1201,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
 
 
 def resolve_lulc_raster_paths(
-    start_year, end_year, lulc_dir=LULC_BASE_DIR, lulc_version="v4"
+    start_year, end_year, lulc_dir=LULC_BASE_DIR, lulc_version=LULC_VERSION
 ):
     raster_paths = []
     for year in range(int(start_year), int(end_year) + 1):

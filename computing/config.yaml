@@ -558,7 +558,7 @@ derived_layers:
       layer_type: vector
 
     - name: dem_raster
-      local_path: "{DATA_DIR}/fabdem/fabdem_local/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/fabdem/"
       geoserver_workspace: dem
       layer_type: raster
 
@@ -667,7 +667,7 @@ derived_layers:
       layer_type: vector
 
     - name: restoration_opportunity
-      local_path: "{DATA_DIR}/layers/restoration_opportunity/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/restoration_opportunity/"
       geoserver_workspace: restoration
       layer_type: raster
 
@@ -679,7 +679,7 @@ derived_layers:
       layer_type: vector
 
     - name: site_suitability
-      local_path: "{DATA_DIR}/layers/site_suitability/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/site_suitability/"
       geoserver_workspace: plantation
       layer_type: raster
 
@@ -727,22 +727,22 @@ derived_layers:
       layer_type: vector
 
     - name: generate_natural_depression
-      local_path: "{DATA_DIR}/layers/natural_depression/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/natural_depression/"
       geoserver_workspace: natural_depression
       layer_type: raster
 
     - name: generate_distance_nearest_DL
-      local_path: "{DATA_DIR}/layers/distance_nearest_upstream_DL/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/distance_nearest_upstream_DL/"
       geoserver_workspace: distance_nearest_upstream_DL
       layer_type: raster
 
     - name: generate_catchment_area_singleflow
-      local_path: "{DATA_DIR}/layers/catchment_area_singleflow/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/catchment_area_singleflow/"
       geoserver_workspace: catchment_area_singleflow
       layer_type: raster
 
     - name: generate_slope_percentage
-      local_path: "{DATA_DIR}/layers/slope_percentage/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/slope_percentage/"
       geoserver_workspace: slope_percentage
       layer_type: raster
 

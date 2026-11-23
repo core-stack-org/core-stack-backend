@@ -23,7 +23,7 @@ from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
 
-LOCAL_CH_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ch"
+LOCAL_CH_BASE_DIR = DATA_DIR / "base_layers/tree_health/ch"
 LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "tree_ch_raster"
 GEOSERVER_STYLE = "tree_ch_style"

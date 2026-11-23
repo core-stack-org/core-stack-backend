@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR: Path = (
     Path(os.environ.get("DATA_DIR", str(PROJECT_ROOT / "data"))).expanduser().resolve()
 )
+LULC_VERSION: str = os.environ.get("LULC_VERSION", "v4").strip().lower() or "v4"
 
 
 def _load(path: Path) -> dict:
@@ -269,6 +270,7 @@ CROPPING_INTENSITY_OUTPUT_DIR: Path = _derived_output_dir("cropping intensity")
 LULC_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("lulc vector")
 LULC_V3_OUTPUT_DIR: Path = _derived_output_dir("lulc v3")
 LULC_V4_OUTPUT_DIR: Path = _derived_output_dir("lulc v4")
+LULC_OUTPUT_DIR: Path = _derived_output_dir(f"lulc {LULC_VERSION}")
 LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc slope clusters")
 LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
@@ -284,14 +286,14 @@ PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
 PAN_INDIA_DRAINAGE_LINES_PATH = (
     DATA_DIR / "layers/drainage_lines/Pan_India_drainage_lines.gpkg"
 )
-LOCAL_DRAINAGE_LINES_OUTPUT = DATA_DIR / "layers/drainage_lines/drainage_lines_local"
+LOCAL_DRAINAGE_LINES_OUTPUT = _derived_output_dir("generate_drainage_layer")
 
 LOCAL_DRAINAGE_DENSITY_OUTPUT = DATA_DIR / "drainage_density"
 
 PAN_INDIA_CANAL_PATH = _base_layer_path(
     "canal", fallback="{DATA_DIR}/canal/Canal_pan_india.geojson"
 )
-LOCAL_CANAL_OUTPUT = DATA_DIR / "canal/canal_local"
+LOCAL_CANAL_OUTPUT = _derived_output_dir("generate_canal_vector")
 
 PAN_INDIA_AGROECOLOGICAL_PATH = _base_layer_path(
     "aez",
@@ -339,7 +341,7 @@ LOCAL_DISTANCETONEARESTDRAINAGE_OUTPUT = (
 PAN_INDIA_FACILITIES_PATH = _base_layer_path(
     "facilities", fallback="{DATA_DIR}/base_layers/Pan_India_facilities_polygon.geojson"
 )
-LOCAL_FACILITIES_OUTPUT = DATA_DIR / "outputs/facilities"
+LOCAL_FACILITIES_OUTPUT = _derived_output_dir("generate_facilities_proximity")
 PAN_INDIA_CATCHMENT_AREA_PATH = DATA_DIR / "base_layers/Pan_India_catchment_area.tif"
 LOCAL_CATCHMENT_AREA_OUTPUT = DATA_DIR / "layers/catchment_area_singleflow"
 
@@ -351,9 +353,7 @@ LOCAL_SLOPE_PERCENTAGE_OUTPUT = DATA_DIR / "layers/slope_percentage"
 PAN_INDIA_MWS_CONNECTIVITY_PATH = (
     DATA_DIR / "layers/mws_connectivity/Pan_India_mws_connectivity.geojson"
 )
-LOCAL_MWS_CONNECTIVITY_OUTPUT = (
-    DATA_DIR / "layers/mws_connectivity/mws_connectivity_local"
-)
+LOCAL_MWS_CONNECTIVITY_OUTPUT = _derived_output_dir("generate_mws_connectivity_data")
 
 LOCAL_MWS_CENTROID_OUTPUT = DATA_DIR / "layers/mws_centroid"
 
@@ -381,18 +381,18 @@ PAN_INDIA_WATERBODIES_CENSUS_PATH = (
 PAN_INDIA_RIVER_PATH = _base_layer_path(
     "river", fallback="{DATA_DIR}/river/River_pan_india.geojson"
 )
-LOCAL_RIVER_OUTPUT = DATA_DIR / "river/river_local"
+LOCAL_RIVER_OUTPUT = _derived_output_dir("generate_river_data")
 
 PAN_INDIA_FABDEM_PATH = _base_layer_path(
     "dem", fallback="{DATA_DIR}/fabdem/fabdem_pan_india.tif"
 )
-LOCAL_FABDEM_OUTPUT = DATA_DIR / "fabdem/fabdem_local"
+LOCAL_FABDEM_OUTPUT = _derived_output_dir("dem_vector")
 
 PAN_INDIA_ANTYODAYA_2020 = DATA_DIR / "base_layers/pan_india_antyodaya_2020.gpkg"
-LOCAL_ANTYODAYA_2020_OUTPUT = DATA_DIR / "outputs/antyodaya20"
+LOCAL_ANTYODAYA_2020_OUTPUT = _derived_output_dir("generate_antyodaya")
 
 PAN_INDIA_LIVESTOCKS = DATA_DIR / "base_layers/pan_india_livestock.gpkg"
-LOCAL_LIVESTOCKS_OUTPUT = DATA_DIR / "outputs/livestocks20"
+LOCAL_LIVESTOCKS_OUTPUT = _derived_output_dir("generate_livestocks")
 
 
 PAN_INDIA_FOREST_FRINGE = _base_layer_path(
@@ -411,4 +411,4 @@ PAN_INDIA_FOREST_FIRE = _base_layer_path(
     "forest fire",
     allowed_suffixes=(".geojson", ".gpkg", ".shp"),
 )
-LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fringe")
+LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fire")
