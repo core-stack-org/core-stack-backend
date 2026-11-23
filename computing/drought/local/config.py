@@ -7,7 +7,7 @@ severity rule of the Manual for Drought Management, updated to December 2020.
 from dataclasses import dataclass
 from pathlib import Path
 
-from computing.config_loader import DATA_DIR, LULC_BASE_DIR
+from computing.config_loader import DATA_DIR, LULC_BASE_DIR, LULC_VERSION
 
 METHOD_VERSION = "v1"
 MANUAL_EDITION = "Manual for Drought Management, updated to December 2020"
@@ -110,7 +110,7 @@ class Paths:
         return self.base / ".lock"
 
     def lulc_file(self, year):
-        return self.lulc_dir / f"lulc_v3_{year}_{year + 1}.tif"
+        return self.lulc_dir / f"lulc_{LULC_VERSION}_{year}_{year + 1}.tif"
 
     def chirps_day(self, day):
         return self.chirps / "daily" / str(day.year) / f"chirps_{day:%Y_%m_%d}.tif"

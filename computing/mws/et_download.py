@@ -2,13 +2,13 @@ import logging
 
 from nrm_app.celery import app
 
-from computing.config_loader import PROJECT_ROOT
+from computing.config_loader import DATA_DIR, PROJECT_ROOT
 from computing.hydrology_gpu.et_download import download_pan_india_et_assets
 
 from .runoff_gpu import _parse_bool, _resolve_dates
 
 
-PAN_INDIA_ET_OUTPUT_ROOT = PROJECT_ROOT / "data" / "base_layers" / "hydrology" / "et"
+PAN_INDIA_ET_OUTPUT_ROOT = DATA_DIR / "base_layers" / "hydrology" / "et"
 
 
 def _make_logger():
