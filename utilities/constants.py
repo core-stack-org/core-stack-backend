@@ -369,7 +369,7 @@ SLOPE_PERCENTAGE = "projects/ext-datasets/assets/datasets/slope_percentage_fabde
 NATURAL_DEPRESSION_EXTERNAL_DATASET = (
     "projects/ext-datasets/assets/datasets/Natural_depression_raster"
 )
-PAN_INDIA_MWS_PATH = "projects/corestack-datasets/assets/datasets/India_mws_UID_Merged"
+PAN_INDIA_MWS_PATH = "projects/corestack-datasets/assets/datasets/hydrological_boundaries/microwatershed"
 NATURAL_DEPRESSION = (
     "projects/corestack-datasets/assets/datasets/Natural_depression_raster"
 )
