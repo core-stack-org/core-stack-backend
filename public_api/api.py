@@ -57,8 +57,14 @@ from geoadmin.utils import (
 )
 from .dataset_filters import (
     filter_active_locations,
+    filter_kyl_indicator_payload,
+    filter_kyl_v1_rows,
+    filter_mws_fortnight_payload,
+    filter_mws_v1_timeseries_payload,
     filter_tehsil_payload,
+    parse_fields_filter,
     parse_tehsil_data_filter,
+    validate_mws_fortnight_fields,
 )
 from utilities.openmeteo_format import (
     error_envelope,
@@ -354,6 +360,14 @@ def get_mws_data(request):
             )
         if isinstance(data, dict) and data.get("error"):
             return Response(data, status=status.HTTP_404_NOT_FOUND)
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields:
+            try:
+                data = filter_mws_v1_timeseries_payload(data, requested_fields)
+            except ValueError as exc:
+                return Response(
+                    {"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+                )
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -399,11 +413,20 @@ def get_mws_data_v2(request):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields:
+            try:
+                validate_mws_fortnight_fields(requested_fields)
+            except ValueError as exc:
+                return _error_response_v2(str(exc), status.HTTP_400_BAD_REQUEST)
+
         state_norm = state.upper()
         if not regenerate:
             cached = _load_mws_v2_from_mongo(state_norm, district, tehsil, mws_id)
             if cached is not None:
-                return _success_response_v2(cached, http_status=status.HTTP_200_OK)
+                migrated = legacy_hourly_to_fortnight_inner_block(cached)
+                filtered = filter_mws_fortnight_payload(migrated, requested_fields)
+                return _success_response_v2(filtered, http_status=status.HTTP_200_OK)
 
         data = get_mws_time_series_data(state, district, tehsil, mws_id)
         if not data:
@@ -426,7 +449,8 @@ def get_mws_data_v2(request):
         v2_payload = fortnight_structure_from_mws(data)
         _save_mws_v2_to_mongo(state_norm, district, tehsil, mws_id, v2_payload)
 
-        return _success_response_v2(v2_payload, http_status=status.HTTP_200_OK)
+        response_payload = filter_mws_fortnight_payload(v2_payload, requested_fields)
+        return _success_response_v2(response_payload, http_status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json v2 :: ", e)
         return _error_response_v2(
@@ -536,6 +560,14 @@ def get_mws_json_by_kyl_indicator(request):
                 {"error": "Data not found for the given mws_id."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields and isinstance(data, list):
+            try:
+                data = filter_kyl_v1_rows(data, requested_fields)
+            except ValueError as exc:
+                return Response(
+                    {"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+                )
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -951,6 +983,12 @@ def get_mws_json_by_kyl_indicator_v2(request):
             )
         rows = data if isinstance(data, list) else []
         payload = flat_kyl_indicator_payload(rows)
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields:
+            try:
+                payload = filter_kyl_indicator_payload(payload, requested_fields)
+            except ValueError as exc:
+                return _error_response(str(exc), status.HTTP_400_BAD_REQUEST)
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)

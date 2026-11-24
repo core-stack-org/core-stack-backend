@@ -85,6 +85,28 @@ tehsil_data_filter_param = openapi.Parameter(
     required=False,
 )
 
+mws_data_fields_param = openapi.Parameter(
+    "fields",
+    openapi.IN_QUERY,
+    description=(
+        "Optional comma-separated metric filter (e.g. `fields=et,precipitation`). "
+        "Valid fields: `et`, `runoff`, `precipitation`. `mws_id` and `time` are always returned."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+kyl_fields_param = openapi.Parameter(
+    "fields",
+    openapi.IN_QUERY,
+    description=(
+        "Optional comma-separated indicator filter (e.g. `fields=area,drought_category`). "
+        "Returns only the requested fields plus the MWS identifier (`uid`/`mws_id`)."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
 active_locations_state_filter_param = openapi.Parameter(
     "state",
     openapi.IN_QUERY,
@@ -689,6 +711,7 @@ get_mws_data_v2_schema = {
         district_param,
         tehsil_param,
         mws_id_param,
+        mws_data_fields_param,
         authorization_param,
     ],
     "responses": {
@@ -1395,6 +1418,9 @@ This is a flat table, not a time series.
 **Related**
 Retrieve MWS time series · List tehsil datasets
 """
+kyl_indicators_schema_v2["manual_parameters"] = list(
+    kyl_indicators_schema_v2["manual_parameters"]
+) + [kyl_fields_param]
 _set_json_example(
     kyl_indicators_schema_v2,
     200,

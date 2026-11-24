@@ -622,6 +622,103 @@ class TehsilDataV2Tests(V2ApiTestCase):
 
     @patch("public_api.api.get_tehsil_json")
     @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_previously_missing_five_pipeline_sheets_are_accepted(
+        self, _mock_exists, mock_json
+    ):
+        mock_json.return_value = {
+            "forest_fire": [{"uid": "12_1", "fire_count_per_year": 2}],
+            "forest_fringes": [{"uid": "12_1", "fringe_area": 5.0}],
+            "ndvi": [{"uid": "12_1", "ndvi_2017": 0.42}],
+            "tree_in_grassland": [{"uid": "12_1", "tig_area": 1.2}],
+            "village_GP": [{"village_name": "Rampur", "gp_name": "Rampur GP"}],
+            "mws": [{"uid": "12_1", "area_in_ha": 10}],
+        }
+        response = self._get(
+            self.url_name,
+            {
+                **GEO,
+                "data": "forest_fire,forest_fringes,ndvi,tree_in_grassland,village_GP",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        self.assertEqual(
+            set(body["data"]["tehsil_data"].keys()),
+            {
+                "forest_fire",
+                "forest_fringes",
+                "ndvi",
+                "tree_in_grassland",
+                "village_gp",
+            },
+        )
+        self.assertNotIn("mws", body["data"]["tehsil_data"])
+
+    def test_every_pipeline_sheet_is_accepted_by_data_filter(self):
+        import ast
+        from pathlib import Path
+        from public_api.dataset_filters import (
+            TEHSIL_DATA_TYPE_DOCS,
+            filter_tehsil_payload,
+            parse_tehsil_data_filter,
+        )
+        from stats_generator.sheet_names import (
+            EXCEL_SHEET_BY_KEY,
+            PIPELINE_EXCEL_SHEETS,
+            TEHSIL_SHEET_SPECS,
+        )
+
+        # 1. Inspect every .to_excel(..., sheet_name=...) call in stats_generator/utils.py.
+        utils_src = Path(__file__).resolve().parents[1] / "stats_generator" / "utils.py"
+        tree = ast.parse(utils_src.read_text(encoding="utf-8"))
+        discovered_sheets = set()
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "to_excel"
+            ):
+                for kw in node.keywords:
+                    if kw.arg != "sheet_name":
+                        continue
+                    if isinstance(kw.value, ast.Constant) and isinstance(
+                        kw.value.value, str
+                    ):
+                        discovered_sheets.add(kw.value.value)
+                    elif (
+                        isinstance(kw.value, ast.Subscript)
+                        and isinstance(kw.value.value, ast.Name)
+                        and kw.value.value.id == "EXCEL_SHEET_BY_KEY"
+                        and isinstance(kw.value.slice, ast.Constant)
+                    ):
+                        discovered_sheets.add(
+                            EXCEL_SHEET_BY_KEY[kw.value.slice.value]
+                        )
+
+        self.assertEqual(discovered_sheets, set(PIPELINE_EXCEL_SHEETS))
+
+        # 2. Every pipeline sheet must pass parse_tehsil_data_filter and match filter_tehsil_payload.
+        for excel_sheet, api_key, _desc in TEHSIL_SHEET_SPECS:
+            parsed_raw = parse_tehsil_data_filter([excel_sheet])
+            parsed_canon = parse_tehsil_data_filter([api_key])
+            self.assertEqual(parsed_raw, {api_key}, msg=f"sheet={excel_sheet}")
+            self.assertEqual(parsed_canon, {api_key}, msg=f"key={api_key}")
+
+            sample_payload = {
+                "tehsil_data": {api_key: [{"uid": "12_1"}]},
+                "tehsil_units": {api_key: {"uid": "id"}},
+            }
+            filtered = filter_tehsil_payload(sample_payload, parsed_raw)
+            self.assertIn(api_key, filtered["tehsil_data"], msg=f"sheet={excel_sheet}")
+
+        # 3. Reverse parity: every documented canonical data= token (besides "all") is a real sheet.
+        documented_keys = {key for key, _ in TEHSIL_DATA_TYPE_DOCS if key != "all"}
+        spec_keys = {api_key for _, api_key, _ in TEHSIL_SHEET_SPECS}
+        self.assertEqual(documented_keys, spec_keys)
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
     def test_unknown_data_filter_returns_400(self, _mock_exists, mock_json):
         mock_json.return_value = {"drought": [{"uid": "12_1"}]}
         response = self._get(self.url_name, {**GEO, "data": "not_a_real_sheet"})
@@ -671,6 +768,59 @@ class KylIndicatorsV2Tests(V2ApiTestCase):
         self.assertEqual(data["indicator_units"]["cropping_intensity_avg"], "ratio")
         self.assertEqual(data["indicator_units"]["drought_category"], "category")
         assert_string_unit_map(self, data["indicator_units"], "indicator_units")
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_fields_filter_keeps_requested_keys_plus_mws_id(
+        self, _mock_exists, mock_kyl
+    ):
+        mock_kyl.return_value = [
+            {
+                "mws_id": "12_100174",
+                "avg_precipitation": 800.129,
+                "cropping_intensity_avg": 1.5,
+                "drought_category": "mild",
+            }
+        ]
+        response = self._get(
+            self.url_name, {**MWS, "fields": "avg_precipitation,drought_category"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        data = body["data"]
+        self.assertEqual(
+            set(data["indicators"].keys()),
+            {"mws_id", "avg_precipitation", "drought_category"},
+        )
+        self.assertNotIn("cropping_intensity_avg", data["indicators"])
+        self.assertEqual(
+            set(data["indicator_units"].keys()),
+            {"mws_id", "avg_precipitation", "drought_category"},
+        )
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_unknown_fields_returns_400_listing_valid_names(
+        self, _mock_exists, mock_kyl
+    ):
+        mock_kyl.return_value = [
+            {
+                "mws_id": "12_100174",
+                "avg_precipitation": 800.129,
+                "cropping_intensity_avg": 1.5,
+                "drought_category": "mild",
+            }
+        ]
+        response = self._get(
+            self.url_name, {**MWS, "fields": "avg_precipitation,bogus_metric"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertIn("bogus_metric", body["error_message"])
+        self.assertIn("avg_precipitation", body["error_message"])
+        self.assertIn("drought_category", body["error_message"])
 
 
 class GeneratedLayerUrlsV2Tests(V2ApiTestCase):

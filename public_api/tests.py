@@ -263,6 +263,78 @@ class GetMwsDataV2ApiTests(TestCase):
         self.assertEqual(body["status"], "error")
         self.assertEqual(body["error_message"], "Data not found for the given mws_id")
 
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    @patch("public_api.api.get_mws_time_series_data")
+    def test_fields_filter_keeps_requested_metrics_and_caches_full_payload(
+        self, mock_get_mws, _mock_load, mock_save
+    ):
+        mock_get_mws.return_value = _sample_mws_timeseries()
+
+        response = self._get(extra_query={"fields": "et,precipitation"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["status"], "success")
+        data = body["data"]
+        self.assertEqual(data["metadata"]["mws_id"], "12_208104")
+        self.assertEqual(
+            set(data["fortnight"].keys()), {"time", "et", "precipitation"}
+        )
+        self.assertNotIn("runoff", data["fortnight"])
+        self.assertEqual(
+            set(data["fortnight_units"].keys()),
+            {"time", "time_step", "et", "precipitation"},
+        )
+        # Full unfiltered payload must still be stored in Mongo cache.
+        mock_save.assert_called_once()
+        saved_payload = mock_save.call_args[0][4]
+        self.assertEqual(
+            set(saved_payload["fortnight"].keys()),
+            {"time", "et", "runoff", "precipitation"},
+        )
+
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo")
+    @patch("public_api.api.get_mws_time_series_data")
+    def test_fields_filter_applies_on_cache_hit(
+        self, mock_get_mws, mock_load, mock_save
+    ):
+        mock_load.return_value = {
+            "metadata": {"mws_id": "12_208104"},
+            "fortnight": {
+                "time": ["2024-01-01", "2024-01-15"],
+                "et": [2.5, 3.1],
+                "runoff": [1.3, 0.8],
+                "precipitation": [10.2, 5.4],
+            },
+            "fortnight_units": dict(EXPECTED_FORTNIGHT_UNITS),
+        }
+
+        response = self._get(extra_query={"fields": "runoff"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()["data"]
+        self.assertEqual(set(data["fortnight"].keys()), {"time", "runoff"})
+        self.assertEqual(
+            set(data["fortnight_units"].keys()), {"time", "time_step", "runoff"}
+        )
+        mock_get_mws.assert_not_called()
+        mock_save.assert_not_called()
+
+    @patch("public_api.api._load_mws_v2_from_mongo")
+    @patch("public_api.api.get_mws_time_series_data")
+    def test_unknown_field_returns_400_with_valid_names(
+        self, mock_get_mws, mock_load
+    ):
+        response = self._get(extra_query={"fields": "et,not_a_real_metric"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        body = response.json()
+        self.assertEqual(body["status"], "error")
+        self.assertIn("not_a_real_metric", body["error_message"])
+        for valid in ("et", "runoff", "precipitation"):
+            self.assertIn(valid, body["error_message"])
+        mock_load.assert_not_called()
+        mock_get_mws.assert_not_called()
+
 
 class GetMwsDataMultiWordGeoLookupTests(TestCase):
     """End-to-end SOI lookup tests for get_mws_data (v1 and v2) with multi-word names."""
