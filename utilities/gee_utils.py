@@ -385,21 +385,47 @@ def gdf_to_ee_fc(gdf):
     return ee.FeatureCollection(features)
 
 
+def normalize_gee_asset_id(path):
+    """Join a Cloud asset id and reject a blank storage project.
+
+    An empty GEE_STORAGE_PROJECT becomes ``projects//assets/...``. Earth
+    Engine then treats that as ``projects/earthengine-legacy/assets/projects//assets``.
+    """
+    parts = [part for part in str(path).split("/") if part]
+    if (
+        len(parts) < 4
+        or parts[0] != "projects"
+        or parts[2] != "assets"
+        or not parts[1]
+    ):
+        raise ValueError(
+            "GEE_STORAGE_PROJECT is blank, so the Earth Engine path is "
+            f"'{path}'. Set GEE_STORAGE_PROJECT to the project that holds "
+            "apps/waterbody (ee-corestackdev-1) and restart the worker."
+        )
+    return "/".join(parts)
+
+
 def create_gee_folder(folder_path, gee_project_path):
-    full_path = gee_project_path + folder_path
+    full_path = normalize_gee_asset_id(
+        str(gee_project_path).rstrip("/") + "/" + str(folder_path).strip("/")
+    )
     parts = full_path.split("/")
-    for i in range(1, len(parts) + 1):
+    # projects/{project}/assets already exist. Create only folders under assets.
+    start = parts.index("assets") + 1
+    for i in range(start + 1, len(parts) + 1):
         sub_path = "/".join(parts[:i])
         try:
             ee.data.getAsset(sub_path)
             print(f"Exists: {sub_path}")
-        except:
+        except Exception:
             try:
                 ee.data.createAsset({"type": "Folder"}, sub_path)
                 print(f"Created: {sub_path}")
                 time.sleep(1)
             except Exception as e:
                 print(f"Failed: {sub_path} -> {e}")
+                raise
 
 
 def create_gee_directory(
@@ -449,7 +475,7 @@ def get_gee_dir_path(folder_list, asset_path=GEE_ASSET_PATH):
     gee_path = asset_path
     for folder in folder_list:
         gee_path += valid_gee_text(folder.lower()) + "/"
-    return gee_path
+    return normalize_gee_asset_id(gee_path) + "/"
 
 
 def export_vector_asset_to_gee(fc, description, asset_id):
