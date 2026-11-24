@@ -10,6 +10,10 @@ from computing.mws.generate_hydrology_local import (
     generate_hydrology_base_layer,
 )
 from computing.mws.runoff_gpu import generate_runoff_gpu
+from computing.lulc.v4.temporal_correction.tasks import (  # noqa: F401  (registers the tasks)
+    lulc_temporal_correction_incremental,
+    lulc_temporal_correction_six_year,
+)
 
 
 logger = logging.getLogger(__name__)

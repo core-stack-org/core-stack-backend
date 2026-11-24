@@ -14,6 +14,7 @@ from computing.surface_water_bodies.swb import generate_swb_layer
 from computing.drought.drought import calculate_drought
 from computing.drought.drought_local_compute import calculate_drought_local
 from computing.drought.drought_causality import drought_causality
+from computing.drought.drought_causality_local import drought_causality_local
 from computing.crop_grid.crop_grid import create_crop_grids
 from computing.change_detection.change_detection import get_change_detection
 from computing.change_detection.change_detection_vector import (
@@ -379,12 +380,12 @@ LOCAL_TASK_REGISTRY = {
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
     "calculate_drought": calculate_drought_local,
     "generate_drought_layer": calculate_drought_local,
+    "drought_causality": drought_causality_local,
+    "mws_drought_causality": drought_causality_local,
     # GEE-backed tasks that can be triggered from the local map
     # (nodes need "pass_gee_account_id": true).
     "ndvi_timeseries": ndvi_timeseries,
     "generate_ndvi_timeseries": ndvi_timeseries,
-    "drought_causality": drought_causality,
-    "mws_drought_causality": drought_causality,
     "generate_stream_order": generate_stream_order,
     "stream_order": generate_stream_order,
     "generate_clart_layer": generate_clart_layer,

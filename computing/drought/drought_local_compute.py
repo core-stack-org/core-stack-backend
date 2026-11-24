@@ -4,8 +4,13 @@ utilities/scripts/generate_drought_layer.py (stage mws) writes one pan-India lay
 kharif season, data/base_layers/drought/v1/mws/drought_mws_<year>.gpkg. This task takes
 the tehsil's MWS (the precomputed tehsil watersheds, as the other local layers do),
 joins each season's columns by uid, adds avg_dryspell as the GEE merge does (the mean
-of drysp_<year>), and publishes <district>_<block>_drought in the drought workspace,
+of dryspell_length_<year>), and publishes <district>_<block>_drought in the drought workspace,
 the layer the GEE task made. Nothing is computed here.
+
+The columns keep the names of the pan-India layers, the long names of the GEE yearly drought
+asset; the GEE task's layers have the short names of its merge (drlb_, drysp_, ...). Only the
+season columns and the rainfall deviations are copied (mws.geoserver_column): the other
+per-window values and drought causality stay in the pan-India layers.
 """
 
 import logging
@@ -32,10 +37,10 @@ logger = logging.getLogger(__name__)
 DATASET_NAME = "Drought"
 GEOSERVER_WORKSPACE = "drought"
 LOCAL_ALGORITHM = "local_drought"
-LOCAL_ALGORITHM_VERSION = "local-1.0"
+LOCAL_ALGORITHM_VERSION = "local-2.0"  # 2.0: long column names (GEE yearly asset), not the short ones
 UID = "uid"
-# drlb of an MWS without cropland, which has no weekly classes. The pan-India layer leaves
-# it empty; GEE layers never had empty labels and readers call drlb.count(...).
+# drought_labels of an MWS without cropland, which has no weekly classes. The pan-India layer
+# leaves it empty; GEE layers never had empty labels and readers call drlb.count(...).
 NO_CLASSES = "[]"
 
 
@@ -76,20 +81,30 @@ def missing_drought_mws_layers(start_year=None, end_year=None, paths=None):
     return [y for y in range(start_year, end_year + 1) if not season_layer_path(y, paths).is_file()]
 
 
-def read_season_columns(path, uids):
-    """A season's drought columns for the given uids, indexed by uid; integer columns as Int64."""
+def layer_column_names(path):
+    """The attribute columns of a pan-India season layer."""
+    with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as con:
+        return [name for _, name, *_ in con.execute(f'PRAGMA table_info("{path.stem}")')]
+
+
+def read_season_columns(path, uids, keep=drought_mws.geoserver_column):
+    """A season's columns for the given uids, indexed by uid, each with the type the pan-India layer
+    declares: integer columns as Int64, decimal ones as float64. pandas types a column by its values,
+    so without this a column empty for every one of these MWS would come back untyped and be
+    written as text. keep(name) picks the columns: by default those of the tehsil drought layer."""
     table = path.stem
     with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as con:
         info = con.execute(f'PRAGMA table_info("{table}")').fetchall()
-        columns = [(name, kind.upper()) for _, name, kind, *_ in info
-                   if name not in drought_mws.ATTRIBUTES and name not in ("fid", "geom")]
+        columns = [(name, kind.upper()) for _, name, kind, *_ in info if keep(name)]
         con.execute("CREATE TEMP TABLE wanted (uid TEXT PRIMARY KEY)")
         con.executemany("INSERT OR IGNORE INTO wanted VALUES (?)", [(u,) for u in uids])
-        select = ", ".join(f'd."{name}"' for name, _ in columns)
-        frame = pd.read_sql(f'SELECT d.uid, {select} FROM "{table}" d JOIN wanted w ON d.uid = w.uid', con)
+        select = "".join(f', d."{name}"' for name, _ in columns)
+        frame = pd.read_sql(f'SELECT d.uid{select} FROM "{table}" d JOIN wanted w ON d.uid = w.uid', con)
     for name, kind in columns:
         if "INT" in kind:
             frame[name] = frame[name].astype("Int64")
+        elif kind in ("REAL", "FLOAT", "DOUBLE"):
+            frame[name] = frame[name].astype("float64")
     return frame.set_index(UID)
 
 
@@ -111,11 +126,11 @@ def tehsil_drought(watersheds_gdf, start_year, end_year, paths=None):
                 f"{path.name} has no row for {len(missing)} MWS of this tehsil. First missing uids: {missing[:5]}"
             )
         frame = frame.reindex(uids)
-        frame[f"drlb_{year}"] = frame[f"drlb_{year}"].fillna(NO_CLASSES)
+        frame[f"drought_labels_{year}"] = frame[f"drought_labels_{year}"].fillna(NO_CLASSES)
         seasons[year] = frame
 
     columns = pd.concat(seasons.values(), axis=1)
-    dryspell = columns[[f"drysp_{y}" for y in seasons]].astype("float64")
+    dryspell = columns[[f"dryspell_length_{y}" for y in seasons]].astype("float64")
     columns.insert(0, "avg_dryspell", dryspell.mean(axis=1, skipna=False))
     columns.index = result.index
     return result.join(columns)
@@ -133,6 +148,48 @@ def run_drought_local(
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
+    return publish_tehsil_layer(
+        build=tehsil_drought,
+        layer_suffix="drought",
+        dataset_name=DATASET_NAME,
+        algorithm=LOCAL_ALGORITHM,
+        algorithm_version=LOCAL_ALGORITHM_VERSION,
+        workspace=GEOSERVER_WORKSPACE,
+        state=state,
+        district=district,
+        block=block,
+        start_year=start_year,
+        end_year=end_year,
+        paths=paths,
+        precomputed_roi_dir=precomputed_roi_dir,
+        output_base_dir=output_base_dir,
+        push_to_geoserver=push_to_geoserver,
+        sync_layer_metadata=sync_layer_metadata,
+    )
+
+
+def publish_tehsil_layer(
+    *,
+    build,
+    layer_suffix,
+    dataset_name,
+    algorithm,
+    algorithm_version,
+    workspace,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
+    paths=None,
+    precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    output_base_dir=LOCAL_DROUGHT_OUTPUT,
+    push_to_geoserver=True,
+    sync_layer_metadata=True,
+):
+    """Cut <district>_<block>_<layer_suffix> from the pan-India MWS layers with
+    build(watersheds_gdf, start_year, end_year, paths), write it, register it and queue it for
+    GeoServer. Shared by the drought and drought causality tasks."""
     if not (state and district and block):
         raise ValueError("state, district and block are required")
     state, district, block = (str(v).strip().lower() for v in (state, district, block))
@@ -150,9 +207,9 @@ def run_drought_local(
         block=block,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    result_gdf = tehsil_drought(watersheds_gdf, start_year, end_year, paths)
+    result_gdf = build(watersheds_gdf, start_year, end_year, paths)
 
-    layer_name = f"{valid_gee_text(district)}_{valid_gee_text(block)}_drought"
+    layer_name = f"{valid_gee_text(district)}_{valid_gee_text(block)}_{layer_suffix}"
     output_path = build_output_vector_path(
         layer_name=layer_name,
         state=state,
@@ -163,7 +220,8 @@ def run_drought_local(
     if os.path.exists(output_path):
         os.remove(output_path)
     asset_id = write_vector_output(result_gdf, output_path, layer_name)
-    logger.info("Saved local drought vector: %s (%d MWS, %s-%s)", asset_id, len(result_gdf), start_year, end_year)
+    logger.info("Saved local %s vector: %s (%d MWS, %s-%s)", dataset_name, asset_id, len(result_gdf),
+                start_year, end_year)
 
     layer_id = None
     if sync_layer_metadata:
@@ -173,9 +231,9 @@ def run_drought_local(
             block=block,
             layer_name=layer_name,
             asset_id=asset_id,
-            dataset_name=DATASET_NAME,
-            algorithm=LOCAL_ALGORITHM,
-            algorithm_version=LOCAL_ALGORITHM_VERSION,
+            dataset_name=dataset_name,
+            algorithm=algorithm,
+            algorithm_version=algorithm_version,
             misc={
                 "start_year": start_year,
                 "end_year": end_year,
@@ -192,7 +250,7 @@ def run_drought_local(
     response = queue_local_vector_for_geoserver(
         path=os.path.splitext(asset_id)[0],
         layer_name=layer_name,
-        workspace=GEOSERVER_WORKSPACE,
+        workspace=workspace,
         file_type="gpkg",
         layer_id=layer_id,
     )

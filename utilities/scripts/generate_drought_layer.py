@@ -11,7 +11,8 @@ Stages:
             dry-spell weeks and each window's rainfall trigger, each season against
             1981 to the year before it
   cropland  on the 500 m grid of the region: each pixel's kharif-sown share from the
-            10 m LULC, the 2017-2024 normal, the cropland mask, and area sown per season
+            10 m LULC v4 (temporally corrected; plantation counted as tree), the 2017-2024
+            normal, the cropland mask, and area sown per season
   vegetation  on the 500 m grid of the region: each window's highest NDVI and NDWI per
             year from 2000 (cloud-flagged images only as a fallback), and VCI per season
   mai       on the 500 m grid of the region: ET / PET per window from MOD16A2GF, and the
@@ -19,7 +20,8 @@ Stages:
   classify  weekly drought labels with the 2020 rules, the season summary, and an
             EPSG:4326 copy of the summary for publishing
   mws       per micro-watershed: the indicators aggregated over each MWS, then the 2020
-            rules, one pan-India GeoPackage per season
+            rules, one pan-India GeoPackage per season with the GEE drought layer's columns
+            and, for drought causality, each window's values under the GEE yearly asset's names
 
 Each stage skips what is already done, so running again continues an
 interrupted run or adds seasons whose inputs have arrived. The stages are run by
@@ -94,7 +96,8 @@ def main():
     parser.add_argument("--tile", help="limit the run to one MODIS tile, e.g. h25v07; outputs go to drought/tiles/<tile>/")
     parser.add_argument("--workers", type=int, default=min(16, os.cpu_count() or 1), help="parallel processes")
     parser.add_argument("--data-dir", help="data folder (default: $DATA_DIR or ./data)")
-    parser.add_argument("--lulc-dir", help="folder with lulc_v3_<year>_<year+1>.tif (default: the LULC folder in config.yaml)")
+    parser.add_argument("--lulc-dir", help="folder with the temporally corrected LULC v4, "
+                                           "lulc_v4_<year>_<year+1>.tif (default: data/base_layers/lulc)")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
