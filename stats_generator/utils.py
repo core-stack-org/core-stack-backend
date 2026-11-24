@@ -1,6 +1,7 @@
 import os
 import re
 import requests, json
+from django.conf import settings
 from django.http import HttpResponse, Http404
 from rest_framework.response import Response
 import pandas as pd
@@ -37,14 +38,115 @@ class _TehsilLogger(logging.LoggerAdapter):
 logger = _TehsilLogger(logging.getLogger(__name__), {})
 
 
+LAYER_INFO_FIELDS = (
+    "id",
+    "layer_name",
+    "layer_type",
+    "workspace",
+    "excel_to_be_generated",
+    "sheet_name",
+    "can_be_absent",
+    "start_year",
+    "end_year",
+    "style_name",
+)
+
+
+def _prod_backend_url() -> str:
+    return getattr(settings, "PROD_BACKEND_URL", "").strip().rstrip("/")
+
+
+def _fetch_layer_info_from_prod(
+    *, layer_type=None, workspace=None, excel_to_be_generated=None
+):
+    prod_url = _prod_backend_url()
+    endpoint = f"{prod_url}/api/v1/layer_info/"
+    params = {}
+    if layer_type is not None:
+        params["layer_type"] = layer_type
+    if workspace is not None:
+        params["workspace"] = workspace
+    if excel_to_be_generated is not None:
+        params["excel_to_be_generated"] = (
+            "true" if excel_to_be_generated else "false"
+        )
+    headers = {"X-Api-Key": getattr(settings, "PROD_BACKEND_API_KEY", "")}
+    try:
+        response = requests.get(
+            endpoint, params=params, headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        payload = response.json()
+    except (requests.RequestException, ValueError) as exc:
+        raise RuntimeError(
+            f"Failed to fetch LayerInfo from {endpoint}: {exc}"
+        ) from exc
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("layers"), list):
+        raise RuntimeError(
+            f"LayerInfo API at {endpoint} returned an invalid response."
+        )
+    return payload["layers"]
+
+
 def fetch_layers_for_excel_generation():
     """
     Fetch all vector layers where `excel_to_be_generated` is True.
+
+    When PROD_BACKEND_URL is configured, reads from the prod LayerInfo API
+    and raises on failure rather than falling back to the local database.
     """
+    if _prod_backend_url():
+        rows = _fetch_layer_info_from_prod(
+            layer_type="vector", excel_to_be_generated=True
+        )
+        try:
+            return [
+                {
+                    "layer_name": row["layer_name"],
+                    "workspace": row["workspace"],
+                    "start_year": row.get("start_year"),
+                    "end_year": row.get("end_year"),
+                }
+                for row in rows
+            ]
+        except (KeyError, TypeError, AttributeError) as exc:
+            raise RuntimeError(
+                "LayerInfo API returned a malformed layer entry."
+            ) from exc
+
     layers = LayerInfo.objects.filter(
         layer_type="vector", excel_to_be_generated=True
     ).values("layer_name", "workspace", "start_year", "end_year")
     return list(layers)
+
+
+def fetch_drought_layer_years():
+    """
+    Fetch drought year strings from LayerInfo (layer_type='vector', workspace='drought').
+
+    When PROD_BACKEND_URL is configured, reads from the prod LayerInfo API
+    and raises on failure rather than falling back to the local database.
+    """
+    if _prod_backend_url():
+        rows = _fetch_layer_info_from_prod(layer_type="vector", workspace="drought")
+        if len(rows) != 1:
+            raise RuntimeError(
+                f"Expected 1 drought LayerInfo row from prod, got {len(rows)}."
+            )
+        row = rows[0]
+        if not isinstance(row, dict):
+            raise RuntimeError("LayerInfo API returned a malformed drought entry.")
+        start_year = row.get("start_year")
+        end_year = row.get("end_year")
+        if start_year is None or end_year is None:
+            raise RuntimeError(
+                "Drought LayerInfo from prod is missing start_year/end_year."
+            )
+        return [str(year) for year in range(int(start_year), int(end_year) + 1)]
+
+    layer = LayerInfo.objects.get(layer_type="vector", workspace="drought")
+    return [str(year) for year in range(layer.start_year, layer.end_year + 1)]
 
 
 def get_url(workspace, layer_name):
@@ -54,7 +156,13 @@ def get_url(workspace, layer_name):
 
 
 def get_vector_layer_geoserver(
-    state, district, block, specific_sheets=None, layer_source=None, xlsx_file=None
+    state,
+    district,
+    block,
+    specific_sheets=None,
+    layer_source=None,
+    xlsx_file=None,
+    layers=None,
 ):
     """
     Writes the stats excel for a tehsil, one or more sheets per LayerInfo row.
@@ -64,6 +172,8 @@ def get_vector_layer_geoserver(
     generated layers instead; see generate_local_stats_excel(). `xlsx_file`
     overrides the output path.
     """
+    if layers is None:
+        layers = fetch_layers_for_excel_generation()
     local_mode = layer_source is not None
     run_started = time.monotonic()
     tehsil_token = _current_tehsil.set(f"{state}/{district}/{block}")
@@ -105,7 +215,7 @@ def get_vector_layer_geoserver(
         mode=mode,
         if_sheet_exists="replace" if mode == "a" else None,
     ) as writer:
-        for layer in fetch_layers_for_excel_generation():
+        for layer in layers:
             workspace = layer["workspace"]
 
             if workspaces_to_process and workspace not in workspaces_to_process:
@@ -3244,6 +3354,7 @@ def generate_local_stats_excel(
     geoserver_fallback=True,
     specific_sheets=None,
     xlsx_file=None,
+    layers=None,
 ):
     """
     Builds the stats excel from locally generated layers (paths from
@@ -3270,6 +3381,7 @@ def generate_local_stats_excel(
         specific_sheets=specific_sheets,
         layer_source=source,
         xlsx_file=xlsx_file,
+        layers=layers,
     )
 
 
