@@ -354,11 +354,18 @@ def filter_kyl_indicator_payload(payload, requested_fields):
     filtered_units = {
         k: v for k, v in indicator_units.items() if k in keep_keys
     }
-    return {
+    out = {
         **payload,
         "indicators": filtered_indicators,
         "indicator_units": filtered_units,
     }
+    if "indicator_legends" in payload and isinstance(
+        payload["indicator_legends"], dict
+    ):
+        out["indicator_legends"] = {
+            k: v for k, v in payload["indicator_legends"].items() if k in keep_keys
+        }
+    return out
 
 
 def filter_kyl_v1_rows(rows, requested_fields):

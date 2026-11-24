@@ -26,7 +26,7 @@ from .views import (
     filter_village_feature_collection,
     village_rows_to_feature_collection,
 )
-from utilities.auth_check_decorator import api_security_check
+from utilities.auth_check_decorator import api_security_check, validate_jwt
 from drf_yasg.utils import swagger_auto_schema
 from .swagger_schemas import (
     admin_by_latlon_schema,
@@ -196,6 +196,32 @@ def _get_required_query_param(request, name):
         return None
     value = str(value).strip()
     return value if value else None
+
+
+def _parse_bool_flag(raw_value):
+    """Parse query-string boolean flags strictly (only 1/true/yes are True)."""
+    if isinstance(raw_value, bool):
+        return raw_value
+    return str(raw_value or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _can_regenerate(request):
+    """Allow cache rebuild (regenerate=true) only for admin/staff or JWT users."""
+    user = getattr(request, "user", None)
+    if user is not None and (
+        getattr(user, "is_superuser", False) or getattr(user, "is_staff", False)
+    ):
+        return True
+    if getattr(request, "auth_method", None) == "JWT":
+        return True
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split("Bearer ", 1)[1].strip()
+        if token:
+            is_valid, _ = validate_jwt(token)
+            if is_valid:
+                return True
+    return False
 
 
 def _normalize_geo_params(request):
@@ -385,11 +411,7 @@ def get_mws_data_v2(request):
     try:
         state, district, tehsil = _normalize_geo_params(request)
         mws_id = _get_required_query_param(request, "mws_id")
-        regenerate = str(request.query_params.get("regenerate", "")).lower() in {
-            "1",
-            "true",
-            "yes",
-        }
+        regenerate = _parse_bool_flag(request.query_params.get("regenerate", ""))
 
         if state is None or district is None or tehsil is None or mws_id is None:
             return _error_response_v2(
@@ -462,7 +484,7 @@ def get_mws_data_v2(request):
 
 ######### Get MWS DATA by Admin Details  ##########
 @swagger_auto_schema(**tehsil_data_schema)
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="JWT_or_API_key")
 def generate_tehsil_data(request):
     """
     Retrieve Tehsil-level JSON data for a given state, district, and tehsil.
@@ -471,7 +493,14 @@ def generate_tehsil_data(request):
     try:
         # Get query parameters
         state, district, tehsil = _normalize_geo_params(request)
-        regenerate = request.query_params.get("regenerate", "").lower()
+        regenerate = _parse_bool_flag(request.query_params.get("regenerate", ""))
+        if regenerate and not _can_regenerate(request):
+            return Response(
+                {
+                    "error": "The 'regenerate' option is restricted to admin or JWT-authenticated users."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         if state is None or district is None or tehsil is None:
             return Response(
@@ -864,12 +893,17 @@ def get_mws_by_lat_lon_v2(request):
 
 
 @swagger_auto_schema(**tehsil_data_schema_v2)
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="JWT_or_API_key")
 def generate_tehsil_data_v2(request):
     print("Inside generating tehsil excel data")
     try:
         state, district, tehsil = _normalize_geo_params(request)
-        regenerate = request.query_params.get("regenerate", "").lower()
+        regenerate = _parse_bool_flag(request.query_params.get("regenerate", ""))
+        if regenerate and not _can_regenerate(request):
+            return _error_response(
+                "The 'regenerate' option is restricted to admin or JWT-authenticated users.",
+                status.HTTP_403_FORBIDDEN,
+            )
 
         if state is None or district is None or tehsil is None:
             return _error_response(

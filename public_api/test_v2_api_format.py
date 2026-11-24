@@ -325,7 +325,10 @@ class EnvelopeAndTransformerTests(SimpleTestCase):
                 }
             ]
         )
-        self.assertEqual(set(payload.keys()), {"indicators", "indicator_units"})
+        self.assertEqual(
+            set(payload.keys()),
+            {"indicators", "indicator_units", "indicator_legends"},
+        )
         self.assertIsInstance(payload["indicators"], dict)
         self.assertEqual(payload["indicators"]["avg_precipitation"], 800.13)
         self.assertEqual(payload["indicators"]["lulc_crop"], 40.12)
@@ -728,6 +731,223 @@ class TehsilDataV2Tests(V2ApiTestCase):
         self.assertIn("Unknown data filter", body["error_message"])
         mock_json.assert_not_called()
 
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_regenerate_false_is_parsed_as_bool_false_not_truthy_string(
+        self, _mock_exists, mock_json
+    ):
+        mock_json.return_value = {
+            "aquifer_vector": [{"uid": "12_1", "area_in_ha": 100.0}]
+        }
+        for raw in ("false", "False", "0", "no", ""):
+            mock_json.reset_mock()
+            response = self._get(self.url_name, {**GEO, "regenerate": raw})
+            self.assertEqual(response.status_code, status.HTTP_200_OK, msg=raw)
+            self.assertIs(mock_json.call_args.args[3], False, msg=raw)
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_regenerate_true_forbidden_for_regular_api_key_user(
+        self, _mock_exists, mock_json
+    ):
+        response = self._get(self.url_name, {**GEO, "regenerate": "true"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertIn("regenerate", body["error_message"].lower())
+        mock_json.assert_not_called()
+
+        # v1 route also blocks non-admin API key regenerate=true
+        v1_resp = self.client.get(
+            reverse("get-tehsil-data"),
+            {**GEO, "regenerate": "true"},
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(v1_resp.status_code, status.HTTP_403_FORBIDDEN)
+        mock_json.assert_not_called()
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_regenerate_true_allowed_for_admin_and_jwt_users(
+        self, _mock_exists, mock_json
+    ):
+        import jwt
+        from django.conf import settings
+
+        mock_json.return_value = {
+            "aquifer_vector": [{"uid": "12_1", "area_in_ha": 100.0}]
+        }
+
+        # 1. JWT-authenticated regular user -> allowed
+        token = jwt.encode(
+            {"user_id": self.user.id}, settings.SECRET_KEY, algorithm="HS256"
+        )
+        jwt_resp = self.client.get(
+            reverse(self.url_name),
+            {**GEO, "regenerate": "true"},
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+        )
+        self.assertEqual(jwt_resp.status_code, status.HTTP_200_OK)
+        self.assertIs(mock_json.call_args.args[3], True)
+
+        # 2. Staff/admin API-key user -> allowed
+        mock_json.reset_mock()
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        admin_resp = self._get(self.url_name, {**GEO, "regenerate": "true"})
+        self.assertEqual(admin_resp.status_code, status.HTTP_200_OK)
+        self.assertIs(mock_json.call_args.args[3], True)
+
+    @patch("public_api.views.pd.read_excel")
+    @patch("public_api.views.excel_file_exists")
+    def test_get_tehsil_json_uses_cache_when_regenerate_is_string_false(
+        self, mock_exists, mock_read_excel
+    ):
+        import json
+        import tempfile
+        from pathlib import Path
+        from public_api.views import get_tehsil_json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xlsx_path = Path(tmpdir) / "sample.xlsx"
+            json_path = Path(tmpdir) / "sample.json"
+            json_path.write_text(
+                json.dumps({"aquifer_vector": [{"uid": "12_1"}]}),
+                encoding="utf-8",
+            )
+            mock_exists.return_value = (str(xlsx_path), True)
+            result = get_tehsil_json("Rajasthan", "Bhilwara", "Mandalgarh", "false")
+            self.assertEqual(result, {"aquifer_vector": [{"uid": "12_1"}]})
+            mock_read_excel.assert_not_called()
+
+    @patch("public_api.views.pd.read_excel")
+    @patch("public_api.views.excel_file_exists")
+    def test_get_tehsil_json_rebuilds_when_excel_is_newer_than_cache(
+        self, mock_exists, mock_read_excel
+    ):
+        import json
+        import os
+        import tempfile
+        from pathlib import Path
+        import pandas as pd
+        from public_api.views import get_tehsil_json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xlsx_path = Path(tmpdir) / "sample.xlsx"
+            json_path = Path(tmpdir) / "sample.json"
+            xlsx_path.write_bytes(b"fake-xlsx")
+            json_path.write_text(
+                json.dumps({"drought": [{"uid": "12_1", "year": 2022}]}),
+                encoding="utf-8",
+            )
+            # Simulate pipeline rewriting Excel after the JSON cache was built
+            os.utime(json_path, (1_700_000_000, 1_700_000_000))
+            os.utime(xlsx_path, (1_700_000_100, 1_700_000_100))
+
+            mock_exists.return_value = (str(xlsx_path), True)
+            mock_read_excel.return_value = {
+                "drought": pd.DataFrame([{"UID": "12_1", "year": 2024}])
+            }
+
+            result = get_tehsil_json("Rajasthan", "Bhilwara", "Mandalgarh", False)
+            self.assertEqual(result, {"drought": [{"uid": "12_1", "year": 2024}]})
+            mock_read_excel.assert_called_once()
+            self.assertEqual(
+                json.loads(json_path.read_text(encoding="utf-8")),
+                {"drought": [{"uid": "12_1", "year": 2024}]},
+            )
+
+            # Subsequent call with unchanged Excel should hit the refreshed cache
+            mock_read_excel.reset_mock()
+            cached = get_tehsil_json("Rajasthan", "Bhilwara", "Mandalgarh", False)
+            self.assertEqual(cached, {"drought": [{"uid": "12_1", "year": 2024}]})
+            mock_read_excel.assert_not_called()
+
+    @patch("public_api.views.pd.read_excel")
+    @patch("public_api.views.excel_file_exists")
+    def test_get_tehsil_json_recovers_from_corrupt_cache_file(
+        self, mock_exists, mock_read_excel
+    ):
+        import json
+        import os
+        import tempfile
+        from pathlib import Path
+        import pandas as pd
+        from public_api.views import get_tehsil_json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xlsx_path = Path(tmpdir) / "sample.xlsx"
+            json_path = Path(tmpdir) / "sample.json"
+            xlsx_path.write_bytes(b"fake-xlsx")
+            # Simulate a half-written / truncated JSON cache newer than the Excel
+            json_path.write_text('{"drought": [{"uid": "12_1"', encoding="utf-8")
+            os.utime(xlsx_path, (1_700_000_000, 1_700_000_000))
+            os.utime(json_path, (1_700_000_100, 1_700_000_100))
+
+            mock_exists.return_value = (str(xlsx_path), True)
+            mock_read_excel.return_value = {
+                "drought": pd.DataFrame([{"UID": "12_1", "year": 2024}])
+            }
+
+            result = get_tehsil_json("Rajasthan", "Bhilwara", "Mandalgarh", False)
+            self.assertEqual(result, {"drought": [{"uid": "12_1", "year": 2024}]})
+            mock_read_excel.assert_called_once()
+            self.assertEqual(
+                json.loads(json_path.read_text(encoding="utf-8")),
+                {"drought": [{"uid": "12_1", "year": 2024}]},
+            )
+
+    @patch("public_api.views.pd.read_excel")
+    @patch("public_api.views.excel_file_exists")
+    def test_get_tehsil_json_writes_cache_atomically_via_os_replace(
+        self, mock_exists, mock_read_excel
+    ):
+        import json
+        import os
+        import tempfile
+        from pathlib import Path
+        import pandas as pd
+        from public_api.views import get_tehsil_json
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            xlsx_path = Path(tmpdir) / "sample.xlsx"
+            json_path = Path(tmpdir) / "sample.json"
+            xlsx_path.write_bytes(b"fake-xlsx")
+            mock_exists.return_value = (str(xlsx_path), True)
+            mock_read_excel.return_value = {
+                "aquifer_vector": pd.DataFrame([{"UID": "12_1", "area": 10.5}])
+            }
+
+            replace_calls = []
+            real_replace = os.replace
+
+            def _spy_replace(src, dst):
+                replace_calls.append((src, dst))
+                self.assertEqual(os.path.dirname(src), tmpdir)
+                self.assertNotEqual(src, dst)
+                self.assertTrue(os.path.exists(src))
+                return real_replace(src, dst)
+
+            with patch("public_api.views.os.replace", side_effect=_spy_replace):
+                result = get_tehsil_json("Rajasthan", "Bhilwara", "Mandalgarh", True)
+
+            self.assertEqual(result, {"aquifer_vector": [{"uid": "12_1", "area": 10.5}]})
+            self.assertEqual(len(replace_calls), 1)
+            self.assertEqual(replace_calls[0][1], str(json_path))
+            # No leftover temp files
+            self.assertEqual(sorted(os.listdir(tmpdir)), ["sample.json", "sample.xlsx"])
+
+            # If a later write fails mid-dump, existing valid cache stays intact and temp file is cleaned up
+            with patch("public_api.views.json.dump", side_effect=RuntimeError("disk full")):
+                with self.assertRaises(RuntimeError):
+                    get_tehsil_json("Rajasthan", "Bhilwara", "Mandalgarh", True)
+
+            self.assertEqual(
+                json.loads(json_path.read_text(encoding="utf-8")),
+                {"aquifer_vector": [{"uid": "12_1", "area": 10.5}]},
+            )
+            self.assertEqual(sorted(os.listdir(tmpdir)), ["sample.json", "sample.xlsx"])
+
 
 class KylIndicatorsV2Tests(V2ApiTestCase):
     url_name = "get_mws_kyl_indicators_v2"
@@ -762,7 +982,10 @@ class KylIndicatorsV2Tests(V2ApiTestCase):
         body = response.json()
         assert_success_envelope(self, body)
         data = body["data"]
-        self.assertEqual(set(data.keys()), {"indicators", "indicator_units"})
+        self.assertEqual(
+            set(data.keys()),
+            {"indicators", "indicator_units", "indicator_legends"},
+        )
         self.assertEqual(data["indicators"]["mws_id"], "12_100174")
         self.assertEqual(data["indicator_units"]["avg_precipitation"], "mm")
         self.assertEqual(data["indicator_units"]["cropping_intensity_avg"], "ratio")
@@ -821,6 +1044,396 @@ class KylIndicatorsV2Tests(V2ApiTestCase):
         self.assertIn("bogus_metric", body["error_message"])
         self.assertIn("avg_precipitation", body["error_message"])
         self.assertIn("drought_category", body["error_message"])
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_avg_cropped_units_are_percent_of_cropped_area(
+        self, _mock_exists, mock_kyl
+    ):
+        mock_kyl.return_value = [
+            {
+                "mws_id": "12_100174",
+                "avg_single_cropped": 41.25,
+                "avg_double_cropped": 22.5,
+                "avg_triple_cropped": 3.75,
+            }
+        ]
+        response = self._get(self.url_name, MWS)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        units = body["data"]["indicator_units"]
+        for key in ("avg_single_cropped", "avg_double_cropped", "avg_triple_cropped"):
+            self.assertEqual(units[key], "% of cropped area")
+            self.assertNotEqual(units[key], "ha")
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_avg_surface_water_units_and_null_preserved(self, _mock_exists, mock_kyl):
+        mock_kyl.return_value = [
+            {
+                "mws_id": "12_100174",
+                "avg_kharif_surface_water_mws": 80.5,
+                "avg_rabi_surface_water_mws": None,
+                "avg_zaid_surface_water_mws": None,
+            }
+        ]
+        response = self._get(self.url_name, MWS)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        assert_success_envelope(self, body)
+        units = body["data"]["indicator_units"]
+        indicators = body["data"]["indicators"]
+        for key in (
+            "avg_kharif_surface_water_mws",
+            "avg_rabi_surface_water_mws",
+            "avg_zaid_surface_water_mws",
+        ):
+            self.assertEqual(units[key], "% of that year's water area")
+            self.assertNotEqual(units[key], "mm")
+        self.assertEqual(indicators["avg_kharif_surface_water_mws"], 80.5)
+        self.assertIsNone(indicators["avg_rabi_surface_water_mws"])
+        self.assertIsNone(indicators["avg_zaid_surface_water_mws"])
+
+    def test_avg_season_surface_water_percent_computation_and_null_on_no_data(self):
+        import json
+        import pandas as pd
+        from stats_generator.mws_indicators import (
+            _kyl_df_to_json_records,
+            _prepare_kyl_results_df,
+            compute_avg_season_surface_water_percent,
+        )
+
+        # Valid years: 2018-2019 -> 80%, 2019-2020 -> skipped (total=0), 2020-2021 -> 60%
+        df = pd.DataFrame(
+            [
+                {
+                    "UID": "12_100174",
+                    "total_area_in_ha_2018-2019": 10.0,
+                    "kharif_area_in_ha_2018-2019": 8.0,
+                    "rabi_area_in_ha_2018-2019": None,
+                    "total_area_in_ha_2019-2020": 0.0,
+                    "kharif_area_in_ha_2019-2020": 0.0,
+                    "rabi_area_in_ha_2019-2020": 0.0,
+                    "total_area_in_ha_2020-2021": 20.0,
+                    "kharif_area_in_ha_2020-2021": 12.0,
+                    "rabi_area_in_ha_2020-2021": None,
+                }
+            ]
+        )
+        self.assertEqual(compute_avg_season_surface_water_percent(df, "kharif"), 70.0)
+        # Rabi has no valid year -> None (not 0)
+        self.assertIsNone(compute_avg_season_surface_water_percent(df, "rabi"))
+        # Zaid columns absent -> None (not 0)
+        self.assertIsNone(compute_avg_season_surface_water_percent(df, "zaid"))
+        # Empty dataframe -> None (not 0)
+        self.assertIsNone(
+            compute_avg_season_surface_water_percent(pd.DataFrame(), "kharif")
+        )
+
+        # Mixed rows: float + None must stay JSON null (not -9999 or NaN)
+        rows = [
+            {
+                "mws_id": "12_1",
+                "avg_kharif_surface_water_mws": 70.0,
+                "avg_rabi_surface_water_mws": None,
+                "avg_zaid_surface_water_mws": None,
+                "avg_precipitation": 800.0,
+            },
+            {
+                "mws_id": "12_2",
+                "avg_kharif_surface_water_mws": None,
+                "avg_rabi_surface_water_mws": None,
+                "avg_zaid_surface_water_mws": None,
+                "avg_precipitation": None,
+            },
+        ]
+        prepared = _prepare_kyl_results_df(rows)
+        records = _kyl_df_to_json_records(prepared)
+        serialized = json.dumps(records, allow_nan=False)
+        parsed = json.loads(serialized)
+        self.assertEqual(parsed[0]["avg_kharif_surface_water_mws"], 70.0)
+        self.assertIsNone(parsed[0]["avg_rabi_surface_water_mws"])
+        self.assertIsNone(parsed[1]["avg_kharif_surface_water_mws"])
+        # Non-nullable columns keep legacy -9999 fill behavior
+        self.assertEqual(parsed[1]["avg_precipitation"], -9999.0)
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_cropping_intensity_change_area_unit_and_legacy_rename(
+        self, _mock_exists, mock_kyl
+    ):
+        from utilities.openmeteo_format import indicator_unit_for_key
+
+        # Direct canonical key
+        mock_kyl.return_value = [
+            {"mws_id": "12_100174", "cropping_intensity_change_area": 245.67}
+        ]
+        response = self._get(self.url_name, MWS)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()["data"]
+        self.assertEqual(data["indicators"]["cropping_intensity_change_area"], 245.67)
+        self.assertEqual(data["indicator_units"]["cropping_intensity_change_area"], "ha")
+        self.assertNotIn("degradation_cropping_intensity", data["indicators"])
+
+        # Pre-existing cached KYL JSON still carrying legacy key is renamed transparently
+        mock_kyl.return_value = [
+            {"mws_id": "12_100174", "degradation_cropping_intensity": 312.45}
+        ]
+        response = self._get(
+            self.url_name, {**MWS, "fields": "cropping_intensity_change_area"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()["data"]
+        self.assertEqual(data["indicators"]["cropping_intensity_change_area"], 312.45)
+        self.assertEqual(data["indicator_units"]["cropping_intensity_change_area"], "ha")
+        self.assertNotIn("degradation_cropping_intensity", data["indicators"])
+        self.assertEqual(indicator_unit_for_key("cropping_intensity_change_area"), "ha")
+        self.assertEqual(indicator_unit_for_key("degradation_cropping_intensity"), "ha")
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_water_to_cropped_area_units_and_legacy_wsr_rename(
+        self, _mock_exists, mock_kyl
+    ):
+        mock_kyl.return_value = [
+            {
+                "mws_id": "12_100174",
+                "avg_wsr_ratio_kharif": 15.0,
+                "avg_wsr_ratio_rabi": 12.5,
+                "avg_wsr_ratio_zaid": None,
+            }
+        ]
+        response = self._get(self.url_name, MWS)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()["data"]
+        for season, expected in (
+            ("kharif", 15.0),
+            ("rabi", 12.5),
+            ("zaid", None),
+        ):
+            key = f"avg_water_surface_to_cropped_area_{season}"
+            self.assertEqual(data["indicators"][key], expected)
+            self.assertEqual(data["indicator_units"][key], "%")
+            self.assertNotIn(f"avg_wsr_ratio_{season}", data["indicators"])
+
+    def test_avg_season_water_to_cropped_percent_computation(self):
+        import json
+        import pandas as pd
+        from stats_generator.mws_indicators import (
+            _kyl_df_to_json_records,
+            _prepare_kyl_results_df,
+            compute_avg_season_water_to_cropped_percent,
+        )
+
+        swb_df = pd.DataFrame(
+            [
+                {
+                    "UID": "12_100174",
+                    "kharif_area_in_ha_2017-2018": 10.0,
+                    "kharif_area_in_ha_2018-2019": 20.0,
+                    "rabi_area_in_ha_2017-2018": 5.0,
+                    "rabi_area_in_ha_2018-2019": 15.0,
+                    "zaid_area_in_ha_2017-2018": 2.0,
+                    "zaid_area_in_ha_2018-2019": 4.0,
+                }
+            ]
+        )
+        crp_df = pd.DataFrame(
+            [
+                {
+                    "UID": "12_100174",
+                    # Year 1: kharif=100 (10%), rabi=50 (10%), zaid=0 (skipped)
+                    "single_kharif_cropped_area_in_ha_2017-2018": 60.0,
+                    "single_non_kharif_cropped_area_in_ha_2017-2018": 10.0,
+                    "doubly_cropped_area_in_ha_2017-2018": 40.0,
+                    "triply_cropped_area_in_ha_2017-2018": 0.0,
+                    # Year 2: kharif=100 (20%), rabi=50 (30%), zaid=2 (200%)
+                    "single_kharif_cropped_area_in_ha_2018-2019": 58.0,
+                    "single_non_kharif_cropped_area_in_ha_2018-2019": 8.0,
+                    "doubly_cropped_area_in_ha_2018-2019": 40.0,
+                    "triply_cropped_area_in_ha_2018-2019": 2.0,
+                }
+            ]
+        )
+        # Per-year averages (NOT divided by number of years a second time)
+        self.assertEqual(
+            compute_avg_season_water_to_cropped_percent(swb_df, crp_df, "kharif"),
+            15.0,
+        )
+        self.assertEqual(
+            compute_avg_season_water_to_cropped_percent(swb_df, crp_df, "rabi"),
+            20.0,
+        )
+        # Zaid uses triple-cropped area only, skipping year 1 where triple=0
+        self.assertEqual(
+            compute_avg_season_water_to_cropped_percent(swb_df, crp_df, "zaid"),
+            200.0,
+        )
+
+        # When all years have 0 triple-cropped area -> None (JSON null, not 0 or -9999)
+        crp_zero_zaid = crp_df.copy()
+        crp_zero_zaid["triply_cropped_area_in_ha_2018-2019"] = 0.0
+        zaid_none = compute_avg_season_water_to_cropped_percent(
+            swb_df, crp_zero_zaid, "zaid"
+        )
+        self.assertIsNone(zaid_none)
+        records = _kyl_df_to_json_records(
+            _prepare_kyl_results_df(
+                [
+                    {"mws_id": "12_1", "avg_water_surface_to_cropped_area_zaid": 200.0},
+                    {"mws_id": "12_2", "avg_water_surface_to_cropped_area_zaid": None},
+                ]
+            )
+        )
+        parsed = json.loads(json.dumps(records, allow_nan=False))
+        self.assertIsNone(parsed[1]["avg_water_surface_to_cropped_area_zaid"])
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_soil_terrain_canopy_and_boolean_units_not_value(
+        self, _mock_exists, mock_kyl
+    ):
+        expected_units = {
+            "nitrogen_levels": "kg/ha",
+            "phosphoros_levels": "kg/ha",
+            "potassium_levels": "kg/ha",
+            "organic_carbon": "%",
+            "organic_carbon_tree_cover": "%",
+            "soil_ph": "pH",
+            "soil_drainage": "code",
+            "soil_texture": "code",
+            "reduction_canopy_density_height": "%",
+            "increase_canopy_density_height": "%",
+            "reduction_in_shrubland_cover": "ha",
+            "forest_to_farm": "ha",
+            "degradation_in_forests": "ha",
+            "trees_in_forest_loss": "ha",
+            "trees_in_forest_fringe_loss": "ha",
+            "trees_in_grassland_loss": "ha",
+            "relief": "m",
+            "mean_elevation": "m",
+            "relative_mean_elevation": "m",
+            "drainage_density": "km/km²",
+            "canal_available": "boolean",
+            "river_available": "boolean",
+            "mws_intersect_swb": "list",
+            "distance_to_bank": "km",
+            "dist_to_coops": "km",
+            "shrub_trend": "code",
+            "trend_annual_rainfall": "code",
+            "kharif_annual_rainfall_ratio": "ratio",
+            "monsoon_onset_day_range": "days",
+            "shg_penetration": "score",
+            "max_livestock_score": "score",
+        }
+        row = {"mws_id": "12_100174"}
+        for key in expected_units:
+            row[key] = True if expected_units[key] == "boolean" else 1.5
+        mock_kyl.return_value = [row]
+
+        response = self._get(self.url_name, MWS)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        units = response.json()["data"]["indicator_units"]
+        for key, expected_unit in expected_units.items():
+            self.assertEqual(units[key], expected_unit, msg=key)
+            self.assertNotEqual(units[key], "value", msg=key)
+
+    def test_every_emitted_kyl_indicator_has_non_value_unit(self):
+        import ast
+        from pathlib import Path
+        from utilities.openmeteo_format import _canonicalize_indicator_row
+
+        src = (
+            Path(__file__).resolve().parent.parent
+            / "stats_generator"
+            / "mws_indicators.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        emitted_keys = []
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "append"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "results"
+                and len(node.args) == 1
+                and isinstance(node.args[0], ast.Dict)
+            ):
+                for k in node.args[0].keys:
+                    if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                        emitted_keys.append(k.value)
+        self.assertGreater(len(emitted_keys), 50)
+        unknown_value_units = []
+        for key in emitted_keys:
+            _, units = _canonicalize_indicator_row({key: 1})
+            for canon_key, unit in units.items():
+                if unit == "value":
+                    unknown_value_units.append((key, canon_key))
+        self.assertEqual(
+            unknown_value_units,
+            [],
+            msg=f"KYL indicators still resolving to 'value': {unknown_value_units}",
+        )
+
+    @patch("public_api.api.get_mws_json_from_kyl_indicator")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_coded_fields_return_indicator_legends_and_respect_fields_filter(
+        self, _mock_exists, mock_kyl
+    ):
+        mock_kyl.return_value = [
+            {
+                "mws_id": "12_100174",
+                "avg_precipitation": 800.0,
+                "drought_category": 2,
+                "aquifer_class": 0,
+                "soge_class": 3,
+                "soil_drainage": 3,
+                "soil_texture": 1,
+                "trend_annual_rainfall": "-1",
+                "shrub_trend": 1,
+                "mining": 0,
+            }
+        ]
+        response = self._get(self.url_name, MWS)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        legends = response.json()["data"]["indicator_legends"]
+        self.assertEqual(legends["aquifer_class"]["0"], "Hard Rock")
+        self.assertEqual(legends["aquifer_class"]["1"], "Alluvial")
+        self.assertIn("two or more years", legends["drought_category"]["2"].lower())
+        self.assertEqual(legends["soge_class"]["3"], "Over Exploited")
+        # Verify non-monotonic drainage map matches mws_indicators.py
+        self.assertEqual(legends["soil_drainage"]["3"], "Imperfectly drained")
+        self.assertIn("Poorly drained", legends["soil_drainage"]["2"])
+        self.assertEqual(legends["trend_annual_rainfall"]["-1"], "decreasing")
+        self.assertEqual(legends["shrub_trend"]["1"], "increasing")
+        self.assertEqual(legends["mining"]["0"], "No mining record")
+        self.assertNotIn("avg_precipitation", legends)
+
+        # fields= must trim indicator_legends to only the requested coded fields
+        filtered_resp = self._get(
+            self.url_name, {**MWS, "fields": "aquifer_class,avg_precipitation"}
+        )
+        self.assertEqual(filtered_resp.status_code, status.HTTP_200_OK)
+        filtered_legends = filtered_resp.json()["data"]["indicator_legends"]
+        self.assertEqual(set(filtered_legends.keys()), {"aquifer_class"})
+
+    def test_every_coded_kyl_unit_has_legend(self):
+        from stats_generator.kyl_legends import KYL_INDICATOR_LEGENDS
+        from utilities.openmeteo_format import KYL_INDICATOR_UNIT_OVERRIDES
+
+        coded_keys = {
+            k
+            for k, u in KYL_INDICATOR_UNIT_OVERRIDES.items()
+            if u in {"code", "class", "flag"}
+        } | {"drought_category"}
+        missing = sorted(coded_keys - set(KYL_INDICATOR_LEGENDS.keys()))
+        self.assertEqual(
+            missing,
+            [],
+            msg=f"Coded KYL indicators missing legends: {missing}",
+        )
 
 
 class GeneratedLayerUrlsV2Tests(V2ApiTestCase):

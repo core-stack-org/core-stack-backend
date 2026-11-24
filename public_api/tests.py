@@ -114,6 +114,39 @@ class FortnightStructureFromMwsTests(SimpleTestCase):
         self.assertEqual(payload["fortnight"]["runoff"], [1.33, 0.8])
         self.assertEqual(payload["fortnight"]["precipitation"], [10.22, 5.4])
 
+    def test_sanitizes_empty_strings_and_drops_trailing_empty_fortnights(self):
+        payload = fortnight_structure_from_mws(
+            {
+                "mws_id": "12_208104",
+                "time_series": [
+                    {"date": "2024-07-01", "et": 3.5, "runoff": 0.0, "precipitation": 0.0},
+                    {"date": "2024-07-16", "et": 4.0, "runoff": "", "precipitation": None},
+                    {"date": "2024-08-01", "et": None, "runoff": "", "precipitation": None},
+                ],
+            }
+        )
+        _assert_fortnight_inner_block(self, payload)
+        self.assertEqual(payload["fortnight"]["time"], ["2024-07-01", "2024-07-16"])
+        self.assertEqual(payload["fortnight"]["et"], [3.5, 4.0])
+        self.assertEqual(payload["fortnight"]["runoff"], [0.0, None])
+        self.assertEqual(payload["fortnight"]["precipitation"], [0.0, None])
+
+        # Cached Mongo payload with "" and trailing all-null period is cleaned too
+        cleaned = legacy_hourly_to_fortnight_inner_block(
+            {
+                "metadata": {"mws_id": "12_208104"},
+                "fortnight": {
+                    "time": ["2024-07-01", "2024-07-16"],
+                    "et": [3.5, ""],
+                    "runoff": [0.0, ""],
+                    "precipitation": [12.0, ""],
+                },
+                "fortnight_units": dict(EXPECTED_FORTNIGHT_UNITS),
+            }
+        )
+        self.assertEqual(cleaned["fortnight"]["time"], ["2024-07-01"])
+        self.assertEqual(cleaned["fortnight"]["et"], [3.5])
+
     def test_success_envelope_json_formatting(self):
         inner = fortnight_structure_from_mws(_sample_mws_timeseries())
         envelope = success_envelope(inner)
@@ -538,3 +571,80 @@ class GetMwsDataMultiWordGeoLookupTests(TestCase):
         err_msg = err_resp.json()["error"]
         self.assertIn("unknown district", err_msg.lower())
         self.assertIn("Chik Ballapur", err_msg)
+
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    @patch("public_api.views.requests.get")
+    def test_missing_and_unparseable_fortnights_return_null_and_drop_trailing_empty(
+        self, mock_requests_get, *_mocks
+    ):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {
+                        "uid": "12_208104",
+                        # Real zero rain & runoff must stay 0.0
+                        "2024-07-01": json.dumps(
+                            {"ET": 3.5, "RunOff": 0, "Precipitation": 0.0}
+                        ),
+                        # Partial missing + bad string -> null, never 0.0 or ""
+                        "2024-07-16": json.dumps(
+                            {"ET": 4.25, "RunOff": None, "Precipitation": "bad"}
+                        ),
+                        # Corrupt JSON in middle -> all nulls, never ""
+                        "2024-08-01": "{not valid json",
+                        # Subsequent valid period -> keeps interior gap above
+                        "2024-08-16": json.dumps(
+                            {"ET": 5.1, "RunOff": 2.2, "Precipitation": 48.9}
+                        ),
+                        # Trailing empty/unpopulated periods -> dropped!
+                        "2024-09-01": "{}",
+                        "2024-09-16": None,
+                    }
+                }
+            ]
+        }
+        mock_requests_get.return_value = mock_resp
+
+        v2_resp = self.client.get(
+            self.url_v2,
+            {
+                "state": "Karnataka",
+                "district": "Chik Ballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(v2_resp.status_code, status.HTTP_200_OK)
+        fortnight = v2_resp.json()["data"]["fortnight"]
+        self.assertEqual(
+            fortnight["time"],
+            ["2024-07-01", "2024-07-16", "2024-08-01", "2024-08-16"],
+        )
+        self.assertEqual(fortnight["et"], [3.5, 4.25, None, 5.1])
+        self.assertEqual(fortnight["runoff"], [0.0, None, None, 2.2])
+        self.assertEqual(fortnight["precipitation"], [0.0, None, None, 48.9])
+
+        # v1 must also never emit "" in number fields and must drop trailing empty periods
+        v1_resp = self.client.get(
+            self.url_v1,
+            {
+                "state": "Karnataka",
+                "district": "Chik Ballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(v1_resp.status_code, status.HTTP_200_OK)
+        ts = v1_resp.json()["time_series"]
+        self.assertEqual([r["date"] for r in ts], ["2024-07-01", "2024-07-16", "2024-08-01", "2024-08-16"])
+        self.assertIsNone(ts[1]["runoff"])
+        self.assertIsNone(ts[1]["precipitation"])
+        self.assertIsNone(ts[2]["et"])
+        for row in ts:
+            for key in ("et", "runoff", "precipitation", "ndvi_crop", "ndvi_shrub", "ndvi_tree"):
+                self.assertNotEqual(row[key], "")
