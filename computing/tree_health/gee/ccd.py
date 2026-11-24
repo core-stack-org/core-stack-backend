@@ -92,7 +92,7 @@ def tree_health_ccd_raster(
             )
 
             # Apply tree mask (class 6 = Tree)
-            tree_mask = lulc.eq(6).reproject(crs="EPSG:4326", scale=25)
+            tree_mask = lulc.eq(6).Or(lulc.eq(13)).reproject(crs="EPSG:4326", scale=25)
             raster = raster.updateMask(tree_mask)
 
             # Export raster to GEE
