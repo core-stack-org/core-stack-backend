@@ -16,6 +16,7 @@ from computing.utils import save_layer_info_to_db
 from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 from computing.config_loader import (
+    LULC_VERSION,
     SOIL_HEALTH_BASE_DIR,
     SOIL_HEALTH_RASTER_OUTPUT_DIR,
     SOIL_HEALTH_VECTOR_OUTPUT_DIR,
@@ -88,7 +89,7 @@ def _resolve_latest_lulc_raster_paths(count=3, lulc_dir=LULC_BASE_DIR):
     if not lulc_dir.exists():
         return []
 
-    candidates = sorted(lulc_dir.glob("lulc_v4_*.tif"))
+    candidates = sorted(lulc_dir.glob(f"lulc_{LULC_VERSION}_*.tif"))
     if not candidates:
         return []
 

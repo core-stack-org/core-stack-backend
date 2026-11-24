@@ -22,7 +22,7 @@ from nrm_app.celery import app
 from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
-LOCAL_CCD_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ccd"
+LOCAL_CCD_BASE_DIR = DATA_DIR / "base_layers/tree_health/ccd"
 LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "tree_ccd_raster"
 GEOSERVER_STYLE = "tree_ccd_style"

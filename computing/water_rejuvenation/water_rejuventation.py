@@ -12,7 +12,7 @@ from utilities.constants import (
     SRTM_DIGITAL_ELEVATION,
     LANDSAT8_T1_CALIBERATED_TOA,
     PAN_INDIA_LULC_PATH,
-    PAN_INDIA_MWS_PATH,
+    MWS_DATASET,
     LulcClass,
 )
 from utilities.gee_utils import (
@@ -145,7 +145,7 @@ def find_watersheds_for_point_with_buffer(latitude, longitude, buffer_distance=1
 
     point = ee.Geometry.Point([longitude, latitude])
     buffered_point = point.buffer(buffer_distance)
-    WaterSheds = ee.FeatureCollection(PAN_INDIA_MWS_PATH)
+    WaterSheds = ee.FeatureCollection(MWS_DATASET)
     intersecting_watersheds = WaterSheds.filter(
         ee.Filter.intersects(".geo", buffered_point)
     )

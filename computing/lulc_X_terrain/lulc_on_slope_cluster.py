@@ -88,9 +88,7 @@ def lulc_on_slope_cluster(
             slope_mwsheds, study_area_landforms, study_area_lulc, slope_centroids
         )
         result = result.map(
-            lambda feature: feature.select(
-                feature.propertyNames().remove("area")
-            )
+            lambda feature: feature.select(feature.propertyNames().remove("area"))
         )
         print("Processing completed successfully")
         task = export_vector_asset_to_gee(result, asset_description, asset_id)
@@ -175,12 +173,13 @@ def assign_l2_cluster(feature, landforms, area_lulc, slope_centroids):
 
     # Calculate LULC proportions
     def calculate_lulc_proportion(lulc_class):
-        area_image = (
-            slopy.eq(1)
-            .And(lulc.eq(lulc_class))
-            .multiply(ee.Image.pixelArea())
-            .rename("area")
-        )
+        if isinstance(lulc_class, list):
+            cond = lulc.eq(lulc_class[0])
+            for class_value in lulc_class[1:]:
+                cond = cond.Or(lulc.eq(class_value))
+        else:
+            cond = lulc.eq(lulc_class)
+        area_image = slopy.eq(1).And(cond).multiply(ee.Image.pixelArea()).rename("area")
 
         area = area_image.reduceRegion(
             reducer=ee.Reducer.sum(), geometry=study_area, scale=30, maxPixels=1e10
@@ -194,7 +193,7 @@ def assign_l2_cluster(feature, landforms, area_lulc, slope_centroids):
     slopy_shrub_scrub = calculate_lulc_proportion(12)  # Shrubs/scrubs
     slopy_single_kharif = calculate_lulc_proportion(8)  # Single crop
     slopy_single_non_kharif = calculate_lulc_proportion(9)  # Single non-kharif
-    slopy_forests = calculate_lulc_proportion(6)  # Forest
+    slopy_forests = calculate_lulc_proportion([6, 13])  # Forest
     slopy_triple = calculate_lulc_proportion(11)  # Triple crop
 
     # Create feature vector
