@@ -1,10 +1,15 @@
 import logging
 import token
-# import requests
+import requests
+import secrets
+import threading
 
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.core.mail import send_mail
 from django.shortcuts import render
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -18,6 +23,9 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework.exceptions import APIException
+from rest_framework.permissions import AllowAny
+
 
 from public_api.swagger_schemas import login_schema
 
@@ -37,45 +45,46 @@ from .serializers import (
 )
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
-# def verify_recaptcha(token):
-#         try:
-#             response = requests.post(
-#                 "https://www.google.com/recaptcha/api/siteverify",
-#                 data={
-#                     "secret": settings.RECAPTCHA_SECRET_KEY,
-#                     "response": token,
-#                 },
-#                 timeout=10,
-#             )
+def verify_recaptcha(token):
+        try:
+            response = requests.post(
+                "https://www.google.com/recaptcha/api/siteverify",
+                data={
+                    "secret": settings.RECAPTCHA_SECRET_KEY,
+                    "response": token,
+                },
+                timeout=10,
+            )
 
-#             response.raise_for_status()
+            response.raise_for_status()
 
-#             result = response.json()
-#             success = result.get("success", False)
+            result = response.json()
+            success = result.get("success", False)
 
-#             if not success:
-#                 logger.warning(
-#                     "reCAPTCHA verification failed. Response: %s",
-#                     result,
-#                 )
+            if not success:
+                logger.warning(
+                    "reCAPTCHA verification failed. Response: %s",
+                    result,
+                )
 
-#             return success
-#         except requests.exceptions.Timeout:
-#             logger.error("reCAPTCHA request timed out")
-#             return False
-#         except requests.exceptions.RequestException as exc:
-#             logger.exception(
-#                 "Error while verifying reCAPTCHA: %s",
-#                 str(exc),
-#             )
-#             return False
-#         except Exception as exc:
-#             logger.exception(
-#                 "Unexpected error during reCAPTCHA verification: %s",
-#                 str(exc),
-#             )
-#             return False
+            return success
+        except requests.exceptions.Timeout:
+            logger.error("reCAPTCHA request timed out")
+            return False
+        except requests.exceptions.RequestException as exc:
+            logger.exception(
+                "Error while verifying reCAPTCHA: %s",
+                str(exc),
+            )
+            return False
+        except Exception as exc:
+            logger.exception(
+                "Unexpected error during reCAPTCHA verification: %s",
+                str(exc),
+            )
+            return False
 
 
 class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
@@ -139,7 +148,22 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
             },
             status=status.HTTP_201_CREATED,
         )
-    
+
+    def create(self, request, *args, **kwargs):
+        email = (request.data.get("email") or "").strip().lower()
+        otp = (request.data.get("otp") or "").strip()
+
+        cached_otp = cache.get(f"reg_otp:{email}") if email else None
+        if not cached_otp or not secrets.compare_digest(str(cached_otp), otp):
+            logger.warning("register 400: invalid or expired OTP for %s", email)
+            return Response(
+                {"otp": ["Please verify your email by clicking send otp and entering the OTP sent to your email."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        response = super().create(request, *args, **kwargs)
+        cache.delete(f"reg_otp:{email}")
+        return response
     
 
 
@@ -187,6 +211,8 @@ class RegisterView(viewsets.GenericViewSet, generics.CreateAPIView):
 #             )
 #             response.data["user"] = UserSerializer(user).data
 #             return response
+#         except APIException:
+#             raise
 #         except Exception as exc:
 #             logger.exception(
 #                 "Unexpected error during login: %s",
@@ -772,3 +798,41 @@ class ResetPasswordView(View):
         OutstandingToken.objects.filter(user=user).delete()
 
         return render(request, "password_reset_done.html")
+
+
+class SendOtpView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        try:
+            if not email:
+                logger.warning("send_otp 400: email missing")
+                return Response({"email": ["Email is required"]}, status=status.HTTP_400_BAD_REQUEST)
+
+            if User.objects.filter(email__iexact=email).exists():
+                logger.warning("send_otp 400: email already registered: %s", email)
+                return Response({"email": ["This email is already registered"]}, status=status.HTTP_400_BAD_REQUEST)
+
+            otp = f"{secrets.randbelow(10**6):06d}"
+            cache.set(f"reg_otp:{email}", otp, timeout=600)
+
+            threading.Thread(
+                target=send_email,
+                kwargs={
+                    "subject": "Your verification code",
+                    "text_body": f"Your OTP is {otp}. It is valid for 10 minutes.",
+                    "to_emails": [email],
+                },
+            ).start()
+
+            logger.info("send_otp 200: OTP sent to %s", email)
+            return Response({"detail": "OTP sent"}, status=status.HTTP_200_OK)
+
+        except Exception:
+            logger.exception("send_otp 500: unexpected error for %s", email)
+            return Response(
+                {"detail": "Something went wrong. Please try again."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
