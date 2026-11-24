@@ -1,3 +1,4 @@
+import difflib
 import ee
 import os
 import json
@@ -90,6 +91,41 @@ def _get_soi_by_name(model, field_name, name, **filters):
     raise model.DoesNotExist(
         f"{model.__name__} matching query does not exist for {field_name}={name!r}."
     )
+
+
+def _format_unknown_soi_error(
+    label, value, model, field_name, parent_context="", **filters
+):
+    """Return a readable 'unknown <level>' error message with accepted name hints."""
+    available = sorted(
+        {
+            str(name).strip()
+            for name in model.objects.filter(**filters).values_list(
+                field_name, flat=True
+            )
+            if name and str(name).strip()
+        }
+    )
+    query_norm = str(value or "").replace("_", " ").strip().lower()
+    lower_to_original = {name.lower(): name for name in available}
+    close_keys = difflib.get_close_matches(
+        query_norm, list(lower_to_original.keys()), n=3, cutoff=0.6
+    )
+    suggestions = [lower_to_original[key] for key in close_keys]
+
+    location_suffix = f" {parent_context}" if parent_context else ""
+    base = f"Unknown {label} '{value}'{location_suffix}."
+    if suggestions:
+        if len(suggestions) == 1:
+            return f"{base} Accepted name: '{suggestions[0]}'."
+        return f"{base} Accepted names: {', '.join(suggestions)}."
+    if available:
+        preview = available[:10]
+        names_str = ", ".join(preview)
+        if len(available) > 10:
+            names_str += f" (and {len(available) - 10} more)"
+        return f"{base} Accepted {label} names: {names_str}."
+    return base
 
 
 def fetch_generated_layer_urls(state_name, district_name, block_name):
@@ -284,13 +320,44 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
 
     try:
         # Validate geographic hierarchy
-        state_obj = StateSOI.objects.get(state_name__iexact=state)
-        district_obj = DistrictSOI.objects.get(
-            district_name__iexact=district, state=state_obj
-        )
-        tehsil_obj = TehsilSOI.objects.get(
-            tehsil_name__iexact=tehsil, district=district_obj
-        )
+        try:
+            state_obj = _get_soi_by_name(StateSOI, "state_name", state)
+        except StateSOI.DoesNotExist:
+            return {
+                "error": _format_unknown_soi_error(
+                    "state", state, StateSOI, "state_name"
+                )
+            }
+        try:
+            district_obj = _get_soi_by_name(
+                DistrictSOI, "district_name", district, state=state_obj
+            )
+        except DistrictSOI.DoesNotExist:
+            return {
+                "error": _format_unknown_soi_error(
+                    "district",
+                    district,
+                    DistrictSOI,
+                    "district_name",
+                    parent_context=f"in state '{state_obj.state_name}'",
+                    state=state_obj,
+                )
+            }
+        try:
+            tehsil_obj = _get_soi_by_name(
+                TehsilSOI, "tehsil_name", tehsil, district=district_obj
+            )
+        except TehsilSOI.DoesNotExist:
+            return {
+                "error": _format_unknown_soi_error(
+                    "tehsil",
+                    tehsil,
+                    TehsilSOI,
+                    "tehsil_name",
+                    parent_context=f"in district '{district_obj.district_name}'",
+                    district=district_obj,
+                )
+            }
 
         # Check if water layer exists
         district = valid_gee_text(district.lower())

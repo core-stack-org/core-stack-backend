@@ -3,7 +3,7 @@
 import json
 import re
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -11,7 +11,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from geoadmin.models import UserAPIKey
+from geoadmin.models import DistrictSOI, StateSOI, TehsilSOI, UserAPIKey
 from users.models import User
 from utilities.openmeteo_format import (
     fortnight_structure_from_mws,
@@ -262,3 +262,207 @@ class GetMwsDataV2ApiTests(TestCase):
         body = response.json()
         self.assertEqual(body["status"], "error")
         self.assertEqual(body["error_message"], "Data not found for the given mws_id")
+
+
+class GetMwsDataMultiWordGeoLookupTests(TestCase):
+    """End-to-end SOI lookup tests for get_mws_data (v1 and v2) with multi-word names."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="mws_geo_tester",
+            email="mws_geo_tester@example.com",
+            password="password123",
+        )
+        self.api_key_obj, self.api_key = UserAPIKey.objects.create_key(
+            user=self.user,
+            name="mws-geo-test-key",
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        self.api_key_obj.api_key = self.api_key
+        self.api_key_obj.save()
+
+        self.url_v2 = reverse("get-mws-data-v2")
+        self.url_v1 = reverse("get-mws-data")
+
+        self.karnataka = StateSOI.objects.create(state_name="Karnataka")
+        self.chik_ballapur = DistrictSOI.objects.create(
+            state=self.karnataka, district_name="Chik Ballapur"
+        )
+        self.bagepalli = TehsilSOI.objects.create(
+            district=self.chik_ballapur, tehsil_name="Bagepalli"
+        )
+
+        # Multi-word state, district, and tehsil all at once.
+        self.uttar_pradesh = StateSOI.objects.create(state_name="Uttar Pradesh")
+        self.sant_kabir_nagar = DistrictSOI.objects.create(
+            state=self.uttar_pradesh, district_name="Sant Kabir Nagar"
+        )
+        self.khalil_abad = TehsilSOI.objects.create(
+            district=self.sant_kabir_nagar, tehsil_name="Khalil Abad"
+        )
+
+    @staticmethod
+    def _mock_geoserver_response():
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {
+                        "2024-01-01": json.dumps(
+                            {"ET": 2.555, "RunOff": 1.333, "Precipitation": 10.219}
+                        ),
+                        "2024-01-15": json.dumps(
+                            {"ET": 3.14159, "RunOff": 0.8, "Precipitation": 5.4}
+                        ),
+                    }
+                }
+            ]
+        }
+        return resp
+
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    @patch("public_api.views.requests.get")
+    def test_two_word_district_succeeds_v2(
+        self, mock_requests_get, _mock_load, _mock_save
+    ):
+        mock_requests_get.return_value = self._mock_geoserver_response()
+
+        response = self.client.get(
+            self.url_v2,
+            {
+                "state": "Karnataka",
+                "district": "Chik Ballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["status"], "success")
+        _assert_fortnight_inner_block(self, body["data"])
+        self.assertEqual(
+            mock_requests_get.call_args.kwargs["params"]["typeName"],
+            "mws_layers:deltaG_fortnight_chik_ballapur_bagepalli",
+        )
+
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    @patch("public_api.views.requests.get")
+    def test_multi_word_state_district_and_tehsil_succeed_v2(
+        self, mock_requests_get, _mock_load, _mock_save
+    ):
+        mock_requests_get.return_value = self._mock_geoserver_response()
+
+        response = self.client.get(
+            self.url_v2,
+            {
+                "state": "Uttar Pradesh",
+                "district": "Sant Kabir Nagar",
+                "tehsil": "Khalil Abad",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        body = response.json()
+        self.assertEqual(body["status"], "success")
+        _assert_fortnight_inner_block(self, body["data"])
+        self.assertEqual(
+            mock_requests_get.call_args.kwargs["params"]["typeName"],
+            "mws_layers:deltaG_fortnight_sant_kabir_nagar_khalil_abad",
+        )
+
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    def test_unknown_district_returns_clean_404_with_accepted_name(self, *_mocks):
+        response = self.client.get(
+            self.url_v2,
+            {
+                "state": "Karnataka",
+                "district": "Chikkaballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        body = response.json()
+        self.assertEqual(body["status"], "error")
+        msg = body["error_message"]
+        self.assertIn("unknown district", msg.lower())
+        self.assertIn("Chik Ballapur", msg)
+        self.assertNotIn("DistrictSOI matching query does not exist", msg)
+
+    @patch("public_api.api._save_mws_v2_to_mongo")
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    def test_unknown_state_and_tehsil_return_clean_404(self, *_mocks):
+        state_resp = self.client.get(
+            self.url_v2,
+            {
+                "state": "Karnatka",
+                "district": "Chik Ballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(state_resp.status_code, status.HTTP_404_NOT_FOUND)
+        state_msg = state_resp.json()["error_message"]
+        self.assertIn("unknown state", state_msg.lower())
+        self.assertIn("Karnataka", state_msg)
+        self.assertNotIn("StateSOI matching query does not exist", state_msg)
+
+        tehsil_resp = self.client.get(
+            self.url_v2,
+            {
+                "state": "Karnataka",
+                "district": "Chik Ballapur",
+                "tehsil": "Bagepali",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(tehsil_resp.status_code, status.HTTP_404_NOT_FOUND)
+        tehsil_msg = tehsil_resp.json()["error_message"]
+        self.assertIn("unknown tehsil", tehsil_msg.lower())
+        self.assertIn("Bagepalli", tehsil_msg)
+        self.assertNotIn("TehsilSOI matching query does not exist", tehsil_msg)
+
+    @patch("public_api.views.requests.get")
+    def test_v1_two_word_district_and_unknown_district(self, mock_requests_get):
+        mock_requests_get.return_value = self._mock_geoserver_response()
+
+        ok_resp = self.client.get(
+            self.url_v1,
+            {
+                "state": "Karnataka",
+                "district": "Chik Ballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(ok_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(ok_resp.json()["mws_id"], "12_208104")
+
+        err_resp = self.client.get(
+            self.url_v1,
+            {
+                "state": "Karnataka",
+                "district": "Chikkaballapur",
+                "tehsil": "Bagepalli",
+                "mws_id": "12_208104",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(err_resp.status_code, status.HTTP_404_NOT_FOUND)
+        err_msg = err_resp.json()["error"]
+        self.assertIn("unknown district", err_msg.lower())
+        self.assertIn("Chik Ballapur", err_msg)

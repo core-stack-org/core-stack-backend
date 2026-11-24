@@ -349,6 +349,8 @@ def get_mws_data(request):
                 {"error": "Data not found for the given mws_id"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if isinstance(data, dict) and data.get("error"):
+            return Response(data, status=status.HTTP_404_NOT_FOUND)
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
