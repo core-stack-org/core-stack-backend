@@ -1207,8 +1207,6 @@ def resolve_lulc_raster_paths(
 
 
 # ── cropping intensity (shared by the watershed and farm pipelines) ─────────────
-
-CROPPING_INTENSITY_INITIAL_YEAR = 2017
 SINGLE_CROP_CLASSES = (LulcClass.SINGLE_KHARIF, LulcClass.SINGLE_NON_KHARIF)
 ALL_CROP_CLASSES = SINGLE_CROP_CLASSES + (
     LulcClass.DOUBLE_CROPPING,
