@@ -390,20 +390,20 @@ def Upload_Desilting_Points(
             return None
         return val
 
+    def coord(value):
+        if value is None:
+            return None
+        try:
+            return round(float(value), 6)
+        except (TypeError, ValueError):
+            return None
+
+    def text(value):
+        if value is None:
+            return ""
+        return str(value).strip().lower()
+
     def point_key(lat, lon, waterbody_name, intervention_year):
-        def coord(value):
-            if value is None:
-                return None
-            try:
-                return round(float(value), 6)
-            except (TypeError, ValueError):
-                return None
-
-        def text(value):
-            if value is None:
-                return ""
-            return str(value).strip().lower()
-
         return (
             coord(lat),
             coord(lon),
@@ -411,28 +411,45 @@ def Upload_Desilting_Points(
             text(intervention_year),
         )
 
+    def excel_cell(row, header):
+        # Header checks ignore case and surrounding space. The old lookup
+        # required "Name of the waterbody " with a trailing space, so a normal
+        # column was skipped and the name was stored as empty.
+        wanted = str(header).strip().lower()
+        for col in row.index:
+            if str(col).strip().lower() == wanted:
+                return normalize(row[col])
+        return None
+
     wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
     df = pd.read_excel(wb_obj.file)
     successful_keys = set()
     failed_ids = {}
+    processed_without_name = {}
+    failed_without_name = {}
     for log in WaterbodiesDesiltingLog.objects.filter(project=proj_obj).only(
         "id", "lat", "lon", "waterbody_name", "intervention_year", "process"
     ):
         key = point_key(log.lat, log.lon, log.waterbody_name, log.intervention_year)
+        location = (coord(log.lat), coord(log.lon), text(log.intervention_year))
         if log.process:
             successful_keys.add(key)
+            if not text(log.waterbody_name):
+                processed_without_name[location] = log.id
         else:
             failed_ids[key] = log.id
+            if not text(log.waterbody_name):
+                failed_without_name[location] = log.id
 
     new_rows = []
     skipped_rows = 0
     for index, row in df.iterrows():
-        lat = normalize(row.get("Latitude"))
-        lon = normalize(row.get("Longitude"))
-        waterbody_name = normalize(row.get("Name of the waterbody "))
-        intervention_year = normalize(row.get("Intervention_year"))
+        lat = excel_cell(row, "Latitude")
+        lon = excel_cell(row, "Longitude")
+        waterbody_name = excel_cell(row, "Name of the waterbody")
+        intervention_year = excel_cell(row, "Intervention_year")
         key = point_key(lat, lon, waterbody_name, intervention_year)
         if key in successful_keys:
             skipped_rows += 1
@@ -443,6 +460,21 @@ def Upload_Desilting_Points(
             )
             continue
         existing_id = failed_ids.pop(key, None)
+        if existing_id is None and waterbody_name:
+            location = (coord(lat), coord(lon), text(intervention_year))
+            processed_id = processed_without_name.pop(location, None)
+            if processed_id:
+                WaterbodiesDesiltingLog.objects.filter(pk=processed_id).update(
+                    waterbody_name=waterbody_name
+                )
+                skipped_rows += 1
+                logger.info(
+                    "Set waterbody name on already processed row %s for project %s.",
+                    processed_id,
+                    proj_obj.id,
+                )
+                continue
+            existing_id = failed_without_name.pop(location, None)
         successful_keys.add(key)
         new_rows.append(
             (index, row, lat, lon, waterbody_name, intervention_year, existing_id)
@@ -490,15 +522,15 @@ def Upload_Desilting_Points(
     ) in new_rows:
         print(row)
         row_values = {
-            "name_of_ngo": normalize(row.get("Name of NGO")),
-            "State": normalize(row.get("State")),
-            "District": normalize(row.get("District")),
-            "Taluka": normalize(row.get("Taluka")),
-            "Village": normalize(row.get("Village")),
+            "name_of_ngo": excel_cell(row, "Name of NGO"),
+            "State": excel_cell(row, "State"),
+            "District": excel_cell(row, "District"),
+            "Taluka": excel_cell(row, "Taluka"),
+            "Village": excel_cell(row, "Village"),
             "waterbody_name": waterbody_name,
             "lat": lat,
             "lon": lon,
-            "slit_excavated": normalize(row.get("Silt Excavated as per App")),
+            "slit_excavated": excel_cell(row, "Silt Excavated as per App"),
             "intervention_year": intervention_year,
             "excel_hash": wb_obj.excel_hash,
             "project": proj_obj,

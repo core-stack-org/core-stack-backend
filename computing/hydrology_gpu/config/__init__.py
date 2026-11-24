@@ -6,8 +6,9 @@ except ModuleNotFoundError:
     settings = None
 
 from computing.config_loader import (
+    DATA_DIR,
     LULC_BASE_DIR,
-    PROJECT_ROOT,
+    LULC_VERSION,
     SOIL_RASTER_PATH,
     TERRAIN_RASTER_PATH,
 )
@@ -25,7 +26,7 @@ def _env_or_setting(name, default=""):
     return str(value or "").strip()
 
 
-DATA_ROOT = PROJECT_ROOT / "data"
+DATA_ROOT = DATA_DIR
 
 # Optional. Do not commit a real project id; use env/settings when needed.
 GEE_PROJECT_NAME = _env_or_setting("GEE_PROJECT_NAME")
@@ -36,7 +37,7 @@ BOUNDARY_GEOJSON_PATH = ""
 MICROWATERSHEDS_PATH = BOUNDARY_GEOJSON_PATH
 DEMFILE_PATH = ""
 SOIL_PATH = str(SOIL_RASTER_PATH)
-LULC_PATH = str(LULC_BASE_DIR / "lulc_v3_2024_2025.tif")
+LULC_PATH = str(LULC_BASE_DIR / f"lulc_{LULC_VERSION}_2024_2025.tif")
 LULC_SOURCE = "indiasatv3"
 INDIASATV3_LULC_PATH = LULC_PATH
 

@@ -121,6 +121,11 @@ base_layers:
           source: s3://corestack-datasets/base_layers/static_layers/mws/Microwatershed_v2_with_details.geojson
           type: file
 
+        - name: mws connectivity
+          local_path: "{DATA_DIR}/base_layers/Pan_India_mws_connectivity.geojson"
+          source: ""
+          type: file
+
         - name: stream order
           local_path: "{DATA_DIR}/base_layers/stream_order/stream_order.tif"
           source: ""
@@ -287,6 +292,17 @@ base_layers:
           source: ""
           type: file
 
+        # Raw yearly LULC v4, lulc_v4_{year}_{year+1}.tif (band 1 predicted_label, band 2
+        # predicted_cluster): the input of the pan-India temporal correction APIs
+        # (pan-india/lulc_temporal_correction_six_year/ and .../incremental/). They write the
+        # corrected lulc_v4_{year}_{year+1}.tif into base_layers/lulc/ (lulc_v4 above), with
+        # temporal_correction_manifest.json marking each year final or provisional. Keep the raw
+        # years: the incremental run reads them.
+        - name: lulc_v4_raw
+          local_path: "{DATA_DIR}/base_layers/lulc/raw/"
+          source: ""
+          type: file
+
         - name: rainfall jaxa
           local_path: "{DATA_DIR}/base_layers/periodic/rainfall_jaxa/"
           source: ""
@@ -443,24 +459,29 @@ derived_layers:
 
     - name: lulc v3
       filename: "{district}_{block}_{start_year}-07-01_{end_year}-06-30_LULCmap_10m.tif"
-      local_path: "{DATA_DIR}/lulc/lulc_v3_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/lulc/lulc_v3_local/{filename}"
       geoserver_workspace: LULC_v3
       layer_type: raster
 
     - name: lulc v4
       filename: "{district}_{block}_{start_year}-07-01_{end_year}-06-30_LULCmap_10m.tif"
-      local_path: "{DATA_DIR}/lulc/lulc_v4_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/lulc/lulc_v4_local/{filename}"
       layer_type: raster
 
     - name: generate_ci_layer
 
     - name: generate_terrain_raster
+      filename: "{district}_{block}_terrain_raster.tif"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/terrain/fabdem_local/{filename}"
+      geoserver_workspace: terrain
+      geoserver_layer: "{district}_{block}_terrain_raster"
+      layer_type: raster
 
     - name: generate_terrain_descriptor
       aliases:
           - terrain clusters
       filename: "{district}_{block}_cluster.gpkg"
-      local_path: "{DATA_DIR}/terrain/terrain_clusters_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/terrain/terrain_clusters_local/{filename}"
       geoserver_workspace: terrain
       geoserver_layer: "{district}_{block}_cluster"
       layer_type: vector
@@ -469,7 +490,7 @@ derived_layers:
       aliases:
           - lulc slope clusters
       filename: "{district}_{block}_lulc_slope.gpkg"
-      local_path: "{DATA_DIR}/lulc_X_terrain/lulc_slope_clusters_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/lulc_X_terrain/lulc_slope_clusters_local/{filename}"
       geoserver_workspace: terrain_lulc
       geoserver_layer: "{district}_{block}_lulc_slope"
       layer_type: vector
@@ -478,7 +499,7 @@ derived_layers:
       aliases:
           - lulc plain clusters
       filename: "{district}_{block}_lulc_plain.gpkg"
-      local_path: "{DATA_DIR}/lulc_X_terrain/lulc_plain_clusters_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/lulc_X_terrain/lulc_plain_clusters_local/{filename}"
       geoserver_workspace: terrain_lulc
       geoserver_layer: "{district}_{block}_lulc_plain"
       layer_type: vector
@@ -487,7 +508,7 @@ derived_layers:
 
     - name: lulc vector
       filename: lulc_vector_{district}_{block}.gpkg
-      local_path: "{DATA_DIR}/lulc/lulc_vector_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/lulc/lulc_vector_local/{filename}"
       geoserver_workspace: lulc_vector
       geoserver_layer: "lulc_vector_{district}_{block}"
       layer_type: vector
@@ -502,7 +523,7 @@ derived_layers:
               CropIntensity,
           ]
       filename: change_{district}_{block}_{param_name}_{start_year}_{end_year}.tif
-      local_path: "{DATA_DIR}/change_detection/change_detection_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/change_detection/change_detection_local/{filename}"
       geoserver_workspace: change_detection
       layer_type: raster
 
@@ -517,28 +538,28 @@ derived_layers:
               ShrubChange,
           ]
       filename: change_vector_{district}_{block}_{param_name}_{start_year}_{end_year}.gpkg
-      local_path: "{DATA_DIR}/change_detection/change_detection_vector_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/change_detection/change_detection_vector_local/{filename}"
       geoserver_workspace: change_detection
       geoserver_layer: "change_vector_{district}_{block}_{param_name}"
       layer_type: vector
 
     - name: aquifer vector
       filename: aquifer_vector_{district}_{block}.gpkg
-      local_path: "{DATA_DIR}/layers/aquifer_vector/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/aquifer_vector/{filename}"
       geoserver_workspace: aquifer
       geoserver_layer: "aquifer_vector_{district}_{block}"
       layer_type: vector
 
     - name: soil type
       filename: soil_type_{district}_{block}.gpkg
-      local_path: "{DATA_DIR}/layers/soil_type/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/soil_type/{filename}"
       geoserver_workspace: soil_type
       geoserver_layer: "soil_type_{district}_{block}"
       layer_type: vector
 
     - name: generate_swb
       filename: surface_waterbodies_{district}_{block}.gpkg
-      local_path: "{DATA_DIR}/surface_water_bodies/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/surface_water_bodies/{filename}"
       geoserver_workspace: swb
       geoserver_layer: "surface_waterbodies_{district}_{block}"
       layer_type: vector
@@ -547,40 +568,40 @@ derived_layers:
 
     - name: cropping intensity
       filename: "{district}_{block}_intensity.gpkg"
-      local_path: "{DATA_DIR}/cropping_intensity/cropping_intensity_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/cropping_intensity/{filename}"
       geoserver_workspace: crop_intensity
       geoserver_layer: "{district}_{block}_intensity"
       layer_type: vector
 
     - name: dem_raster
-      local_path: "{DATA_DIR}/fabdem/fabdem_local/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/fabdem/"
       geoserver_workspace: dem
       layer_type: raster
 
     - name: dem_vector
       filename: "{district}_{block}_dem_vector.gpkg"
-      local_path: "{DATA_DIR}/fabdem/fabdem_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/fabdem/{filename}"
       geoserver_workspace: dem
       geoserver_layer: "{district}_{block}_dem_vector"
       layer_type: vector
 
     - name: drainage_density_vector
       filename: "{district}_{block}_drainage_density.gpkg"
-      local_path: "{DATA_DIR}/drainage_density/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/drainage_density/{filename}"
       geoserver_workspace: drainage_density
       geoserver_layer: "{district}_{block}_drainage_density"
       layer_type: vector
 
     - name: generate_canal_vector
       filename: "{district}_{block}_canal_vector.gpkg"
-      local_path: "{DATA_DIR}/canal/canal_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/canal/{filename}"
       geoserver_workspace: canal
       geoserver_layer: "{district}_{block}_canal_vector"
       layer_type: vector
 
     - name: generate_river_data
       filename: "{district}_{block}_river_vector.gpkg"
-      local_path: "{DATA_DIR}/river/river_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/river/{filename}"
       geoserver_workspace: river
       geoserver_layer: "{district}_{block}_river_vector"
       layer_type: vector
@@ -588,10 +609,15 @@ derived_layers:
     - name: run_off_daily_and_fortnightly
 
     - name: clip_soil_health
+      filename: "{district}_{block}_soil_health_raster_{nutrient}.tif"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/soil_health/{filename}"
+      geoserver_workspace: soil_health_raster
+      geoserver_layer: "{district}_{block}_soil_health_raster_{nutrient}"
+      layer_type: raster
 
     - name: soil_health_vector
       filename: "{district}_{block}_soil_health_vector.gpkg"
-      local_path: "{DATA_DIR}/soil_health/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/soil_health/{filename}"
       geoserver_workspace: soil_health_vector
       geoserver_layer: "{district}_{block}_soil_health_vector"
       layer_type: vector
@@ -602,21 +628,21 @@ derived_layers:
 
     - name: canopy height vector
       filename: "ch_vector_{district}_{block}_{start_year}_{end_year}.gpkg"
-      local_path: "{DATA_DIR}/tree_health/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/tree_health/{filename}"
       geoserver_workspace: canopy_height_vector
       geoserver_layer: "ch_vector_{district}_{block}_{start_year}_{end_year}"
       layer_type: vector
 
     - name: canopy cover density vector
       filename: "ccd_vector_{district}_{block}_{start_year}_{end_year}.gpkg"
-      local_path: "{DATA_DIR}/tree_health/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/tree_health/{filename}"
       geoserver_workspace: tree_ccd_vector
       geoserver_layer: "ccd_vector_{district}_{block}_{start_year}_{end_year}"
       layer_type: vector
 
     - name: overall tree change vector
       filename: "overall_change_vector_{district}_{block}.gpkg"
-      local_path: "{DATA_DIR}/tree_health/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/tree_health/{filename}"
       geoserver_workspace: tree_overall_vector
       geoserver_layer: "overall_change_vector_{district}_{block}"
       layer_type: vector
@@ -629,14 +655,14 @@ derived_layers:
 
     - name: hydrology_fortnightly
       filename: "deltaG_fortnight_{district}_{block}.gpkg"
-      local_path: "{DATA_DIR}/hydrology/hydrology_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/hydrology/{filename}"
       geoserver_workspace: mws_layers
       geoserver_layer: "deltaG_fortnight_{district}_{block}"
       layer_type: vector
 
     - name: hydrology_annual
       filename: "deltaG_well_depth_{district}_{block}.gpkg"
-      local_path: "{DATA_DIR}/hydrology/hydrology_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/hydrology/{filename}"
       geoserver_workspace: mws_layers
       geoserver_layer: "deltaG_well_depth_{district}_{block}"
       layer_type: vector
@@ -652,30 +678,30 @@ derived_layers:
 
     - name: generate_drainage_layer
       filename: "{district}_{block}.gpkg"
-      local_path: "{DATA_DIR}/layers/drainage_lines/drainage_lines_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/drainage_lines/{filename}"
       geoserver_workspace: drainage_lines
       layer_type: vector
 
     - name: restoration_opportunity
-      local_path: "{DATA_DIR}/layers/restoration_opportunity/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/restoration_opportunity/"
       geoserver_workspace: restoration
       layer_type: raster
 
     - name: restoration_opportunity_vector
       filename: "restoration_{district}_{block}_vector.gpkg"
-      local_path: "{DATA_DIR}/layers/restoration_opportunity/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/restoration_opportunity/{filename}"
       geoserver_workspace: restoration
       geoserver_layer: "restoration_{district}_{block}_vector"
       layer_type: vector
 
     - name: site_suitability
-      local_path: "{DATA_DIR}/layers/site_suitability/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/site_suitability/"
       geoserver_workspace: plantation
       layer_type: raster
 
     - name: soge_vector
       filename: "soge_vector_{district}_{block}_{year}.gpkg"
-      local_path: "{DATA_DIR}/layers/SOGE_vector/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/SOGE_vector/{filename}"
       geoserver_workspace: soge
       geoserver_layer: "soge_vector_{district}_{block}"
       per_year: true
@@ -683,83 +709,83 @@ derived_layers:
 
     - name: generate_lcw
       filename: "{district}_{block}_lcw_conflict.gpkg"
-      local_path: "{DATA_DIR}/layers/lcw_conflict/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/lcw_conflict/{filename}"
       geoserver_workspace: lcw
       geoserver_layer: "{district}_{block}_lcw_conflict"
       layer_type: vector
 
     - name: generate_agroecological
       filename: "{district}_{block}_agroecological.gpkg"
-      local_path: "{DATA_DIR}/layers/agroecological/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/agroecological/{filename}"
       geoserver_workspace: agroecological
       geoserver_layer: "{district}_{block}_agroecological"
       layer_type: vector
 
     - name: generate_factory_csr
       filename: "{district}_{block}_factory_csr.gpkg"
-      local_path: "{DATA_DIR}/layers/factory_csr/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/factory_csr/{filename}"
       geoserver_workspace: factory_csr
       geoserver_layer: "{district}_{block}_factory_csr"
       layer_type: vector
 
     - name: generate_green_credit
       filename: "{district}_{block}_green_credit.gpkg"
-      local_path: "{DATA_DIR}/layers/green_credit/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/green_credit/{filename}"
       geoserver_workspace: green_credit
       geoserver_layer: "{district}_{block}_green_credit"
       layer_type: vector
 
     - name: generate_mining
       filename: "{district}_{block}_mining.gpkg"
-      local_path: "{DATA_DIR}/layers/mining/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/mining/{filename}"
       geoserver_workspace: mining
       geoserver_layer: "{district}_{block}_mining"
       layer_type: vector
 
     - name: generate_natural_depression
-      local_path: "{DATA_DIR}/layers/natural_depression/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/natural_depression/"
       geoserver_workspace: natural_depression
       layer_type: raster
 
     - name: generate_distance_nearest_DL
-      local_path: "{DATA_DIR}/layers/distance_nearest_upstream_DL/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/distance_nearest_upstream_DL/"
       geoserver_workspace: distance_nearest_upstream_DL
       layer_type: raster
 
     - name: generate_catchment_area_singleflow
-      local_path: "{DATA_DIR}/layers/catchment_area_singleflow/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/catchment_area_singleflow/"
       geoserver_workspace: catchment_area_singleflow
       layer_type: raster
 
     - name: generate_slope_percentage
-      local_path: "{DATA_DIR}/layers/slope_percentage/"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/slope_percentage/"
       geoserver_workspace: slope_percentage
       layer_type: raster
 
     - name: generate_mws_connectivity_data
       filename: "{district}_{block}_mws_connectivity.gpkg"
-      local_path: "{DATA_DIR}/layers/mws_connectivity/mws_connectivity_local/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/mws_connectivity/{filename}"
       geoserver_workspace: mws_connectivity
       geoserver_layer: "{district}_{block}_mws_connectivity"
       layer_type: vector
 
     - name: generate_mws_centroid
       filename: "{district}_{block}_mws_centroid.gpkg"
-      local_path: "{DATA_DIR}/layers/mws_centroid/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/mws_centroid/{filename}"
       geoserver_workspace: mws_centroid
       layer_type: vector
 
     - name: generate_facilities_proximity
       filename: "facilities_{district}_{block}.gpkg"
       # computing/misc/facilities/pipeline.py (output.root in facilities_pipeline.yaml)
-      local_path: "{DATA_DIR}/outputs/{state}/{district}/{block}/facilities/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/facilities/{filename}"
       geoserver_workspace: facilities_proximity
       geoserver_layer: "facilities_{district}_{block}"
       layer_type: vector
 
     - name: generate_nrega_layer
       filename: "{district}_{block}.gpkg"
-      local_path: "{DATA_DIR}/layers/nrega_assets/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/nrega_assets/{filename}"
       geoserver_workspace: nrega_assets
       geoserver_layer: "{district}_{block}"
       layer_type: vector
@@ -767,7 +793,7 @@ derived_layers:
     - name: generate_livestocks
       filename: "livestocks_{district}_{block}.gpkg"
       # computing/misc/livestocks/pipeline.py (output.root in livestocks_pipeline.yaml)
-      local_path: "{DATA_DIR}/outputs/{state}/{district}/{block}/livestocks20/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/livestocks20/{filename}"
       geoserver_workspace: livestocks
       geoserver_layer: "livestocks_{district}_{block}"
       layer_type: vector
@@ -776,16 +802,19 @@ derived_layers:
 
     - name: generate_drought_layer
       filename: "{district}_{block}_drought.gpkg"
-      local_path: "{DATA_DIR}/drought/output/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/drought/{filename}"
       geoserver_workspace: drought
       geoserver_layer: "{district}_{block}_drought"
       layer_type: vector
 
     # Not generated locally (GEE only).
     - name: mws_drought_causality
+      filename: "{district}_{block}_drought_causality.gpkg"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/drought_causality/{filename}"
       geoserver_workspace: drought_causality
       geoserver_layer: "{district}_{block}_drought_causality"
       layer_type: vector
+
 
     - name: clip_drought_spei
 
@@ -804,7 +833,7 @@ derived_layers:
     - name: generate_antyodaya
       filename: "antyodaya20_{district}_{block}.gpkg"
       # computing/misc/antyodaya/pipeline.py (output.root in antyodaya_pipeline.yaml)
-      local_path: "{DATA_DIR}/outputs/{state}/{district}/{block}/antyodaya20/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/antyodaya20/{filename}"
       geoserver_workspace: antyodaya_2020
       geoserver_layer: "antyodaya20_{district}_{block}"
       layer_type: vector
@@ -813,21 +842,21 @@ derived_layers:
 
     - name: forest fringe
       filename: "{district}_{block}_forest_fringe.gpkg"
-      local_path: "{DATA_DIR}/forest_fringe/output/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/forest_fringe/{filename}"
       geoserver_workspace: forest_fringes
       geoserver_layer: "{district}_{block}_forest_fringe"
       layer_type: vector
 
     - name: tree in grassland
       filename: "{district}_{block}_tree_in_grassland.gpkg"
-      local_path: "{DATA_DIR}/tree_in_grassland/output/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/tree_in_grassland/{filename}"
       geoserver_workspace: tree_in_grassland
       geoserver_layer: "{district}_{block}_tree_in_grassland"
       layer_type: vector
 
     - name: forest fire
       filename: "{district}_{block}_forest_fire.gpkg"
-      local_path: "{DATA_DIR}/forest_fire/output/{state}/{district}/{block}/{filename}"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/forest_fire/{filename}"
       geoserver_workspace: forest_fire
       geoserver_layer: "{district}_{block}_forest_fire"
       layer_type: vector

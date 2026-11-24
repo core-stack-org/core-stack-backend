@@ -16,6 +16,7 @@ import pandas as pd
 from django.conf import settings
 from scipy.spatial import cKDTree
 
+from computing.config_loader import DATA_DIR
 from computing.utils import save_layer_info_to_db, update_layer_sync_status
 from utilities.pipelines import AdminScope, CSAdminSource, StandardRequest, load_config
 from utilities.pipelines.admin import (
@@ -79,6 +80,13 @@ def _repo_path(path: str | Path) -> Path:
         return path
     base_dir = Path(settings.BASE_DIR) if settings.configured else Path.cwd()
     return base_dir / path
+
+
+def _output_root_path(path: str | Path) -> Path:
+    raw = str(path)
+    if "{DATA_DIR}" in raw:
+        return Path(raw.replace("{DATA_DIR}", str(DATA_DIR)))
+    return _repo_path(path)
 
 
 def _apply_source_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
@@ -1048,7 +1056,7 @@ def run_facilities_pipeline(
     )
     timings["read_admin_seconds"] = round(time.perf_counter() - t0, 3)
 
-    output_root = _repo_path(output_config["root"]).joinpath(*output_parts)
+    output_root = _output_root_path(output_config["root"]).joinpath(*output_parts)
     bundle = OutputBundle(
         output_root,
         layer_name,

@@ -1,4 +1,7 @@
-from computing.config_loader import LULC_V4_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR
+from computing.config_loader import (
+    LULC_OUTPUT_DIR as LOCAL_OUTPUT_BASE_DIR,
+    LULC_VERSION,
+)
 from computing.local_compute_helper import (
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
@@ -16,7 +19,7 @@ from utilities.gee_utils import valid_gee_text
 
 GEOSERVER_WORKSPACE = "LULC_level_3"
 GEOSERVER_STYLE = "lulc_level_3_style"
-LOCAL_ALGORITHM = "local_lulc_v4_clip"
+LOCAL_ALGORITHM = f"local_lulc_{LULC_VERSION}_clip"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
 
 

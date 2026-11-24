@@ -13,6 +13,7 @@ from nrm_app.settings import (
 from computing.config_loader import (
     ADMIN_BOUNDARY_INPUT_DIR as _ADMIN_BOUNDARY_INPUT_DIR,
     ADMIN_BOUNDARY_OUTPUT_DIR as _ADMIN_BOUNDARY_OUTPUT_DIR,
+    DATA_DIR as _DATA_DIR,
     SOI_TEHSIL_PATH as _SOI_TEHSIL_PATH,
 )
 
@@ -22,7 +23,7 @@ ADMIN_BOUNDARY_OUTPUT_DIR = str(_ADMIN_BOUNDARY_OUTPUT_DIR)
 
 # Canonical local pipeline resources. Runtime pipelines read these defaults
 # directly; their YAML `sources` entries are optional test overrides.
-BASE_RESOURCES_DIR = "data/base_resources"
+BASE_RESOURCES_DIR = str(_DATA_DIR / "base_resources")
 ADMIN_BOUNDARY_GPKG = f"{BASE_RESOURCES_DIR}/cs_admin_standard.gpkg"
 FACILITIES_GPKG = f"{BASE_RESOURCES_DIR}/cs_pan_india_facilities.gpkg"
 ANTYODAYA_2020_CSV = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020_cluster_analysis.csv"
