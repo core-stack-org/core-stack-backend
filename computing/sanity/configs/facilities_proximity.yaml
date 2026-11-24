@@ -3,26 +3,88 @@ sheet_names:
   - facilities_proximity
 
 rules:
-  # Source: Pan India STAC Facilities Proximity collection and stats-generator export.
-  - name: facilities_censuscode_not_null
-    applies_to: [excel, vector]
-    type: not_null
-    field: censuscode2011
+  # Source: computing/misc/facilities/pipeline.py (l2_<group>_distance_km,
+  # l3_<facility>_distance_km, l3_<facility>_inside_scope) and stats-generator
+  # create_excel_for_facilities, which drops rows without a village_id, drops
+  # *_facility_uid/*_inside_scope and renames distances to *_distance_in_km.
 
-  - name: facilities_schema_present
+  # Key fields in both forms.
+  - name: facilities_village_id_present
     applies_to: [excel, vector]
+    type: required_fields
+    value: [village_id]
+
+  - name: facilities_vector_distance_present
+    applies_to: [vector]
     type: required_any_field_pattern
-    value:
-      - "*_distance_in_km"
+    value: ["*_distance_km"]
 
-  - name: facilities_distance_type
-    applies_to: [excel, vector]
+  - name: facilities_excel_distance_present
+    applies_to: [excel]
+    type: required_any_field_pattern
+    value: ["*_distance_in_km"]
+
+  # Vector rows for admin polygons without a village id legitimately carry a
+  # null village_id (facilities_status = "no village id available"); the Excel
+  # export drops them, so village_id must be set there.
+  - name: facilities_excel_village_id_not_null
+    applies_to: [excel]
+    type: not_null
+    field: village_id
+
+  - name: facilities_vector_status_allowed_values
+    applies_to: [vector]
+    type: allowed_values
+    field: facilities_status
+    value: ["computed", "no village id available", "no data available for this village"]
+
+  - name: facilities_excel_status_allowed_values
+    applies_to: [excel]
+    type: allowed_values
+    field: data_availability_status
+    value: ["computed", "no data available for this village"]
+
+  # Great-circle distances in km: non-negative, and far below 1000 km for a
+  # nearest facility in India (a larger value suggests metres, not km).
+  - name: facilities_vector_distance_type
+    applies_to: [vector]
+    type: data_type
+    field_pattern: "*_distance_km"
+    expected_type: numeric
+
+  - name: facilities_vector_distance_min
+    applies_to: [vector]
+    type: min_value
+    field_pattern: "*_distance_km"
+    value: 0
+
+  - name: facilities_vector_distance_max
+    applies_to: [vector]
+    type: max_value
+    field_pattern: "*_distance_km"
+    value: 1000
+
+  - name: facilities_excel_distance_type
+    applies_to: [excel]
     type: data_type
     field_pattern: "*_distance_in_km"
     expected_type: numeric
 
-  - name: facilities_distance_min
-    applies_to: [excel, vector]
+  - name: facilities_excel_distance_min
+    applies_to: [excel]
     type: min_value
     field_pattern: "*_distance_in_km"
     value: 0
+
+  - name: facilities_excel_distance_max
+    applies_to: [excel]
+    type: max_value
+    field_pattern: "*_distance_in_km"
+    value: 1000
+
+  # Vector: whether the nearest facility lies inside the requested boundary.
+  - name: facilities_vector_inside_scope_allowed_values
+    applies_to: [vector]
+    type: allowed_values
+    field_pattern: "*_inside_scope"
+    value: [0, 1]

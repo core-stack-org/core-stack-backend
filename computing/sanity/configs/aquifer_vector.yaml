@@ -3,21 +3,26 @@ sheet_names:
   - aquifer_vector
 
 rules:
-  # Source: STAC Aquifer vector table:columns.
+  # Source: aquifer_vector layer (computing/misc/aquifer_vector*.py) and
+  # stats_generator create_excel_for_aquifer.
   - name: aquifer_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
-    allow_missing_fields: true
 
-  - name: aquifer_schema_present
+  # Both forms carry aquifer_class and one principle_aq_<name>_percent column
+  # per principal aquifer type; require each family on its own.
+  - name: aquifer_class_present
     applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
       - "aquifer_class"
-      - "principle_aq_*"
-      - "Principal_*"
-      - "Major_Aq*"
+
+  - name: aquifer_percent_present
+    applies_to: [excel, vector]
+    type: required_any_field_pattern
+    value:
+      - "principle_aq_*_percent"
 
   - name: aquifer_numeric_type
     applies_to: [excel, vector]
@@ -69,4 +74,45 @@ rules:
     type: max_value
     field_pattern: "*percent"
     value: 100
+    allow_missing_fields: true
+
+  # Vector-only: dominant aquifer's share of the MWS, and specific-yield
+  # fractions (y_value from the yeild__ lookup, total_weighted_yield its
+  # area-weighted sum).
+  - name: aquifer_vector_dominant_pct_max
+    applies_to: [vector]
+    type: max_value
+    fields: ["%_area_aquifer"]
+    value: 100
+    allow_missing_fields: true
+
+  - name: aquifer_vector_yield_min
+    applies_to: [vector]
+    type: min_value
+    fields: [total_weighted_yield, y_value]
+    value: 0
+    allow_missing_fields: true
+
+  - name: aquifer_vector_yield_max
+    applies_to: [vector]
+    type: max_value
+    fields: [total_weighted_yield, y_value]
+    value: 1
+    allow_missing_fields: true
+
+  # Vector class labels: GEE writes "None" and local writes "No Data" when an
+  # MWS has no aquifer. The Excel export rewrites Hard-Rock to "Hard Rock" and
+  # everything else to "Alluvium".
+  - name: aquifer_vector_class_allowed
+    applies_to: [vector]
+    type: allowed_values
+    fields: [aquifer_class]
+    value: [Alluvium, Hard-Rock, None, No Data]
+    allow_missing_fields: true
+
+  - name: aquifer_excel_class_allowed
+    applies_to: [excel]
+    type: allowed_values
+    fields: [aquifer_class]
+    value: [Alluvium, Hard Rock]
     allow_missing_fields: true

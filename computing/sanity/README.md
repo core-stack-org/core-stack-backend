@@ -110,6 +110,9 @@ Important fields:
 - `value`: Rule-specific threshold or allowed values.
 - `expected_type`: Expected type for `data_type`.
 - `allow_missing_fields`: Allows optional field families to be absent.
+- `ignore_values`: Values a rule skips, e.g. `[-9999]` (no-data) or `[0]` (placeholder ids). Supported by `min_value`, `max_value`, `unique`, `max_null_fraction` and `expression`.
+- `allow_empty_strings`: For `not_null`, accept `""` as a value (by default blank strings count as missing).
+- `suffix_from`, `suffix_min`: For `expression`, expand `{year}`-style placeholders over every matching column family.
 
 ## Supported Rules
 
@@ -117,13 +120,32 @@ The current rule types live in `rules.py`.
 
 | Rule type | Purpose |
 |---|---|
-| `not_null` | Fails rows where matched fields are null |
+| `not_null` | Fails rows where matched fields are null or blank strings |
 | `data_type` | Checks pandas dtype family: `integer`, `float`, `numeric`, `string`, `boolean` |
 | `min_value` | Fails numeric values below `value` |
 | `max_value` | Fails numeric values above `value` |
 | `allowed_values` | Fails non-null values outside the configured allowed list |
 | `required_fields` | Fails when explicit fields are missing |
 | `required_any_field_pattern` | Fails when no configured wildcard pattern matches any column |
+| `unique` | Fails rows whose key (all matched fields together) repeats; `ignore_values` skips placeholder keys |
+| `max_null_fraction` | Fails a field whose share of null, blank or `ignore_values` rows exceeds `value` (catches all-no-data columns) |
+| `distinct_columns` | Fails a pair of fields that are identical in every row (one column written into another) |
+| `expression` | Row-level cross-field check written as a pandas expression, e.g. `TOT_M + TOT_F == TOT_P` |
+
+Cross-field example, checked once per year column:
+
+```yaml
+  - name: soge_excel_total_extraction_sum
+    applies_to: [excel]
+    type: expression
+    suffix_from: "total_extraction_in_bcm_{year}"
+    value: "abs(total_extraction_in_bcm_{year} - (extraction_for_irrigation_in_bcm_{year} + extraction_for_domestic_and_industrial_in_bcm_{year})) <= 0.02 * total_extraction_in_bcm_{year}"
+    ignore_values: [-9999]
+```
+
+Column names that are not Python identifiers go in backticks (`` `built-up_area_2017` ``). Rows where any referenced value is null or ignored are skipped.
+
+Configs can also validate pipeline inputs: `admin_boundary_census_input` checks the district census files that the admin boundary pipeline clips.
 
 ## Running Validation
 

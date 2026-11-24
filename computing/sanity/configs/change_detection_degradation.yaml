@@ -10,8 +10,10 @@ rules:
     applies_to: [excel, vector]
 
   # Vector schema from STAC Land Use Change: Cropping reduction table:columns.
+  # Labels are fixed in change_detection_vector(_local).py, so every one is
+  # required: a layer missing one class would otherwise pass.
   - name: degradation_vector_schema_present
-    type: required_any_field_pattern
+    type: required_fields
     value:
       - "f_ba"
       - "f_bu"
@@ -21,8 +23,11 @@ rules:
     applies_to: [vector]
 
   # Excel schema from stats-generator change_detection_degradation sheet.
+  # The export writes every column even when the vector lacks the source
+  # field (properties.get(..., None)), so the Excel not-null check below is
+  # what catches a missing vector class here.
   - name: degradation_excel_schema_present
-    type: required_any_field_pattern
+    type: required_fields
     value:
       - "farm_to_barren_area_in_ha"
       - "farm_to_built_up_area_in_ha"
@@ -31,32 +36,61 @@ rules:
       - "total_degradation_area_in_ha"
     applies_to: [excel]
 
+  # Vector area fields, listed explicitly: MWS layers in some states also carry
+  # watershed code strings (bacode, sbcode, wsconc) that are not areas.
+  # Areas are hectares (pixelArea * 0.0001), so never negative.
   - name: degradation_vector_numeric_type
     type: data_type
-    field_pattern: "*"
+    fields:
+      - "area_in_ha"
+      - "f_ba"
+      - "f_bu"
+      - "f_f"
+      - "f_sc"
+      - "total_deg"
     expected_type: numeric
-    exclude_field_patterns: ["*uid*", "the_geom", "geometry"]
     allow_missing_fields: true
     applies_to: [vector]
 
-  - name: degradation_excel_numeric_type
-    type: data_type
-    field_pattern: "*_area_in_ha"
-    expected_type: numeric
+  - name: degradation_vector_area_not_null
+    type: not_null
+    fields:
+      - "area_in_ha"
+      - "f_ba"
+      - "f_bu"
+      - "f_f"
+      - "f_sc"
+      - "total_deg"
     allow_missing_fields: true
-    applies_to: [excel]
+    applies_to: [vector]
 
   - name: degradation_vector_area_min
     type: min_value
-    field_pattern: "*"
+    fields:
+      - "area_in_ha"
+      - "f_ba"
+      - "f_bu"
+      - "f_f"
+      - "f_sc"
+      - "total_deg"
     value: 0
-    exclude_field_patterns: ["*uid*", "the_geom", "geometry"]
     allow_missing_fields: true
     applies_to: [vector]
 
+  # Excel area fields, including the MWS area_in_ha.
+  - name: degradation_excel_numeric_type
+    type: data_type
+    field_pattern: "*area_in_ha"
+    expected_type: numeric
+    applies_to: [excel]
+
+  - name: degradation_excel_area_not_null
+    type: not_null
+    field_pattern: "*area_in_ha"
+    applies_to: [excel]
+
   - name: degradation_excel_area_min
     type: min_value
-    field_pattern: "*_area_in_ha"
+    field_pattern: "*area_in_ha"
     value: 0
-    allow_missing_fields: true
     applies_to: [excel]

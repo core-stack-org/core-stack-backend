@@ -11,6 +11,13 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Keys every rule entry may carry; anything else is passed to the rule class.
+BASE_RULE_KEYS = {
+    "name", "type", "applies_to", "field", "field_pattern", "value",
+    "expected_type", "severity", "fields", "exclude_field_patterns",
+    "allow_missing_fields",
+}
+
 
 class VectorValidator:
     def __init__(
@@ -120,6 +127,13 @@ class VectorValidator:
                     fields=rule_cfg.get("fields"),
                     exclude_field_patterns=rule_cfg.get("exclude_field_patterns"),
                     allow_missing_fields=rule_cfg.get("allow_missing_fields", False),
+                    # Remaining keys are rule-type options (ignore_values,
+                    # suffix_from, ...); see the rule classes.
+                    **{
+                        key: value
+                        for key, value in rule_cfg.items()
+                        if key not in BASE_RULE_KEYS
+                    },
                 )
             )
 

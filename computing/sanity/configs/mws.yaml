@@ -4,22 +4,52 @@ sheet_names:
 
 rules:
   # Source: STAC hydrological boundary / microwatershed metadata.
+  # Pipeline: computing/mws/mws.py clips the pan-India MWS dataset (uid,
+  # area_in_ha, bacode, sbcode, wsconc). stats_generator renames the codes
+  # to basin_code, sub_basin_code and watershed_code.
   - name: mws_uid_not_null
     applies_to: [excel, vector]
     type: not_null
     field_pattern: "*uid*"
 
-  - name: mws_schema_present
+  - name: mws_uid_present
     applies_to: [excel, vector]
     type: required_any_field_pattern
     value:
-      - "watershed_code"
-      - "basin_code"
-      - "sub_basin_code"
+      - "uid"
+
+  # MWS area in hectares: present, numeric, never null or negative.
+  - name: mws_area_type
+    applies_to: [excel, vector]
+    type: data_type
+    field_pattern: "area_in_ha"
+    expected_type: numeric
+
+  - name: mws_area_not_null
+    applies_to: [excel, vector]
+    type: not_null
+    field_pattern: "area_in_ha"
 
   - name: mws_area_min
     applies_to: [excel, vector]
     type: min_value
-    field: area_in_ha
+    field_pattern: "area_in_ha"
     value: 0
-    allow_missing_fields: true
+
+  # Basin / sub-basin / watershed codes, under raw names in the vector and
+  # renamed in Excel. Excel writes "" (null) when the source layer lacks them.
+  - name: mws_vector_codes_not_null
+    applies_to: [vector]
+    type: not_null
+    fields:
+      - bacode
+      - sbcode
+      - wsconc
+
+  - name: mws_excel_codes_not_null
+    applies_to: [excel]
+    type: not_null
+    fields:
+      - basin_code
+      - sub_basin_code
+      - watershed_code
