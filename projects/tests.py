@@ -99,7 +99,7 @@ class ProjectAPITest(APITestCase):
             "geojson_path": "/path/to/geojson",
             "organization": str(self.organization.pk),
             "app_type": AppType.WATERSHED,
-            # created_by is set from the logged-in user, not from the request
+            # Ignored: the server sets created_by to the request user (admin_user)
             "created_by": self.regular_user.pk,
         }
 
