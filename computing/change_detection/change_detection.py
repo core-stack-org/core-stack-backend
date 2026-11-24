@@ -138,8 +138,8 @@ def built_up(roi_boundary, l1_asset):
     # Remap values function
     def remap_values(image):
         return image.remap(
-            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
-            [1, 2, 2, 2, 3, 4, 3, 3, 3, 3, 4],
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13],
+            [1, 2, 2, 2, 3, 4, 3, 3, 3, 3, 4, 3],
             0,
             "predicted_label",
         ).setDefaultProjection(lulc_projection)
@@ -174,8 +174,8 @@ def change_degradation(roi_boundary, l1_asset):
     # Remap values function
     def remap_values(image):
         return image.remap(
-            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
-            [1, 2, 2, 2, 4, 5, 3, 3, 3, 3, 6],
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13],
+            [1, 2, 2, 2, 4, 5, 3, 3, 3, 3, 6, 4],
             0,
             "predicted_label",
         ).setDefaultProjection(lulc_projection)
@@ -208,8 +208,8 @@ def change_deforestation(roi_boundary, l1_asset):
 
     def remap_values(image):
         return image.remap(
-            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
-            [1, 2, 2, 2, 3, 5, 4, 4, 4, 4, 6],
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13],
+            [1, 2, 2, 2, 3, 5, 4, 4, 4, 4, 6, 3],
             0,
             "predicted_label",
         ).setDefaultProjection(lulc_projection)
@@ -246,8 +246,8 @@ def change_afforestation(roi_boundary, l1_asset):
 
     def remap_values(image):
         return image.remap(
-            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
-            [1, 2, 2, 2, 3, 5, 4, 4, 4, 4, 6],
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13],
+            [1, 2, 2, 2, 3, 5, 4, 4, 4, 4, 6, 3],
             0,
             "predicted_label",
         ).setDefaultProjection(lulc_projection)
@@ -286,8 +286,8 @@ def change_cropping_intensity(roi_boundary, l1_asset):
     # Remap values function
     def remap_values(image):
         return image.remap(
-            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
-            [1, 2, 2, 2, 3, 4, 5, 5, 6, 7, 8],
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13],
+            [1, 2, 2, 2, 3, 4, 5, 5, 6, 7, 8, 3],
             0,
             "predicted_label",
         ).setDefaultProjection(lulc_projection)
@@ -341,8 +341,8 @@ def change_shrub(roi_boundary, l1_asset):
     # Remap values function
     def remap_values(image):
         return image.remap(
-            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12],
-            [1, 2, 2, 2, 3, 4, 5, 5, 5, 5, 6],
+            [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13],
+            [1, 2, 2, 2, 3, 4, 5, 5, 5, 5, 6, 3],
             0,
             "predicted_label",
         ).setDefaultProjection(lulc_projection)
