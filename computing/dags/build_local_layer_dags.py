@@ -27,6 +27,7 @@ CATALOG_ROOT = Path("stacd_catalog_data/dags")
 NODE_META = {
     # dynamic_layers
     "generate_nrega_layer": ("NREGA_Clip", "NREGA_Layer", "Clips the NREGA shapefile to the local watershed boundary."),
+    "lulc": ("LULC_Algorithm", "LULC_Raster", "Generates yearly LULC rasters (start_year to end_year) clipped to the local watershed boundary."),
     "lulc_v3": ("LULC_Algorithm", "LULC_Raster", "Generates yearly LULC rasters (start_year to end_year) clipped to the local watershed boundary."),
     "lulc_vector": ("LULC_Vectorization", "LULC_Vector", "Vectorizes the local LULC raster into per-MWS area statistics."),
     "change_detection": ("Change_Detection", "Change_Detection_Asset", "Computes change-detection classes from local LULC rasters."),

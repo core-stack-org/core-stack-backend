@@ -38,6 +38,17 @@ FACILITY_POINT_LAYERS = (
     "village_nearest_facility_collection",
 )
 
+# The shared Dataset rows still carry the seed placeholder "default_style" for the
+# tree health rasters, which does not exist on GeoServer, so the style would be
+# silently skipped. Keep these in sync with GEOSERVER_STYLE in
+# computing/tree_health/local/*_local.py.
+PLACEHOLDER_STYLES = frozenset({None, "", "default_style"})
+TREE_HEALTH_RASTER_STYLES = {
+    "tree_ch_raster": "tree_ch_style",
+    "tree_ccd_raster": "tree_ccd_style",
+    "tree_overall_raster": "tree_overall_style",
+}
+
 SOIL_HEALTH_RASTER_WORKSPACE = "soil_health_raster"
 SOIL_HEALTH_NUTRIENTS = ("N", "K", "P", "OC", "OC_OLM")
 
@@ -251,12 +262,15 @@ def _publish_args(entry):
     exists = os.path.exists(path if layer_type == "raster" else f"{path}.{file_type}")
     if not exists or not entry.get("workspace") or not entry.get("layer_name"):
         return None
+    style_name = entry.get("style_name")
+    if layer_type == "raster" and style_name in PLACEHOLDER_STYLES:
+        style_name = TREE_HEALTH_RASTER_STYLES.get(entry["workspace"], style_name)
     args = {
         "layer_type": layer_type,
         "path": path,
         "layer_name": entry["layer_name"],
         "workspace": entry["workspace"],
-        "style_name": entry.get("style_name"),
+        "style_name": style_name,
         "file_type": file_type,
         "layer_id": entry.get("layer_id"),
     }

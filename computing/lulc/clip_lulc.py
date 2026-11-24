@@ -1,6 +1,5 @@
-import datetime
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import ee
 from utilities.constants import GEE_PATHS
@@ -122,37 +121,42 @@ def clip_lulc(
         final_output_assetid = gee_asset_path + final_output_filename
         final_output_filename_array_new.append(final_output_filename)
         final_output_assetid_array_new.append(final_output_assetid)
-        if not new_loop_start or loop_start >= new_loop_start:
+        # Compare this year's start, not the already-advanced loop_start.
+        # Otherwise the previous year is exported again under this year's asset.
+        if not new_loop_start or curr_start_date >= new_loop_start:
             pan_india = ee.Image(
                 f"{PAN_INDIA_LULC_V4_DATASET}{curr_start_year}_{curr_end_year}"
             )
             clipped_lulc = pan_india.clip(roi.geometry())
-            l1_asset_new.append(clipped_lulc)
+            l1_asset_new.append(
+                (clipped_lulc, final_output_filename, final_output_assetid)
+            )
 
     task_list = []
     geometry = roi.geometry()
-    if not is_gee_asset_exists(final_output_assetid_array_new[len(l1_asset_new) - 1]):
-        for i in range(0, len(l1_asset_new)):
-            if (
-                is_gee_asset_exists(final_output_assetid_array_new[i])
-                and len(l1_asset_new) <= 2
-            ):
-                ee.data.copyAsset(
-                    final_output_assetid_array_new[i],
-                    f"{final_output_assetid_array_new[i]}_old",
-                )
-                time.sleep(10)
-                ee.data.deleteAsset(final_output_assetid_array_new[i])
-            task_id = export_raster_asset_to_gee(
-                image=l1_asset_new[i].clip(geometry),
-                description=final_output_filename_array_new[i],
-                asset_id=final_output_assetid_array_new[i],
-                scale=scale,
-                region=geometry,
-                pyramiding_policy={"predicted_label": "mode"},
-            )
+    # A short incremental window may replace the latest year. A full window
+    # must not start another export for a year whose asset is already on GEE.
+    refresh_recent = new_loop_start is not None and len(l1_asset_new) <= 2
+    for clipped_lulc, filename, asset_id in l1_asset_new:
+        asset_exists = is_gee_asset_exists(asset_id)
+        if asset_exists and not refresh_recent:
+            continue
+        if asset_exists and refresh_recent:
+            ee.data.copyAsset(asset_id, f"{asset_id}_old")
+            time.sleep(10)
+            ee.data.deleteAsset(asset_id)
+        task_id = export_raster_asset_to_gee(
+            image=clipped_lulc.clip(geometry),
+            description=filename,
+            asset_id=asset_id,
+            scale=scale,
+            region=geometry,
+            pyramiding_policy={"predicted_label": "mode"},
+        )
+        if task_id:
             task_list.append(task_id)
 
+    if task_list:
         task_id_list = check_task_status(task_list)
         print("LULC task_id_list", task_id_list)
 
@@ -189,22 +193,22 @@ def clip_lulc(
                     print("saved info to db at the gee level...")
                 make_asset_public(final_output_assetid_array_new[i])
 
-    # sync_lulc_to_gcs(
-    #     final_output_filename_array_new,
-    #     final_output_assetid_array_new,
-    #     scale,
-    # )
-    #
-    # layer_at_geoserver = sync_lulc_to_geoserver(
-    #     final_output_filename_array_new,
-    #     state,
-    #     district,
-    #     block,
-    #     layer_ids,
-    #     asset_suffix,
-    # )
-    #
-    # return layer_at_geoserver
+    sync_lulc_to_gcs(
+        final_output_filename_array_new,
+        final_output_assetid_array_new,
+        scale,
+    )
+
+    layer_at_geoserver = sync_lulc_to_geoserver(
+        final_output_filename_array_new,
+        state,
+        district,
+        block,
+        layer_ids,
+        asset_suffix,
+    )
+
+    return layer_at_geoserver
 
 
 def sync_lulc_to_gcs(

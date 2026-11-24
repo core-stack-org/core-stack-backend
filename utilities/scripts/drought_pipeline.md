@@ -19,9 +19,11 @@ folder, with the Docker stack up. The method and its rules are described in the 
 2. Add an Earthdata login to `nrm_app/.env`; the MODIS download needs it. Create a free account at
    https://urs.earthdata.nasa.gov, then add `USERNAME_GESDISC=<user>` and `PASSWORD_GESDISC='<password>'`
    (keep the quotes if the password has a `$`).
-3. Use the uint8 copy of LULC v3 ([convert_lulc_to_uint8.md](convert_lulc_to_uint8.md)), or add
-   `--lulc-dir $DATA_DIR/base_layers/lulc_uint8` to every Step 2 command. The float64 originals make the
-   cropland stage several times slower.
+3. Check that the temporally corrected LULC v4 is in `data/base_layers/lulc/`, one
+   `lulc_v4_<year>_<year+1>.tif` per year (the address every local pipeline reads) with
+   `temporal_correction_manifest.json`. The `pan-india/lulc_temporal_correction_six_year/` and
+   `.../incremental/` APIs make them from the raw layers in `data/base_layers/lulc/raw/`; the drought
+   layer's cropland mask and area sown come from them.
 4. Check that the hydrology tehsil watersheds are in `data/base_layers/hydrology/runoff/commons/tehsil_watersheds/`,
    with `tehsil_watershed_manifest.csv`. The MWS layers use the same micro-watersheds as the hydrology layers.
 5. Check disk space: the inputs keep about 105 GB and the outputs need about 70 GB, of which about 25 GB is
@@ -132,9 +134,38 @@ Before the first call:
 | GeoServer layer | `drought:<district>_<tehsil>_drought`, the same name GEE used |
 | Database record | dataset Drought, algorithm `local_drought`, with `start_year` and `end_year` in `misc` |
 
-The layer has the GEE layer's columns plus `dsw_<year>` (weeks inside dry spells). `avg_dryspell` is the
-mean of `drysp_<year>` over the seasons. A micro-watershed without cropland has `drlb_<year>` = `[]` and
-empty class columns.
+The layer has the season columns and each window's `monthly_rainfall_deviation_<date>`, 39 per season,
+under the long names of the GEE yearly drought asset (see the MWS layer table in
+[generate_drought_layer.md](generate_drought_layer.md)); layers made by the GEE task have the short names
+(`drlb_`, `drysp_`, `w_mod_`, `rd…`). The other window values and drought causality stay in the pan-India
+layers. `avg_dryspell` is the mean of `dryspell_length_<year>` over the seasons. A micro-watershed without
+cropland has `drought_labels_<year>` = `[]` and empty class columns.
+
+### The drought causality layer
+
+The causality API cuts the drought causality columns the same way: `POST /api/v1/mws_drought_causality/`
+with `"compute": "local"` (without it, it still runs GEE). Call it after Step 2, with the same token and
+location:
+
+```bash
+curl -s -X POST "http://localhost:8000/api/v1/mws_drought_causality/" \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"compute":"local","state":"karnataka","district":"raichur","block":"devadurga","start_year":2017,"end_year":2025}'; echo
+```
+
+It answers 400 and queues nothing if a season's pan-India layer is missing or was made before drought
+causality was added (run Step 2 with `--stages mws` first).
+
+| What it makes | Where |
+|---|---|
+| File | `data/drought/causality/<state>/<district>/<tehsil>/<district>_<tehsil>_drought_causality.gpkg` |
+| GeoServer layer | `drought_causality:<district>_<tehsil>_drought_causality`, the same name GEE used |
+| Database record | dataset Drought Causality, algorithm `local_drought_causality` |
+
+Columns: `uid`, `area_in_ha`, and per season `severe_moderate_drought_causality_<year>` and
+`mild_drought_causality_<year>` (GEE: `se_mo_<year>`, `mild_<year>`): the three most frequent combinations of
+window class, triggers and impact classes, filled only in a drought year of the micro-watershed (more than 5
+moderate + severe weeks).
 
 ## Step 4: Check it in GeoServer
 
@@ -159,24 +190,26 @@ The server's GeoServer listens only on its own port 8080, so open a tunnel from 
    import json, sys
    f = [x["properties"] for x in json.load(sys.stdin)["features"]]
    print(len(f), "MWS")
-   for y in range(2017, 2025):
-       ms = [p[f"w_mod_{y}"] + p[f"w_sev_{y}"] for p in f if p.get(f"w_mod_{y}") is not None]
+   for y in range(2017, 2026):
+       mod, sev = f"number_of_weeks_in_moderate_drought_{y}", f"number_of_weeks_in_severe_drought_{y}"
+       ms = [p[mod] + p[sev] for p in f if p.get(mod) is not None]
        print(y, "mean moderate+severe weeks", round(sum(ms) / len(ms), 1))'
    ```
 
-   For Devadurga it lists 156 micro-watersheds, with about 5.3 weeks in 2018 and 3.1 in 2023. If the layer
-   is not there, the reason is in `docker compose logs celery-geoserver`.
+   If the layer is not there, the reason is in `docker compose logs celery-geoserver`.
 
 ## New seasons and reruns
 
 | When | Run |
 |---|---|
 | New CHIRPS or MODIS data is out (CHIRPS about a month after the day; MOD16A2GF once a year, early in the next year) | Step 1 |
-| A new season's inputs are all on disk, including its LULC (`lulc_v3_<year>_<year+1>.tif`) | Step 2: only the new season runs. Then Step 3 for each tehsil with the new `end_year` |
+| A new season's inputs are all on disk, including its LULC (`data/base_layers/lulc/lulc_v4_<year>_<year+1>.tif`) | Step 2: only the new season runs. Then Step 3 for each tehsil with the new `end_year` |
+| A provisional LULC year is finalised (the incremental temporal-correction API, after the next year's raw layer) | Step 2: that season's cropland, classes and MWS layer are made again. Then Step 3 for the tehsils |
 | The rainfall rules change (onset or normals) | Step 2: the rain stage redoes the seasons made under the old rule, and `classify` and `mws` follow |
 | Another stage's code changes | Delete that stage's files for the seasons concerned (for example `v1/moisture/mai_2023.tif`), then Step 2 |
 | The hydrology tehsil watersheds change | Step 2: a newer manifest rebuilds the MWS copy and every MWS layer. Without a new manifest, delete `v1/mws/watersheds.gpkg` first |
 | A tehsil layer is needed again | Step 3: it rewrites the file and replaces the GeoServer layer |
+| The MWS layer's columns or the drought causality code change (`LAYOUT` in `computing/drought/local/mws.py` is bumped) | Step 2 with `--stages mws`: every MWS layer is made again. Then Step 3 (drought and causality) for the tehsils |
 
 NASA expects the Terra satellite, which carries this MODIS, to stop around February 2027; seasons after that
 will need VIIRS inputs.

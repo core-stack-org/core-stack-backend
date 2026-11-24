@@ -17,6 +17,7 @@ from shapely.geometry import box, mapping
 
 from computing.config_loader import (
     AQUIFER_VECTOR_PATH,
+    DATA_DIR,
     HYDROLOGY_LOCAL_OUTPUT_DIR,
     PROJECT_ROOT,
 )
@@ -67,7 +68,7 @@ CACHE_ET_SOURCE_SIGNATURE_COLUMN = "et_source_signature"
 CACHE_ET_ERROR_COLUMN = "et_error"
 SOURCE_YEARS_COLUMN = "source_years"
 FORTNIGHT_ANCHOR_DATE = dt.date(2017, 7, 1)
-HYDROLOGY_BASE_LAYER_ROOT = PROJECT_ROOT / "data" / "base_layers" / "hydrology"
+HYDROLOGY_BASE_LAYER_ROOT = DATA_DIR / "base_layers" / "hydrology"
 
 
 def _parse_bool(value):
