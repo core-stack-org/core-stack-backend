@@ -50,7 +50,7 @@ You can also create a key at [dashboard.core-stack.org](https://dashboard.core-s
 | **v1** | `/api/v1/` | Raw JSON. Errors: `{"error": "..."}`. | Existing integrations |
 | **v2** | `/api/v2/` | `{status, error_message, data}` | New integrations |
 
-v2 tehsil sheets accept `data=drought,stream_order`. v2 active locations accept optional `state`, `district`, and `tehsil`. Geometry `data` is a GeoJSON FeatureCollection you can open in QGIS.
+v2 tehsil sheets accept `data=croppingdrought_kharif,stream_order`. v2 active locations accept optional `state`, `district`, and `tehsil`. Geometry `data` is a GeoJSON FeatureCollection you can open in QGIS.
 
 # First request
 
