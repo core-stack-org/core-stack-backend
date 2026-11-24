@@ -3,6 +3,7 @@ import json
 import inspect
 import logging
 import os
+import re
 from pathlib import Path
 
 import requests
@@ -531,12 +532,21 @@ def delete_layer(request):
         return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+# Lowercased SOI names, e.g. "k.v.v.b. puram", "atmakur(m)", "lahul & spiti",
+# or already formatted ("west_champaran"). Starting with a letter or digit
+# means a name can never be "." or "..".
+LOCATION_NAME = re.compile(r"[a-z0-9][a-z0-9 ._&()-]*")
+
+
 def _location_path_error(**names):
-    """Location names become folder and file names, so they can't hold path parts."""
+    """Location names become folder and file names, so only allow name characters."""
     for field, value in names.items():
-        if any(part in value for part in ("/", "\\", "..", "\x00")):
+        if not LOCATION_NAME.fullmatch(value):
             return Response(
-                {"error": f"{field} must not contain '/', '\\' or '..'"},
+                {
+                    "error": f"{field} may only contain letters, digits, spaces"
+                    " and . _ & ( ) -"
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
     return None
@@ -551,8 +561,7 @@ def upload_kml(request):
         state = req_body.get("state").lower()
         district = req_body.get("district").lower()
         block = req_body.get("block").lower()
-        error = _location_path_error(state=state, district=district, block=block)
-        if error:
+        if error := _location_path_error(state=state, district=district, block=block):
             return error
         kml_file = request.FILES["file"]
 
@@ -2269,8 +2278,7 @@ def fes_clart_upload_layer(request):
         gee_account_id = request.data.get("gee_account_id").lower()
         uploaded_file = request.FILES.get("clart_file")
 
-        error = _location_path_error(state=state, district=district, block=block)
-        if error:
+        if error := _location_path_error(state=state, district=district, block=block):
             return error
 
         if not uploaded_file:
