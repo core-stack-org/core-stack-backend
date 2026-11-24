@@ -21,8 +21,8 @@
       },
       "avg_double_cropped": {
         "type": "number",
-        "description": "Average annual percentage of total cropped area classified as double-cropped, calculated from the annual double-cropped areas and total cropped area.",
-        "unit": "%"
+        "description": "Average annual percentage of cropped area (land cropped in any year of the period, sum_area_in_ha) classified as double-cropped.",
+        "unit": "% of cropped area"
       },
       "avg_kharif_rainfall": {
         "type": "number",
@@ -31,8 +31,8 @@
       },
       "avg_kharif_surface_water_mws": {
         "type": "number",
-        "description": "Average Kharif surface-water area as a percentage of the total mapped surface-water-body area, averaged across the available years.",
-        "unit": "%"
+        "description": "Average annual Kharif surface-water area as a percentage of that year's total observed surface-water area in the micro-watershed (total_area_in_ha_<year>, not total waterbody capacity), averaged across years with valid data. Returns null when no year has data.",
+        "unit": "% of that year's water area"
       },
       "avg_number_dry_spell": {
         "type": "number",
@@ -46,8 +46,8 @@
       },
       "avg_rabi_surface_water_mws": {
         "type": "number",
-        "description": "Average Rabi surface-water area as a percentage of the total mapped surface-water-body area, averaged across the available years.",
-        "unit": "%"
+        "description": "Average annual Rabi surface-water area as a percentage of that year's total observed surface-water area in the micro-watershed (total_area_in_ha_<year>, not total waterbody capacity), averaged across years with valid data. Returns null when no year has data.",
+        "unit": "% of that year's water area"
       },
       "avg_runoff": {
         "type": "number",
@@ -56,38 +56,38 @@
       },
       "avg_single_cropped": {
         "type": "number",
-        "description": "Average annual percentage of total cropped area classified as single-cropped, calculated from the annual single-cropped areas and total cropped area.",
-        "unit": "%"
+        "description": "Average annual percentage of cropped area (land cropped in any year of the period, sum_area_in_ha) classified as single-cropped.",
+        "unit": "% of cropped area"
       },
       "avg_triple_cropped": {
         "type": "number",
-        "description": "Average annual percentage of total cropped area classified as triple-cropped, calculated from the annual triple-cropped areas and total cropped area.",
+        "description": "Average annual percentage of cropped area (land cropped in any year of the period, sum_area_in_ha) classified as triple-cropped.",
+        "unit": "% of cropped area"
+      },
+      "avg_water_surface_to_cropped_area_kharif": {
+        "type": "number",
+        "description": "Average annual Kharif surface-water area as a percentage of Kharif cropped area (single-kharif + double + triple cropped area), computed per year and averaged across years with positive Kharif cropped area. Returns null when no year has valid data.",
         "unit": "%"
       },
-      "avg_wsr_ratio_kharif": {
+      "avg_water_surface_to_cropped_area_rabi": {
         "type": "number",
-        "description": "Kharif water-surface ratio calculated from summed Kharif surface-water area and summed Kharif cropped area across the available years, multiplied by 100 and divided by the number of Kharif surface-water-area columns.",
+        "description": "Average annual Rabi surface-water area as a percentage of Rabi cropped area (single-non-kharif + double + triple cropped area), computed per year and averaged across years with positive Rabi cropped area. Returns null when no year has valid data.",
         "unit": "%"
       },
-      "avg_wsr_ratio_rabi": {
+      "avg_water_surface_to_cropped_area_zaid": {
         "type": "number",
-        "description": "Rabi water-surface ratio calculated from summed Rabi surface-water area and summed Rabi cropped area across the available years, multiplied by 100 and divided by the number of Rabi surface-water-area columns.",
-        "unit": "%"
-      },
-      "avg_wsr_ratio_zaid": {
-        "type": "number",
-        "description": "Zaid water-surface ratio calculated from summed Zaid surface-water area and summed Zaid cropped area across the available years, multiplied by 100 and divided by the number of Zaid surface-water-area columns.",
+        "description": "Average annual Zaid surface-water area as a percentage of Zaid cropped area (triple-cropped area only, triply_cropped_area_in_ha_<year>), computed per year and averaged across years with positive triple-cropped area. Because triple-cropped area is often small, percentages can be large; returns null when no year has positive triple-cropped area.",
         "unit": "%"
       },
       "avg_zaid_surface_water_mws": {
         "type": "number",
-        "description": "Average Zaid surface-water area as a percentage of the total mapped surface-water-body area, averaged across the available years.",
-        "unit": "%"
+        "description": "Average annual Zaid surface-water area as a percentage of that year's total observed surface-water area in the micro-watershed (total_area_in_ha_<year>, not total waterbody capacity), averaged across years with valid data. Returns null when no year has data.",
+        "unit": "% of that year's water area"
       },
       "canal_available": {
         "type": "boolean",
         "description": "Indicates whether a canal feature is mapped within the micro-watershed: true if present, false otherwise.",
-        "unit": "flag"
+        "unit": "boolean"
       },
       "cropping_area": {
         "type": "number",
@@ -98,6 +98,11 @@
         "type": "number",
         "description": "Mean annual cropping-intensity value across the available years; it represents the intensity of cultivation across crop cycles.",
         "unit": "ratio"
+      },
+      "cropping_intensity_change_area": {
+        "type": "number",
+        "description": "Total area in hectares where cropping intensity changed between the first and last three-year composites (total_change_crop_intensity_area_in_ha). Counts both decreases (double-to-single, triple-to-single, triple-to-double) and increases (single-to-double, single-to-triple, double-to-triple), excluding unchanged cropland.",
+        "unit": "ha"
       },
       "cropping_intensity_trend": {
         "type": "string",
@@ -112,11 +117,6 @@
       "decrease_in_tree_cover": {
         "type": "number",
         "description": "Total area classified as deforestation in the overall land-cover change output.",
-        "unit": "ha"
-      },
-      "degradation_cropping_intensity": {
-        "type": "number",
-        "description": "Area affected by a decline in cropping intensity, including double-to-single, triple-to-double, and triple-to-single cropping transitions.",
         "unit": "ha"
       },
       "degradation_in_forests": {
@@ -247,7 +247,7 @@
       "mws_intersect_swb": {
         "type": "array",
         "description": "List of surface-water bodies intersecting the micro-watershed. Each entry includes the water-body ID, name when available, latitude, and longitude.",
-        "unit": "value",
+        "unit": "list",
         "items": {
           "type": "object",
           "properties": {
@@ -344,12 +344,12 @@
       "river_available": {
         "type": "boolean",
         "description": "Indicates whether a river feature is mapped within the micro-watershed: true if present, false otherwise.",
-        "unit": "flag"
+        "unit": "boolean"
       },
       "shg_penetration": {
         "type": "number",
         "description": "SHG penetration indicator value from the Antyodaya data for villages intersecting the micro-watershed.",
-        "unit": "value"
+        "unit": "score"
       },
       "shrub_trend": {
         "type": "integer",
@@ -364,7 +364,7 @@
       "soil_drainage": {
         "type": "integer",
         "description": "Soil drainage class derived from the mapped soil drainage description: 0 = excessively or somewhat excessively drained, 1 = well or moderately well drained, 2 = poorly or very poorly drained, and 3 = imperfectly drained.",
-        "unit": "value"
+        "unit": "code"
       },
       "soil_ph": {
         "type": "number",
@@ -374,7 +374,7 @@
       "soil_texture": {
         "type": "integer",
         "description": "Soil texture class derived from subsoil texture: 0 = sandy textures, 1 = silt/loam textures, 2 = clay-loam textures, and 3 = clay textures.",
-        "unit": "value"
+        "unit": "code"
       },
       "terraincluster_id": {
         "type": "integer",
