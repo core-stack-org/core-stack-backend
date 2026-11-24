@@ -13,7 +13,7 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     ensure_file_exists,
-    load_precomputed_watersheds,
+    get_roi,
     queue_local_vector_for_geoserver,
     write_vector_output,
 )
@@ -82,26 +82,20 @@ def _slug(value, fallback):
     return valid_gee_text(str(value).strip().lower()) or fallback
 
 
-def _published_layer_name(district, block, param_name):
-    return (
-        f"change_vector_{_slug(district, 'unknown_district')}_"
-        f"{_slug(block, 'unknown_block')}_{param_name}"
-    )
+def _published_layer_name(asset_suffix, param_name):
+    return f"change_vector_{asset_suffix}_{param_name}"
 
 
-def _output_stub(district, block, param_name, start_year, end_year):
-    return (
-        f"{_published_layer_name(district, block, param_name)}_{start_year}_{end_year}"
-    )
+def _output_stub(asset_suffix, param_name, start_year, end_year):
+    return f"{_published_layer_name(asset_suffix, param_name)}_{start_year}_{end_year}"
 
 
 def _resolve_local_change_raster_path(
-    state, district, block, param_name, start_year, end_year
+    state, district, block, param_name, start_year, end_year, asset_suffix
 ):
     raster_path = build_output_raster_path(
         layer_name=(
-            f"change_{_slug(district, 'unknown_district')}_"
-            f"{_slug(block, 'unknown_block')}_{param_name}_{int(start_year)}_{int(end_year)}"
+            f"change_{asset_suffix}_{param_name}_{int(start_year)}_{int(end_year)}"
         ),
         output_base_dir=CHANGE_RASTER_OUTPUT_BASE_DIR,
         state=state,
@@ -114,28 +108,34 @@ def _resolve_local_change_raster_path(
 
 
 def run_change_detection_vector_local(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    asset_suffix=None,
+    roi=None,
 ):
-    state = str(state).strip().lower()
-    district = str(district).strip().lower()
-    block = str(block).strip().lower()
+    if state and district and block:
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
     start_year = int(start_year)
     end_year = int(end_year)
 
-    watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    print(f"Watershed boundary source: {watershed_source}")
 
     geoserver_statuses = []
 
@@ -147,6 +147,7 @@ def run_change_detection_vector_local(
             param_name=param_name,
             start_year=start_year,
             end_year=end_year,
+            asset_suffix=asset_suffix,
         )
         print(f"Using local change raster for {param_name}: {raster_path}")
 
@@ -156,8 +157,8 @@ def run_change_detection_vector_local(
             class_definitions=class_definitions,
         )
 
-        published_layer_name = _published_layer_name(district, block, param_name)
-        output_stub = _output_stub(district, block, param_name, start_year, end_year)
+        published_layer_name = _published_layer_name(asset_suffix, param_name)
+        output_stub = _output_stub(asset_suffix, param_name, start_year, end_year)
         output_path = build_output_vector_path(
             layer_name=output_stub,
             state=state,
@@ -174,7 +175,7 @@ def run_change_detection_vector_local(
         print(f"Saved local change detection vector: {asset_id}")
 
         layer_id = None
-        if sync_layer_metadata:
+        if sync_layer_metadata and state and district and block:
             layer_id = save_layer_info_to_db(
                 state=state,
                 district=district,
@@ -202,12 +203,14 @@ def run_change_detection_vector_local(
 
 
 def _vectorise_change_detection_local_task(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = gee_account_id
     return run_change_detection_vector_local(
@@ -218,18 +221,22 @@ def _vectorise_change_detection_local_task(
         end_year=end_year,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
 
 
 @app.task(bind=True)
 def vectorise_change_detection(
     self,
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = self
     return _vectorise_change_detection_local_task(
@@ -239,4 +246,6 @@ def vectorise_change_detection(
         start_year=start_year,
         end_year=end_year,
         gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )

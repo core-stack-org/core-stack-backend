@@ -6,7 +6,7 @@ from utilities.gee_utils import valid_gee_text
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     validate_geometry,
     write_vector_output,
@@ -70,29 +70,26 @@ def clip_drainage_lines(
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    roi=None,
 ):
     """
     Celery task for local drainage lines vector generation.
     """
 
+    roi = roi or roi_path
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        proj_obj = Project.objects.get(pk=proj_id)
-        state = proj_obj.name
-        layer_name = asset_suffix
-        watersheds_gdf = read_validated_vector_file(
-            roi_path,
-            f"ROI file has no valid geometries: {roi_path}",
-        )
-        print(f"ROI source: {roi_path}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = asset_suffix
 
     if not os.path.exists(drainage_lines_path):
         raise FileNotFoundError(f"PAN INDIA drainage lines file not found at {drainage_lines_path}")

@@ -10,7 +10,7 @@ from computing.utils import (
 )
 from computing.local_compute_helper import (
     PROJECT_ROOT,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     clip_raster_with_roi,
     queue_local_raster_for_geoserver,
@@ -47,21 +47,27 @@ def run_raster_restoration_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"restoration_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Loaded watersheds from {watershed_source}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+        use_precomputed = True
     else:
-        if not roi_path or not asset_suffix:
-            raise ValueError("ROI path and asset_suffix are required for custom runs.")
+        use_precomputed = False
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi_path` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi_path,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    if use_precomputed:
+        layer_name = f"restoration_{asset_suffix}_raster"
+    else:
         layer_name = f"{asset_suffix}_restoration_raster".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi_path, f"Invalid ROI file: {roi_path}"
-        )
 
     # ==========================================
     # 1. Raster Processing
@@ -125,18 +131,27 @@ def run_vector_restoration_local(
         raise ValueError("`raster_path` is required for vector stage.")
 
     if state and district and block:
-        layer_name = f"restoration_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_vector"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+        use_precomputed = True
+    else:
+        use_precomputed = False
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi_path` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi_path,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    if use_precomputed:
+        layer_name = f"restoration_{asset_suffix}_vector"
     else:
         layer_name = f"{asset_suffix}_restoration_vector".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi_path, f"Invalid ROI file: {roi_path}"
-        )
 
     # ==========================================
     # 2. Vector Processing

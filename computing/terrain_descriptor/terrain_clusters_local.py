@@ -12,9 +12,11 @@ from utilities.gee_utils import valid_gee_text
 
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+    build_output_raster_path,
     build_output_vector_path,
     compute_terrain_properties_for_watersheds,
-    load_precomputed_watersheds,
+    ensure_file_exists,
+    get_roi,
     resolve_clipped_terrain_raster_path,
     write_vector_output,
 )
@@ -51,35 +53,52 @@ def _push_vector_to_geoserver(gdf, layer_name):
 
 
 def run_terrain_clusters_local(
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     clipped_raster_dir=CLIPPED_TERRAIN_RASTER_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=False,
+    asset_suffix=None,
+    roi=None,
 ):
-    state = str(state).strip()
-    district = str(district).strip()
-    block = str(block).strip()
+    use_precomputed = bool(state and district and block)
+    if use_precomputed:
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
 
-    layer_name = (
-        f"{valid_gee_text(str(district).strip().lower())}_"
-        f"{valid_gee_text(str(block).strip().lower())}_cluster"
-    )
-
-    watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    clipped_raster_path = resolve_clipped_terrain_raster_path(
-        state=state,
-        district=district,
-        block=block,
-        clipped_raster_dir=clipped_raster_dir,
-    )
+    watershed_source = "precomputed tehsil ROI" if use_precomputed else roi
+
+    layer_name = f"{valid_gee_text(str(asset_suffix).strip().lower())}_cluster"
+
+    if use_precomputed:
+        clipped_raster_path = resolve_clipped_terrain_raster_path(
+            state=state,
+            district=district,
+            block=block,
+            clipped_raster_dir=clipped_raster_dir,
+        )
+    else:
+        # Custom runs read the clipped terrain raster written by the custom
+        # terrain raster step (`<asset_suffix>_terrain_raster`).
+        clipped_raster_path = build_output_raster_path(
+            layer_name=f"{asset_suffix}_terrain_raster".lower(),
+            output_base_dir=clipped_raster_dir,
+        )
+        ensure_file_exists(clipped_raster_path, "Clipped terrain raster")
+        clipped_raster_path = str(clipped_raster_path)
     print(f"Using clipped terrain raster: {clipped_raster_path}")
 
     terrain_clusters_gdf = compute_terrain_properties_for_watersheds(
@@ -112,7 +131,7 @@ def run_terrain_clusters_local(
             print(f"Failed to sync terrain clusters vector to GeoServer: {error}")
             return False
 
-    if sync_layer_metadata:
+    if sync_layer_metadata and use_precomputed:
         from computing.STAC_specs import generate_STAC_layerwise
         from computing.utils import save_layer_info_to_db, update_layer_sync_status
 
@@ -146,12 +165,14 @@ def run_terrain_clusters_local(
 
 
 def _generate_terrain_clusters_task(
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     gee_account_id=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     clipped_raster_dir=CLIPPED_TERRAIN_RASTER_DIR,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = gee_account_id
     return run_terrain_clusters_local(
@@ -162,18 +183,22 @@ def _generate_terrain_clusters_task(
         clipped_raster_dir=clipped_raster_dir,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
 
 
 @app.task(bind=True)
 def generate_terrain_clusters(
     self,
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     gee_account_id=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     clipped_raster_dir=CLIPPED_TERRAIN_RASTER_DIR,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = self
     return _generate_terrain_clusters_task(
@@ -183,4 +208,6 @@ def generate_terrain_clusters(
         gee_account_id=gee_account_id,
         precomputed_roi_dir=precomputed_roi_dir,
         clipped_raster_dir=clipped_raster_dir,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )

@@ -10,10 +10,9 @@ from computing.config_loader import DATA_DIR, LULC_BASE_DIR, PROJECT_ROOT, layer
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
+    get_roi,
     get_union_geometry,
-    load_precomputed_roi,
     queue_local_raster_for_geoserver,
-    read_validated_vector_file,
     resolve_lulc_raster_paths,
     validate_geometry,
 )
@@ -182,27 +181,15 @@ def tree_health_ch_raster_local(
         raise ValueError("end_year must be greater than or equal to start_year")
 
     # Admin runs use the precomputed watershed boundary. Custom runs use the ROI path.
-    if state and district and block:
-        asset_suffix = (
-            f"{_slug(district, 'unknown_district')}_" f"{_slug(block, 'unknown_block')}"
-        )
-        roi_gdf = load_precomputed_roi(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and "
-                "`asset_suffix` are required."
-            )
-        asset_suffix = _slug(asset_suffix, "custom")
-        roi_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
+    asset_suffix, roi_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    asset_suffix = _slug(asset_suffix, "custom")
 
     lulc_paths = resolve_lulc_raster_paths(
         start_year=start_year,

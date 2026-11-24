@@ -11,8 +11,7 @@ from computing.utils import (
 )
 from computing.local_compute_helper import (
     build_output_vector_path,
-    load_precomputed_watersheds,
-    read_validated_vector_file,
+    get_roi,
     write_vector_output,
 )
 
@@ -122,19 +121,24 @@ def drainage_density(
     Produces MWS polygons with drainage_density attributes.
     """
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_drainage_density"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Loaded watersheds from {watershed_source}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+        custom_run = False
     else:
-        if not roi or not asset_suffix:
-            raise ValueError("ROI and asset_suffix are required for custom runs.")
+        custom_run = True
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    if custom_run:
         layer_name = f"{asset_suffix}_drainage_density_vector".lower()
-        watersheds_gdf = read_validated_vector_file(roi, f"Invalid ROI file: {roi}")
+    else:
+        layer_name = f"{asset_suffix}_drainage_density"
 
     # 1. Load drainage lines
     try:

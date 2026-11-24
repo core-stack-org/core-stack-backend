@@ -13,7 +13,7 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
     get_watershed_areas_in_hectares,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     validate_geometry,
     write_vector_output,
@@ -310,22 +310,27 @@ def _compute_aquifer_properties_for_watersheds(
     return watersheds_result
 
 def run_aquifer_vector_local(
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     aquifer_vector_path=AQUIFER_VECTOR_PATH,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    asset_suffix=None,
+    roi=None,
 ):
-    state = str(state).strip().lower()
-    district = str(district).strip().lower()
-    block = str(block).strip().lower()
+    if state and district and block:
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
 
-    watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
     aquifers_gdf = read_validated_vector_file(
@@ -338,10 +343,7 @@ def run_aquifer_vector_local(
         aquifers_gdf=aquifers_gdf,
     )
 
-    layer_name = (
-        f"aquifer_vector_{valid_gee_text(district.lower())}_"
-        f"{valid_gee_text(block.lower())}"
-    )
+    layer_name = f"aquifer_vector_{valid_gee_text(asset_suffix).lower()}"
     output_path = build_output_vector_path(
         layer_name=layer_name,
         state=state,
@@ -356,7 +358,6 @@ def run_aquifer_vector_local(
         layer_name=layer_name,
     )
     print(f"Saved local aquifer vector: {asset_id}")
-    print(f"Watershed boundary source: {watershed_source}")
 
     if push_to_geoserver:
         geoserver_response = push_shape_to_geoserver(
@@ -371,7 +372,7 @@ def run_aquifer_vector_local(
         ) not in (200, 201):
             return False
 
-    if sync_layer_metadata:
+    if sync_layer_metadata and state and district and block:
         from computing.STAC_specs import generate_STAC_layerwise
 
         layer_id = save_layer_info_to_db(
@@ -400,10 +401,12 @@ def run_aquifer_vector_local(
 
 
 def _generate_aquifer_vector_local_task(
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = gee_account_id
     return run_aquifer_vector_local(
@@ -412,16 +415,20 @@ def _generate_aquifer_vector_local_task(
         block=block,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
 
 
 @app.task(bind=True)
 def generate_aquifer_vector(
     self,
-    state,
-    district,
-    block,
+    state=None,
+    district=None,
+    block=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = self
     return _generate_aquifer_vector_local_task(
@@ -429,4 +436,6 @@ def generate_aquifer_vector(
         district=district,
         block=block,
         gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )

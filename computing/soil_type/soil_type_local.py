@@ -16,9 +16,8 @@ from computing.config_loader import (
 from computing.local_compute_helper import (
     build_output_vector_path,
     ensure_file_exists,
-    load_precomputed_watersheds,
+    get_roi,
     queue_local_vector_for_geoserver,
-    read_validated_vector_file,
     write_vector_output,
 )
 from computing.utils import save_layer_info_to_db
@@ -197,31 +196,30 @@ def run_soil_type_local(
     output_base_dir=SOIL_TYPE_OUTPUT_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    roi=None,
 ):
     is_tehsil_run = bool(state and district and block)
     if is_tehsil_run:
         state = str(state).strip().lower()
         district = str(district).strip().lower()
         block = str(block).strip().lower()
-        geometries_gdf, geometry_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi_path or not asset_suffix:
-            raise ValueError(
-                "Custom runs require both `roi_path` and `asset_suffix`."
-            )
-        geometries_gdf = read_validated_vector_file(
-            roi_path,
-            f"Custom ROI file has no valid geometries: {roi_path}",
-        )
-        geometry_source = str(roi_path)
+    # `roi` is an alias of `roi_path`.
+    roi = roi or roi_path
 
-    logger.info("Soil type geometry source: %s", geometry_source)
-    layer_name = _layer_name(district, block, asset_suffix)
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    derived_asset_suffix, geometries_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+
+    layer_name = _layer_name(
+        district, block, None if is_tehsil_run else derived_asset_suffix
+    )
     result_gdf = compute_soil_properties_for_geometries(
         geometries_gdf=geometries_gdf,
         raster_paths=raster_paths,
@@ -274,10 +272,19 @@ def run_soil_type_local(
 
 
 @app.task(bind=True)
-def generate_soil_type_local(self, state=None, district=None, block=None):
+def generate_soil_type_local(
+    self,
+    state=None,
+    district=None,
+    block=None,
+    asset_suffix=None,
+    roi=None,
+):
     _ = self
     return run_soil_type_local(
         state=state,
         district=district,
         block=block,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
