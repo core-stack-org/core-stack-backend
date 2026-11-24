@@ -1,6 +1,5 @@
-import datetime
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 import ee
 from utilities.constants import GEE_PATHS
