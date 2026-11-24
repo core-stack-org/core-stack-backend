@@ -101,9 +101,7 @@ def lulc_on_plain_cluster(
                 plain_chunk, study_area_landforms, study_area_lulc, plain_centroids
             )
             result_chunk = result_chunk.map(
-                lambda feature: feature.select(
-                    feature.propertyNames().remove("area")
-                )
+                lambda feature: feature.select(feature.propertyNames().remove("area"))
             )
 
             chunk_asset_id = (
@@ -220,11 +218,14 @@ def assign_l2_cluster(feature, landforms, area_lulc, plain_centroids):
 
     # Calculate LULC proportions
     def calculate_lulc_proportion(lulc_class):
+        if isinstance(lulc_class, list):
+            cond = lulc.eq(lulc_class[0])
+            for class_value in lulc_class[1:]:
+                cond = cond.Or(lulc.eq(class_value))
+        else:
+            cond = lulc.eq(lulc_class)
         area_image = (
-            plains.eq(1)
-            .And(lulc.eq(lulc_class))
-            .multiply(ee.Image.pixelArea())
-            .rename("area")
+            plains.eq(1).And(cond).multiply(ee.Image.pixelArea()).rename("area")
         )
 
         area = area_image.reduceRegion(
@@ -239,7 +240,7 @@ def assign_l2_cluster(feature, landforms, area_lulc, plain_centroids):
     plains_shrubs_scrubs = calculate_lulc_proportion(12)  # Shrubs/scrubs
     plains_single_crop = calculate_lulc_proportion(8)  # Single crop
     plains_single_non_kharif_crop = calculate_lulc_proportion(9)  # Single non-kharif
-    plains_forest = calculate_lulc_proportion(6)  # Forest
+    plains_forest = calculate_lulc_proportion([6, 13])  # Forest
     plains_triple_crop = calculate_lulc_proportion(11)  # Triple crop
 
     # Create feature vector
