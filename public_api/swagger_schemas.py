@@ -78,8 +78,8 @@ tehsil_data_filter_param = openapi.Parameter(
     openapi.IN_QUERY,
     description=(
         "Optional v2 sheet filter. Omit or pass `all` for every sheet. "
-        "Pass one or more sheet names: `data=drought,stream_order` or "
-        "`data=drought&data=stream_order`."
+        "Pass one or more sheet names: `data=croppingdrought_kharif,stream_order` or "
+        "`data=croppingdrought_kharif&data=stream_order`."
     ),
     type=openapi.TYPE_STRING,
     required=False,
@@ -1358,7 +1358,7 @@ tehsil_data_schema_v2["operation_description"] = f"""
 Lists analytical sheets for a tehsil: drought, hydrology, LULC, NREGA, and others.
 
 Filter with ``data=all`` (default) or sheet names:
-``data=drought,stream_order``.
+``data=croppingdrought_kharif,stream_order``.
 
 **Returns**
 ``{{status, error_message, data}}`` with ``tehsil_data`` and ``tehsil_units``.

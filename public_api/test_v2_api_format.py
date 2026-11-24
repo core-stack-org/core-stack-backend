@@ -552,18 +552,73 @@ class TehsilDataV2Tests(V2ApiTestCase):
     @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
     def test_data_filter_keeps_requested_sheets(self, _mock_exists, mock_json):
         mock_json.return_value = {
-            "drought": [{"uid": "12_1", "area_in_ha": 10, "no_drought_2017": 2}],
+            "croppingDrought_kharif": [
+                {"uid": "12_1", "area_in_ha": 10, "no_drought_2017": 2}
+            ],
             "stream_order": [{"uid": "12_1", "stream_order": 3}],
             "mws": [{"uid": "12_1", "area_in_ha": 10}],
         }
-        response = self._get(self.url_name, {**GEO, "data": "drought,stream_order"})
+        response = self._get(
+            self.url_name, {**GEO, "data": "croppingdrought_kharif,stream_order"}
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         body = response.json()
         assert_success_envelope(self, body)
         self.assertEqual(
-            set(body["data"]["tehsil_data"].keys()), {"drought", "stream_order"}
+            set(body["data"]["tehsil_data"].keys()),
+            {"croppingdrought_kharif", "stream_order"},
         )
         self.assertNotIn("mws", body["data"]["tehsil_data"])
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_drought_and_ndvi_shrub_aliases_map_to_real_sheets(
+        self, _mock_exists, mock_json
+    ):
+        mock_json.return_value = {
+            "croppingDrought_kharif": [
+                {"uid": "12_1", "area_in_ha": 10, "no_drought_2017": 2}
+            ],
+            "ndvi": [{"uid": "12_1", "ndvi_2017": 0.42}],
+            "mws": [{"uid": "12_1", "area_in_ha": 10}],
+        }
+
+        drought_resp = self._get(self.url_name, {**GEO, "data": "drought"})
+        self.assertEqual(drought_resp.status_code, status.HTTP_200_OK)
+        drought_body = drought_resp.json()
+        assert_success_envelope(self, drought_body)
+        self.assertEqual(
+            set(drought_body["data"]["tehsil_data"].keys()),
+            {"croppingdrought_kharif"},
+        )
+
+        ndvi_resp = self._get(self.url_name, {**GEO, "data": "ndvi_shrub"})
+        self.assertEqual(ndvi_resp.status_code, status.HTTP_200_OK)
+        ndvi_body = ndvi_resp.json()
+        assert_success_envelope(self, ndvi_body)
+        self.assertEqual(set(ndvi_body["data"]["tehsil_data"].keys()), {"ndvi"})
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_missing_valid_dataset_returns_404_data_not_generated(
+        self, _mock_exists, mock_json
+    ):
+        mock_json.return_value = {
+            "stream_order": [{"uid": "12_1", "stream_order": 3}],
+            "mws": [{"uid": "12_1", "area_in_ha": 10}],
+        }
+        response = self._get(self.url_name, {**GEO, "data": "drought"})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertEqual(body["code"], "DATA_NOT_GENERATED")
+        self.assertIn("croppingdrought_kharif", body["error_message"])
+        self.assertEqual(
+            body["details"]["missing_datasets"], ["croppingdrought_kharif"]
+        )
+        self.assertEqual(
+            body["details"]["available_datasets"], ["mws", "stream_order"]
+        )
 
     @patch("public_api.api.get_tehsil_json")
     @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))

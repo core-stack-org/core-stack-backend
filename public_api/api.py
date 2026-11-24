@@ -173,8 +173,11 @@ def _success_response_v2(data, http_status=status.HTTP_200_OK):
     return Response(success_envelope(inner), status=http_status)
 
 
-def _error_response(message, http_status, details=None):
-    return Response(error_envelope(message, details), status=http_status)
+def _error_response(message, http_status, details=None, code=None):
+    payload = error_envelope(message, details)
+    if code is not None:
+        payload["code"] = code
+    return Response(payload, status=http_status)
 
 
 def _error_response_v2(message, http_status, details=None):
@@ -867,9 +870,28 @@ def generate_tehsil_data_v2(request):
             return _error_response(str(exc), status.HTTP_400_BAD_REQUEST)
 
         json_data = get_tehsil_json(state, district, tehsil, regenerate)
-        payload = filter_tehsil_payload(
-            tehsil_structure_from_dict(json_data), requested_sheets
-        )
+        full_payload = tehsil_structure_from_dict(json_data)
+        payload = filter_tehsil_payload(full_payload, requested_sheets)
+        matched_sheets = payload.get("tehsil_data") or {}
+        if not matched_sheets:
+            available_datasets = sorted((full_payload.get("tehsil_data") or {}).keys())
+            if requested_sheets:
+                missing_datasets = sorted(requested_sheets)
+                names = ", ".join(missing_datasets)
+                message = f"Dataset not generated for this tehsil: {names}."
+            else:
+                missing_datasets = []
+                message = "No datasets generated for this tehsil."
+            return _error_response(
+                message,
+                status.HTTP_404_NOT_FOUND,
+                details={
+                    "code": "DATA_NOT_GENERATED",
+                    "missing_datasets": missing_datasets,
+                    "available_datasets": available_datasets,
+                },
+                code="DATA_NOT_GENERATED",
+            )
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print(f"Error: {str(e)}")

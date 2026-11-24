@@ -13,6 +13,7 @@ def _canonical_sheet_name(key):
         k = k.replace("deltag", "delta_g", 1)
     return k
 
+
 # Canonical tehsil Excel / JSON sheet keys people can pass to ``data=``.
 # ``all`` returns every sheet present for that tehsil (default when omitted).
 TEHSIL_DATA_TYPE_DOCS = [
@@ -29,11 +30,10 @@ TEHSIL_DATA_TYPE_DOCS = [
     ("change_detection_tree_cover_decrease", "Change detection: tree-cover decrease (deforestation)"),
     ("change_detection_tree_cover_increase", "Change detection: tree-cover increase (afforestation)"),
     ("change_detection_urbanization", "Change detection: urbanization"),
-    ("croppingdrought_kharif", "Kharif cropping vs drought years"),
+    ("croppingdrought_kharif", "Kharif cropping vs drought years (alias: ``drought``)"),
     ("croppingintensity_annual", "Annual cropping intensity"),
     ("dem", "Elevation / DEM summary per MWS"),
     ("drainage_density", "Drainage density"),
-    ("drought", "Drought frequency / weeks (if present as a sheet)"),
     ("drought_causality", "Drought causality classes"),
     ("facilities_proximity", "Distance to facilities (km)"),
     ("factory_csr", "Factory / CSR sites intersecting the MWS"),
@@ -48,7 +48,7 @@ TEHSIL_DATA_TYPE_DOCS = [
     ("mws_connectivity", "MWS drainage connectivity"),
     ("mws_intersect_swb", "Surface water bodies intersecting the MWS"),
     ("mws_intersect_villages", "Villages intersecting the MWS"),
-    ("ndvi_shrub", "Shrub NDVI"),
+    ("ndvi", "NDVI vegetation indices (alias: ``ndvi_shrub``)"),
     ("nrega_annual", "Annual MGNREGA works"),
     ("nrega_assets_village", "Village-level MGNREGA assets"),
     ("overall_tree_change", "Overall tree-cover change"),
@@ -65,10 +65,12 @@ TEHSIL_DATA_TYPE_DOCS = [
     ("terrain_lulc_slope", "Terrain × LULC on slopes"),
 ]
 
-# Extra aliases after ``_normalize_key_name`` (Excel sheet names that differ).
+# Extra aliases after ``_normalize_key_name`` (Excel sheet names or legacy aliases).
 TEHSIL_DATA_ALIASES = {
     "change_detection_afforestation": "change_detection_tree_cover_increase",
     "change_detection_deforestation": "change_detection_tree_cover_decrease",
+    "drought": "croppingdrought_kharif",
+    "ndvi_shrub": "ndvi",
 }
 
 TEHSIL_DATA_TYPE_VALUES = ["all"] + [item[0] for item in TEHSIL_DATA_TYPE_DOCS if item[0] != "all"]
@@ -77,7 +79,7 @@ TEHSIL_DATA_TYPE_VALUES = ["all"] + [item[0] for item in TEHSIL_DATA_TYPE_DOCS i
 def tehsil_data_type_help_markdown():
     lines = [
         "Pass ``data=all`` (or omit ``data``) for every sheet. Pass one or more sheet names to filter.",
-        "Multiple values: ``data=drought,stream_order`` or ``data=drought&data=stream_order``.",
+        "Multiple values: ``data=croppingdrought_kharif,stream_order`` or ``data=croppingdrought_kharif&data=stream_order``.",
         "",
         "| ``data`` value | What you get |",
         "| --- | --- |",
@@ -86,8 +88,9 @@ def tehsil_data_type_help_markdown():
         lines.append(f"| ``{value}`` | {meaning} |")
     lines.append("")
     lines.append(
-        "Excel aliases such as ``Canopy_height``, ``change_detection_afforestation``, "
-        "and ``surfaceWaterBodies_annual`` are accepted and mapped to the names above."
+        "Aliases such as ``drought`` (→ ``croppingdrought_kharif``), ``ndvi_shrub`` (→ ``ndvi``), "
+        "``Canopy_height``, ``change_detection_afforestation``, and ``surfaceWaterBodies_annual`` "
+        "are accepted and mapped to the canonical sheet names above."
     )
     return "\n".join(lines)
 
@@ -202,11 +205,11 @@ def filter_tehsil_payload(payload, requested_tokens):
         return payload
     tehsil_data = payload.get("tehsil_data") or {}
     tehsil_units = payload.get("tehsil_units") or {}
-    wanted = {_canonical_sheet_name(token) for token in requested_tokens}
+    wanted = {canonical_tehsil_data_token(token) for token in requested_tokens}
     filtered_data = {}
     filtered_units = {}
     for key, rows in tehsil_data.items():
-        if _canonical_sheet_name(key) in wanted:
+        if canonical_tehsil_data_token(key) in wanted:
             filtered_data[key] = rows
             if key in tehsil_units:
                 filtered_units[key] = tehsil_units[key]
