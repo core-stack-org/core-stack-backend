@@ -15,6 +15,11 @@ Micro-watersheds"):
   area sown  the MWS's kharif-sown share this season as % of its 2017-2024 average
 An MWS without cropland pixels gets the rainfall columns only.
 
+Drought causality is computed here too, from the same values and the same rule: for a drought
+year (more than DROUGHT_YEAR_WEEKS moderate + severe weeks), the three most frequent
+combinations of window class, the triggers that fired and each impact's class, over the windows
+the rule classes moderate or severe, and separately over the mild ones (CAUSALITY_COLUMNS).
+
 The MWS are those of the hydrology layers: the tehsil files under
 hydrology/runoff/commons/tehsil_watersheds, the first copy of each uid, so the
 tehsil layers can be cut by uid. A --tile run covers the MWS whose pixels all lie
@@ -22,14 +27,22 @@ in the tile.
 
 Files:
   drought/<version>/mws/watersheds.gpkg, pixels.npz       the MWS and their pixels, built once
-  drought/<region>/<version>/mws/drought_mws_<season>.gpkg one row per MWS, EPSG:4326, with the
-                                                           columns of the GEE drought layer (COLUMNS)
+  drought/<region>/<version>/mws/drought_mws_<season>.gpkg one row per MWS, EPSG:4326: the season
+                                                           columns (COLUMNS), each window's values
+                                                           (WINDOW_COLUMNS) and drought causality
+                                                           (CAUSALITY_COLUMNS)
+
+Column names are those of the GEE yearly drought asset. The tehsil drought layers published to
+GeoServer carry the season columns and the rainfall deviations (geoserver_column); the tehsil
+drought causality layers carry the causality columns (causality_column).
 """
 
 import datetime as dt
+import json
 import logging
 import math
 import os
+import re
 
 import fiona
 import numpy as np
@@ -40,7 +53,7 @@ from rasterio.windows import transform as window_transform
 from scipy import sparse
 from shapely.geometry import mapping, shape
 
-from computing.drought.local import classify, cropland, moisture, rainfall, rules, vegetation
+from computing.drought.local import classify, cropland, moisture, onset, rainfall, rules, vegetation
 from computing.drought.local.config import MANUAL_EDITION, METHOD_VERSION, RAIN_RECORD_START, rain_normal_years
 from computing.drought.local.grid import lonlat_at, lookup_index, sinusoidal_xy
 from computing.drought.local.store import read_bands, read_tags
@@ -49,26 +62,92 @@ from computing.drought.local.weeks import WEEKS_PER_YEAR, week_of, week_start
 log = logging.getLogger(__name__)
 
 WINDOW_STARTS = rainfall.WINDOW_STARTS
+# The windows that get columns in the layer: those that can be counted. A window counts from the
+# MWS's onset week, and onset is never before the Kerala date, which is never before 22 May
+# (onset.KERALA_FROM, week 21); so the windows of weeks 19 and 20 (7 and 14 May) never count and
+# have no columns. 20 windows, 21 May to 1 October.
+EARLIEST_ONSET_WEEK = week_of(dt.date(2001, *onset.KERALA_FROM))
+LAYER_WINDOWS = [w for w in WINDOW_STARTS if w >= EARLIEST_ONSET_WEEK]
 SEASON_WEEKS = classify.SEASON_WEEKS
 NODATA = classify.UINT8_NODATA
 WATERSHED_LAYER = "watersheds"
 ATTRIBUTES = {"uid": "str", "area_in_ha": "float", "bacode": "str", "sbcode": "str", "wsconc": "str"}
 BATCH = 5000
 
-# Columns per season (name_<season>), as in the GEE drought layer (merge_layers.py), plus dsw.
+# Season columns, <y> the season, as named in the GEE yearly drought asset (plus
+# total_dryspell_weeks, which GEE did not have). The tehsil drought layers carry them.
 COLUMNS = {
-    "drlb": "weekly classes from the onset week to week 43, a JSON list (0 none, 1 mild, 2 moderate, 3 severe)",
-    "drysp": "longest dry spell, weeks",
-    "dsw": "weeks inside dry spells",
-    "frth0-3": "weeks of class k or worse",
-    "inth0-3": "mean class of those weeks",
-    "w_no, w_mld, w_mod, w_sev": "weeks of no, mild, moderate and severe drought",
-    "kh_cr": "kharif-sown area, km2",
-    "m_ons": "onset date, e.g. 2023-6-12",
-    "pcr_k": "area sown, % of the MWS's 2017-2024 average",
-    "t_wks": "weeks from the onset week to week 43",
-    "rd<yy>-<m>-<d>": "rainfall deviation, %, of the 4-week window starting that day",
+    "drought_labels_<y>": "weekly classes from the onset week to week 43, a JSON list (0 none, 1 mild, 2 moderate, 3 severe)",
+    "dryspell_length_<y>": "longest dry spell, weeks",
+    "total_dryspell_weeks_<y>": "weeks inside dry spells (4 or more dry weeks in a row) from onset",
+    "freq_of_drought_<y>_at_threshold_<k>": "weeks of class k or worse, k = 0 to 3",
+    "intensity_of_drought_<y>_at_threshold_<k>": "mean class of those weeks",
+    "number_of_weeks_in_{no,mild,moderate,severe}_drought_<y>": "weeks of no, mild, moderate and severe drought",
+    "kharif_cropped_sqkm_<y>": "kharif-sown area, km2",
+    "monsoon_onset_<y>": "onset date, e.g. 2023-6-12",
+    "percent_of_area_cropped_kharif_<y>": "area sown, % of the MWS's 2017-2024 average",
+    "total_weeks_<y>": "weeks from the onset week to week 43",
 }
+WEEK_CLASS_NAMES = ("no", "mild", "moderate", "severe")  # number_of_weeks_in_<name>_drought
+
+# Per-window values, <name>_<yyyy>-<m>-<d> by the window's start, the same 20 windows every year
+# (LAYER_WINDOWS, 21 May to 1 October).
+# Empty for a window that starts before the MWS's onset week, as GEE has no windows before
+# onset; weekly_label, VCI, ET, PET and MAI also where the MWS has no cropland. The tehsil drought
+# layers carry monthly_rainfall_deviation; the others are for drought causality and analysis.
+WINDOW_COLUMNS = {
+    "weekly_label": "drought class of the week starting that day (0 none, 1 mild, 2 moderate, 3 severe)",
+    "dryspell": "1 if the window is a dry spell (4 weeks in a row each below 50% of normal), else 0",
+    "monthly_rainfall_deviation": "rainfall deviation of the 4-week window, % of normal",
+    "rfdev_class": "Normal rf (deviation -19% or above), Deficit rf (below -19% to above -60%), Scanty rf (-60% or worse)",
+    "spi": "SPI of the window",
+    "meteorological_drought": "1 if dry spell, rainfall 60% or more below normal, or SPI below -1.5, else 0",
+    "vci": "VCI, mean over the MWS's cropland pixels",
+    "et": "ET of the window, mm, mean over the cropland pixels with both ET and PET",
+    "pet": "PET of the window, mm, mean over the same pixels",
+    "mai": "MAI, %: 100 x ET / PET over the same pixels",
+}
+
+# Drought causality per season. Each is a JSON object of up to three combinations and how many
+# windows had each, most frequent first, for example
+#   {"moderate: scanty rain + SPI; VCI moderate, MAI severe, area sown normal": 3}
+# Empty unless the season is a drought year for the MWS (more than DROUGHT_YEAR_WEEKS moderate +
+# severe weeks); in a drought year without mild windows the mild column is {}.
+CAUSALITY_COLUMNS = {
+    "severe_moderate_drought_causality_<y>": "the top 3 combinations over the windows classed moderate or severe",
+    "mild_drought_causality_<y>": "the top 3 combinations over the windows classed mild",
+}
+DROUGHT_YEAR_WEEKS = 5  # a season is a drought year with more than this many moderate + severe weeks
+CAUSALITY_TOP = 3
+TRIGGER_NAMES = ("dry spell", "scanty rain", "SPI")  # in this order in a combination
+CLASS_NAMES = {rules.MILD: "mild", rules.MODERATE: "moderate", rules.SEVERE: "severe"}
+IMPACT_CLASS_NAMES = {rules.NORMAL: "normal", rules.IMPACT_MODERATE: "moderate", rules.IMPACT_SEVERE: "severe"}
+
+# Bumped when the columns or how their values are written change, so layers written before are
+# made again.
+LAYOUT = "gee-long-names+windows-from-21-may+causality+unrounded-3"
+
+_SEASON = r"\d{4}"
+_DATE = r"\d{4}-\d{1,2}-\d{1,2}"
+GEOSERVER_COLUMN = re.compile("|".join([
+    rf"drought_labels_{_SEASON}", rf"dryspell_length_{_SEASON}", rf"total_dryspell_weeks_{_SEASON}",
+    rf"freq_of_drought_{_SEASON}_at_threshold_[0-3]", rf"intensity_of_drought_{_SEASON}_at_threshold_[0-3]",
+    rf"number_of_weeks_in_(?:{'|'.join(WEEK_CLASS_NAMES)})_drought_{_SEASON}",
+    rf"kharif_cropped_sqkm_{_SEASON}", rf"monsoon_onset_{_SEASON}", rf"percent_of_area_cropped_kharif_{_SEASON}",
+    rf"total_weeks_{_SEASON}", rf"monthly_rainfall_deviation_{_DATE}",
+]))
+CAUSALITY_COLUMN = re.compile(rf"(?:severe_moderate|mild)_drought_causality_{_SEASON}")
+
+
+def geoserver_column(name):
+    """True for the columns the tehsil drought layers on GeoServer carry: the season columns and
+    each window's rainfall deviation."""
+    return bool(GEOSERVER_COLUMN.fullmatch(name))
+
+
+def causality_column(name):
+    """True for the columns the tehsil drought causality layers carry."""
+    return bool(CAUSALITY_COLUMN.fullmatch(name))
 
 
 # ---------------------------------------------------------------- paths
@@ -298,7 +377,7 @@ class Watersheds:
 def mws_rain(season, onset_day, weekly, normal, spi):
     """MWS rainfall. onset_day (n,) day of year; weekly rain and normal (52, n); SPI (windows, n).
     Returns onset week (NaN without rain), dry-spell weeks, the longest dry spell, and per window
-    the trigger and the deviation (windows, n)."""
+    (windows, n) the trigger, the deviation, the dry spell and the SPI."""
     jan1 = dt.date(season, 1, 1)
     week_by_day = np.array([week_of(jan1 + dt.timedelta(days=i)) for i in range(366)], dtype=np.float64)
     has = ~np.isnan(onset_day)
@@ -310,7 +389,7 @@ def mws_rain(season, onset_day, weekly, normal, spi):
     deviation = rainfall.deviation_pct(rainfall.window_totals(weekly), rainfall.window_totals(normal))
     dry_spell = np.stack([rules.dry_spell_in_window(dry[w - 1:w + 3]) for w in WINDOW_STARTS])
     return {"onset_day": onset_day, "onset_week": onset_week, "dry_spell_weeks": dry_spell_weeks,
-            "longest_dry_spell": longest, "deviation": deviation,
+            "longest_dry_spell": longest, "deviation": deviation, "dry_spell": dry_spell, "spi": spi,
             "triggers": rules.rain_trigger(dry_spell, deviation, spi)}
 
 
@@ -329,8 +408,19 @@ def _ints(values, present):
     return [v if p else None for v, p in zip(values, present.tolist())]
 
 
-def _floats(values, digits):
-    return [None if math.isnan(v) else v for v in np.round(np.asarray(values, dtype=np.float64), digits).tolist()]
+def _floats(values, digits=None):
+    """Floats, None where missing; rounded to digits decimals, or as computed when digits is None."""
+    values = np.asarray(values, dtype=np.float64)
+    if digits is not None:
+        values = np.round(values, digits)
+    return [None if math.isnan(v) else v for v in values.tolist()]
+
+
+# The values the rules compare with a threshold (rainfall deviation, SPI, VCI, MAI, area sown) are
+# stored as computed, not rounded: a value rounded onto a threshold (SPI -1.4996 as -1.50) would
+# contradict the class, trigger or causality stored beside it, which are worked out from the
+# unrounded value.
+EXACT = None
 
 
 def layer_columns(season, rain, labels, summary, kharif_km2, sown):
@@ -340,10 +430,11 @@ def layer_columns(season, rain, labels, summary, kharif_km2, sown):
     has_class = summary[0] != NODATA
     names = classify.SUMMARY_NAMES
     in_season = labels != NODATA
-    cols = [(f"drlb_{y}", "str", [("[" + ",".join(str(v) for v in week if v != NODATA) + "]") if ok else None
-                                  for week, ok in zip(labels.T.tolist(), has_class.tolist())]),
-            (f"drysp_{y}", "int", _ints(rain["longest_dry_spell"], has_rain)),
-            (f"dsw_{y}", "int", _ints(rain["dry_spell_weeks"], has_rain))]
+    cols = [(f"drought_labels_{y}", "str",
+             [("[" + ",".join(str(v) for v in week if v != NODATA) + "]") if ok else None
+              for week, ok in zip(labels.T.tolist(), has_class.tolist())]),
+            (f"dryspell_length_{y}", "int", _ints(rain["longest_dry_spell"], has_rain)),
+            (f"total_dryspell_weeks_{y}", "int", _ints(rain["dry_spell_weeks"], has_rain))]
     freq, intensity = [], []
     for k in (rules.NONE, rules.MILD, rules.MODERATE, rules.SEVERE):
         at_least = in_season & (labels >= k)
@@ -351,21 +442,150 @@ def layer_columns(season, rain, labels, summary, kharif_km2, sown):
         total = np.where(at_least, labels, 0).sum(axis=0)
         with np.errstate(divide="ignore", invalid="ignore"):
             mean = np.where(n > 0, total / n, 0)
-        freq.append((f"frth{k}_{y}", "int", _ints(n, has_class)))
-        intensity.append((f"inth{k}_{y}", "float", _floats(np.where(has_class, mean, np.nan), 3)))
+        freq.append((f"freq_of_drought_{y}_at_threshold_{k}", "int", _ints(n, has_class)))
+        intensity.append((f"intensity_of_drought_{y}_at_threshold_{k}", "float",
+                          _floats(np.where(has_class, mean, np.nan), 3)))
     cols += freq + intensity
-    for i, short in enumerate(("w_no", "w_mld", "w_mod", "w_sev")):  # summary rows 0-3: weeks_none ... weeks_severe
-        cols.append((f"{short}_{y}", "int", _ints(summary[i], has_class)))
+    for i, name in enumerate(WEEK_CLASS_NAMES):  # summary rows 0-3: weeks_none ... weeks_severe
+        cols.append((f"number_of_weeks_in_{name}_drought_{y}", "int", _ints(summary[i], has_class)))
     jan1 = dt.date(season, 1, 1)
     onset = [None if math.isnan(d) else jan1 + dt.timedelta(days=int(d) - 1) for d in rain["onset_day"].tolist()]
-    cols += [(f"kh_cr_{y}", "float", _floats(kharif_km2, 4)),
-             (f"m_ons_{y}", "str", [None if d is None else f"{d.year}-{d.month}-{d.day}" for d in onset]),
-             (f"pcr_k_{y}", "float", _floats(sown, 2)),
-             (f"t_wks_{y}", "int", _ints(summary[names.index("season_weeks")], has_rain))]
-    for i, w in enumerate(WINDOW_STARTS):
-        start = week_start(season, w)
-        cols.append((f"rd{start:%y}-{start.month}-{start.day}", "float", _floats(rain["deviation"][i], 2)))
+    cols += [(f"kharif_cropped_sqkm_{y}", "float", _floats(kharif_km2, 4)),
+             (f"monsoon_onset_{y}", "str", [None if d is None else f"{d.year}-{d.month}-{d.day}" for d in onset]),
+             (f"percent_of_area_cropped_kharif_{y}", "float", _floats(sown, EXACT)),
+             (f"total_weeks_{y}", "int", _ints(summary[names.index("season_weeks")], has_rain))]
     return cols
+
+
+def rfdev_class(deviation):
+    """The rainfall-deviation class of the GEE drought layer, with scanty at the 2020 trigger:
+    -19% or above Normal rf, -60% or worse Scanty rf, Deficit rf between; None where missing."""
+    deviation = np.asarray(deviation, dtype=np.float64)
+    out = np.full(deviation.shape, None, dtype=object)
+    ok = ~np.isnan(deviation)
+    out[ok] = "Deficit rf"
+    out[ok & (deviation >= -19)] = "Normal rf"
+    out[ok & (deviation <= rules.SCANTY_DEVIATION)] = "Scanty rf"
+    return out
+
+
+def counted_windows(onset_week):
+    """(windows, n) True for the windows that start in or after the MWS's onset week; none for an
+    MWS without onset. Window values and drought classes are only for these windows."""
+    onset = np.where(np.isnan(onset_week), np.inf, onset_week)
+    return np.array(WINDOW_STARTS)[:, None] >= onset[None, :]
+
+
+def window_date(season, week):
+    start = week_start(season, week)
+    return f"{start.year}-{start.month}-{start.day}"
+
+
+def window_columns(season, rain, labels, vci, et, pet, mai):
+    """[(name, fiona type, values)] of the per-window values (WINDOW_COLUMNS) of the windows in
+    LAYER_WINDOWS, named <name>_<yyyy>-<m>-<d> by the window's start. labels: weeks 19-43 (n each);
+    the rest (windows, n), all of WINDOW_STARTS. Every value is None for a window that starts
+    before the MWS's onset week."""
+    with np.errstate(invalid="ignore"):
+        early = rain["onset_week"] < EARLIEST_ONSET_WEEK
+    if np.any(early):
+        raise ValueError(f"{int(early.sum())} MWS have onset before week {EARLIEST_ONSET_WEEK}, whose windows "
+                         "have no columns (LAYER_WINDOWS): the onset rule changed, so the layout must too")
+    counted = counted_windows(rain["onset_week"])
+    cols = {name: [] for name in WINDOW_COLUMNS}
+    for i, w in enumerate(WINDOW_STARTS):
+        if w not in LAYER_WINDOWS:
+            continue  # never counted: no columns
+        date, here = window_date(season, w), counted[i]
+        label = labels[w - SEASON_WEEKS[0]]
+        classes = rfdev_class(rain["deviation"][i])
+        cols["weekly_label"].append((date, "int", _ints(label, here & (label != NODATA))))
+        cols["dryspell"].append((date, "int", _ints(rain["dry_spell"][i], here)))
+        cols["monthly_rainfall_deviation"].append(
+            (date, "float", _floats(np.where(here, rain["deviation"][i], np.nan), EXACT)))
+        cols["rfdev_class"].append((date, "str", [c if ok else None for c, ok in zip(classes.tolist(), here.tolist())]))
+        cols["spi"].append((date, "float", _floats(np.where(here, rain["spi"][i], np.nan), EXACT)))
+        cols["meteorological_drought"].append((date, "int", _ints(rain["triggers"][i], here)))
+        for name, values, digits in (("vci", vci, EXACT), ("et", et, 2), ("pet", pet, 2), ("mai", mai, EXACT)):
+            cols[name].append((date, "float", _floats(np.where(here, values[i], np.nan), digits)))
+    return [(f"{name}_{date}", kind, values) for name in WINDOW_COLUMNS for date, kind, values in cols[name]]
+
+
+# ---------------------------------------------------------------- drought causality
+
+
+def window_triggers(rain):
+    """(3, windows, n): which of the 2020 triggers fired in each window, in TRIGGER_NAMES order -
+    the parts of rules.rain_trigger."""
+    deviation = np.asarray(rain["deviation"], dtype=np.float64)
+    spi = np.asarray(rain["spi"], dtype=np.float64)
+    with np.errstate(invalid="ignore"):
+        return np.stack([np.asarray(rain["dry_spell"], dtype=bool),
+                         deviation <= rules.SCANTY_DEVIATION, spi < rules.SPI_TRIGGER])
+
+
+# A combination is coded as one integer: window class, trigger bits (dry spell 1, scanty rain 2,
+# SPI 4) and the three impact classes (0-2 each), so windows can be counted with np.unique.
+_IMPACT_BASE = 3
+_PER_CLASS = 8 * _IMPACT_BASE ** 3  # codes per window class
+_CODES = 4 * _PER_CLASS
+
+
+def combination_class(code):
+    return int(code) // _PER_CLASS
+
+
+def combination_text(code):
+    """'moderate: scanty rain + SPI; VCI moderate, MAI severe, area sown normal' for a code."""
+    code, sown = divmod(int(code), _IMPACT_BASE)
+    code, mai = divmod(code, _IMPACT_BASE)
+    code, vci = divmod(code, _IMPACT_BASE)
+    cls, bits = divmod(code, 8)
+    triggers = " + ".join(name for k, name in enumerate(TRIGGER_NAMES) if bits & (1 << k))
+    return (f"{CLASS_NAMES[cls]}: {triggers}; VCI {IMPACT_CLASS_NAMES[vci]}, "
+            f"MAI {IMPACT_CLASS_NAMES[mai]}, area sown {IMPACT_CLASS_NAMES[sown]}")
+
+
+def _top(entries):
+    """entries: [(code, windows)] -> {text: windows} of the CAUSALITY_TOP most frequent; ties go
+    to the worse class, then by text, so the result never depends on input order."""
+    ranked = sorted(((combination_text(c), n, combination_class(c)) for c, n in entries),
+                    key=lambda t: (-t[1], -t[2], t[0]))
+    return {text: int(n) for text, n, _ in ranked[:CAUSALITY_TOP]}
+
+
+def causality_columns(season, rain, vci, mai, sown, summary):
+    """[(name, fiona type, values)] of drought causality (CAUSALITY_COLUMNS). The windows are classed
+    exactly as the drought layer classes them (classify.window_classes, the 2020 rule); vci, mai:
+    (windows, n); sown: area sown, % of normal (n); summary: mws_classes' summary."""
+    y = season
+    names = classify.SUMMARY_NAMES
+    has_class = summary[0] != NODATA
+    drought_weeks = (summary[names.index("weeks_moderate")].astype(np.int64)
+                     + summary[names.index("weeks_severe")].astype(np.int64))
+    drought_year = has_class & (drought_weeks > DROUGHT_YEAR_WEEKS)
+
+    classes = classify.window_classes(rain["onset_week"], rain["triggers"], vci, mai, sown).astype(np.int64)
+    triggered = window_triggers(rain).astype(np.int64)
+    bits = triggered[0] + 2 * triggered[1] + 4 * triggered[2]
+    code = classes * 8 + bits
+    for impact in (rules.vci_class(vci), rules.mai_class(mai), np.broadcast_to(rules.sown_class(sown), classes.shape)):
+        code = code * _IMPACT_BASE + impact.astype(np.int64)
+
+    keep = (classes >= rules.MILD) & drought_year[None, :]
+    window, mws_index = np.nonzero(keep)
+    pairs, counts = np.unique(mws_index * _CODES + code[window, mws_index], return_counts=True)
+    per_mws = {}
+    for pair, n in zip(pairs.tolist(), counts.tolist()):
+        per_mws.setdefault(pair // _CODES, []).append((pair % _CODES, n))
+
+    severe_moderate, mild = [None] * len(has_class), [None] * len(has_class)
+    for j in np.flatnonzero(drought_year).tolist():
+        entries = per_mws.get(j, [])
+        severe_moderate[j] = json.dumps(_top([(c, n) for c, n in entries if combination_class(c) >= rules.MODERATE]))
+        mild[j] = json.dumps(_top([(c, n) for c, n in entries if combination_class(c) == rules.MILD]))
+    return [(f"severe_moderate_drought_causality_{y}", "str", severe_moderate),
+            (f"mild_drought_causality_{y}", "str", mild)]
 
 
 # ---------------------------------------------------------------- season
@@ -390,7 +610,8 @@ def is_current(paths, season, watersheds):
     if not path.is_file():
         return False
     with fiona.open(path) as src:
-        return src.tags().get("inputs_written_at") == inputs_stamp(paths, season, watersheds)
+        tags = src.tags()
+    return tags.get("inputs_written_at") == inputs_stamp(paths, season, watersheds) and tags.get("layout") == LAYOUT
 
 
 def season_layer(paths, season, ws, weights, normals):
@@ -409,8 +630,14 @@ def season_layer(paths, season, ws, weights, normals):
     crop_mws = ws.mws[crop]
     vci_path, mai_path = vegetation.vci_file(paths, season), moisture.mai_file(paths, season)
     vci = np.stack([group_mean(crop_mws, ws.values(vci_path, f"vci_w{w:02d}", crop), ws.n) for w in WINDOW_STARTS])
-    mai = np.stack([group_ratio(crop_mws, ws.values(mai_path, et, crop), ws.values(mai_path, pet, crop), ws.n) * 100
-                    for et, pet in zip(moisture.ET_NAMES, moisture.PET_NAMES)])
+    mai, et, pet = [], [], []  # per window; ET and PET in mm, mean over the cropland pixels with both
+    for et_name, pet_name in zip(moisture.ET_NAMES, moisture.PET_NAMES):
+        e, p = ws.values(mai_path, et_name, crop), ws.values(mai_path, pet_name, crop)
+        mai.append(group_ratio(crop_mws, e, p, ws.n) * 100)
+        both = ~np.isnan(e) & ~np.isnan(p)
+        et.append(group_mean(crop_mws, np.where(both, e, np.nan), ws.n) / moisture.SUM_SCALE)
+        pet.append(group_mean(crop_mws, np.where(both, p, np.nan), ws.n) / moisture.SUM_SCALE)
+    mai, et, pet = np.stack(mai), np.stack(et), np.stack(pet)
 
     share_path = cropland.share_file(paths, season)
     kharif, valid = ws.values(share_path, "kharif_cells"), ws.values(share_path, "valid_cells")
@@ -423,9 +650,11 @@ def season_layer(paths, season, ws, weights, normals):
 
     has_crop = np.bincount(crop_mws, minlength=ws.n) > 0
     labels, summary = mws_classes(rain, vci, mai, sown, has_crop)
-    columns = layer_columns(season, rain, labels, summary, season_share * ws.area_km2, sown)
+    columns = (layer_columns(season, rain, labels, summary, season_share * ws.area_km2, sown)
+               + window_columns(season, rain, labels, vci, et, pet, mai)
+               + causality_columns(season, rain, vci, mai, sown, summary))
     first, last = rain_normal_years(season)
-    tags = {"method_version": METHOD_VERSION, "manual": MANUAL_EDITION, "season": season,
+    tags = {"method_version": METHOD_VERSION, "manual": MANUAL_EDITION, "season": season, "layout": LAYOUT,
             "region": paths.region_key, "written_at": dt.datetime.now().isoformat(timespec="seconds"),
             "inputs_written_at": inputs_stamp(paths, season, ws), "rain_normal_years": f"{first}-{last}",
             "classes": "0 none, 1 mild, 2 moderate, 3 severe",

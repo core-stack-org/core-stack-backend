@@ -72,19 +72,29 @@ def is_current(paths, season):
             and read_tags(summary).get("inputs_written_at") == inputs_stamp(paths, season))
 
 
+def window_classes(onset, triggers, vci, mai, sown):
+    """Each window's class (rules.NONE, MILD, MODERATE, SEVERE), shape (windows, ...): the 2020 rule
+    on the windows that start in or after the onset week; earlier windows are NONE.
+    onset: week or NaN; triggers, vci, mai: (windows, ...); sown: area sown, % of normal (...)."""
+    onset = np.where(np.isnan(onset), np.inf, onset)
+    sown_cls = rules.sown_class(sown)
+    classes = []
+    for i, w in enumerate(WINDOW_STARTS):
+        trigger = (w >= onset) & (np.nan_to_num(triggers[i]) == 1)
+        classes.append(rules.window_class(trigger, rules.vci_class(vci[i]), rules.mai_class(mai[i]), sown_cls))
+    return np.stack(classes)
+
+
 def classify_arrays(onset, triggers, vci, mai, sown, crop, fallback, dry_total, dry_longest):
     """onset (r, c) week or NaN; triggers, vci, mai, fallback: (windows, r, c); sown, crop: (r, c).
     Returns (labels (weeks 19-43, r, c), summary (len(SUMMARY_NAMES), r, c)), both uint8."""
     land = ~np.isnan(onset)
+    classes = window_classes(onset, triggers, vci, mai, sown)
     onset = np.where(land, onset, np.inf)
-    sown_cls = rules.sown_class(sown)
-    classes, used_fallback = [], np.zeros(onset.shape, np.int32)
+    used_fallback = np.zeros(onset.shape, np.int32)
     for i, w in enumerate(WINDOW_STARTS):
-        counted = w >= onset
-        trigger = counted & (np.nan_to_num(triggers[i]) == 1)
-        classes.append(rules.window_class(trigger, rules.vci_class(vci[i]), rules.mai_class(mai[i]), sown_cls))
-        used_fallback += (counted & (np.nan_to_num(fallback[i]) == 1)).astype(np.int32)
-    labels = rules.weekly_labels(np.stack(classes))  # weeks 19-43
+        used_fallback += ((w >= onset) & (np.nan_to_num(fallback[i]) == 1)).astype(np.int32)
+    labels = rules.weekly_labels(classes)  # weeks 19-43
     in_season = np.array(SEASON_WEEKS)[:, None, None] >= onset
     labels = np.where(in_season & crop, labels, UINT8_NODATA).astype(np.uint8)
 

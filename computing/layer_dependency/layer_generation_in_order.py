@@ -14,6 +14,7 @@ from computing.surface_water_bodies.swb import generate_swb_layer
 from computing.drought.drought import calculate_drought
 from computing.drought.drought_local_compute import calculate_drought_local
 from computing.drought.drought_causality import drought_causality
+from computing.drought.drought_causality_local import drought_causality_local
 from computing.crop_grid.crop_grid import create_crop_grids
 from computing.change_detection.change_detection import get_change_detection
 from computing.change_detection.change_detection_vector import (
@@ -186,6 +187,8 @@ GEE_TASK_REGISTRY = {
     "mws_layer": mws_layer,
     "generate_mws_layer": mws_layer,
     "generate_hydrology": generate_hydrology,
+    "clip_lulc": clip_lulc,
+    "lulc": clip_lulc,
     "clip_lulc_v3": clip_lulc,
     "lulc_v3": clip_lulc,
     "vectorise_lulc": vectorise_lulc,
@@ -292,8 +295,12 @@ LOCAL_TASK_REGISTRY = {
     "clip_nrega_district_block": generate_nrega_data_local,
     "generate_nrega_data": generate_nrega_data_local,
     "generate_nrega_layer": generate_nrega_data_local,
+    "clip_lulc": clip_lulc_local,
+    "lulc": clip_lulc_local,
     "clip_lulc_v3": clip_lulc_local,
     "lulc_v3": clip_lulc_local,
+    "clip_lulc_v4": clip_lulc_local,
+    "lulc_v4": clip_lulc_local,
     "vectorise_lulc": vectorise_lulc_local,
     "lulc_vector": vectorise_lulc_local,
     "generate_cropping_intensity": generate_cropping_intensity_local,
@@ -373,12 +380,12 @@ LOCAL_TASK_REGISTRY = {
     "generate_tree_in_grassland": generate_tree_in_grassland_local,
     "calculate_drought": calculate_drought_local,
     "generate_drought_layer": calculate_drought_local,
+    "drought_causality": drought_causality_local,
+    "mws_drought_causality": drought_causality_local,
     # GEE-backed tasks that can be triggered from the local map
     # (nodes need "pass_gee_account_id": true).
     "ndvi_timeseries": ndvi_timeseries,
     "generate_ndvi_timeseries": ndvi_timeseries,
-    "drought_causality": drought_causality,
-    "mws_drought_causality": drought_causality,
     "generate_stream_order": generate_stream_order,
     "stream_order": generate_stream_order,
     "generate_clart_layer": generate_clart_layer,

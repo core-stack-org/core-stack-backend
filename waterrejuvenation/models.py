@@ -102,6 +102,10 @@ class WaterbodiesFileUploadLog(models.Model):
                 layer_generation_sync_if_enabled,
             )
 
+            print(
+                "layer generation sync: "
+                f"{layer_generation_sync_enabled()}"
+            )
             with layer_generation_sync_if_enabled():
                 dispatched = Upload_Desilting_Points.apply_async(
                     kwargs=task_kwargs,

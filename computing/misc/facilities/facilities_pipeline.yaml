@@ -14,7 +14,7 @@ sources:
   classification_yaml: computing/misc/facilities/facility_classifications.yaml
 
 output:
-  root: data/outputs
+  root: "{DATA_DIR}/layers"
   directory_name: facilities
   layer_prefix: facilities
   # geoserver_workspace: testworkspace
