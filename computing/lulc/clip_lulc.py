@@ -194,22 +194,22 @@ def clip_lulc(
                     print("saved info to db at the gee level...")
                 make_asset_public(final_output_assetid_array_new[i])
 
-    # sync_lulc_to_gcs(
-    #     final_output_filename_array_new,
-    #     final_output_assetid_array_new,
-    #     scale,
-    # )
-    #
-    # layer_at_geoserver = sync_lulc_to_geoserver(
-    #     final_output_filename_array_new,
-    #     state,
-    #     district,
-    #     block,
-    #     layer_ids,
-    #     asset_suffix,
-    # )
-    #
-    # return layer_at_geoserver
+    sync_lulc_to_gcs(
+        final_output_filename_array_new,
+        final_output_assetid_array_new,
+        scale,
+    )
+
+    layer_at_geoserver = sync_lulc_to_geoserver(
+        final_output_filename_array_new,
+        state,
+        district,
+        block,
+        layer_ids,
+        asset_suffix,
+    )
+
+    return layer_at_geoserver
 
 
 def sync_lulc_to_gcs(
