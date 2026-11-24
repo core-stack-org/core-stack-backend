@@ -78,8 +78,30 @@ tehsil_data_filter_param = openapi.Parameter(
     openapi.IN_QUERY,
     description=(
         "Optional v2 sheet filter. Omit or pass `all` for every sheet. "
-        "Pass one or more sheet names: `data=drought,stream_order` or "
-        "`data=drought&data=stream_order`."
+        "Pass one or more sheet names: `data=croppingdrought_kharif,stream_order` or "
+        "`data=croppingdrought_kharif&data=stream_order`."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+mws_data_fields_param = openapi.Parameter(
+    "fields",
+    openapi.IN_QUERY,
+    description=(
+        "Optional comma-separated metric filter (e.g. `fields=et,precipitation`). "
+        "Valid fields: `et`, `runoff`, `precipitation`. `mws_id` and `time` are always returned."
+    ),
+    type=openapi.TYPE_STRING,
+    required=False,
+)
+
+kyl_fields_param = openapi.Parameter(
+    "fields",
+    openapi.IN_QUERY,
+    description=(
+        "Optional comma-separated indicator filter (e.g. `fields=area,drought_category`). "
+        "Returns only the requested fields plus the MWS identifier (`uid`/`mws_id`)."
     ),
     type=openapi.TYPE_STRING,
     required=False,
@@ -254,13 +276,18 @@ KYL_V2_EXAMPLE = {
         "mws_id": "12_234647",
         "terraincluster_id": 1,
         "avg_precipitation": 764.45,
+        "aquifer_class": 0,
         "total_nrega_assets": 550,
     },
     "indicator_units": {
         "mws_id": "id",
         "terraincluster_id": "id",
         "avg_precipitation": "mm",
+        "aquifer_class": "class",
         "total_nrega_assets": "count",
+    },
+    "indicator_legends": {
+        "aquifer_class": {"0": "Hard Rock", "1": "Alluvial"},
     },
 }
 LAYER_V1_EXAMPLE = [
@@ -689,6 +716,7 @@ get_mws_data_v2_schema = {
         district_param,
         tehsil_param,
         mws_id_param,
+        mws_data_fields_param,
         authorization_param,
     ],
     "responses": {
@@ -1358,7 +1386,7 @@ tehsil_data_schema_v2["operation_description"] = f"""
 Lists analytical sheets for a tehsil: drought, hydrology, LULC, NREGA, and others.
 
 Filter with ``data=all`` (default) or sheet names:
-``data=drought,stream_order``.
+``data=croppingdrought_kharif,stream_order``.
 
 **Returns**
 ``{{status, error_message, data}}`` with ``tehsil_data`` and ``tehsil_units``.
@@ -1389,12 +1417,39 @@ Retrieves a single-row KYL snapshot for one micro-watershed.
 This is a flat table, not a time series.
 
 **Returns**
-``{status, error_message, data}`` with ``indicators`` and ``indicator_units``
-(mm, ha, count, and similar).
+``{status, error_message, data}`` with ``indicators``, ``indicator_units``
+(mm, ha, count, ``% of cropped area``, and similar), and ``indicator_legends``
+(code-to-label lookup maps for coded/classed indicators such as ``aquifer_class``,
+``soge_class``, ``drought_category``, ``soil_drainage``, ``soil_texture``, trend
+codes, and presence flags).
+
+``avg_single_cropped``, ``avg_double_cropped``, and ``avg_triple_cropped`` are
+reported in ``% of cropped area``, where *cropped area* means land cropped in
+any year of the period (``sum_area_in_ha``).
+
+``avg_kharif_surface_water_mws``, ``avg_rabi_surface_water_mws``, and
+``avg_zaid_surface_water_mws`` are reported in ``% of that year's water area``,
+where the denominator is that year's total observed surface-water area in the
+micro-watershed (``total_area_in_ha_<year>``, not total waterbody capacity),
+and ``null`` is returned when no year has data.
+
+``cropping_intensity_change_area`` (formerly ``degradation_cropping_intensity``)
+is reported in ``ha`` and measures total area where cropping intensity changed,
+counting **both** decreases (double→single, triple→single, triple→double) and
+increases (single→double, single→triple, double→triple).
+
+``avg_water_surface_to_cropped_area_kharif``, ``avg_water_surface_to_cropped_area_rabi``,
+and ``avg_water_surface_to_cropped_area_zaid`` (formerly ``avg_wsr_ratio_*``) are
+reported in ``%`` as the per-year average of ``(season_water_area / season_cropped_area) * 100``
+(Zaid denominator is triple-cropped area only, ``triply_cropped_area_in_ha_<year>``;
+``null`` when no year has positive cropped area).
 
 **Related**
 Retrieve MWS time series · List tehsil datasets
 """
+kyl_indicators_schema_v2["manual_parameters"] = list(
+    kyl_indicators_schema_v2["manual_parameters"]
+) + [kyl_fields_param]
 _set_json_example(
     kyl_indicators_schema_v2,
     200,
