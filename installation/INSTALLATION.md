@@ -462,7 +462,7 @@ For asynchronous task processing:
 conda activate corestackenv
 
 # Start Celery worker
-celery -A nrm_app worker -l info -Q nrm
+celery -A nrm_app worker -l info -Q nrm,farm
 ```
 
 ### Optional Apache Deployment

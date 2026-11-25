@@ -495,7 +495,7 @@ configuration and image have not changed.
 
 ```bash
 docker compose --env-file nrm_app/.env restart \
-  backend celery-nrm celery-general celery-geoserver celery-layer-bulk
+  backend celery-nrm celery-farm celery-general celery-geoserver celery-layer-bulk
 ```
 
 Add `celery-heavy` or `celery-beat` if you enabled the `heavy` or `periodic`

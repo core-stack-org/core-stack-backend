@@ -328,6 +328,12 @@ services:
     <<: *worker-common
     command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=layer_bulk", "--hostname=layer-bulk@%h", "--concurrency=1"]
 
+  # Farm boundary generation and updates. One at a time, because a task
+  # rewrites its block's parquet files and manifests in place.
+  celery-farm:
+    <<: *worker-common
+    command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=farm", "--hostname=farm@%h", "--concurrency=1"]
+
   celery-geoserver:
     <<: *worker-common
     command: ["bash", "/opt/corestack-scripts/entrypoint.sh", "celery", "-A", "nrm_app", "worker", "--loglevel=INFO", "--queues=geoserver", "--hostname=geoserver@%h", "--concurrency=1"]

@@ -128,6 +128,14 @@ class DockerComposeArchitectureTests(unittest.TestCase):
         for key in ("GPU_AVAILABLE", "HEAVY_WORKER_ENABLED"):
             self.assertNotIn(f"\n{key}=", template)
 
+    def test_farm_worker_consumes_the_farm_queue_serially(self) -> None:
+        compose = COMPOSE_FILE.read_text(encoding="utf-8")
+
+        farm = compose.split("celery-farm:", 1)[1].split("\n\n", 1)[0]
+        self.assertIn("--queues=farm", farm)
+        self.assertIn("--concurrency=1", farm)
+        self.assertNotIn("profiles:", farm)
+
     def test_proxy_is_wired_into_build_and_runtime(self) -> None:
         compose = COMPOSE_FILE.read_text(encoding="utf-8")
 

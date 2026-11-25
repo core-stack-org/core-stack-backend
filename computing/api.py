@@ -333,7 +333,7 @@ def generate_farm_boundaries(request):
                     "start_year": start_year,
                     "end_year": end_year,
                 },
-                queue="nrm",
+                queue="farm",
             )
         else:
             update_existing_parquet.apply_async(
@@ -345,7 +345,7 @@ def generate_farm_boundaries(request):
                     "start_year": start_year,
                     "end_year": end_year,
                 },
-                queue="nrm",
+                queue="farm",
             )
 
         msg = f"Farm boundary pipeline initiated for {start_year} to {end_year}"

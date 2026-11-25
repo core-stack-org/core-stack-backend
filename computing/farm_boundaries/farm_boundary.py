@@ -20,8 +20,9 @@ Celery task that orchestrates the three-phase farm boundary pipeline:
       here is logged but does not fail the overall task — Phases 1-3's
       output is still usable without the tileset.
 
-The task is wired to the "nrm" Celery queue (same as all other CoRE Stack
-pipelines) and supports automatic retries on transient failures.
+The task runs on the "farm" Celery queue (celery-farm worker), so it does not
+hold up the other CoRE Stack pipelines on "nrm". It supports automatic retries
+on transient failures.
 
 Triggered via the Django API:
     POST /api/v1/generate_farm_boundaries/

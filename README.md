@@ -85,9 +85,9 @@ python manage.py local_compute_layer_setup --ensure-tehsil-watersheds
 - **Running celery:**
 If you are running some tasks, you need to run 
 ```bash
-celery -A nrm_app worker -l info -Q nrm
+celery -A nrm_app worker -l info -Q nrm,farm
 ```
-where 'nrm_app' is the app_name and 'nrm' is the rabbitmq queue.
+where 'nrm_app' is the app_name, and 'nrm' and 'farm' (farm boundaries) are the rabbitmq queues.
 
 
 #### 4. Open in Browser

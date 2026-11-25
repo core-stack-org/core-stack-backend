@@ -293,7 +293,7 @@ sudo systemctl status rabbitmq-server
 conda activate corestack-backend
 
 # Start worker with full path
-python -m celery -A nrm_app worker -l info -Q nrm
+python -m celery -A nrm_app worker -l info -Q nrm,farm
 ```
 
 **Celery tasks not processing:**
