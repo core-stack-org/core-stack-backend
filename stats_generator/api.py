@@ -1,6 +1,10 @@
+import hmac
+
+from django.conf import settings
 from rest_framework.decorators import api_view, schema
 from rest_framework.response import Response
 from rest_framework import status
+from .models import LayerInfo
 from .utils import *
 from .mws_indicators import generate_mws_data_for_kyl_filters
 from .village_indicators import get_generate_filter_data_village
@@ -16,6 +20,53 @@ def _compute_param(request):
     if compute not in ("local", "gee"):
         raise ValueError(f"compute must be 'local' or 'gee', got {compute!r}")
     return compute
+
+
+@api_view(["GET"])
+@auth_free
+@schema(None)
+def list_layer_info(request):
+    """
+    Read-only list of LayerInfo rows for local compute instances.
+    Optional query filters: layer_type, workspace, excel_to_be_generated.
+    Validates X-Api-Key against PROD_BACKEND_API_KEY when configured.
+    """
+    api_key = getattr(settings, "PROD_BACKEND_API_KEY", "")
+    if api_key and not hmac.compare_digest(
+        request.headers.get("X-Api-Key", ""), api_key
+    ):
+        return Response(
+            {"error": "Unauthorized"}, status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    queryset = LayerInfo.objects.all()
+
+    layer_type = request.query_params.get("layer_type")
+    if layer_type:
+        queryset = queryset.filter(layer_type=layer_type)
+
+    workspace = request.query_params.get("workspace")
+    if workspace:
+        queryset = queryset.filter(workspace=workspace)
+
+    excel_param = request.query_params.get("excel_to_be_generated")
+    if excel_param is not None and excel_param != "":
+        normalized = str(excel_param).strip().lower()
+        if normalized in ("1", "true", "yes"):
+            queryset = queryset.filter(excel_to_be_generated=True)
+        elif normalized in ("0", "false", "no"):
+            queryset = queryset.filter(excel_to_be_generated=False)
+        else:
+            return Response(
+                {
+                    "error": (
+                        f"Invalid boolean for excel_to_be_generated: {excel_param!r}"
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    return Response({"layers": list(queryset.values(*LAYER_INFO_FIELDS))})
 
 
 @api_view(["GET"])
