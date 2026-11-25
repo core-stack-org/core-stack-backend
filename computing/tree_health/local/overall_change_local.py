@@ -159,7 +159,7 @@ def _reproject_to_match(raster_path, meta):
             dst_transform=meta["transform"],
             dst_crs=meta["crs"],
             dst_nodata=BACKGROUND,
-            resampling=Resampling.mode,
+            resampling=Resampling.nearest,
         )
     return output
 

@@ -40,7 +40,7 @@ PRECOMPUTED_PANCHAYAT_DIR = VILLAGE_BOUNDARIES_DIR
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
-LULC_CLASSES = np.arange(1, 13, dtype=np.int16)
+LULC_CLASSES = np.arange(1, 14, dtype=np.int16)
 
 TERRAIN_CLUSTER_CENTROIDS = np.array(
     [
@@ -929,10 +929,11 @@ def compute_categorical_raster_areas_for_watersheds(
                 computed_rows.append(empty_result.copy())
                 continue
 
-            values = np.asarray(data, dtype=np.float64)
-            values = np.where(np.isfinite(values), values, 0)
+            raw_values = np.asarray(data, dtype=np.float64)
+            finite_mask = np.isfinite(raw_values)
+            values = np.where(finite_mask, raw_values, 0)
             values = np.rint(values).astype(np.int16, copy=False)
-            valid_mask = ~np.ma.getmaskarray(data)
+            valid_mask = (~np.ma.getmaskarray(data)) & finite_mask
             if nodata is not None and not np.isnan(nodata):
                 valid_mask &= values != int(round(nodata))
 
@@ -1032,11 +1033,12 @@ def compute_union_categorical_area_across_rasters_for_watersheds(
                 if data.size == 0:
                     continue
 
-                values = np.asarray(data, dtype=np.float64)
-                values = np.where(np.isfinite(values), values, 0)
+                raw_values = np.asarray(data, dtype=np.float64)
+                finite_mask = np.isfinite(raw_values)
+                values = np.where(finite_mask, raw_values, 0)
                 values = np.rint(values).astype(np.int16, copy=False)
 
-                valid_mask = ~np.ma.getmaskarray(data)
+                valid_mask = (~np.ma.getmaskarray(data)) & finite_mask
                 nodata = src.nodata
                 if nodata is not None and not np.isnan(nodata):
                     valid_mask &= values != int(round(nodata))

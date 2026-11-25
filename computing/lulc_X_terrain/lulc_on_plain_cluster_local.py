@@ -26,16 +26,13 @@ from computing.local_compute_helper import (
     ensure_file_exists as _ensure_file_exists,
     filter_large_watersheds as _filter_large_watersheds,
     load_precomputed_watersheds as _load_precomputed_watersheds,
+    queue_local_vector_for_geoserver,
     resolve_aez_code as _resolve_aez_code,
     resolve_lulc_raster_paths as _resolve_lulc_raster_paths,
     validate_geometry as _validate_geometry,
     write_vector_output as _write_output_vector,
 )
-from computing.utils import (
-    push_shape_to_geoserver,
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
+from computing.utils import save_layer_info_to_db
 
 from .utils import aez_lulcXterrain_cluster_centroids
 
@@ -60,17 +57,23 @@ def _compute_plain_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
             terrain_src,
             [geometry.__geo_interface__],
             crop=True,
-            filled=True,
+            filled=False,
         )
     except ValueError:
         return None
 
-    terrain_values = np.rint(terrain_data[0]).astype(np.int16, copy=False)
-    if terrain_values.size == 0:
+    band = terrain_data[0]
+    if band.size == 0:
         return None
 
-    terrain_valid_mask = np.ones(terrain_values.shape, dtype=bool)
-    if terrain_src.nodata is not None:
+    raw_terrain = np.asarray(band, dtype=np.float64)
+    finite_mask = np.isfinite(raw_terrain)
+    terrain_values = np.rint(np.where(finite_mask, raw_terrain, 0)).astype(
+        np.int16, copy=False
+    )
+
+    terrain_valid_mask = (~np.ma.getmaskarray(band)) & finite_mask
+    if terrain_src.nodata is not None and not np.isnan(terrain_src.nodata):
         terrain_valid_mask &= terrain_values != int(round(terrain_src.nodata))
     terrain_valid_mask &= terrain_values > 0
 
@@ -138,13 +141,21 @@ def _assign_plain_clusters(
 
     computed_rows = []
     with rasterio.open(terrain_raster_path) as terrain_src, ExitStack() as stack:
+        working_gdf = plain_watersheds_gdf
+        if working_gdf.crs is None:
+            raise ValueError(
+                "Watershed CRS is missing; cannot align with terrain raster."
+            )
+        if terrain_src.crs and working_gdf.crs != terrain_src.crs:
+            working_gdf = working_gdf.to_crs(terrain_src.crs)
+
         lulc_sources = [
             stack.enter_context(rasterio.open(path)) for path in lulc_raster_paths
         ]
-        total = len(plain_watersheds_gdf)
+        total = len(working_gdf)
 
         for index, row in enumerate(
-            plain_watersheds_gdf.itertuples(index=False),
+            working_gdf.itertuples(index=False),
             start=1,
         ):
             properties = _compute_plain_lulc_properties_for_feature(
@@ -278,7 +289,7 @@ def run_lulc_on_plain_cluster_local(
         "terrainClusters"
     ].astype(int)
     plain_watersheds = terrain_classified.loc[
-        terrain_classified["terrain_cluster"] != 2
+        terrain_classified["terrain_cluster"].isin([0, 1, 3])
     ].copy()
     if plain_watersheds.empty:
         raise ValueError(
@@ -328,26 +339,6 @@ def run_lulc_on_plain_cluster_local(
     logger.info("Watershed boundary source: %s", watershed_source)
     logger.info("Resolved AEZ code: %s", aez_code)
 
-    geoserver_ok = False
-    if push_to_geoserver:
-        geoserver_response = push_shape_to_geoserver(
-            os.path.splitext(asset_id)[0],
-            workspace=GEOSERVER_WORKSPACE,
-            layer_name=layer_name,
-            file_type="gpkg",
-        )
-        geoserver_ok = isinstance(geoserver_response, dict) and geoserver_response.get(
-            "status_code"
-        ) in (200, 201)
-        if geoserver_ok:
-            logger.info("GeoServer upload succeeded for layer %s", layer_name)
-        else:
-            logger.error(
-                "GeoServer upload failed for layer %s: %s",
-                layer_name,
-                geoserver_response,
-            )
-
     layer_id = None
     if sync_layer_metadata:
         layer_id = save_layer_info_to_db(
@@ -364,8 +355,28 @@ def run_lulc_on_plain_cluster_local(
             },
         )
         logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-        if layer_id and geoserver_ok:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+
+    geoserver_ok = False
+    if push_to_geoserver:
+        geoserver_response = queue_local_vector_for_geoserver(
+            path=os.path.splitext(asset_id)[0],
+            workspace=GEOSERVER_WORKSPACE,
+            layer_name=layer_name,
+            file_type="gpkg",
+            layer_id=layer_id,
+        )
+        geoserver_ok = (
+            isinstance(geoserver_response, dict)
+            and geoserver_response.get("status_code") == 202
+        )
+        if geoserver_ok:
+            logger.info("GeoServer upload queued for layer %s", layer_name)
+        else:
+            logger.error(
+                "GeoServer queueing failed for layer %s: %s",
+                layer_name,
+                geoserver_response,
+            )
 
     return geoserver_ok if push_to_geoserver else True
 

@@ -139,11 +139,11 @@ def _clip_and_mask_ch(ch_path, lulc_path, roi_gdf, output_path):
             dst_transform=output_meta["transform"],
             dst_crs=output_meta["crs"],
             dst_nodata=0,
-            resampling=Resampling.mode,
+            resampling=Resampling.nearest,
         )
 
     tree_mask = (lulc_array == LulcClass.TREES) | (lulc_array == LulcClass.PLANTATION)
-    valid_ch = ch_array != nodata
+    valid_ch = np.isfinite(ch_array) & (ch_array != nodata)
     output_array = np.where(tree_mask & valid_ch, ch_array, nodata).astype(
         ch_array.dtype,
         copy=False,
