@@ -3,6 +3,10 @@ import shutil
 import tempfile
 import zipfile
 
+from computing.config_loader import (
+    TERRAIN_CLUSTER_OUTPUT_DIR,
+    TERRAIN_RASTER_OUTPUT_DIR,
+)
 from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
@@ -16,8 +20,8 @@ from computing.local_compute_helper import (
 )
 
 
-CLIPPED_TERRAIN_RASTER_DIR = "data/terrain/fabdem_local"
-LOCAL_CLUSTER_OUTPUT_DIR = "data/terrain/terrain_clusters_local"
+CLIPPED_TERRAIN_RASTER_DIR = TERRAIN_RASTER_OUTPUT_DIR
+LOCAL_CLUSTER_OUTPUT_DIR = TERRAIN_CLUSTER_OUTPUT_DIR
 GEOSERVER_WORKSPACE = "terrain"
 
 

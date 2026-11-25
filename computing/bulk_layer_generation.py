@@ -71,6 +71,7 @@ STANDARD_PIPELINES = {
 
 LOCAL_TASK_DATASETS = {
     "computing.misc.nrega_local_compute.generate_nrega_data_local": ("NREGA Assets",),
+    "computing.lulc.clip_lulc_local.clip_lulc_local": ("LULC_v3", "LULC_level_3"),
     "computing.lulc.lulc_v3_local.clip_lulc_v3": ("LULC_v3", "LULC_level_3"),
     "computing.lulc.lulc_vector_local.vectorise_lulc": ("LULC",),
     "computing.cropping_intensity.cropping_intensity_local.generate_cropping_intensity": (
@@ -194,7 +195,7 @@ LOCAL_TASK_DATASETS = {
     "computing.tree_in_grassland.tree_in_grassland_local_compute.generate_tree_in_grassland_local": (
         "Tree in Grassland",
     ),
-    "computing.drought.drought_causality.drought_causality": ("Drought Causality",),
+    "computing.drought.drought_causality_local.drought_causality_local": ("Drought Causality",),
 }
 
 

@@ -2,7 +2,7 @@ from utilities.gee_utils import valid_gee_text
 
 from nrm_app.celery import app
 
-from computing.config_loader import TERRAIN_RASTER_PATH
+from computing.config_loader import TERRAIN_RASTER_OUTPUT_DIR, TERRAIN_RASTER_PATH
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
@@ -13,7 +13,7 @@ from computing.local_compute_helper import (
 )
 
 
-LOCAL_OUTPUT_BASE_DIR = "data/terrain/fabdem_local"
+LOCAL_OUTPUT_BASE_DIR = TERRAIN_RASTER_OUTPUT_DIR
 GEOSERVER_STYLE = "terrain_raster"
 GEOSERVER_WORKSPACE = "terrain"
 

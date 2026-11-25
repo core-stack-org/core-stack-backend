@@ -13,6 +13,7 @@ from nrm_app.settings import (
 from computing.config_loader import (
     ADMIN_BOUNDARY_INPUT_DIR as _ADMIN_BOUNDARY_INPUT_DIR,
     ADMIN_BOUNDARY_OUTPUT_DIR as _ADMIN_BOUNDARY_OUTPUT_DIR,
+    DATA_DIR as _DATA_DIR,
     SOI_TEHSIL_PATH as _SOI_TEHSIL_PATH,
 )
 
@@ -22,7 +23,7 @@ ADMIN_BOUNDARY_OUTPUT_DIR = str(_ADMIN_BOUNDARY_OUTPUT_DIR)
 
 # Canonical local pipeline resources. Runtime pipelines read these defaults
 # directly; their YAML `sources` entries are optional test overrides.
-BASE_RESOURCES_DIR = "data/base_resources"
+BASE_RESOURCES_DIR = str(_DATA_DIR / "base_resources")
 ADMIN_BOUNDARY_GPKG = f"{BASE_RESOURCES_DIR}/cs_admin_standard.gpkg"
 FACILITIES_GPKG = f"{BASE_RESOURCES_DIR}/cs_pan_india_facilities.gpkg"
 ANTYODAYA_2020_CSV = f"{BASE_RESOURCES_DIR}/cs_antyodaya_2020_cluster_analysis.csv"
@@ -233,15 +234,20 @@ GEE_PATHS = {
     },
 }
 
-PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
-)
-
 LULC_V2_RIVER_BASIN_OUTPUT_PATH = (
     "projects/corestack-datasets/assets/datasets/lulc_v2_river_basin/"
 )
-
+PAN_INDIA_RIVER_BASIN_LULC_V3_BASE_PATH = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3"
+)
 LULC_V3_OUTPUT_ASSET_PATH = "projects/corestack-datasets/assets/datasets/lulc_v3/"
+PAN_INDIA_LULC_V3_DATASET = (
+    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
+)
+PAN_INDIA_LULC_V4_DATASET = (
+    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
+)
+PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
 
 
 class LulcClass(IntEnum):
@@ -355,12 +361,7 @@ FABDEM = "projects/sat-io/open-datasets/FABDEM"
 WATERREJUVENATION = "projects/ee-corestackdev/assets/apps/waterrej/proj1"
 WATERREJ_LULCFORM = "projects/ee-corestackdev/assets/apps/waterrej/lulcfrom"
 WATER_REJ_GEE_ASSET = "projects/ee-corestackdev/assets/apps/waterbody/"
-PAN_INDIA_LULC_V3_DATASET = (
-    "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_"
-)
-PAN_INDIA_LULC_V4_DATASET = (
-    "projects/corestack-datasets/assets/datasets/lulc_v4/pan_india/lulc_v4_"
-)
+
 DISTANCE_TO_UPSTREAM_DL = (
     "projects/ext-datasets/assets/datasets/distance_to_nearest_upstream_DL_raster"
 )
@@ -368,12 +369,12 @@ SLOPE_PERCENTAGE = "projects/ext-datasets/assets/datasets/slope_percentage_fabde
 NATURAL_DEPRESSION_EXTERNAL_DATASET = (
     "projects/ext-datasets/assets/datasets/Natural_depression_raster"
 )
-PAN_INDIA_MWS_PATH = "projects/corestack-datasets/assets/datasets/India_mws_UID_Merged"
+PAN_INDIA_MWS_PATH = "projects/corestack-datasets/assets/datasets/hydrological_boundaries/microwatershed"
 NATURAL_DEPRESSION = (
     "projects/corestack-datasets/assets/datasets/Natural_depression_raster"
 )
 CATCHMENT_AREA = "projects/ext-datasets/assets/datasets/catchment_area_singleflow"
-PAN_INDIA_LULC_PATH = "projects/corestack-datasets/assets/datasets/LULC_v3_river_basin/pan_india_lulc_v3_2023_2024"
+
 # CRS
 CRS_4326 = "EPSG:4326"
 

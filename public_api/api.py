@@ -26,7 +26,7 @@ from .views import (
     filter_village_feature_collection,
     village_rows_to_feature_collection,
 )
-from utilities.auth_check_decorator import api_security_check
+from utilities.auth_check_decorator import api_security_check, validate_jwt
 from drf_yasg.utils import swagger_auto_schema
 from .swagger_schemas import (
     admin_by_latlon_schema,
@@ -57,8 +57,14 @@ from geoadmin.utils import (
 )
 from .dataset_filters import (
     filter_active_locations,
+    filter_kyl_indicator_payload,
+    filter_kyl_v1_rows,
+    filter_mws_fortnight_payload,
+    filter_mws_v1_timeseries_payload,
     filter_tehsil_payload,
+    parse_fields_filter,
     parse_tehsil_data_filter,
+    validate_mws_fortnight_fields,
 )
 from utilities.openmeteo_format import (
     error_envelope,
@@ -173,8 +179,11 @@ def _success_response_v2(data, http_status=status.HTTP_200_OK):
     return Response(success_envelope(inner), status=http_status)
 
 
-def _error_response(message, http_status, details=None):
-    return Response(error_envelope(message, details), status=http_status)
+def _error_response(message, http_status, details=None, code=None):
+    payload = error_envelope(message, details)
+    if code is not None:
+        payload["code"] = code
+    return Response(payload, status=http_status)
 
 
 def _error_response_v2(message, http_status, details=None):
@@ -187,6 +196,32 @@ def _get_required_query_param(request, name):
         return None
     value = str(value).strip()
     return value if value else None
+
+
+def _parse_bool_flag(raw_value):
+    """Parse query-string boolean flags strictly (only 1/true/yes are True)."""
+    if isinstance(raw_value, bool):
+        return raw_value
+    return str(raw_value or "").strip().lower() in {"1", "true", "yes"}
+
+
+def _can_regenerate(request):
+    """Allow cache rebuild (regenerate=true) only for admin/staff or JWT users."""
+    user = getattr(request, "user", None)
+    if user is not None and (
+        getattr(user, "is_superuser", False) or getattr(user, "is_staff", False)
+    ):
+        return True
+    if getattr(request, "auth_method", None) == "JWT":
+        return True
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split("Bearer ", 1)[1].strip()
+        if token:
+            is_valid, _ = validate_jwt(token)
+            if is_valid:
+                return True
+    return False
 
 
 def _normalize_geo_params(request):
@@ -349,6 +384,16 @@ def get_mws_data(request):
                 {"error": "Data not found for the given mws_id"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if isinstance(data, dict) and data.get("error"):
+            return Response(data, status=status.HTTP_404_NOT_FOUND)
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields:
+            try:
+                data = filter_mws_v1_timeseries_payload(data, requested_fields)
+            except ValueError as exc:
+                return Response(
+                    {"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+                )
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -366,11 +411,7 @@ def get_mws_data_v2(request):
     try:
         state, district, tehsil = _normalize_geo_params(request)
         mws_id = _get_required_query_param(request, "mws_id")
-        regenerate = str(request.query_params.get("regenerate", "")).lower() in {
-            "1",
-            "true",
-            "yes",
-        }
+        regenerate = _parse_bool_flag(request.query_params.get("regenerate", ""))
 
         if state is None or district is None or tehsil is None or mws_id is None:
             return _error_response_v2(
@@ -394,11 +435,20 @@ def get_mws_data_v2(request):
                 status.HTTP_400_BAD_REQUEST,
             )
 
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields:
+            try:
+                validate_mws_fortnight_fields(requested_fields)
+            except ValueError as exc:
+                return _error_response_v2(str(exc), status.HTTP_400_BAD_REQUEST)
+
         state_norm = state.upper()
         if not regenerate:
             cached = _load_mws_v2_from_mongo(state_norm, district, tehsil, mws_id)
             if cached is not None:
-                return _success_response_v2(cached, http_status=status.HTTP_200_OK)
+                migrated = legacy_hourly_to_fortnight_inner_block(cached)
+                filtered = filter_mws_fortnight_payload(migrated, requested_fields)
+                return _success_response_v2(filtered, http_status=status.HTTP_200_OK)
 
         data = get_mws_time_series_data(state, district, tehsil, mws_id)
         if not data:
@@ -421,7 +471,8 @@ def get_mws_data_v2(request):
         v2_payload = fortnight_structure_from_mws(data)
         _save_mws_v2_to_mongo(state_norm, district, tehsil, mws_id, v2_payload)
 
-        return _success_response_v2(v2_payload, http_status=status.HTTP_200_OK)
+        response_payload = filter_mws_fortnight_payload(v2_payload, requested_fields)
+        return _success_response_v2(response_payload, http_status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json v2 :: ", e)
         return _error_response_v2(
@@ -433,7 +484,7 @@ def get_mws_data_v2(request):
 
 ######### Get MWS DATA by Admin Details  ##########
 @swagger_auto_schema(**tehsil_data_schema)
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="JWT_or_API_key")
 def generate_tehsil_data(request):
     """
     Retrieve Tehsil-level JSON data for a given state, district, and tehsil.
@@ -442,7 +493,14 @@ def generate_tehsil_data(request):
     try:
         # Get query parameters
         state, district, tehsil = _normalize_geo_params(request)
-        regenerate = request.query_params.get("regenerate", "").lower()
+        regenerate = _parse_bool_flag(request.query_params.get("regenerate", ""))
+        if regenerate and not _can_regenerate(request):
+            return Response(
+                {
+                    "error": "The 'regenerate' option is restricted to admin or JWT-authenticated users."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         if state is None or district is None or tehsil is None:
             return Response(
@@ -531,6 +589,14 @@ def get_mws_json_by_kyl_indicator(request):
                 {"error": "Data not found for the given mws_id."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields and isinstance(data, list):
+            try:
+                data = filter_kyl_v1_rows(data, requested_fields)
+            except ValueError as exc:
+                return Response(
+                    {"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+                )
         return Response(data, status=200)
     except Exception as e:
         print("Exception in stats mws json :: ", e)
@@ -827,12 +893,17 @@ def get_mws_by_lat_lon_v2(request):
 
 
 @swagger_auto_schema(**tehsil_data_schema_v2)
-@api_security_check(auth_type="API_key")
+@api_security_check(auth_type="JWT_or_API_key")
 def generate_tehsil_data_v2(request):
     print("Inside generating tehsil excel data")
     try:
         state, district, tehsil = _normalize_geo_params(request)
-        regenerate = request.query_params.get("regenerate", "").lower()
+        regenerate = _parse_bool_flag(request.query_params.get("regenerate", ""))
+        if regenerate and not _can_regenerate(request):
+            return _error_response(
+                "The 'regenerate' option is restricted to admin or JWT-authenticated users.",
+                status.HTTP_403_FORBIDDEN,
+            )
 
         if state is None or district is None or tehsil is None:
             return _error_response(
@@ -865,9 +936,28 @@ def generate_tehsil_data_v2(request):
             return _error_response(str(exc), status.HTTP_400_BAD_REQUEST)
 
         json_data = get_tehsil_json(state, district, tehsil, regenerate)
-        payload = filter_tehsil_payload(
-            tehsil_structure_from_dict(json_data), requested_sheets
-        )
+        full_payload = tehsil_structure_from_dict(json_data)
+        payload = filter_tehsil_payload(full_payload, requested_sheets)
+        matched_sheets = payload.get("tehsil_data") or {}
+        if not matched_sheets:
+            available_datasets = sorted((full_payload.get("tehsil_data") or {}).keys())
+            if requested_sheets:
+                missing_datasets = sorted(requested_sheets)
+                names = ", ".join(missing_datasets)
+                message = f"Dataset not generated for this tehsil: {names}."
+            else:
+                missing_datasets = []
+                message = "No datasets generated for this tehsil."
+            return _error_response(
+                message,
+                status.HTTP_404_NOT_FOUND,
+                details={
+                    "code": "DATA_NOT_GENERATED",
+                    "missing_datasets": missing_datasets,
+                    "available_datasets": available_datasets,
+                },
+                code="DATA_NOT_GENERATED",
+            )
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -927,6 +1017,12 @@ def get_mws_json_by_kyl_indicator_v2(request):
             )
         rows = data if isinstance(data, list) else []
         payload = flat_kyl_indicator_payload(rows)
+        requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
+        if requested_fields:
+            try:
+                payload = filter_kyl_indicator_payload(payload, requested_fields)
+            except ValueError as exc:
+                return _error_response(str(exc), status.HTTP_400_BAD_REQUEST)
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
         print("Exception in stats mws json :: ", e)

@@ -134,6 +134,17 @@ def stages_done(status, paths, season):
     return done
 
 
+def cropland_outdated(paths, season):
+    """The season's cropland files were made from other LULC files (LULC v3, or a provisional
+    year since finalised); the next run makes them, the classes and the MWS layer again."""
+    from computing.drought.local import cropland  # cropland imports config and store only
+
+    try:
+        return not cropland.share_current(paths, season, cropland.normal_stamp(paths))
+    except (OSError, ValueError):  # a LULC file is missing: the season waits for it instead
+        return False
+
+
 def season_states(paths, seasons=None):
     """[(season, state, detail)] for the given seasons (default: FIRST_SEASON to this year)."""
     seasons = seasons or range(FIRST_SEASON, dt.date.today().year + 1)
@@ -145,11 +156,15 @@ def season_states(paths, seasons=None):
     rows = []
     for season in seasons:
         done = record.get(str(season), {})
+        provisional = "; LULC provisional" if paths.lulc_status(season) == "provisional" else ""
         if done.get("state") == DONE:
-            if done.get("method_version") == METHOD_VERSION:
+            if cropland_outdated(paths, season):
+                rows.append((season, OUTDATED, "made from other LULC files; the next run makes its cropland, "
+                                               "classes and MWS layer again" + provisional))
+            elif done.get("method_version") == METHOD_VERSION:
                 layer = "mws" in stages_done(status, paths, season)
                 rows.append((season, DONE, f"finished {done.get('finished_at', '?')}"
-                             + ("; MWS layer done" if layer else "; MWS layer not made yet")))
+                             + ("; MWS layer done" if layer else "; MWS layer not made yet") + provisional))
             else:
                 rows.append((season, OUTDATED, f"made with {done.get('method_version')}, now {METHOD_VERSION}"))
             continue
@@ -159,5 +174,5 @@ def season_states(paths, seasons=None):
         if gaps:
             rows.append((season, WAITING, "; ".join(text for _, text in gaps) + progress))
         else:
-            rows.append((season, READY, "all inputs present" + progress))
+            rows.append((season, READY, "all inputs present" + progress + provisional))
     return rows

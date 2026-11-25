@@ -3,8 +3,10 @@ Open-Meteo-style API payloads: aligned time arrays + units, shared across apps.
 """
 import ast
 import json
+import math
 import re
 
+from stats_generator.kyl_legends import indicator_legends_for_keys
 from utilities.renderers import round_floats
 
 YEAR_SUFFIX_RE = re.compile(
@@ -169,18 +171,29 @@ KYL_INDICATOR_UNIT_OVERRIDES = {
     "mws_id": "id",
     "terraincluster_id": "id",
     "avg_precipitation": "mm",
+    "kharif_annual_rainfall_ratio": "ratio",
+    "trend_annual_rainfall": "code",
+    "monsoon_onset_day_range": "days",
     "cropping_intensity_trend": "code",
+    "cropping_intensity_trend_value": "ratio/year",
     "cropping_intensity_avg": "ratio",
-    "avg_single_cropped": "ha",
-    "avg_double_cropped": "ha",
-    "avg_triple_cropped": "ha",
-    "avg_wsr_ratio_kharif": "ratio",
-    "avg_wsr_ratio_rabi": "ratio",
-    "avg_wsr_ratio_zaid": "ratio",
-    "avg_kharif_surface_water_mws": "mm",
-    "avg_rabi_surface_water_mws": "mm",
-    "avg_zaid_surface_water_mws": "mm",
+    # Average annual share of land cropped in any year of the period (sum_area_in_ha).
+    "avg_single_cropped": "% of cropped area",
+    "avg_double_cropped": "% of cropped area",
+    "avg_triple_cropped": "% of cropped area",
+    # Average annual seasonal surface-water area as % of seasonal cropped area.
+    # Denominators: Kharif = single-kharif + double + triple; Rabi =
+    # single-non-kharif + double + triple; Zaid = triple-cropped area only.
+    "avg_water_surface_to_cropped_area_kharif": "%",
+    "avg_water_surface_to_cropped_area_rabi": "%",
+    "avg_water_surface_to_cropped_area_zaid": "%",
+    # Average annual share of that year's observed surface-water area
+    # (total_area_in_ha_<year>, not total waterbody capacity).
+    "avg_kharif_surface_water_mws": "% of that year's water area",
+    "avg_rabi_surface_water_mws": "% of that year's water area",
+    "avg_zaid_surface_water_mws": "% of that year's water area",
     "trend_swb": "code",
+    "trend_water_surface_area_value": "ha/year",
     "trend_g": "code",
     "drought_category": "category",
     "avg_number_dry_spell": "count",
@@ -190,7 +203,10 @@ KYL_INDICATOR_UNIT_OVERRIDES = {
     "degradation_land_area": "ha",
     "increase_in_tree_cover": "ha",
     "decrease_in_tree_cover": "ha",
-    "degradation_cropping_intensity": "ratio",
+    # Total area (ha) where cropping intensity changed between the first and
+    # last 3-year composites: counts BOTH decreases (do->si, tr->si, tr->do)
+    # and increases (si->do, si->tr, do->tr).
+    "cropping_intensity_change_area": "ha",
     "urbanization_area": "ha",
     "lulc_slope_category": "category",
     "lulc_plain_category": "category",
@@ -202,12 +218,55 @@ KYL_INDICATOR_UNIT_OVERRIDES = {
     "mining": "flag",
     "green_credit": "flag",
     "factory_csr": "flag",
+    # Terrain, hydrology & water infrastructure (IMP-15)
+    "relief": "m",
+    "mean_elevation": "m",
+    "relative_mean_elevation": "m",
+    "drainage_density": "km/km²",
+    "canal_available": "boolean",
+    "river_available": "boolean",
+    "mws_intersect_swb": "list",
+    # Canopy, forest & shrubland (IMP-15)
+    "forest_to_farm": "ha",
+    "degradation_in_forests": "ha",
+    "trees_in_forest_loss": "ha",
+    "trees_in_forest_fringe_loss": "ha",
+    "trees_in_grassland_loss": "ha",
+    "reduction_in_shrubland_cover": "ha",
+    "reduction_canopy_density_height": "%",
+    "increase_canopy_density_height": "%",
+    "shrub_trend": "code",
+    # Soil health & soil type (IMP-15)
+    "nitrogen_levels": "kg/ha",
+    "phosphoros_levels": "kg/ha",
+    "potassium_levels": "kg/ha",
+    "organic_carbon": "%",
+    "organic_carbon_tree_cover": "%",
+    "soil_ph": "pH",
+    "soil_drainage": "code",
+    "soil_texture": "code",
+    # Proximity & socioeconomic indicators (IMP-15)
+    "distance_to_bank": "km",
+    "dist_to_coops": "km",
+    "shg_penetration": "score",
+    "max_livestock_score": "score",
+}
+
+
+# Legacy KYL indicator keys renamed to clearer canonical names on output,
+# so already-cached KYL JSON files on disk serve the corrected name immediately.
+KYL_INDICATOR_KEY_RENAMES = {
+    "degradation_cropping_intensity": "cropping_intensity_change_area",
+    "avg_wsr_ratio_kharif": "avg_water_surface_to_cropped_area_kharif",
+    "avg_wsr_ratio_rabi": "avg_water_surface_to_cropped_area_rabi",
+    "avg_wsr_ratio_zaid": "avg_water_surface_to_cropped_area_zaid",
 }
 
 
 def indicator_unit_for_key(key):
     """Unit label for a flat indicator column name (KYL & similar tabular APIs)."""
     k = str(key).strip().lower()
+    k = KYL_INDICATOR_KEY_RENAMES.get(k, k)
     if k in KYL_INDICATOR_UNIT_OVERRIDES:
         return KYL_INDICATOR_UNIT_OVERRIDES[k]
     name, unit = _split_metric_unit_suffix(k)
@@ -217,19 +276,22 @@ def indicator_unit_for_key(key):
 
 
 def _canonicalize_indicator_row(row):
-    """Rename keys that embed units (``lulc_crop_percent`` → ``lulc_crop``)."""
+    """Rename legacy/unit-embedded KYL keys and attach canonical units."""
     if not isinstance(row, dict):
         return {}, {}
     out = {}
     units = {}
     for key, value in row.items():
-        lower = str(key).strip().lower()
+        raw_lower = str(key).strip().lower()
+        lower = KYL_INDICATOR_KEY_RENAMES.get(raw_lower, raw_lower)
         if lower in KYL_INDICATOR_UNIT_OVERRIDES:
             new_key, unit = lower, KYL_INDICATOR_UNIT_OVERRIDES[lower]
         else:
             new_key, unit = _split_metric_unit_suffix(lower)
             if new_key in KYL_INDICATOR_UNIT_OVERRIDES:
                 unit = KYL_INDICATOR_UNIT_OVERRIDES[new_key]
+        if raw_lower in KYL_INDICATOR_KEY_RENAMES and new_key in out:
+            continue
         out[new_key] = value
         units[new_key] = unit
     return out, units
@@ -237,14 +299,15 @@ def _canonicalize_indicator_row(row):
 
 def flat_kyl_indicator_payload(rows):
     """
-    Tabular KYL indicators (not time series): one or more flat rows + parallel unit map.
+    Tabular KYL indicators (not time series): one or more flat rows +
+    parallel unit map + code legends for coded/classed indicators.
 
     ``rows`` is a list of dicts (typically one row per ``mws_id``).
     """
     if not isinstance(rows, list):
         rows = []
     if len(rows) == 0:
-        return {"indicators": [], "indicator_units": {}}
+        return {"indicators": [], "indicator_units": {}, "indicator_legends": {}}
 
     normalized_rows = []
     indicator_units = {}
@@ -256,17 +319,23 @@ def flat_kyl_indicator_payload(rows):
         indicator_units.update(units)
 
     if len(normalized_rows) == 0:
-        return {"indicators": [], "indicator_units": {}}
+        return {"indicators": [], "indicator_units": {}, "indicator_legends": {}}
+    indicator_legends = indicator_legends_for_keys(indicator_units.keys())
     if len(normalized_rows) == 1:
         return round_floats(
             {
                 "indicators": normalized_rows[0],
                 "indicator_units": indicator_units,
+                "indicator_legends": indicator_legends,
             },
             precision=2,
         )
     return round_floats(
-        {"indicators": normalized_rows, "indicator_units": indicator_units},
+        {
+            "indicators": normalized_rows,
+            "indicator_units": indicator_units,
+            "indicator_legends": indicator_legends,
+        },
         precision=2,
     )
 
@@ -1020,12 +1089,14 @@ def fortnight_structure_from_mws(payload):
         )
 
     rows = payload.get("time_series", [])
-    fortnight = {
-        "time": [row.get("date") for row in rows],
-        "et": [row.get("et") for row in rows],
-        "runoff": [row.get("runoff") for row in rows],
-        "precipitation": [row.get("precipitation") for row in rows],
-    }
+    fortnight = _sanitize_fortnight_block(
+        {
+            "time": [row.get("date") for row in rows],
+            "et": [row.get("et") for row in rows],
+            "runoff": [row.get("runoff") for row in rows],
+            "precipitation": [row.get("precipitation") for row in rows],
+        }
+    )
     return round_floats(
         {
             "metadata": {"mws_id": payload.get("mws_id")},
@@ -1036,6 +1107,56 @@ def fortnight_structure_from_mws(payload):
     )
 
 
+def _coerce_optional_number(value):
+    """Coerce numeric fortnight value to float/int, or None if missing/invalid (never '')."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            num = float(stripped)
+        except ValueError:
+            return None
+        if math.isnan(num) or math.isinf(num):
+            return None
+        return num
+    return None
+
+
+def _sanitize_fortnight_block(fortnight):
+    """Sanitize numeric series (no '' in number arrays) and drop trailing all-null periods."""
+    if not isinstance(fortnight, dict):
+        return fortnight
+    times = fortnight.get("time")
+    if not isinstance(times, list):
+        return fortnight
+    metric_keys = [k for k, v in fortnight.items() if k != "time" and isinstance(v, list)]
+    sanitized = {"time": list(times)}
+    for k, v in fortnight.items():
+        if k == "time":
+            continue
+        if k in metric_keys:
+            sanitized[k] = [_coerce_optional_number(item) for item in v]
+        else:
+            sanitized[k] = v
+    if metric_keys:
+        n = len(sanitized["time"])
+        if all(len(sanitized[k]) == n for k in metric_keys):
+            while n > 0 and all(sanitized[k][n - 1] is None for k in metric_keys):
+                n -= 1
+            if n != len(sanitized["time"]):
+                sanitized["time"] = sanitized["time"][:n]
+                for k in metric_keys:
+                    sanitized[k] = sanitized[k][:n]
+    return sanitized
+
+
 # Backwards compatibility for imports; returns fortnight keys only.
 hourly_structure_from_mws = fortnight_structure_from_mws
 
@@ -1044,14 +1165,13 @@ def legacy_hourly_to_fortnight_inner_block(inner):
     """Mongo / old clients may still store ``hourly`` / ``hourly_units``; expose ``fortnight``."""
     if not isinstance(inner, dict):
         return inner
-    if "fortnight" in inner:
-        return inner
-    if "hourly" not in inner:
-        return inner
     migrated = dict(inner)
-    migrated["fortnight"] = migrated.pop("hourly")
-    if "hourly_units" in migrated:
-        migrated["fortnight_units"] = migrated.pop("hourly_units")
+    if "fortnight" not in migrated and "hourly" in migrated:
+        migrated["fortnight"] = migrated.pop("hourly")
+        if "hourly_units" in migrated:
+            migrated["fortnight_units"] = migrated.pop("hourly_units")
+    if isinstance(migrated.get("fortnight"), dict):
+        migrated["fortnight"] = _sanitize_fortnight_block(migrated["fortnight"])
     return migrated
 
 

@@ -1,6 +1,8 @@
 from django.contrib.auth.models import Group
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from rest_framework import serializers
+
 
 from projects.models import Project
 
@@ -158,31 +160,32 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         new_org_name = validated_data.pop("_new_org_name", None)
         validated_data.pop("password_confirm")
 
-        # Create the user first
-        user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data["email"],
-            password=validated_data["password"],
-            first_name=validated_data.get("first_name", ""),
-            last_name=validated_data.get("last_name", ""),
-            contact_number=validated_data.get("contact_number", ""),
-            age=validated_data.get("age"),
-            education_qualification=validated_data.get("education_qualification", ""),
-            gender=validated_data.get("gender", ""),
-            profile_picture=validated_data.get("profile_picture"),
-            account_type=validated_data.get("account_type"),
-            user_consent=validated_data.get("user_consent", False),
-        )
-
-        if org_obj:
-            user.organization = org_obj
-        elif new_org_name:
-            org_obj = Organization.objects.create(
-                name=new_org_name,
-                created_by=user,  # <-- here we set created_by to the same new user
+    # Create the user first
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=validated_data["username"],
+                email=validated_data["email"],
+                password=validated_data["password"],
+                first_name=validated_data.get("first_name", ""),
+                last_name=validated_data.get("last_name", ""),
+                contact_number=validated_data.get("contact_number", ""),
+                age=validated_data.get("age"),
+                education_qualification=validated_data.get("education_qualification", ""),
+                gender=validated_data.get("gender", ""),
+                profile_picture=validated_data.get("profile_picture"),
+                account_type=validated_data.get("account_type"),
+                user_consent=validated_data.get("user_consent", False),
             )
-            user.organization = org_obj
-        user.save()
+
+            if org_obj:
+                user.organization = org_obj
+            elif new_org_name:
+                org_obj = Organization.objects.create(
+                    name=new_org_name,
+                    created_by=user,
+                )
+                user.organization = org_obj
+            user.save()
         return user
 
 

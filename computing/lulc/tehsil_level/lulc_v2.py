@@ -10,7 +10,7 @@ from utilities.gee_utils import (
 )
 from computing.lulc.utils.built_up import *
 from computing.lulc.utils.cropland import *
-from computing.lulc.cropping_frequency import *
+from computing.lulc.utils.cropping_frequency import *
 from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from nrm_app.celery import app

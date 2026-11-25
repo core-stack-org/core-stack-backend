@@ -3,6 +3,7 @@ import json
 import inspect
 import logging
 import os
+from pathlib import Path
 
 import requests
 from django.conf import settings
@@ -89,6 +90,10 @@ from .drought.local.pipeline import stage_list as drought_stage_list
 from .drought.local.store import not_writable as drought_not_writable
 from .drought.local.store import run_in_progress as drought_run_in_progress
 from .drought.drought_causality import drought_causality
+from .drought.drought_causality_local import (
+    drought_causality_local,
+    seasons_without_causality,
+)
 from .et_downscale.et_downscale import generate_et_downscale
 from .forest_fringe.forest_fringe import generate_forest_fringe_degradation
 from .local_compute_helper import (
@@ -97,7 +102,7 @@ from .local_compute_helper import (
 from .local_compute_helper import (
     select_compute_task as _select_compute_task,
 )
-from .lulc.lulc_v3 import clip_lulc_v3 as clip_lulc_v3_gee_task
+from .lulc.clip_lulc import clip_lulc as clip_lulc_gee_task
 from .lulc.clip_lulc_local import clip_lulc_local as clip_lulc_local_task
 from .lulc.lulc_vector import vectorise_lulc as vectorise_lulc_gee_task
 from .lulc.lulc_vector_local import vectorise_lulc as vectorise_lulc_local_task
@@ -105,6 +110,16 @@ from .lulc.river_basin_lulc.lulc_v2_river_basin import lulc_river_basin_v2
 from .lulc.river_basin_lulc.lulc_v3_river_basin_using_v2 import lulc_river_basin_v3
 from .lulc.tehsil_level.lulc_v2 import generate_lulc_v2_tehsil
 from .lulc.tehsil_level.lulc_v3 import generate_lulc_v3_tehsil
+from .lulc.v4.temporal_correction import runner as temporal_correction
+from .lulc.v4.temporal_correction.tasks import (
+    lulc_temporal_correction_incremental as lulc_temporal_correction_incremental_task,
+    lulc_temporal_correction_six_year as lulc_temporal_correction_six_year_task,
+)
+from .config_loader import (
+    DATA_DIR as CONFIG_DATA_DIR,
+    LULC_TEMPORAL_CORRECTION_INPUT_DIR,
+    LULC_TEMPORAL_CORRECTION_OUTPUT_DIR,
+)
 from .lulc_X_terrain.lulc_on_plain_cluster import (
     lulc_on_plain_cluster as lulc_on_plain_cluster_gee_task,
 )
@@ -649,7 +664,7 @@ def _generate_tehsil_hydrology(request, is_annual):
                 "end_year": end_year,
                 "is_annual": is_annual,
                 "pan_india": False,
-                "overwrite": request.data.get("overwrite", False),
+                "overwrite": parse_bool(request.data.get("overwrite", False)),
             },
             queue="nrm",
         )
@@ -729,7 +744,7 @@ def _generate_pan_india_hydrology_base_layer(request, is_annual):
             "start_year": start_year,
             "end_year": end_year,
             "is_annual": is_annual,
-            "overwrite": request.data.get("overwrite", False),
+            "overwrite": parse_bool(request.data.get("overwrite", False)),
         },
         queue=_heavy_queue(),
     )
@@ -866,7 +881,7 @@ def et_download(request):
                 "end_date": request.data.get("end_date"),
                 "start_year": request.data.get("start_year"),
                 "end_year": request.data.get("end_year"),
-                "overwrite": request.data.get("overwrite", False),
+                "overwrite": parse_bool(request.data.get("overwrite", False)),
                 "patch_fill": request.data.get("patch_fill", True),
             },
             queue=_heavy_queue(),
@@ -1003,7 +1018,7 @@ def lulc_clip(request):
         compute = _get_compute_mode(request)
         task = _select_compute_task(
             compute,
-            clip_lulc_v3_gee_task,
+            clip_lulc_gee_task,
             clip_lulc_local_task,
         )
         task.apply_async(
@@ -1168,6 +1183,7 @@ def generate_swb(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def generate_drought_layer(request):
     logger.info("Inside generate_drought_layer")
@@ -1399,6 +1415,155 @@ def generate_pan_india_drought(request):
         return Response(
             {"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+def _data_dir_payload(request, field, default):
+    """A folder from the payload, relative to DATA_DIR or absolute inside it; default when not given."""
+    value = request.data.get(field)
+    if value in (None, ""):
+        return default
+    path = Path(str(value)).expanduser()
+    if not path.is_absolute():
+        path = CONFIG_DATA_DIR / path
+    path = path.resolve()
+    if path != CONFIG_DATA_DIR and CONFIG_DATA_DIR not in path.parents:
+        raise ValueError(f"{field} must be a folder inside {CONFIG_DATA_DIR}")
+    return path
+
+
+def _temporal_correction_request(request):
+    """(compute, input_dir, output_dir, workers) from a temporal-correction request."""
+    compute = _check_pan_india_drought_payload(request, "LULC temporal correction")
+    input_dir = _data_dir_payload(request, "input_dir", LULC_TEMPORAL_CORRECTION_INPUT_DIR)
+    output_dir = _data_dir_payload(request, "output_dir", LULC_TEMPORAL_CORRECTION_OUTPUT_DIR)
+    temporal_correction.check_folders(input_dir, output_dir)
+    workers = request.data.get("workers")
+    workers = int(workers) if workers not in (None, "") else temporal_correction.DEFAULT_WORKERS
+    max_workers = os.cpu_count() or 1
+    if not 1 <= workers <= max_workers:
+        raise ValueError(f"workers must be between 1 and {max_workers}")
+    return compute, input_dir, output_dir, workers
+
+
+def _temporal_correction_busy(output_dir):
+    if temporal_correction.run_in_progress(output_dir):
+        return Response(
+            {"Exception": f"A temporal-correction run is already writing into {output_dir}; wait for it to finish."},
+            status=status.HTTP_409_CONFLICT,
+        )
+    return None
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_lulc_temporal_correction_six_year(request):
+    """Correct six raw LULC v4 years as one window (years Y..Y+4 final, Y+5 provisional).
+
+    Payload (all optional): start_year (default: the earliest input year), input_dir and
+    output_dir (inside DATA_DIR; default: the config.yaml folders), workers (default 6),
+    overwrite (needed when the output folder already holds any of the six years).
+    """
+    logger.info("Inside generate_pan_india_lulc_temporal_correction_six_year")
+    try:
+        compute, input_dir, output_dir, workers = _temporal_correction_request(request)
+        start_year = request.data.get("start_year")
+        start_year = int(start_year) if start_year not in (None, "") else None
+        overwrite = _payload_flag(request.data.get("overwrite", False))
+        queue = _heavy_queue()
+        busy = _temporal_correction_busy(output_dir)
+        if busy:
+            return busy
+        plan = temporal_correction.plan_six_year(input_dir, start_year)
+        existing = sorted(set(plan["years"]) & set(temporal_correction.year_states(output_dir)))
+        if existing and not overwrite:
+            raise ValueError(
+                f"{output_dir} already holds corrected {existing}; pass overwrite=true to redo the six-year run"
+            )
+        task = lulc_temporal_correction_six_year_task.apply_async(
+            kwargs={
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "start_year": plan["years"][0],
+                "workers": workers,
+            },
+            queue=queue,
+        )
+        return Response(
+            {
+                "Success": "Pan-India LULC temporal correction (six-year) task initiated",
+                "task_id": task.id,
+                "compute": compute,
+                "scope": "pan_india",
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "years": plan["years"],
+                "final": plan["years"][:-1],
+                "provisional": plan["years"][-1],
+                "workers": workers,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        logger.warning("Heavy worker unavailable in generate_pan_india_lulc_temporal_correction_six_year api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except ValueError as e:
+        logger.warning("Invalid request in generate_pan_india_lulc_temporal_correction_six_year api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Exception in generate_pan_india_lulc_temporal_correction_six_year api")
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(["POST"])
+@schema(None)
+def generate_pan_india_lulc_temporal_correction_incremental(request):
+    """Finalise the oldest provisional year N from corrected N-1, raw N and raw N+1; raw N+1 is
+    written uncorrected as the new provisional year. Run the six-year API first.
+
+    Payload (all optional): all (true: finalise every year whose next raw year exists),
+    input_dir and output_dir (inside DATA_DIR; default: the config.yaml folders), workers.
+    """
+    logger.info("Inside generate_pan_india_lulc_temporal_correction_incremental")
+    try:
+        compute, input_dir, output_dir, workers = _temporal_correction_request(request)
+        all_years = _payload_flag(request.data.get("all", False))
+        queue = _heavy_queue()
+        busy = _temporal_correction_busy(output_dir)
+        if busy:
+            return busy
+        plan = temporal_correction.plan_incremental(input_dir, output_dir, all_years)
+        task = lulc_temporal_correction_incremental_task.apply_async(
+            kwargs={
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "all_years": all_years,
+                "workers": workers,
+            },
+            queue=queue,
+        )
+        return Response(
+            {
+                "Success": "Pan-India LULC temporal correction (incremental) task initiated",
+                "task_id": task.id,
+                "compute": compute,
+                "scope": "pan_india",
+                "input_dir": str(input_dir),
+                "output_dir": str(output_dir),
+                "finalising": plan["steps"],
+                "provisional": plan["provisional"],
+                "workers": workers,
+            },
+            status=status.HTTP_200_OK,
+        )
+    except HeavyWorkerUnavailable as e:
+        logger.warning("Heavy worker unavailable in generate_pan_india_lulc_temporal_correction_incremental api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+    except ValueError as e:
+        logger.warning("Invalid request in generate_pan_india_lulc_temporal_correction_incremental api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.exception("Exception in generate_pan_india_lulc_temporal_correction_incremental api")
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -1689,27 +1854,62 @@ def crop_grid(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def mws_drought_causality(request):
+    """Drought causality layer of a tehsil. compute "gee" (default) runs the GEE task; "local" cuts
+    the tehsil out of the pan-India MWS drought layers, which hold drought causality."""
     logger.info("Inside Drought Causality API")
     try:
-        state = request.data.get("state").lower()
-        district = request.data.get("district").lower()
-        block = request.data.get("block").lower()
+        state = request.data.get("state")
+        district = request.data.get("district")
+        block = request.data.get("block")
+        if not all([state, district, block]):
+            raise ValueError("state, district, and block are required")
+        state, district, block = (str(v).strip().lower() for v in (state, district, block))
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        drought_causality.apply_async(
-            args=[state, district, block, start_year, end_year, gee_account_id],
-            queue="nrm",
-        )
+        compute = _get_compute_mode(request)
+        if compute == "local":
+            missing = missing_drought_mws_layers(start_year, end_year)
+            if missing:
+                raise ValueError(
+                    "Missing pan-India drought MWS layer(s) for "
+                    f"{', '.join(map(str, missing))}. Make them first with "
+                    "utilities/scripts/generate_drought_layer.py --stages mws; "
+                    "Celery task was not queued."
+                )
+            without = seasons_without_causality(start_year, end_year)
+            if without:
+                raise ValueError(
+                    "The pan-India drought MWS layer(s) for "
+                    f"{', '.join(map(str, without))} were made before drought causality was added. "
+                    "Make them again with utilities/scripts/generate_drought_layer.py --stages mws; "
+                    "Celery task was not queued."
+                )
+            drought_causality_local.apply_async(
+                kwargs={"state": state, "district": district, "block": block,
+                        "start_year": start_year, "end_year": end_year},
+                queue="nrm",
+            )
+        else:
+            if start_year in (None, "") or end_year in (None, ""):
+                raise ValueError("start_year and end_year are required")
+            drought_causality.apply_async(
+                args=[state, district, block, int(start_year), int(end_year), gee_account_id],
+                queue="nrm",
+            )
         return Response(
-            {"Success": "Drought Causality task initiated"},
+            {"Success": "Drought Causality task initiated", "compute": compute},
             status=status.HTTP_200_OK,
         )
+    except (ValueError, FileNotFoundError) as e:
+        logger.warning("Invalid request in Drought Causality api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in Drought Causality api")
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])
@@ -2864,8 +3064,8 @@ def generate_stac_collection(request):
         start_year = request.data.get("start_year", "")
         end_year = request.data.get("end_year", "")
         upload_to_s3 = request.data.get("upload_to_s3", False)
-        overwrite = request.data.get("overwrite", False)
-        overwrite_metadata = request.data.get("overwrite_metadata", False)
+        overwrite = parse_bool(request.data.get("overwrite", False))
+        overwrite_metadata = parse_bool(request.data.get("overwrite_metadata", False))
 
         if not all([state, district, block, layer_name, layer_type]):
             return Response(
@@ -3250,7 +3450,7 @@ def generate_spei(request):
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
         gee_account_id = request.data.get("gee_account_id")
-        overwrite = request.data.get("overwrite") or False
+        overwrite = parse_bool(request.data.get("overwrite", False))
 
         generate_spei_pipeline.apply_async(
             args=[aez, start_year, end_year, gee_account_id, overwrite], queue="nrm"

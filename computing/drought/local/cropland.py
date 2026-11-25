@@ -1,4 +1,5 @@
-"""Cropland stage: how much of each 500 m pixel is kharif crop, from the 10 m LULC v3.
+"""Cropland stage: how much of each 500 m pixel is kharif crop, from the 10 m LULC v4
+(temporally corrected).
 
 Each 10 m LULC cell is counted in the 500 m pixel that contains its centre, so a
 pixel's counts add up to its roughly 2,100 LULC cells. Per season this gives the
@@ -7,6 +8,11 @@ triple crop). From the 2017-2024 seasons it gives:
   - the area-sown normal: the average kharif-sown share;
   - the cropland mask: pixels where kharif crop (8, 10 and 11 together) is the most
     common land category on that average, even if under half.
+LULC v4 adds class 13, plantation, which is counted as tree (6).
+
+Each file records the LULC files it was made from (tag "lulc"). A file made from other LULC
+files - LULC v3, or a provisional year that has since been finalised - is made again, and the
+classify and mws stages follow because their inputs are newer.
 
 Files, under drought/<region>/<version>/cropland/:
   share_<year>.tif        kharif_cells, valid_cells, area_sown_pct (season vs the normal, %)
@@ -21,14 +27,15 @@ import rasterio
 from rasterio.windows import Window
 from rasterio.windows import transform as window_transform
 
-from computing.drought.local.config import SOWN_NORMAL_YEARS
+from computing.drought.local.config import LULC_VERSION, SOWN_NORMAL_YEARS
 from computing.drought.local.grid import EARTH_RADIUS, blocks, load_grid
-from computing.drought.local.store import write_stack
+from computing.drought.local.store import read_tags, write_stack
 
 log = logging.getLogger(__name__)
 
 KHARIF_CLASSES = (8, 10, 11)
 N_CLASSES = 12
+TREE, PLANTATION = 6, 13  # LULC v4's plantation is counted as tree
 OTHER_CLASSES = tuple(c for c in range(1, N_CLASSES + 1) if c not in KHARIF_CLASSES)
 UINT16_NODATA = 65535
 BLOCK_PX = 128  # 500 m pixels per block side: about 6,000 x 6,000 LULC cells
@@ -55,17 +62,52 @@ def normal_years():
 SOWN_NORMAL_YEARS_SET = set(normal_years())
 
 
+# ---------------------------------------------------------------- which LULC a file was made from
+
+
+def lulc_stamp(paths, year):
+    """The year's LULC file and when it was written; changes when the file is replaced."""
+    path = paths.lulc_file(year)
+    return f"{path.name}@{path.stat().st_mtime_ns}"
+
+
+def normal_stamp(paths):
+    return ";".join(lulc_stamp(paths, y) for y in normal_years())
+
+
+def _tag(path, key):
+    try:
+        return read_tags(path).get(key)
+    except Exception:  # missing or unreadable: not current
+        return None
+
+
+def normal_current(paths):
+    """The normal exists and was made from the current LULC of every normal year."""
+    return normal_file(paths).is_file() and _tag(normal_file(paths), "lulc") == normal_stamp(paths)
+
+
+def share_current(paths, year, stamp_of_normal):
+    """The season's share exists and was made from its current LULC and against the current normal."""
+    path = share_file(paths, year)
+    if not path.is_file():
+        return False
+    tags = read_tags(path)
+    return tags.get("lulc") == lulc_stamp(paths, year) and tags.get("normal_lulc") == stamp_of_normal
+
+
 
 # ---------------------------------------------------------------- counting
 
 
 def lulc_classes(values):
-    """Class numbers 1-12 as uint8; anything else (NaN, 0, out of range) becomes 0.
-    The float64 originals are rounded first."""
+    """Class numbers 1-12 as uint8, plantation (13) counted as tree (6); anything else (NaN, 0,
+    out of range) becomes 0. Float rasters are rounded first."""
     values = np.asarray(values)
     if values.dtype.kind == "f":
         values = np.where(np.isnan(values), 0, np.rint(values))
     values = values.astype(np.int64)
+    values[values == PLANTATION] = TREE
     values[(values < 1) | (values > N_CLASSES)] = 0
     return values.astype(np.uint8)
 
@@ -158,14 +200,17 @@ def _uint16(values, scale=1.0):
 def run(paths, seasons, region, workers=8):
     """Cropland stage for the region (a grid window) and seasons. Returns the seasons written."""
     grid = load_grid(paths)
-    have_normal = normal_file(paths).is_file()
-    todo = [s for s in seasons if not share_file(paths, s).is_file()]
+    missing = [y for y in sorted(set(seasons) | set(normal_years())) if not paths.lulc_file(y).is_file()]
+    if missing:
+        raise FileNotFoundError("LULC not found: " + ", ".join(paths.lulc_file(y).name for y in missing))
+    stamp_of_normal = normal_stamp(paths)
+    have_normal = normal_current(paths)
+    todo = [s for s in seasons if not share_current(paths, s, stamp_of_normal)]
     years = sorted(set(todo) | (set() if have_normal else set(normal_years())))
     if not years:
         return []
-    missing = [y for y in years if not paths.lulc_file(y).is_file()]
-    if missing:
-        raise FileNotFoundError("LULC not found: " + ", ".join(paths.lulc_file(y).name for y in missing))
+    if not have_normal and normal_file(paths).is_file():
+        log.info("Cropland: the normal was made from other LULC files; making it again")
 
     h, w = region.height, region.width
     kharif = {y: np.zeros((h, w), np.uint16) for y in years}
@@ -194,7 +239,8 @@ def run(paths, seasons, region, workers=8):
     inside = grid.mask[rr, cc]
     transform = window_transform(region, grid.transform)
     tags = {"normal_years": f"{SOWN_NORMAL_YEARS[0]}-{SOWN_NORMAL_YEARS[1]}",
-            "kharif_classes": "8 10 11", "region": paths.region_key}
+            "kharif_classes": "8 10 11", "region": paths.region_key,
+            "lulc_version": LULC_VERSION, "plantation": f"counted as tree ({TREE})"}
 
     if not have_normal:
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -205,7 +251,7 @@ def run(paths, seasons, region, workers=8):
         data[:, ~inside | (share_years == 0)] = UINT16_NODATA
         write_stack(normal_file(paths), data, transform, grid.crs,
                     ["kharif_share_x10000", "cropland", "top_other_class", "top_other_share_x10000"],
-                    UINT16_NODATA, tags)
+                    UINT16_NODATA, {**tags, "lulc": stamp_of_normal})
         normal_share = normal.astype(np.float64)
         normal_share[~inside | (share_years == 0)] = np.nan
     else:
@@ -216,12 +262,14 @@ def run(paths, seasons, region, workers=8):
 
     written = []
     for year in years:
-        if share_file(paths, year).is_file():
+        if share_current(paths, year, stamp_of_normal):
             continue
         sown = area_sown_pct(kharif[year].astype(np.float64), valid[year].astype(np.float64), normal_share)
         data = np.stack([kharif[year], valid[year], _uint16(sown)])
         data[:, ~inside] = UINT16_NODATA
         write_stack(share_file(paths, year), data, transform, grid.crs,
-                    ["kharif_cells", "valid_cells", "area_sown_pct"], UINT16_NODATA, {**tags, "season": year})
+                    ["kharif_cells", "valid_cells", "area_sown_pct"], UINT16_NODATA,
+                    {**tags, "season": year, "lulc": lulc_stamp(paths, year), "normal_lulc": stamp_of_normal,
+                     "lulc_status": paths.lulc_status(year) or "unknown"})
         written.append(year)
     return written

@@ -16,7 +16,7 @@ keys:
   source_join_key: village_code
 
 output:
-  root: data/outputs
+  root: "{DATA_DIR}/layers"
   directory_name: livestocks20
   layer_prefix: livestocks
   # geoserver_workspace: testworkspace
