@@ -867,16 +867,12 @@ def compute_pixel_area_grid(transform, height, width, crs):
     if crs is None:
         raise ValueError("Raster CRS is missing; cannot compute pixel areas.")
 
-    if height == 0 or width == 0:
-        return np.empty((height, width), dtype=np.float64)
-
-    earth_radius_m = 6378137.0
-
     if getattr(crs, "is_geographic", False):
         lon_width_radians = np.deg2rad(abs(transform.a))
         row_indices = np.arange(height, dtype=np.float64)
         lat_top = transform.f + (row_indices * transform.e)
         lat_bottom = lat_top + transform.e
+        earth_radius_m = 6378137.0
         row_areas = (
             (earth_radius_m**2)
             * lon_width_radians
@@ -884,40 +880,8 @@ def compute_pixel_area_grid(transform, height, width, crs):
         )
         return np.broadcast_to(row_areas[:, None], (height, width))
 
-    # For projected CRSs (e.g. EPSG:3857 Web Mercator), abs(transform.a * transform.e)
-    # is map-plane area, not true ground area. Compute true ground area per row using
-    # the local Jacobian of the pixel at the center column in EPSG:4326.
-    from rasterio.warp import transform as warp_transform
-
-    mid_col = width * 0.5
-    rows = np.arange(height, dtype=np.float64) + 0.5
-    cols = np.full(height, mid_col, dtype=np.float64)
-
-    x_c = transform.c + cols * transform.a + rows * transform.b
-    y_c = transform.f + cols * transform.d + rows * transform.e
-
-    # Pixel step vectors (+1 col and +1 row) from the center of each row's middle pixel
-    lon_c, lat_c = warp_transform(crs, "EPSG:4326", x_c.tolist(), y_c.tolist())
-    lon_x, lat_x = warp_transform(
-        crs, "EPSG:4326", (x_c + transform.a).tolist(), (y_c + transform.d).tolist()
-    )
-    lon_y, lat_y = warp_transform(
-        crs, "EPSG:4326", (x_c + transform.b).tolist(), (y_c + transform.e).tolist()
-    )
-
-    lon_c = np.deg2rad(np.asarray(lon_c, dtype=np.float64))
-    lat_c = np.deg2rad(np.asarray(lat_c, dtype=np.float64))
-    dlon_x = np.deg2rad(np.asarray(lon_x, dtype=np.float64)) - lon_c
-    dlat_x = np.deg2rad(np.asarray(lat_x, dtype=np.float64)) - lat_c
-    dlon_y = np.deg2rad(np.asarray(lon_y, dtype=np.float64)) - lon_c
-    dlat_y = np.deg2rad(np.asarray(lat_y, dtype=np.float64)) - lat_c
-
-    row_areas = (
-        (earth_radius_m**2)
-        * np.cos(lat_c)
-        * np.abs(dlon_x * dlat_y - dlon_y * dlat_x)
-    )
-    return np.broadcast_to(row_areas[:, None], (height, width))
+    pixel_area = abs(transform.a * transform.e)
+    return np.full((height, width), pixel_area, dtype=np.float64)
 
 
 def compute_categorical_raster_areas_for_watersheds(
