@@ -3,7 +3,11 @@ import pandas as pd
 
 
 SQM_PER_HECTARE = 10000.0
-AREA_YEARS = tuple(range(2018, 2026))
+AREA_YEARS = tuple(range(2018, 2027))
+
+
+def _short_year(end_year):
+    return f"{(end_year - 1) % 100:02d}-{end_year % 100:02d}"
 
 
 def add_area_ored_to_gdf(gdf):
@@ -15,15 +19,31 @@ def add_area_ored_to_gdf(gdf):
     )
 
     for year in reversed(AREA_YEARS):
-        area_column = f"area_{year}"
-        k_column = f"k_{year}"
-        if area_column not in result or k_column not in result:
-            continue
+        short_year = _short_year(year)
+        area_column = f"area_{short_year}"
+        k_column = f"k_{short_year}"
+        if area_column in result and k_column in result:
+            area = pd.to_numeric(result[area_column], errors="coerce")
+            k = pd.to_numeric(result[k_column], errors="coerce")
+            candidate = area.multiply(100).divide(k)
+            area_ored = area_ored.fillna(candidate.where(k.notna() & k.ne(0)))
 
-        area = pd.to_numeric(result[area_column], errors="coerce")
-        k = pd.to_numeric(result[k_column], errors="coerce")
-        candidate = area.multiply(100).divide(k).divide(SQM_PER_HECTARE)
-        area_ored = area_ored.fillna(candidate.where(k.notna() & k.ne(0)))
+        legacy_area_column = f"area_{year}"
+        legacy_k_column = f"k_{year}"
+        if legacy_area_column in result and legacy_k_column in result:
+            area = pd.to_numeric(result[legacy_area_column], errors="coerce")
+            k = pd.to_numeric(result[legacy_k_column], errors="coerce")
+            candidate = area.multiply(100).divide(k).divide(SQM_PER_HECTARE)
+            area_ored = area_ored.fillna(candidate.where(k.notna() & k.ne(0)))
+
+    if "total_area" in result:
+        total_area = pd.to_numeric(result["total_area"], errors="coerce")
+        area_ored = area_ored.fillna(total_area)
+    elif "total_area_m2" in result:
+        total_area = pd.to_numeric(result["total_area_m2"], errors="coerce").divide(
+            SQM_PER_HECTARE
+        )
+        area_ored = area_ored.fillna(total_area)
 
     result["area_ored"] = area_ored
     return result
@@ -61,10 +81,21 @@ def gee_area_ored(feature):
     )
 
     for year in AREA_YEARS:
-        area, has_area = _gee_number_and_presence(feature, f"area_{year}")
-        k, has_k = _gee_number_and_presence(feature, f"k_{year}")
+        legacy_area, has_legacy_area = _gee_number_and_presence(
+            feature, f"area_{year}"
+        )
+        legacy_k, has_legacy_k = _gee_number_and_presence(feature, f"k_{year}")
+        legacy_valid = has_legacy_area.And(has_legacy_k).And(legacy_k.neq(0))
+        legacy_candidate = (
+            legacy_area.multiply(100).divide(legacy_k).divide(annual_area_divisor)
+        )
+        derived = ee.Number(ee.Algorithms.If(legacy_valid, legacy_candidate, derived))
+
+        short_year = _short_year(year)
+        area, has_area = _gee_number_and_presence(feature, f"area_{short_year}")
+        k, has_k = _gee_number_and_presence(feature, f"k_{short_year}")
         valid = has_area.And(has_k).And(k.neq(0))
-        candidate = area.multiply(100).divide(k).divide(annual_area_divisor)
+        candidate = area.multiply(100).divide(k)
         derived = ee.Number(ee.Algorithms.If(valid, candidate, derived))
 
     existing, has_existing = _gee_number_and_presence(feature, "area_ored")

@@ -23,7 +23,7 @@ base_layers:
           aliases:
               - swb
               - pan india waterbodies
-          local_path: "{DATA_DIR}/base_layers/pan_india_waterbodies.fgb"
+          local_path: "{DATA_DIR}/base_layers/surface_waterbodies/pan_india_waterbodies_with_mws.fgb"
           source: ""
           type: file
 

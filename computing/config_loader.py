@@ -216,7 +216,7 @@ AQUIFER_VECTOR_PATH: Path = _base_layer_path(
 
 SWB_VECTOR_PATH: Path = _base_layer_path(
     "surface water bodies",
-    fallback="{DATA_DIR}/base_layers/pan_india_waterbodies.geojson",
+    fallback="{DATA_DIR}/base_layers/surface_waterbodies/pan_india_waterbodies_with_mws.fgb",
 )
 
 SOI_TEHSIL_PATH: Path = _base_layer_path("admin boundaries")

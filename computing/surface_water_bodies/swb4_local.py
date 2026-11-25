@@ -59,11 +59,19 @@ def waterbody_wbc_intersection_local(
 
     out = gdf.copy().reset_index(drop=True)
     if "UID" not in out.columns:
-        out["UID"] = out["wb_id"] if "wb_id" in out.columns else out.index.astype(str)
+        if "wb_id" in out.columns:
+            wb_id = out["wb_id"]
+            out["UID"] = wb_id.astype(str).where(wb_id.notna(), out.index.astype(str))
+        else:
+            out["UID"] = out.index.astype(str)
     else:
         missing = out["UID"].isna()
         if missing.any() and "wb_id" in out.columns:
-            out.loc[missing, "UID"] = out.loc[missing, "wb_id"]
+            wb_id_missing = out.loc[missing, "wb_id"]
+            out["UID"] = out["UID"].astype(object)
+            out.loc[missing, "UID"] = wb_id_missing.astype(str).where(
+                wb_id_missing.notna(), out.loc[missing, "UID"]
+            )
     if "area_ored" not in out.columns:
         out["area_ored"] = out.to_crs(out.estimate_utm_crs()).area / 10000.0
 
