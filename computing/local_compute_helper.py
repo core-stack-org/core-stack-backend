@@ -38,6 +38,7 @@ from utilities.download_gpkg_from_geoserver import generate_gpkg
 PRECOMPUTED_PANCHAYAT_DIR = VILLAGE_BOUNDARIES_DIR
 
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
+INDEXED_VECTOR_SUFFIXES = (".fgb", ".gpkg")
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
 LULC_CLASSES = np.arange(1, 14, dtype=np.int16)
@@ -87,6 +88,16 @@ def ensure_file_exists(path, label):
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"{label} not found: {path}")
+
+
+def resolve_indexed_vector_path(path, suffixes=INDEXED_VECTOR_SUFFIXES):
+    """Prefer a spatially indexed sibling (.fgb/.gpkg) of a vector file if present."""
+    path = Path(path)
+    for suffix in suffixes:
+        candidate = path.with_suffix(suffix)
+        if candidate.exists():
+            return candidate
+    return path
 
 
 def validate_geometry(gdf):
