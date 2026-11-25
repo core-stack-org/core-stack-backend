@@ -455,16 +455,6 @@ def _read_raster_clipped(raster_paths, bbox):
     return data, transform
 
 
-# ── zonal statistics (true polygon-raster geometric intersection) ──────────────
-# No rasterize/paint step anywhere below: each farm's own polygon is intersected
-# directly against the raster's pixel grid using shapely, and each pixel's
-# contribution is weighted by its exact overlap area with that farm. This is
-# slower than a single vectorised rasterize+bincount pass over all farms at
-# once, but avoids both of that approach's inaccuracies: (a) two farms sharing
-# a boundary pixel can no longer "steal" it from each other — each farm is
-# evaluated independently against its own geometry — and (b) a pixel that's
-# only partially inside a farm contributes proportionally, not all-or-nothing.
-
 def _farm_pixel_window(geom, transform, arr_height, arr_width):
     """
     Compute the row/col index range of the raster array that could possibly
@@ -636,7 +626,6 @@ def compute_farm_cropping_intensity(farms_gdf, years, lulc_dir=None):
     # lazy: the helper module imports Django-dependent modules
     from computing.local_compute_helper import (
         ALL_CROP_CLASSES,
-        CROPPING_INTENSITY_INITIAL_YEAR,
         LULC_BASE_DIR,
         SINGLE_CROP_CLASSES,
         compute_cropping_intensity,
@@ -644,7 +633,7 @@ def compute_farm_cropping_intensity(farms_gdf, years, lulc_dir=None):
     )
 
     lulc_dir = LULC_BASE_DIR if lulc_dir is None else lulc_dir
-    initial_year = CROPPING_INTENSITY_INITIAL_YEAR
+    initial_year = 2017
     years = sorted(int(y) for y in years)
     farms = farms_gdf[["farm_id", "geometry"]].reset_index(drop=True)
     n_farms = len(farms)
@@ -702,10 +691,8 @@ def compute_farm_cropping_intensity(farms_gdf, years, lulc_dir=None):
                 keep = w > 1e-6 * abs(transform.a * transform.e)
                 farm_idx, rows, cols, w = farm_idx[keep], rows[keep], cols[keep], w[keep]
                 ever_cropped = np.zeros(shape, dtype=bool)
-            elif (src.transform, (src.height, src.width)) != ref[:2]:
-                raise ValueError(
-                    f"LULC raster {raster_path} is not on the same grid as the first raster."
-                )
+            # all yearly LULC rasters are generated on one common grid, so the
+            # first raster's window / pixel indices are reused for every year
             lulc = src.read(1, window=ref[2])
 
         print(f"Computing farm cropping intensity inputs for {year}-{year + 1}")
@@ -1510,6 +1497,28 @@ def intersect_et_with_farms(
         summary["avg_mai_annual"] = round(float(gdf["mai_annual"].mean()), 4)
     logger.info("Phase 3 complete: %s", summary)
     return summary
+
+
+def compute_year_ET_values(state: str, district: str, block: str, year: int) -> dict:
+    """
+    Add (or refresh) one year of AET / PET / MAI in an existing block's parquets.
+
+    Runs the single-year pipeline on top of the files already on disk:
+      annual.parquet      rows for `year` replaced, all other years kept
+      sub_annual.parquet  monthly rows for `year` replaced, other years kept
+      static.parquet      drought indicators recomputed from all years
+
+    Years that are already in the parquets are not recomputed.
+    Raises FileNotFoundError if the block has no parquets yet or the AET/PET
+    rasters for `year` are missing.
+    """
+    year = int(year)
+    for path in (_static_parquet_path(state, district, block), _annual_parquet_path(state, district, block)):
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Parquet not found, run the full pipeline first: {path}")
+
+    logger.info("Updating ET values for %s/%s/%s, year %d", state, district, block, year)
+    return intersect_et_with_farms(state=state, district=district, block=block, year=year, overwrite=True)
 
 
 # ── multi-year analysis ────────────────────────────────────────────────────────

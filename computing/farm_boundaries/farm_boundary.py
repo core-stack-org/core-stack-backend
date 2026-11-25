@@ -41,6 +41,7 @@ from nrm_app.celery import app
 from .convert import convert_to_geoparquet
 from .fetch_raw import fetch_raw_boundaries
 from .fetch_metadata import fetch_farm_metadata
+from .lulc_intersection import compute_year_LULC_values
 
 from computing.utils import save_layer_info_to_db
 
@@ -54,8 +55,7 @@ def build_farm_boundary_map(
     district: str,
     block: str,
     start_year : int,
-    end_year : int,
-    overwrite=False,
+    end_year : int
 ):
     """
     Celery task: runs Phase 1, Phase 2, and optionally Phase 3.
@@ -190,3 +190,20 @@ def build_farm_boundary_map(
     }
     logger.info("Farm boundary pipeline completed successfully: %s", result)
     return result
+
+
+
+@app.task(bind=True, max_retries=3, default_retry_delay=60)
+def update_existing_parquet(self, state: str, district: str, block: str, update_type: str, end_year: int, update=None, start_year=None):
+    try:
+        if update_type == "LULC":
+            return compute_year_LULC_values(state=state, district=district, block=block, year=end_year)
+        if update_type == "ET":
+            from .et_intersection import compute_year_ET_values   # heavy imports, load only when needed
+
+            return compute_year_ET_values(state=state, district=district, block=block, year=end_year)
+        raise ValueError(f"Unsupported update_type '{update_type}', expected 'LULC' or 'ET'")
+
+    except Exception as exc:
+        logger.exception("Update of %s data failed for %s/%s/%s: %s", update_type, state, district, block, exc)
+        raise
