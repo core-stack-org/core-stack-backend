@@ -144,7 +144,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
         import geopandas as gpd
         from shapely.geometry import box
 
-        years = [f"{y:02d}-{y + 1:02d}" for y in range(17, 26)]
+        sample_years = ("17-18", "24-25", "25-26", "30-31")
         row = {
             "wb_id": pd.Series([100001], dtype="int64")[0],
             "ba_id": 12,
@@ -156,7 +156,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
             "category_sq_m": "5000 and above",
             "category_ha": ">0.5 ha",
         }
-        for idx, yy in enumerate(years, start=1):
+        for idx, yy in enumerate(sample_years, start=1):
             row[f"area_{yy}"] = round(0.1 * idx, 2)
             row[f"k_{yy}"] = 50.0
             row[f"kr_{yy}"] = 25.0
@@ -185,7 +185,7 @@ class LocalSwbContinuationTests(SimpleTestCase):
         self.assertAlmostEqual(result.loc[0, "total_area"], 1.25, places=6)
         self.assertAlmostEqual(result.loc[0, "area_ored"], 1.50, places=6)
         self.assertEqual(result.loc[0, "category_ha"], ">0.5 ha")
-        for idx, yy in enumerate(years, start=1):
+        for idx, yy in enumerate(sample_years, start=1):
             self.assertAlmostEqual(
                 result.loc[0, f"area_{yy}"], round(0.1 * idx, 2), places=6
             )
@@ -213,10 +213,12 @@ class LocalSwbContinuationTests(SimpleTestCase):
     def test_add_area_ored_to_gdf_supports_new_schema_and_total_area_fallback(self):
         source = pd.DataFrame(
             {
-                "area_ored": [0.25, None, None],
-                "area_25-26": [0.20, 0.40, 0.0],
-                "k_25-26": [80.0, 50.0, 0.0],
-                "total_area": [0.25, 0.75, 0.35],
+                "area_ored": [0.25, None, None, None],
+                "area_25-26": [0.20, 0.40, 0.0, 0.15],
+                "k_25-26": [80.0, 50.0, 0.0, 50.0],
+                "area_30-31": [0.10, 0.0, 0.0, 0.60],
+                "k_30-31": [40.0, 0.0, 0.0, 75.0],
+                "total_area": [0.25, 0.75, 0.35, 0.50],
             }
         )
 
@@ -225,6 +227,8 @@ class LocalSwbContinuationTests(SimpleTestCase):
         self.assertAlmostEqual(result.loc[0, "area_ored"], 0.25, places=6)
         self.assertAlmostEqual(result.loc[1, "area_ored"], 0.80, places=6)
         self.assertAlmostEqual(result.loc[2, "area_ored"], 0.35, places=6)
+        # Picks up arbitrary future YY-YY columns newest-first dynamically (0.60 * 100 / 75).
+        self.assertAlmostEqual(result.loc[3, "area_ored"], 0.80, places=6)
 
     def test_swb_enrichment_defaults_to_pan_india_assets(self):
         raster_parameters = signature(
