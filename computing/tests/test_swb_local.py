@@ -7,14 +7,15 @@ import pandas as pd
 from django.test import SimpleTestCase
 
 from computing.layer_dependency.layer_generation_in_order import get_args, load_map_config
+from computing.surface_water_bodies.area_utils import add_area_ored_to_gdf
 from computing.surface_water_bodies.swb_local import (
+    _build_swb2_gdf,
     _complete_swb_pipeline,
     _continue_swb_in_gee,
-    _convert_area_columns_to_hectares,
     _delete_existing_swb_outputs,
     _final_layer_name,
     _layer_name,
-    _restore_legacy_columns,
+    _resolve_source_path,
     generate_swb_layer as generate_swb_layer_local,
     run_swb_local,
 )
@@ -139,62 +140,95 @@ class LocalSwbContinuationTests(SimpleTestCase):
         self.assertEqual(events, ["swb2", "complete"])
         self.assertTrue(result)
 
-    def test_reconstructs_area_ored_before_converting_annual_areas(self):
+    def test_build_swb2_gdf_preserves_new_schema_hectare_values(self):
+        import geopandas as gpd
+        from shapely.geometry import box
+
+        sample_years = ("17-18", "24-25", "25-26", "30-31")
+        row = {
+            "wb_id": pd.Series([100001], dtype="int64")[0],
+            "ba_id": 12,
+            "basin": "Ganga",
+            "mws_uid_list": "12_1001|12_1002",
+            "basin_id_list": "12",
+            "total_area": 1.25,
+            "area_ored": 1.50,
+            "category_sq_m": "5000 and above",
+            "category_ha": ">0.5 ha",
+        }
+        for idx, yy in enumerate(sample_years, start=1):
+            row[f"area_{yy}"] = round(0.1 * idx, 2)
+            row[f"k_{yy}"] = 50.0
+            row[f"kr_{yy}"] = 25.0
+            row[f"krz_{yy}"] = 10.0
+
+        source_gdf = gpd.GeoDataFrame(
+            [row],
+            geometry=[box(77.0, 12.0, 77.01, 12.01)],
+            crs="EPSG:4326",
+        )
+        roi = box(76.99, 11.99, 77.02, 12.02)
+
+        with TemporaryDirectory() as folder:
+            source_path = (
+                Path(folder)
+                / "base_layers"
+                / "surface_waterbodies"
+                / "pan_india_waterbodies_with_mws.fgb"
+            )
+            source_path.parent.mkdir(parents=True, exist_ok=True)
+            source_gdf.to_file(source_path, driver="FlatGeobuf")
+
+            result = _build_swb2_gdf(source_path, roi)
+
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result.loc[0, "total_area"], 1.25, places=6)
+        self.assertAlmostEqual(result.loc[0, "area_ored"], 1.50, places=6)
+        self.assertEqual(result.loc[0, "category_ha"], ">0.5 ha")
+        for idx, yy in enumerate(sample_years, start=1):
+            self.assertAlmostEqual(
+                result.loc[0, f"area_{yy}"], round(0.1 * idx, 2), places=6
+            )
+
+    def test_resolve_source_path_prefers_fgb_and_falls_back_to_geojson(self):
+        with TemporaryDirectory() as folder:
+            swb_dir = Path(folder) / "base_layers" / "surface_waterbodies"
+            swb_dir.mkdir(parents=True)
+            fgb_path = swb_dir / "pan_india_waterbodies_with_mws.fgb"
+            geojson_path = swb_dir / "pan_india_waterbodies_with_mws.geojson"
+
+            geojson_path.write_text("{}")
+            self.assertEqual(
+                _resolve_source_path(fgb_path), str(geojson_path.resolve())
+            )
+
+            fgb_path.write_bytes(b"fgb")
+            self.assertEqual(
+                _resolve_source_path(geojson_path), str(fgb_path.resolve())
+            )
+            self.assertEqual(
+                _resolve_source_path(fgb_path), str(fgb_path.resolve())
+            )
+
+    def test_add_area_ored_to_gdf_supports_new_schema_and_total_area_fallback(self):
         source = pd.DataFrame(
             {
-                "area_2020": [500, 0],
-                "k_2020": [83.3333, 0],
-                "area_2021": [600, 240],
-                "k_2021": [100, 20],
-                "total_area_m2": [550, 1200],
+                "area_ored": [0.25, None, None, None],
+                "area_25-26": [0.20, 0.40, 0.0, 0.15],
+                "k_25-26": [80.0, 50.0, 0.0, 50.0],
+                "area_30-31": [0.10, 0.0, 0.0, 0.60],
+                "k_30-31": [40.0, 0.0, 0.0, 75.0],
+                "total_area": [0.25, 0.75, 0.35, 0.50],
             }
         )
 
-        converted, _ = _convert_area_columns_to_hectares(source)
+        result = add_area_ored_to_gdf(source)
 
-        self.assertAlmostEqual(converted.loc[0, "area_ored"], 0.06, places=6)
-        self.assertAlmostEqual(converted.loc[1, "area_ored"], 0.12, places=6)
-        self.assertEqual(converted["area_2020"].tolist(), [0.05, 0])
-        self.assertEqual(converted["total_area"].tolist(), [0.055, 0.12])
-
-    def test_preserves_existing_area_ored(self):
-        source = pd.DataFrame(
-            {
-                "area_ored": [0.25],
-                "area_2025": [500],
-                "k_2025": [100],
-            }
-        )
-
-        converted, _ = _convert_area_columns_to_hectares(source)
-
-        self.assertEqual(converted.loc[0, "area_ored"], 0.25)
-
-    def test_restores_legacy_annual_columns(self):
-        source = pd.DataFrame(
-            {
-                "wb_id": ["waterbody-1"],
-                "area_2018": [0.14],
-                "k_2019": [20],
-                "kr_2020": [30],
-                "krz_2021": [40],
-                "area_ored": [0.25],
-            }
-        )
-
-        result = _restore_legacy_columns(source)
-
-        self.assertEqual(
-            list(result.columns),
-            [
-                "wb_id",
-                "area_17-18",
-                "k_18-19",
-                "kr_19-20",
-                "krz_20-21",
-                "area_ored",
-            ],
-        )
+        self.assertAlmostEqual(result.loc[0, "area_ored"], 0.25, places=6)
+        self.assertAlmostEqual(result.loc[1, "area_ored"], 0.80, places=6)
+        self.assertAlmostEqual(result.loc[2, "area_ored"], 0.35, places=6)
+        # Picks up arbitrary future YY-YY columns newest-first dynamically (0.60 * 100 / 75).
+        self.assertAlmostEqual(result.loc[3, "area_ored"], 0.80, places=6)
 
     def test_swb_enrichment_defaults_to_pan_india_assets(self):
         raster_parameters = signature(
@@ -480,3 +514,39 @@ class LocalOnlySwbTests(SimpleTestCase):
 
         self.assertEqual(list(result["census_id"]), ["u1", "NA"])
         self.assertEqual(list(result["water_body_name"]), ["pond", "NA"])
+
+    def test_swb4_local_casts_int64_wb_id_to_string_uid(self):
+        import geopandas as gpd
+        from shapely.geometry import Point, box
+
+        from computing.surface_water_bodies.swb4_local import (
+            waterbody_wbc_intersection_local,
+        )
+
+        swb = gpd.GeoDataFrame(
+            {
+                "wb_id": pd.Series([1001, 1002], dtype="int64"),
+                "area_ored": [1.0, 2.0],
+            },
+            geometry=[box(77.0, 12.0, 77.001, 12.001), box(77.1, 12.1, 77.101, 12.101)],
+            crs="EPSG:4326",
+        )
+        census = gpd.GeoDataFrame(
+            {
+                "unique_id": ["u1"],
+                "State Name": ["KARNATAKA"],
+                "water_spread_area_of_water_body": [1.0],
+                "storage_capacity_water_body_original": [None],
+                "max_depth_water_body_fully_filled": [None],
+                "water_body_name": ["pond"],
+            },
+            geometry=[Point(77.0005, 12.0005)],
+            crs="EPSG:4326",
+        )
+        with TemporaryDirectory() as folder:
+            census_path = Path(folder) / "census.gpkg"
+            census.to_file(census_path, driver="GPKG")
+            result = waterbody_wbc_intersection_local(swb, "Karnataka", census_path)
+
+        self.assertEqual(list(result["UID"]), ["1001", "1002"])
+        self.assertTrue(all(isinstance(uid, str) for uid in result["UID"]))
