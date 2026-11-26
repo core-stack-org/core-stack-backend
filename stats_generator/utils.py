@@ -3154,11 +3154,25 @@ VILLAGE_GP_MAPPING_CSV = os.path.join(
 )
 
 
+def _resolve_village_gp_mapping_csv():
+    from computing.config_loader import DATA_DIR
+
+    candidates = (
+        DATA_DIR / "base_layers" / "village_gp" / "core_stack_gp_village_mapping.csv",
+        DATA_DIR / "village_gp" / "core_stack_gp_village_mapping.csv",
+        Path(VILLAGE_GP_MAPPING_CSV),
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+    return VILLAGE_GP_MAPPING_CSV
+
+
 @lru_cache(maxsize=1)
 def _load_village_gp_source():
     """Read the Pan-India village-GP mapping once"""
     source_df = pd.read_csv(
-        VILLAGE_GP_MAPPING_CSV,
+        _resolve_village_gp_mapping_csv(),
         usecols=["village_id", "village_name", "gp_id", "gp_name"],
         dtype=str,
     )
