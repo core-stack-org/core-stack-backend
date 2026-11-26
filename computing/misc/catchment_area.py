@@ -14,7 +14,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
-    export_raster_asset_to_gee,
+    export_raster_over_features,
     make_asset_public,
     get_gee_dir_path,
 )
@@ -67,7 +67,7 @@ def generate_catchment_area_singleflow(
         )
 
     catchment_area_raster = ee.Image(CATCHMENT_AREA)
-    raster = catchment_area_raster.clip(roi_boundary.geometry())
+    raster = catchment_area_raster
 
     # Generate raster Layer
     layer_status = catchment_area_raster_generation(
@@ -99,12 +99,12 @@ def catchment_area_raster_generation(
         proj_obj = Project.objects.get(pk=proj_id)
 
     if not is_gee_asset_exists(asset_id):
-        task_id = export_raster_asset_to_gee(
+        task_id = export_raster_over_features(
             image=raster,
+            fc=roi,
             description=description,
             asset_id=asset_id,
             scale=30,
-            region=roi.geometry(),
         )
         catchment_area_task_id_list = check_task_status([task_id])
         print("catchmenta area task_id list", catchment_area_task_id_list)

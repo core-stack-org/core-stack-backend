@@ -16,7 +16,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
-    export_raster_asset_to_gee,
+    export_raster_over_features,
     make_asset_public,
     get_gee_dir_path,
     export_vector_asset_to_gee,
@@ -78,7 +78,7 @@ def generate_stream_order(
         )
 
     stream_order_raster = ee.Image(STREAM_ORDER_ASSET)
-    raster = stream_order_raster.clip(roi.geometry())
+    raster = stream_order_raster
 
     # Generate raster Layer
     stream_order_raster_generation(
@@ -135,12 +135,12 @@ def stream_order_raster_generation(
 ):
 
     if not is_gee_asset_exists(raster_asset_id):
-        task_id = export_raster_asset_to_gee(
+        task_id = export_raster_over_features(
             image=raster,
+            fc=roi,
             description=description + "_raster",
             asset_id=raster_asset_id,
             scale=30,
-            region=roi.geometry(),
         )
         stream_order_task_id_list = check_task_status([task_id])
         print("steam order task_id list", stream_order_task_id_list)
