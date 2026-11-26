@@ -278,6 +278,7 @@ LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc slope clusters")
 LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
 SWB_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("generate_swb")
+ZOI_OUTPUT_DIR: Path = _derived_output_dir("generate_zoi_data")
 SOIL_TYPE_OUTPUT_DIR: Path = _derived_output_dir("soil type")
 PAN_INDIA_SOIL_TYPE_OUTPUT_DIR: Path = DATA_DIR
 HYDROLOGY_LOCAL_OUTPUT_DIR: Path = _derived_output_dir("hydrology_fortnightly")

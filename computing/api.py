@@ -2840,16 +2840,20 @@ def generate_zoi_to_gee(request):
 
         compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
         task = generate_zoi_local if compute == "local" else generate_zoi
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "gee_account_id": gee_account_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+        if compute == "local":
+            task_kwargs["run_ndvi"] = parse_bool(request.data.get("run_ndvi", False))
+            task_kwargs["fast_ndvi"] = parse_bool(request.data.get("fast_ndvi", False))
 
         task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-                "start_date": start_date,
-                "end_date": end_date,
-            },
+            kwargs=task_kwargs,
             queue="nrm" if compute == "local" else "waterbody",
         )
 
