@@ -13,6 +13,7 @@ from computing.config_loader import (
 )
 
 GEOSERVER_WORKSPACE = "plantation"
+GEOSERVER_STYLE = "site_suitability"
 
 
 @app.task(bind=True)
@@ -78,6 +79,7 @@ def generate_site_suitability_local(
             file_path=str(clipped_raster_path),
             layer_name=layer_name,
             workspace=GEOSERVER_WORKSPACE,
+            style_name=GEOSERVER_STYLE,
             layer_id=layer_id,
         )
         if response.get("status_code") != 202:

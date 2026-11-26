@@ -12,7 +12,11 @@ from django.conf import settings
 
 from computing.models import Layer, LayerMapping
 from computing.STAC_specs import constants
-from computing.STAC_specs.stac_collection import STACConfig
+from computing.STAC_specs.stac_collection import (
+    STACConfig,
+    _file_lock,
+    _write_csv_atomic,
+)
 from utilities.gee_utils import valid_gee_text
 
 log = logging.getLogger(__name__)
@@ -81,12 +85,14 @@ def _mapping_from_csv_row(row) -> SimpleNamespace:
 def _load_layer_mapping_csv():
     config = STACConfig()
     path = config.layer_map_csv
-    if os.path.exists(path):
-        return pd.read_csv(path)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
-    df.to_csv(path, index=False)
-    return df
+    lock_path = path + ".lock"
+    with _file_lock(lock_path):
+        if os.path.exists(path):
+            return pd.read_csv(path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
+        _write_csv_atomic(df, path)
+        return df
 
 
 def _resolve_mapping_from_csv(layer: Layer):
@@ -212,7 +218,7 @@ def stac_task_kwargs_for_layer(layer: Layer, mapping=None):
         "start_year": start_year,
         "end_year": end_year,
         "upload_to_s3": bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
-        "overwrite_metadata": bool(getattr(settings, "STAC_OVERWRITE_METADATA", True)),
+        "overwrite_metadata": bool(getattr(settings, "STAC_OVERWRITE_METADATA", False)),
         "layer_id": layer.id,
     }
 

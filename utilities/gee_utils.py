@@ -679,11 +679,25 @@ def sync_raster_gcs_to_geoserver(workspace, gcs_file_name, layer_name, style_nam
 
     file_upload_res = geo.upload_raster(tif_content, workspace, layer_name)
     print("File response:", file_upload_res)
-    if style_name:
-        style_res = geo.publish_style(
-            layer_name=layer_name, style_name=style_name, workspace=workspace
-        )
-        print("Style response:", style_res)
+    if style_name and style_name != "default_style":
+        style_found = False
+        for ws in (workspace, None):
+            try:
+                geo.get_style(style_name, workspace=ws)
+                style_found = True
+                break
+            except Exception:
+                continue
+        if style_found:
+            style_res = geo.publish_style(
+                layer_name=layer_name, style_name=style_name, workspace=workspace
+            )
+            print("Style response:", style_res)
+        else:
+            print(
+                f"Style '{style_name}' not found for workspace {workspace}; "
+                f"not applying it to {layer_name}."
+            )
     return f"File response: {file_upload_res}"
 
 

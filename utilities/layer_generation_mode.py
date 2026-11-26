@@ -292,7 +292,7 @@ def _ensure_stac_for_layer_targets(layer_targets):
             "end_year": target.get("end_year", "") or "",
             "upload_to_s3": bool(getattr(settings, "STAC_UPLOAD_TO_S3", False)),
             "overwrite_metadata": bool(
-                getattr(settings, "STAC_OVERWRITE_METADATA", True)
+                getattr(settings, "STAC_OVERWRITE_METADATA", False)
             ),
         }
         result = generate_stac_collection_task.apply(kwargs=task_kwargs)

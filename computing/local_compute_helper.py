@@ -476,7 +476,7 @@ def _push_raster_to_geoserver_instance(
     )
     configure_response = None
     style_response = None
-    if upload_response.get("status_code") == 201:
+    if upload_response.get("status_code") in (200, 201):
         try:
             configure_response = geo.configure_coverage(
                 workspace=workspace,

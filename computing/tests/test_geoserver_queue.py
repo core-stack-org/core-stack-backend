@@ -458,3 +458,441 @@ class PushGeeAssetCommandTests(SimpleTestCase):
                 "--workspace=w",
             )
         apply_async.assert_not_called()
+
+
+class DataDirPathRebaseTests(SimpleTestCase):
+    def _entry(self, **kw):
+        base = {
+            "layer_id": 1,
+            "layer_name": "kullu_kullu_cluster",
+            "path": "",
+            "workspace": "terrain",
+            "style_name": None,
+            "layer_type": "vector",
+            "state": "Himachal Pradesh",
+            "district": "Kullu",
+            "block": "Kullu",
+        }
+        base.update(kw)
+        return base
+
+    def test_absolute_path_from_other_data_dir_is_rebased(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = (
+                Path(tmp)
+                / "layers"
+                / "himachal_pradesh"
+                / "kullu"
+                / "kullu"
+                / "terrain"
+                / "terrain_clusters_local"
+                / "kullu_kullu_cluster.gpkg"
+            )
+            target.parent.mkdir(parents=True)
+            target.touch()
+            stale_abs = (
+                "/var/tmp/other-core-stack-data/layers/himachal_pradesh/kullu/kullu/"
+                "terrain/terrain_clusters_local/kullu_kullu_cluster.gpkg"
+            )
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                args = _publish_args(self._entry(path=stale_abs))
+        self.assertIsNotNone(args)
+        self.assertEqual(args["path"], str(target.with_suffix("")))
+        self.assertEqual(args["file_type"], "gpkg")
+
+    def test_active_data_dir_takes_precedence_over_old_absolute_path(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as old_root, tempfile.TemporaryDirectory() as new_root:
+            rel = Path(
+                "layers/himachal_pradesh/kullu/kullu/terrain/terrain_clusters_local/kullu_kullu_cluster.gpkg"
+            )
+            old_file = Path(old_root) / rel
+            new_file = Path(new_root) / rel
+            old_file.parent.mkdir(parents=True)
+            new_file.parent.mkdir(parents=True)
+            old_file.touch()
+            new_file.touch()
+            with patch.object(config_loader, "DATA_DIR", Path(new_root)):
+                args = _publish_args(self._entry(path=str(old_file)))
+        self.assertIsNotNone(args)
+        self.assertEqual(args["path"], str(new_file.with_suffix("")))
+
+    def test_legacy_layout_falls_back_to_config_yaml_layer_dir(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # New layout on disk under DATA_DIR
+            terrain_target = (
+                Path(tmp)
+                / "layers"
+                / "himachal_pradesh"
+                / "kullu"
+                / "kullu"
+                / "terrain"
+                / "terrain_clusters_local"
+                / "kullu_kullu_cluster.gpkg"
+            )
+            terrain_target.parent.mkdir(parents=True)
+            terrain_target.touch()
+
+            drought_target = (
+                Path(tmp)
+                / "layers"
+                / "bihar"
+                / "banka"
+                / "banka"
+                / "drought_causality"
+                / "banka_banka_drought_causality.gpkg"
+            )
+            drought_target.parent.mkdir(parents=True)
+            drought_target.touch()
+
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                terrain_args = _publish_args(
+                    self._entry(
+                        path="data/terrain/terrain_clusters_local/himachal_pradesh/kullu/kullu/kullu_kullu_cluster.gpkg"
+                    )
+                )
+                drought_args = _publish_args(
+                    self._entry(
+                        layer_name="banka_banka_drought_causality",
+                        workspace="drought_causality",
+                        state="Bihar",
+                        district="Banka",
+                        block="Banka",
+                        path="/app/data/fc_to_shape/Bihar/banka_banka_drought_causality.gpkg",
+                    )
+                )
+
+        self.assertIsNotNone(terrain_args)
+        self.assertEqual(terrain_args["path"], str(terrain_target.with_suffix("")))
+        self.assertIsNotNone(drought_args)
+        self.assertEqual(drought_args["path"], str(drought_target.with_suffix("")))
+
+    def test_legacy_unconfigured_subdir_reorders_into_layers_dir(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = (
+                Path(tmp)
+                / "layers"
+                / "himachal_pradesh"
+                / "kullu"
+                / "kullu"
+                / "tree_health"
+                / "ch"
+                / "ch_kullu_kullu_2017_2022.tif"
+            )
+            target.parent.mkdir(parents=True)
+            target.touch()
+
+            entry = self._entry(
+                layer_name="ch_kullu_kullu_2017_2022",
+                workspace="tree_ch_raster",
+                layer_type="raster",
+                style_name="default_style",
+                path="data/tree_health/ch/himachal_pradesh/kullu/kullu/ch_kullu_kullu_2017_2022.tif",
+            )
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                args = _publish_args(entry)
+        self.assertIsNotNone(args)
+        self.assertEqual(args["path"], str(target))
+        self.assertEqual(args["style_name"], "tree_ch_style")
+
+    def test_soil_health_raster_expansion_rebases_to_active_data_dir(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.pending_geoserver_sync import (
+            SOIL_HEALTH_NUTRIENTS,
+            _expand_soil_health_raster,
+            _publish_args,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out_dir = Path(tmp) / "layers" / "himachal_pradesh" / "kullu" / "kullu" / "soil_health"
+            out_dir.mkdir(parents=True)
+            for n in SOIL_HEALTH_NUTRIENTS:
+                (out_dir / f"kullu_kullu_soil_health_raster_{n}.tif").touch()
+
+            entry = self._entry(
+                layer_name="kullu_kullu_soil_health_raster",
+                workspace="soil_health_raster",
+                layer_type="raster",
+                path="/old/host/data/layers/himachal_pradesh/kullu/kullu/soil_health/kullu_kullu_soil_health_raster_OC_OLM.tif",
+            )
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                expanded = _expand_soil_health_raster(entry)
+                published = [_publish_args(e) for e in expanded]
+
+        self.assertEqual(len(published), len(SOIL_HEALTH_NUTRIENTS))
+        self.assertTrue(all(p is not None for p in published))
+        self.assertTrue(all(p["path"].startswith(str(out_dir)) for p in published))
+
+    def test_layer_output_present_rebases_and_checks_relative_paths(self):
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from computing import config_loader
+        from computing.bulk_layer_generation import _layer_output_present
+
+        location = {"state": "Himachal Pradesh", "district": "Kullu", "block": "Kullu"}
+        dataset = SimpleNamespace(workspace="terrain", layer_type="vector")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = (
+                Path(tmp)
+                / "layers"
+                / "himachal_pradesh"
+                / "kullu"
+                / "kullu"
+                / "terrain"
+                / "terrain_clusters_local"
+                / "kullu_kullu_cluster.gpkg"
+            )
+            target.parent.mkdir(parents=True)
+            target.touch()
+
+            relocated_layer = SimpleNamespace(
+                gee_asset_path="/other/data/layers/himachal_pradesh/kullu/kullu/terrain/terrain_clusters_local/kullu_kullu_cluster.gpkg",
+                dataset=dataset,
+            )
+            missing_relative_layer = SimpleNamespace(
+                gee_asset_path="data/terrain/missing.gpkg",
+                dataset=dataset,
+            )
+            gee_layer = SimpleNamespace(
+                gee_asset_path="projects/p/assets/swb",
+                dataset=dataset,
+            )
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                self.assertTrue(_layer_output_present(relocated_layer, location=location))
+                self.assertFalse(_layer_output_present(missing_relative_layer, location=location))
+                self.assertTrue(_layer_output_present(gee_layer, location=location))
+
+    def test_fc_to_shape_dir_uses_data_dir_and_creates_parents(self):
+        import tempfile
+        from pathlib import Path
+
+        from computing import config_loader
+        from computing.utils import _fc_to_shape_dir
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(config_loader, "DATA_DIR", Path(tmp)):
+                created = _fc_to_shape_dir("bihar")
+            self.assertEqual(Path(created), Path(tmp) / "fc_to_shape" / "bihar")
+            self.assertTrue(Path(created).is_dir())
+
+
+class BulkSyncStacControlTests(SimpleTestCase):
+    @patch("computing.utils.update_layer_sync_status", return_value=42)
+    @patch("computing.local_compute_helper.push_local_raster_to_geoserver")
+    def test_publish_local_layer_skip_stac_preserves_flag_and_skips_trigger(
+        self, push_raster, update_sync
+    ):
+        push_raster.return_value = {"status_code": 201}
+
+        publish_local_layer.run(
+            layer_type="raster",
+            path="/tmp/layer.tif",
+            layer_name="layer",
+            workspace="workspace",
+            layer_id=42,
+            skip_stac=True,
+        )
+
+        update_sync.assert_called_once_with(
+            layer_id=42,
+            sync_to_geoserver=True,
+            skip_stac=True,
+        )
+
+    @patch("computing.tasks.publish_local_layer.apply_async")
+    def test_queue_local_entries_sets_skip_stac_by_default(self, apply_async):
+        import tempfile
+        from pathlib import Path
+
+        from computing.pending_geoserver_sync import _queue_local_entries
+
+        apply_async.return_value.id = "t"
+        with tempfile.TemporaryDirectory() as tmp:
+            tif = Path(tmp) / "layer.tif"
+            tif.touch()
+            entry = {
+                "layer_id": 10,
+                "layer_name": "layer",
+                "path": str(tif),
+                "workspace": "ws",
+                "style_name": None,
+                "layer_type": "raster",
+                "state": "s",
+                "district": "d",
+                "block": "b",
+            }
+            _queue_local_entries([entry], dry_run=False)
+            self.assertTrue(apply_async.call_args.kwargs["kwargs"]["skip_stac"])
+
+            apply_async.reset_mock()
+            _queue_local_entries([entry], dry_run=False, skip_stac=False)
+            self.assertNotIn("skip_stac", apply_async.call_args.kwargs["kwargs"])
+
+    @patch("computing.STAC_specs.stac_collection.generate_stac_collection_task.apply_async")
+    @patch("computing.signals.stac_task_kwargs_for_layer")
+    def test_signal_respects_skip_flag_setting_and_update_fields(
+        self, mock_kwargs, mock_apply_async
+    ):
+        from types import SimpleNamespace
+        from django.test import override_settings
+
+        from computing.signals import trigger_stac_on_geoserver_sync
+
+        mock_kwargs.return_value = {
+            "layer_type": "vector",
+            "state": "Bihar",
+            "district": "Banka",
+            "block": "Banka",
+            "layer_name": "terrain_clusters",
+            "start_year": "",
+            "end_year": "",
+            "upload_to_s3": False,
+            "overwrite_metadata": False,
+            "layer_id": 9,
+        }
+
+        layer = SimpleNamespace(
+            id=9,
+            is_sync_to_geoserver=True,
+            is_stac_specs_generated=False,
+            _skip_stac_trigger=True,
+        )
+        trigger_stac_on_geoserver_sync(None, layer, created=False, update_fields=["is_sync_to_geoserver"])
+        mock_apply_async.assert_not_called()
+
+        layer._skip_stac_trigger = False
+        trigger_stac_on_geoserver_sync(None, layer, created=False, update_fields=["misc"])
+        mock_apply_async.assert_not_called()
+
+        with override_settings(STAC_AUTO_TRIGGER_ON_SYNC=False):
+            trigger_stac_on_geoserver_sync(
+                None, layer, created=False, update_fields=["is_sync_to_geoserver"]
+            )
+            mock_apply_async.assert_not_called()
+
+        with override_settings(STAC_AUTO_TRIGGER_ON_SYNC=True, STAC_CELERY_QUEUE="stac"):
+            trigger_stac_on_geoserver_sync(
+                None, layer, created=False, update_fields=["is_sync_to_geoserver"]
+            )
+            mock_apply_async.assert_called_once()
+            self.assertEqual(mock_apply_async.call_args.kwargs["queue"], "stac")
+
+
+class RasterStyleResolutionTests(SimpleTestCase):
+    def test_resolves_placeholder_styles_for_all_raster_workspaces(self):
+        from computing.pending_geoserver_sync import _resolve_raster_style
+
+        cases = [
+            ("LULC_level_3", "LULC_23_24_banka_banka_level_3", "default_style", "lulc_level_3_style"),
+            ("LULC_level_2", "LULC_23_24_banka_banka_level_2", None, "lulc_level_2_style"),
+            ("LULC_level_1", "LULC_23_24_banka_banka_level_1", "", "lulc_level_1_style"),
+            ("terrain", "banka_banka_terrain_raster", "default_style", "terrain_raster"),
+            ("restoration", "banka_banka_restoration_raster", "default_style", "restoration_style"),
+            ("plantation", "banka_banka_site_suitability_raster", "default_style", "site_suitability"),
+            ("clart", "banka_banka_clart", "default_style", "testClart"),
+            ("stream_order", "banka_banka_stream_order_raster", "default_style", "stream_order"),
+            ("tree_ch_raster", "banka_banka_ch_2022", "default_style", "tree_ch_style"),
+            ("tree_ccd_raster", "banka_banka_ccd_2022", "default_style", "tree_ccd_style"),
+            ("tree_overall_raster", "banka_banka_overall", "default_style", "tree_overall_style"),
+            ("change_detection", "change_banka_banka_Urbanization", "default_style", "urbanization"),
+            ("change_detection", "change_banka_banka_Afforestation", "default_style", "afforestation"),
+            ("change_detection", "change_banka_banka_CropIntensity", None, "cropintensity"),
+            ("change_detection", "change_banka_banka_ShrubChange", "", "shrubchange"),
+            ("soil_health_raster", "banka_banka_soil_health_raster_N", "default_style", None),
+            # Explicit non-placeholder styles are preserved
+            ("LULC_level_3", "layer", "custom_lulc_style", "custom_lulc_style"),
+        ]
+        for ws, name, raw, expected in cases:
+            with self.subTest(ws=ws, name=name, raw=raw):
+                self.assertEqual(_resolve_raster_style(ws, name, raw), expected)
+
+    @patch("computing.tasks.publish_gee_layer.apply_async")
+    @patch("computing.pending_geoserver_sync._gee_skip_reason", return_value=None)
+    @patch("computing.pending_geoserver_sync._gee_layer_kind")
+    def test_queue_gee_entries_resolves_raster_and_strips_vector_placeholder_style(
+        self, mock_kind, _mock_skip, mock_apply_async
+    ):
+        from computing.pending_geoserver_sync import _queue_gee_entries
+
+        mock_apply_async.return_value.id = "t-gee"
+        mock_kind.side_effect = ["raster", "vector"]
+        entries = [
+            {
+                "layer_id": 1,
+                "layer_name": "LULC_23_24_banka_banka_level_3",
+                "path": "projects/e/a/lulc",
+                "workspace": "LULC_level_3",
+                "style_name": "default_style",
+                "layer_type": "raster",
+                "state": "Bihar",
+                "district": "Banka",
+                "block": "Banka",
+            },
+            {
+                "layer_id": 2,
+                "layer_name": "banka_banka_mws",
+                "path": "projects/e/a/mws",
+                "workspace": "filtered_mws",
+                "style_name": "default_style",
+                "layer_type": "vector",
+                "state": "Bihar",
+                "district": "Banka",
+                "block": "Banka",
+            },
+        ]
+
+        _queue_gee_entries(entries, dry_run=False, gee_account_id="acc")
+        self.assertEqual(mock_apply_async.call_count, 2)
+        raster_kwargs = mock_apply_async.call_args_list[0].kwargs["kwargs"]
+        vector_kwargs = mock_apply_async.call_args_list[1].kwargs["kwargs"]
+        self.assertEqual(raster_kwargs["style_name"], "lulc_level_3_style")
+        self.assertIsNone(vector_kwargs["style_name"])
+
+    def test_push_raster_applies_style_on_http_200_overwrite(self):
+        from unittest.mock import MagicMock
+
+        from computing.local_compute_helper import _push_raster_to_geoserver_instance
+
+        geo = MagicMock()
+        geo.create_coveragestore.return_value = {"status_code": 200}
+        geo.get_style.return_value = {"style": {"name": "lulc_level_3_style"}}
+        geo.publish_style.return_value = 200
+        geo.get_layer.return_value = {"layer": {"name": "l"}}
+
+        res = _push_raster_to_geoserver_instance(
+            geo, "/tmp/a.tif", "l", "LULC_level_3", "lulc_level_3_style"
+        )
+        self.assertEqual(res["status_code"], 200)
+        geo.configure_coverage.assert_called_once()
+        geo.publish_style.assert_called_once_with(
+            layer_name="l", style_name="lulc_level_3_style", workspace="LULC_level_3"
+        )

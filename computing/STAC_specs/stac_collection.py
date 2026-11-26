@@ -1,12 +1,16 @@
+from contextlib import contextmanager
 import datetime
+import fcntl
 import logging
 import os
 import re
 import subprocess
+import tempfile
+import threading
 import urllib
 import xml.etree.ElementTree as ET
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 import pystac
@@ -51,6 +55,64 @@ def _clean_style_url(v):
 
 
 _STAC_DATA = os.path.join(BASE_DIR, "data", "STAC_specs")
+_FILE_LOCK_STATE = threading.local()
+
+
+@contextmanager
+def _file_lock(lock_path):
+    """Cross-process advisory file lock that is safely re-entrant per thread."""
+    held = getattr(_FILE_LOCK_STATE, "held", None)
+    if held is None:
+        held = {}
+        _FILE_LOCK_STATE.held = held
+
+    key = os.path.abspath(lock_path)
+    if key in held:
+        held[key] += 1
+        try:
+            yield
+        finally:
+            held[key] -= 1
+        return
+
+    parent = os.path.dirname(key)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(key, "a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        held[key] = 1
+        try:
+            yield
+        finally:
+            held.pop(key, None)
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _write_csv_atomic(df, path):
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_", suffix=".csv", dir=directory)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as tmp_file:
+            df.to_csv(tmp_file, index=False)
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+def _default_geoserver_base_url():
+    try:
+        from django.conf import settings as django_settings
+
+        configured = getattr(django_settings, "STAC_GEOSERVER_BASE_URL", "")
+    except Exception:
+        configured = ""
+    configured = (configured or os.environ.get("STAC_GEOSERVER_BASE_URL", "")).strip()
+    return configured.rstrip("/") if configured else constants.GEOSERVER_BASE_URL
 
 JAVA_TYPE_MAP = {
     "java.lang.String": "object",
@@ -70,7 +132,7 @@ _THUMBNAIL_LONG_SIDE = 512
 
 @dataclass
 class STACConfig:
-    geoserver_base_url: str = constants.GEOSERVER_BASE_URL
+    geoserver_base_url: str = field(default_factory=_default_geoserver_base_url)
     thumbnail_data_url: str = constants.S3_STAC_BUCKET_URL
     local_data_dir: str = _STAC_DATA
     stac_files_dir: str = os.path.join(
@@ -104,6 +166,7 @@ class GeoServerClient:
 
     def _get(self, url, **kwargs):
         kwargs.setdefault("verify", False)
+        kwargs.setdefault("timeout", 60)
         return requests.get(url, auth=self.auth, **kwargs)
 
     # -- URL builders --------------------------------------------------------
@@ -377,14 +440,21 @@ class MetadataProvider:
     def __init__(self, config):
         self.config = config
 
+    @staticmethod
+    def _read_or_fetch_csv(path, url, overwrite_metadata=False):
+        with _file_lock(path + ".lock"):
+            if os.path.exists(path) and not overwrite_metadata:
+                return pd.read_csv(path)
+            df = pd.read_csv(url)
+            _write_csv_atomic(df, path)
+            return df
+
     def get_layer_description(self, layer_name, overwrite_metadata=False):
-        path = self.config.layer_desc_csv
-        if os.path.exists(path) and not overwrite_metadata:
-            df = pd.read_csv(path)
-        else:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            df = pd.read_csv(constants.LAYER_DESC_GITHUB_URL)
-            df.to_csv(path, index=False)
+        df = self._read_or_fetch_csv(
+            self.config.layer_desc_csv,
+            constants.LAYER_DESC_GITHUB_URL,
+            overwrite_metadata=overwrite_metadata,
+        )
 
         match = df[df["layer_name"] == layer_name]
         desc = match["layer_description"].iloc[0] if not match.empty else ""
@@ -394,13 +464,11 @@ class MetadataProvider:
     def get_layer_mapping(
         self, layer_name, district, block, start_year="", overwrite_metadata=False
     ):
-        path = self.config.layer_map_csv
-        if os.path.exists(path) and not overwrite_metadata:
-            df = pd.read_csv(path)
-        else:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            df = pd.read_csv(constants.LAYER_MAP_GITHUB_URL)
-            df.to_csv(path, index=False)
+        df = self._read_or_fetch_csv(
+            self.config.layer_map_csv,
+            constants.LAYER_MAP_GITHUB_URL,
+            overwrite_metadata=overwrite_metadata,
+        )
         row = df[df["layer_name"] == layer_name].iloc[0]
         gs_layer = row["geoserver_layer_name"]
 
@@ -432,16 +500,32 @@ class MetadataProvider:
         }
 
     def get_vector_column_descriptions(self, ee_layer_name, overwrite_metadata=False):
-        path = self.config.column_desc_csv
-        if os.path.exists(path) and not overwrite_metadata:
-            df = pd.read_csv(path)
-        else:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            df = pd.read_csv(constants.VECTOR_COLUMN_DESC_GITHUB_URL)
-            df.to_csv(path, index=False)
+        df = self._read_or_fetch_csv(
+            self.config.column_desc_csv,
+            constants.VECTOR_COLUMN_DESC_GITHUB_URL,
+            overwrite_metadata=overwrite_metadata,
+        )
 
         return df[df["ee_layer_name"] == ee_layer_name].rename(
             {"column_name_description": "column_description"}, axis=1
+        )
+
+    def refresh_metadata(self):
+        """Force-refresh all cached metadata CSVs from GitHub once."""
+        self._read_or_fetch_csv(
+            self.config.layer_desc_csv,
+            constants.LAYER_DESC_GITHUB_URL,
+            overwrite_metadata=True,
+        )
+        self._read_or_fetch_csv(
+            self.config.layer_map_csv,
+            constants.LAYER_MAP_GITHUB_URL,
+            overwrite_metadata=True,
+        )
+        self._read_or_fetch_csv(
+            self.config.column_desc_csv,
+            constants.VECTOR_COLUMN_DESC_GITHUB_URL,
+            overwrite_metadata=True,
         )
 
 
@@ -518,8 +602,16 @@ class CatalogManager:
             url="https://core-stack.org/",
         )
 
+    @property
+    def lock_path(self):
+        return os.path.join(self.config.stac_files_dir, ".catalog.lock")
+
     def update(self, state, district, block, item):
         """Update the catalog and return the list of local paths that were written."""
+        with _file_lock(self.lock_path):
+            return self._update_unlocked(state, district, block, item)
+
+    def _update_unlocked(self, state, district, block, item):
         bbox = item.bbox
         log.info(
             "Updating catalog: state=%s district=%s block=%s item=%s bbox=%s",
@@ -1255,8 +1347,7 @@ class STACCollectionGenerator:
         else:
             years = [start_year]
 
-        built = []
-        s3_paths = set()
+        items_with_years = []
         for year in years:
             item = builder.build(
                 state,
@@ -1274,26 +1365,38 @@ class STACCollectionGenerator:
                     year,
                 )
                 continue
-            touched = self.catalog_mgr.update(state, district, block, item)
-            if upload_to_s3:
-                s3_paths.update(touched)
-                thumb_fname = BaseSTACItemBuilder._thumbnail_filename(
-                    state, district, block, layer_name, year
-                )
-                thumb_path = os.path.join(self.config.thumbnail_dir, thumb_fname)
-                if os.path.exists(thumb_path):
-                    s3_paths.add(thumb_path)
-            log.info("generate_raster built item=%s", item.id)
-            built.append(item.id)
+            items_with_years.append((year, item))
 
-        if not built:
+        if not items_with_years:
             log.error("generate_raster: no items were built for layer=%s", layer_name)
             return False
 
-        if upload_to_s3:
-            self._sync_s3(paths=list(s3_paths))
-        else:
-            log.info("Skipping S3 sync (upload_to_s3=False)")
+        built = []
+        s3_paths = set()
+        with _file_lock(self.catalog_mgr.lock_path):
+            for year, item in items_with_years:
+                touched = self.catalog_mgr.update(state, district, block, item)
+                if upload_to_s3:
+                    s3_paths.update(touched)
+                    thumb_fname = BaseSTACItemBuilder._thumbnail_filename(
+                        state, district, block, layer_name, year
+                    )
+                    thumb_path = os.path.join(self.config.thumbnail_dir, thumb_fname)
+                    if os.path.exists(thumb_path):
+                        s3_paths.add(thumb_path)
+                log.info("generate_raster built item=%s", item.id)
+                built.append(item.id)
+
+            if upload_to_s3:
+                if not self._sync_s3(paths=list(s3_paths)):
+                    log.error(
+                        "generate_raster: S3 sync failed for layer=%s items=%s",
+                        layer_name,
+                        built,
+                    )
+                    return False
+            else:
+                log.info("Skipping S3 sync (upload_to_s3=False)")
         log.info("generate_raster done: built %d item(s)=%s", len(built), built)
         return True
 
@@ -1335,20 +1438,196 @@ class STACCollectionGenerator:
                 "generate_vector aborted: item not built for layer=%s", layer_name
             )
             return False
-        touched = self.catalog_mgr.update(state, district, block, item)
-        if upload_to_s3:
-            s3_paths = set(touched)
-            thumb_fname = BaseSTACItemBuilder._thumbnail_filename(
-                state, district, block, layer_name
-            )
-            thumb_path = os.path.join(self.config.thumbnail_dir, thumb_fname)
-            if os.path.exists(thumb_path):
-                s3_paths.add(thumb_path)
-            self._sync_s3(paths=list(s3_paths))
-        else:
-            log.info("Skipping S3 sync (upload_to_s3=False)")
+        with _file_lock(self.catalog_mgr.lock_path):
+            touched = self.catalog_mgr.update(state, district, block, item)
+            if upload_to_s3:
+                s3_paths = set(touched)
+                thumb_fname = BaseSTACItemBuilder._thumbnail_filename(
+                    state, district, block, layer_name
+                )
+                thumb_path = os.path.join(self.config.thumbnail_dir, thumb_fname)
+                if os.path.exists(thumb_path):
+                    s3_paths.add(thumb_path)
+                if not self._sync_s3(paths=list(s3_paths)):
+                    log.error(
+                        "generate_vector: S3 sync failed for layer=%s item=%s",
+                        layer_name,
+                        item.id,
+                    )
+                    return False
+            else:
+                log.info("Skipping S3 sync (upload_to_s3=False)")
         log.info("generate_vector done: item=%s", item.id)
         return True
+
+    def sync_tehsil_layers(
+        self,
+        state,
+        district,
+        block,
+        targets,
+        upload_to_s3=False,
+        overwrite=False,
+        overwrite_metadata=False,
+    ):
+        """Build STAC items for all given layers of one tehsil, update catalogs
+        serially under one lock, and upload to S3 at most once for the tehsil.
+
+        Each entry in ``targets`` is a dict with keys:
+        ``layer_type`` ("raster" | "vector"), ``layer_name``, optional
+        ``start_year`` / ``end_year``, and optional ``layer_ids`` (list of DB PKs).
+        ``Layer.is_stac_specs_generated`` is only flipped to True after catalog
+        updates AND (when ``upload_to_s3=True``) S3 upload succeed.
+        """
+        state_s, district_s, block_s = (
+            sanitize_text(x.lower()) for x in (state, district, block)
+        )
+        raster_builder = RasterSTACItemBuilder(*self._builder_args())
+        vector_builder = VectorSTACItemBuilder(*self._builder_args())
+
+        built_entries = []  # (target, [(year_or_empty, item), ...])
+        failed = []
+
+        for target in targets:
+            layer_type = target["layer_type"]
+            layer_name = target["layer_name"]
+            start_year = str(target.get("start_year", "") or "")
+            end_year = str(target.get("end_year", "") or "")
+            try:
+                if layer_type == "raster":
+                    if start_year and end_year:
+                        years = [
+                            str(y) for y in range(int(start_year), int(end_year) + 1)
+                        ]
+                    else:
+                        years = [start_year]
+                    items_with_years = []
+                    for year in years:
+                        item = raster_builder.build(
+                            state_s,
+                            district_s,
+                            block_s,
+                            layer_name,
+                            overwrite=overwrite,
+                            overwrite_metadata=overwrite_metadata,
+                            start_year=year,
+                        )
+                        if item is None:
+                            log.error(
+                                "sync_tehsil_layers: raster item not built for "
+                                "%s/%s/%s layer=%s year=%s",
+                                state_s,
+                                district_s,
+                                block_s,
+                                layer_name,
+                                year,
+                            )
+                            continue
+                        items_with_years.append((year, item))
+                    if not items_with_years:
+                        failed.append({**target, "reason": "raster item build failed"})
+                        continue
+                    built_entries.append((target, items_with_years))
+                elif layer_type == "vector":
+                    item = vector_builder.build(
+                        state_s,
+                        district_s,
+                        block_s,
+                        layer_name,
+                        overwrite=overwrite,
+                        overwrite_metadata=overwrite_metadata,
+                    )
+                    if item is None:
+                        log.error(
+                            "sync_tehsil_layers: vector item not built for "
+                            "%s/%s/%s layer=%s",
+                            state_s,
+                            district_s,
+                            block_s,
+                            layer_name,
+                        )
+                        failed.append({**target, "reason": "vector item build failed"})
+                        continue
+                    built_entries.append((target, [("", item)]))
+                else:
+                    failed.append(
+                        {**target, "reason": f"unknown layer_type: {layer_type}"}
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.exception(
+                    "sync_tehsil_layers: error building %s/%s/%s layer=%s",
+                    state_s,
+                    district_s,
+                    block_s,
+                    layer_name,
+                )
+                failed.append({**target, "reason": str(exc)})
+
+        if not built_entries:
+            return {
+                "state": state,
+                "district": district,
+                "block": block,
+                "built": [],
+                "failed": failed,
+                "s3_synced": None,
+                "s3_paths_count": 0,
+            }
+
+        s3_paths = set()
+        built_report = []
+        s3_synced = None
+
+        with _file_lock(self.catalog_mgr.lock_path):
+            for target, items_with_years in built_entries:
+                layer_name = target["layer_name"]
+                item_ids = []
+                for year, item in items_with_years:
+                    touched = self.catalog_mgr.update(state_s, district_s, block_s, item)
+                    if upload_to_s3:
+                        s3_paths.update(touched)
+                        thumb_fname = BaseSTACItemBuilder._thumbnail_filename(
+                            state_s, district_s, block_s, layer_name, year
+                        )
+                        thumb_path = os.path.join(self.config.thumbnail_dir, thumb_fname)
+                        if os.path.exists(thumb_path):
+                            s3_paths.add(thumb_path)
+                    item_ids.append(item.id)
+                built_report.append({**target, "item_ids": item_ids})
+
+            if upload_to_s3:
+                s3_synced = bool(self._sync_s3(paths=sorted(s3_paths)))
+                if not s3_synced:
+                    log.error(
+                        "sync_tehsil_layers: S3 sync failed for %s/%s/%s (%d path(s))",
+                        state_s,
+                        district_s,
+                        block_s,
+                        len(s3_paths),
+                    )
+            else:
+                log.info(
+                    "sync_tehsil_layers: skipping S3 sync for %s/%s/%s (upload_to_s3=False)",
+                    state_s,
+                    district_s,
+                    block_s,
+                )
+
+        if not upload_to_s3 or s3_synced:
+            for entry in built_report:
+                for lid in entry.get("layer_ids") or []:
+                    if lid:
+                        _mark_layer_stac_generated(lid)
+
+        return {
+            "state": state,
+            "district": district,
+            "block": block,
+            "built": built_report,
+            "failed": failed,
+            "s3_synced": s3_synced,
+            "s3_paths_count": len(s3_paths),
+        }
 
     def _sync_s3(self, paths=None):
         if paths:
@@ -1427,10 +1706,21 @@ def generate_stac_collection_task(
 def _mark_layer_stac_generated(layer_id):
     """Flip `Layer.is_stac_specs_generated=True` without re-firing the trigger signal.
 
-    Uses queryset `.update()` so `post_save` is NOT invoked (avoiding any
+    Updates prod via API when PROD_BACKEND_URL is configured; otherwise uses
+    queryset `.update()` locally so `post_save` is NOT invoked (avoiding any
     redundant re-dispatch from the auto-trigger handler).
     """
     try:
+        from computing.utils import _get_prod_backend_url, _update_layer_sync_remote
+
+        if _get_prod_backend_url():
+            _update_layer_sync_remote(
+                layer_id,
+                is_stac_specs_generated=True,
+                skip_stac=True,
+            )
+            return
+
         from computing.models import Layer
 
         Layer.objects.filter(id=layer_id).update(is_stac_specs_generated=True)

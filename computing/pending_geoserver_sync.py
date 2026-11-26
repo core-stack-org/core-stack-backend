@@ -16,6 +16,7 @@ generation time, by ``publish_gee_layer``.
 
 import logging
 import os
+from pathlib import Path
 
 import requests
 from django.conf import settings
@@ -38,16 +39,64 @@ FACILITY_POINT_LAYERS = (
     "village_nearest_facility_collection",
 )
 
-# The shared Dataset rows still carry the seed placeholder "default_style" for the
-# tree health rasters, which does not exist on GeoServer, so the style would be
-# silently skipped. Keep these in sync with GEOSERVER_STYLE in
-# computing/tree_health/local/*_local.py.
+# Many shared Dataset rows still carry the seed placeholder "default_style" (or
+# blank/None), which does not exist on GeoServer and would either be silently
+# skipped (leaving grayscale default "raster") or create a dangling reference.
+# Keep these in sync with GEOSERVER_STYLE / *_STYLE_NAME in computing/ pipelines.
 PLACEHOLDER_STYLES = frozenset({None, "", "default_style"})
 TREE_HEALTH_RASTER_STYLES = {
     "tree_ch_raster": "tree_ch_style",
     "tree_ccd_raster": "tree_ccd_style",
     "tree_overall_raster": "tree_overall_style",
 }
+RASTER_DEFAULT_STYLES = {
+    **TREE_HEALTH_RASTER_STYLES,
+    # Legacy tree health raster workspaces
+    "canopy_height": "ch_style",
+    "ccd": "ccd_style",
+    "tree_overall_ch": "tree_overall_ch_style",
+    # LULC
+    "LULC_level_1": "lulc_level_1_style",
+    "LULC_level_2": "lulc_level_2_style",
+    "LULC_level_3": "lulc_level_3_style",
+    # Terrain, restoration, plantation, CLART, hydrology/topo rasters
+    "terrain": "terrain_raster",
+    "restoration": "restoration_style",
+    "plantation": "site_suitability",
+    "clart": "testClart",
+    "stream_order": "stream_order",
+    "catchment_area_singleflow": "catchment_area_singleflow",
+    "distance_nearest_upstream_DL": "distance_nearest_upstream_DL",
+    "natural_depression": "natural_depression",
+    "slope_percentage": "slope_percentage",
+    "dem": "dem_style",
+}
+# Change detection layers share one Dataset row ("Change Detection Raster") and
+# derive their GeoServer style from the layer name suffix (param_name.lower()).
+CHANGE_DETECTION_WORKSPACE = "change_detection"
+CHANGE_DETECTION_STYLE_SUFFIXES = (
+    "urbanization",
+    "degradation",
+    "deforestation",
+    "afforestation",
+    "cropintensity",
+    "shrubchange",
+)
+
+
+def _resolve_raster_style(workspace, layer_name, style_name):
+    """Resolve placeholder Dataset styles to the actual GeoServer raster style."""
+    if style_name not in PLACEHOLDER_STYLES:
+        return style_name
+    if workspace == CHANGE_DETECTION_WORKSPACE and layer_name:
+        lowered = str(layer_name).lower()
+        for suffix in CHANGE_DETECTION_STYLE_SUFFIXES:
+            if lowered.endswith(f"_{suffix}"):
+                return suffix
+    resolved = RASTER_DEFAULT_STYLES.get(workspace)
+    if resolved is not None:
+        return resolved
+    return None if style_name == "default_style" else style_name
 
 SOIL_HEALTH_RASTER_WORKSPACE = "soil_health_raster"
 SOIL_HEALTH_NUTRIENTS = ("N", "K", "P", "OC", "OC_OLM")
@@ -186,26 +235,187 @@ def _is_gee_path(path):
     return bool(path) and str(path).startswith("projects/")
 
 
-def _resolve_local_path(path):
-    """
-    Local generators store output paths relative to the repo (``data/...``).
-    Resolve them under DATA_DIR (which may be relocated) or the repo root;
-    absolute paths are returned as they are.
-    """
-    if os.path.isabs(path):
-        return path
-    from computing.config_loader import DATA_DIR, PROJECT_ROOT
+def _local_path_exists(candidate):
+    if os.path.exists(candidate):
+        return True
+    _, ext = os.path.splitext(candidate)
+    if ext.lower() not in (*VECTOR_EXTENSIONS, ".tif", ".tiff"):
+        return os.path.exists(f"{candidate}.gpkg")
+    return False
+
+
+def _location_slug_variants(value):
+    from utilities.gee_utils import valid_gee_text
+
+    slug = valid_gee_text(str(value).strip().lower())
+    if not slug:
+        return []
+    return list(dict.fromkeys([slug, slug.replace("-", "_"), slug.replace("_", "-")]))
+
+
+def _derived_layer_subdirs(workspace, layer_type=None):
+    if not workspace:
+        return []
+    from computing import config_loader
+
+    prefix = config_loader._LOCATION_PREFIX
+    exact, fallback = [], []
+    for layer in config_loader.derived_layers():
+        if layer.get("geoserver_workspace") != workspace:
+            continue
+        local_path = layer.get("local_path") or ""
+        if not local_path.startswith(prefix):
+            continue
+        subdir = local_path[len(prefix) :].split("{")[0].rstrip("/")
+        if not subdir:
+            continue
+        target = (
+            exact
+            if (not layer_type or layer.get("layer_type") == layer_type)
+            else fallback
+        )
+        if subdir not in target:
+            target.append(subdir)
+    return exact + [s for s in fallback if s not in exact]
+
+
+def _rebased_data_dir_candidates(raw_path, data_dir, project_root):
+    candidates = []
+
+    def add(candidate):
+        candidate_str = str(candidate)
+        if candidate_str not in candidates:
+            candidates.append(candidate_str)
+
+    path_obj = Path(raw_path)
+    parts = path_obj.parts
+
+    if os.path.isabs(raw_path):
+        try:
+            path_obj.relative_to(data_dir)
+        except ValueError:
+            in_data_dir = False
+        else:
+            in_data_dir = True
+
+        if in_data_dir:
+            add(raw_path)
+
+        # Rebase absolute paths from another DATA_DIR (e.g. host vs Docker
+        # mount or relocated data volume) onto the active DATA_DIR.
+        for anchor in ("layers", "base_layers"):
+            for idx in range(len(parts) - 1, -1, -1):
+                if parts[idx] == anchor and idx + 1 < len(parts):
+                    add(data_dir.joinpath(*parts[idx:]))
+        for idx in range(len(parts) - 1, -1, -1):
+            if parts[idx] == "data" and idx + 1 < len(parts):
+                add(data_dir.joinpath(*parts[idx + 1 :]))
+
+        if not in_data_dir:
+            add(raw_path)
+    else:
+        if raw_path == "data":
+            add(data_dir)
+        elif raw_path.startswith("data/"):
+            add(data_dir / raw_path[len("data/") :])
+        add(data_dir / raw_path)
+        add(project_root / raw_path)
+
+    return candidates
+
+
+def _relocated_layer_layout_candidates(raw_path, entry, data_dir):
+    if not entry:
+        return []
+    state = entry.get("state")
+    district = entry.get("district")
+    block = entry.get("block")
+    filename = Path(raw_path).name
+    if not (state and district and block and filename):
+        return []
+
+    state_variants = _location_slug_variants(state)
+    district_variants = _location_slug_variants(district)
+    block_variants = _location_slug_variants(block)
+    if not (state_variants and district_variants and block_variants):
+        return []
 
     candidates = []
-    if path == "data" or path.startswith("data/"):
-        candidates.append(str(DATA_DIR / path[len("data/"):]))
-    candidates.append(str(PROJECT_ROOT / path))
-    for candidate in candidates:
-        if os.path.exists(candidate) or os.path.exists(
-            os.path.splitext(candidate)[0] + ".gpkg"
+
+    def add(candidate):
+        candidate_str = str(candidate)
+        if candidate_str not in candidates:
+            candidates.append(candidate_str)
+
+    # 1. Look up the derived layer's subdir under
+    #    {DATA_DIR}/layers/{state}/{district}/{block}/<subdir>/<filename>
+    #    from computing/config.yaml.
+    for subdir in _derived_layer_subdirs(
+        entry.get("workspace"), layer_type=entry.get("layer_type")
+    ):
+        for s in state_variants:
+            for d in district_variants:
+                for b in block_variants:
+                    add(data_dir / "layers" / s / d / b / subdir / filename)
+
+    # 2. Reorder legacy <subdir>/{state}/{district}/{block}/{filename} paths
+    #    (covers layers without a config.yaml workspace, e.g. tree health rasters).
+    parts = Path(raw_path).parts
+    if len(parts) >= 5:
+        loc = parts[-4:-1]
+        if (
+            loc[0] in state_variants
+            and loc[1] in district_variants
+            and loc[2] in block_variants
         ):
+            prefix = parts[:-4]
+            rel_subdir = None
+            for idx in range(len(prefix) - 1, -1, -1):
+                if prefix[idx] in ("data", "layers"):
+                    rel_subdir = prefix[idx + 1 :]
+                    break
+            if rel_subdir is None and not os.path.isabs(raw_path):
+                rel_subdir = prefix
+            if rel_subdir:
+                if rel_subdir[0] == "layers":
+                    rel_subdir = rel_subdir[1:]
+                if rel_subdir:
+                    add(
+                        data_dir.joinpath(
+                            "layers", loc[0], loc[1], loc[2], *rel_subdir, filename
+                        )
+                    )
+
+    return candidates
+
+
+def _resolve_local_path(path, entry=None):
+    """
+    Resolve a Layer.gee_asset_path against the active ``config_loader.DATA_DIR``.
+
+    Handles:
+    - Current ``DATA_DIR`` paths (returned directly when present).
+    - Absolute paths written under a different ``DATA_DIR`` (e.g. host vs
+      Docker mount or relocated volume), rebased onto ``DATA_DIR``.
+    - Legacy relative ``data/...`` paths under ``DATA_DIR`` or ``PROJECT_ROOT``.
+    - Pre-restructure paths whose files now live under
+      ``{DATA_DIR}/layers/{state}/{district}/{block}/<subdir>/<filename>``.
+    """
+    from computing import config_loader
+
+    data_dir = Path(config_loader.DATA_DIR)
+    project_root = Path(config_loader.PROJECT_ROOT)
+
+    candidates = _rebased_data_dir_candidates(path, data_dir, project_root)
+    for candidate in candidates:
+        if _local_path_exists(candidate):
             return candidate
-    return candidates[0]
+
+    for candidate in _relocated_layer_layout_candidates(path, entry, data_dir):
+        if _local_path_exists(candidate):
+            return candidate
+
+    return candidates[0] if candidates else path
 
 
 def _expand_soil_health_raster(entry):
@@ -222,7 +432,7 @@ def _expand_soil_health_raster(entry):
         or _is_gee_path(path)
     ):
         return [entry]
-    resolved = _resolve_local_path(path)
+    resolved = _resolve_local_path(path, entry=entry)
     stem = os.path.splitext(resolved)[0]
     for nutrient in sorted(SOIL_HEALTH_NUTRIENTS, key=len, reverse=True):
         if stem.endswith(f"_{nutrient}"):
@@ -249,7 +459,7 @@ def _publish_args(entry):
     path = entry.get("path")
     if not path or _is_gee_path(path):
         return None  # not a local file (e.g. a GEE asset)
-    path = _resolve_local_path(path)
+    path = _resolve_local_path(path, entry=entry)
     if entry.get("layer_type") == "raster":
         layer_type, file_type = "raster", "tif"
     else:
@@ -263,8 +473,10 @@ def _publish_args(entry):
     if not exists or not entry.get("workspace") or not entry.get("layer_name"):
         return None
     style_name = entry.get("style_name")
-    if layer_type == "raster" and style_name in PLACEHOLDER_STYLES:
-        style_name = TREE_HEALTH_RASTER_STYLES.get(entry["workspace"], style_name)
+    if layer_type == "raster":
+        style_name = _resolve_raster_style(
+            entry["workspace"], entry["layer_name"], style_name
+        )
     args = {
         "layer_type": layer_type,
         "path": path,
@@ -333,7 +545,7 @@ def _layer_info(entry):
     }
 
 
-def _queue_local_entries(entries, dry_run):
+def _queue_local_entries(entries, dry_run, skip_stac=True):
     """
     Layers sharing one GeoServer datastore (facility points) are published by
     a single task, which flips every one of their flags; publishing them one by
@@ -371,8 +583,9 @@ def _queue_local_entries(entries, dry_run):
     task_ids = {}
     for info, args in planned:
         if not dry_run and id(args) not in task_ids:
+            publish_kwargs = {**args, "skip_stac": skip_stac} if skip_stac else args
             result = publish_local_layer.apply_async(
-                kwargs=args, queue=GEOSERVER_QUEUE
+                kwargs=publish_kwargs, queue=GEOSERVER_QUEUE
             )
             task_ids[id(args)] = result.id
         if not dry_run:
@@ -438,7 +651,7 @@ def _gee_layer_kind(entry, gee_account_id, ee_ready):
     return kind
 
 
-def _queue_gee_entries(entries, dry_run, gee_account_id):
+def _queue_gee_entries(entries, dry_run, gee_account_id, skip_stac=True):
     from computing.tasks import GEOSERVER_QUEUE, publish_gee_layer
 
     summary = {
@@ -464,16 +677,24 @@ def _queue_gee_entries(entries, dry_run, gee_account_id):
             summary["skipped_layers"].append({**info, "reason": reason})
             continue
         if not dry_run:
+            style_name = entry.get("style_name")
+            if kind == "raster":
+                style_name = _resolve_raster_style(
+                    entry["workspace"], entry["layer_name"], style_name
+                )
+            elif style_name in PLACEHOLDER_STYLES:
+                style_name = None
             result = publish_gee_layer.apply_async(
                 kwargs={
                     "layer_type": kind,
                     "asset_id": entry["path"],
                     "layer_name": entry["layer_name"],
                     "workspace": entry["workspace"],
-                    "style_name": entry.get("style_name"),
+                    "style_name": style_name,
                     "state": entry["state"],
                     "layer_id": entry.get("layer_id"),
                     "gee_account_id": gee_account_id,
+                    **({"skip_stac": True} if skip_stac else {}),
                 },
                 queue=GEOSERVER_QUEUE,
             )
@@ -494,6 +715,7 @@ def queue_unsynced_layers(
     gee_account_id=None,
     force=False,
     sync_boundaries=True,
+    skip_stac=True,
 ):
     """
     Queue the GeoServer push of every unsynced layer of active tehsils,
@@ -528,8 +750,10 @@ def queue_unsynced_layers(
     if not dry_run and sync_boundaries:
         _sync_boundaries(local_entries + gee_entries)
 
-    summary = _queue_local_entries(local_entries, dry_run)
-    summary["gee"] = _queue_gee_entries(gee_entries, dry_run, gee_account_id)
+    summary = _queue_local_entries(local_entries, dry_run, skip_stac=skip_stac)
+    summary["gee"] = _queue_gee_entries(
+        gee_entries, dry_run, gee_account_id, skip_stac=skip_stac
+    )
     summary["dry_run"] = dry_run
     summary["force"] = force
     return summary
