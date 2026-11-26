@@ -15,6 +15,7 @@ from computing.local_compute_helper import (
     build_output_vector_path,
     load_precomputed_watersheds,
     read_validated_vector_file,
+    resolve_indexed_vector_path,
     write_vector_output,
     validate_geometry,
 )
@@ -199,9 +200,10 @@ def generate_soge_vector_local(
 
     for year, soge_path in soge_files:
         year_layer_name = f"{layer_name}_{year}"
-        print(f"Processing SOGE {year} from {soge_path}")
+        resolved_soge_path = resolve_indexed_vector_path(soge_path)
+        print(f"Processing SOGE {year} from {resolved_soge_path}")
 
-        soge_gdf = gpd.read_file(soge_path, mask=watersheds_gdf)
+        soge_gdf = gpd.read_file(resolved_soge_path, mask=watersheds_gdf)
         soge_gdf = validate_geometry(soge_gdf)
         if soge_gdf.empty:
             raise ValueError(
