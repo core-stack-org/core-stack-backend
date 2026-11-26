@@ -59,6 +59,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 import rasterio
 import rasterio.merge
@@ -1233,53 +1234,102 @@ def _save_annual_parquet(gdf, state, district, block, year):
     return out_path
 
 
+MONTHLY_BATCH_ROWS = 1_000_000   # rows of the existing file held in memory at a time
+
+
+def _monthly_frame_for_month(gdf, state, district, block, year, month):
+    """One month of AET/PET/MAI for every farm, in long format (one row per farm)."""
+    n = len(gdf)
+    month_num = [num for num, name in _MONTH_NUM_TO_NAME.items() if name == month][0]
+    # Months Jul-Dec belong to `year`; Jan-Jun belong to the next calendar year
+    # (crop year starting July spans two calendar years)
+    cal_year = int(year) if month_num >= 7 else int(year) + 1
+    area = (gdf["area_m2"] / 10_000).round(4).values if "area_m2" in gdf.columns else np.full(n, np.nan)
+
+    def col(name):
+        return gdf[name].values if name in gdf.columns else np.nan
+
+    return pd.DataFrame({
+        "farm_id":    gdf["farm_id"].values if "farm_id" in gdf.columns else np.arange(n),
+        "tehsil":     block,
+        "district":   district,
+        "state":      state,
+        "area_in_ha": area,
+        "year":       int(year),
+        "date":       np.full(n, np.datetime64(f"{cal_year}-{month_num:02d}-01"), dtype="datetime64[ns]"),
+        "aet":           col(f"aet_{month}"),
+        "aet_corrected": col(f"aet_corrected_{month}"),
+        "pet":           col(f"pet_{month}"),
+        "mai":           col(f"mai_{month}"),
+    })
+
+
+def _align_to_schema(table, schema):
+    """Same columns, order and types as `schema` (missing columns become null, extra ones are dropped)."""
+    arrays = []
+    for field in schema:
+        if field.name in table.column_names:
+            arrays.append(table[field.name].cast(field.type))
+        else:
+            arrays.append(pa.nulls(table.num_rows, type=field.type))
+    return pa.Table.from_arrays(arrays, schema=schema)
+
+
 def _save_monthly_parquet(gdf, state, district, block, year):
     """
-    Melt monthly AET/PET/MAI wide columns into long format and
-    append to farm_monthly.parquet.  One row per farm per month.
+    Melt monthly AET/PET/MAI wide columns into long format and write them to
+    sub_annual.parquet (one row per farm per month), replacing any rows already
+    there for `year` and keeping every other year.
+
+    Memory is kept small for large tehsils (millions of farms): the existing
+    file is streamed in batches (rows of `year` dropped on the way) into a
+    temporary file, then the new year is appended one month at a time. The
+    old and new rows are never all in memory together. The result is still the
+    single farms/sub_annual.parquet that the later steps expect.
     """
     out_path = _monthly_parquet_path(state, district, block)
-
-    farm_ids  = gdf["farm_id"].values if "farm_id" in gdf.columns else np.arange(len(gdf))
-    area_vals = (gdf["area_m2"] / 10_000).round(4).values if "area_m2" in gdf.columns else np.full(len(gdf), np.nan)
-
-    rows = []
-    for month in MONTH_NAMES:   # month = 'jan','feb',...'dec' (calendar order)
-        month_num = list(_MONTH_NUM_TO_NAME.keys())[
-            list(_MONTH_NUM_TO_NAME.values()).index(month)
-        ]  # calendar month number 1-12
-        # Months Jul-Dec belong to `year`; Jan-Jun belong to the next calendar year
-        # (crop year starting July spans two calendar years)
-        cal_year = int(year) if month_num >= 7 else int(year) + 1
-        rows.append(pd.DataFrame({
-            "farm_id":   farm_ids,
-            "tehsil":    block,
-            "district":  district,
-            "state":     state,
-            "area_in_ha": area_vals,
-            "year":      int(year),
-            "date":      date(cal_year, month_num, 1),
-            "aet":       gdf[f"aet_{month}"].values if f"aet_{month}" in gdf.columns else np.nan,
-            "aet_corrected": gdf[f"aet_corrected_{month}"].values if f"aet_corrected_{month}" in gdf.columns else np.nan,
-            "pet":       gdf[f"pet_{month}"].values if f"pet_{month}" in gdf.columns else np.nan,
-            "mai":       gdf[f"mai_{month}"].values if f"mai_{month}" in gdf.columns else np.nan,
-        }))
-
-    monthly = pd.concat(rows, ignore_index=True)
-    monthly["date"] = pd.to_datetime(monthly["date"])
-
-    if os.path.exists(out_path):
-        existing = pd.read_parquet(out_path)
-        existing = existing[existing["year"] != int(year)]
-        combined = pd.concat([existing, monthly], ignore_index=True)
-    else:
-        combined = monthly
-
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    combined.to_parquet(out_path, index=False)
-    logger.info(
-        "farm_monthly.parquet updated → %s  (%d total rows)", out_path, len(combined)
-    )
+    tmp_path = out_path + ".tmp"
+    year = int(year)
+
+    def month_table(month):
+        frame = _monthly_frame_for_month(gdf, state, district, block, year, month)
+        return pa.Table.from_pandas(frame, preserve_index=False)
+
+    writer = None
+    total_rows = 0
+    try:
+        first = month_table(MONTH_NAMES[0])
+        schema = first.schema
+        writer = pq.ParquetWriter(tmp_path, schema)
+
+        # 1. existing rows of the other years, batch by batch
+        if os.path.exists(out_path):
+            for batch in pq.ParquetFile(out_path).iter_batches(batch_size=MONTHLY_BATCH_ROWS):
+                table = pa.Table.from_batches([batch])
+                keep = pc.not_equal(table["year"], year)
+                table = table.filter(keep)
+                if table.num_rows:
+                    writer.write_table(_align_to_schema(table, schema), row_group_size=MONTHLY_BATCH_ROWS)
+                    total_rows += table.num_rows
+
+        # 2. the new year, one month at a time
+        for i, month in enumerate(MONTH_NAMES):
+            table = first if i == 0 else month_table(month)
+            writer.write_table(table, row_group_size=MONTHLY_BATCH_ROWS)
+            total_rows += table.num_rows
+
+        writer.close()
+        writer = None
+        os.replace(tmp_path, out_path)
+    except Exception:
+        if writer is not None:
+            writer.close()
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+    logger.info("sub_annual.parquet updated → %s  (%d total rows)", out_path, total_rows)
     return out_path
 
 
