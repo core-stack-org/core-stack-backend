@@ -40,6 +40,7 @@ class DataDirAndLocalOutputPathsTests(TestCase):
             (config_loader.LOCAL_AGROECOLOGICAL_OUTPUT, "generate_agroecological"),
             (config_loader.LOCAL_LCW_OUTPUT, "generate_lcw"),
             (config_loader.LOCAL_SOGE_OUTPUT, "soge_vector"),
+            (config_loader.LOCAL_STREAM_ORDER_OUTPUT, "stream_order"),
             (config_loader.LOCAL_FACTORY_CSR_OUTPUT, "generate_factory_csr"),
             (config_loader.LOCAL_GREEN_CREDIT_OUTPUT, "generate_green_credit"),
             (config_loader.LOCAL_MINING_OUTPUT, "generate_mining"),
@@ -134,6 +135,11 @@ class DataDirAndLocalOutputPathsTests(TestCase):
                     self.assertEqual(
                         config_loader.PAN_INDIA_MWS_CONNECTIVITY_PATH,
                         custom_data_dir / "base_layers/Pan_India_mws_connectivity.geojson",
+                    )
+                    self.assertEqual(
+                        config_loader.PAN_INDIA_STREAM_ORDER_PATH,
+                        custom_data_dir
+                        / "base_layers/stream_order/Pan_India_stream_order_raster.tif",
                     )
                     self.assertEqual(
                         Path(constants.BASE_RESOURCES_DIR),

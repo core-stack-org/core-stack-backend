@@ -1026,6 +1026,108 @@ def compute_categorical_raster_areas_for_watersheds(
     return result
 
 
+def compute_categorical_raster_percentages_for_watersheds(
+    watersheds_gdf,
+    raster_path,
+    class_definitions,
+):
+    from rasterio.features import geometry_mask
+
+    ensure_file_exists(raster_path, "Categorical raster")
+
+    with rasterio.open(raster_path) as src:
+        working_gdf = watersheds_gdf.copy()
+        if working_gdf.crs is None:
+            raise ValueError(
+                "Watershed CRS is missing; cannot align with categorical raster."
+            )
+        if src.crs and working_gdf.crs != src.crs:
+            working_gdf = working_gdf.to_crs(src.crs)
+
+        nodata = src.nodata
+        computed_rows = []
+        class_labels = [class_definition["label"] for class_definition in class_definitions]
+        empty_result = {label: 0.0 for label in class_labels}
+
+        total = len(working_gdf)
+        for index, row in enumerate(working_gdf.itertuples(index=False), start=1):
+            geom = row.geometry
+            if geom is None or geom.is_empty:
+                computed_rows.append(empty_result.copy())
+                continue
+
+            geom_mapping = mapping(geom)
+            try:
+                clipped, clipped_transform = mask(
+                    src,
+                    [geom_mapping],
+                    crop=True,
+                    filled=False,
+                )
+            except ValueError:
+                computed_rows.append(empty_result.copy())
+                continue
+
+            data = clipped[0]
+            if data.size == 0:
+                computed_rows.append(empty_result.copy())
+                continue
+
+            inside_polygon_mask = geometry_mask(
+                [geom_mapping],
+                out_shape=data.shape,
+                transform=clipped_transform,
+                invert=True,
+            )
+            pixel_area = compute_pixel_area_grid(
+                transform=clipped_transform,
+                height=data.shape[0],
+                width=data.shape[1],
+                crs=src.crs,
+            )
+            total_area = float(pixel_area[inside_polygon_mask].sum())
+            if total_area <= 0.0:
+                computed_rows.append(empty_result.copy())
+                continue
+
+            raw_values = np.asarray(data, dtype=np.float64)
+            finite_mask = np.isfinite(raw_values)
+            values = np.where(finite_mask, raw_values, 0)
+            values = np.rint(values).astype(np.int16, copy=False)
+            valid_mask = inside_polygon_mask & (~np.ma.getmaskarray(data)) & finite_mask
+            if nodata is not None and not np.isnan(nodata):
+                valid_mask &= values != int(round(nodata))
+
+            row_result = {}
+            for class_definition in class_definitions:
+                raw_class_values = class_definition.get(
+                    "values", class_definition.get("value")
+                )
+                if isinstance(raw_class_values, (list, tuple, set, np.ndarray)):
+                    class_values = list(raw_class_values)
+                else:
+                    class_values = [raw_class_values]
+                if len(class_values) == 1:
+                    class_mask = valid_mask & (values == class_values[0])
+                else:
+                    class_mask = valid_mask & np.isin(values, class_values)
+                class_area = float(pixel_area[class_mask].sum())
+                row_result[class_definition["label"]] = (class_area / total_area) * 100.0
+
+            computed_rows.append(row_result)
+
+            if index % 200 == 0 or index == total:
+                print(
+                    f"Computed categorical raster percentages for {index}/{total} watersheds"
+                )
+
+    result = watersheds_gdf.copy()
+    computed_df = pd.DataFrame(computed_rows, columns=class_labels)
+    for column in computed_df.columns:
+        result[column] = computed_df[column].values
+    return result
+
+
 def compute_union_categorical_area_across_rasters_for_watersheds(
     watersheds_gdf,
     raster_paths,

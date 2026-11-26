@@ -104,6 +104,9 @@ LOCAL_TASK_DATASETS = {
         "Terrain LULC",
     ),
     "computing.misc.soge_vector_local_compute.generate_soge_vector_local": ("SOGE",),
+    "computing.misc.stream_order_local_compute.generate_stream_order_local": (
+        "Stream Order",
+    ),
     "computing.misc.drainage_lines_local_compute.clip_drainage_lines": ("Drainage",),
     "computing.misc.naturaldepression_local_compute.generate_natural_depression_data_local": (
         "Natural Depression",

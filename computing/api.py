@@ -202,6 +202,9 @@ from .misc.soge_vector_local_compute import (
     generate_soge_vector_local as generate_soge_vector_local_task,
 )
 from .misc.stream_order import generate_stream_order
+from .misc.stream_order_local_compute import (
+    generate_stream_order_local as generate_stream_order_local_task,
+)
 from .mws.generate_hydrology import generate_hydrology as generate_hydrology_gee_task
 from .mws.generate_hydrology_local import (
     generate_hydrology_base_layer as generate_hydrology_base_layer_task,
@@ -2077,6 +2080,7 @@ def gee_task_status(request):
 
 @api_view(["POST"])
 @schema(None)
+@require_local_tehsil_boundaries()
 @sync_layer_generation_if_enabled
 def stream_order(request):
     logger.info("Inside stream_order_vector api")
@@ -2085,16 +2089,31 @@ def stream_order(request):
         district = request.data.get("district").lower()
         block = request.data.get("block").lower()
         gee_account_id = request.data.get("gee_account_id")
-        generate_stream_order.apply_async(
-            args=[state, district, block, gee_account_id], queue="nrm"
+        compute = _get_compute_mode(request)
+        task = _select_compute_task(
+            compute,
+            generate_stream_order,
+            generate_stream_order_local_task,
+        )
+        task.apply_async(
+            kwargs={
+                "state": state,
+                "district": district,
+                "block": block,
+                "gee_account_id": gee_account_id,
+            },
+            queue="nrm",
         )
         return Response(
             {"Success": "stream_order_vector task initiated"},
             status=status.HTTP_200_OK,
         )
+    except ValueError as e:
+        logger.warning("Invalid request in stream_order_vector api: %s", e)
+        return Response({"Exception": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.exception("Exception in stream_order_vector api")
-        return Response({"Exception": e}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"Exception": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["POST"])

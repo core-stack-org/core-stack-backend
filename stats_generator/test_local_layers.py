@@ -55,11 +55,32 @@ class FindSpecTests(SimpleTestCase):
         self.assertIsNone(find_spec("mining", "x_y_mining", "banka", "banka")[0])
         self.assertIsNone(find_spec("no_such_ws", "banka_banka", "banka", "banka")[0])
 
-    def test_gee_only_layers_have_no_local_path(self):
+    def test_stream_order_is_local(self):
         spec, _ = find_spec(
             "stream_order", "stream_order_banka_banka_vector", "banka", "banka"
         )
-        self.assertFalse(spec.is_local)
+        self.assertIsNotNone(spec)
+        self.assertTrue(spec.is_local)
+
+    def test_gee_only_layers_have_no_local_path(self):
+        gee_only = [
+            {
+                "name": "gee_only_example",
+                "geoserver_workspace": "gee_only_ws",
+                "geoserver_layer": "gee_only_{district}_{block}_vector",
+                "layer_type": "vector",
+            }
+        ]
+        with patch.object(local_layers, "derived_layers", return_value=gee_only):
+            local_layers.local_layer_specs.cache_clear()
+            try:
+                spec, _ = find_spec(
+                    "gee_only_ws", "gee_only_banka_banka_vector", "banka", "banka"
+                )
+                self.assertIsNotNone(spec)
+                self.assertFalse(spec.is_local)
+            finally:
+                local_layers.local_layer_specs.cache_clear()
 
 
 class LocalPathTests(SimpleTestCase):
