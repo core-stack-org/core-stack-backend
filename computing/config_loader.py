@@ -375,7 +375,11 @@ PAN_INDIA_SITE_SUITABILITY_PATH = _base_layer_path(
 )
 LOCAL_SITE_SUITABILITY_OUTPUT = DATA_DIR / "layers/site_suitability"
 
-PAN_INDIA_STREAM_ORDER_PATH = DATA_DIR / "base_layers/Pan_India_stream_order_raster.tif"
+PAN_INDIA_STREAM_ORDER_PATH = _base_layer_path(
+    "stream order",
+    fallback="{DATA_DIR}/base_layers/stream_order/Pan_India_stream_order_raster.tif",
+)
+LOCAL_STREAM_ORDER_OUTPUT = _derived_output_dir("stream_order")
 PAN_INDIA_VILLAGE_PATH = DATA_DIR / "base_layers/Village_pan_India.geojson"
 # Field in PAN_INDIA_VILLAGE_PATH holding the village name.
 PAN_INDIA_VILLAGE_NAME_FIELD = "name"

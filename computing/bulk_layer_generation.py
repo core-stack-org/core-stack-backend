@@ -104,6 +104,9 @@ LOCAL_TASK_DATASETS = {
         "Terrain LULC",
     ),
     "computing.misc.soge_vector_local_compute.generate_soge_vector_local": ("SOGE",),
+    "computing.misc.stream_order_local_compute.generate_stream_order_local": (
+        "Stream Order",
+    ),
     "computing.misc.drainage_lines_local_compute.clip_drainage_lines": ("Drainage",),
     "computing.misc.naturaldepression_local_compute.generate_natural_depression_data_local": (
         "Natural Depression",
@@ -328,20 +331,35 @@ def datasets_exist_locally(
             state__state_name__iexact=location["state"],
             district__district_name__iexact=location["district"],
             block__tehsil_name__iexact=location["block"],
-        )
+        ).select_related("dataset")
         if layer_name_prefix:
             layers = layers.filter(layer_name__startswith=layer_name_prefix)
-        if not any(_layer_output_present(layer) for layer in layers):
+        if not any(_layer_output_present(layer, location=location) for layer in layers):
             return False
     return True
 
 
-def _layer_output_present(layer: Layer) -> bool:
+def _layer_output_present(
+    layer: Layer, location: Mapping[str, str] | None = None
+) -> bool:
     path = layer.gee_asset_path
-    if not path or not os.path.isabs(path):
+    if not path or str(path).startswith("projects/"):
         # Not a local file path; the Layer row is the only evidence we have.
         return True
-    return os.path.exists(path) or bool(glob.glob(glob.escape(path) + ".*"))
+    from computing.pending_geoserver_sync import _resolve_local_path
+
+    entry = None
+    if location is not None:
+        dataset = getattr(layer, "dataset", None)
+        entry = {
+            "state": location.get("state"),
+            "district": location.get("district"),
+            "block": location.get("block"),
+            "workspace": getattr(dataset, "workspace", None),
+            "layer_type": getattr(dataset, "layer_type", None),
+        }
+    resolved = _resolve_local_path(path, entry=entry)
+    return os.path.exists(resolved) or bool(glob.glob(glob.escape(resolved) + ".*"))
 
 
 def _legacy_runner_kwargs(
