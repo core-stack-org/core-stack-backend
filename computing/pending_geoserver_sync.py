@@ -460,11 +460,11 @@ def _publish_args(entry):
     if not path or _is_gee_path(path):
         return None  # not a local file (e.g. a GEE asset)
     path = _resolve_local_path(path, entry=entry)
-    if entry.get("layer_type") == "raster":
+    base, ext = os.path.splitext(path)
+    if entry.get("layer_type") == "raster" or ext.lower() in (".tif", ".tiff"):
         layer_type, file_type = "raster", "tif"
     else:
         layer_type = "vector"
-        base, ext = os.path.splitext(path)
         if ext.lower() in VECTOR_EXTENSIONS:
             path, file_type = base, ext.lower().lstrip(".")
         else:

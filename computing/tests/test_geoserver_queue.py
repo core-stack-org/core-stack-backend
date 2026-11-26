@@ -328,6 +328,22 @@ class GeeLayerKindTests(SimpleTestCase):
         vec = {**self.ENTRY, "layer_name": "stream_order_x_vector"}
         self.assertEqual(_gee_layer_kind(vec, None, [False]), "vector")
 
+    def test_local_tif_published_as_raster_despite_vector_dataset(self):
+        import tempfile
+        from computing.pending_geoserver_sync import _publish_args
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tif = f"{tmp}/stream_order_x_raster.tif"
+            open(tif, "w").close()
+            entry = {**self.ENTRY, "path": tif}
+            args = _publish_args(entry)
+
+        self.assertIsNotNone(args)
+        self.assertEqual(args["layer_type"], "raster")
+        self.assertEqual(args["file_type"], "tif")
+        self.assertEqual(args["path"], tif)
+        self.assertEqual(args["style_name"], "stream_order")
+
 
 class GpkgPipelineSyncTests(SimpleTestCase):
     def _entries(self, tmp):
