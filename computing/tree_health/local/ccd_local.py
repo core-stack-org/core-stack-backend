@@ -6,7 +6,7 @@ from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
 
-from computing.config_loader import LULC_BASE_DIR, PROJECT_ROOT
+from computing.config_loader import DATA_DIR, LULC_BASE_DIR, PROJECT_ROOT, layer_dir
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
@@ -22,8 +22,8 @@ from nrm_app.celery import app
 from utilities.constants import LulcClass
 from utilities.gee_utils import valid_gee_text
 
-LOCAL_CCD_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health/ccd"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
+LOCAL_CCD_BASE_DIR = DATA_DIR / "base_layers/tree_health/ccd"
+LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "tree_ccd_raster"
 GEOSERVER_STYLE = "tree_ccd_style"
 
@@ -129,13 +129,13 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
             dst_transform=output_meta["transform"],
             dst_crs=output_meta["crs"],
             dst_nodata=0,
-            resampling=Resampling.mode,
+            resampling=Resampling.nearest,
         )
 
     # Keep CCD values only for tree pixels. Everything else becomes nodata.
     tree_mask = (lulc_array == LulcClass.TREES) | (lulc_array == LulcClass.PLANTATION)
 
-    valid_ccd = ccd_array != nodata
+    valid_ccd = np.isfinite(ccd_array) & (ccd_array != nodata)
     output_array = np.where(tree_mask & valid_ccd, ccd_array, nodata).astype(
         ccd_array.dtype,
         copy=False,

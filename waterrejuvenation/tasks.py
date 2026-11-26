@@ -5,7 +5,7 @@ import time
 from celery import shared_task
 
 
-from computing.lulc.lulc_v3 import clip_lulc_v3
+from computing.lulc.clip_lulc import clip_lulc
 from computing.misc.catchment_area import (
     generate_catchment_area_singleflow,
 )
@@ -27,8 +27,10 @@ from projects.models import Project
 
 from utilities.constants import SITE_DATA_PATH, GEE_PATHS
 from utilities.gee_utils import (
+    create_gee_dir,
     ee_initialize,
     get_gee_dir_path,
+    is_gee_asset_exists,
     make_asset_public,
     valid_gee_text,
 )
@@ -52,6 +54,20 @@ from computing.misc.drainage_lines import clip_drainage_lines
 
 # logger object for writing logs to file
 logger = logging.getLogger(__name__)
+
+
+def _waterbody_asset(folder, name):
+    return (
+        get_gee_dir_path(folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"])
+        + name
+    )
+
+
+def _layer_exists(asset_id, label):
+    if is_gee_asset_exists(asset_id):
+        logger.info("%s already exists, skipping export: %s", label, asset_id)
+        return True
+    return False
 
 # task to take file obj and process all desilting points shared
 import math
@@ -141,7 +157,12 @@ def _gee_safe_property(value, prop_name=None):
         stripped = value.strip()
         if not stripped or stripped.upper() in ("N/A", "NAN", "NONE"):
             return None
-        if prop_name and prop_name.lower() in {"area_ored", "zoi", "zoi_wb", "zoi_area"}:
+        if prop_name and prop_name.lower() in {
+            "area_ored",
+            "zoi",
+            "zoi_wb",
+            "zoi_area",
+        }:
             try:
                 return float(stripped)
             except ValueError:
@@ -280,11 +301,7 @@ def _merge_matched_desilt_with_swb(desilt_row, wb_row):
     if geometry is None:
         return None
 
-    wb_props = {
-        col: wb_row[col]
-        for col in wb_row.index
-        if col != "geometry"
-    }
+    wb_props = {col: wb_row[col] for col in wb_row.index if col != "geometry"}
     desilt_props = {
         col: desilt_row[col]
         for col in desilt_row.index
@@ -389,20 +406,20 @@ def Upload_Desilting_Points(
             return None
         return val
 
+    def coord(value):
+        if value is None:
+            return None
+        try:
+            return round(float(value), 6)
+        except (TypeError, ValueError):
+            return None
+
+    def text(value):
+        if value is None:
+            return ""
+        return str(value).strip().lower()
+
     def point_key(lat, lon, waterbody_name, intervention_year):
-        def coord(value):
-            if value is None:
-                return None
-            try:
-                return round(float(value), 6)
-            except (TypeError, ValueError):
-                return None
-
-        def text(value):
-            if value is None:
-                return ""
-            return str(value).strip().lower()
-
         return (
             coord(lat),
             coord(lon),
@@ -410,28 +427,48 @@ def Upload_Desilting_Points(
             text(intervention_year),
         )
 
+    def header_key(value):
+        return " ".join(str(value).replace("\xa0", " ").split()).lower()
+
+    def excel_cell(row, header):
+        # Header checks ignore case and surrounding space. The old lookup
+        # required "Name of the waterbody " with a trailing space, so a normal
+        # column was skipped and the name was stored as empty.
+        wanted = header_key(header)
+        for col in row.index:
+            if header_key(col) == wanted:
+                return normalize(row[col])
+        return None
+
     wb_obj = WaterbodiesFileUploadLog.objects.get(pk=file_obj_id)
     proj_obj = Project.objects.get(pk=wb_obj.project_id)
 
     df = pd.read_excel(wb_obj.file)
     successful_keys = set()
     failed_ids = {}
+    processed_without_name = {}
+    failed_without_name = {}
     for log in WaterbodiesDesiltingLog.objects.filter(project=proj_obj).only(
         "id", "lat", "lon", "waterbody_name", "intervention_year", "process"
     ):
         key = point_key(log.lat, log.lon, log.waterbody_name, log.intervention_year)
+        location = (coord(log.lat), coord(log.lon), text(log.intervention_year))
         if log.process:
             successful_keys.add(key)
+            if not text(log.waterbody_name):
+                processed_without_name[location] = log.id
         else:
             failed_ids[key] = log.id
+            if not text(log.waterbody_name):
+                failed_without_name[location] = log.id
 
     new_rows = []
     skipped_rows = 0
     for index, row in df.iterrows():
-        lat = normalize(row.get("Latitude"))
-        lon = normalize(row.get("Longitude"))
-        waterbody_name = normalize(row.get("Name of the waterbody "))
-        intervention_year = normalize(row.get("Intervention_year"))
+        lat = excel_cell(row, "Latitude")
+        lon = excel_cell(row, "Longitude")
+        waterbody_name = excel_cell(row, "Name of the waterbody")
+        intervention_year = excel_cell(row, "Intervention_year")
         key = point_key(lat, lon, waterbody_name, intervention_year)
         if key in successful_keys:
             skipped_rows += 1
@@ -442,10 +479,75 @@ def Upload_Desilting_Points(
             )
             continue
         existing_id = failed_ids.pop(key, None)
+        if existing_id is None and waterbody_name:
+            location = (coord(lat), coord(lon), text(intervention_year))
+            processed_id = processed_without_name.pop(location, None)
+            if processed_id:
+                WaterbodiesDesiltingLog.objects.filter(pk=processed_id).update(
+                    waterbody_name=waterbody_name
+                )
+                skipped_rows += 1
+                logger.info(
+                    "Set waterbody name on already processed row %s for project %s.",
+                    processed_id,
+                    proj_obj.id,
+                )
+                continue
+            existing_id = failed_without_name.pop(location, None)
         successful_keys.add(key)
         new_rows.append(
             (index, row, lat, lon, waterbody_name, intervention_year, existing_id)
         )
+
+    if not new_rows and is_processing_required:
+        saved_points = list(
+            WaterbodiesDesiltingLog.objects.filter(
+                project=proj_obj,
+                process=True,
+                closest_wb_lat__isnull=False,
+                closest_wb_long__isnull=False,
+            ).only("id", "closest_wb_lat", "closest_wb_long")
+        )
+        if saved_points:
+            if not start_date or not end_date:
+                raise ValueError(
+                    "start_date and end_date are required when processing desilting points "
+                    "(YYYY-MM-DD)."
+                )
+            ee_initialize(gee_account_id, strict=True)
+            merged_features = []
+            for saved in saved_points:
+                try:
+                    watershed_fc, _buffer = find_watersheds_for_point_with_buffer(
+                        saved.closest_wb_lat, saved.closest_wb_long
+                    )
+                    merged_features.append(watershed_fc)
+                except Exception as e:
+                    logger.info("Watershed failure for saved row %s: %s", saved.id, e)
+            if merged_features:
+                logger.info(
+                    "Refreshing desilt waterbodies for project %s from %s saved points.",
+                    proj_obj.id,
+                    len(saved_points),
+                )
+                Generate_lulc_mws(
+                    intersecting_mws_asset=ee.FeatureCollection(merged_features)
+                    .flatten()
+                    .distinct("uid"),
+                    is_lulc_required=is_lulc_required,
+                    gee_account_id=gee_account_id,
+                    proj_id=proj_obj.id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                wb_obj.process = True
+                wb_obj.save(update_fields=["process"])
+                return {
+                    "status": "processed",
+                    "new_rows": 0,
+                    "retried_rows": 0,
+                    "skipped_rows": skipped_rows,
+                }
 
     if not new_rows:
         logger.info(
@@ -478,18 +580,26 @@ def Upload_Desilting_Points(
     created_rows = 0
     retried_rows = 0
 
-    for index, row, lat, lon, waterbody_name, intervention_year, existing_id in new_rows:
+    for (
+        index,
+        row,
+        lat,
+        lon,
+        waterbody_name,
+        intervention_year,
+        existing_id,
+    ) in new_rows:
         print(row)
         row_values = {
-            "name_of_ngo": normalize(row.get("Name of NGO")),
-            "State": normalize(row.get("State")),
-            "District": normalize(row.get("District")),
-            "Taluka": normalize(row.get("Taluka")),
-            "Village": normalize(row.get("Village")),
+            "name_of_ngo": excel_cell(row, "Name of NGO"),
+            "State": excel_cell(row, "State"),
+            "District": excel_cell(row, "District"),
+            "Taluka": excel_cell(row, "Taluka"),
+            "Village": excel_cell(row, "Village"),
             "waterbody_name": waterbody_name,
             "lat": lat,
             "lon": lon,
-            "slit_excavated": normalize(row.get("Silt Excavated as per App")),
+            "slit_excavated": excel_cell(row, "Silt Excavated as per App"),
             "intervention_year": intervention_year,
             "excel_hash": wb_obj.excel_hash,
             "project": proj_obj,
@@ -579,10 +689,46 @@ def Upload_Desilting_Points(
         except Exception as e:
             logger.info(f"Watershed failure for row {index}: {e}")
 
+    # Retries that still have no watershed must not block layers for the
+    # points that were already matched on an earlier upload.
+    if is_processing_required and not merged_features:
+        saved_points = WaterbodiesDesiltingLog.objects.filter(
+            project=proj_obj,
+            process=True,
+            closest_wb_lat__isnull=False,
+            closest_wb_long__isnull=False,
+        ).only("id", "closest_wb_lat", "closest_wb_long")
+        for saved in saved_points:
+            try:
+                watershed_fc, _buffer = find_watersheds_for_point_with_buffer(
+                    saved.closest_wb_lat, saved.closest_wb_long
+                )
+                merged_features.append(watershed_fc)
+            except Exception as e:
+                logger.info("Watershed failure for saved row %s: %s", saved.id, e)
+        if merged_features:
+            logger.info(
+                "Using %s saved points for project %s after %s retried rows "
+                "produced no watershed.",
+                len(merged_features),
+                proj_obj.id,
+                retried_rows,
+            )
+
     # -----------------------------
     # Post processing (LULC)
     # -----------------------------
     print(merged_features)
+
+    if is_processing_required and not merged_features:
+        logger.info(
+            "No watershed for project %s. Layer generation was not started. "
+            "new_rows=%s retried_rows=%s skipped_rows=%s",
+            proj_obj.id,
+            created_rows,
+            retried_rows,
+            skipped_rows,
+        )
 
     if is_processing_required and merged_features:
         intersecting_mws_asset = (
@@ -622,27 +768,27 @@ def Generate_lulc_mws(
     asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
     asset_folder = [proj_obj.name.lower()]
     description = "mws_" + asset_suffix
-    mws_asset_id = (
-        get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
-        )
-        + description
-    )
-    filter_mws_task = ee.batch.Export.table.toAsset(
-        collection=intersecting_mws_asset,
-        description="water_rej_app_mws_tasks",
-        assetId=mws_asset_id,
-    )
+    waterbody_asset_path = GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
+    create_gee_dir(asset_folder, waterbody_asset_path)
+    mws_asset_id = _waterbody_asset(asset_folder, description)
     try:
-        filter_mws_task.start()
-        logger.info("MWS task started for given lat long")
-        wait_for_task_completion(filter_mws_task)
-        logger.info("MWS task completed")
+        if _layer_exists(mws_asset_id, "MWS"):
+            pass
+        else:
+            filter_mws_task = ee.batch.Export.table.toAsset(
+                collection=intersecting_mws_asset,
+                description="water_rej_app_mws_tasks",
+                assetId=mws_asset_id,
+            )
+            filter_mws_task.start()
+            logger.info("MWS task started for given lat long")
+            wait_for_task_completion(filter_mws_task)
+            logger.info("MWS task completed")
 
         logger.info(f"is lulc required: {is_lulc_required}")
         make_asset_public(mws_asset_id)
         if is_lulc_required:
-            clip_lulc_v3(
+            clip_lulc(
                 start_year=start_year,
                 end_year=end_year,
                 gee_account_id=gee_account_id,
@@ -654,6 +800,7 @@ def Generate_lulc_mws(
             logger.info("luc Task finished for lulc")
     except Exception as e:
         logger.error(f"Error in Generating Lulc and mws layer: {str(e)}")
+        return
     Generate_water_balance_indicator(
         mws_asset_id,
         proj_id=proj_obj.id,
@@ -668,12 +815,16 @@ def Generate_lulc_mws(
         )
         + asset_suffix_swb3
     )
-    BuildMWSLayer(
-        gee_account_id=gee_account_id,
-        proj_id=proj_obj.id,
-        app_type="WATERBODY",
-        export_year_range=(start_year, end_year),
+    mws_layer_id = _waterbody_asset(
+        asset_folder, f"waterbodies_mws_{asset_suffix}".lower()
     )
+    if not _layer_exists(mws_layer_id, "MWS layer"):
+        BuildMWSLayer(
+            gee_account_id=gee_account_id,
+            proj_id=proj_obj.id,
+            app_type="WATERBODY",
+            export_year_range=(start_year, end_year),
+        )
     asset_suffix_wb = f"waterbodies_{asset_suffix}".lower()
     asset_id_wb = (
         get_gee_dir_path(
@@ -681,16 +832,18 @@ def Generate_lulc_mws(
         )
         + asset_suffix_wb
     )
-    Genereate_zoi_and_zoi_indicator(
-        roi=asset_id_wb,
-        proj_id=proj_obj.id,
-        gee_project_id=gee_account_id,
-        asset_suffix=asset_suffix,
-        asset_folder=asset_folder,
-        app_type="WATERBODY",
-        start_date=start_date,
-        end_date=end_date,
-    )
+    zoi_asset_id = _waterbody_asset(asset_folder, "zoi_" + asset_suffix)
+    if not _layer_exists(zoi_asset_id, "ZOI"):
+        Genereate_zoi_and_zoi_indicator(
+            roi=asset_id_wb,
+            proj_id=proj_obj.id,
+            gee_project_id=gee_account_id,
+            asset_suffix=asset_suffix,
+            asset_folder=asset_folder,
+            app_type="WATERBODY",
+            start_date=start_date,
+            end_date=end_date,
+        )
 
 
 @shared_task()
@@ -706,14 +859,18 @@ def Generate_water_balance_indicator(
     logger.info("Generating SWB layer for given lat long")
     asset_folder = [str(proj_obj.name).lower()]
     asset_suffix = f"{proj_obj.name}_{proj_obj.id}".lower()
-    clip_drainage_lines(
-        roi_path=mws_asset_id,
-        asset_suffix=asset_suffix,
-        asset_folder=asset_folder,
-        gee_account_id=gee_account_id,
-        proj_id=proj_obj.id,
-        app_type="WATERDBOY",
+    drainage_asset_id = _waterbody_asset(
+        [proj_obj.name], f"drainage_lines_{asset_suffix}"
     )
+    if not _layer_exists(drainage_asset_id, "Drainage"):
+        clip_drainage_lines(
+            roi_path=mws_asset_id,
+            asset_suffix=asset_suffix,
+            asset_folder=asset_folder,
+            gee_account_id=gee_account_id,
+            proj_id=proj_obj.id,
+            app_type="WATERDBOY",
+        )
 
     generate_catchment_area_singleflow(
         roi_path=mws_asset_id,
@@ -732,31 +889,23 @@ def Generate_water_balance_indicator(
         proj_id=proj_obj.id,
         app_type="WATERBODY",
     )
-    asset_id_swb1 = (
-        get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
+    asset_id_swb2 = _waterbody_asset(asset_folder, f"swb2_{asset_suffix}")
+    swb3_asset_id = _waterbody_asset(asset_folder, f"swb3_{asset_suffix}")
+    if _layer_exists(swb3_asset_id, "Surface water bodies"):
+        pass
+    else:
+        delete_asset_on_GEE(_waterbody_asset(asset_folder, f"swb1_{asset_suffix}"))
+        delete_asset_on_GEE(asset_id_swb2)
+        generate_swb_layer(
+            roi_path=mws_asset_id,
+            asset_suffix=asset_suffix,
+            asset_folder_list=asset_folder,
+            app_type="WATERBODY",
+            start_year=str(start_year),
+            end_year=str(end_year),
+            is_all_classes=True,
+            gee_account_id=gee_account_id,
         )
-        + f"swb1_{asset_suffix}"
-    )
-    asset_id_swb2 = (
-        get_gee_dir_path(
-            asset_folder, asset_path=GEE_PATHS["WATERBODY"]["GEE_ASSET_PATH"]
-        )
-        + f"swb2_{asset_suffix}"
-    )
-
-    delete_asset_on_GEE(asset_id_swb1)
-    delete_asset_on_GEE(asset_id_swb2)
-    generate_swb_layer(
-        roi_path=mws_asset_id,
-        asset_suffix=asset_suffix,
-        asset_folder_list=asset_folder,
-        app_type="WATERBODY",
-        start_year=str(start_year),
-        end_year=str(end_year),
-        is_all_classes=True,
-        gee_account_id=gee_account_id,
-    )
 
     logger.info("SWB layer Generation successfull")
     make_asset_public(asset_id_swb2)

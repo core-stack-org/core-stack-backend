@@ -340,17 +340,13 @@ def download_dataset_images(
     download_jobs = []
     target_projection = None
     if dataset == "modis_pet" and frequency == "monthly":
-        # Use CHIRPS monthly precipitation projection as the output grid for PET.
-        # This keeps local PET files aligned with CHIRPS and reproduces the
-        # original GEE reduceResolution(mean)->reproject(P.projection()) step.
-        first_date = labeled_dates[0][0]
-        first_chirps, _ = make_chirps_image(
-            ee.ImageCollection(CHIRPS_COLLECTION).select("precipitation"),
-            region,
-            first_date,
-            frequency,
+        # Put PET on the native CHIRPS 0.05 deg grid. Take the projection from a
+        # single daily CHIRPS image: a monthly .sum() composite has lost the
+        # CHIRPS projection and defaults to a 1 deg grid, which would make PET
+        # constant over 1 deg x 1 deg blocks and put 1 deg seams into SPEI.
+        target_projection = (
+            ee.ImageCollection(CHIRPS_COLLECTION).first().projection()
         )
-        target_projection = first_chirps.projection()
 
     for index, (current_date, label) in enumerate(labeled_dates, start=1):
         # Keeping one time step per request avoids the EE direct-download size

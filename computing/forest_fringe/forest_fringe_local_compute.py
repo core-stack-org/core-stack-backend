@@ -7,6 +7,7 @@ from computing.local_compute_helper import (
     clip_vector_to_mws,
     load_precomputed_watersheds,
     read_validated_vector_file,
+    resolve_indexed_vector_path,
     validate_geometry,
     write_vector_output,
     build_output_vector_path,
@@ -50,13 +51,14 @@ def generate_forest_fringe_local(
         )
         print(f"ROI source: {roi_path}")
 
-    if not os.path.exists(PAN_INDIA_FOREST_FRINGE):
+    forest_fringe_path = resolve_indexed_vector_path(PAN_INDIA_FOREST_FRINGE)
+    if not forest_fringe_path.exists():
         raise FileNotFoundError(
-            f"PAN INDIA forest fringe file not found at {PAN_INDIA_FOREST_FRINGE}"
+            f"PAN INDIA forest fringe file not found at {forest_fringe_path}"
         )
 
-    print("Loading forest fringe data overlapping ROI...")
-    forest_fringe_gdf = gpd.read_file(PAN_INDIA_FOREST_FRINGE, mask=watersheds_gdf)
+    print(f"Loading forest fringe data overlapping ROI from {forest_fringe_path}...")
+    forest_fringe_gdf = gpd.read_file(forest_fringe_path, mask=watersheds_gdf)
     forest_fringe_gdf = validate_geometry(forest_fringe_gdf)
     if forest_fringe_gdf.empty:
         print(

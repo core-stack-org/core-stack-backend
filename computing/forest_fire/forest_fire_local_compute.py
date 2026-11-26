@@ -7,6 +7,7 @@ from computing.local_compute_helper import (
     clip_vector_to_mws,
     load_precomputed_watersheds,
     read_validated_vector_file,
+    resolve_indexed_vector_path,
     validate_geometry,
     write_vector_output,
     build_output_vector_path,
@@ -56,13 +57,14 @@ def generate_forest_fire_local(
         )
         print(f"ROI source: {roi_path}")
 
-    if not os.path.exists(PAN_INDIA_FOREST_FIRE):
+    forest_fire_path = resolve_indexed_vector_path(PAN_INDIA_FOREST_FIRE)
+    if not forest_fire_path.exists():
         raise FileNotFoundError(
-            f"PAN INDIA forest fire file not found at {PAN_INDIA_FOREST_FIRE}"
+            f"PAN INDIA forest fire file not found at {forest_fire_path}"
         )
 
-    print("Loading forest fire data overlapping ROI...")
-    forest_fire_gdf = gpd.read_file(PAN_INDIA_FOREST_FIRE, mask=watersheds_gdf)
+    print(f"Loading forest fire data overlapping ROI from {forest_fire_path}...")
+    forest_fire_gdf = gpd.read_file(forest_fire_path, mask=watersheds_gdf)
     forest_fire_gdf = validate_geometry(forest_fire_gdf)
     if forest_fire_gdf.empty:
         print(

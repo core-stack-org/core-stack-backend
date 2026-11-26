@@ -5,13 +5,176 @@ import pymannkendall as mk
 import numpy as np
 import ast
 from nrm_app.settings import EXCEL_PATH
-from .utils import get_url
+from .utils import fetch_drought_layer_years, get_url
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
-from .models import LayerInfo
+from .kyl_legends import (
+    AQUIFER_CLASS_TO_ID,
+    SOGE_CLASS_TO_ID,
+    SOIL_DRAINAGE_LABEL_TO_CODE,
+    SOIL_TEXTURE_LABEL_TO_CODE,
+    TREND_LABEL_TO_CODE,
+    TREND_LABEL_TO_STR_CODE,
+)
 
 import re
+
+
+SURFACE_WATER_PERCENT_FIELDS = (
+    "avg_kharif_surface_water_mws",
+    "avg_rabi_surface_water_mws",
+    "avg_zaid_surface_water_mws",
+)
+
+WATER_TO_CROPPED_PERCENT_FIELDS = (
+    "avg_water_surface_to_cropped_area_kharif",
+    "avg_water_surface_to_cropped_area_rabi",
+    "avg_water_surface_to_cropped_area_zaid",
+)
+
+NULLABLE_KYL_FIELDS = (
+    SURFACE_WATER_PERCENT_FIELDS + WATER_TO_CROPPED_PERCENT_FIELDS
+)
+
+
+def compute_avg_season_water_to_cropped_percent(
+    df_swb_annual_mws_data, df_crp_intensity_mws_data, season
+):
+    """Return mean annual ``(season_water_area / season_cropped_area) * 100``.
+
+    Computed per hydrological year and averaged across years with valid
+    positive seasonal cropped area (avoids dividing by number of years twice).
+    Seasonal cropped area denominators:
+      - kharif: single_kharif + doubly + triply cropped area
+      - rabi:   single_non_kharif + doubly + triply cropped area
+      - zaid:   triply cropped area only (small/often zero, so values can be
+                large or None when no triple-cropped area exists)
+    """
+    if (
+        df_swb_annual_mws_data is None
+        or df_swb_annual_mws_data.empty
+        or df_crp_intensity_mws_data is None
+        or df_crp_intensity_mws_data.empty
+    ):
+        return None
+
+    swb_row = df_swb_annual_mws_data.iloc[0]
+    crp_row = df_crp_intensity_mws_data.iloc[0]
+    season_pattern = re.compile(rf"{re.escape(season)}_area_in_ha_(\d{{4}}-\d{{4}})")
+    years = [
+        m.group(1)
+        for col in df_swb_annual_mws_data.columns
+        if (m := season_pattern.fullmatch(col))
+    ]
+
+    yearly_percents = []
+    for year in years:
+        swb_col = f"{season}_area_in_ha_{year}"
+        swb_area = pd.to_numeric(swb_row[swb_col], errors="coerce")
+        if pd.isna(swb_area):
+            continue
+
+        if season == "kharif":
+            crop_cols = (
+                f"single_kharif_cropped_area_in_ha_{year}",
+                f"doubly_cropped_area_in_ha_{year}",
+                f"triply_cropped_area_in_ha_{year}",
+            )
+        elif season == "rabi":
+            crop_cols = (
+                f"single_non_kharif_cropped_area_in_ha_{year}",
+                f"doubly_cropped_area_in_ha_{year}",
+                f"triply_cropped_area_in_ha_{year}",
+            )
+        elif season == "zaid":
+            crop_cols = (f"triply_cropped_area_in_ha_{year}",)
+        else:
+            raise ValueError(f"Unsupported season: {season}")
+
+        present_crop_cols = [
+            c for c in crop_cols if c in df_crp_intensity_mws_data.columns
+        ]
+        if not present_crop_cols:
+            continue
+
+        crop_vals = [
+            pd.to_numeric(crp_row[c], errors="coerce") for c in present_crop_cols
+        ]
+        valid_crop_vals = [float(v) for v in crop_vals if not pd.isna(v)]
+        if not valid_crop_vals:
+            continue
+        cropped_area = sum(valid_crop_vals)
+        if cropped_area <= 0:
+            continue
+
+        yearly_percents.append((float(swb_area) / cropped_area) * 100)
+
+    if not yearly_percents:
+        return None
+    return round(float(sum(yearly_percents) / len(yearly_percents)), 4)
+
+
+def compute_avg_season_surface_water_percent(df_swb_annual_mws_data, season):
+    """Return mean annual ``(season_area / total_area) * 100`` across years with data.
+
+    The denominator is ``total_area_in_ha_<year>`` (that year's observed
+    surface-water area in the MWS, not total waterbody capacity). Returns
+    ``None`` when no year has valid non-zero water area or the input is empty.
+    """
+    if df_swb_annual_mws_data is None or df_swb_annual_mws_data.empty:
+        return None
+
+    row = df_swb_annual_mws_data.iloc[0]
+    # Discover years from the "total_area_in_ha_<year>" columns,
+    # so newly added years are picked up automatically.
+    years = [
+        m.group(1)
+        for col in df_swb_annual_mws_data.columns
+        if (m := re.fullmatch(r"total_area_in_ha_(\d{4}-\d{4})", col))
+    ]
+
+    yearly_percents = []
+    for year in years:
+        total_col = f"total_area_in_ha_{year}"
+        season_col = f"{season}_area_in_ha_{year}"
+        if season_col not in df_swb_annual_mws_data.columns:
+            continue
+        total_area = pd.to_numeric(row[total_col], errors="coerce")
+        season_area = pd.to_numeric(row[season_col], errors="coerce")
+        # skip years with missing data or zero water (avoid divide-by-zero)
+        if pd.isna(total_area) or pd.isna(season_area) or total_area == 0:
+            continue
+        yearly_percents.append((season_area / total_area) * 100)
+
+    if not yearly_percents:
+        return None
+    return round(float(sum(yearly_percents) / len(yearly_percents)), 4)
+
+
+def _prepare_kyl_results_df(results):
+    """Build KYL results DataFrame, preserving None/NaN on nullable fields."""
+    results_df = pd.DataFrame(results)
+    nullable_cols = [
+        col for col in NULLABLE_KYL_FIELDS if col in results_df.columns
+    ]
+    non_nullable_cols = [
+        col for col in results_df.columns if col not in nullable_cols
+    ]
+    if non_nullable_cols:
+        results_df[non_nullable_cols] = results_df[non_nullable_cols].fillna(-9999)
+    return results_df
+
+
+def _kyl_df_to_json_records(results_df):
+    """Convert KYL results DataFrame to JSON-safe dicts (NaN -> None on nullable cols)."""
+    nullable_cols = set(NULLABLE_KYL_FIELDS)
+    records = results_df.to_dict(orient="records")
+    for record in records:
+        for col in nullable_cols:
+            if col in record and record[col] is not None and pd.isna(record[col]):
+                record[col] = None
+    return records
 
 
 def create_geojson_for_all_mws(existing_geojson_path, df, new_geojson_path):
@@ -35,7 +198,16 @@ def create_geojson_for_all_mws(existing_geojson_path, df, new_geojson_path):
             )
             geometry = {"type": "Point", "coordinates": [0, 0]}
 
-        properties = row.to_dict()
+        properties = {
+            k: (
+                None
+                if k in NULLABLE_KYL_FIELDS
+                and v is not None
+                and pd.isna(v)
+                else v
+            )
+            for k, v in row.to_dict().items()
+        }
 
         new_feature = {
             "type": "Feature",
@@ -134,6 +306,7 @@ def generate_mws_data_for_kyl_filters(
 
             results = []
             df_hydrological_annual = sheets["hydrological_annual"]
+            drought_years = fetch_drought_layer_years()
 
             for specific_mws_id in df_hydrological_annual["UID"].unique():
                 hydro_annual_mws_data = df_hydrological_annual[
@@ -150,14 +323,7 @@ def generate_mws_data_for_kyl_filters(
 
                 rainfall_T = precipitation_columns.squeeze().tolist()
                 result = mk.original_test(rainfall_T)
-                rainfall_trend = None
-
-                if result.trend == "no trend":
-                    rainfall_trend = "0"
-                elif result.trend == "increasing":
-                    rainfall_trend = "1"
-                else:
-                    rainfall_trend = "-1"
+                rainfall_trend = TREND_LABEL_TO_STR_CODE.get(result.trend, "-1")
                 try:
                     terrain_vector_mws_data = sheets["terrain"][
                         sheets["terrain"]["UID"] == specific_mws_id
@@ -206,13 +372,9 @@ def generate_mws_data_for_kyl_filters(
                         return np.median(slopes)
 
                     cropping_intensity_trend_value = sens_slope(crp_intensity_T)
-                    cropping_intensity_trend = None
-                    if result.trend == "no trend":
-                        cropping_intensity_trend = "0"
-                    elif result.trend == "increasing":
-                        cropping_intensity_trend = "1"
-                    else:
-                        cropping_intensity_trend = "-1"
+                    cropping_intensity_trend = TREND_LABEL_TO_STR_CODE.get(
+                        result.trend, "-1"
+                    )
 
                     # Total cropped area, replace NaN with 0 for these columns as well
                     total_cropped_area = df_crp_intensity_mws_data.iloc[0][
@@ -326,9 +488,9 @@ def generate_mws_data_for_kyl_filters(
                     kharif_annual_rainfall_ratio = -9999
 
                 ##################### SWB #####################
-                avg_wsr_ratio_kharif = -9999
-                avg_wsr_ratio_rabi = -9999
-                avg_wsr_ratio_zaid = -9999
+                avg_water_surface_to_cropped_area_kharif = None
+                avg_water_surface_to_cropped_area_rabi = None
+                avg_water_surface_to_cropped_area_zaid = None
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
@@ -336,90 +498,26 @@ def generate_mws_data_for_kyl_filters(
                     df_crp_intensity_mws_data = sheets["croppingIntensity_annual"][
                         sheets["croppingIntensity_annual"]["UID"] == specific_mws_id
                     ]
-
-                    df_crp_intensity_mws_data = df_crp_intensity_mws_data.fillna(0)
-                    df_swb_annual_mws_data = df_swb_annual_mws_data.fillna(0)
-                    swb_area_kharif_columns = df_swb_annual_mws_data.filter(
-                        like="kharif_area"
+                    avg_water_surface_to_cropped_area_kharif = (
+                        compute_avg_season_water_to_cropped_percent(
+                            df_swb_annual_mws_data, df_crp_intensity_mws_data, "kharif"
+                        )
                     )
-                    single_kharif_crop_columns = df_crp_intensity_mws_data.filter(
-                        like="single_kharif_cropped_area"
+                    avg_water_surface_to_cropped_area_rabi = (
+                        compute_avg_season_water_to_cropped_percent(
+                            df_swb_annual_mws_data, df_crp_intensity_mws_data, "rabi"
+                        )
                     )
-                    double_crop_columns = df_crp_intensity_mws_data.filter(
-                        like="doubly_cropped_area"
-                    )
-                    triply_crop_columns = df_crp_intensity_mws_data.filter(
-                        like="triply_cropped_area"
-                    )
-
-                    combined_columns_kharif = single_kharif_crop_columns.add(
-                        double_crop_columns, fill_value=0
-                    )
-                    combined_columns_kharif = combined_columns_kharif.add(
-                        triply_crop_columns, fill_value=0
-                    )
-                    total_cropped_area_kharif = combined_columns_kharif.sum(
-                        axis=1
-                    ).sum()
-                    total_swb_area_kharif_column = swb_area_kharif_columns.shape[1]
-                    sum_swb_area_kharif = swb_area_kharif_columns.sum(axis=1).sum()
-
-                    avg_wsr_ratio_kharif = (
-                        sum_swb_area_kharif / total_cropped_area_kharif
-                        if total_cropped_area_kharif > 0
-                        else 0
-                    )
-                    avg_wsr_ratio_kharif = round(
-                        avg_wsr_ratio_kharif * 100 / total_swb_area_kharif_column, 4
-                    )
-                    swb_area_rabi_columns = df_swb_annual_mws_data.filter(
-                        like="rabi_area"
-                    )
-                    single_non_kharif_crop_columns = df_crp_intensity_mws_data.filter(
-                        like="single_non_kharif_cropped_area"
-                    )
-
-                    # Combine the cropping areas and calculate total cropped area for Rabi
-                    combined_columns_rabi = single_non_kharif_crop_columns.add(
-                        double_crop_columns, fill_value=0
-                    )
-                    combined_columns_rabi = combined_columns_rabi.add(
-                        triply_crop_columns, fill_value=0
-                    )
-                    total_cropped_area_rabi = combined_columns_rabi.sum(axis=1).sum()
-
-                    total_swb_rabi_column = swb_area_rabi_columns.shape[1]
-                    sum_swb_area_rabi = swb_area_rabi_columns.sum(axis=1).sum()
-
-                    # Average WSR ratio for Rabi
-                    avg_wsr_ratio_rabi = (
-                        sum_swb_area_rabi / total_cropped_area_rabi
-                        if total_cropped_area_rabi > 0
-                        else 0
-                    )
-                    avg_wsr_ratio_rabi = round(
-                        avg_wsr_ratio_rabi * 100 / total_swb_rabi_column, 4
-                    )
-                    swb_area_zaid_columns = df_swb_annual_mws_data.filter(
-                        like="zaid_area"
-                    )
-                    total_cropped_area_zaid = triply_crop_columns.sum(axis=1).sum()
-
-                    total_swb_zaid_column = swb_area_zaid_columns.shape[1]
-                    sum_swb_area_zaid = swb_area_zaid_columns.sum(axis=1).sum()
-                    avg_wsr_ratio_zaid = (
-                        sum_swb_area_zaid / total_cropped_area_zaid
-                        if total_cropped_area_zaid > 0
-                        else 0
-                    )
-                    avg_wsr_ratio_zaid = round(
-                        avg_wsr_ratio_zaid * 100 / total_swb_zaid_column, 4
+                    avg_water_surface_to_cropped_area_zaid = (
+                        compute_avg_season_water_to_cropped_percent(
+                            df_swb_annual_mws_data, df_crp_intensity_mws_data, "zaid"
+                        )
                     )
 
                 except Exception as e:
-                    avg_wsr_ratio_kharif = -9999
-                    avg_wsr_ratio_rabi = -9999
-                    avg_wsr_ratio_zaid = -9999
+                    avg_water_surface_to_cropped_area_kharif = None
+                    avg_water_surface_to_cropped_area_rabi = None
+                    avg_water_surface_to_cropped_area_zaid = None
                     print(f"Error occurred: {e}")
 
                 ############ Swb_average
@@ -495,7 +593,7 @@ def generate_mws_data_for_kyl_filters(
                 except Exception:
                     avg_kharif_surface_water_mws = (
                         avg_rabi_surface_water_mws
-                    ) = avg_zaid_surface_water_mws = -9999
+                    ) = avg_zaid_surface_water_mws = None
 
                 ###################### Mean of Kharif and Rabi Water Surface Area ######################
                 mean_kharif_water_surface_area = -9999
@@ -585,13 +683,7 @@ def generate_mws_data_for_kyl_filters(
                     swb_T = swb_T.iloc[0].dropna().tolist()
                     result = mk.original_test(swb_T)
 
-                    trend_swb = None
-                    if result.trend == "no trend":
-                        trend_swb = "0"
-                    elif result.trend == "increasing":
-                        trend_swb = "1"
-                    else:
-                        trend_swb = "-1"
+                    trend_swb = TREND_LABEL_TO_STR_CODE.get(result.trend, "-1")
                 except:
                     trend_swb = -9999
 
@@ -653,13 +745,7 @@ def generate_mws_data_for_kyl_filters(
                         return np.median(slopes)
 
                     trend_g_value = sens_slope(G_Trend)
-                    trend_g = None
-                    if result.trend == "no trend":
-                        trend_g = "0"
-                    elif result.trend == "increasing":
-                        trend_g = "1"
-                    else:
-                        trend_g = "-1"
+                    trend_g = TREND_LABEL_TO_STR_CODE.get(result.trend, "-1")
                 except:
                     trend_g = -9999
 
@@ -670,13 +756,7 @@ def generate_mws_data_for_kyl_filters(
                 max_dry_spell_weeks = -9999
                 max_drought_weeks = -9999
                 try:
-                    layers = LayerInfo.objects.get(
-                        layer_type="vector", workspace="drought"
-                    )
-                    years = [
-                        str(year)
-                        for year in range(layers.start_year, layers.end_year + 1)
-                    ]
+                    years = drought_years
 
                     df_crpDrought_mws_data = sheets["croppingDrought_kharif"][
                         sheets["croppingDrought_kharif"]["UID"] == specific_mws_id
@@ -1138,9 +1218,6 @@ def generate_mws_data_for_kyl_filters(
 
                 ################# Aquifer Vector  #########################
                 aquifer_class = -9999
-                aquifer_class_map = {0: "Hard Rock", 1: "Alluvial"}
-
-                class_to_id = {v: k for k, v in aquifer_class_map.items()}
                 try:
                     df_aquifer_vector_mws_data = sheets["aquifer_vector"][
                         sheets["aquifer_vector"]["UID"] == specific_mws_id
@@ -1150,20 +1227,11 @@ def generate_mws_data_for_kyl_filters(
                     ).iloc[0]
                     if aquifer_class_name == "Alluvium":
                         aquifer_class_name = "Alluvial"
-                    aquifer_class = int(class_to_id.get(aquifer_class_name, ""))
+                    aquifer_class = int(AQUIFER_CLASS_TO_ID.get(aquifer_class_name, ""))
                 except Exception:
                     aquifer_class = -9999
 
                 ################# SOGE Vector  #########################
-                Soge_class = {
-                    0: "Safe",
-                    1: "Semi-Critical",
-                    2: "Critical",
-                    3: "Over Exploited",
-                    4: "Not Assessed",
-                }
-
-                class_to_id = {v: k for k, v in Soge_class.items()}
                 try:
                     df_soge_vector_mws_data = sheets["soge_vector"][
                         sheets["soge_vector"]["UID"] == specific_mws_id
@@ -1172,7 +1240,7 @@ def generate_mws_data_for_kyl_filters(
                         "class_name_2025", None
                     ).iloc[0]
                     soge_class = int(
-                        class_to_id.get(soge_class_name, "")
+                        SOGE_CLASS_TO_ID.get(soge_class_name, "")
                     )  # Returns None if not found
                 except Exception:
                     soge_class = -9999
@@ -1516,31 +1584,6 @@ def generate_mws_data_for_kyl_filters(
                     print(f"Error while fetching data for soil health {e}")
 
                 ###### soil type ###########
-                soil_type_drainage_class = {
-                    "Excessively drained": 0,
-                    "Somewhat excessively drained": 0,
-                    "Well drained": 1,
-                    "Moderately well drained": 1,
-                    "Imperfectly drained": 3,
-                    "Poorly drained": 2,
-                    "Very poorly drained": 2,
-                }
-                soil_type_texture_class = {
-                    "Clay (heavy)": 3,
-                    "Silty clay": 3,
-                    "Clay": 3,
-                    "Sandy clay": 3,
-                    "Sandy clay loam": 2,
-                    "Silty clay loam": 2,
-                    "Clay loam": 2,
-                    "Silt": 1,
-                    "Silt loam": 1,
-                    "Loam": 1,
-                    "sandy loam": 0,
-                    "Loamy sand": 0,
-                    "sand": 0,
-                }
-
                 try:
                     soil_drainage = -9999
                     soil_texture = -9999
@@ -1553,10 +1596,10 @@ def generate_mws_data_for_kyl_filters(
                         ]
                         if not soil_type_data.empty:
                             row = soil_type_data.iloc[0]
-                            soil_drainage = soil_type_drainage_class.get(
+                            soil_drainage = SOIL_DRAINAGE_LABEL_TO_CODE.get(
                                 row.get("soil_drainage_classes", -9999), -9999
                             )
-                            soil_texture = soil_type_texture_class.get(
+                            soil_texture = SOIL_TEXTURE_LABEL_TO_CODE.get(
                                 row.get("subsoil_texture", -9999), -9999
                             )
                             soil_ph = row.get("topsoil_ph", -9999)
@@ -1621,9 +1664,7 @@ def generate_mws_data_for_kyl_filters(
                     ]
                     shrub_trend = df_ndvi_mws_data["shrub_trend"].iloc[0]
 
-                    trend_mapping = {"no trend": 0, "increasing": 1, "decreasing": -1}
-
-                    shrub_trend = trend_mapping.get(
+                    shrub_trend = TREND_LABEL_TO_CODE.get(
                         str(shrub_trend).strip().lower(), -9999
                     )
 
@@ -1781,9 +1822,9 @@ def generate_mws_data_for_kyl_filters(
                         "avg_single_cropped": avg_single_cropped,
                         "avg_double_cropped": avg_double_cropped,
                         "avg_triple_cropped": avg_triply_cropped,
-                        "avg_wsr_ratio_kharif": avg_wsr_ratio_kharif,
-                        "avg_wsr_ratio_rabi": avg_wsr_ratio_rabi,
-                        "avg_wsr_ratio_zaid": avg_wsr_ratio_zaid,
+                        "avg_water_surface_to_cropped_area_kharif": avg_water_surface_to_cropped_area_kharif,
+                        "avg_water_surface_to_cropped_area_rabi": avg_water_surface_to_cropped_area_rabi,
+                        "avg_water_surface_to_cropped_area_zaid": avg_water_surface_to_cropped_area_zaid,
                         "avg_kharif_surface_water_mws": avg_kharif_surface_water_mws,
                         "avg_rabi_surface_water_mws": avg_rabi_surface_water_mws,
                         "avg_zaid_surface_water_mws": avg_zaid_surface_water_mws,
@@ -1808,7 +1849,7 @@ def generate_mws_data_for_kyl_filters(
                         "forest_to_farm": round(forest_to_farm, 4),
                         "increase_in_tree_cover": round(afforestation_land_area, 4),
                         "decrease_in_tree_cover": round(deforestation_land_area, 4),
-                        "degradation_cropping_intensity": round(
+                        "cropping_intensity_change_area": round(
                             change_in_cropping_intensity_area, 4
                         ),
                         "urbanization_area": round(urbanization_land_area, 4),

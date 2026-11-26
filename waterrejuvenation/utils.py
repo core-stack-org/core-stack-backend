@@ -19,9 +19,11 @@ from utilities.gee_utils import (
     make_asset_public,
     is_gee_asset_exists,
     get_gee_dir_path,
+    valid_gee_text,
 )
 import numpy as np
-from nrm_app.settings import MEDIA_ROOT
+from django.conf import settings
+from nrm_app.settings import GEOSERVER_URL, MEDIA_ROOT
 
 
 import time
@@ -842,17 +844,53 @@ def add_on_drainage_flag(swb_fc, dl_asset_id):
     return swb_fc.map(set_flag)
 
 
+class WaterbodyLayerNotFoundError(Exception):
+    """Raised when the requested waterbody GeoServer layer(s) do not exist."""
+
+    def __init__(self, layers, message=None):
+        self.layers = list(layers)
+        self.code = "DATA_NOT_GENERATED"
+        layer_list = ", ".join(self.layers)
+        super().__init__(
+            message or f"Waterbody layer not generated on GeoServer: {layer_list}"
+        )
+
+
+class WaterbodyGeoServerError(Exception):
+    """Raised when GeoServer cannot be reached or returns an upstream failure."""
+
+
+def _is_geoserver_missing_layer_response(status_code, body_text):
+    """Detect GeoServer WFS responses indicating a missing/unknown layer."""
+    if status_code == 404:
+        return True
+    lower_body = (body_text or "").lower()
+    missing_markers = (
+        "serviceexception",
+        "exceptionreport",
+        "unknown",
+        "featuretype",
+        "could not locate",
+        "no such",
+        "does not exist",
+        "not found",
+    )
+    if status_code == 400:
+        return True
+    return any(marker in lower_body for marker in missing_markers)
+
+
 def get_merged_waterbodies_with_zoi(
-    state=None, district=None, block=None, max_features=50000
+    state=None, district=None, block=None, max_features=50000, regenerate=False
 ):
     """
     Fetch standard and ZOI waterbodies layers, merge by UID and save single JSON.
 
-    - standard layer: workspace `water_bodies`, layer `surface_waterbodies_{district}_{block}`
-    - zoi layer:       workspace `water_bodies`, layer `waterbodies_zoi_{district}_{block}`
+    - standard layer: workspace `swb`, layer `surface_waterbodies_{district}_{block}`
+    - zoi layer:       workspace `swb`, layer `waterbodies_zoi_{district}_{block}`
 
     Output file:
-      data/states_excel_files/{STATE}/{DISTRICT}/{district}_{block}_merged_data.json
+      {MEDIA_ROOT}/stats_excel_files/{STATE}/{DISTRICT}/{district}_{block}_merged_data.json
 
     Returns:
       merged_dict  (UID -> { ...waterbody props..., "zoi_properties": {...} })
@@ -860,22 +898,29 @@ def get_merged_waterbodies_with_zoi(
     if not district or not block:
         raise ValueError("district and block are required!")
 
-    # normalize
-    state = (state or "UNKNOWN_STATE").upper()
-    district_l = str(district).lower()
-    block_l = str(block).lower()
+    # normalize with valid_gee_text so multi-word names match GeoServer layers
+    state = valid_gee_text(str(state or "UNKNOWN_STATE").strip().lower()).upper()
+    district_l = valid_gee_text(str(district).strip().lower())
+    block_l = valid_gee_text(str(block).strip().lower())
 
-    base_dir = f"{MEDIA_ROOT}stats_excel_files"
-    out_dir = os.path.join(base_dir, state, district.upper())
+    media_root = getattr(settings, "MEDIA_ROOT", None) or MEDIA_ROOT
+    base_dir = os.path.join(media_root, "stats_excel_files")
+    out_dir = os.path.join(base_dir, state, district_l.upper())
     os.makedirs(out_dir, exist_ok=True)
 
     merged_fname = f"{district_l}_{block_l}_merged_data.json"
     merged_path = os.path.join(out_dir, merged_fname)
 
+    geoserver_base = (
+        getattr(settings, "GEOSERVER_URL", "") or GEOSERVER_URL or ""
+    ).rstrip("/")
+    if not geoserver_base:
+        raise WaterbodyGeoServerError("GEOSERVER_URL is not configured.")
+
     # helper: build WFS url
     def build_wfs(workspace, layer, maxf):
         return (
-            f"https://geoserver.core-stack.org:8443/geoserver/{workspace}/ows"
+            f"{geoserver_base}/{workspace}/ows"
             f"?service=WFS&version=1.0.0&request=GetFeature"
             f"&typeName={workspace}:{layer}"
             f"&maxFeatures={maxf}&outputFormat=application/json"
@@ -883,18 +928,37 @@ def get_merged_waterbodies_with_zoi(
 
     standard_layer = f"surface_waterbodies_{district_l}_{block_l}"
     zoi_layer = f"waterbodies_zoi_{district_l}_{block_l}"
+    standard_qualified = f"swb:{standard_layer}"
+    zoi_qualified = f"swb:{zoi_layer}"
 
     standard_wfs = build_wfs("swb", standard_layer, max_features)
     zoi_wfs = build_wfs("swb", zoi_layer, max_features)
 
-    # fetch and return uid->props dict
+    # fetch and return (status, uid_map_or_error)
     def fetch_uid_props(wfs_url, generate_from_props=False):
         try:
             resp = requests.get(wfs_url, timeout=60)
-            resp.raise_for_status()
+        except requests.exceptions.RequestException as exc:
+            return "upstream_error", str(exc)
+
+        status_code = getattr(resp, "status_code", None)
+        body_text = getattr(resp, "text", "") or ""
+        if status_code is not None and status_code >= 500:
+            return "upstream_error", f"GeoServer HTTP {status_code}"
+        if status_code is not None and status_code >= 400:
+            if _is_geoserver_missing_layer_response(status_code, body_text):
+                return "not_found", None
+            return "upstream_error", f"GeoServer HTTP {status_code}"
+
+        try:
             data = resp.json()
-        except Exception:
-            return None  # caller handles None
+        except Exception as exc:
+            if _is_geoserver_missing_layer_response(status_code, body_text):
+                return "not_found", None
+            return "upstream_error", f"Invalid GeoServer response: {exc}"
+
+        if not isinstance(data, dict):
+            return "upstream_error", "Unexpected non-object GeoServer JSON response."
 
         uid_map = {}
         for feat in data.get("features", []):
@@ -921,10 +985,10 @@ def get_merged_waterbodies_with_zoi(
             # for waterbody props we'll keep the original keys as-is)
             uid_map[str(uid)] = props
 
-        return uid_map
+        return "ok", uid_map
 
     # Try to use cached merged if exists
-    if os.path.exists(merged_path):
+    if not regenerate and os.path.exists(merged_path):
         try:
             with open(merged_path, "r", encoding="utf-8") as f:
                 print("Serving cached merged data")
@@ -935,15 +999,30 @@ def get_merged_waterbodies_with_zoi(
 
     # Fetch both layers
     print(f"Attempting standard layer: {standard_wfs}")
-    standard_map = fetch_uid_props(standard_wfs)
+    standard_status, standard_result = fetch_uid_props(standard_wfs)
 
     print(f"Attempting ZOI layer: {zoi_wfs}")
-    zoi_map = fetch_uid_props(zoi_wfs)
+    zoi_status, zoi_result = fetch_uid_props(zoi_wfs)
 
-    # If both failed, return None
+    standard_map = standard_result if standard_status == "ok" else None
+    zoi_map = zoi_result if zoi_status == "ok" else None
+
+    # If both failed, distinguish missing layer (404) from upstream failure (502)
     if standard_map is None and zoi_map is None:
         print(" Both standard and ZOI fetch failed.")
-        return None
+        if standard_status == "not_found" and zoi_status == "not_found":
+            raise WaterbodyLayerNotFoundError([standard_qualified, zoi_qualified])
+        errors = [
+            err
+            for st, err in (
+                (standard_status, standard_result),
+                (zoi_status, zoi_result),
+            )
+            if st == "upstream_error" and err
+        ]
+        raise WaterbodyGeoServerError(
+            "; ".join(errors) or "GeoServer request failed for waterbody layers."
+        )
 
     # Merge: union of UIDs from both maps
     merged = {}

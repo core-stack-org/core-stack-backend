@@ -2,8 +2,6 @@ from computing.surface_water_bodies.swb import sync_asset_to_db_and_geoserver
 from nrm_app.celery import app
 from utilities.constants import GEE_PATHS
 from utilities.gee_utils import valid_gee_text, get_gee_dir_path, make_asset_public
-from projects.models import Project
-from computing.utils import sync_project_fc_to_geoserver, sync_fc_to_geoserver
 import ee
 
 from waterrejuvenation.utils import delete_asset_on_GEE
@@ -82,6 +80,10 @@ def generate_zoi_ci(
         )
         + description_zoi_ci
     )
+    if proj_id:
+        # Project runs publish waterbodies_zoi_* once, after NDVI.
+        return
+
     if state and district and block:
         layer_name = f"waterbodies_zoi_{asset_suffix}"
         layer_at_geoserver = sync_asset_to_db_and_geoserver(
@@ -94,8 +96,3 @@ def generate_zoi_ci(
             district,
             block,
         )
-    else:
-        proj_obj = Project.objects.get(pk=proj_id)
-        fc = ee.FeatureCollection(asset_id_zoi_ci)
-        layer_name = f"waterbodies_zoi_{asset_suffix}"
-        sync_project_fc_to_geoserver(fc, proj_obj.name, layer_name, "zoi_layers")

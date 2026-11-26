@@ -4,13 +4,20 @@ The method is the CoRE v3 writeup (section 3.2.2.1) with the thresholds and
 severity rule of the Manual for Drought Management, updated to December 2020.
 """
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from computing.config_loader import DATA_DIR, LULC_BASE_DIR
+from computing.config_loader import DATA_DIR, LULC_BASE_DIR, LULC_VERSION
 
 METHOD_VERSION = "v1"
 MANUAL_EDITION = "Manual for Drought Management, updated to December 2020"
+
+# LULC: lulc_<LULC_VERSION>_<Y>_<Y+1>.tif in the LULC folder of config.yaml, as every local
+# pipeline reads it. For v4 these are the temporally corrected layers that the
+# pan-india/lulc_temporal_correction_* APIs write there, with this manifest beside them: it marks
+# the newest year provisional until the next year's raw layer is added.
+LULC_MANIFEST = "temporal_correction_manifest.json"
 
 FIRST_SEASON = 2017
 RAIN_RECORD_START = 1981  # CHIRPS's first year
@@ -109,8 +116,18 @@ class Paths:
     def lock_file(self):
         return self.base / ".lock"
 
+    def lulc_manifest(self):
+        try:
+            return json.loads((self.lulc_dir / LULC_MANIFEST).read_text())
+        except (OSError, ValueError):
+            return {}
+
     def lulc_file(self, year):
-        return self.lulc_dir / f"lulc_v3_{year}_{year + 1}.tif"
+        return self.lulc_dir / f"lulc_{LULC_VERSION}_{year}_{year + 1}.tif"
+
+    def lulc_status(self, year):
+        """"final" or "provisional" from the manifest; None when it does not list the year."""
+        return self.lulc_manifest().get("years", {}).get(str(year), {}).get("status")
 
     def chirps_day(self, day):
         return self.chirps / "daily" / str(day.year) / f"chirps_{day:%Y_%m_%d}.tif"

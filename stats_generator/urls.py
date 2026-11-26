@@ -28,4 +28,9 @@ urlpatterns = [
         api.generate_village_data_for_kyl,
         name="generate_kyl_village_data",
     ),
+    path(
+        "layer_info/",
+        api.list_layer_info,
+        name="layer_info",
+    ),
 ]

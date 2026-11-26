@@ -30,7 +30,7 @@ from utilities.gee_utils import (
 from nrm_app.celery import app
 
 
-def forest_fire_on_AEZ(aez_no, gee_account_id=7):
+def forest_fire_on_AEZ(aez_no, gee_account_id=None):
     ee_initialize(gee_account_id)
     aez = ee.FeatureCollection(AEZ)
     mwses = ee.FeatureCollection(MWS_DATASET)

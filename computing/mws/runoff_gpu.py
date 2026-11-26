@@ -10,7 +10,9 @@ from django.conf import settings
 from nrm_app.celery import app
 
 from computing.config_loader import (
+    DATA_DIR,
     LULC_BASE_DIR,
+    LULC_VERSION,
     MICROWATERSHED_PATH,
     PROJECT_ROOT,
     SOIL_RASTER_PATH,
@@ -29,7 +31,7 @@ else:
     dem = None
 
 
-DATA_ROOT = PROJECT_ROOT / "data"
+DATA_ROOT = DATA_DIR
 HYDROLOGY_OUTPUT_ROOT = DATA_ROOT / "hydrology_gpu"
 PAN_INDIA_RUNOFF_OUTPUT_ROOT = DATA_ROOT / "base_layers" / "hydrology" / "runoff"
 PAN_INDIA_RUNOFF_COMMONS_ROOT = PAN_INDIA_RUNOFF_OUTPUT_ROOT / "commons"
@@ -87,7 +89,7 @@ def _resolve_dates(start_date, end_date, start_year=None, end_year=None):
 
 
 def _resolve_lulc_path(lulc_start_year, lulc_end_year):
-    expected_name = f"lulc_v3_{lulc_start_year}_{lulc_end_year}.tif"
+    expected_name = f"lulc_{LULC_VERSION}_{lulc_start_year}_{lulc_end_year}.tif"
     lulc_path = LULC_BASE_DIR / expected_name
     if not lulc_path.exists():
         raise FileNotFoundError(f"LULC raster not found for requested annual period: {lulc_path}")

@@ -81,7 +81,7 @@ def generate_swb_layer(
     # SWB2: Intersect water bodies with micro-watershed to get unique ids for water bodies per micro-watershed
     layer_name = "surface_waterbodies_" + asset_suffix
 
-    swb2, asset_id = waterbody_mws_intersection(
+    swb2, _swb2_asset_id = waterbody_mws_intersection(
         roi=roi,
         asset_suffix=asset_suffix,
         asset_folder_list=asset_folder_list,
@@ -91,10 +91,9 @@ def generate_swb_layer(
         task_id_list = check_task_status([swb2])
         print("SWB2 task completed - task_id_list:", task_id_list)
 
-    layer_at_geoserver = sync_asset_to_db_and_geoserver(
-        asset_id, layer_name, asset_suffix, start_date, end_date, state, district, block
-    )
-
+    # SWB2 is only an input to SWB3. Publishing it here used the same
+    # "surface_waterbodies_{suffix}" dataset as the final SWB3 sync and
+    # started a second Earth Engine task for that dataset.
     swb3_kwargs = {
         "roi": roi,
         "asset_suffix": asset_suffix,

@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR: Path = (
     Path(os.environ.get("DATA_DIR", str(PROJECT_ROOT / "data"))).expanduser().resolve()
 )
+LULC_VERSION: str = os.environ.get("LULC_VERSION", "v4").strip().lower() or "v4"
 
 
 def _load(path: Path) -> dict:
@@ -132,13 +133,42 @@ def derived_layers() -> list[dict]:
     return [dict(layer) for layer in _cfg.get("derived_layers", [])]
 
 
+def layer_dir(root, *slugs) -> Path:
+    """
+    Per-location directory of a derived layer:
+    {DATA_DIR}/layers/{state}/{district}/{block}/<layer subdir>, where the layer
+    subdir is `root` relative to DATA_DIR. Roots outside DATA_DIR keep the
+    legacy `root/<slugs>` layout.
+    """
+    root = Path(root)
+    try:
+        rel = root.relative_to(DATA_DIR)
+    except ValueError:
+        return root.joinpath(*slugs)
+    if rel.parts and rel.parts[0] == "layers":
+        rel = Path(*rel.parts[1:])  # "layers" is already the leading prefix
+    return DATA_DIR.joinpath("layers", *slugs, rel)
+
+
+_LOCATION_PREFIX = "{DATA_DIR}/layers/{state}/{district}/{block}/"
+
+
 def _derived_output_dir(name: str) -> Path:
+    """
+    Layer subdir under DATA_DIR (e.g. DATA_DIR/lulc/lulc_vector_local) taken
+    from `{DATA_DIR}/layers/{state}/{district}/{block}/<subdir>/{filename}`. Pass it
+    to layer_dir() to get the per-location directory.
+    """
     layer = _derived_layer(name)
     if not layer:
         raise KeyError(
             f"No derived layer found in {_CONFIG_PATH.name} for name: {name}"
         )
-    return _abs(layer["local_path"])
+    local_path = layer["local_path"]
+    if local_path.startswith(_LOCATION_PREFIX):
+        subdir = local_path[len(_LOCATION_PREFIX):].split("{")[0].rstrip("/")
+        return DATA_DIR / subdir
+    return _abs(local_path)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +183,13 @@ LULC_BASE_DIR: Path = _abs(
     )
 ).parent
 
+LULC_TEMPORAL_CORRECTION_INPUT_DIR: Path = _base_layer_path("lulc_v4_raw")
+LULC_TEMPORAL_CORRECTION_OUTPUT_DIR: Path = LULC_BASE_DIR  # lulc_v4_<year>_<year+1>.tif, as everything reads it
+
 TERRAIN_RASTER_PATH: Path = _base_layer_path("terrain")
+
+# Directory holding soil_health_{N,K,P,OC,OC_OLM}.tif (from the base layer entry).
+SOIL_HEALTH_BASE_DIR: Path = _base_layer_path("soil_health").parent
 
 SOIL_RASTER_PATH: Path = _base_layer_path(
     "hydrological soil group",
@@ -180,7 +216,7 @@ AQUIFER_VECTOR_PATH: Path = _base_layer_path(
 
 SWB_VECTOR_PATH: Path = _base_layer_path(
     "surface water bodies",
-    fallback="{DATA_DIR}/base_layers/pan_india_waterbodies.geojson",
+    fallback="{DATA_DIR}/base_layers/surface_waterbodies/pan_india_waterbodies_with_mws.fgb",
 )
 
 SOI_TEHSIL_PATH: Path = _base_layer_path("admin boundaries")
@@ -229,13 +265,20 @@ CHANGE_DETECTION_RASTER_OUTPUT_DIR: Path = _derived_output_dir("change detection
 CHANGE_DETECTION_VECTOR_OUTPUT_DIR: Path = _derived_output_dir(
     "change detection vector"
 )
+TERRAIN_RASTER_OUTPUT_DIR: Path = _derived_output_dir("generate_terrain_raster")
+TERRAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("generate_terrain_descriptor")
+SOIL_HEALTH_RASTER_OUTPUT_DIR: Path = _derived_output_dir("clip_soil_health")
+SOIL_HEALTH_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("soil_health_vector")
+CROPPING_INTENSITY_OUTPUT_DIR: Path = _derived_output_dir("cropping intensity")
 LULC_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("lulc vector")
 LULC_V3_OUTPUT_DIR: Path = _derived_output_dir("lulc v3")
 LULC_V4_OUTPUT_DIR: Path = _derived_output_dir("lulc v4")
+LULC_OUTPUT_DIR: Path = _derived_output_dir(f"lulc {LULC_VERSION}")
 LULC_SLOPE_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc slope clusters")
 LULC_PLAIN_CLUSTER_OUTPUT_DIR: Path = _derived_output_dir("lulc plain clusters")
 AQUIFER_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("aquifer vector")
 SWB_VECTOR_OUTPUT_DIR: Path = _derived_output_dir("generate_swb")
+ZOI_OUTPUT_DIR: Path = _derived_output_dir("generate_zoi_data")
 SOIL_TYPE_OUTPUT_DIR: Path = _derived_output_dir("soil type")
 PAN_INDIA_SOIL_TYPE_OUTPUT_DIR: Path = DATA_DIR
 HYDROLOGY_LOCAL_OUTPUT_DIR: Path = _derived_output_dir("hydrology_fortnightly")
@@ -245,16 +288,16 @@ PAN_INDIA_DRAINAGE_LINES_GPKG_PATH = (
 )
 
 PAN_INDIA_DRAINAGE_LINES_PATH = (
-    DATA_DIR / "layers/drainage_lines/Pan_India_drainage_lines.gpkg"
+    DATA_DIR / "base_layers/Pan_India_drainage_lines.gpkg"
 )
-LOCAL_DRAINAGE_LINES_OUTPUT = DATA_DIR / "layers/drainage_lines/drainage_lines_local"
+LOCAL_DRAINAGE_LINES_OUTPUT = _derived_output_dir("generate_drainage_layer")
 
 LOCAL_DRAINAGE_DENSITY_OUTPUT = DATA_DIR / "drainage_density"
 
 PAN_INDIA_CANAL_PATH = _base_layer_path(
     "canal", fallback="{DATA_DIR}/canal/Canal_pan_india.geojson"
 )
-LOCAL_CANAL_OUTPUT = DATA_DIR / "canal/canal_local"
+LOCAL_CANAL_OUTPUT = _derived_output_dir("generate_canal_vector")
 
 PAN_INDIA_AGROECOLOGICAL_PATH = _base_layer_path(
     "aez",
@@ -302,7 +345,7 @@ LOCAL_DISTANCETONEARESTDRAINAGE_OUTPUT = (
 PAN_INDIA_FACILITIES_PATH = _base_layer_path(
     "facilities", fallback="{DATA_DIR}/base_layers/Pan_India_facilities_polygon.geojson"
 )
-LOCAL_FACILITIES_OUTPUT = DATA_DIR / "layers/facilities"
+LOCAL_FACILITIES_OUTPUT = _derived_output_dir("generate_facilities_proximity")
 PAN_INDIA_CATCHMENT_AREA_PATH = DATA_DIR / "base_layers/Pan_India_catchment_area.tif"
 LOCAL_CATCHMENT_AREA_OUTPUT = DATA_DIR / "layers/catchment_area_singleflow"
 
@@ -311,12 +354,11 @@ PAN_INDIA_SLOPE_PERCENTAGE_PATH = _base_layer_path(
 )
 LOCAL_SLOPE_PERCENTAGE_OUTPUT = DATA_DIR / "layers/slope_percentage"
 
-PAN_INDIA_MWS_CONNECTIVITY_PATH = (
-    DATA_DIR / "layers/mws_connectivity/Pan_India_mws_connectivity.geojson"
+PAN_INDIA_MWS_CONNECTIVITY_PATH = _base_layer_path(
+    "mws connectivity",
+    fallback="{DATA_DIR}/base_layers/Pan_India_mws_connectivity.geojson",
 )
-LOCAL_MWS_CONNECTIVITY_OUTPUT = (
-    DATA_DIR / "layers/mws_connectivity/mws_connectivity_local"
-)
+LOCAL_MWS_CONNECTIVITY_OUTPUT = _derived_output_dir("generate_mws_connectivity_data")
 
 LOCAL_MWS_CENTROID_OUTPUT = DATA_DIR / "layers/mws_centroid"
 
@@ -344,18 +386,18 @@ PAN_INDIA_WATERBODIES_CENSUS_PATH = (
 PAN_INDIA_RIVER_PATH = _base_layer_path(
     "river", fallback="{DATA_DIR}/river/River_pan_india.geojson"
 )
-LOCAL_RIVER_OUTPUT = DATA_DIR / "river/river_local"
+LOCAL_RIVER_OUTPUT = _derived_output_dir("generate_river_data")
 
 PAN_INDIA_FABDEM_PATH = _base_layer_path(
     "dem", fallback="{DATA_DIR}/fabdem/fabdem_pan_india.tif"
 )
-LOCAL_FABDEM_OUTPUT = DATA_DIR / "fabdem/fabdem_local"
+LOCAL_FABDEM_OUTPUT = _derived_output_dir("dem_vector")
 
 PAN_INDIA_ANTYODAYA_2020 = DATA_DIR / "base_layers/pan_india_antyodaya_2020.gpkg"
-LOCAL_ANTYODAYA_2020_OUTPUT = DATA_DIR / "antyodaya/output/antyodaya_local"
+LOCAL_ANTYODAYA_2020_OUTPUT = _derived_output_dir("generate_antyodaya")
 
 PAN_INDIA_LIVESTOCKS = DATA_DIR / "base_layers/pan_india_livestock.gpkg"
-LOCAL_LIVESTOCKS_OUTPUT = DATA_DIR / "livestock/output/livestock_local"
+LOCAL_LIVESTOCKS_OUTPUT = _derived_output_dir("generate_livestocks")
 
 
 PAN_INDIA_FOREST_FRINGE = _base_layer_path(
@@ -369,9 +411,10 @@ PAN_INDIA_TREE_IN_GRASSLAND = _base_layer_path(
 )
 LOCAL_TREE_IN_GRASSLAND_OUTPUT = _derived_output_dir("tree in grassland")
 LOCAL_DROUGHT_OUTPUT = _derived_output_dir("generate_drought_layer")
+LOCAL_DROUGHT_CAUSALITY_OUTPUT = _derived_output_dir("mws_drought_causality")
 
 PAN_INDIA_FOREST_FIRE = _base_layer_path(
     "forest fire",
     allowed_suffixes=(".geojson", ".gpkg", ".shp"),
 )
-LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fringe")
+LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fire")

@@ -7,7 +7,7 @@ from utilities.gee_utils import ee_initialize, valid_gee_text, get_gee_asset_pat
 from nrm_app.celery import app
 from computing.lulc.utils.built_up import *
 from computing.lulc.utils.cropland import *
-from computing.lulc.cropping_frequency import *
+from computing.lulc.utils.cropping_frequency import *
 from computing.lulc.utils.water_body import *
 from computing.lulc.misc import *
 from utilities.constants import CRS_4326

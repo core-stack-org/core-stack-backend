@@ -22,8 +22,11 @@ from computing.config_loader import (
     AEZ_VECTOR_PATH,
     LOCAL_ADMIN_BOUNDARY_DIR,
     LULC_BASE_DIR,
+    LULC_VERSION,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
+    VILLAGE_BOUNDARIES_DIR,
+    layer_dir,
 )
 from computing.base_layer_setup import (
     ensure_tehsil_watershed,
@@ -32,12 +35,13 @@ from computing.base_layer_setup import (
 )
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 
-PRECOMPUTED_PANCHAYAT_DIR = PROJECT_ROOT / "data/base_layers/village_boundaries"
+PRECOMPUTED_PANCHAYAT_DIR = VILLAGE_BOUNDARIES_DIR
 
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
+INDEXED_VECTOR_SUFFIXES = (".fgb", ".gpkg")
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
-LULC_CLASSES = np.arange(1, 13, dtype=np.int16)
+LULC_CLASSES = np.arange(1, 14, dtype=np.int16)
 
 TERRAIN_CLUSTER_CENTROIDS = np.array(
     [
@@ -84,6 +88,16 @@ def ensure_file_exists(path, label):
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"{label} not found: {path}")
+
+
+def resolve_indexed_vector_path(path, suffixes=INDEXED_VECTOR_SUFFIXES):
+    """Prefer a spatially indexed sibling (.fgb/.gpkg) of a vector file if present."""
+    path = Path(path)
+    for suffix in suffixes:
+        candidate = path.with_suffix(suffix)
+        if candidate.exists():
+            return candidate
+    return path
 
 
 def validate_geometry(gdf):
@@ -310,11 +324,11 @@ def _build_output_dir(
 ):
     output_base_dir = Path(output_base_dir)
     if state and district and block:
-        output_dir = (
-            output_base_dir
-            / _slug(state, "unknown_state")
-            / _slug(district, "unknown_district")
-            / _slug(block, block_fallback)
+        output_dir = layer_dir(
+            output_base_dir,
+            _slug(state, "unknown_state"),
+            _slug(district, "unknown_district"),
+            _slug(block, block_fallback),
         )
     else:
         output_dir = output_base_dir / custom_subdir
@@ -926,10 +940,11 @@ def compute_categorical_raster_areas_for_watersheds(
                 computed_rows.append(empty_result.copy())
                 continue
 
-            values = np.asarray(data, dtype=np.float64)
-            values = np.where(np.isfinite(values), values, 0)
+            raw_values = np.asarray(data, dtype=np.float64)
+            finite_mask = np.isfinite(raw_values)
+            values = np.where(finite_mask, raw_values, 0)
             values = np.rint(values).astype(np.int16, copy=False)
-            valid_mask = ~np.ma.getmaskarray(data)
+            valid_mask = (~np.ma.getmaskarray(data)) & finite_mask
             if nodata is not None and not np.isnan(nodata):
                 valid_mask &= values != int(round(nodata))
 
@@ -1029,11 +1044,12 @@ def compute_union_categorical_area_across_rasters_for_watersheds(
                 if data.size == 0:
                     continue
 
-                values = np.asarray(data, dtype=np.float64)
-                values = np.where(np.isfinite(values), values, 0)
+                raw_values = np.asarray(data, dtype=np.float64)
+                finite_mask = np.isfinite(raw_values)
+                values = np.where(finite_mask, raw_values, 0)
                 values = np.rint(values).astype(np.int16, copy=False)
 
-                valid_mask = ~np.ma.getmaskarray(data)
+                valid_mask = (~np.ma.getmaskarray(data)) & finite_mask
                 nodata = src.nodata
                 if nodata is not None and not np.isnan(nodata):
                     valid_mask &= values != int(round(nodata))
@@ -1089,10 +1105,12 @@ def resolve_clipped_terrain_raster_path(
 ):
     layer_stub = f"{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_tehsil')}_terrain_raster"
     raster_path = (
-        Path(clipped_raster_dir)
-        / _slug(state, "unknown_state")
-        / _slug(district, "unknown_district")
-        / _slug(block, "unknown_tehsil")
+        layer_dir(
+            clipped_raster_dir,
+            _slug(state, "unknown_state"),
+            _slug(district, "unknown_district"),
+            _slug(block, "unknown_tehsil"),
+        )
         / f"{layer_stub}.tif"
     )
     ensure_file_exists(raster_path, "Clipped terrain raster")
@@ -1196,7 +1214,7 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
 
 
 def resolve_lulc_raster_paths(
-    start_year, end_year, lulc_dir=LULC_BASE_DIR, lulc_version="v4"
+    start_year, end_year, lulc_dir=LULC_BASE_DIR, lulc_version=LULC_VERSION
 ):
     raster_paths = []
     for year in range(int(start_year), int(end_year) + 1):
@@ -1207,8 +1225,6 @@ def resolve_lulc_raster_paths(
 
 
 # ── cropping intensity (shared by the watershed and farm pipelines) ─────────────
-
-CROPPING_INTENSITY_INITIAL_YEAR = 2017
 SINGLE_CROP_CLASSES = (LulcClass.SINGLE_KHARIF, LulcClass.SINGLE_NON_KHARIF)
 ALL_CROP_CLASSES = SINGLE_CROP_CLASSES + (
     LulcClass.DOUBLE_CROPPING,

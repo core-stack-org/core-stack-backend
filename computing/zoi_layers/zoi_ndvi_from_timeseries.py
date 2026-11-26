@@ -19,7 +19,11 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
 )
-from waterrejuvenation.utils import wait_for_task_completion, resolve_zoi_ndvi_input
+from waterrejuvenation.utils import (
+    delete_asset_on_GEE,
+    resolve_zoi_ndvi_input,
+    wait_for_task_completion,
+)
 
 
 def _merge_ndvi_year_assets(chunk_assets):
@@ -149,6 +153,7 @@ def get_ndvi_for_zoi_from_timeseries_compute(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
+    sync_to_geoserver=True,
 ):
     """
     Same orchestration and result as get_ndvi_for_zoi (zoi3), but NDVI values come from
@@ -181,29 +186,31 @@ def get_ndvi_for_zoi_from_timeseries_compute(
         ndvi_asset_path,
     )
 
+    delete_asset_on_GEE(ndvi_asset_path)  # re-runs would otherwise fail on the export
     task = ee.batch.Export.table.toAsset(
         collection=fc, description=description_ndvi, assetId=ndvi_asset_path
     )
     task.start()
     wait_for_task_completion(task)
 
-    if state and district and block:
-        layer_name = f"waterbodies_zoi_{asset_suffix}"
-        sync_asset_to_db_and_geoserver(
-            ndvi_asset_path,
-            layer_name,
-            asset_suffix,
-            start_date,
-            end_date,
-            state,
-            district,
-            block,
-        )
-    elif proj_id:
-        proj_obj = Project.objects.get(pk=proj_id)
-        layer_name = f"waterbodies_zoi_{asset_suffix}"
-        sync_project_fc_to_geoserver(
-            fc, proj_obj.name, layer_name, "zoi_layers"
-        )
+    if sync_to_geoserver:
+        if state and district and block:
+            layer_name = f"waterbodies_zoi_{asset_suffix}"
+            sync_asset_to_db_and_geoserver(
+                ndvi_asset_path,
+                layer_name,
+                asset_suffix,
+                start_date,
+                end_date,
+                state,
+                district,
+                block,
+            )
+        elif proj_id:
+            proj_obj = Project.objects.get(pk=proj_id)
+            layer_name = f"waterbodies_zoi_{asset_suffix}"
+            sync_project_fc_to_geoserver(
+                fc, proj_obj.name, layer_name, "zoi_layers"
+            )
 
     return fc

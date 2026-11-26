@@ -27,10 +27,15 @@ from datetime import datetime
 from multiprocessing import get_context
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
 
-from computing.bulk_layer_generation import get_active_locations, get_all_locations
+from computing.bulk_layer_generation import (
+    get_active_locations,
+    get_active_locations_from_api,
+    get_all_locations,
+)
 from stats_generator import local_layers
 from stats_generator.local_layers import (
     ORIGIN_GEOSERVER,
@@ -88,7 +93,7 @@ def build_filter_files(state, district, block):
 
 
 def _generate_one(loc, is_active, geoserver_fallback, skip_existing,
-                  with_filters=False, filters_only=False):
+                  with_filters=False, filters_only=False, layers=None):
     """
     Runs in a worker process.
     Returns (loc, is_active, rows, seconds, error, filters_error).
@@ -117,6 +122,7 @@ def _generate_one(loc, is_active, geoserver_fallback, skip_existing,
             is_active=is_active,
             geoserver_fallback=geoserver_fallback,
             xlsx_file=str(tmp),
+            layers=layers,
         )
         if not tmp.exists():
             raise RuntimeError("no workbook was written")
@@ -146,7 +152,10 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--active-only", action="store_true",
-            help="Only active tehsils (default: every tehsil in TehsilSOI).",
+            help=(
+                "Only active tehsils (from PROD_BACKEND_URL when set, else "
+                "local TehsilSOI; default: every tehsil in TehsilSOI)."
+            ),
         )
         parser.add_argument("--limit", type=int)
         parser.add_argument(
@@ -191,23 +200,33 @@ class Command(BaseCommand):
             blocks=opts["blocks"], limit=opts["limit"],
         )
         fallback = not opts["no_geoserver_fallback"]
-        if opts["retry_failed"]:
-            with open(opts["retry_failed"], newline="") as fh:
+        try:
+            if opts["retry_failed"]:
+                with open(opts["retry_failed"], newline="") as fh:
+                    locations = list(dict.fromkeys(
+                        (r["state"], r["district"], r["block"])
+                        for r in csv.DictReader(fh)
+                        if r["status"] == "error" and not r["error"].startswith("skipped")
+                    ))
+                self.stdout.write(f"Retrying {len(locations)} failed tehsils from {opts['retry_failed']}")
+            else:
+                if opts["active_only"]:
+                    locator = (
+                        get_active_locations_from_api
+                        if getattr(settings, "PROD_BACKEND_URL", "").strip()
+                        else get_active_locations
+                    )
+                else:
+                    locator = get_all_locations
                 locations = list(dict.fromkeys(
-                    (r["state"], r["district"], r["block"])
-                    for r in csv.DictReader(fh)
-                    if r["status"] == "error" and not r["error"].startswith("skipped")
+                    (slug(l.state), slug(l.district), slug(l.block)) for l in locator(**filters)
                 ))
-            self.stdout.write(f"Retrying {len(locations)} failed tehsils from {opts['retry_failed']}")
-        else:
-            locator = get_active_locations if opts["active_only"] else get_all_locations
-            locations = list(dict.fromkeys(
-                (slug(l.state), slug(l.district), slug(l.block)) for l in locator(**filters)
-            ))
-        if not locations:
-            raise CommandError("No tehsils matched the filters.")
-        active = local_layers.active_location_slugs()
-        layers = fetch_layers_for_excel_generation()
+            if not locations:
+                raise CommandError("No tehsils matched the filters.")
+            active = local_layers.active_location_slugs()
+            layers = fetch_layers_for_excel_generation()
+        except (RuntimeError, ValueError) as exc:
+            raise CommandError(str(exc)) from exc
         n_active = sum(loc in active for loc in locations)
         self.stdout.write(
             f"{len(locations)} tehsils ({n_active} active), {len(layers)} layers, "
@@ -226,7 +245,7 @@ class Command(BaseCommand):
             / f"local_generation_report_{datetime.now():%Y%m%d_%H%M%S}.csv"
         )
         report_path.parent.mkdir(parents=True, exist_ok=True)
-        self._run(locations, active, fallback, opts, report_path)
+        self._run(locations, active, fallback, opts, report_path, layers=layers)
 
     # ------------------------------------------------------------------
 
@@ -301,6 +320,7 @@ class Command(BaseCommand):
                     geoserver_fallback=use_fallback,
                     specific_sheets=[workspace],
                     xlsx_file=str(scratch),
+                    layers=layers,
                 )
             except Exception:
                 logger.exception("Header probe for %s failed", workspace)
@@ -315,14 +335,14 @@ class Command(BaseCommand):
                 f"{'/'.join(sample)}{' (GeoServer)' if use_fallback else ''}"
             )
 
-    def _run(self, locations, active, fallback, opts, report_path):
+    def _run(self, locations, active, fallback, opts, report_path, layers=None):
         totals = Counter()
         failures = []
         done = 0
         started = time.monotonic()
         jobs = [
             (loc, loc in active, fallback, opts["skip_existing"],
-             opts["with_filters"], opts["filters_only"])
+             opts["with_filters"], opts["filters_only"], layers)
             for loc in locations
         ]
         filters_on = opts["with_filters"] or opts["filters_only"]

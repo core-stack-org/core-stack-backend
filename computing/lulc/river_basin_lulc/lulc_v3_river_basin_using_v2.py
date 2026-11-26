@@ -1,6 +1,5 @@
 import datetime
 from datetime import timedelta
-import ee
 from dateutil.relativedelta import relativedelta
 
 from utilities.gee_utils import (
@@ -8,7 +7,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
 )
 from nrm_app.celery import app
-from computing.lulc.cropping_frequency import *
+from computing.lulc.utils.cropping_frequency import *
 from utilities.constants import (
     CGWB_BASIN,
     LULC_V3_OUTPUT_ASSET_PATH,

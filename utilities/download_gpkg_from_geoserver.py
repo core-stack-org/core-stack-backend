@@ -4,14 +4,14 @@ from pathlib import Path
 
 from nrm_app import settings
 from utilities.gee_utils import valid_gee_text
-from computing.config_loader import PROJECT_ROOT
+from computing.config_loader import DATA_DIR
 
 """
 from utilities.download_gpkg_from_geoserver import generate_gpkg
 generate_gpkg(state="Odisha", district="Srikakulam", block="Bhamini", workspace="panchayat_boundaries")
 """
 
-BASE_OUTPUT_DIR = PROJECT_ROOT / "data/base_layers/"
+BASE_OUTPUT_DIR = DATA_DIR / "base_layers"
 
 
 def build_layer_and_path(state, district, block, workspace):

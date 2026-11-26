@@ -6,7 +6,12 @@ from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
 
-from computing.config_loader import CHANGE_DETECTION_RASTER_OUTPUT_DIR, PROJECT_ROOT
+from computing.config_loader import (
+    CHANGE_DETECTION_RASTER_OUTPUT_DIR,
+    DATA_DIR,
+    PROJECT_ROOT,
+    layer_dir,
+)
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
@@ -21,8 +26,8 @@ from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
 
-LOCAL_TREE_CHANGE_BASE_DIR = PROJECT_ROOT / "data/base_layers/tree_health"
-LOCAL_OUTPUT_BASE_DIR = PROJECT_ROOT / "data/tree_health"
+LOCAL_TREE_CHANGE_BASE_DIR = DATA_DIR / "base_layers/tree_health"
+LOCAL_OUTPUT_BASE_DIR = DATA_DIR / "tree_health"
 GEOSERVER_WORKSPACE = "tree_overall_raster"
 GEOSERVER_STYLE = "tree_overall_style"
 BACKGROUND = -9999
@@ -70,24 +75,32 @@ def _resolve_change_detection_raster(
     end_year,
     change_dir=CHANGE_DETECTION_RASTER_OUTPUT_DIR,
 ):
-    # Original GEE code reads change outputs ending at end_year + 1.
-    candidate_end_years = [int(end_year) + 1, int(end_year)]
+    change_root = layer_dir(
+        change_dir,
+        _slug(state, "unknown_state"),
+        _slug(district, "unknown_district"),
+        _slug(block, "unknown_block"),
+    )
+    prefix = f"change_{asset_suffix}_{param_name}_{start_year}_"
 
-    for candidate_end_year in candidate_end_years:
-        raster_name = f"change_{asset_suffix}_{param_name}_{start_year}_{candidate_end_year}.tif"
-        path = (
-            Path(change_dir)
-            / _slug(state, "unknown_state")
-            / _slug(district, "unknown_district")
-            / _slug(block, "unknown_block")
-            / raster_name
-        )
-        if path.exists():
-            return str(path)
+    # Use whatever change raster is available for this start year, whatever
+    # its end year. Prefer end_year + 1 (original GEE behaviour), then
+    # end_year, then the latest end year on disk.
+    available = {}
+    for path in change_root.glob(f"{prefix}*.tif"):
+        suffix = path.stem[len(prefix):]
+        if suffix.isdigit():
+            available[int(suffix)] = path
+
+    for preferred in (int(end_year) + 1, int(end_year)):
+        if preferred in available:
+            return str(available[preferred])
+    if available:
+        return str(available[max(available)])
 
     raise FileNotFoundError(
-        f"Local {param_name} change raster not found for "
-        f"{asset_suffix}, start_year={start_year}, end_year={end_year}."
+        f"Local {param_name} change raster not found for {asset_suffix}, "
+        f"start_year={start_year} in {change_root} (pattern {prefix}*.tif)."
     )
 
 
@@ -146,7 +159,7 @@ def _reproject_to_match(raster_path, meta):
             dst_transform=meta["transform"],
             dst_crs=meta["crs"],
             dst_nodata=BACKGROUND,
-            resampling=Resampling.mode,
+            resampling=Resampling.nearest,
         )
     return output
 
