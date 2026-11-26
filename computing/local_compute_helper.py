@@ -117,6 +117,36 @@ def read_validated_vector_file(path, empty_message):
     return gdf
 
 
+def clip_layer_to_micro_watersheds(watersheds_gdf, source_gdf):
+    """
+    Generic spatial join for point (or any geometry) datasets against watershed
+    polygons. Equivalent to the GEE Join.saveFirst() with spatial intersection.
+    It takes uid property from watersheds_gdf to the final gdf 
+
+    """
+    if source_gdf.empty:
+        return source_gdf
+
+    if watersheds_gdf.crs and source_gdf.crs and watersheds_gdf.crs != source_gdf.crs:
+        source_gdf = source_gdf.to_crs(watersheds_gdf.crs)
+
+    target_watersheds = watersheds_gdf[["uid", "geometry"]].copy()
+
+    joined_gdf = gpd.sjoin(
+        source_gdf,
+        target_watersheds,
+        how="inner",
+        predicate="intersects",
+    )
+
+    joined_gdf = joined_gdf[~joined_gdf.index.duplicated(keep="first")]
+
+    if "index_right" in joined_gdf.columns:
+        joined_gdf = joined_gdf.drop(columns=["index_right"])
+
+    return joined_gdf
+
+
 def clip_vector_to_mws(watersheds_gdf, source_gdf):
     """
     Clips pan-India forest fringe data to the watershed boundaries
