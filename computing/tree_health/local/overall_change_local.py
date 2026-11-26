@@ -61,7 +61,9 @@ def _resolve_tree_change_raster(
     if matches:
         return str(matches[0])
 
-    raise FileNotFoundError(f"Local overall change raster not found in {tree_change_dir}.")
+    raise FileNotFoundError(
+        f"Local overall change raster not found in {tree_change_dir}."
+    )
 
 
 def _resolve_change_detection_raster(
@@ -87,7 +89,7 @@ def _resolve_change_detection_raster(
     # end_year, then the latest end year on disk.
     available = {}
     for path in change_root.glob(f"{prefix}*.tif"):
-        suffix = path.stem[len(prefix):]
+        suffix = path.stem[len(prefix) :]
         if suffix.isdigit():
             available[int(suffix)] = path
 
@@ -107,7 +109,9 @@ def _clip_tree_change(tree_change_path, roi_gdf):
     with rasterio.open(tree_change_path) as src:
         roi_gdf = validate_geometry(roi_gdf)
         if roi_gdf.empty:
-            raise ValueError("No valid ROI geometry available for overall change clipping.")
+            raise ValueError(
+                "No valid ROI geometry available for overall change clipping."
+            )
         if roi_gdf.crs is None:
             raise ValueError("ROI CRS is missing; cannot align overall change raster.")
         if src.crs and roi_gdf.crs != src.crs:
@@ -149,16 +153,17 @@ def _clip_tree_change(tree_change_path, roi_gdf):
 def _reproject_to_match(raster_path, meta):
     output = np.full((meta["height"], meta["width"]), BACKGROUND, dtype=np.int16)
     with rasterio.open(raster_path) as src:
+        src_data = src.read(1).astype(np.int16)
         reproject(
-            source=rasterio.band(src, 1),
+            source=src_data,
             destination=output,
             src_transform=src.transform,
             src_crs=src.crs,
-            src_nodata=src.nodata,
+            src_nodata=BACKGROUND,
             dst_transform=meta["transform"],
             dst_crs=meta["crs"],
             dst_nodata=BACKGROUND,
-            resampling=Resampling.nearest,
+            resampling=Resampling.mode,
         )
     return output
 
@@ -199,6 +204,7 @@ def _build_overall_change_raster(
         dst.set_band_description(1, "constant")
 
     return str(output_path)
+
 
 @app.task(bind=True)
 def tree_health_overall_change_raster_local(

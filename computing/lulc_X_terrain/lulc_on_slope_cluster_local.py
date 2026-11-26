@@ -82,7 +82,7 @@ def _compute_slope_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
 
     reprojected_lulc = []
     for lulc_src in lulc_sources:
-        destination = np.zeros(terrain_values.shape, dtype=np.float32)
+        destination = np.zeros(terrain_values.shape, dtype=np.uint8)
         reproject(
             source=rasterio.band(lulc_src, 1),
             destination=destination,
@@ -92,7 +92,7 @@ def _compute_slope_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
             dst_transform=terrain_transform,
             dst_crs=terrain_src.crs,
             dst_nodata=0,
-            resampling=Resampling.nearest,
+            resampling=Resampling.mode,
         )
         reprojected_lulc.append(destination)
 
