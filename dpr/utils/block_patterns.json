@@ -1,137 +1,1769 @@
 {
-    "Agriculture" : [
-        {
-            "Name" : "groundwater_stress",
-            "values" : [
-                {
-                    "sheet_name" : "soge_vector",
-                    "type" : 2,
-                    "column" : "class_name",
-                    "comparison" : "Safe",
-                    "comp_type" : 2
-                },
-                {
-                    "sheet_name" : "hydrological_annual",
-                    "type" : 3,
-                    "column" : "G_in_mm_",
-                    "trend" : -1
-                }
-            ]
+    "Production_system": {
+        "Agriculture": {
+            "observed_stresses": {
+                "Water": [
+                    {
+                        "Name": "groundwater_stress",
+                        "Category": "Groundwater stress",
+                        "Characteristics": "Stage of groundwater extraction is unsafe, Water balance is negative",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "not_equal",
+                                "Key": "soge_class",
+                                "value": "safe",
+                                "template": "SOGE not being safe is a clear and validated indicator of groundwater stress.",
+                                "description": "Groundwater extraction stage (SOGE) is not Safe"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "mean_annual_delta_g_mm",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 50
+                                },
+                                "template": "Since SOGE data is available only at the block level, the water balance being negative indicates further stress at the micro-watershed level.",
+                                "description": "Mean annual groundwater change is between 0 and 50 mm"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "equal",
+                                "Key": "upstream_mws_count",
+                                "value": 0,
+                                "template": "The micro-watershed is at the head, i.e. it does not get runoff from upstream micro-watersheds.",
+                                "description": "No upstream micro-watersheds (this micro-watershed is at the head)"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "equal",
+                                "Key": "aquifer_class",
+                                "value": "Hard Rock",
+                                "template": "The aquifer type is hard-rock, and these aquifers have low storage anyway.",
+                                "description": "Aquifer type is Hard Rock"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "logic",
+                                "logic": "AND",
+                                "Values": [
+                                    {
+                                        "type": "range",
+                                        "Key": "cropping_intensity_avg",
+                                        "value": {
+                                            "lower": 1.5,
+                                            "upper": 99999
+                                        }
+                                    },
+                                    {
+                                        "type": "equal",
+                                        "Key": "river_available",
+                                        "value": "False"
+                                    },
+                                    {
+                                        "type": "equal",
+                                        "Key": "canal_available",
+                                        "value": "False"
+                                    }
+                                ],
+                                "template": "The cropping intensity is high and likely fueled by groundwater in the absence of other irrigation sources.",
+                                "description": "Cropping intensity is greater than 1.5, and no river or canal is available"
+
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 OR sig_02 AND (sig_03 OR sig_04 OR sig_05)",
+                            "type": "logic",
+                            "logic": "OR",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_02"
+                                        },
+                                        {
+                                            "type": "logic",
+                                            "logic": "OR",
+                                            "Values": [
+                                                {
+                                                    "ref": "sig_03"
+                                                },
+                                                {
+                                                    "ref": "sig_04"
+                                                },
+                                                {
+                                                    "ref": "sig_05"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 + sig_02 AND sig_03 + sig_02 AND sig_04 + sig_02 AND sig_05 [out of 4]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "ref": "sig_05"
+                                }
+                            ]
+                        },
+                        "Comment": "SOGE not being safe (sig_01) is a clear and validated indicator of groundwater stress. Since SOGE data is available only at the block level, further stress at the micro-watershed level can be quantified by the water balance being negative (sig_02). Water balance being negative is triggered in the presence of at least one of the following: the micro-watershed is at the head, i.e. does not get runoff from upstream micro-watersheds (sig_03); the aquifer type is hard-rock (sig_04), since these aquifers have low storage anyway; or the cropping intensity is high (sig_05) and likely fueled by groundwater in the absence of other irrigation sources. Further validation should be done via community interactions and documented on Commons Connect, to check for dropping water levels in the wells (sure sign of groundwater stress), borewell density (higher implies likely groundwater stress), and few NREGA works for groundwater recharge."
+                    },
+                    {
+                        "Name": "high_drought_risk",
+                        "Category": "High drought risk",
+                        "Characteristics": "Drought frequency is high, Dry spells length is long",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "max_drought_weeks",
+                                "value": {
+                                    "lower": 5,
+                                    "upper": 99999
+                                },
+                                "template": "Non-zero severe or moderate drought incidence, triggered through a combination of SPI (rainfall deviation from historical averages), MAI (leading indicator of crops being under stress, measured as AET/PET), and VCI (lagging indicator of crops actually being stressed when compared with historical averages), is a clear sign of drought risk.",
+                                "description": "Drought lasted 5 weeks or more in a year (severe or moderate)"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "max_dry_spell_weeks",
+                                "value": {
+                                    "lower": 5,
+                                    "upper": 99999
+                                },
+                                "template": "There is evidence of large dry spell durations in the past.",
+                                "description": "Longest dry spell is 5 weeks or more"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "logic",
+                                "logic": "OR",
+                                "Values": [
+                                    {
+                                        "type": "range",
+                                        "Key": "avg_precipitation",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 950
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "kharif_annual_rainfall_ratio",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 0.75
+                                        }
+                                    },
+                                    {
+                                        "type": "logic",
+                                        "logic": "OR",
+                                        "Values": [
+                                            {
+                                                "type": "equal",
+                                                "Key": "trend_annual_rainfall",
+                                                "value": "-1"
+                                            },
+                                            {
+                                                "type": "equal",
+                                                "Key": "trend_annual_rainfall",
+                                                "value": "0"
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "template": "Rainfall is low, has a decreasing trend, or is spread beyond the kharif season, indicating an arid climate or changing climatic conditions.",
+                                "description": "Any one of: average rainfall is below 950 mm, kharif rainfall is less than 75% of annual rainfall, or annual rainfall is decreasing over time"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "monsoon_onset_day_range",
+                                "value": {
+                                    "lower": 14,
+                                    "upper": 99999
+                                },
+                                "template": "There is significant deviation in monsoon onset dates, indicating risk for rainfed agriculture.",
+                                "description": "Monsoon onset date varies by 14 days or more across years"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "range",
+                                "Key": "cropping_intensity_avg",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 1.25
+                                },
+                                "template": "Cropping intensity is low, an observational indicator of natural reasons behind dependence on rainfall.",
+                                "description": "Cropping intensity is below 1.25"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "(sig_01 OR sig_02) AND (sig_03 OR sig_04 OR sig_05)",
+                            "type": "logic",
+                            "logic": "AND",
+                            "Trigger_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "(sig_01 OR sig_02) + (sig_03 OR sig_02) + (sig_04 OR sig_02) + sig_05 [out of 4]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "ref": "sig_05"
+                                }
+                            ]
+                        },
+                        "Comment": "Non-zero severe or moderate drought incidence triggered through a combination of SPI (rainfall deviation from historical averages), MAI (leading indicator of crops being under stress, measured as AET/PET), and VCI (lagging indicator of crops actually being stressed when compared with historical averages) is a clear sign of drought risk (sig_01). Alternately, evidence of large dry spell durations in the past (sig_02), along with one of the following further confirms drought risk: low rainfall or decreasing trend in rainfall or rainfall spread beyond the kharif season (sig_03) indicates an arid climate or changing climatic conditions; significant deviation in monsoon onset dates (sig_04) indicates risk for rainfed agriculture; or low cropping intensity (sig_05) is an observational indicator of natural reasons behind dependence on rainfall. Further validation should be done via community interactions and documented on Commons Connect, to check for frequent crop loss due to droughts in the area."
+                    },
+                    {
+                        "Name": "high_irrigation_difficulties",
+                        "Category": "High irrigation difficulties",
+                        "Characteristics": "Surface water during Rabi is low, Surface water trends over the years are negative",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "mean_kharif_rabi_ratio",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 0.3
+                                },
+                                "template": "A significant amount of surface water drying up post monsoon likely indicates irrigation risk for cropping areas irrigated through pumping or lift irrigation from waterbodies, especially during the Rabi season.",
+                                "description": "Surface water in Rabi is low compared to Kharif (ratio is 0.3 or below)"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "trend_water_surface_area_value",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 1
+                                },
+                                "template": "The area is not seeing any significant creation of new waterbodies or increase in surface water area.",
+                                "description": "Surface water area is not increasing over the years"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "logic",
+                                "logic": "OR",
+                                "Values": [
+                                    {
+                                        "type": "not_equal",
+                                        "Key": "soge_class",
+                                        "value": "safe"
+                                    },
+                                    {
+                                        "type": "logic",
+                                        "logic": "AND",
+                                        "Values": [
+                                            {
+                                                "type": "range",
+                                                "Key": "mean_annual_delta_g_mm",
+                                                "value": {
+                                                    "lower": 0,
+                                                    "upper": 50
+                                                }
+                                            },
+                                            {
+                                                "type": "logic",
+                                                "logic": "OR",
+                                                "Values": [
+                                                    {
+                                                        "type": "equal",
+                                                        "Key": "upstream_mws_count",
+                                                        "value": 0
+                                                    },
+                                                    {
+                                                        "type": "equal",
+                                                        "Key": "aquifer_class",
+                                                        "value": "Hard Rock"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "template": "The area is already groundwater stressed, and therefore groundwater may not be a reliable source for irrigation.",
+                                "description": "Groundwater extraction stage (SOGE) is not Safe, or groundwater change is between 0 and 50 mm per year with no upstream micro-watersheds or a Hard Rock aquifer"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "logic",
+                                "logic": "AND",
+                                "Values": [
+                                    {
+                                        "type": "equal",
+                                        "Key": "river_available",
+                                        "value": "False"
+                                    },
+                                    {
+                                        "type": "equal",
+                                        "Key": "canal_available",
+                                        "value": "False"
+                                    }
+                                ],
+                                "template": "Canals and rivers are not present in the area to offer any resilience.",
+                                "description": "No river or canal is available"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "range",
+                                "Key": "nrega_irrigation_count",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 50
+                                },
+                                "template": "NREGA investment in irrigation works is also low.",
+                                "description": "NREGA irrigation works is not more than 50."
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 AND (at least 2 of sig_02, sig_03, sig_04, sig_05)",
+                            "type": "logic",
+                            "logic": "AND",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "COUNT",
+                                    "min_true": 2,
+                                    "Values": [
+                                        {
+                                            "ref": "sig_02"
+                                        },
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "(sig_01 AND sig_02) + (sig_01 AND sig_03) + (sig_01 AND sig_04) + (sig_01 AND sig_05) [out of 4]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_03"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Comment": "Significant amount of surface water drying up post monsoon (sig_01) likely indicates irrigation risk for cropping areas irrigated through pumping or lift irrigation from waterbodies, especially during the Rabi season. This is confirmed by at least 2 of 4 additional indicators, that the area is not seeing any significant creation of new waterbodies and increase in surface water area (sig_02), or the area is already groundwater stressed and therefore groundwater may not be realiable source for irrigation (sig_03), or canals and rivers are not present in the area to offer any resilience (sig_04), or NREGA investment in irrigation works is also low (sig_05). Further validation should be done via community interactions and documented on Commons Connect, to check for the absence or low reliability of various irrigation water sources."
+                    }
+                ],
+                "Soil": [
+                    {
+                        "Name": "soil_health",
+                        "Category": "Soil health",
+                        "Characteristics": "Low soil nutrients, Low soil organic carbon",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "low_nitrogen_percent",
+                                "value": {
+                                    "lower": 0.5,
+                                    "upper": 99999
+                                },
+                                "template": "Low levels of nitrogen in more than half of the cropping area.",
+                                "description": "Low nitrogen in more than 50% of the cropping area."
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "low_phosphorus_percent",
+                                "value": {
+                                    "lower": 0.5,
+                                    "upper": 99999
+                                },
+                                "template": "Low levels of phosphorus in more than half of the cropping area.",
+                                "description": "Low phosphorus in more than 50% of the cropping area."
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "low_potassium_percent",
+                                "value": {
+                                    "lower": 0.5,
+                                    "upper": 99999
+                                },
+                                "template": "Low levels of potassium in more than half of the cropping area.",
+                                "description": "Low potassium in more than 50% of the cropping area."
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "low_organic_carbon_percent",
+                                "value": {
+                                    "lower": 0.5,
+                                    "upper": 99999
+                                },
+                                "template": "Low soil organic carbon in more than half of the cropping area.",
+                                "description": "Low soil organic carbon in more than 50% of the cropping area."
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "at least 2 of sig_01, sig_02, sig_03, sig_04",
+                            "type": "logic",
+                            "logic": "COUNT",
+                            "min_true": 2,
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                },
+                                {
+                                    "ref": "sig_03"
+                                },
+                                {
+                                    "ref": "sig_04"
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 + sig_02 + sig_03 + sig_04 [out of 4]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                },
+                                {
+                                    "ref": "sig_03"
+                                },
+                                {
+                                    "ref": "sig_04"
+                                }
+                            ]
+                        },
+                        "Comment": "Low levels of soil nutrients - nitrogen (sig_01), phosphorus (sig_02), potassium (sig_03), and low soil organic carbon (sig_04), indicate poor soil health that affects yields and long-term sustainability of agriculture. Any two of these four indicators flags poor soil health in the area. Further validation should be done via community interactions and documented on Commons Connect, to check for evidence of poor soil health like high fertilizer usage or dropping yields."
+                    }
+                ],
+                "Yield": [
+                    {
+                        "Name": "decreasing_productivity",
+                        "Category": "Decreasing Productivity",
+                        "Characteristics": "Cropping area is being lost, Cropping intensity is declining",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "cropping_to_shrub_area",
+                                "value": {
+                                    "lower": 30,
+                                    "upper": 99999
+                                },
+                                "template": "Loss of cropping area to fallow land.",
+                                "description": "Cropping area converted to shrub or fallow land is greater than 30"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "cropping_intensity_trend_value",
+                                "value": {
+                                    "lower": -99999,
+                                    "upper": 0.1
+                                },
+                                "template": "Reduction in cropping intensity over the years.",
+                                "description": "Cropping intensity is declining over the years"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 OR sig_02",
+                            "type": "logic",
+                            "logic": "OR",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 + sig_02 [out of 2]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                }
+                            ]
+                        },
+                        "Comment": "Loss of cropping area to fallow land (sig_01) or a reduction in cropping intensity (sig_02) over the years, should be layered against causal stresses in agriculture: groundwater, drought, irrigation, and soil health. This can help reveal potential reasons behind reduced agricultural producivity in the area. Further validation should be done via community interactions and documented on Commons Connect, to understand the impact of these causal stresses."
+                    }
+                ],
+                "Waterbodies": [
+                    {
+                        "Name": "siltation",
+                        "Category": "Siltation in Waterbodies",
+                        "Characteristics": "Surface water drying up post monsoon, Surface water area is not increasing",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "mean_kharif_rabi_ratio",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 0.5
+                                },
+                                "template": "A significant amount of surface water is drying up post monsoon.",
+                                "description": "A large share of surface water dries up after the monsoon (Rabi to Kharif ratio of 0.5 or below)"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "trend_water_surface_area_value",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 1
+                                },
+                                "template": "There is a decreasing trend in surface water availability.",
+                                "description": "Surface water availability is not growing and may be declining over the years"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 OR sig_02",
+                            "type": "logic",
+                            "logic": "OR",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 + sig_02 [out of 2]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                }
+                            ]
+                        },
+                        "Comment": "Significant amount of surface water drying up post monsoon (sig_01) or decreasing trend in surface water availability (sig_02), can be a likely indicator of widespread silting in waterbodies that may have eroded reliance on traditional water systems. Intersections of these areas with groundwater stress or canal and river irrigation can indicate likely substitution of surface water sources with groundwater. In hilly areas, intersections with deforestation can indicate increasing risk of soil erosion and less groundwater recharge from upstream forested areas. Areas seeing such reduction in surface water availability should be layered against other agricultural and socio-economic stresses to prioritize areas for treatment. Further validation should be done via community interactions and documented on Commons Connect, to understand the state of waterbodies and why they have degraded."
+                    }
+                ]
+            }
         },
-        {
-            "Name" : "high_drought_incidence",
-            "values" : [
-                {
-                    "sheet_name" : "croppingDrought_kharif",
-                    "type" : 5,
-                    "column" : ["Moderate_in_weeks_", "Severe_in_weeks_"],
-                    "comparison" : 2,
-                    "comp_type" : 5
-                },
-                {
-                    "sheet_name" : "croppingDrought_kharif",
-                    "type" : 1,
-                    "column" : "drysp_unit_4_weeks_",
-                    "comparison" : 2,
-                    "comp_type" : 5
-                }
-            ]
+        "Livelihood": {
+            "observed_stresses": {
+                "Livestock": [
+                    {
+                        "Name": "water_scarcity",
+                        "Category": "Water scarcity",
+                        "Characteristics": "Livestock population is high, Surface water for livestock is limited",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "mean_kharif_rabi_ratio",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 0.3
+                                },
+                                "template": "The area sees depleted surface water availability post the monsoon season.",
+                                "description": "Surface water in Rabi is low compared to Kharif (ratio is 0.3 or below)"
+
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "trend_water_surface_area_value",
+                                "value": {
+                                    "lower": -1,
+                                    "upper": 0
+                                },
+                                "template": "No new waterbodies or surface water increase has happened over the years.",
+                                "description": "Surface water area is declining over the years, with no new waterbodies added"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "max_livestock_score",
+                                "value": {
+                                    "lower": 300,
+                                    "upper": 99999
+                                },
+                                "template": "The area has a high livestock population.",
+                                "description": "Livestock population count is greater than 300."
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "nrega_swc_count",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 50
+                                },
+                                "template": "NREGA works for soil and water conservation are few.",
+                                "description": "Fewer than 50 NREGA soil and water conservation works"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "equal",
+                                "Key": "river_available",
+                                "value": "False",
+                                "template": "Rivers are not flowing through the area.",
+                                "description": "No river is available in the area"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp":"sig_03 AND (sig_01 OR sig_02 AND (sig_04 OR sig_05))",
+                            "type": "logic",
+                            "logic": "AND", 
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_03"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "type": "logic",
+                                            "logic": "AND",
+                                            "Values": [
+                                                {
+                                                    "ref": "sig_02"
+                                                },
+                                                {
+                                                    "type": "logic",
+                                                    "logic": "OR",
+                                                    "Values": [
+                                                        {
+                                                            "ref": "sig_04"
+                                                        },
+                                                        {
+                                                            "ref": "sig_05"
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "(sig_03 AND sig_01) + (sig_03 AND sig_02 AND sig_04) + (sig_03 AND sig_02 AND sig_05) [out of 3]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_01"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Comment": "Water scarcity for livestock is indicated first by checking whether the area has a high livestock population (sig_03). In addition, at least one of the following is true: the area sees depleted surface water availability post the monsoon season (sig_01); no new waterbodies or surface water increase has happened over the years (sig_02); NREGA works for soil and water conservation are few (sig_04); and rivers are not flowing through the area (sig_05). Further validation should be done via community interactions and documented on Commons Connect, to understand the extent of livestock dependency for livelihood and water shortages being faced, level of collectivization for waterbody and commons management, and opportunity to avail the Forest Rights Act to gain community control over grazing areas."
+                    },
+                    {
+                        "Name": "fodder_risk",
+                        "Category": "Fodder Risk",
+                        "Characteristics": "Livestock population is high, Tree cover and grassland are degrading",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "trees_in_grassland_loss",
+                                "value": {
+                                    "lower": 30,
+                                    "upper": 99999
+                                },
+                                "template": "Trees have been lost on grasslands.",
+                                "description": "Tree loss on grasslands is greater than 30ha"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "trees_in_forest_fringe_loss",
+                                "value": {
+                                    "lower": 30,
+                                    "upper": 99999
+                                },
+                                "template": "Trees have been lost on forest fringes.",
+                                "description": "Tree loss on forest fringes is greater than 30ha"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "shrubs_trend",
+                                "value": {
+                                    "lower": -1,
+                                    "upper": 0
+                                },
+                                "template": "Grasslands themselves have degraded, as noticed by a decreasing trend in NDVI.",
+                                "description": "Grassland health is declining over the years (decreasing NDVI trend)"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "max_livestock_score",
+                                "value": {
+                                    "lower": 300,
+                                    "upper": 99999
+                                },
+                                "template": "The area has a high livestock population.",
+                                "description": "Livestock population score is greater than 300"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_04 AND (sig_01 OR sig_02 OR sig_03)",
+                            "type": "logic",
+                            "logic": "AND",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_04"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        },
+                                        {
+                                            "ref": "sig_03"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_04 and sig_01 + sig_04 and sig_02 + sig_04 and sig_03 [out of 3]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_01"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_03"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Comment": "Fodder shortage for livestock is indicated first checking whether the area has a high livestock population (sig_04). In addition, at least one of the following is true: trees have been lost on grasslands (sig_01); trees have been lost on forest fringes (sig_02); or grasslands themselves have degraded as noticed by a decreasing trend in NDVI (sig_03). This degradation may also be happening due to poor commons governance norms in the area, leading to overgrazing. Investigation of the actual extent of stress and potential causes should be understood via community interactions and documented on Commons Connect, to understand the extent of livestock dependency and fodder shortages being faced, level of collectivization for commons management, and opportunity to avail the Forest Rights Act to gain community control over grazing areas."
+                    }
+                ],
+                "Fishery": [
+                    {
+                        "Name": "good_water_potential",
+                        "Category": "Good Water Potential",
+                        "Characteristics": "Surface water retention post monsoon is high, Other indicators support fishery potential",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "mean_kharif_rabi_ratio",
+                                "value": {
+                                    "lower": 0.5,
+                                    "upper": 99999
+                                },
+                                "template": "Surface water retention post the monsoon season is high, indicating sufficient water availability for long-duration fish cultivation.",
+                                "description": "Surface water in Rabi is low compared to Kharif (ratio is 0.3 or below)"
+
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "trend_water_surface_area_value",
+                                "value": {
+                                    "lower": 1,
+                                    "upper": 99999
+                                },
+                                "template": "There has been a non-zero improvement in surface water availability due to new waterbodies being built in the area or improved rainfall.",
+                                "description": "Surface water area is increasing over the years (new waterbodies or better rainfall)"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "nrega_swc_count",
+                                "value": {
+                                    "lower": 50,
+                                    "upper": 99999
+                                },
+                                "template": "Significant NREGA works have been undertaken.",
+                                "description": "More than 50 NREGA soil and water conservation works"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "cropping_intensity_avg",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 1.25
+                                },
+                                "template": "Cropping intensity is low, indicating an opportunity to transition communities towards other livelihood opportunities beyond agriculture.",
+                                "description": "Cropping intensity is below 1.25"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "range",
+                                "Key": "shg_penetration",
+                                "value": {
+                                    "lower": 70,
+                                    "upper": 99999
+                                },
+                                "template": "SHG penetration is high, indicating a good capacity to take up new income opportunities.",
+                                "description": "Self-help group (SHG) penetration is greater than 70%"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 AND (sig_02 OR sig_03 OR sig_04 OR sig_05)",
+                            "type": "logic",
+                            "logic": "AND",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "OR",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_02"
+                                        },
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 AND sig_02 + sig_01 AND sig_03 + sig_01 AND sig_04 + sig_01 AND sig_05 [out of 4]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_03"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Comment": "Areas may have a good potential for fishery if the surface water retention post the monsoon season is high, indicating sufficient water availability for long-duration fish cultivation (sig_01). The potential is confirmed if at least 1 of the following 4 indicators is also active: there has been a non-zero improvement in surface water availability due to new waterbodies being built in the area or improved rainfall and other aspects leading to higher water availability; significant NREGA works have been undertaken; cropping intensity is low indicating an opportunity to transition communities towards other livelihood opportunities beyond agriculture; and SHG penetration is high indicating a good capacity to take up new income opportunities. Further validation should be done via community interactions and documented on Commons Connect, to understand whether suitable government schemes are accessible in the area, the SHG networks are indeed active and vibrant, and communities are open to such opportunities."
+                    }
+                ],
+                "Agroforestry": [
+                    {
+                        "Name": "transition_from_crops_to_agroforestry",
+                        "Category": "Transition from Crops to Agroforestry",
+                        "Characteristics": "Cropping area or intensity is declining, Other indicators support a transition to agroforestry",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "cropping_to_shrub_area",
+                                "value": {
+                                    "lower": 30,
+                                    "upper": 99999
+                                },
+                                "template": "Loss of cropping area to fallow land.",
+                                "description": "Cropping area converted to shrub or fallow land is greater than 30 ha"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "trend_cropping_intensity",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 10
+                                },
+                                "template": "Decrease in cropping intensity.",
+                                "description": "Cropping intensity is not more than 10"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "nrega_plantations_count",
+                                "value": {
+                                    "lower": 5,
+                                    "upper": 99999
+                                },
+                                "template": "A few NREGA plantations have already been done in the area, indicating that experiments have already been done.",
+                                "description": "At least 5 NREGA plantation works have already been done in the area"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "shg_penetration",
+                                "value": {
+                                    "lower": 70,
+                                    "upper": 99999
+                                },
+                                "template": "SHG penetration is high, indicating a good capacity to take up new income opportunities and downstream value addition on the produce.",
+                                "description": "Self-help group (SHG) penetration is greater than 70%"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "logic",
+                                "logic": "OR",
+                                "Values": [
+                                    {
+                                        "type": "range",
+                                        "Key": "dist_fpos",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 5
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "dist_coops",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 5
+                                        }
+                                    }
+                                ],
+                                "template": "Cooperatives and FPOs are present in the area, indicating scope for produce aggregation and market linkages.",
+                                "description": "A farmer producer organisation (FPO) or cooperative is within 5 km"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 or sig_02",
+                            "type": "logic",
+                            "logic": "OR",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "(sig_01 + sig_02) * (1 + sig_03 + sig_04 + sig_05) [out of 8]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "COUNT_TRUE",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "COUNT_TRUE",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ],
+                                    "base": 1
+                                }
+                            ]
+                        },
+                        "Comment": "Groundwater, irrigation, droughts, or soil health stresses may have intensified to the extent that cropping productivity is already decreasing, evidenced by loss of cropping area to fallow land (sig_01), or a decrease in cropping intensity (sig_02). Such areas may benefit from a transition to agroforestry and plantations. The potential is confirmed if a few NREGA plantations have already been done in the area, indicating that experiments have already been done; SHG penetratin is high indicating a good capacity to take up new income opportunities and downstream value addition on the produce; and cooperatives and FPOs are present in the area, indicating scope for produce aggregation and market linkages. Further validation should be done via community interactions and documented on Commons Connect, to understand hinderances and opportunities to be aware of, such as soil types, distances of habitations to degraded cropping areas, water availability, administrative responsiveness to avail governance schemes, and social capital of local elected representatives to mobilize fulfilment of demands."
+                    }
+                ]
+            }
         },
-        {
-            "Name" : "high_irrigation_risk",
-            "values" : [
-                {
-                    "sheet_name" : "surfaceWaterBodies_annual",
-                    "type" : 4,
-                    "column" : ["total_area_in_ha_","rabi_area_in_ha_"],
-                    "percentage" : "30",
-                    "comp_type" : 4
-                },
-                {
-                    "sheet_name" : "surfaceWaterBodies_annual",
-                    "type" : 3,
-                    "column" : "total_area_in_ha_",
-                    "trend" : -1,
-                    "comp_type" : 1                
-                }
-            ]
+        "Forest_Biodiversity": {
+            "observed_stresses": {
+                "Forests": [
+                    {
+                        "Name": "forest_degradation",
+                        "Category": "Forest Degradation",
+                        "Characteristics": "Tree cover loss or degradation inside forests, Compensatory afforestation is lagging",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "logic",
+                                "logic": "OR",
+                                "Values": [
+                                    {
+                                        "type": "range",
+                                        "Key": "trees_in_forest_loss",
+                                        "value": {
+                                            "lower": 30,
+                                            "upper": 99999
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "degradation_in_forests",
+                                        "value": {
+                                            "lower": 30,
+                                            "upper": 99999
+                                        }
+                                    }
+                                ],
+                                "template": "Tree cover loss or degradation has happened deep inside forests.",
+                                "description": "Tree loss inside forests is greater than 30, or forest degradation is greater than 30ha"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "logic",
+                                "logic": "AND",
+                                "Values": [
+                                    {
+                                        "type": "range",
+                                        "Key": "tree_cover_area",
+                                        "value": {
+                                            "lower": 20,
+                                            "upper": 99999
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "tree_cover_gain_to_loss_ratio",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 0.75
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "ltp_to_stp_to_tree_cover_ratio",
+                                        "value": {
+                                            "lower": 0.1,
+                                            "upper": 99999
+                                        }
+                                    }
+                                ],
+                                "template": "Compensatory afforestation is lagging behind deforestation and forests are getting fragmented over time.",
+                               "description": "Over 20 ha of tree cover, but trees gained are under 75% of trees lost, and tree area that has turned short-lived is over 10% of the total tree cover"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "not_equal",
+                                "Key": "terrain_cluster",
+                                "value": "plain",
+                                "template": "The terrain in the area has slopes or hills, pointing to the possibility that forests on slopes have degraded or been lost, likely leading to soil erosion and water challenges in the long term.",
+                                "description": "Terrain is not plain."
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "forest_to_farm",
+                                "value": {
+                                    "lower": 20,
+                                    "upper": 99999
+                                },
+                                "template": "A large part of the forest has been lost to cropping, indicating high encroachment pressure.",
+                                "description": "Forest area converted to farmland is greater than 20ha"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "range",
+                                "Key": "st_population",
+                                "value": {
+                                    "lower": 33,
+                                    "upper": 99999
+                                },
+                                "template": "The ST population is high, likely indicating a dependency on forest-based livelihood through NTFPs.",
+                                "description": "ST population is greater than 33%"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 or sig_02",
+                            "type": "logic",
+                            "logic": "OR",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "(sig_01 + sig_02) * (1 + sig_03 + sig_04 + sig_05) [out of 8]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "type": "logic",
+                                    "logic": "COUNT_TRUE",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_01"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "COUNT_TRUE",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ],
+                                    "base": 1
+                                }
+                            ]
+                        },
+                        "Comment": "Forest degradation is indicated by any of two signals: if tree cover loss or degradation has happened deep inside forests (sig_01); or compensatory afforestation is lagging behind deforestation and forests are getting fragmented over time (sig_02). Forest degradation risk is further amplified by three additional indicators: if the terrain in the area has slopes or hills, pointing to the possibility that forests on slopes have degraded or been lost, likely leading to soil erosion and water challenges in the long term (sig_03); a large part of the forest has been lost to cropping, indicating high encroachment pressure (sig_04); or the ST population is high, likely indicating a dependency on forest-based livelihood through NTFPs (sig_05). Further validation should be done via community interactions and documented on Commons Connect, to understand whether NTFP productivity has declined over the years, whether communities have observed a reduction in biodiversity, and whether CFR claims have been made under the Forest Rights Act - if not, it would indicate a less collectivized community. "
+                    }
+                ]
+            }
         },
-        {
-            "Name" : "low_yield",
-            "values" : [
-                {
-                    "sheet_name" : "change_detection_degradation",
-                    "type" : 5,
-                    "column" : ["farm_to_barren_area_in_ha","farm_to_scrub_land_area_in_ha"],
-                    "comparison" : 30,
-                    "comp_type" : 3    
-                },
-                {
-                    "sheet_name" : "change_detection_cropintensity",
-                    "type" : 2,
-                    "column" : "total_change_crop_intensity_area_in_ha",
-                    "comparison" : 30,
-                    "comp_type" : 3                
-                }
-            ]
+        "Socio_economic": {
+            "observed_stresses": {
+                "Socio-economic": [
+                    {
+                        "Name": "multi_sector_vulnerability",
+                        "Category": "Multi-sector vulnerability",
+                        "Characteristics": "High ST and SC population, Low access to banking, literacy and social entitlements",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "range",
+                                "Key": "st_sc_percent",
+                                "value": {
+                                    "lower": 45,
+                                    "upper": 99999
+                                },
+                                "template": "The area has a high combined SC and ST population, indicating historical marginalization which may still be persisting.",
+                                "description": "Combined SC and ST population is greater than 45%"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "range",
+                                "Key": "total_nrega_assets",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 100
+                                },
+                                "template": "Few NREGA works have been done in the area, indicating low access or awareness or community mobilization to utilize social entitlements and welfare.",
+                                "description": "Fewer than 100 NREGA assets in the area"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "distance_to_bank",
+                                "value": {
+                                    "lower": 1,
+                                    "upper": 99999
+                                },
+                                "template": "Distance to banking facilities is high, indicating low connectivity with essential credit and working capital requirements for economic mobility.",
+                                "description": "Nearest bank is more than 1 km away"
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "range",
+                                "Key": "literacy_rate",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 55
+                                },
+                                "template": "Literacy rate (census 2011) is low, indicating historically poor access to essential education, health, and economic opportunities.",
+                                "description": "Literacy rate is below 55% (Census 2011)"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "range",
+                                "Key": "shg_penetration",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 50
+                                },
+                                "template": "SHG penetration is low, indicating low levels of collectivization.",
+                                "description": "Self-help group (SHG) penetration is below 50%"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 + sig_02 + sig_03 + sig_04 + sig_05 >= 3",
+                            "type": "logic",
+                            "logic": "COUNT",
+                            "min_true": 3,
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                },
+                                {
+                                    "ref": "sig_03"
+                                },
+                                {
+                                    "ref": "sig_04"
+                                },
+                                {
+                                    "ref": "sig_05"
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 + sig_02 + sig_03 + sig_04 + sig_05 [out of 5]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "ref": "sig_02"
+                                },
+                                {
+                                    "ref": "sig_03"
+                                },
+                                {
+                                    "ref": "sig_04"
+                                },
+                                {
+                                    "ref": "sig_05"
+                                }
+                            ]
+                        },
+                        "Comment": "Multi-sector vulnerability is indicated based on how many of the following indicators may be true: the area has a high combined SC and ST population, indicating historical marginalization which may still be persisting (sig_01); few NREGA works have been done in the area, indicating low access or awareness or community mobilization to utilize social entitlements and welfare (sig_02); distance to banking facilities is high indicating low connectivity with essential credit and working capital requirements for economic mobility (sig_03); literacy rate (census 2011) is low indicating historically poor access to essential education, health, and economic opportunities (sig_04); and SHG penetration is low indicating low levels of collectivization (sig_05). When layered against other stresses of groundwater, drought, irrigation, soil health, forest degradation, or livestock, this can help identify areas facing compound stresses that need attention. Further validation should be done via community interactions and documented on Commons Connect, to understand the degree of progress made in recent years and enduring stresses, felt impact in terms of out-migration rates, and youth satisfaction with the current situation."
+                    }
+                ],
+                "Health": [
+                    {
+                        "Name": "water_security_safety_domestic_use",
+                        "Category": "Water Security and Safety for domestic use",
+                        "Characteristics": "Mining is present nearby, Surface water availability post monsoon is low",
+                        "level": "mws",
+                        "Signals": [
+                            {
+                                "id": "sig_01",
+                                "type": "equal",
+                                "Key": "mining",
+                                "value": 1,
+                                "template": "Water quality for drinking and domestic purposes can be at risk as the area is near mining sites.",
+                                "description": "Mining is present near the area"
+                            },
+                            {
+                                "id": "sig_02",
+                                "type": "logic",
+                                "logic": "AND",
+                                "Values": [
+                                    {
+                                        "type": "not_equal",
+                                        "Key": "terrain_cluster",
+                                        "value": "plain"
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "trees_in_forest_loss",
+                                        "value": {
+                                            "lower": 30,
+                                            "upper": 99999
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "cropping_intensity_avg",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 1.25
+                                        }
+                                    }
+                                ],
+                                "template": "In hilly areas which have seen deforestation, likely leading to the drying up of what may have been perennial streams.",
+                                "description": "Terrain is not plain, tree loss inside forests is greater than 30 ha, and cropping intensity is below 1.25"
+                            },
+                            {
+                                "id": "sig_03",
+                                "type": "range",
+                                "Key": "mean_kharif_rabi_ratio",
+                                "value": {
+                                    "lower": 0,
+                                    "upper": 0.5
+                                },
+                                "template": "The area is already seeing less surface water availability post monsoon.",
+                                "description": "Surface water in Rabi is low compared to Kharif (ratio is 0.5 or below)"
+
+                            },
+                            {
+                                "id": "sig_04",
+                                "type": "logic",
+                                "logic": "OR",
+                                "Values": [
+                                    {
+                                        "type": "not_equal",
+                                        "Key": "soge_class",
+                                        "value": "safe"
+                                    },
+                                    {
+                                        "type": "logic",
+                                        "logic": "AND",
+                                        "Values": [
+                                            {
+                                                "type": "range",
+                                                "Key": "mean_annual_delta_g_mm",
+                                                "value": {
+                                                    "lower": 0,
+                                                    "upper": 50
+                                                }
+                                            },
+                                            {
+                                                "type": "logic",
+                                                "logic": "OR",
+                                                "Values": [
+                                                    {
+                                                        "type": "equal",
+                                                        "Key": "upstream_mws_count",
+                                                        "value": 0
+                                                    },
+                                                    {
+                                                        "type": "equal",
+                                                        "Key": "aquifer_class",
+                                                        "value": "Hard Rock"
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "template": "The area is already groundwater stressed, and this can lead to salination in pumped water.",
+                                "description": "Groundwater extraction stage (SOGE) is not Safe, or groundwater change is between 0 and 50 mm per year with no upstream micro-watersheds or a Hard Rock aquifer"
+                            },
+                            {
+                                "id": "sig_05",
+                                "type": "logic",
+                                "logic": "AND",
+                                "Values": [
+                                    {
+                                        "type": "range",
+                                        "Key": "trend_water_surface_area_value",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 1
+                                        }
+                                    },
+                                    {
+                                        "type": "range",
+                                        "Key": "nrega_swc_count",
+                                        "value": {
+                                            "lower": 0,
+                                            "upper": 50
+                                        }
+                                    }
+                                ],
+                                "template": "No new waterbodies or few NREGA works have been built to increase surface water availability.",
+                                "description": "Surface water area is not increasing, and fewer than 50 NREGA soil and water conservation works"
+                            }
+                        ],
+                        "Trigger": {
+                            "Trigger_Exp": "sig_01 OR sig_03 AND (sig_02 OR sig_04 OR sig_05)",
+                            "type": "logic",
+                            "logic": "OR",
+                            "Trigger_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "type": "logic",
+                                            "logic": "OR",
+                                            "Values": [
+                                                {
+                                                    "ref": "sig_02"
+                                                },
+                                                {
+                                                    "ref": "sig_04"
+                                                },
+                                                {
+                                                    "ref": "sig_05"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Intensity": {
+                            "Intensity_Exp": "sig_01 + sig_03 and sig_02 + sig_03 and sig_04 + sig_03 and sig_05 [out of 4]",
+                            "type": "logic",
+                            "logic": "COUNT_TRUE",
+                            "Intensity_Values": [
+                                {
+                                    "ref": "sig_01"
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_02"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_04"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "logic",
+                                    "logic": "AND",
+                                    "Values": [
+                                        {
+                                            "ref": "sig_03"
+                                        },
+                                        {
+                                            "ref": "sig_05"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "Comment": "Water quality for drinking and domestic purposes can be at risk if the area is near mining sites (sig_01). In addition, water security can be a challenge if the area is already seeing less surface water availability post monsoon (sig_03), coupled with one of the following: In hilly areas which have seen deforestation, likely leading to the drying up of what may have been perennial streams (sig_02); areas which are already groundwater stressed, and can lead to salination in pumped water (sig_04); or no new waterbodies or few NREGA works having been built to increase surface water availability (sig_05). Further validation should be done via community interactions and documented on Commons Connect, to understand the state of drinking water quality by asking people about changes in taste and colour they may have noticed, and about year-round availability of drinking water in wells and waterbodies, along with the quality of groundwater."
+                    }
+                ]
+            }
         }
-    ],
-    "Forest & Livestock" : [
-        {
-            "Name" : "forest_degradation",
-            "values" : [
-                {
-                    "sheet_name" : "change_detection_deforestation",
-                    "type" : 2,
-                    "column" : "total_deforestation_area_in_ha",
-                    "comparison" : 50,
-                    "comp_type" : 3
-                }
-            ]
-        }
-    ],
-    "Health" : [
-        {
-            "Name" : "mining_presence",
-            "values" : [
-                {
-                    "sheet_name" : "mining",
-                    "type" : 6
-                }
-            ]
-        }
-    ],
-    "Socio-economic" : [
-        {
-            "Name" : "caste",
-            "values" : [
-                {
-                    "sheet_name" : ["mws_intersect_villages","social_economic_indicator"],
-                    "type" : 7,
-                    "column" : [["MWS UID","Village IDs"],["village_id","SC_percent"]],
-                    "comparison" : 17,
-                    "comp_type" : 3
-                },
-                {
-                    "sheet_name" : ["mws_intersect_villages","social_economic_indicator"],
-                    "type" : 7,
-                    "column" : [["MWS UID","Village IDs"],["village_id","ST_percent"]],
-                    "comparison" : 33,
-                    "comp_type" : 3
-                }
-            ]
-        },
-        {
-            "Name" : "nrega",
-            "values" : [
-                {
-                    "sheet_name" : "nrega_annual",
-                    "type" : 8,
-                    "column" : ["mws_id","Soil and water conservation_count_","Land restoration_count_","Plantations_count_","Irrigation on farms_count_","Other farm works_count_","Off-farm livelihood assets_count_","Community assets_count_"],
-                    "comparison" : 100,
-                    "comp_type" : 4
-                }
-            ]
-        }
-    ]
+    }
 }

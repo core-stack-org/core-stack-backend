@@ -880,7 +880,7 @@
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
                         <h4>Stress Pattern identified where:</h4>
-                        <ul>
+                        <ul id="groundwater-conditions">
                             <li>Stage of groundwater extraction is <strong>unsafe</strong></li>
                             <li>Water balance trend is <strong>negative</strong></li>
                         </ul>
@@ -894,12 +894,18 @@
                         </ul>
                     </div>
                 </div>
+                <p id="groundwater-description"></p>
                 <p>
+                    Data analysed over the years <span id="GWStressyearRange"></span>. Stressed micro-watersheds are
+                    colored from green to red based on how many conditions are met, with red showing the most.
+                    Micro-watersheds with no stress pattern are shown in gray.
+                </p>
+                <!-- <p>
                     Areas where either stage of groundwater stress is unsafe or water balance trend over the years
                     <span id="GWStressyearRange"></span>
                     is negative, are color coded as <span class="stress-yellow">yellow</span>. Areas with an unsafe groundwater stress and negative water
                     balance trend are shown in <span class="stress-red">red</span>.
-                </p>
+                </p> -->
                 <br>
                 <br>
 
@@ -943,7 +949,8 @@
                     </div>
                 </div>
                 <p>Areas where there have been at least two drought years or at least two intensive dry-spell years
-                    during the <span class="HDIncidenceyearRange"></span>, are color coded as <span class="stress-yellow">yellow</span>. Areas which
+                    during the <span class="HDIncidenceyearRange"></span>, are color coded as <span
+                        class="stress-yellow">yellow</span>. Areas which
                     experienced both of these conditions
                     are shown in <span class="stress-red">red</span>.</p>
 
@@ -979,9 +986,7 @@
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
                         <h4>Stress Pattern identified where:</h4>
-                        <ul>
-                            <li>Surface water during Rabi is <strong>low</strong></li>
-                            <li>Surface water trends over the years are <strong>negative</strong></li>
+                        <ul id="irrigation-conditions">
                         </ul>
                     </div>
                     <div class="pattern-recommendations">
@@ -994,9 +999,11 @@
                         </ul>
                     </div>
                 </div>
+                <p id="irrigation-description"></p>
                 <p>Areas where the surface water availability during Rabi season is less than 30% or where surface water
                     availability trend is negative over the years <span id="HIrriRiskyearRange"></span>, are color coded
-                    as <span class="stress-yellow">yellow</span>. Areas which experienced both of these conditions are shown in <span class="stress-red">red</span>.</p>
+                    as <span class="stress-yellow">yellow</span>. Areas which experienced both of these conditions are
+                    shown in <span class="stress-red">red</span>.</p>
                 <div class="map-chart-container">
                     <div id="agriIrrigationMap" class="map"></div>
                     <div class="chart-container">
@@ -1016,7 +1023,8 @@
                     areas and areas with reduced cropping intensity.
                     Micro-watersheds where the extent of either of these conditions over the years <span
                         id="CRPYieldyearRange"></span> exceed
-                    30 hectares have been highlighted in <span class="stress-yellow">yellow</span>. Similarly, micro-watersheds where farmland areas that
+                    30 hectares have been highlighted in <span class="stress-yellow">yellow</span>. Similarly,
+                    micro-watersheds where farmland areas that
                     have undergone degradation and reduction in the number of crop cycles both exceeding 30 hectares are
                     marked in <span class="stress-red">red</span>.</p>
                 <p class="pattern-summary">
@@ -1030,10 +1038,7 @@
                 <div class="pattern-info-container">
                     <div class="pattern-conditions">
                         <h4>Stress Pattern identified where:</h4>
-                        <ul>
-                            <li>Reduction in cropping area over the years is <strong>&gt; 30 ha</strong></li>
-                            <li>Reduction in cropping intensity over the years is <strong>&gt; 30 ha</strong></li>
-                        </ul>
+                        <ul id="yield-conditions"></ul>
                     </div>
                     <div class="pattern-recommendations">
                         <h4>Suggestions:</h4>
@@ -1044,12 +1049,14 @@
                         </ul>
                     </div>
                 </div>
+                
                 <div class="map-chart-container">
                     <div id="agriYieldMap" class="map"></div>
                     <div class="chart-container">
                         <canvas id="yieldSankeyChart"></canvas>
                     </div>
                 </div>
+                
                 <p class="legend-note">
                     Note: Cropping degradation is calculated based on farmland transitions to barren or scrubs and shrub
                     land or reduction in cropping intensity (change in area earlier sown thrice to now sown twice,
@@ -1061,9 +1068,58 @@
                     which are classified as single kharif, single non-kharif, double and triple classes of LULC
                     classifier to determine cropping intensity.
                 </p>
+                <p id="yield-description"></p>
                 <br>
                 <br>
             </div>
+
+            <div id="soil-health-section">
+                <h3>Poor Soil Health</h3>
+
+                <p class="pattern-summary">
+                    <span id="soil-health-area" class="number-class"></span> hectares out of
+                    <span id="soil-health-area-1" class="number-class"></span> hectares of
+                    total cropping area in the tehsil appears to have poor soil health.
+                </p>
+
+                <div class="pattern-info-container">
+                    <div class="pattern-conditions">
+                        <h4>Stress Pattern identified where:</h4>
+                        <ul id="soil-health-conditions">
+                        </ul>
+                    </div>
+
+                    <div class="pattern-recommendations">
+                        <h4>Suggestions:</h4>
+                        <ul>
+                            <li>Validate soil health concerns through community interactions.</li>
+                            <li>Check for evidence of high fertilizer usage.</li>
+                            <li>Investigate declining crop yields.</li>
+                            <li>Document observations on Commons Connect.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <p id="soil-health-description"></p>
+
+                <p>
+                    Micro-watersheds where at least two out of four soil health
+                    indicators are identified are highlighted. The intensity of
+                    the pattern is based on the number of indicators satisfied.
+                </p>
+
+                <div id="soilHealthMap" class="map map-only"></div>
+
+                <p class="legend-note">
+                    Note: Soil health is assessed using nitrogen, phosphorus,
+                    potassium and soil organic carbon indicators across the
+                    cropping area.
+                </p>
+
+                <br>
+                <br>
+            </div>
+
         </section>
 
         <section class="section" id="forest-section">
@@ -1260,6 +1316,7 @@
         const highDroughtIncidence = {{ high_drought_incidence_json| safe}};
         const highIrrigationRisk = {{ high_irrigation_risk_json| safe}};
         const lowYield = {{ low_yield_json| safe}};
+        const soilHealth = {{ soil_health_json| safe}};
         const droughtTimeline = {{ drought_timeline_json| safe}};
         const yieldSankey = {{ yield_sankey_json| safe}};
         const irrigationTimeline = {{ irrigation_timeline_json| safe}};
@@ -1281,10 +1338,80 @@
         const patternDisplayMappingSafe = patternDisplayMapping || {};
         const villageActivePattern = {{ village_active_pattern| safe }};
 
-        //const agroforestryTransition = {{agroforestry_transition_json|safe}};
+        const conditionsList = document.getElementById("groundwater-conditions");
+
+        if (conditionsList && Array.isArray(groundwaterStress.conditions)) {
+            conditionsList.innerHTML = "";
+
+            groundwaterStress.conditions.forEach(condition => {
+                const li = document.createElement("li");
+                li.textContent = condition;
+                conditionsList.appendChild(li);
+            });
+        }
+        const gwDescription = document.getElementById("groundwater-description");
+        if (gwDescription) {
+            gwDescription.textContent = groundwaterStress.description || "";
+        }
+        // High Irrigation Risk - Dynamic Conditions
+        const irrigationConditionsList = document.getElementById("irrigation-conditions");
+
+        if (irrigationConditionsList && Array.isArray(highIrrigationRisk.conditions)) {
+            irrigationConditionsList.innerHTML = "";
+
+            highIrrigationRisk.conditions.forEach(condition => {
+                const li = document.createElement("li");
+                li.textContent = condition;
+                irrigationConditionsList.appendChild(li);
+            });
+        }
+
+        // High Irrigation Risk - Description
+        const irrigationDescription = document.getElementById("irrigation-description");
+
+        if (irrigationDescription) {
+            irrigationDescription.textContent = highIrrigationRisk.description || "";
+        }
+
+        // Low Yield - Dynamic Conditions
+        const yieldConditionsList = document.getElementById("yield-conditions");
+
+        if (yieldConditionsList && Array.isArray(lowYield.conditions)) {
+            yieldConditionsList.innerHTML = "";
+
+            lowYield.conditions.forEach(condition => {
+                const li = document.createElement("li");
+                li.textContent = condition;
+                yieldConditionsList.appendChild(li);
+            });
+        }
+        // Low Yield - Dynamic Description
+        const yieldDescription = document.getElementById("yield-description");
+
+        if (yieldDescription) {
+            yieldDescription.textContent = lowYield.description || "";
+        }
+                //const agroforestryTransition = {{agroforestry_transition_json|safe}};
         //const agroforestrySankey = {{agroforestry_sankey_json|safe}};
 
+        // Soil Health - Dynamic Conditions
+        const soilHealthConditionsList = document.getElementById("soil-health-conditions");
 
+        if (soilHealthConditionsList && Array.isArray(soilHealth.conditions)) {
+            soilHealthConditionsList.innerHTML = "";
+
+            soilHealth.conditions.forEach(condition => {
+                const li = document.createElement("li");
+                li.textContent = condition;
+                soilHealthConditionsList.appendChild(li);
+            });
+        }
+
+        const soilHealthDescription = document.getElementById("soil-health-description");
+
+        if (soilHealthDescription) {
+            soilHealthDescription.textContent = soilHealth.description || "";
+        }
         const intensityValues = Object.values(mwsPatternIntensity);
         const minIntensity = Math.min(...intensityValues);
         const maxIntensity = Math.max(...intensityValues);
@@ -1294,6 +1421,7 @@
         document.getElementById('drought-area').textContent = highDroughtIncidence.total_area.toFixed(2);
         document.getElementById('irrigation-area').textContent = highIrrigationRisk.total_area.toFixed(2);
         document.getElementById('yield-area').textContent = lowYield.total_area.toFixed(2);
+        document.getElementById('soil-health-area').textContent = soilHealth.total_area.toFixed(2);
         document.getElementById('forest-area').textContent = forestDegradation.total_area.toFixed(2);
         document.getElementById('mining-area').textContent = miningPresence.total_area.toFixed(2);
         document.getElementById('caste-population').textContent = socioCaste.total_population.toLocaleString();
@@ -1306,6 +1434,7 @@
         document.getElementById('drought-area-1').textContent = highDroughtIncidence.total_all_area.toFixed(2);
         document.getElementById('irrigation-area-1').textContent = highIrrigationRisk.total_all_area.toFixed(2);
         document.getElementById('yield-area-1').textContent = lowYield.total_all_area.toFixed(2);
+        document.getElementById('soil-health-area-1').textContent = soilHealth.total_all_area.toFixed(2);
         document.getElementById('forest-area-1').textContent = forestDegradation.total_all_area.toFixed(2);
         document.getElementById('nrega-villages-1').textContent = socioNrega.total_all_villages;
         document.getElementById('fishery-area-1').textContent = fisheryPotential.total_zaid_area.toFixed(2);
@@ -1494,6 +1623,34 @@
                 new ol.interaction.KeyboardZoom(),
             ])
         })
+
+
+        const SoilHealthMap = new ol.Map({
+            target: 'soilHealthMap',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.XYZ({
+                        url: `https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}`,
+                        maxZoom: 30,
+                        transition: 500,
+                    }),
+                    preload: 4,
+                })
+            ],
+            view: new ol.View({
+                center: [78.9, 23.6],
+                zoom: 10,
+                projection: "EPSG:4326",
+                constrainResolution: true,
+                smoothExtentConstraint: true,
+                smoothResolutionConstraint: true,
+            }),
+            interactions: new ol.Collection([
+                new ol.interaction.DragPan(),
+                new ol.interaction.KeyboardPan(),
+                new ol.interaction.KeyboardZoom(),
+            ])
+        });
 
         const ForestDegradMap = new ol.Map({
             target: 'forestDegradMap',
@@ -1885,6 +2042,11 @@
                 style: createStyleFunction(lowYield),
             });
 
+            const soilHealthVectorLayer = new ol.layer.Vector({
+                source: vectorSource,
+                style: createStyleFunction(soilHealth),
+            });
+
             const vectorLayer5 = new ol.layer.Vector({
                 source: vectorSource,
                 style: createStyleFunction(forestDegradation),
@@ -1912,6 +2074,7 @@
             AgriDroughtMap.addLayer(vectorLayer2);
             AgriIrrigationMap.addLayer(vectorLayer3);
             AgriYieldMap.addLayer(vectorLayer4);
+            SoilHealthMap.addLayer(soilHealthVectorLayer);
             ForestDegradMap.addLayer(vectorLayer5);
             MiningMap.addLayer(vectorLayer6);
             FisheryMap.addLayer(vectorLayer9)
@@ -1921,6 +2084,7 @@
             AgriDroughtMap.getView().setCenter(mapcenter);
             AgriIrrigationMap.getView().setCenter(mapcenter);
             AgriYieldMap.getView().setCenter(mapcenter);
+            SoilHealthMap.getView().setCenter(mapcenter);
             ForestDegradMap.getView().setCenter(mapcenter);
             MiningMap.getView().setCenter(mapcenter);
             FisheryMap.getView().setCenter(mapcenter);
@@ -2806,12 +2970,16 @@
         if (!hasSectionData(lowYield)) {
             hideSection('yield-section');
         }
+        if (!hasSectionData(soilHealth)) {
+            hideSection('soil-health-section');
+        }
 
         // Check if entire Agriculture section should be hidden
         if (!hasSectionData(groundwaterStress) &&
             !hasSectionData(highDroughtIncidence) &&
             !hasSectionData(highIrrigationRisk) &&
-            !hasSectionData(lowYield)) {
+            !hasSectionData(lowYield) &&
+            !hasSectionData(soilHealth)) {
             hideSection('agriculture-section');
         }
 
@@ -2866,7 +3034,7 @@
             console.log('Preparing for print...');
             const allMaps = [
                 mainMap, AgricultureMap, AgriDroughtMap, AgriIrrigationMap,
-                AgriYieldMap, ForestDegradMap, MiningMap, CasteMap,
+                AgriYieldMap,  SoilHealthMap,ForestDegradMap, MiningMap, CasteMap,
                 NREGAMap, FisheryMap, AgroforestryMap, AquiferMap,
                 SogeMap, wellDepthMap
             ];
@@ -3140,7 +3308,7 @@
             initPopupForMap(mainMap, true);
             const sectionMaps = [
                 AgricultureMap, AgriDroughtMap, AgriIrrigationMap,
-                AgriYieldMap, ForestDegradMap, MiningMap, FisheryMap
+                AgriYieldMap, SoilHealthMap, ForestDegradMap, MiningMap, FisheryMap
             ];
             sectionMaps.forEach(map => initPopupForMap(map, false));
             console.log('Popups initialized for all maps');
