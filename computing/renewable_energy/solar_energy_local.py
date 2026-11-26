@@ -34,7 +34,7 @@ def generate_solar_power_local(
     roi_path=None,
     gee_account_id=None,
     precomputed_roi_dir=None,
-    push_to_geoserver=False,
+    push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
     if state and district and block:
