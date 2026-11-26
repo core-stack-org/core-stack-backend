@@ -27,6 +27,7 @@ from computing.local_compute_helper import (
     filter_large_watersheds as _filter_large_watersheds,
     load_precomputed_watersheds as _load_precomputed_watersheds,
     queue_local_vector_for_geoserver,
+    get_roi as _get_roi,
     resolve_aez_code as _resolve_aez_code,
     resolve_lulc_raster_paths as _resolve_lulc_raster_paths,
     validate_geometry as _validate_geometry,
@@ -230,21 +231,24 @@ def _assign_plain_clusters(
 
 
 def run_lulc_on_plain_cluster_local(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     aez_vector_path=AEZ_VECTOR_PATH,
     lulc_dir=LULC_BASE_DIR,
     terrain_raster_path=TERRAIN_RASTER_PATH,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    asset_suffix=None,
+    roi=None,
 ):
-    state = str(state).strip()
-    district = str(district).strip()
-    block = str(block).strip()
+    if state and district and block:
+        state = str(state).strip()
+        district = str(district).strip()
+        block = str(block).strip()
     start_year = int(start_year)
     end_year = int(end_year)
 
@@ -258,10 +262,14 @@ def run_lulc_on_plain_cluster_local(
         lulc_dir=lulc_dir,
     )
 
-    watersheds_gdf, watershed_source = _load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = _get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
     watersheds_gdf = _validate_geometry(watersheds_gdf)
@@ -277,7 +285,7 @@ def run_lulc_on_plain_cluster_local(
     filtered_watersheds = _filter_large_watersheds(watersheds_gdf)
     if filtered_watersheds.empty:
         raise ValueError(
-            f"No watersheds larger than {MIN_WATERSHED_AREA_HA} ha found for {state}/{district}/{block}."
+            f"No watersheds larger than {MIN_WATERSHED_AREA_HA} ha found for {asset_suffix}."
         )
     filtered_watersheds.drop(columns=["area"], inplace=True)
 
@@ -289,11 +297,11 @@ def run_lulc_on_plain_cluster_local(
         "terrainClusters"
     ].astype(int)
     plain_watersheds = terrain_classified.loc[
-        terrain_classified["terrain_cluster"].isin([0, 1, 3])
+        terrain_classified["terrain_cluster"] != 2
     ].copy()
     if plain_watersheds.empty:
         raise ValueError(
-            f"No plain-cluster watersheds found for {state}/{district}/{block}."
+            f"No plain-cluster watersheds found for {asset_suffix}."
         )
 
     temp_columns = [
@@ -318,10 +326,7 @@ def run_lulc_on_plain_cluster_local(
         lulc_raster_paths=lulc_raster_paths,
     )
 
-    layer_name = (
-        f"{valid_gee_text(str(district).strip().lower())}_"
-        f"{valid_gee_text(str(block).strip().lower())}_lulc_plain"
-    )
+    layer_name = f"{valid_gee_text(str(asset_suffix).strip().lower())}_lulc_plain"
     output_path = _build_output_vector_path(
         layer_name=layer_name,
         state=state,
@@ -336,11 +341,10 @@ def run_lulc_on_plain_cluster_local(
         layer_name=layer_name,
     )
     logger.info("Saved local plain-cluster vector: %s", asset_id)
-    logger.info("Watershed boundary source: %s", watershed_source)
     logger.info("Resolved AEZ code: %s", aez_code)
 
     layer_id = None
-    if sync_layer_metadata:
+    if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,
@@ -382,12 +386,14 @@ def run_lulc_on_plain_cluster_local(
 
 
 def _generate_lulc_on_plain_cluster_local_task(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = gee_account_id
     return run_lulc_on_plain_cluster_local(
@@ -398,18 +404,22 @@ def _generate_lulc_on_plain_cluster_local_task(
         end_year=end_year,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
 
 
 @app.task(bind=True)
 def lulc_on_plain_cluster_local(
     self,
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = self
     return _generate_lulc_on_plain_cluster_local_task(
@@ -419,4 +429,6 @@ def lulc_on_plain_cluster_local(
         start_year=start_year,
         end_year=end_year,
         gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )

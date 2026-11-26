@@ -5,8 +5,7 @@ from computing.utils import save_layer_info_to_db
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_raster_path,
-    load_precomputed_watersheds,
-    read_validated_vector_file,
+    get_roi,
     clip_raster_with_roi,
     queue_local_raster_for_geoserver,
 )
@@ -34,24 +33,22 @@ def generate_catchment_area_singleflow_local(
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    roi=None,
 ):
+    roi = roi or roi_path
     if state and district and block:
-        layer_name_base = f"catchment_area_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_raster"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not roi_path or not asset_suffix:
-            raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name_base = f"catchment_area_{asset_suffix}_raster".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi_path, f"Invalid ROI file: {roi_path}"
-        )
-        print(f"ROI source: {roi_path}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name_base = f"catchment_area_{asset_suffix}_raster".lower()
 
     # Raster Processing
     raster_layer_name = f"{layer_name_base}"

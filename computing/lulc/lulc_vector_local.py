@@ -10,7 +10,7 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
-    load_precomputed_watersheds,
+    get_roi,
     queue_local_vector_for_geoserver,
     resolve_lulc_raster_paths,
     write_vector_output,
@@ -45,8 +45,8 @@ def _slug(value, fallback):
     return valid_gee_text(text) or fallback
 
 
-def _layer_name(district, block):
-    return f"lulc_vector_{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
+def _layer_name(asset_suffix):
+    return f"lulc_vector_{asset_suffix}"
 
 
 def _year_class_definitions(year):
@@ -60,34 +60,40 @@ def _year_class_definitions(year):
 
 
 def run_lulc_vector_local(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     lulc_dir=LULC_BASE_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    asset_suffix=None,
+    roi=None,
 ):
-    state = str(state).strip().lower()
-    district = str(district).strip().lower()
-    block = str(block).strip().lower()
+    if state and district and block:
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
     start_year = int(start_year)
     end_year = int(end_year)
 
     if end_year < start_year:
         raise ValueError("end_year must be greater than or equal to start_year")
 
-    watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    logger.info("Watershed boundary source: %s", watershed_source)
 
-    layer_name = _layer_name(district, block)
+    layer_name = _layer_name(asset_suffix)
     result_gdf = watersheds_gdf.copy()
     raster_paths = resolve_lulc_raster_paths(
         start_year=start_year,
@@ -128,7 +134,7 @@ def run_lulc_vector_local(
 
     geoserver_ok = False
     layer_id = None
-    if sync_layer_metadata:
+    if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,
@@ -168,12 +174,14 @@ def run_lulc_vector_local(
 
 
 def _vectorise_lulc_local_task(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = gee_account_id
     return run_lulc_vector_local(
@@ -184,18 +192,22 @@ def _vectorise_lulc_local_task(
         end_year=end_year,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
 
 
 @app.task(bind=True)
 def vectorise_lulc(
     self,
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = self
     return _vectorise_lulc_local_task(
@@ -205,4 +217,6 @@ def vectorise_lulc(
         start_year=start_year,
         end_year=end_year,
         gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )

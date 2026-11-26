@@ -13,7 +13,7 @@ from computing.utils import (
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     resolve_indexed_vector_path,
     write_vector_output,
@@ -169,22 +169,21 @@ def generate_soge_vector_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"soge_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not roi_path or not asset_suffix:
-            raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name = f"soge_vector_{asset_suffix}".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi_path, f"Invalid ROI file: {roi_path}"
-        )
-        print(f"ROI source: {roi_path}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi_path` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi_path,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"soge_vector_{asset_suffix}".lower()
 
     soge_files = sorted(
         (m.group(1), path)

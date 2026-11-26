@@ -11,7 +11,7 @@ from computing.utils import (
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     write_vector_output,
     validate_geometry,
@@ -66,22 +66,22 @@ def generate_agroecological_data_local(
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    roi=None,
 ):
+    roi = roi or roi_path
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_agroecological"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not roi_path or not asset_suffix:
-            raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name = f"{valid_gee_text(asset_suffix).lower()}_agroecological"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
-        print(f"ROI source: {roi_path}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"{valid_gee_text(asset_suffix).lower()}_agroecological"
 
     if not os.path.exists(PAN_INDIA_AGROECOLOGICAL_PATH):
         raise FileNotFoundError(f"PAN INDIA Agroecological file not found at {PAN_INDIA_AGROECOLOGICAL_PATH}")

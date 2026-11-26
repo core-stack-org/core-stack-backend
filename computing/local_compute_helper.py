@@ -314,6 +314,46 @@ def load_precomputed_roi(
     return roi_gdf
 
 
+def get_roi(
+    asset_suffix,
+    block,
+    district,
+    roi,
+    state,
+    precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+):
+    """
+    Resolves the ROI GeoDataFrame and asset suffix for a local pipeline.
+
+    If state, district and block are given, the precomputed tehsil ROI is
+    used (asset_suffix is derived as `<district>_<block>`). Otherwise both
+    `roi` (vector file path) and `asset_suffix` are required.
+    """
+    if state and district and block:
+        asset_suffix = (
+            f"{valid_gee_text(str(district).lower())}_"
+            f"{valid_gee_text(str(block).lower())}"
+        )
+        roi_gdf = load_precomputed_roi(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+        )
+    else:
+        if not roi or not asset_suffix:
+            raise ValueError(
+                "For non state/district/block runs, both `roi` and `asset_suffix` are required."
+            )
+
+        roi_gdf = read_validated_vector_file(
+            roi,
+            f"ROI file has no valid geometries: {roi}",
+        )
+    roi_gdf = validate_geometry(roi_gdf)
+    return asset_suffix, roi_gdf
+
+
 def _build_output_dir(
     output_base_dir,
     state=None,

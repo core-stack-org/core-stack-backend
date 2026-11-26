@@ -10,7 +10,7 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
     get_watershed_areas_in_hectares,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     validate_geometry,
     write_vector_output,
@@ -65,25 +65,21 @@ def mws_connectivity_vector(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_mws_connectivity"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and `asset_suffix` are required."
-            )
-        layer_name = f"{asset_suffix}_mws_connectivity".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
-        print(f"ROI source: {roi}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"{asset_suffix}_mws_connectivity".lower()
 
     if not os.path.exists(PAN_INDIA_MWS_CONNECTIVITY_PATH):
         raise FileNotFoundError(f"PAN INDIA MWS connectivity file not found")

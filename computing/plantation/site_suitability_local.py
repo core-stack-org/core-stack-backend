@@ -2,7 +2,7 @@ from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 from computing.utils import save_layer_info_to_db
 from computing.local_compute_helper import (
-    load_precomputed_watersheds,
+    get_roi,
     clip_raster_with_roi,
     queue_local_raster_for_geoserver,
     build_output_raster_path,
@@ -28,23 +28,23 @@ def generate_site_suitability_local(
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    asset_suffix=None,
+    roi=None,
 ):
     """Clip the pan-India site suitability COG to a tehsil."""
     _ = (self, gee_account_id, project_id, start_year, end_year)
-    if not (state and district and block):
-        raise ValueError("state, district and block are required.")
 
-    layer_name = (
-        f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        "_site_suitability_raster"
-    )
-    watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    print(f"Loaded watersheds from {watershed_source}")
+    layer_name = f"{valid_gee_text(asset_suffix.lower())}_site_suitability_raster"
 
     output_raster_path = build_output_raster_path(
         layer_name=layer_name,
@@ -62,7 +62,7 @@ def generate_site_suitability_local(
     print(f"Saved clipped site suitability raster to: {clipped_raster_path}")
 
     layer_id = None
-    if sync_layer_metadata:
+    if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
             state=state,
             district=district,

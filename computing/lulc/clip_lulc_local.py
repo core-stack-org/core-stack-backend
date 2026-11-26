@@ -7,9 +7,8 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
     clip_raster_with_roi,
-    load_precomputed_roi,
+    get_roi,
     queue_local_raster_for_geoserver,
-    read_validated_vector_file,
     resolve_lulc_raster_paths,
 )
 from computing.models import Dataset
@@ -30,36 +29,6 @@ def _slug(value, fallback):
     if not text:
         return fallback
     return valid_gee_text(text) or fallback
-
-
-def _resolve_roi(state, district, block, roi_path, precomputed_roi_dir):
-    if state and district and block:
-        return load_precomputed_roi(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-
-    if not roi_path:
-        raise ValueError(
-            "For non state/district/block runs, `roi_path` must be provided."
-        )
-
-    return read_validated_vector_file(
-        roi_path,
-        f"ROI file has no valid geometries: {roi_path}",
-    )
-
-
-def _resolve_filename_prefix(district, block, asset_suffix):
-    if district and block:
-        return f"{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
-    if asset_suffix is None or not str(asset_suffix).strip():
-        raise ValueError(
-            "For non state/district/block runs, `asset_suffix` must be provided."
-        )
-    return _slug(asset_suffix, "custom")
 
 
 def _build_output_stub(filename_prefix, start_year):
@@ -98,14 +67,17 @@ def run_lulc_local(
     if end_year < start_year:
         raise ValueError("end_year must be greater than or equal to start_year")
 
-    roi_gdf = _resolve_roi(
-        state=state,
-        district=district,
-        block=block,
-        roi_path=roi_path,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided ROI file (`roi_path`) and `asset_suffix`.
+    asset_suffix, roi_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi_path,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    filename_prefix = _resolve_filename_prefix(district, block, asset_suffix)
+    filename_prefix = _slug(asset_suffix, "custom")
     raster_paths = resolve_lulc_raster_paths(
         start_year=start_year,
         end_year=end_year,
