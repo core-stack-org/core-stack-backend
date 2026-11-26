@@ -2378,7 +2378,7 @@ def get_waterbody_stats(state, district, block, uid):
         url = (
             f"https://geoserver.core-stack.org:8443/geoserver/swb/ows?service=WFS&version=1.0.0"
             f"&request=GetFeature&typeName=swb:surface_waterbodies_{district.lower()}_{block.lower()}"
-            f"&outputFormat=application/json&CQL_FILTER=MWS_UID='{uid}'"
+            f"&outputFormat=application/json&CQL_FILTER=mws_uid_list='{uid}'"
         )
         res = requests.get(url, verify=False, timeout=30)
         if res.status_code == 200:

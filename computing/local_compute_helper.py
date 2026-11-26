@@ -38,9 +38,10 @@ from utilities.download_gpkg_from_geoserver import generate_gpkg
 PRECOMPUTED_PANCHAYAT_DIR = VILLAGE_BOUNDARIES_DIR
 
 PRECOMPUTED_ROI_EXTENSIONS = (".gpkg", ".geojson")
+INDEXED_VECTOR_SUFFIXES = (".fgb", ".gpkg")
 VALID_COMPUTE_TYPES = {"gee", "local"}
 MIN_WATERSHED_AREA_HA = 400.0
-LULC_CLASSES = np.arange(1, 13, dtype=np.int16)
+LULC_CLASSES = np.arange(1, 14, dtype=np.int16)
 
 TERRAIN_CLUSTER_CENTROIDS = np.array(
     [
@@ -87,6 +88,16 @@ def ensure_file_exists(path, label):
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"{label} not found: {path}")
+
+
+def resolve_indexed_vector_path(path, suffixes=INDEXED_VECTOR_SUFFIXES):
+    """Prefer a spatially indexed sibling (.fgb/.gpkg) of a vector file if present."""
+    path = Path(path)
+    for suffix in suffixes:
+        candidate = path.with_suffix(suffix)
+        if candidate.exists():
+            return candidate
+    return path
 
 
 def validate_geometry(gdf):
@@ -301,6 +312,46 @@ def load_precomputed_roi(
     )
     print(f"Loaded precomputed ROI file: {roi_path}")
     return roi_gdf
+
+
+def get_roi(
+    asset_suffix,
+    block,
+    district,
+    roi,
+    state,
+    precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
+):
+    """
+    Resolves the ROI GeoDataFrame and asset suffix for a local pipeline.
+
+    If state, district and block are given, the precomputed tehsil ROI is
+    used (asset_suffix is derived as `<district>_<block>`). Otherwise both
+    `roi` (vector file path) and `asset_suffix` are required.
+    """
+    if state and district and block:
+        asset_suffix = (
+            f"{valid_gee_text(str(district).lower())}_"
+            f"{valid_gee_text(str(block).lower())}"
+        )
+        roi_gdf = load_precomputed_roi(
+            state=state,
+            district=district,
+            block=block,
+            precomputed_roi_dir=precomputed_roi_dir,
+        )
+    else:
+        if not roi or not asset_suffix:
+            raise ValueError(
+                "For non state/district/block runs, both `roi` and `asset_suffix` are required."
+            )
+
+        roi_gdf = read_validated_vector_file(
+            roi,
+            f"ROI file has no valid geometries: {roi}",
+        )
+    roi_gdf = validate_geometry(roi_gdf)
+    return asset_suffix, roi_gdf
 
 
 def _build_output_dir(
@@ -929,10 +980,11 @@ def compute_categorical_raster_areas_for_watersheds(
                 computed_rows.append(empty_result.copy())
                 continue
 
-            values = np.asarray(data, dtype=np.float64)
-            values = np.where(np.isfinite(values), values, 0)
+            raw_values = np.asarray(data, dtype=np.float64)
+            finite_mask = np.isfinite(raw_values)
+            values = np.where(finite_mask, raw_values, 0)
             values = np.rint(values).astype(np.int16, copy=False)
-            valid_mask = ~np.ma.getmaskarray(data)
+            valid_mask = (~np.ma.getmaskarray(data)) & finite_mask
             if nodata is not None and not np.isnan(nodata):
                 valid_mask &= values != int(round(nodata))
 
@@ -1032,11 +1084,12 @@ def compute_union_categorical_area_across_rasters_for_watersheds(
                 if data.size == 0:
                     continue
 
-                values = np.asarray(data, dtype=np.float64)
-                values = np.where(np.isfinite(values), values, 0)
+                raw_values = np.asarray(data, dtype=np.float64)
+                finite_mask = np.isfinite(raw_values)
+                values = np.where(finite_mask, raw_values, 0)
                 values = np.rint(values).astype(np.int16, copy=False)
 
-                valid_mask = ~np.ma.getmaskarray(data)
+                valid_mask = (~np.ma.getmaskarray(data)) & finite_mask
                 nodata = src.nodata
                 if nodata is not None and not np.isnan(nodata):
                     valid_mask &= values != int(round(nodata))
@@ -1212,8 +1265,6 @@ def resolve_lulc_raster_paths(
 
 
 # ── cropping intensity (shared by the watershed and farm pipelines) ─────────────
-
-CROPPING_INTENSITY_INITIAL_YEAR = 2017
 SINGLE_CROP_CLASSES = (LulcClass.SINGLE_KHARIF, LulcClass.SINGLE_NON_KHARIF)
 ALL_CROP_CLASSES = SINGLE_CROP_CLASSES + (
     LulcClass.DOUBLE_CROPPING,

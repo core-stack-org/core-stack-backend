@@ -29,6 +29,7 @@ class DataDirAndLocalOutputPathsTests(TestCase):
             (config_loader.LULC_PLAIN_CLUSTER_OUTPUT_DIR, "lulc plain clusters"),
             (config_loader.AQUIFER_VECTOR_OUTPUT_DIR, "aquifer vector"),
             (config_loader.SWB_VECTOR_OUTPUT_DIR, "generate_swb"),
+            (config_loader.ZOI_OUTPUT_DIR, "generate_zoi_data"),
             (config_loader.SOIL_TYPE_OUTPUT_DIR, "soil type"),
             (config_loader.HYDROLOGY_LOCAL_OUTPUT_DIR, "hydrology_fortnightly"),
             (config_loader.LOCAL_DRAINAGE_LINES_OUTPUT, "generate_drainage_layer"),

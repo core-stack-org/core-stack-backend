@@ -6,14 +6,13 @@ from nrm_app.celery import app
 from utilities.gee_utils import valid_gee_text
 
 from computing.local_compute_helper import (
-    CROPPING_INTENSITY_INITIAL_YEAR,
     LULC_BASE_DIR,
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     PROJECT_ROOT,
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
     compute_union_categorical_area_across_rasters_for_watersheds,
-    load_precomputed_watersheds,
+    get_roi,
     resolve_lulc_raster_paths,
     write_vector_output,
 )
@@ -29,7 +28,7 @@ LOCAL_OUTPUT_BASE_DIR = CROPPING_INTENSITY_OUTPUT_DIR
 GEOSERVER_WORKSPACE = "crop_intensity"
 LOCAL_ALGORITHM = "local_cropping_intensity"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
-INITIAL_YEAR = CROPPING_INTENSITY_INITIAL_YEAR   # defined once in local_compute_helper
+INITIAL_YEAR = 2017
 
 YEARLY_CLASS_DEFINITIONS = (
     {"value": LulcClass.SINGLE_KHARIF, "label_prefix": "single_kharif_cropped_area_"},
@@ -146,21 +145,23 @@ def _compute_cropping_intensity_columns(result_gdf, start_year, end_year):
 
 
 def run_cropping_intensity_local(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     asset_suffix=None,
+    roi=None,
     zoi_ci_asset=False,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     lulc_dir=LULC_BASE_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=True,
 ):
-    state = str(state).strip().lower()
-    district = str(district).strip().lower()
-    block = str(block).strip().lower()
+    if state and district and block:
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
     start_year = _coerce_year(start_year, "start_year")
     end_year = _coerce_year(end_year, "end_year")
 
@@ -171,16 +172,17 @@ def run_cropping_intensity_local(
             f"start_year must be greater than or equal to {INITIAL_YEAR} for local cropping intensity."
         )
 
-    asset_suffix = _resolve_asset_suffix(state, district, block, asset_suffix)
-    layer_name = _layer_name(asset_suffix, zoi_ci_asset=zoi_ci_asset)
-
-    watersheds_gdf, watershed_source = load_precomputed_watersheds(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
-    print(f"Watershed boundary source: {watershed_source}")
+    layer_name = _layer_name(asset_suffix, zoi_ci_asset=zoi_ci_asset)
 
     yearly_raster_paths = resolve_lulc_raster_paths(
         start_year=start_year,
@@ -273,7 +275,7 @@ def _generate_cropping_intensity_local_task(
     gee_account_id=None,
     zoi_ci_asset=None,
 ):
-    _ = roi_path, asset_folder_list, app_type, gee_account_id
+    _ = asset_folder_list, app_type, gee_account_id
     return run_cropping_intensity_local(
         state=state,
         district=district,
@@ -281,6 +283,7 @@ def _generate_cropping_intensity_local_task(
         start_year=start_year,
         end_year=end_year,
         asset_suffix=asset_suffix,
+        roi=roi_path,
         zoi_ci_asset=bool(zoi_ci_asset),
         push_to_geoserver=True,
         sync_layer_metadata=True,

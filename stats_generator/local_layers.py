@@ -32,6 +32,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import requests
+from django.conf import settings
 
 from computing.config_loader import DATA_DIR, derived_layers
 from nrm_app.settings import EXCEL_PATH, GEOSERVER_URL
@@ -264,12 +265,26 @@ def geoserver_wfs_url(workspace, layer_name):
 
 
 def active_location_slugs() -> set[tuple[str, str, str]]:
-    """(state, district, block) slugs of active tehsils in the local DB."""
-    from computing.bulk_layer_generation import get_active_locations
+    """
+    (state, district, block) slugs of active tehsils.
 
+    Uses the prod API (get_active_locations_from_api) when PROD_BACKEND_URL is
+    set, raising on failure rather than falling back to the local DB. Reads the
+    local DB only when PROD_BACKEND_URL is unset (i.e. on prod itself).
+    """
+    from computing.bulk_layer_generation import (
+        get_active_locations,
+        get_active_locations_from_api,
+    )
+
+    loader = (
+        get_active_locations_from_api
+        if getattr(settings, "PROD_BACKEND_URL", "").strip()
+        else get_active_locations
+    )
     return {
         (slug(loc.state), slug(loc.district), slug(loc.block))
-        for loc in get_active_locations()
+        for loc in loader()
     }
 
 

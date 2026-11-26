@@ -17,8 +17,8 @@ from computing.config_loader import (
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
+    get_roi,
     get_union_geometry,
-    load_precomputed_roi,
     queue_local_raster_for_geoserver,
     resolve_lulc_raster_paths,
     validate_geometry,
@@ -162,20 +162,16 @@ def _combine_transitions(shape, transitions):
     return result
 
 
-def _base_description(district, block):
-    return (
-        f"change_{_slug(district, 'unknown_district')}_{_slug(block, 'unknown_block')}"
-    )
+def _base_description(asset_suffix):
+    return f"change_{asset_suffix}"
 
 
-def _published_layer_name(district, block, param_name):
-    return f"{_base_description(district, block)}_{param_name}"
+def _published_layer_name(asset_suffix, param_name):
+    return f"{_base_description(asset_suffix)}_{param_name}"
 
 
-def _output_stub(district, block, param_name, start_year, end_year):
-    return (
-        f"{_published_layer_name(district, block, param_name)}_{start_year}_{end_year}"
-    )
+def _output_stub(asset_suffix, param_name, start_year, end_year):
+    return f"{_published_layer_name(asset_suffix, param_name)}_{start_year}_{end_year}"
 
 
 def _select_change_detection_raster_paths(start_year, end_year):
@@ -513,28 +509,35 @@ def _compute_change_outputs(lulc_arrays):
 
 
 def run_change_detection_local(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     precomputed_roi_dir=PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     push_to_geoserver=True,
     sync_layer_metadata=True,
+    asset_suffix=None,
+    roi=None,
 ):
-    state = str(state).strip().lower()
-    district = str(district).strip().lower()
-    block = str(block).strip().lower()
+    if state and district and block:
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
     start_year = int(start_year)
     end_year = int(end_year)
 
     if end_year < start_year:
         raise ValueError("end_year must be greater than or equal to start_year")
 
-    roi_gdf = load_precomputed_roi(
-        state=state,
-        district=district,
-        block=block,
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, roi_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
         precomputed_roi_dir=precomputed_roi_dir,
     )
     lulc_raster_paths = _select_change_detection_raster_paths(
@@ -547,7 +550,7 @@ def run_change_detection_local(
     geoserver_statuses = []
 
     for param_name, change_array in change_outputs.items():
-        output_stub = _output_stub(district, block, param_name, start_year, end_year)
+        output_stub = _output_stub(asset_suffix, param_name, start_year, end_year)
         output_path = build_output_raster_path(
             layer_name=output_stub,
             output_base_dir=LOCAL_OUTPUT_BASE_DIR,
@@ -563,9 +566,9 @@ def run_change_detection_local(
         )
         print(f"Saved local change detection raster: {raster_path}")
 
-        published_layer_name = _published_layer_name(district, block, param_name)
+        published_layer_name = _published_layer_name(asset_suffix, param_name)
         layer_id = None
-        if sync_layer_metadata:
+        if sync_layer_metadata and state and district and block:
             layer_id = save_layer_info_to_db(
                 state=state,
                 district=district,
@@ -599,12 +602,14 @@ def run_change_detection_local(
 
 
 def _get_change_detection_local_task(
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = gee_account_id
     return run_change_detection_local(
@@ -615,18 +620,22 @@ def _get_change_detection_local_task(
         end_year=end_year,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )
 
 
 @app.task(bind=True)
 def get_change_detection(
     self,
-    state,
-    district,
-    block,
-    start_year,
-    end_year,
+    state=None,
+    district=None,
+    block=None,
+    start_year=None,
+    end_year=None,
     gee_account_id=None,
+    asset_suffix=None,
+    roi=None,
 ):
     _ = self
     return _get_change_detection_local_task(
@@ -636,4 +645,6 @@ def get_change_detection(
         start_year=start_year,
         end_year=end_year,
         gee_account_id=gee_account_id,
+        asset_suffix=asset_suffix,
+        roi=roi,
     )

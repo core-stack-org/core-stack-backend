@@ -13,8 +13,9 @@ from computing.utils import (
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
+    resolve_indexed_vector_path,
     write_vector_output,
     validate_geometry,
 )
@@ -168,22 +169,21 @@ def generate_soge_vector_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"soge_vector_{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not roi_path or not asset_suffix:
-            raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name = f"soge_vector_{asset_suffix}".lower()
-        watersheds_gdf = read_validated_vector_file(
-            roi_path, f"Invalid ROI file: {roi_path}"
-        )
-        print(f"ROI source: {roi_path}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi_path` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi_path,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"soge_vector_{asset_suffix}".lower()
 
     soge_files = sorted(
         (m.group(1), path)
@@ -199,9 +199,10 @@ def generate_soge_vector_local(
 
     for year, soge_path in soge_files:
         year_layer_name = f"{layer_name}_{year}"
-        print(f"Processing SOGE {year} from {soge_path}")
+        resolved_soge_path = resolve_indexed_vector_path(soge_path)
+        print(f"Processing SOGE {year} from {resolved_soge_path}")
 
-        soge_gdf = gpd.read_file(soge_path, mask=watersheds_gdf)
+        soge_gdf = gpd.read_file(resolved_soge_path, mask=watersheds_gdf)
         soge_gdf = validate_geometry(soge_gdf)
         if soge_gdf.empty:
             raise ValueError(

@@ -42,13 +42,25 @@ def maybe_skip(task):
         return None
     from computing.bulk_layer_generation import (
         LOCAL_TASK_DATASETS,
+        LOCAL_TASK_LAYER_PREFIXES,
         datasets_exist_locally,
     )
 
-    dataset_names = LOCAL_TASK_DATASETS.get(getattr(task, "name", None))
-    if not dataset_names or not datasets_exist_locally(
-        dataset_names, ctx["location"]
-    ):
+    task_name = getattr(task, "name", None)
+    dataset_names = LOCAL_TASK_DATASETS.get(task_name)
+    if not dataset_names:
+        return None
+    layer_name_prefix = LOCAL_TASK_LAYER_PREFIXES.get(task_name)
+    exists = (
+        datasets_exist_locally(
+            dataset_names,
+            ctx["location"],
+            layer_name_prefix=layer_name_prefix,
+        )
+        if layer_name_prefix
+        else datasets_exist_locally(dataset_names, ctx["location"])
+    )
+    if not exists:
         return None
     logger.info(
         "Skipping %s for %s: layer already exists",
