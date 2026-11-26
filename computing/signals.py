@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -22,7 +23,17 @@ _STAC_QUEUE = "nrm"
 
 @receiver(post_save, sender=Layer, dispatch_uid="computing.signals.trigger_stac_on_geoserver_sync")
 def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
+    if not getattr(settings, "STAC_AUTO_TRIGGER_ON_SYNC", True):
+        return
+
+    if getattr(instance, "_skip_stac_trigger", False):
+        return
+
     if not instance.is_sync_to_geoserver:
+        return
+
+    update_fields = kwargs.get("update_fields")
+    if not created and update_fields is not None and "is_sync_to_geoserver" not in update_fields:
         return
 
     if instance.is_stac_specs_generated:
@@ -66,8 +77,9 @@ def trigger_stac_on_geoserver_sync(sender, instance: Layer, created, **kwargs):
                 end_year=task_kwargs["end_year"],
             )
         else:
+            queue = getattr(settings, "STAC_CELERY_QUEUE", _STAC_QUEUE) or _STAC_QUEUE
             generate_stac_collection_task.apply_async(
-                kwargs=task_kwargs, queue=_STAC_QUEUE
+                kwargs=task_kwargs, queue=queue
             )
     except Exception as exc:  # noqa: BLE001
         log.error(

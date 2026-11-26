@@ -127,6 +127,7 @@ from computing.misc.slope_percentage_local_compute import (
     generate_slope_percentage_data_local,
 )
 from computing.misc.soge_vector_local_compute import generate_soge_vector_local
+from computing.misc.stream_order_local_compute import generate_stream_order_local
 from computing.mws.mws_centroid_local_compute import generate_mws_centroid_data_local
 from computing.mws.mws_connectivity_local_compute import mws_connectivity_vector
 from computing.surface_water_bodies.swb_local import (
@@ -326,6 +327,8 @@ LOCAL_TASK_REGISTRY = {
     "terrain_lulc_slope_cluster": lulc_on_slope_cluster_local,
     "generate_soge_vector": generate_soge_vector_local,
     "soge_vector": generate_soge_vector_local,
+    "generate_stream_order": generate_stream_order_local,
+    "stream_order": generate_stream_order_local,
     "clip_drainage_lines": clip_drainage_lines_local,
     "generate_drainage_layer": clip_drainage_lines_local,
     "generate_natural_depression_data": generate_natural_depression_data_local,
@@ -386,8 +389,6 @@ LOCAL_TASK_REGISTRY = {
     # (nodes need "pass_gee_account_id": true).
     "ndvi_timeseries": ndvi_timeseries,
     "generate_ndvi_timeseries": ndvi_timeseries,
-    "generate_stream_order": generate_stream_order,
-    "stream_order": generate_stream_order,
     "generate_clart_layer": generate_clart_layer,
     "generate_clart": generate_clart_layer,
 }

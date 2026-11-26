@@ -161,10 +161,16 @@ def kml_to_shp(state_name, district_name, block_name, kml_path):
     os.remove(shapefile_layer_path + ".zip")
 
 
+def _fc_to_shape_dir(folder):
+    from computing import config_loader
+
+    state_dir = os.path.join(str(config_loader.DATA_DIR), "fc_to_shape", folder)
+    os.makedirs(state_dir, exist_ok=True)
+    return state_dir
+
+
 def sync_layer_to_geoserver(state_name, fc, layer_name, workspace):
-    state_dir = os.path.join("data/fc_to_shape", state_name)
-    if not os.path.exists(state_dir):
-        os.mkdir(state_dir)
+    state_dir = _fc_to_shape_dir(state_name)
     path = os.path.join(state_dir, f"{layer_name}")
     # Write the feature collection into json file
     with open(path + ".json", "w") as f:
@@ -188,9 +194,7 @@ def sync_fc_to_geoserver(fc, shp_folder, layer_name, workspace, style_name=None)
         geojson_fc = get_geojson_from_gcs(layer_name)
     geo = Geoserver()
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", shp_folder)
-        if not os.path.exists(state_dir):
-            os.mkdir(state_dir)
+        state_dir = _fc_to_shape_dir(shp_folder)
         path = os.path.join(state_dir, f"{layer_name}")
 
         # Convert to GeoDataFrame
@@ -234,9 +238,7 @@ def sync_project_fc_to_geoserver(fc, project_name, layer_name, workspace):
         geojson_fc = get_geojson_from_gcs(layer_name)
     print(len(geojson_fc["features"]))
     if len(geojson_fc["features"]) > 0:
-        state_dir = os.path.join("data/fc_to_shape", project_name)
-        if not os.path.exists(state_dir):
-            os.mkdir(state_dir)
+        state_dir = _fc_to_shape_dir(project_name)
         path = os.path.join(state_dir, f"{layer_name}")
 
         # Convert to GeoDataFrame
@@ -678,7 +680,7 @@ def _sync_layer_to_prod_db(payload: dict):
 
 
 def _update_layer_sync_remote(
-    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+    layer_id, sync_to_geoserver=None, is_stac_specs_generated=None, skip_stac=False
 ):
     prod_url = _get_prod_backend_url()
     if not prod_url or layer_id is None:
@@ -690,6 +692,8 @@ def _update_layer_sync_remote(
         "sync_to_geoserver": sync_to_geoserver,
         "is_stac_specs_generated": is_stac_specs_generated,
     }
+    if skip_stac:
+        payload["skip_stac"] = True
     try:
         response = requests.post(
             endpoint,
@@ -1075,7 +1079,7 @@ def save_layer_info_to_db(
 
 
 def update_layer_sync_status(
-        layer_id, sync_to_geoserver=None, is_stac_specs_generated=None
+        layer_id, sync_to_geoserver=None, is_stac_specs_generated=None, skip_stac=False
 ):
     if sync_to_geoserver and should_skip_sync():
         # The push was skipped by the GeoServer gate, so the layer is not on
@@ -1089,6 +1093,7 @@ def update_layer_sync_status(
             layer_id,
             sync_to_geoserver=sync_to_geoserver,
             is_stac_specs_generated=is_stac_specs_generated,
+            skip_stac=skip_stac,
         )
         if sync_to_geoserver:
             try:
@@ -1113,8 +1118,11 @@ def update_layer_sync_status(
             update_fields.append("is_stac_specs_generated")
 
         # `save(update_fields=...)` fires the post_save signal so the STAC
-        # auto-trigger handler in `computing.signals` can pick up the flip.
+        # auto-trigger handler in `computing.signals` can pick up the flip
+        # unless `skip_stac=True` (e.g. during bulk GeoServer sync).
         if update_fields:
+            if skip_stac:
+                layer_obj._skip_stac_trigger = True
             layer_obj.save(update_fields=update_fields)
             print(
                 f"Updated {update_fields} for layer ID: {layer_id} "
