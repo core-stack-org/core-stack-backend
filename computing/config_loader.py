@@ -418,3 +418,12 @@ PAN_INDIA_FOREST_FIRE = _base_layer_path(
     allowed_suffixes=(".geojson", ".gpkg", ".shp"),
 )
 LOCAL_FOREST_FIRE_OUTPUT = _derived_output_dir("forest fire")
+
+PAN_INDIA_SOLAR_POWER_TRACKER_PATH = (
+    DATA_DIR / "base_layers/renewable_energy/india_solar_power_tracker.geojson"
+)
+LOCAL_SOLAR_POWER_TRACKER_OUTPUT = DATA_DIR / "layers/solar_power_tracker"
+PAN_INDIA_WIND_POWER_TRACKER_PATH = (
+    DATA_DIR / "base_layers/renewable_energy/india_wind_power_tracker.geojson"
+)
+LOCAL_WIND_POWER_TRACKER_OUTPUT = DATA_DIR / "layers/wind_power_tracker"
