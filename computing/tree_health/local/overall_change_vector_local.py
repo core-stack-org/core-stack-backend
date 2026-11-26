@@ -5,9 +5,8 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_vector_path,
     compute_categorical_raster_areas_for_watersheds,
-    load_precomputed_watersheds,
+    get_roi,
     queue_local_vector_for_geoserver,
-    read_validated_vector_file,
     write_vector_output,
 )
 from computing.utils import save_layer_info_to_db
@@ -79,27 +78,15 @@ def tree_health_overall_change_vector_local(
     block = str(block).strip().lower() if block else None
 
     # Vector outputs are generated over watershed polygons, same as reduceRegions in GEE.
-    if state and district and block:
-        asset_suffix = (
-            f"{_slug(district, 'unknown_district')}_" f"{_slug(block, 'unknown_block')}"
-        )
-        result_gdf, _ = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and "
-                "`asset_suffix` are required."
-            )
-        asset_suffix = _slug(asset_suffix, "custom")
-        result_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
+    asset_suffix, result_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    asset_suffix = _slug(asset_suffix, "custom")
 
     raster_path = _resolve_overall_change_raster(
         asset_suffix=asset_suffix,

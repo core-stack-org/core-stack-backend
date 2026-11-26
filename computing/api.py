@@ -299,7 +299,10 @@ from .misc.livestocks import generate_livestocks_layer_task
 from .misc.digital_elevation_model import generate_dem_layer
 from .misc.canal_layer import canal_vector
 from .STAC_specs.stac_collection import generate_stac_collection_task
-from .farm_boundaries.farm_boundary import build_farm_boundary_map
+from .farm_boundaries.farm_boundary import (
+    build_farm_boundary_map,
+    update_existing_parquet,
+)
 from .forest_fire.forest_fire_local_compute import generate_forest_fire_local
 
 
@@ -313,25 +316,37 @@ def generate_farm_boundaries(request):
         block = request.data.get("block", "").lower().strip()
         start_year = request.data.get("start_year")
         end_year = request.data.get("end_year")
-        overwrite = parse_bool(request.data.get("overwrite", False))
+        update = request.data.get("update", False)
+        update_type = request.data.get("update_type", "")
 
         if not all([state, district, block]):
             return Response(
                 {"Error": "state, district, block are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        build_farm_boundary_map.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "start_year": start_year,
-                "end_year": end_year,
-                "overwrite": overwrite,
-            },
-            queue="nrm",
-        )
+        if not update:
+            build_farm_boundary_map.apply_async(
+                kwargs={
+                    "state": state,
+                    "district": district,
+                    "block": block,
+                    "start_year": start_year,
+                    "end_year": end_year,
+                },
+                queue="nrm",
+            )
+        else:
+            update_existing_parquet.apply_async(
+                kwargs={
+                    "state": state,
+                    "district": district,
+                    "block": block,
+                    "update_type": update_type,
+                    "start_year": start_year,
+                    "end_year": end_year,
+                },
+                queue="nrm",
+            )
 
         msg = f"Farm boundary pipeline initiated for {start_year} to {end_year}"
 
@@ -2825,16 +2840,20 @@ def generate_zoi_to_gee(request):
 
         compute = _normalize_layer_order_compute(request.data.get("compute") or "gee")
         task = generate_zoi_local if compute == "local" else generate_zoi
+        task_kwargs = {
+            "state": state,
+            "district": district,
+            "block": block,
+            "gee_account_id": gee_account_id,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+        if compute == "local":
+            task_kwargs["run_ndvi"] = parse_bool(request.data.get("run_ndvi", False))
+            task_kwargs["fast_ndvi"] = parse_bool(request.data.get("fast_ndvi", False))
 
         task.apply_async(
-            kwargs={
-                "state": state,
-                "district": district,
-                "block": block,
-                "gee_account_id": gee_account_id,
-                "start_date": start_date,
-                "end_date": end_date,
-            },
+            kwargs=task_kwargs,
             queue="nrm" if compute == "local" else "waterbody",
         )
 

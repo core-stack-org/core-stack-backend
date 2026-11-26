@@ -11,7 +11,7 @@ from computing.utils import (
 from computing.local_compute_helper import (
     PROJECT_ROOT,
     build_output_vector_path,
-    load_precomputed_watersheds,
+    get_roi,
     read_validated_vector_file,
     write_vector_output,
     validate_geometry,
@@ -97,20 +97,21 @@ def generate_factory_csr_data_local(
     sync_layer_metadata=True,
 ):
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_factory_csr"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not roi_path or not asset_suffix:
-            raise ValueError("ROI path and asset_suffix are required for custom runs.")
-        layer_name = f"{valid_gee_text(asset_suffix).lower()}_factory_csr"
-        watersheds_gdf = read_validated_vector_file(roi_path, f"Invalid ROI file: {roi_path}")
-        print(f"ROI source: {roi_path}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi_path` file and `asset_suffix`.
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi_path,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"{valid_gee_text(asset_suffix).lower()}_factory_csr"
 
     if not os.path.exists(PAN_INDIA_FACTORY_CSR_PATH):
         raise FileNotFoundError(f"PAN INDIA Factory CSR file not found at {PAN_INDIA_FACTORY_CSR_PATH}")

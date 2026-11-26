@@ -32,7 +32,7 @@ from computing.local_compute_helper import (
     write_vector_output,
     queue_local_vector_for_geoserver,
     queue_local_raster_for_geoserver,
-    load_precomputed_roi,
+    get_roi,
     resolve_lulc_raster_paths,
 )
 
@@ -383,29 +383,6 @@ def clip_soil_health_raster(
         lulc_mode_array,
         reference_meta,
     )
-
-
-def get_roi(asset_suffix, block, district, roi, state, precomputed_roi_dir):
-    if state and district and block:
-        asset_suffix = f"{valid_gee_text(str(district).lower())}_{valid_gee_text(str(block).lower())}"
-        roi_gdf = load_precomputed_roi(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and `asset_suffix` are required."
-            )
-
-        roi_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
-    roi_gdf = validate_geometry(roi_gdf)
-    return asset_suffix, roi_gdf
 
 
 def vectorize_soil_health(

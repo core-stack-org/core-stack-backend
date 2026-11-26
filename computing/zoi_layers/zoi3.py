@@ -31,6 +31,7 @@ def get_ndvi_for_zoi(
     app_type="MWS",
     gee_account_id=None,
     proj_id=None,
+    sync_to_geoserver=True,
 ):
     print("started generating ndvi")
     if not start_date or not end_date or start_year is None or end_year is None:
@@ -61,19 +62,21 @@ def get_ndvi_for_zoi(
     )
     task.start()
     wait_for_task_completion(task)
-    if state and district and block:
-        layer_name = f"waterbodies_zoi_{asset_suffix}"
-        layer_at_geoserver = sync_asset_to_db_and_geoserver(
-            ndvi_asset_path,
-            layer_name,
-            asset_suffix,
-            start_date,
-            end_date,
-            state,
-            district,
-            block,
-        )
-    else:
-        proj_obj = Project.objects.get(pk=proj_id)
-        layer_name = f"waterbodies_zoi_{asset_suffix}"
-        sync_project_fc_to_geoserver(fc, proj_obj.name, layer_name, "zoi_layers")
+    if sync_to_geoserver:
+        if state and district and block:
+            layer_name = f"waterbodies_zoi_{asset_suffix}"
+            sync_asset_to_db_and_geoserver(
+                ndvi_asset_path,
+                layer_name,
+                asset_suffix,
+                start_date,
+                end_date,
+                state,
+                district,
+                block,
+            )
+        else:
+            proj_obj = Project.objects.get(pk=proj_id)
+            layer_name = f"waterbodies_zoi_{asset_suffix}"
+            sync_project_fc_to_geoserver(fc, proj_obj.name, layer_name, "zoi_layers")
+    return ndvi_asset_path

@@ -1,5 +1,4 @@
 import logging
-import re
 from pathlib import Path
 
 import ee
@@ -15,10 +14,6 @@ from computing.local_compute_helper import (
     load_precomputed_roi,
     read_validated_vector_file,
     write_vector_output,
-)
-from computing.surface_water_bodies.area_utils import (
-    SQM_PER_HECTARE,
-    add_area_ored_to_gdf,
 )
 from computing.surface_water_bodies.clip_swb_local import _clip_gdf, _to_geom
 from computing.surface_water_bodies.swb3 import (
@@ -57,7 +52,6 @@ logger = logging.getLogger(__name__)
 GEE_EXPORT_CHUNK_SIZE = 1000
 # EE rejects requests > 10 MB; keep GeoJSON payload well below (serialization adds overhead).
 GEE_EXPORT_MAX_CHUNK_BYTES = 4 * 1024 * 1024
-ANNUAL_COLUMN_PATTERN = re.compile(r"^(area|k|kr|krz)_(\d{4})$")
 
 
 def _slug(value, fallback):
@@ -68,11 +62,28 @@ def _slug(value, fallback):
 
 def _resolve_source_path(vector_path):
     src = Path(vector_path).expanduser().resolve()
-    candidates = [
-        src.parent / "pan_india_waterbodies_with_mws.fgb",
+    raw_candidates = [
         src.with_suffix(".fgb"),
-        src,
+        src.parent / "pan_india_waterbodies_with_mws.fgb",
     ]
+    if src.parent.name != "surface_waterbodies":
+        raw_candidates.append(
+            src.parent / "surface_waterbodies" / "pan_india_waterbodies_with_mws.fgb"
+        )
+    raw_candidates.extend(
+        [
+            src,
+            src.with_suffix(".geojson"),
+            src.parent / "pan_india_waterbodies_with_mws.geojson",
+        ]
+    )
+    if src.parent.name != "surface_waterbodies":
+        raw_candidates.append(
+            src.parent
+            / "surface_waterbodies"
+            / "pan_india_waterbodies_with_mws.geojson"
+        )
+    candidates = list(dict.fromkeys(raw_candidates))
     for candidate in candidates:
         if candidate.exists():
             logger.info("Using SWB source path: %s", candidate)
@@ -200,67 +211,15 @@ def _prepare_gdf_for_gee(gdf):
     return prepared
 
 
-def _convert_area_columns_to_hectares(gdf):
-    converted = add_area_ored_to_gdf(gdf)
-    converted_columns = {}
-
-    for column in list(converted.columns):
-        if column == "geometry":
-            continue
-
-        target_column = None
-        if column == "total_area_m2":
-            target_column = "total_area"
-        elif column.startswith("area_") and column != "area_ored":
-            target_column = column
-
-        if target_column is None:
-            continue
-
-        converted[target_column] = converted[column] / SQM_PER_HECTARE
-        if target_column != column:
-            converted.drop(columns=[column], inplace=True)
-        converted_columns[column] = "converted_in_place_to_hectares"
-
-    return converted, converted_columns
-
-
-def _restore_legacy_columns(gdf):
-    renamed_columns = {}
-    for column in gdf.columns:
-        match = ANNUAL_COLUMN_PATTERN.fullmatch(column)
-        if not match:
-            continue
-
-        prefix, end_year = match.groups()
-        end_year = int(end_year)
-        target_column = f"{prefix}_{(end_year - 1) % 100:02d}-{end_year % 100:02d}"
-        if target_column in gdf.columns:
-            raise ValueError(
-                f"Cannot rename SWB column {column} to existing column {target_column}."
-            )
-        renamed_columns[column] = target_column
-
-    return gdf.rename(columns=renamed_columns)
-
-
 def _build_swb2_gdf(swb_path, roi_geometry):
     clipped_gdf = _clip_gdf(_resolve_source_path(swb_path), roi_geometry)
     if clipped_gdf.empty:
         raise ValueError("No surface water body features intersect the provided ROI.")
 
-    clipped_gdf, converted_area_columns = _convert_area_columns_to_hectares(
-        clipped_gdf
-    )
-    clipped_gdf = _restore_legacy_columns(clipped_gdf)
     logger.info(
         "Clipped SWB features: count=%s columns=%s",
         len(clipped_gdf),
         list(clipped_gdf.columns),
-    )
-    logger.info(
-        "Converted SWB area columns from square meters to hectares: %s",
-        converted_area_columns,
     )
     return clipped_gdf
 

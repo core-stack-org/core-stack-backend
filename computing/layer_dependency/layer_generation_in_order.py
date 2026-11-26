@@ -712,15 +712,21 @@ _SKIP_EXISTING = ContextVar("layer_map_skip_existing", default=False)
 def _layer_already_generated(node_func_obj, state, district, block):
     from computing.bulk_layer_generation import (
         LOCAL_TASK_DATASETS,
+        LOCAL_TASK_LAYER_PREFIXES,
         datasets_exist_locally,
     )
 
-    dataset_names = LOCAL_TASK_DATASETS.get(getattr(node_func_obj, "name", None))
+    task_name = getattr(node_func_obj, "name", None)
+    dataset_names = LOCAL_TASK_DATASETS.get(task_name)
     if not dataset_names:
         return False
-    return datasets_exist_locally(
-        dataset_names, {"state": state, "district": district, "block": block}
-    )
+    layer_name_prefix = LOCAL_TASK_LAYER_PREFIXES.get(task_name)
+    location = {"state": state, "district": district, "block": block}
+    if layer_name_prefix:
+        return datasets_exist_locally(
+            dataset_names, location, layer_name_prefix=layer_name_prefix
+        )
+    return datasets_exist_locally(dataset_names, location)
 
 
 def run_node_tree(

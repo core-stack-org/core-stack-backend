@@ -13,8 +13,7 @@ from computing.local_compute_helper import (
     build_output_raster_path,
     build_output_vector_path,
     get_union_geometry,
-    load_precomputed_roi,
-    load_precomputed_watersheds,
+    get_roi,
     queue_local_raster_for_geoserver,
     read_validated_vector_file,
     write_vector_output,
@@ -86,23 +85,18 @@ def run_raster_fabdem_local(
     sync_layer_metadata=False,
 ):
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_dem_raster"
-        roi_gdf = load_precomputed_roi(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and `asset_suffix` are required."
-            )
-        layer_name = f"{asset_suffix}_dem_raster".lower()
-        roi_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+    asset_suffix, roi_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"{asset_suffix}_dem_raster".lower()
 
     output_raster_path = build_output_raster_path(
         layer_name=layer_name,
@@ -198,6 +192,7 @@ def run_vector_fabdem_local(
     precomputed_roi_dir=None,
     push_to_geoserver=True,
     sync_layer_metadata=False,
+    roi=None,
 ):
     if not raster_path:
         raise ValueError(
@@ -205,27 +200,18 @@ def run_vector_fabdem_local(
         )
 
     if state and district and block:
-        layer_name = f"{valid_gee_text(district.lower())}_{valid_gee_text(block.lower())}_dem_vector"
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
-    else:
-        if not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, `asset_suffix` is required."
-            )
-        layer_name = f"{asset_suffix}_dem_vector".lower()
-        watersheds_gdf, watershed_source = load_precomputed_watersheds(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-        print(f"Watershed boundary source: {watershed_source}")
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+    asset_suffix, watersheds_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"{asset_suffix}_dem_vector".lower()
 
     result_gdf = _compute_watershed_dem_stats(watersheds_gdf, raster_path)
     print(f"Computed DEM stats for {len(result_gdf)} watersheds")
@@ -318,6 +304,7 @@ def generate_febdem_raster_vector_clip(
         precomputed_roi_dir=precomputed_roi_dir,
         push_to_geoserver=True,
         sync_layer_metadata=True,
+        roi=roi,
     )
 
     return raster_ok and vector_ok

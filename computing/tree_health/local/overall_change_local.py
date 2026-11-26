@@ -15,10 +15,9 @@ from computing.config_loader import (
 from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
+    get_roi,
     get_union_geometry,
-    load_precomputed_roi,
     queue_local_raster_for_geoserver,
-    read_validated_vector_file,
     validate_geometry,
 )
 from computing.utils import save_layer_info_to_db
@@ -159,7 +158,7 @@ def _reproject_to_match(raster_path, meta):
             dst_transform=meta["transform"],
             dst_crs=meta["crs"],
             dst_nodata=BACKGROUND,
-            resampling=Resampling.mode,
+            resampling=Resampling.nearest,
         )
     return output
 
@@ -225,28 +224,15 @@ def tree_health_overall_change_raster_local(
     start_year = int(start_year)
     end_year = int(end_year)
 
-    if state and district and block:
-        asset_suffix = (
-            f"{_slug(district, 'unknown_district')}_"
-            f"{_slug(block, 'unknown_block')}"
-        )
-        roi_gdf = load_precomputed_roi(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and "
-                "`asset_suffix` are required."
-            )
-        asset_suffix = _slug(asset_suffix, "custom")
-        roi_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
+    asset_suffix, roi_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    asset_suffix = _slug(asset_suffix, "custom")
 
     layer_name = f"overall_change_raster_{asset_suffix}"
     tree_change_path = _resolve_tree_change_raster(

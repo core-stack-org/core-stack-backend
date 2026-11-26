@@ -23,7 +23,7 @@ base_layers:
           aliases:
               - swb
               - pan india waterbodies
-          local_path: "{DATA_DIR}/base_layers/pan_india_waterbodies.fgb"
+          local_path: "{DATA_DIR}/base_layers/surface_waterbodies/pan_india_waterbodies_with_mws.fgb"
           source: ""
           type: file
 
@@ -218,7 +218,7 @@ base_layers:
           local_path: "{DATA_DIR}/base_layers/lulc/{filename}"
           periodicity: annual
           start_year: 2017
-          end_year: 2024
+          end_year: 2025
           source: s3://corestack-datasets/base_layers/periodic_layers/lulc/lulc_v4/{filename}
           type: file
 
@@ -829,6 +829,11 @@ derived_layers:
     - name: grassland health
 
     - name: generate_zoi_data
+      filename: "waterbodies_zoi_{district}_{block}.gpkg"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/zoi/{filename}"
+      geoserver_workspace: swb
+      geoserver_layer: "waterbodies_zoi_{district}_{block}"
+      layer_type: vector
 
     - name: generate_antyodaya
       filename: "antyodaya20_{district}_{block}.gpkg"

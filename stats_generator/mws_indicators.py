@@ -5,11 +5,10 @@ import pymannkendall as mk
 import numpy as np
 import ast
 from nrm_app.settings import EXCEL_PATH
-from .utils import get_url
+from .utils import fetch_drought_layer_years, get_url
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
-from .models import LayerInfo
 from .kyl_legends import (
     AQUIFER_CLASS_TO_ID,
     SOGE_CLASS_TO_ID,
@@ -307,6 +306,7 @@ def generate_mws_data_for_kyl_filters(
 
             results = []
             df_hydrological_annual = sheets["hydrological_annual"]
+            drought_years = fetch_drought_layer_years()
 
             for specific_mws_id in df_hydrological_annual["UID"].unique():
                 hydro_annual_mws_data = df_hydrological_annual[
@@ -710,13 +710,7 @@ def generate_mws_data_for_kyl_filters(
                 max_dry_spell_weeks = -9999
                 max_drought_weeks = -9999
                 try:
-                    layers = LayerInfo.objects.get(
-                        layer_type="vector", workspace="drought"
-                    )
-                    years = [
-                        str(year)
-                        for year in range(layers.start_year, layers.end_year + 1)
-                    ]
+                    years = drought_years
 
                     df_crpDrought_mws_data = sheets["croppingDrought_kharif"][
                         sheets["croppingDrought_kharif"]["UID"] == specific_mws_id

@@ -7,7 +7,7 @@ from computing.local_compute_helper import (
     PRECOMPUTED_TEHSIL_WATERSHED_DIR,
     build_output_raster_path,
     clip_raster_with_roi,
-    load_precomputed_roi,
+    get_roi,
     queue_local_raster_for_geoserver,
     read_validated_vector_file,
 )
@@ -29,26 +29,21 @@ def run_terrain_raster_fabdem_local(
     sync_layer_metadata=False,
 ):
     if state and district and block:
-        layer_name = (
-            f"{valid_gee_text(str(district).strip().lower())}_"
-            f"{valid_gee_text(str(block).strip().lower())}_terrain_raster"
-        )
-        roi_gdf = load_precomputed_roi(
-            state=state,
-            district=district,
-            block=block,
-            precomputed_roi_dir=precomputed_roi_dir,
-        )
-    else:
-        if not roi or not asset_suffix:
-            raise ValueError(
-                "For non state/district/block runs, both `roi` and `asset_suffix` are required."
-            )
-        layer_name = f"{asset_suffix}_terrain_raster".lower()
-        roi_gdf = read_validated_vector_file(
-            roi,
-            f"ROI file has no valid geometries: {roi}",
-        )
+        state = str(state).strip().lower()
+        district = str(district).strip().lower()
+        block = str(block).strip().lower()
+
+    # Uses precomputed tehsil ROI when state/district/block are given,
+    # otherwise falls back to the provided `roi` file and `asset_suffix`.
+    asset_suffix, roi_gdf = get_roi(
+        asset_suffix,
+        block,
+        district,
+        roi,
+        state,
+        precomputed_roi_dir=precomputed_roi_dir,
+    )
+    layer_name = f"{valid_gee_text(str(asset_suffix).strip().lower())}_terrain_raster"
 
     output_raster_path = build_output_raster_path(
         layer_name=layer_name,

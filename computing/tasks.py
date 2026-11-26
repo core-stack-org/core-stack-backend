@@ -14,6 +14,7 @@ from computing.lulc.v4.temporal_correction.tasks import (  # noqa: F401  (regist
     lulc_temporal_correction_incremental,
     lulc_temporal_correction_six_year,
 )
+from computing.zoi_layers.zoi_local import sync_zoi_ndvi_gee
 
 
 logger = logging.getLogger(__name__)
@@ -259,10 +260,11 @@ def bulk_generate_layer(
 
 __all__ = ["bulk_generate_layer",
            "sync_unsynced_local_layers",
-           "generate_stac_collection_task", 
+           "generate_stac_collection_task",
            "et_download",
            "generate_hydrology",
            "generate_hydrology_base_layer",
            "generate_runoff_gpu",
            "publish_local_layer",
-           "publish_gee_layer"]
+           "publish_gee_layer",
+           "sync_zoi_ndvi_gee"]
