@@ -91,6 +91,8 @@ def api_security_check(auth_type="JWT", allowed_methods="GET", required_headers=
                 if "user" in auth_result:
                     request.user = auth_result["user"]
 
+                request.auth_method = auth_result.get("auth_method")
+
                 missing_headers = validate_required_headers(request, required_headers)
                 if missing_headers:
                     return create_drf_response(
@@ -138,7 +140,7 @@ def create_drf_response(data, status_code=status.HTTP_200_OK):
 def check_authentication(request, auth_type):
     """Check authentication based on type"""
     if auth_type == "Auth_free":
-        return {"valid": True}
+        return {"valid": True, "auth_method": "Auth_free"}
 
     elif auth_type == "API_key":
         api_key = request.headers.get("X-API-Key")
@@ -152,7 +154,7 @@ def check_authentication(request, auth_type):
         is_valid, user_info = validate_api_key(api_key)
         if is_valid:
             print("validated")
-            return {"valid": True, "user_info": user_info}
+            return {"valid": True, "user_info": user_info, "auth_method": "API_key"}
         else:
             return {
                 "valid": False,
@@ -168,7 +170,7 @@ def check_authentication(request, auth_type):
         token = auth_header.split("Bearer ")[1]
         is_valid, user_info = validate_jwt(token)
         if is_valid:
-            return {"valid": True, "user_info": user_info}
+            return {"valid": True, "user_info": user_info, "auth_method": "JWT"}
         else:
             return {"valid": False, "message": "Invalid or expired JWT token"}
 
@@ -178,14 +180,14 @@ def check_authentication(request, auth_type):
             token = auth_header.split("Bearer ")[1]
             is_valid, user_info = validate_jwt(token)
             if is_valid:
-                return {"valid": True, "user_info": user_info}
+                return {"valid": True, "user_info": user_info, "auth_method": "JWT"}
             return {"valid": False, "message": "Invalid or expired JWT token"}
 
         api_key = request.headers.get("X-API-Key")
         if api_key:
             is_valid, user_info = validate_api_key(api_key)
             if is_valid:
-                return {"valid": True, "user_info": user_info}
+                return {"valid": True, "user_info": user_info, "auth_method": "API_key"}
             return {"valid": False, "message": "Invalid API key"}
 
         return {

@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import ExitStack
 
 import numpy as np
 import pandas as pd
@@ -24,17 +25,15 @@ from computing.local_compute_helper import (
     compute_terrain_properties_for_watersheds,
     ensure_file_exists as _ensure_file_exists,
     filter_large_watersheds as _filter_large_watersheds,
+    load_precomputed_watersheds as _load_precomputed_watersheds,
+    queue_local_vector_for_geoserver,
     get_roi as _get_roi,
     resolve_aez_code as _resolve_aez_code,
     resolve_lulc_raster_paths as _resolve_lulc_raster_paths,
     validate_geometry as _validate_geometry,
     write_vector_output as _write_output_vector,
 )
-from computing.utils import (
-    push_shape_to_geoserver,
-    save_layer_info_to_db,
-    update_layer_sync_status,
-)
+from computing.utils import save_layer_info_to_db
 
 from .utils import aez_lulcXterrain_cluster_centroids
 
@@ -58,17 +57,23 @@ def _compute_slope_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
             terrain_src,
             [geometry.__geo_interface__],
             crop=True,
-            filled=True,
+            filled=False,
         )
     except ValueError:
         return None
 
-    terrain_values = np.rint(terrain_data[0]).astype(np.int16, copy=False)
-    if terrain_values.size == 0:
+    band = terrain_data[0]
+    if band.size == 0:
         return None
 
-    terrain_valid_mask = np.ones(terrain_values.shape, dtype=bool)
-    if terrain_src.nodata is not None:
+    raw_terrain = np.asarray(band, dtype=np.float64)
+    finite_mask = np.isfinite(raw_terrain)
+    terrain_values = np.rint(np.where(finite_mask, raw_terrain, 0)).astype(
+        np.int16, copy=False
+    )
+
+    terrain_valid_mask = (~np.ma.getmaskarray(band)) & finite_mask
+    if terrain_src.nodata is not None and not np.isnan(terrain_src.nodata):
         terrain_valid_mask &= terrain_values != int(round(terrain_src.nodata))
     terrain_valid_mask &= terrain_values > 0
 
@@ -135,76 +140,82 @@ def _assign_slope_clusters(
     )
 
     computed_rows = []
-    with rasterio.open(terrain_raster_path) as terrain_src:
-        lulc_sources = [rasterio.open(path) for path in lulc_raster_paths]
-        try:
-            total = len(slope_watersheds_gdf)
-            for index, row in enumerate(
-                slope_watersheds_gdf.itertuples(index=False),
-                start=1,
-            ):
-                properties = _compute_slope_lulc_properties_for_feature(
-                    geometry=row.geometry,
-                    terrain_src=terrain_src,
-                    lulc_sources=lulc_sources,
+    with rasterio.open(terrain_raster_path) as terrain_src, ExitStack() as stack:
+        working_gdf = slope_watersheds_gdf
+        if working_gdf.crs is None:
+            raise ValueError(
+                "Watershed CRS is missing; cannot align with terrain raster."
+            )
+        if terrain_src.crs and working_gdf.crs != terrain_src.crs:
+            working_gdf = working_gdf.to_crs(terrain_src.crs)
+
+        lulc_sources = [
+            stack.enter_context(rasterio.open(path)) for path in lulc_raster_paths
+        ]
+        total = len(working_gdf)
+        for index, row in enumerate(
+            working_gdf.itertuples(index=False),
+            start=1,
+        ):
+            properties = _compute_slope_lulc_properties_for_feature(
+                geometry=row.geometry,
+                terrain_src=terrain_src,
+                lulc_sources=lulc_sources,
+            )
+
+            if properties is None:
+                computed_rows.append(
+                    {
+                        "LxS_cluster": -1,
+                        "clust_name": "No valid terrain pixels",
+                        "barren": 0.0,
+                        "double": 0.0,
+                        "shrub_scrub": 0.0,
+                        "sing_kharif": 0.0,
+                        "sing_non_kharif": 0.0,
+                        "forests": 0.0,
+                        "triple": 0.0,
+                    }
+                )
+            elif properties.get("LxS_cluster") == -1:
+                computed_rows.append(properties)
+            else:
+                feature_vector = np.array(
+                    [
+                        properties["barren"],
+                        properties["shrub_scrub"],
+                        properties["forests"],
+                    ],
+                    dtype=np.float64,
+                )
+                distances = np.sum(
+                    (centroid_vectors - feature_vector) ** 2,
+                    axis=1,
+                )
+                cluster_index = int(np.argmin(distances))
+
+                computed_rows.append(
+                    {
+                        "LxS_cluster": cluster_index,
+                        "clust_name": slope_centroids[str(cluster_index)][
+                            "cluster_name"
+                        ],
+                        "barren": properties["barren"] * 100.0,
+                        "double": properties["double"] * 100.0,
+                        "shrub_scrub": properties["shrub_scrub"] * 100.0,
+                        "sing_kharif": properties["sing_kharif"] * 100.0,
+                        "sing_non_kharif": (properties["sing_non_kharif"] * 100.0),
+                        "forests": properties["forests"] * 100.0,
+                        "triple": properties["triple"] * 100.0,
+                    }
                 )
 
-                if properties is None:
-                    computed_rows.append(
-                        {
-                            "LxS_cluster": -1,
-                            "clust_name": "No valid terrain pixels",
-                            "barren": 0.0,
-                            "double": 0.0,
-                            "shrub_scrub": 0.0,
-                            "sing_kharif": 0.0,
-                            "sing_non_kharif": 0.0,
-                            "forests": 0.0,
-                            "triple": 0.0,
-                        }
-                    )
-                elif properties.get("LxS_cluster") == -1:
-                    computed_rows.append(properties)
-                else:
-                    feature_vector = np.array(
-                        [
-                            properties["barren"],
-                            properties["shrub_scrub"],
-                            properties["forests"],
-                        ],
-                        dtype=np.float64,
-                    )
-                    distances = np.sum(
-                        (centroid_vectors - feature_vector) ** 2,
-                        axis=1,
-                    )
-                    cluster_index = int(np.argmin(distances))
-
-                    computed_rows.append(
-                        {
-                            "LxS_cluster": cluster_index,
-                            "clust_name": slope_centroids[str(cluster_index)][
-                                "cluster_name"
-                            ],
-                            "barren": properties["barren"] * 100.0,
-                            "double": properties["double"] * 100.0,
-                            "shrub_scrub": properties["shrub_scrub"] * 100.0,
-                            "sing_kharif": properties["sing_kharif"] * 100.0,
-                            "sing_non_kharif": (properties["sing_non_kharif"] * 100.0),
-                            "forests": properties["forests"] * 100.0,
-                            "triple": properties["triple"] * 100.0,
-                        }
-                    )
-
-                if index % 200 == 0 or index == total:
-                    logger.info(
-                        "Computed slope LULC clusters for %d/%d watersheds",
-                        index,
-                        total,
-                    )
-        finally:
-            for lulc_src in lulc_sources:
-                lulc_src.close()
+            if index % 200 == 0 or index == total:
+                logger.info(
+                    "Computed slope LULC clusters for %d/%d watersheds",
+                    index,
+                    total,
+                )
 
     result = slope_watersheds_gdf.copy()
     computed_df = pd.DataFrame(computed_rows)
@@ -284,7 +295,7 @@ def run_lulc_on_slope_cluster_local(
     ].copy()
     if slope_watersheds.empty:
         raise ValueError(
-            f"No slope-cluster watersheds found for {asset_suffix}."
+            f"No slope-cluster watersheds found for {state}/{district}/{block}."
         )
 
     temp_columns = [
@@ -326,26 +337,6 @@ def run_lulc_on_slope_cluster_local(
     logger.info("Saved local slope-cluster vector: %s", asset_id)
     logger.info("Resolved AEZ code: %s", aez_code)
 
-    geoserver_ok = False
-    if push_to_geoserver:
-        geoserver_response = push_shape_to_geoserver(
-            str(output_path.with_suffix("")),
-            workspace=GEOSERVER_WORKSPACE,
-            layer_name=layer_name,
-            file_type="gpkg",
-        )
-        geoserver_ok = isinstance(geoserver_response, dict) and geoserver_response.get(
-            "status_code"
-        ) in (200, 201)
-        if geoserver_ok:
-            logger.info("GeoServer upload succeeded for layer %s", layer_name)
-        else:
-            logger.error(
-                "GeoServer upload failed for layer %s: %s",
-                layer_name,
-                geoserver_response,
-            )
-
     layer_id = None
     if sync_layer_metadata and state and district and block:
         layer_id = save_layer_info_to_db(
@@ -362,8 +353,28 @@ def run_lulc_on_slope_cluster_local(
             },
         )
         logger.info("Saved layer metadata to DB: layer_id=%s", layer_id)
-        if layer_id and geoserver_ok:
-            update_layer_sync_status(layer_id=layer_id, sync_to_geoserver=True)
+
+    geoserver_ok = False
+    if push_to_geoserver:
+        geoserver_response = queue_local_vector_for_geoserver(
+            path=str(output_path.with_suffix("")),
+            workspace=GEOSERVER_WORKSPACE,
+            layer_name=layer_name,
+            file_type="gpkg",
+            layer_id=layer_id,
+        )
+        geoserver_ok = (
+            isinstance(geoserver_response, dict)
+            and geoserver_response.get("status_code") == 202
+        )
+        if geoserver_ok:
+            logger.info("GeoServer upload queued for layer %s", layer_name)
+        else:
+            logger.error(
+                "GeoServer queueing failed for layer %s: %s",
+                layer_name,
+                geoserver_response,
+            )
 
     return geoserver_ok if push_to_geoserver else True
 

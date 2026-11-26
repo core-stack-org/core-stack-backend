@@ -1,10 +1,12 @@
 """Unit tests: Open-Meteo envelope + annual format for waterbody /api/v2/ routes."""
 
 import json
+import tempfile
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from django.test import SimpleTestCase, TestCase
+import requests
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -172,8 +174,12 @@ class WaterbodiesByAdminV2Tests(WaterbodyV2ApiTestCase):
     @patch("waterrejuvenation.api._load_or_generate_merged_data", return_value=None)
     def test_unavailable_dataset_error_envelope(self, _mock_load):
         response = self._get(self.url_name, GEO)
-        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
-        assert_error_envelope(self, response.json())
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertEqual(body["code"], "DATA_NOT_GENERATED")
+        self.assertEqual(body["layer"], "swb:surface_waterbodies_bhilwara_mandalgarh")
+        self.assertIn("surface_waterbodies_bhilwara_mandalgarh", body["error_message"])
 
 
 class WaterbodyByUidV2Tests(WaterbodyV2ApiTestCase):
@@ -205,3 +211,184 @@ class WaterbodyByUidV2Tests(WaterbodyV2ApiTestCase):
         response = self._get(self.url_name, {**GEO, "uid": "99_99_99"})
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         assert_error_envelope(self, response.json())
+
+
+class WaterbodiesMultiWordAndGeoServerTests(WaterbodyV2ApiTestCase):
+    """End-to-end tests for multi-word names, GEOSERVER_URL, and 404 vs 502 handling."""
+
+    def setUp(self):
+        super().setUp()
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+
+    @staticmethod
+    def _wfs_json_response(features):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.text = json.dumps({"features": features})
+        resp.json.return_value = {"features": features}
+        return resp
+
+    @patch("waterrejuvenation.api._save_to_mongo")
+    @patch("waterrejuvenation.api._load_from_mongo", return_value=None)
+    @patch("waterrejuvenation.utils.requests.get")
+    def test_multi_word_district_uses_valid_gee_text_and_geoserver_url(
+        self, mock_requests_get, _mock_load, _mock_save
+    ):
+        wb_props = {k: v for k, v in SAMPLE_WATERBODY.items() if k != "zoi_properties"}
+        zoi_props = {"UID": UID, "extra_flag": 1}
+        mock_requests_get.side_effect = [
+            self._wfs_json_response([{"properties": wb_props}]),
+            self._wfs_json_response([{"properties": zoi_props}]),
+        ]
+
+        with override_settings(
+            MEDIA_ROOT=self._tmpdir.name,
+            GEOSERVER_URL="https://uat-geoserver.example.org/geoserver/",
+        ):
+            params = {
+                "state": "Karnataka",
+                "district": "Chik Ballapur",
+                "tehsil": "Chintamani",
+            }
+            admin_resp = self._get("generate_waterbodies_data_v2", params)
+            self.assertEqual(admin_resp.status_code, status.HTTP_200_OK)
+            admin_body = admin_resp.json()
+            assert_success_envelope(self, admin_body, extra_keys=("location",))
+            self.assertEqual(
+                admin_body["location"],
+                {
+                    "state": "KARNATAKA",
+                    "district": "chik_ballapur",
+                    "tehsil": "chintamani",
+                },
+            )
+            assert_waterbody_item(self, admin_body["data"][0])
+
+            called_urls = [call.args[0] for call in mock_requests_get.call_args_list]
+            self.assertEqual(len(called_urls), 2)
+            self.assertTrue(
+                called_urls[0].startswith(
+                    "https://uat-geoserver.example.org/geoserver/swb/ows?"
+                )
+            )
+            self.assertIn(
+                "typeName=swb:surface_waterbodies_chik_ballapur_chintamani",
+                called_urls[0],
+            )
+            self.assertIn(
+                "typeName=swb:waterbodies_zoi_chik_ballapur_chintamani",
+                called_urls[1],
+            )
+            for url in called_urls:
+                self.assertNotIn("geoserver.core-stack.org:8443", url)
+
+            # Single-waterbody route also succeeds for the same multi-word district.
+            uid_resp = self._get(
+                "generate_waterbody_data_v2", {**params, "uid": UID}
+            )
+            self.assertEqual(uid_resp.status_code, status.HTTP_200_OK)
+            uid_body = uid_resp.json()
+            assert_success_envelope(self, uid_body, extra_keys=("location", "uid"))
+            self.assertEqual(uid_body["uid"], UID)
+            assert_waterbody_item(self, uid_body["data"])
+
+    @patch("waterrejuvenation.api._save_to_mongo")
+    @patch("waterrejuvenation.api._load_from_mongo", return_value=None)
+    @patch("waterrejuvenation.utils.requests.get")
+    def test_missing_geoserver_layer_xml_service_exception_returns_404_data_not_generated(
+        self, mock_requests_get, _mock_load, _mock_save
+    ):
+        xml_resp = MagicMock()
+        xml_resp.status_code = 200
+        xml_resp.text = (
+            "<ServiceExceptionReport><ServiceException>"
+            "Feature type swb:surface_waterbodies_chik_ballapur_chintamani unknown"
+            "</ServiceException></ServiceExceptionReport>"
+        )
+        xml_resp.json.side_effect = ValueError("Not JSON")
+        mock_requests_get.return_value = xml_resp
+
+        with override_settings(
+            MEDIA_ROOT=self._tmpdir.name,
+            GEOSERVER_URL="https://uat-geoserver.example.org/geoserver/",
+        ):
+            response = self._get(
+                "generate_waterbodies_data_v2",
+                {
+                    "state": "Karnataka",
+                    "district": "Chik Ballapur",
+                    "tehsil": "Chintamani",
+                },
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertEqual(body["code"], "DATA_NOT_GENERATED")
+        self.assertEqual(
+            body["layer"], "swb:surface_waterbodies_chik_ballapur_chintamani"
+        )
+        self.assertIn(
+            "swb:surface_waterbodies_chik_ballapur_chintamani",
+            body["error_message"],
+        )
+
+    @patch("waterrejuvenation.api._save_to_mongo")
+    @patch("waterrejuvenation.api._load_from_mongo", return_value=None)
+    @patch("waterrejuvenation.utils.requests.get")
+    def test_missing_geoserver_layer_http_404_returns_404_data_not_generated(
+        self, mock_requests_get, _mock_load, _mock_save
+    ):
+        not_found_resp = MagicMock()
+        not_found_resp.status_code = 404
+        not_found_resp.text = "Not Found"
+        mock_requests_get.return_value = not_found_resp
+
+        with override_settings(
+            MEDIA_ROOT=self._tmpdir.name,
+            GEOSERVER_URL="https://uat-geoserver.example.org/geoserver/",
+        ):
+            response = self._get(
+                "generate_waterbody_data_v2",
+                {
+                    "state": "Uttar Pradesh",
+                    "district": "Sant Kabir Nagar",
+                    "tehsil": "Khalil Abad",
+                    "uid": UID,
+                },
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        body = response.json()
+        assert_error_envelope(self, body)
+        self.assertEqual(body["code"], "DATA_NOT_GENERATED")
+        self.assertEqual(
+            body["layer"], "swb:surface_waterbodies_sant_kabir_nagar_khalil_abad"
+        )
+
+    @patch("waterrejuvenation.api._save_to_mongo")
+    @patch("waterrejuvenation.api._load_from_mongo", return_value=None)
+    @patch(
+        "waterrejuvenation.utils.requests.get",
+        side_effect=requests.exceptions.ConnectionError("GeoServer unreachable"),
+    )
+    def test_geoserver_connection_error_still_returns_502(
+        self, _mock_requests_get, _mock_load, _mock_save
+    ):
+        with override_settings(
+            MEDIA_ROOT=self._tmpdir.name,
+            GEOSERVER_URL="https://uat-geoserver.example.org/geoserver/",
+        ):
+            response = self._get(
+                "generate_waterbodies_data_v2",
+                {
+                    "state": "Karnataka",
+                    "district": "Chik Ballapur",
+                    "tehsil": "Chintamani",
+                },
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        body = response.json()
+        assert_error_envelope(self, body)

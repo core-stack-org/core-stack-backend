@@ -18,6 +18,8 @@ from utilities.openmeteo_format import (
     success_envelope,
     waterbody_structure_from_dict,
 )
+from django.conf import settings
+from utilities.gee_utils import valid_gee_text
 from utilities.renderers import round_floats
 from utilities.auth_check_decorator import api_security_check
 from .swagger_schemas import (
@@ -26,7 +28,11 @@ from .swagger_schemas import (
     waterbodies_by_uuid,
     waterbodies_by_uuid_schema_v2,
 )
-from .utils import get_merged_waterbodies_with_zoi
+from .utils import (
+    WaterbodyGeoServerError,
+    WaterbodyLayerNotFoundError,
+    get_merged_waterbodies_with_zoi,
+)
 
 try:
     from pymongo import MongoClient
@@ -54,8 +60,13 @@ from rest_framework.response import Response
 _MONGO_CACHE_STATUS_LOGGED = False
 
 
-def _error_response(message, http_status, details=None):
-    return Response(error_envelope(message, details), status=http_status)
+def _error_response(message, http_status, details=None, code=None, layer=None):
+    payload = error_envelope(message, details)
+    if code is not None:
+        payload["code"] = code
+    if layer is not None:
+        payload["layer"] = layer
+    return Response(payload, status=http_status)
 
 
 def _success_response_for_admin(merged_data, state_norm, district_l, block_l):
@@ -179,7 +190,8 @@ def _load_or_generate_merged_data(state_norm, district_l, block_l, regenerate=Fa
         if mongo_data is not None:
             return mongo_data
 
-    base_dir = os.path.join(MEDIA_ROOT, "stats_excel_files")
+    media_root = getattr(settings, "MEDIA_ROOT", None) or MEDIA_ROOT
+    base_dir = os.path.join(media_root, "stats_excel_files")
     out_dir = os.path.join(base_dir, state_norm, district_l.upper())
     merged_path = os.path.join(out_dir, f"{district_l}_{block_l}_merged_data.json")
 
@@ -199,6 +211,7 @@ def _load_or_generate_merged_data(state_norm, district_l, block_l, regenerate=Fa
             state=state_norm,
             district=district_l,
             block=block_l,
+            regenerate=regenerate,
         )
         # Persist generated output to Mongo cache when configured.
         if merged_data is not None:
@@ -233,13 +246,36 @@ def _handle_waterbodies_request(request, require_uid=False):
             status.HTTP_400_BAD_REQUEST,
         )
 
-    state_norm = state.upper()
-    district_l = district.lower()
-    block_l = block.lower()
+    state_norm = valid_gee_text(state.strip().lower()).upper()
+    district_l = valid_gee_text(district.strip().lower())
+    block_l = valid_gee_text(block.strip().lower())
+    expected_layers = [
+        f"swb:surface_waterbodies_{district_l}_{block_l}",
+        f"swb:waterbodies_zoi_{district_l}_{block_l}",
+    ]
 
     try:
         merged_data = _load_or_generate_merged_data(
             state_norm, district_l, block_l, regenerate=regenerate
+        )
+    except WaterbodyLayerNotFoundError as exc:
+        primary_layer = exc.layers[0] if exc.layers else expected_layers[0]
+        return _error_response(
+            str(exc),
+            status.HTTP_404_NOT_FOUND,
+            details={
+                "code": "DATA_NOT_GENERATED",
+                "layer": primary_layer,
+                "layers": exc.layers,
+            },
+            code="DATA_NOT_GENERATED",
+            layer=primary_layer,
+        )
+    except WaterbodyGeoServerError as exc:
+        return _error_response(
+            "Failed to fetch waterbody data from GeoServer.",
+            status.HTTP_502_BAD_GATEWAY,
+            details=str(exc),
         )
     except Exception as exc:
         print(f"Error generating merged data for {state_norm}/{district_l}/{block_l}: {exc}")
@@ -250,9 +286,17 @@ def _handle_waterbodies_request(request, require_uid=False):
         )
 
     if merged_data is None:
+        primary_layer = expected_layers[0]
         return _error_response(
-            "Merged dataset not available for given area.",
-            status.HTTP_502_BAD_GATEWAY,
+            f"Waterbody layer not generated on GeoServer: {primary_layer}",
+            status.HTTP_404_NOT_FOUND,
+            details={
+                "code": "DATA_NOT_GENERATED",
+                "layer": primary_layer,
+                "layers": expected_layers,
+            },
+            code="DATA_NOT_GENERATED",
+            layer=primary_layer,
         )
 
     if uid:

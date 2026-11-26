@@ -1,7 +1,9 @@
+import difflib
 import ee
 import os
 import json
 import math
+import tempfile
 import requests
 import pandas as pd
 import numpy as np
@@ -90,6 +92,41 @@ def _get_soi_by_name(model, field_name, name, **filters):
     raise model.DoesNotExist(
         f"{model.__name__} matching query does not exist for {field_name}={name!r}."
     )
+
+
+def _format_unknown_soi_error(
+    label, value, model, field_name, parent_context="", **filters
+):
+    """Return a readable 'unknown <level>' error message with accepted name hints."""
+    available = sorted(
+        {
+            str(name).strip()
+            for name in model.objects.filter(**filters).values_list(
+                field_name, flat=True
+            )
+            if name and str(name).strip()
+        }
+    )
+    query_norm = str(value or "").replace("_", " ").strip().lower()
+    lower_to_original = {name.lower(): name for name in available}
+    close_keys = difflib.get_close_matches(
+        query_norm, list(lower_to_original.keys()), n=3, cutoff=0.6
+    )
+    suggestions = [lower_to_original[key] for key in close_keys]
+
+    location_suffix = f" {parent_context}" if parent_context else ""
+    base = f"Unknown {label} '{value}'{location_suffix}."
+    if suggestions:
+        if len(suggestions) == 1:
+            return f"{base} Accepted name: '{suggestions[0]}'."
+        return f"{base} Accepted names: {', '.join(suggestions)}."
+    if available:
+        preview = available[:10]
+        names_str = ", ".join(preview)
+        if len(available) > 10:
+            names_str += f" (and {len(available) - 10} more)"
+        return f"{base} Accepted {label} names: {names_str}."
+    return base
 
 
 def fetch_generated_layer_urls(state_name, district_name, block_name):
@@ -284,13 +321,44 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
 
     try:
         # Validate geographic hierarchy
-        state_obj = StateSOI.objects.get(state_name__iexact=state)
-        district_obj = DistrictSOI.objects.get(
-            district_name__iexact=district, state=state_obj
-        )
-        tehsil_obj = TehsilSOI.objects.get(
-            tehsil_name__iexact=tehsil, district=district_obj
-        )
+        try:
+            state_obj = _get_soi_by_name(StateSOI, "state_name", state)
+        except StateSOI.DoesNotExist:
+            return {
+                "error": _format_unknown_soi_error(
+                    "state", state, StateSOI, "state_name"
+                )
+            }
+        try:
+            district_obj = _get_soi_by_name(
+                DistrictSOI, "district_name", district, state=state_obj
+            )
+        except DistrictSOI.DoesNotExist:
+            return {
+                "error": _format_unknown_soi_error(
+                    "district",
+                    district,
+                    DistrictSOI,
+                    "district_name",
+                    parent_context=f"in state '{state_obj.state_name}'",
+                    state=state_obj,
+                )
+            }
+        try:
+            tehsil_obj = _get_soi_by_name(
+                TehsilSOI, "tehsil_name", tehsil, district=district_obj
+            )
+        except TehsilSOI.DoesNotExist:
+            return {
+                "error": _format_unknown_soi_error(
+                    "tehsil",
+                    tehsil,
+                    TehsilSOI,
+                    "tehsil_name",
+                    parent_context=f"in district '{district_obj.district_name}'",
+                    district=district_obj,
+                )
+            }
 
         # Check if water layer exists
         district = valid_gee_text(district.lower())
@@ -341,55 +409,76 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
                     if "-" in key and key.count("-") == 2:
                         all_dates.add(key)
 
+        def _parse_optional_number(value):
+            if value is None or isinstance(value, bool):
+                return None
+            if isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    return None
+            try:
+                num = float(value)
+            except (TypeError, ValueError):
+                return None
+            if math.isnan(num) or math.isinf(num):
+                return None
+            return round(num, 2)
+
         time_series = []
         for date in sorted(all_dates):
-            # Parse hydrology metrix from JSON string
-            hydrology_metrix = {}
-            try:
-                values = json.loads(water_data.get(date, "{}"))
-                hydrology_metrix = {
-                    "et": round(values.get("ET"), 2) if values.get("ET") else 0.0,
-                    "runoff": (
-                        round(values.get("RunOff"), 2) if values.get("RunOff") else 0.0
-                    ),
-                    "precipitation": (
-                        round(values.get("Precipitation"), 2)
-                        if values.get("Precipitation")
-                        else 0.0
-                    ),
-                }
-            except:
-                hydrology_metrix = {"et": "", "runoff": "", "precipitation": ""}
+            # Parse hydrology metrics: missing/unparseable -> None (never 0.0 or '')
+            raw_water = water_data.get(date)
+            values = {}
+            if isinstance(raw_water, dict):
+                values = raw_water
+            elif isinstance(raw_water, str) and raw_water.strip():
+                try:
+                    parsed = json.loads(raw_water)
+                    if isinstance(parsed, dict):
+                        values = parsed
+                except (TypeError, ValueError):
+                    values = {}
+            hydrology_metrix = {
+                "et": _parse_optional_number(values.get("ET")),
+                "runoff": _parse_optional_number(values.get("RunOff")),
+                "precipitation": _parse_optional_number(values.get("Precipitation")),
+            }
 
             entry = {
                 "date": date,
                 **hydrology_metrix,
             }
 
-            # Add NDVI data if available
+            # Add NDVI data if available (None when missing/unparseable, never '')
             if water_layer_exists:
-                entry["ndvi_crop"] = ndvi_layers.get("crop", {}).get(date, "")
-                entry["ndvi_shrub"] = ndvi_layers.get("shrub", {}).get(date, "")
-                entry["ndvi_tree"] = ndvi_layers.get("tree", {}).get(date, "")
-
-                # Round NDVI values if they're numbers
-                for ndvi_field in ["ndvi_crop", "ndvi_shrub", "ndvi_tree"]:
-                    val = entry[ndvi_field]
-                    if isinstance(val, (int, float)):
-                        entry[ndvi_field] = round(val, 2)
-                    elif isinstance(val, str):
-                        try:
-                            entry[ndvi_field] = round(float(val), 2)
-                        except:
-                            entry[ndvi_field] = ""
+                entry["ndvi_crop"] = _parse_optional_number(
+                    ndvi_layers.get("crop", {}).get(date)
+                )
+                entry["ndvi_shrub"] = _parse_optional_number(
+                    ndvi_layers.get("shrub", {}).get(date)
+                )
+                entry["ndvi_tree"] = _parse_optional_number(
+                    ndvi_layers.get("tree", {}).get(date)
+                )
             else:
-                entry["ndvi_crop"] = ""
-                entry["ndvi_shrub"] = ""
-                entry["ndvi_tree"] = ""
+                entry["ndvi_crop"] = None
+                entry["ndvi_shrub"] = None
+                entry["ndvi_tree"] = None
 
             time_series.append(entry)
 
         time_series.sort(key=lambda x: x["date"])
+        # Drop trailing periods that have no data yet
+        metric_keys = (
+            "et",
+            "runoff",
+            "precipitation",
+            "ndvi_crop",
+            "ndvi_shrub",
+            "ndvi_tree",
+        )
+        while time_series and all(time_series[-1].get(k) is None for k in metric_keys):
+            time_series.pop()
         return {"mws_id": mws_id, "time_series": time_series}
 
     except Exception as e:
@@ -431,13 +520,66 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         return {"error": f"Error reading or processing file: {str(e)}"}
 
 
-def get_tehsil_json(state, district, tehsil, regenerate):
+def _atomic_write_json(target_path, payload):
+    """Write JSON to a temp file in the same directory and atomically swap into place."""
+    target_dir = os.path.dirname(target_path) or "."
+    base_name = os.path.basename(target_path)
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target_dir,
+            prefix=f".{base_name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as tmp_file:
+            tmp_path = tmp_file.name
+            json.dump(payload, tmp_file)
+            tmp_file.flush()
+            os.fsync(tmp_file.fileno())
+        try:
+            os.chmod(tmp_path, 0o644)
+        except OSError:
+            pass
+        os.replace(tmp_path, target_path)
+    except Exception:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+        raise
+
+
+def _is_cache_fresh(source_path, cache_path):
+    """Return True when cache_path exists and is at least as recent as source_path."""
+    if not os.path.exists(cache_path):
+        return False
+    if os.path.exists(source_path):
+        try:
+            return os.path.getmtime(cache_path) >= os.path.getmtime(source_path)
+        except OSError:
+            return False
+    return True
+
+
+def get_tehsil_json(state, district, tehsil, regenerate=False):
+    regenerate_bool = (
+        regenerate
+        if isinstance(regenerate, bool)
+        else str(regenerate or "").strip().lower() in {"1", "true", "yes"}
+    )
     file_path, file_exists = excel_file_exists(state, district, tehsil)
     json_path = file_path.replace(".xlsx", ".json")
 
-    if not regenerate and os.path.exists(json_path):
-        with open(json_path, "r") as f:
-            return round_floats(json.load(f))
+    if not regenerate_bool and _is_cache_fresh(file_path, json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                return round_floats(json.load(f))
+        except (json.JSONDecodeError, ValueError, OSError):
+            # Corrupt or truncated cache file — fall through and rebuild atomically.
+            pass
 
     xls = pd.read_excel(file_path, sheet_name=None)
     json_data = {}
@@ -449,8 +591,7 @@ def get_tehsil_json(state, district, tehsil, regenerate):
         json_data[sheet_name] = df.to_dict(orient="records")
 
     json_data = round_floats(json_data)
-    with open(json_path, "w") as f:
-        json.dump(json_data, f)
+    _atomic_write_json(json_path, json_data)
     return json_data
 
 

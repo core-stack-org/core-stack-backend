@@ -7,6 +7,7 @@ from computing.local_compute_helper import (
     clip_vector_to_mws,
     get_roi,
     read_validated_vector_file,
+    resolve_indexed_vector_path,
     validate_geometry,
     write_vector_output,
     build_output_vector_path,
@@ -52,14 +53,17 @@ def generate_tree_in_grassland_local(
     )
     layer_name = f"{valid_gee_text(asset_suffix).lower()}_tree_in_grassland"
 
-    if not os.path.exists(PAN_INDIA_TREE_IN_GRASSLAND):
+    tree_in_grassland_path = resolve_indexed_vector_path(PAN_INDIA_TREE_IN_GRASSLAND)
+    if not tree_in_grassland_path.exists():
         raise FileNotFoundError(
-            f"PAN INDIA tree in grassland file not found at {PAN_INDIA_TREE_IN_GRASSLAND}"
+            f"PAN INDIA tree in grassland file not found at {tree_in_grassland_path}"
         )
 
-    print("Loading tree in grassland data overlapping ROI...")
+    print(
+        f"Loading tree in grassland data overlapping ROI from {tree_in_grassland_path}..."
+    )
     tree_in_grassland_gdf = gpd.read_file(
-        PAN_INDIA_TREE_IN_GRASSLAND, mask=watersheds_gdf
+        tree_in_grassland_path, mask=watersheds_gdf
     )
     tree_in_grassland_gdf = validate_geometry(tree_in_grassland_gdf)
     if tree_in_grassland_gdf.empty:

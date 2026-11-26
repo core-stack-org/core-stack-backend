@@ -247,6 +247,15 @@ def get_regeneration_dataset_names(name: str) -> tuple[str, ...]:
         ) from exc
 
 
+# Pipelines that share a Dataset name (e.g. SWB and ZOI both write to
+# "Surface Water Bodies") are disambiguated by their layer-name prefix so
+# skip-existing and sync_pending_geoserver do not collide across them.
+LOCAL_TASK_LAYER_PREFIXES = {
+    "computing.surface_water_bodies.swb_local.generate_swb_layer": "surface_waterbodies_",
+    "computing.zoi_layers.zoi.generate_zoi": "waterbodies_zoi_",
+    "computing.zoi_layers.zoi_local.generate_zoi": "waterbodies_zoi_",
+}
+
 # Hydrology pipelines are plain-function runners writing one shared "Hydrology"
 # dataset; fortnightly and annual layers differ only by layer-name prefix (see
 # generate_hydrology_local._layer_name), so a sync filter needs both.
@@ -264,7 +273,14 @@ def get_layer_sync_filter(name: str) -> tuple[tuple[str, ...], str | None]:
     """
     if name in HYDROLOGY_SYNC_LAYER_PREFIXES:
         return HYDROLOGY_SYNC_DATASETS, HYDROLOGY_SYNC_LAYER_PREFIXES[name]
-    return get_regeneration_dataset_names(name), None
+    dataset_names = get_regeneration_dataset_names(name)
+    pipeline = get_pipeline(name, compute="local")
+    prefix = (
+        None
+        if isinstance(pipeline, PipelineSpec)
+        else LOCAL_TASK_LAYER_PREFIXES.get(getattr(pipeline, "name", None))
+    )
+    return dataset_names, prefix
 
 
 def layer_exists_locally(name: str, location: Mapping[str, str]) -> bool:
@@ -275,9 +291,13 @@ def layer_exists_locally(name: str, location: Mapping[str, str]) -> bool:
     existing, so they are always regenerated.
     """
     try:
-        dataset_names = get_regeneration_dataset_names(name)
+        dataset_names, layer_name_prefix = get_layer_sync_filter(name)
     except ValueError:
         return False
+    if layer_name_prefix:
+        return datasets_exist_locally(
+            dataset_names, location, layer_name_prefix=layer_name_prefix
+        )
     return datasets_exist_locally(dataset_names, location)
 
 
@@ -297,7 +317,9 @@ def _required_dataset_groups(dataset_names):
 
 
 def datasets_exist_locally(
-    dataset_names: tuple[str, ...], location: Mapping[str, str]
+    dataset_names: tuple[str, ...],
+    location: Mapping[str, str],
+    layer_name_prefix: str | None = None,
 ) -> bool:
     for group in _required_dataset_groups(dataset_names):
         layers = Layer.objects.filter(
@@ -307,6 +329,8 @@ def datasets_exist_locally(
             district__district_name__iexact=location["district"],
             block__tehsil_name__iexact=location["block"],
         )
+        if layer_name_prefix:
+            layers = layers.filter(layer_name__startswith=layer_name_prefix)
         if not any(_layer_output_present(layer) for layer in layers):
             return False
     return True

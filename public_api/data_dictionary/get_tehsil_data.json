@@ -1082,7 +1082,7 @@
       },
       "total_change_crop_intensity_area_in_ha": {
         "type": "float",
-        "description": "total change in cropping intensity",
+        "description": "Total area in hectares where cropping intensity changed between the first and last three-year composites, counting both decreases (double-to-single, triple-to-single, triple-to-double) and increases (single-to-double, single-to-triple, double-to-triple).",
         "unit": "hectares"
       },
       "triple_to_double_area_in_ha": {
