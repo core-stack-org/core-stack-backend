@@ -3273,6 +3273,7 @@ def update_layer_sync_remote(request):
             layer_id=layer_id,
             sync_to_geoserver=d.get("sync_to_geoserver"),
             is_stac_specs_generated=d.get("is_stac_specs_generated"),
+            skip_stac=parse_bool(d.get("skip_stac", False)),
         )
         return Response({"layer_id": result}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -3396,6 +3397,7 @@ def sync_local_layers_to_geoserver(request):
             gee_account_id=d.get("gee_account_id"),
             force=parse_bool(d.get("force", False)),
             sync_boundaries=not parse_bool(d.get("skip_boundaries", False)),
+            skip_stac=parse_bool(d.get("skip_stac", True)),
         )
     except ValueError as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

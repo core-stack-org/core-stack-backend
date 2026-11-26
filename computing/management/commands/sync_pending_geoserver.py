@@ -47,6 +47,14 @@ class Command(BaseCommand):
                 "when they are already on GeoServer."
             ),
         )
+        parser.add_argument(
+            "--with-stac",
+            action="store_true",
+            help=(
+                "Allow per-layer STAC auto-trigger on each synced layer. "
+                "Skipped by default during bulk sync to avoid STAC/GeoServer contention."
+            ),
+        )
         parser.add_argument("--yes", action="store_true")
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument(
@@ -76,6 +84,7 @@ class Command(BaseCommand):
                 gee_account_id=options["gee_account_id"],
                 force=options["force"],
                 sync_boundaries=not options["skip_boundaries"],
+                skip_stac=not options["with_stac"],
             )
         except ValueError as exc:
             raise CommandError(str(exc))

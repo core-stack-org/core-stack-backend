@@ -11,6 +11,8 @@ import numpy as np
 
 from gee_computing.models import GEEAccount
 from nrm_app.celery import app
+from computing.config_loader import LOCAL_DROUGHT_CAUSALITY_OUTPUT
+from computing.local_compute_helper import build_output_vector_path
 from computing.utils import (
     push_shape_to_geoserver,
     save_layer_info_to_db,
@@ -652,17 +654,21 @@ def drought_causality(
                 gdf_out[col] = gdf_out[col].apply(
                     lambda v: json.dumps(v) if isinstance(v, (dict, list)) else v
                 )
-        state_dir = os.path.join("data/fc_to_shape", state)
-        os.makedirs(state_dir, exist_ok=True)
-        path = os.path.join(state_dir, geo_filename)
-        gdf_out.to_file(path + ".gpkg", driver="GPKG")
-        print(f"Saved drought causality layer locally: {path}.gpkg")
+        output_path = build_output_vector_path(
+            layer_name=geo_filename,
+            state=state,
+            district=district,
+            block=block,
+            output_base_dir=LOCAL_DROUGHT_CAUSALITY_OUTPUT,
+        )
+        gdf_out.to_file(output_path, driver="GPKG")
+        print(f"Saved drought causality layer locally: {output_path}")
 
         # Honours the GeoServer sync gate: for an inactive tehsil (or when
         # sync_to_geoserver was not requested) the push is skipped and the layer
         # stays local with is_sync_to_geoserver=False for sync_pending_geoserver.
         sync_res = push_shape_to_geoserver(
-            path,
+            str(output_path.with_suffix("")),
             workspace="drought_causality",
             layer_name=geo_filename,
             file_type="gpkg",
@@ -674,7 +680,7 @@ def drought_causality(
                 district,
                 block,
                 layer_name=geo_filename,
-                asset_id=os.path.abspath(path + ".gpkg"),
+                asset_id=str(output_path),
                 dataset_name="Drought Causality",
                 misc={"is_generated_locally": True},
             )

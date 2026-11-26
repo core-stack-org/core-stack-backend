@@ -326,8 +326,11 @@ HEAVY_TASK_QUEUE = env("HEAVY_TASK_QUEUE", default="heavy")
 HEAVY_WORKER_ENABLED = env.bool("HEAVY_WORKER_ENABLED", default=False)
 LAYER_GENERATION_SYNC_MODE = env.bool("LAYER_GENERATION_SYNC_MODE", default=False)
 SYNC_LAYER = env.bool("SYNC_LAYER", default=False)
+STAC_AUTO_TRIGGER_ON_SYNC = env.bool("STAC_AUTO_TRIGGER_ON_SYNC", default=True)
 STAC_UPLOAD_TO_S3 = env.bool("STAC_UPLOAD_TO_S3", default=False)
-STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=True)
+STAC_OVERWRITE_METADATA = env.bool("STAC_OVERWRITE_METADATA", default=False)
+STAC_CELERY_QUEUE = env("STAC_CELERY_QUEUE", default="nrm")
+STAC_GEOSERVER_BASE_URL = env("STAC_GEOSERVER_BASE_URL", default="")
 
 # Set to True only on machines with a CUDA GPU and cupy installed
 # (see installation/environment.yml). Gates GPU-only local hydrology compute

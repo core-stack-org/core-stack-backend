@@ -33,6 +33,17 @@ WORKSPACE_STYLES = {
     "tree_ccd_raster": "tree_ccd_style",
     "tree_overall_raster": "tree_overall_style",
     "plantation": "site_suitability",
+    "LULC_level_1": "lulc_level_1_style",
+    "LULC_level_2": "lulc_level_2_style",
+    "LULC_level_3": "lulc_level_3_style",
+    "terrain": "terrain_raster",
+    "restoration": "restoration_style",
+    "clart": "testClart",
+    "stream_order": "stream_order",
+    "catchment_area_singleflow": "catchment_area_singleflow",
+    "distance_nearest_upstream_DL": "distance_nearest_upstream_DL",
+    "natural_depression": "natural_depression",
+    "slope_percentage": "slope_percentage",
 }
 UNSTYLED = "raster"  # GeoServer's built-in default raster style
 
