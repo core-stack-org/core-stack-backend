@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 
 from computing.config_loader import (
+    CROPPING_INTENSITY_OUTPUT_DIR,
     SWB_VECTOR_OUTPUT_DIR as SWB_OUTPUT_BASE_DIR,
     ZOI_OUTPUT_DIR,
     layer_dir,
@@ -74,6 +75,9 @@ logger = logging.getLogger(__name__)
 ZOI_OUTPUT_BASE_DIR = ZOI_OUTPUT_DIR
 GEOSERVER_WORKSPACE = "swb"
 DATASET_NAME = "Surface Water Bodies"
+ZOI_CI_OUTPUT_BASE_DIR = CROPPING_INTENSITY_OUTPUT_DIR
+ZOI_CI_GEOSERVER_WORKSPACE = "crop_intensity"
+ZOI_CI_DATASET_NAME = "Cropping Intensity"
 LOCAL_ALGORITHM = "local_zoi"
 LOCAL_ALGORITHM_VERSION = "local-1.0"
 AREA_CRS = "EPSG:6933"  # equal-area, for hectares when area_ored is missing
@@ -83,26 +87,31 @@ def zoi_layer_name(asset_suffix):
     return f"waterbodies_zoi_{asset_suffix}"
 
 
-def zoi_output_path(state, district, block, asset_suffix=None, create_dir=False):
-    """Return the local GeoPackage path for a tehsil's ZOI layer."""
-    state = str(state).strip().lower() if state else state
-    district = str(district).strip().lower() if district else district
-    block = str(block).strip().lower() if block else block
-    asset_suffix = _resolve_asset_suffix(state, district, block, asset_suffix)
-    layer_name = zoi_layer_name(asset_suffix)
+def zoi_ci_layer_name(asset_suffix):
+    return f"{asset_suffix}_intensity_ZOI"
 
+
+def _vector_output_path(
+    output_base_dir,
+    layer_name,
+    state,
+    district,
+    block,
+    asset_suffix,
+    create_dir=False,
+):
     if create_dir:
         return build_output_vector_path(
             layer_name=layer_name,
             state=state,
             district=district,
             block=block,
-            output_base_dir=ZOI_OUTPUT_BASE_DIR,
+            output_base_dir=output_base_dir,
             custom_subdir=asset_suffix,
             block_fallback="unknown_block",
         )
 
-    base_dir = Path(ZOI_OUTPUT_BASE_DIR)
+    base_dir = Path(output_base_dir)
     if state and district and block:
         output_dir = layer_dir(
             base_dir,
@@ -113,6 +122,40 @@ def zoi_output_path(state, district, block, asset_suffix=None, create_dir=False)
     else:
         output_dir = base_dir / asset_suffix
     return output_dir / f"{layer_name}.gpkg"
+
+
+def zoi_output_path(state, district, block, asset_suffix=None, create_dir=False):
+    """Return the local GeoPackage path for a tehsil's ZOI layer."""
+    state = str(state).strip().lower() if state else state
+    district = str(district).strip().lower() if district else district
+    block = str(block).strip().lower() if block else block
+    asset_suffix = _resolve_asset_suffix(state, district, block, asset_suffix)
+    return _vector_output_path(
+        ZOI_OUTPUT_BASE_DIR,
+        zoi_layer_name(asset_suffix),
+        state,
+        district,
+        block,
+        asset_suffix,
+        create_dir=create_dir,
+    )
+
+
+def zoi_ci_output_path(state, district, block, asset_suffix=None, create_dir=False):
+    """Return the local GeoPackage path for a tehsil's Cropping Intensity ZOI layer."""
+    state = str(state).strip().lower() if state else state
+    district = str(district).strip().lower() if district else district
+    block = str(block).strip().lower() if block else block
+    asset_suffix = _resolve_asset_suffix(state, district, block, asset_suffix)
+    return _vector_output_path(
+        ZOI_CI_OUTPUT_BASE_DIR,
+        zoi_ci_layer_name(asset_suffix),
+        state,
+        district,
+        block,
+        asset_suffix,
+        create_dir=create_dir,
+    )
 
 
 def _gee_zoi_asset_id(asset_folder_list, asset_suffix, app_type="MWS"):
@@ -263,10 +306,14 @@ def _publish(
     misc,
     sync_layer_metadata,
     sync_geoserver_inline=False,
+    output_path=None,
+    dataset_name=DATASET_NAME,
+    workspace=GEOSERVER_WORKSPACE,
 ):
-    output_path = zoi_output_path(
-        state, district, block, asset_suffix=asset_suffix, create_dir=True
-    )
+    if output_path is None:
+        output_path = zoi_output_path(
+            state, district, block, asset_suffix=asset_suffix, create_dir=True
+        )
     local_path = write_vector_output(
         gdf=gdf, output_path=output_path, layer_name=layer_name
     )
@@ -279,7 +326,7 @@ def _publish(
             block=block,
             layer_name=layer_name,
             asset_id=str(local_path),
-            dataset_name=DATASET_NAME,
+            dataset_name=dataset_name,
             misc={
                 "is_generated_locally": True,
                 "local_vector_path": str(local_path),
@@ -294,7 +341,7 @@ def _publish(
         response = push_local_vector_to_geoserver(
             path=base_path,
             layer_name=layer_name,
-            workspace=GEOSERVER_WORKSPACE,
+            workspace=workspace,
             file_type="gpkg",
         )
         synced = isinstance(response, dict) and response.get("status_code") in (
@@ -316,7 +363,7 @@ def _publish(
         response = queue_local_vector_for_geoserver(
             path=base_path,
             layer_name=layer_name,
-            workspace=GEOSERVER_WORKSPACE,
+            workspace=workspace,
             file_type="gpkg",
             layer_id=layer_id,
         )
@@ -424,6 +471,26 @@ def run_zoi_local(
         asset_suffix,
         {**base_misc, "source_stage": "zoi2_local"},
         sync_layer_metadata,
+    )
+    ci_output_path = zoi_ci_output_path(
+        state, district, block, asset_suffix=asset_suffix, create_dir=True
+    )
+    _publish(
+        rings_with_ci,
+        zoi_ci_layer_name(asset_suffix),
+        state,
+        district,
+        block,
+        asset_suffix,
+        {
+            "start_year": start_year,
+            "end_year": end_year,
+            "source_stage": "zoi2_local",
+        },
+        sync_layer_metadata,
+        output_path=ci_output_path,
+        dataset_name=ZOI_CI_DATASET_NAME,
+        workspace=ZOI_CI_GEOSERVER_WORKSPACE,
     )
     return local_path
 
