@@ -127,7 +127,7 @@ base_layers:
           type: file
 
         - name: stream order
-          local_path: "{DATA_DIR}/base_layers/stream_order/stream_order.tif"
+          local_path: "{DATA_DIR}/base_layers/stream_order/Pan_India_stream_order_raster.tif"
           source: ""
           type: file
 
@@ -647,8 +647,16 @@ derived_layers:
       geoserver_layer: "overall_change_vector_{district}_{block}"
       layer_type: vector
 
-    # Not generated locally (GEE only).
+    - name: stream_order_raster
+      filename: "stream_order_{district}_{block}_raster.tif"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/stream_order/{filename}"
+      geoserver_workspace: stream_order
+      geoserver_layer: "stream_order_{district}_{block}_raster"
+      layer_type: raster
+
     - name: stream_order
+      filename: "stream_order_{district}_{block}_vector.gpkg"
+      local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/stream_order/{filename}"
       geoserver_workspace: stream_order
       geoserver_layer: "stream_order_{district}_{block}_vector"
       layer_type: vector
@@ -679,7 +687,7 @@ derived_layers:
     - name: generate_drainage_layer
       filename: "{district}_{block}.gpkg"
       local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/drainage_lines/{filename}"
-      geoserver_workspace: drainage_lines
+      geoserver_workspace: drainage
       layer_type: vector
 
     - name: restoration_opportunity

@@ -520,3 +520,85 @@ class TestSTACCollectionGeneratorRaster(unittest.TestCase):
         self.assertEqual(item_data["type"], "Feature")
         self.assertIn("data", item_data["assets"])
         self.assertEqual(item_data["assets"]["data"]["type"], "image/tiff; application=geotiff")
+
+
+class TestSTACConcurrencyAndSafety(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.config = _make_config(self.tmp)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    @patch("computing.STAC_specs.stac_collection.requests.get")
+    def test_geoserver_get_sets_default_timeout(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=404, text="missing")
+        client = GeoServerClient("https://gs.example.com/geoserver", "u", "p")
+        client.fetch_vector_metadata("ws", "layer")
+        self.assertEqual(mock_get.call_args.kwargs.get("timeout"), 60)
+
+    def test_concurrent_catalog_updates_do_not_lose_items(self):
+        import concurrent.futures
+
+        mgr = CatalogManager(self.config)
+
+        def add_one(idx):
+            item = pystac.Item(
+                id=f"item_{idx}",
+                geometry=FAKE_FOOTPRINT,
+                bbox=FAKE_BBOX,
+                datetime=None,
+                properties={
+                    "title": f"Test {idx}",
+                    "start_datetime": "2020-01-01T00:00:00Z",
+                    "end_datetime": "2024-01-01T00:00:00Z",
+                },
+            )
+            mgr.update("bihar", "nalanda", "hilsa", item)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            list(pool.map(add_one, range(12)))
+
+        block_coll_path = os.path.join(
+            self.config.stac_files_dir,
+            "tehsil_wise",
+            "bihar",
+            "nalanda",
+            "hilsa",
+            "collection.json",
+        )
+        block = pystac.read_file(block_coll_path)
+        ids = {i.id for i in block.get_all_items()}
+        self.assertEqual(ids, {f"item_{idx}" for idx in range(12)})
+
+    @patch("computing.STAC_specs.stac_collection.GEOSERVER_USERNAME", "user")
+    @patch("computing.STAC_specs.stac_collection.GEOSERVER_PASSWORD", "pass")
+    @patch("computing.STAC_specs.stac_collection.S3_ACCESS_KEY", "key")
+    @patch("computing.STAC_specs.stac_collection.S3_SECRET_KEY", "secret")
+    @patch.object(GeoServerClient, "fetch_layer_default_style", return_value=None)
+    @patch.object(
+        GeoServerClient,
+        "fetch_vector_metadata",
+        return_value=(FAKE_BBOX, FAKE_FOOTPRINT, FAKE_VECTOR_COLUMNS),
+    )
+    @patch.object(GeoServerClient, "download_thumbnail", return_value=True)
+    @patch.object(MetadataProvider, "get_layer_description", return_value="desc")
+    @patch.object(MetadataProvider, "get_layer_mapping", return_value=FAKE_LAYER_MAP)
+    @patch.object(MetadataProvider, "get_vector_column_descriptions")
+    def test_generate_vector_returns_false_when_s3_upload_fails(
+        self, mock_col_desc, *_mocks
+    ):
+        mock_col_desc.return_value = FAKE_COLUMN_DESC_DF.rename(
+            {"column_name_description": "column_description"}, axis=1
+        )
+        gen = STACCollectionGenerator(config=self.config)
+        with patch.object(gen, "_sync_s3", return_value=False) as mock_s3:
+            ok = gen.generate_vector(
+                state="Bihar",
+                district="Nalanda",
+                block="Hilsa",
+                layer_name="test_vector",
+                upload_to_s3=True,
+            )
+        self.assertFalse(ok)
+        mock_s3.assert_called_once()

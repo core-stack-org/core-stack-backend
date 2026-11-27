@@ -637,7 +637,7 @@ class Geoserver:
         - store: Name of the vector datastore to delete
         """
         print("inside delete_raster_store")
-        url = f"{self.service_url}/rest/workspaces/{workspace}/coveragestores/{store}?recurse=true"
+        url = f"{self.service_url}/rest/workspaces/{workspace}/coveragestores/{store}?recurse=true&purge=all"
         resp = self._requests(method="delete", url=url)
         if resp.status_code in [200, 202]:
             print(f"Raster store '{store}' deleted successfully.")

@@ -49,6 +49,7 @@ def publish_local_layer(
     gpkg_layers=None,
     store_name=None,
     extra_layer_ids=None,
+    skip_stac=False,
 ):
     from computing.local_compute_helper import (
         push_local_raster_to_geoserver,
@@ -92,11 +93,14 @@ def publish_local_layer(
         )
 
     for lid in [layer_id, *(extra_layer_ids or [])]:
-        if lid and update_layer_sync_status(
-            layer_id=lid,
-            sync_to_geoserver=True,
-            is_stac_specs_generated=False,
-        ) is None:
+        if not lid:
+            continue
+        update_kwargs = {"layer_id": lid, "sync_to_geoserver": True}
+        if skip_stac:
+            update_kwargs["skip_stac"] = True
+        else:
+            update_kwargs["is_stac_specs_generated"] = False
+        if update_layer_sync_status(**update_kwargs) is None:
             raise GeoServerPublishError(
                 f"Published {workspace}:{layer_name}, but metadata update failed"
             )
@@ -132,6 +136,7 @@ def publish_gee_layer(
     style_name=None,
     layer_id=None,
     gee_account_id=None,
+    skip_stac=False,
 ):
     """
     Push a GEE-generated layer that was kept off GeoServer: a vector is re-read
@@ -173,14 +178,16 @@ def publish_gee_layer(
         logger.warning("Nothing to publish for %s:%s: %s", workspace, layer_name, response)
         return response
 
-    if layer_id and update_layer_sync_status(
-        layer_id=layer_id,
-        sync_to_geoserver=True,
-        is_stac_specs_generated=False,
-    ) is None:
-        raise GeoServerPublishError(
-            f"Published {workspace}:{layer_name}, but metadata update failed"
-        )
+    if layer_id:
+        update_kwargs = {"layer_id": layer_id, "sync_to_geoserver": True}
+        if skip_stac:
+            update_kwargs["skip_stac"] = True
+        else:
+            update_kwargs["is_stac_specs_generated"] = False
+        if update_layer_sync_status(**update_kwargs) is None:
+            raise GeoServerPublishError(
+                f"Published {workspace}:{layer_name}, but metadata update failed"
+            )
 
     logger.info(
         "Published GEE %s layer %s:%s from task %s",
