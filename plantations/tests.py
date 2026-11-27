@@ -18,14 +18,6 @@ class KMLFileModelTest(TestCase):
         # Create organization
         self.organization = Organization.objects.create(name="Test Organization")
 
-        # Create project with app_type
-        self.project = Project.objects.create(
-            name="Test Project",
-            organization=self.organization,
-            app_type=AppType.PLANTATION,
-            enabled=True,
-        )
-
         # Create user
         self.user = User.objects.create_user(
             username="testuser",
@@ -34,13 +26,23 @@ class KMLFileModelTest(TestCase):
             organization=self.organization,
         )
 
+        # Create project with app_type
+        self.project = Project.objects.create(
+            name="Test Project",
+            organization=self.organization,
+            app_type=AppType.PLANTATION,
+            enabled=True,
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
     def test_kml_file_creation(self):
         # Create a temporary KML file
         content = b'<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"></kml>'
         temp_file = SimpleUploadedFile("test.kml", content)
 
         # Calculate expected hash
-        file_hash = hashlib.sha256()
+        file_hash = hashlib.md5()
         file_hash.update(content)
         expected_hash = file_hash.hexdigest()
 
@@ -63,14 +65,6 @@ class KMLFileAPITest(APITestCase):
         # Create organization
         self.organization = Organization.objects.create(name="Test Organization")
 
-        # Create project with app_type
-        self.project = Project.objects.create(
-            name="Test Project",
-            organization=self.organization,
-            app_type=AppType.PLANTATION,
-            enabled=True,
-        )
-
         # Create admin user
         self.admin_user = User.objects.create_user(
             username="admin",
@@ -78,6 +72,16 @@ class KMLFileAPITest(APITestCase):
             password="password123",
             organization=self.organization,
             is_superadmin=True,
+        )
+
+        # Create project with app_type
+        self.project = Project.objects.create(
+            name="Test Project",
+            organization=self.organization,
+            app_type=AppType.PLANTATION,
+            enabled=True,
+            created_by=self.admin_user,
+            updated_by=self.admin_user,
         )
 
         # URL for uploading KML
@@ -100,7 +104,7 @@ class KMLFileAPITest(APITestCase):
 
         # Check response
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["name"], "Test KML")
+        self.assertEqual(response.data["files"][0]["name"], "Test KML")
 
         # Check that KML file was created
         self.assertEqual(KMLFile.objects.count(), 1)
@@ -137,7 +141,7 @@ class KMLFileAPITest(APITestCase):
 
         # Check second upload was rejected
         self.assertEqual(response2.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("already been uploaded", response2.data["detail"])
+        self.assertIn("already been uploaded", response2.data["errors"][0])
 
         # Clean up
         KMLFile.objects.first().file.delete()
