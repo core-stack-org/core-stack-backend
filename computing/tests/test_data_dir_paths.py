@@ -203,21 +203,22 @@ class DataDirAndLocalOutputPathsTests(TestCase):
                     os.environ.pop("DATA_DIR", None)
                     importlib.reload(config_loader)
 
-    def test_local_layer_map_uses_lulc_and_lulc_version_v4(self):
+    def test_local_layer_map_uses_lulc(self):
         import json
 
-        from computing import bulk_layer_generation, config_loader
-        from computing.drought.local.config import Paths as DroughtPaths
-        from computing.hydrology_gpu import config as hydro_config
+        from computing import config_loader
         from computing.layer_dependency.layer_generation_in_order import (
             LOCAL_TASK_REGISTRY,
         )
-        from computing.lulc.clip_lulc_local import clip_lulc_local
 
+        # The map is generated data under data/ (gitignored), so it only
+        # exists on machines that have built it.
         map_path = (
             config_loader.PROJECT_ROOT
             / "data/layers/layer_dependency/local/local_layer_map.json"
         )
+        if not map_path.is_file():
+            self.skipTest(f"{map_path} not present")
         layer_map = json.loads(map_path.read_text(encoding="utf-8"))
         dynamic_nodes = layer_map["dynamic_layers"]
         dynamic_names = {node["name"] for node in dynamic_nodes}
@@ -233,6 +234,15 @@ class DataDirAndLocalOutputPathsTests(TestCase):
 
         for node in layer_map["static_layers"]:
             self.assertIn(node["name"], LOCAL_TASK_REGISTRY)
+
+    def test_lulc_tasks_and_paths_use_lulc_v4(self):
+        from computing import bulk_layer_generation, config_loader
+        from computing.drought.local.config import Paths as DroughtPaths
+        from computing.hydrology_gpu import config as hydro_config
+        from computing.layer_dependency.layer_generation_in_order import (
+            LOCAL_TASK_REGISTRY,
+        )
+        from computing.lulc.clip_lulc_local import clip_lulc_local
 
         self.assertIs(LOCAL_TASK_REGISTRY["lulc"], clip_lulc_local)
         self.assertIs(LOCAL_TASK_REGISTRY["lulc_v3"], clip_lulc_local)

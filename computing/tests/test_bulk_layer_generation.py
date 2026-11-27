@@ -247,6 +247,16 @@ class BulkPipelineRegistryTests(SimpleTestCase):
 
 
 class BulkLayerCommandTests(SimpleTestCase):
+    def setUp(self):
+        # These tests cover argument handling and queueing; the skip-existing
+        # check reads Layer rows from the database, so treat nothing as existing.
+        patcher = patch(
+            "computing.management.commands.bulk_generate_layers.layer_exists_locally",
+            return_value=False,
+        )
+        self.layer_exists_locally = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_command_requires_explicit_scope(self):
         with self.assertRaisesMessage(CommandError, "Specify --all-active"):
             call_command("bulk_generate_layers", "antyodaya")
@@ -319,6 +329,8 @@ class BulkLayerCommandTests(SimpleTestCase):
                 "start_year": None,
                 "end_year": None,
                 "gee_account_id": None,
+                "sync_to_geoserver": False,
+                "skip_existing": True,
             },
             queue="layer_bulk",
         )
