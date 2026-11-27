@@ -496,6 +496,235 @@ def export_vector_asset_to_gee(fc, description, asset_id):
         return None
 
 
+def _mws_bounds_feature(feature):
+    ring = ee.List(feature.geometry().bounds().coordinates().get(0))
+    xs = ring.map(lambda pt: ee.Number(ee.List(pt).get(0)))
+    ys = ring.map(lambda pt: ee.Number(ee.List(pt).get(1)))
+    return ee.Feature(
+        None,
+        {
+            "uid": feature.get("uid"),
+            "west": xs.reduce(ee.Reducer.min()),
+            "east": xs.reduce(ee.Reducer.max()),
+            "south": ys.reduce(ee.Reducer.min()),
+            "north": ys.reduce(ee.Reducer.max()),
+        },
+    )
+
+
+def _cluster_boxes(boxes, gap_deg):
+    parent = list(range(len(boxes)))
+
+    def find(index):
+        while parent[index] != index:
+            parent[index] = parent[parent[index]]
+            index = parent[index]
+        return index
+
+    def unite(left, right):
+        left_root, right_root = find(left), find(right)
+        if left_root != right_root:
+            parent[left_root] = right_root
+
+    for left, box in enumerate(boxes):
+        for right in range(left + 1, len(boxes)):
+            other = boxes[right]
+            if (
+                box["east"] + gap_deg >= other["west"]
+                and other["east"] + gap_deg >= box["west"]
+                and box["north"] + gap_deg >= other["south"]
+                and other["north"] + gap_deg >= box["south"]
+            ):
+                unite(left, right)
+
+    groups = {}
+    for index, box in enumerate(boxes):
+        groups.setdefault(find(index), []).append(box["uid"])
+    return list(groups.values())
+
+
+def cluster_feature_collections(fc, gap_m=1500):
+    """Split a watershed collection into nearby groups.
+
+    One export region is the bounding box of every feature. Watersheds that
+    sit far apart make that box, and the clip, much larger than the
+    watersheds themselves. Touching watersheds stay in one group.
+    """
+    labeled = fc.map(
+        lambda feature: feature.set(
+            "uid",
+            ee.Algorithms.If(
+                feature.get("uid"),
+                feature.get("uid"),
+                ee.Algorithms.If(
+                    feature.get("UID"),
+                    feature.get("UID"),
+                    feature.get("system:index"),
+                ),
+            ),
+        )
+    )
+    try:
+        rows = (
+            labeled.map(_mws_bounds_feature)
+            .reduceColumns(
+                ee.Reducer.toList(5),
+                ["uid", "west", "south", "east", "north"],
+            )
+            .get("list")
+            .getInfo()
+        )
+    except Exception as exc:
+        print(f"MWS cluster check failed, clipping as one area: {exc}")
+        return [fc]
+
+    if not rows or len(rows) <= 1:
+        return [fc]
+
+    boxes = [
+        {
+            "uid": row[0],
+            "west": row[1],
+            "south": row[2],
+            "east": row[3],
+            "north": row[4],
+        }
+        for row in rows
+        if row[0] is not None
+    ]
+    groups = _cluster_boxes(boxes, gap_m / 111000.0)
+    if len(groups) <= 1:
+        return [fc]
+
+    print(f"MWS are scattered across {len(groups)} groups. Clipping each group.")
+    return [labeled.filter(ee.Filter.inList("uid", uids)) for uids in groups]
+
+
+def clip_fc_to_features(source_fc, roi_fc):
+    clusters = cluster_feature_collections(roi_fc)
+    if len(clusters) <= 1:
+        return source_fc.filterBounds(roi_fc.geometry())
+    parts = [source_fc.filterBounds(cluster.geometry()) for cluster in clusters]
+    return ee.FeatureCollection(parts).flatten()
+
+
+def _cluster_part_asset_id(asset_id, index):
+    suffix = f"_c{index}"
+    parent, _, name = asset_id.rpartition("/")
+    trimmed = name[: 100 - len(suffix)] + suffix
+    return f"{parent}/{trimmed}" if parent else trimmed
+
+
+def _wait_until_asset_exists(asset_id, attempts=6, pause=10):
+    for _ in range(attempts):
+        try:
+            if is_gee_asset_exists(asset_id):
+                return True
+        except Exception as exc:
+            print(f"Asset not readable yet {asset_id}: {exc}")
+        time.sleep(pause)
+    return False
+
+
+def export_raster_over_features(
+    image,
+    fc,
+    description,
+    asset_id,
+    scale,
+    pyramiding_policy=None,
+):
+    """Clip and export a raster without covering the gaps between watersheds."""
+    clusters = cluster_feature_collections(fc)
+    description = str(description)[:100]
+    if len(clusters) <= 1:
+        geometry = fc.geometry()
+        return export_raster_asset_to_gee(
+            image=image.clip(geometry),
+            description=description,
+            asset_id=asset_id,
+            scale=scale,
+            region=geometry,
+            pyramiding_policy=pyramiding_policy,
+        )
+
+    part_ids = []
+    task_ids = []
+    for index, cluster in enumerate(clusters):
+        try:
+            if cluster.size().getInfo() == 0:
+                print(f"Skipping empty MWS group {index}")
+                continue
+        except Exception as exc:
+            print(f"Could not count MWS group {index}: {exc}")
+        part_id = _cluster_part_asset_id(asset_id, index)
+        geometry = cluster.geometry()
+        try:
+            if is_gee_asset_exists(part_id):
+                ee.data.deleteAsset(part_id)
+        except Exception as exc:
+            print(f"Could not replace clip part {part_id}: {exc}")
+        task_id = export_raster_asset_to_gee(
+            image=image.clip(geometry),
+            description=f"{description}_c{index}"[:100],
+            asset_id=part_id,
+            scale=scale,
+            region=geometry,
+            pyramiding_policy=pyramiding_policy,
+        )
+        part_ids.append(part_id)
+        if task_id:
+            task_ids.append(task_id)
+    if task_ids:
+        check_task_status(task_ids)
+
+    ready = [part_id for part_id in part_ids if _wait_until_asset_exists(part_id)]
+    missing = [part_id for part_id in part_ids if part_id not in ready]
+    if missing:
+        print(f"Clip parts were not created and will not be mosaicked: {missing}")
+    if not ready:
+        print("Grouped clip failed. Clipping all watersheds in one export.")
+        geometry = fc.geometry()
+        return export_raster_asset_to_gee(
+            image=image.clip(geometry),
+            description=description,
+            asset_id=asset_id,
+            scale=scale,
+            region=geometry,
+            pyramiding_policy=pyramiding_policy,
+        )
+
+    try:
+        if is_gee_asset_exists(asset_id):
+            ee.data.deleteAsset(asset_id)
+    except Exception as exc:
+        print(f"Could not replace {asset_id}: {exc}")
+
+    if len(ready) == 1:
+        ee.data.copyAsset(ready[0], asset_id, True)
+    else:
+        mosaic = ee.ImageCollection([ee.Image(part_id) for part_id in ready]).mosaic()
+        task_id = export_raster_asset_to_gee(
+            image=mosaic,
+            description=description,
+            asset_id=asset_id,
+            scale=scale,
+            region=fc.geometry(),
+            pyramiding_policy=pyramiding_policy,
+        )
+        if task_id:
+            check_task_status([task_id])
+
+    if _wait_until_asset_exists(asset_id):
+        for part_id in ready:
+            try:
+                if is_gee_asset_exists(part_id):
+                    ee.data.deleteAsset(part_id)
+            except Exception as exc:
+                print(f"Could not delete clip part {part_id}: {exc}")
+    return None
+
+
 def export_raster_asset_to_gee(
     image,
     description,

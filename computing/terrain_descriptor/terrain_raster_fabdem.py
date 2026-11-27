@@ -8,7 +8,7 @@ from utilities.gee_utils import (
     ee_initialize,
     valid_gee_text,
     check_task_status,
-    export_raster_asset_to_gee,
+    export_raster_over_features,
     make_asset_public,
     is_gee_asset_exists,
     get_gee_asset_path,
@@ -74,12 +74,12 @@ def generate_terrain_raster_clip(
         # Load the raster image and clip to ROI
         pan_india_raster = ee.Image(PAN_INDIA_RASTER_FABDEM)
 
-        task = export_raster_asset_to_gee(
-            image=pan_india_raster.clip(roi.union().geometry()),
+        task = export_raster_over_features(
+            image=pan_india_raster,
+            fc=roi,
             description=asset_suffix,
             asset_id=asset_id,
             scale=30,
-            region=roi.geometry(),
         )
         # Check task status
         task_id_list = check_task_status([task])

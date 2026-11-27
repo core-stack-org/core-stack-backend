@@ -16,6 +16,7 @@ from utilities.gee_utils import (
     is_gee_asset_exists,
     export_vector_asset_to_gee,
     get_gee_dir_path,
+    clip_fc_to_features,
 )
 from utilities.constants import (
     GEE_PATHS,
@@ -75,7 +76,7 @@ def clip_drainage_lines(
         )
 
     print(asset_id)
-    clipped_drainage = pan_india_drainage.filterBounds(roi.geometry())
+    clipped_drainage = clip_fc_to_features(pan_india_drainage, roi)
 
     task = export_vector_asset_to_gee(clipped_drainage, description, asset_id)
 

@@ -11,7 +11,7 @@ from utilities.gee_utils import (
     sync_raster_to_gcs,
     sync_raster_gcs_to_geoserver,
     make_asset_public,
-    export_raster_asset_to_gee,
+    export_raster_over_features,
     is_gee_asset_exists,
     get_gee_dir_path,
     gcs_file_exists,
@@ -56,14 +56,14 @@ def clip_lulc(
             + "_"
             + valid_gee_text(block.lower())
             + "_uid"
-        ).union()
+        )
 
         filename_prefix = (
             valid_gee_text(district.lower()) + "_" + valid_gee_text(block.lower())
         )
         gee_asset_path = get_gee_asset_path(state, district, block)
     else:
-        roi = ee.FeatureCollection(roi_path).union()
+        roi = ee.FeatureCollection(roi_path)
 
         filename_prefix = valid_gee_text(asset_suffix)
 
@@ -127,17 +127,15 @@ def clip_lulc(
             pan_india = ee.Image(
                 f"{PAN_INDIA_LULC_V4_DATASET}{curr_start_year}_{curr_end_year}"
             )
-            clipped_lulc = pan_india.clip(roi.geometry())
             l1_asset_new.append(
-                (clipped_lulc, final_output_filename, final_output_assetid)
+                (pan_india, final_output_filename, final_output_assetid)
             )
 
     task_list = []
-    geometry = roi.geometry()
     # A short incremental window may replace the latest year. A full window
     # must not start another export for a year whose asset is already on GEE.
     refresh_recent = new_loop_start is not None and len(l1_asset_new) <= 2
-    for clipped_lulc, filename, asset_id in l1_asset_new:
+    for pan_india, filename, asset_id in l1_asset_new:
         asset_exists = is_gee_asset_exists(asset_id)
         if asset_exists and not refresh_recent:
             continue
@@ -145,12 +143,12 @@ def clip_lulc(
             ee.data.copyAsset(asset_id, f"{asset_id}_old")
             time.sleep(10)
             ee.data.deleteAsset(asset_id)
-        task_id = export_raster_asset_to_gee(
-            image=clipped_lulc.clip(geometry),
+        task_id = export_raster_over_features(
+            image=pan_india,
+            fc=roi,
             description=filename,
             asset_id=asset_id,
             scale=scale,
-            region=geometry,
             pyramiding_policy={"predicted_label": "mode"},
         )
         if task_id:
