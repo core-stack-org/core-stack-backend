@@ -469,14 +469,62 @@ def _push_raster_to_geoserver_instance(
     verify=False,
 ):
     geo.ensure_workspace(workspace)
-    upload_response = geo.create_coveragestore(
-        path=file_path,
-        workspace=workspace,
-        layer_name=layer_name,
-    )
+
+    def _upload():
+        return geo.create_coveragestore(
+            path=file_path,
+            workspace=workspace,
+            layer_name=layer_name,
+        )
+
+    def _reset_store():
+        try:
+            geo.delete_raster_store(workspace=workspace, store=layer_name)
+        except Exception as delete_exc:
+            logger.warning(
+                "Failed to delete coveragestore %s:%s: %s",
+                workspace,
+                layer_name,
+                delete_exc,
+            )
+
+    try:
+        upload_response = _upload()
+    except Exception as exc:
+        if getattr(exc, "status", None) != 500 and "Status : 500" not in str(exc):
+            raise
+        logger.warning(
+            "GeoServer returned 500 uploading %s:%s; deleting existing coveragestore and retrying once.",
+            workspace,
+            layer_name,
+        )
+        _reset_store()
+        upload_response = _upload()
+
+    status_code = upload_response.get("status_code")
+    layer_exists = None
+    if status_code in (200, 201):
+        # An orphaned coveragestore (store exists, layer missing) returns HTTP 200
+        # on PUT without registering the layer, which then causes publish_style
+        # to throw HTTP 500 NPE. Reset the store and re-upload once to self-heal.
+        layer_exists = _verify_raster_layer(geo, workspace, layer_name)
+        if not layer_exists:
+            logger.warning(
+                "Raster %s:%s uploaded (HTTP %s) without a registered layer; "
+                "deleting orphaned coveragestore and retrying once.",
+                workspace,
+                layer_name,
+                status_code,
+            )
+            _reset_store()
+            upload_response = _upload()
+            status_code = upload_response.get("status_code")
+            if status_code in (200, 201):
+                layer_exists = _verify_raster_layer(geo, workspace, layer_name)
+
     configure_response = None
     style_response = None
-    if upload_response.get("status_code") in (200, 201):
+    if status_code in (200, 201) and layer_exists:
         try:
             configure_response = geo.configure_coverage(
                 workspace=workspace,
@@ -508,20 +556,14 @@ def _push_raster_to_geoserver_instance(
                 workspace,
                 layer_name,
             )
-
-    status_code = upload_response.get("status_code")
-    layer_exists = None
-    if status_code in (200, 201):
-        # A 201 only means the coverage store was created; the layer record can
-        # still be missing, which makes the raster invisible to WMS.
-        layer_exists = _verify_raster_layer(geo, workspace, layer_name)
-        if not layer_exists:
-            logger.error(
-                "Raster %s:%s uploaded but no layer is registered on GeoServer.",
-                workspace,
-                layer_name,
-            )
-            status_code = 500
+    elif status_code in (200, 201) and not layer_exists:
+        logger.error(
+            "Raster %s:%s uploaded but no layer is registered on GeoServer; cleaning up coveragestore.",
+            workspace,
+            layer_name,
+        )
+        _reset_store()
+        status_code = 500
 
     return {
         "status_code": status_code,

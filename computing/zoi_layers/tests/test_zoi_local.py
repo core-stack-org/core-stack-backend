@@ -85,13 +85,15 @@ class ZoiLocalPipelineTests(SimpleTestCase):
             tmp_root = Path(tmp)
             swb_root = tmp_root / "swb"
             zoi_root = tmp_root / "zoi"
+            ci_root = tmp_root / "cropping_intensity"
 
             with (
                 patch.object(zoi_local, "SWB_OUTPUT_BASE_DIR", swb_root),
                 patch.object(zoi_local, "ZOI_OUTPUT_BASE_DIR", zoi_root),
+                patch.object(zoi_local, "ZOI_CI_OUTPUT_BASE_DIR", ci_root),
                 patch.object(zoi_local, "add_zoi_cropping_intensity") as add_ci,
                 patch.object(
-                    zoi_local, "save_layer_info_to_db", return_value=42
+                    zoi_local, "save_layer_info_to_db", side_effect=[42, 43]
                 ) as save_db,
                 patch.object(
                     zoi_local,
@@ -131,20 +133,48 @@ class ZoiLocalPipelineTests(SimpleTestCase):
                 self.assertIn("cropping_intensity_2024", saved_gdf.columns)
                 self.assertIn("zoi_area", saved_gdf.columns)
 
-                # Only one DB save and one GeoServer queue (zoi2_local); no GEE call.
-                save_db.assert_called_once()
-                misc = save_db.call_args.kwargs["misc"]
-                self.assertEqual(misc["source_stage"], "zoi2_local")
-                self.assertTrue(misc["is_generated_locally"])
-                self.assertEqual(misc["local_vector_path"], str(output_path))
-                self.assertEqual(save_db.call_args.kwargs["asset_id"], str(output_path))
+                ci_output_path = zoi_local.zoi_ci_output_path(
+                    "maharashtra", "pune", "mulshi", create_dir=False
+                )
+                self.assertTrue(ci_output_path.exists())
+                ci_gdf = gpd.read_file(ci_output_path)
+                self.assertIn("cropping_intensity_2024", ci_gdf.columns)
+                self.assertIn("zoi_area", ci_gdf.columns)
 
-                queue_gs.assert_called_once_with(
+                # Two DB saves and two GeoServer queues: swb:waterbodies_zoi_* and crop_intensity:*_intensity_ZOI.
+                self.assertEqual(save_db.call_count, 2)
+                swb_save_kwargs = save_db.call_args_list[0].kwargs
+                self.assertEqual(swb_save_kwargs["dataset_name"], "Surface Water Bodies")
+                self.assertEqual(swb_save_kwargs["layer_name"], "waterbodies_zoi_pune_mulshi")
+                self.assertEqual(swb_save_kwargs["asset_id"], str(output_path))
+                self.assertEqual(swb_save_kwargs["misc"]["source_stage"], "zoi2_local")
+                self.assertTrue(swb_save_kwargs["misc"]["is_generated_locally"])
+                self.assertEqual(swb_save_kwargs["misc"]["local_vector_path"], str(output_path))
+
+                ci_save_kwargs = save_db.call_args_list[1].kwargs
+                self.assertEqual(ci_save_kwargs["dataset_name"], "Cropping Intensity")
+                self.assertEqual(ci_save_kwargs["layer_name"], "pune_mulshi_intensity_ZOI")
+                self.assertEqual(ci_save_kwargs["asset_id"], str(ci_output_path))
+                self.assertEqual(ci_save_kwargs["misc"]["start_year"], 2024)
+                self.assertEqual(ci_save_kwargs["misc"]["end_year"], 2024)
+                self.assertEqual(ci_save_kwargs["misc"]["source_stage"], "zoi2_local")
+                self.assertTrue(ci_save_kwargs["misc"]["is_generated_locally"])
+                self.assertEqual(ci_save_kwargs["misc"]["local_vector_path"], str(ci_output_path))
+
+                self.assertEqual(queue_gs.call_count, 2)
+                queue_gs.assert_any_call(
                     path=str(output_path.with_suffix("")),
                     layer_name="waterbodies_zoi_pune_mulshi",
                     workspace="swb",
                     file_type="gpkg",
                     layer_id=42,
+                )
+                queue_gs.assert_any_call(
+                    path=str(ci_output_path.with_suffix("")),
+                    layer_name="pune_mulshi_intensity_ZOI",
+                    workspace="crop_intensity",
+                    file_type="gpkg",
+                    layer_id=43,
                 )
                 export_gee.assert_not_called()
 
