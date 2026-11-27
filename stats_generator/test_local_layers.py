@@ -94,7 +94,7 @@ class LocalPathTests(SimpleTestCase):
 
     def test_wildcards_unknown_placeholders(self):
         target = (
-            self.data_dir / "change_detection/change_detection_vector_local/bihar/banka/banka"
+            self.data_dir / "layers/bihar/banka/banka/change_detection/change_detection_vector_local"
             / "change_vector_banka_banka_Afforestation_2017_2024.gpkg"
         )
         target.parent.mkdir(parents=True)
@@ -106,7 +106,7 @@ class LocalPathTests(SimpleTestCase):
         self.assertEqual(local_paths_for(spec, params, "bihar", "banka", "banka"), [target])
 
     def test_hyphenated_names_fall_back_to_underscores(self):
-        target = self.data_dir / "layers/mining/bihar/east_champaran/x/east_champaran_x_mining.gpkg"
+        target = self.data_dir / "layers/bihar/east_champaran/x/mining/east_champaran_x_mining.gpkg"
         target.parent.mkdir(parents=True)
         target.touch()
         spec, params = find_spec(
@@ -147,7 +147,7 @@ class LocalLayerSourceTests(SimpleTestCase):
             {"uid": ["1_1"], "id": [7.0], "geometry": [box(0, 0, 1, 1)]}, crs="EPSG:4326"
         )
         return _write_gpkg(
-            self.data_dir / "layers/mining/bihar/banka/banka/banka_banka_mining.gpkg", gdf
+            self.data_dir / "layers/bihar/banka/banka/mining/banka_banka_mining.gpkg", gdf
         )
 
     def test_reads_local_file_as_geoserver_shaped_geojson(self):
@@ -184,7 +184,7 @@ class LocalLayerSourceTests(SimpleTestCase):
         get.assert_not_called()
 
     def test_soge_years_are_read_oldest_first(self):
-        base = self.data_dir / "layers/SOGE_vector/bihar/banka/banka"
+        base = self.data_dir / "layers/bihar/banka/banka/SOGE_vector"
         for year in (2022, 2011):
             gdf = gpd.GeoDataFrame(
                 {"uid": [str(year)], "geometry": [box(0, 0, 1, 1)]}, crs="EPSG:4326"
