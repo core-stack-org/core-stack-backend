@@ -67,25 +67,17 @@ def _fetch_layer_info_from_prod(
     if workspace is not None:
         params["workspace"] = workspace
     if excel_to_be_generated is not None:
-        params["excel_to_be_generated"] = (
-            "true" if excel_to_be_generated else "false"
-        )
+        params["excel_to_be_generated"] = "true" if excel_to_be_generated else "false"
     headers = {"X-Api-Key": getattr(settings, "PROD_BACKEND_API_KEY", "")}
     try:
-        response = requests.get(
-            endpoint, params=params, headers=headers, timeout=30
-        )
+        response = requests.get(endpoint, params=params, headers=headers, timeout=30)
         response.raise_for_status()
         payload = response.json()
     except (requests.RequestException, ValueError) as exc:
-        raise RuntimeError(
-            f"Failed to fetch LayerInfo from {endpoint}: {exc}"
-        ) from exc
+        raise RuntimeError(f"Failed to fetch LayerInfo from {endpoint}: {exc}") from exc
 
     if not isinstance(payload, dict) or not isinstance(payload.get("layers"), list):
-        raise RuntimeError(
-            f"LayerInfo API at {endpoint} returned an invalid response."
-        )
+        raise RuntimeError(f"LayerInfo API at {endpoint} returned an invalid response.")
     return payload["layers"]
 
 
@@ -179,7 +171,10 @@ def get_vector_layer_geoserver(
     tehsil_token = _current_tehsil.set(f"{state}/{district}/{block}")
     logger.info(
         "Generating stats excel for %s/%s/%s (source=%s)",
-        state, district, block, "local" if local_mode else "geoserver",
+        state,
+        district,
+        block,
+        "local" if local_mode else "geoserver",
     )
     if xlsx_file is None:
         base_path = os.path.join(EXCEL_PATH, "data/stats_excel_files")
@@ -241,7 +236,9 @@ def get_vector_layer_geoserver(
                     soge_keys.append(key)
                     years = [
                         (year, data)
-                        for year, data in layer_source.fetch_years(workspace, layer_name)
+                        for year, data in layer_source.fetch_years(
+                            workspace, layer_name
+                        )
                         if year not in soge_years_seen
                     ]
                     for year, data in years:
@@ -267,7 +264,11 @@ def get_vector_layer_geoserver(
                 except requests.exceptions.RequestException as e:
                     logger.error("Failed to fetch %s:%s: %s", workspace, layer_name, e)
                     results.append(
-                        {"layer": layer_name, "status": "failed", "workspace": workspace}
+                        {
+                            "layer": layer_name,
+                            "status": "failed",
+                            "workspace": workspace,
+                        }
                     )
                     continue
 
@@ -293,14 +294,20 @@ def get_vector_layer_geoserver(
                 elif workspace == "nrega_assets":
                     mws_lay_name = f"deltaG_well_depth_{district}_{block}"
                     if local_mode:
-                        mws_geojson_datas = layer_source.fetch("mws_layers", mws_lay_name)
+                        mws_geojson_datas = layer_source.fetch(
+                            "mws_layers", mws_lay_name
+                        )
                         if mws_geojson_datas is None:
                             logger.warning(
                                 "Skipping nrega_assets for %s/%s: MWS layer %s unavailable",
-                                district, block, mws_lay_name,
+                                district,
+                                block,
+                                mws_lay_name,
                             )
                             results.append(
-                                _layer_result(layer_source, layer_name, workspace, False)
+                                _layer_result(
+                                    layer_source, layer_name, workspace, False
+                                )
                             )
                             continue
                     else:
@@ -311,7 +318,9 @@ def get_vector_layer_geoserver(
                             response.raise_for_status()
                             mws_geojson_datas = response.json()
                         except requests.exceptions.RequestException as e:
-                            logger.error("Failed to fetch MWS data %s: %s", mws_lay_name, e)
+                            logger.error(
+                                "Failed to fetch MWS data %s: %s", mws_lay_name, e
+                            )
                             continue
 
                     create_excel_for_nrega_assets(
@@ -335,7 +344,9 @@ def get_vector_layer_geoserver(
                         )
                     except Exception:
                         logger.exception(
-                            "Village NREGA asset count failed for %s/%s", district, block
+                            "Village NREGA asset count failed for %s/%s",
+                            district,
+                            block,
                         )
 
                 elif workspace == "crop_intensity":
@@ -363,7 +374,9 @@ def get_vector_layer_geoserver(
                         )
                     except Exception:
                         logger.exception(
-                            "MWS x village intersection failed for %s/%s", district, block
+                            "MWS x village intersection failed for %s/%s",
+                            district,
+                            block,
                         )
                 elif (
                     workspace == "mws_layers"
@@ -392,7 +405,9 @@ def get_vector_layer_geoserver(
                         geojson_data, xlsx_file, writer, start_year, end_year
                     )
                 elif workspace == "tree_overall_vector":
-                    create_excel_for_overall_tree_change(geojson_data, xlsx_file, writer)
+                    create_excel_for_overall_tree_change(
+                        geojson_data, xlsx_file, writer
+                    )
                 elif (
                     workspace == "change_detection"
                     and layer_name == f"change_vector_{district}_{block}_Afforestation"
@@ -418,7 +433,9 @@ def get_vector_layer_geoserver(
                     workspace == "change_detection"
                     and layer_name == f"change_vector_{district}_{block}_Degradation"
                 ):
-                    create_excel_chan_detection_degradation(geojson_data, xlsx_file, writer)
+                    create_excel_chan_detection_degradation(
+                        geojson_data, xlsx_file, writer
+                    )
                 elif (
                     workspace == "change_detection"
                     and layer_name == f"change_vector_{district}_{block}_Urbanization"
@@ -462,7 +479,9 @@ def get_vector_layer_geoserver(
                 elif workspace == "river":
                     create_excel_for_river(geojson_data, writer)
                 elif workspace == "lulc_vector":
-                    create_excel_for_lulc_vector(geojson_data, writer, start_year, end_year)
+                    create_excel_for_lulc_vector(
+                        geojson_data, writer, start_year, end_year
+                    )
                 elif workspace == "drainage_density":
                     create_excel_for_drainage_density(geojson_data, writer)
                 elif workspace == "antyodaya_2020":
@@ -494,6 +513,15 @@ def get_vector_layer_geoserver(
                     crop_df = create_excel_for_ndvi(geojson_data, "crop_trend")
                 elif workspace == "forest_fire":
                     create_excel_for_forest_fire(geojson_data, writer)
+                elif workspace == "solar_power":
+                    _create_excel_for_power_tracker(
+                        geojson_data, writer, "solar_power", "solar power"
+                    )
+                elif workspace == "wind_power":
+                    _create_excel_for_power_tracker(
+                        geojson_data, writer, "wind_power", "wind power"
+                    )
+
             except Exception:
                 if not local_mode:
                     raise
@@ -502,11 +530,14 @@ def get_vector_layer_geoserver(
                 # blank afterwards instead of failing the whole tehsil.
                 logger.exception(
                     "Writing sheets for %s:%s failed; they will be left blank",
-                    workspace, layer_name,
+                    workspace,
+                    layer_name,
                 )
                 results.append(
-                    {**_layer_result(layer_source, layer_name, workspace, False),
-                     "status": "failed"}
+                    {
+                        **_layer_result(layer_source, layer_name, workspace, False),
+                        "status": "failed",
+                    }
                 )
                 continue
             if local_mode:
@@ -521,7 +552,10 @@ def get_vector_layer_geoserver(
                     {"layer": layer_name, "status": "success", "workspace": workspace}
                 )
             logger.info(
-                "Done %s:%s in %.1fs", workspace, layer_name, time.monotonic() - layer_started
+                "Done %s:%s in %.1fs",
+                workspace,
+                layer_name,
+                time.monotonic() - layer_started,
             )
         if soge_dfs:
             if local_mode:
@@ -557,8 +591,13 @@ def get_vector_layer_geoserver(
     failed = [r["layer"] for r in results if r["status"] != "success"]
     logger.info(
         "Stats excel for %s/%s/%s written to %s in %.1fs: %d/%d layers ok%s",
-        state, district, block, xlsx_file, time.monotonic() - run_started,
-        len(results) - len(failed), len(results),
+        state,
+        district,
+        block,
+        xlsx_file,
+        time.monotonic() - run_started,
+        len(results) - len(failed),
+        len(results),
         f"; not available: {', '.join(failed)}" if failed else "",
     )
     _current_tehsil.reset(tehsil_token)
@@ -606,6 +645,57 @@ def _write_blank_sheets(writer, layer_source, layer_keys):
             logger.info(
                 "Wrote blank sheet '%s' for %s (%d rows)", sheet_name, key, len(df)
             )
+
+
+def _create_excel_for_power_tracker(geojson_data, writer, layer_key, label):
+    """Write a solar or wind power tracker GeoJSON layer to its Excel sheet."""
+    logger.debug("inside %s excel generation", label)
+    try:
+        features = geojson_data["features"]
+        df_data = [feature.get("properties", {}) for feature in features]
+        df = pd.DataFrame(df_data)
+        exclude_cols = [
+            "fid",
+            "Country/Area",
+            "State/Province",
+            "Wiki URL",
+            "Latitude",
+            "Longitude",
+            "Project Name in Local Language / Script",
+            "Operator Name in Local Language / Script",
+            "Owner Name in Local Language / Script",
+        ]
+        df = df.drop(columns=exclude_cols, errors="ignore")
+        df.rename(
+            columns={"uid": "UID"},
+            inplace=True,
+        )
+        if "Date Last Researched" in df.columns:
+            parsed_dates = pd.to_datetime(df["Date Last Researched"], errors="coerce")
+            df["Date Last Researched"] = parsed_dates.dt.strftime("%Y-%m-%d").where(
+                parsed_dates.notna(), df["Date Last Researched"]
+            )
+        if "Start year" in df.columns:
+            numeric_years = pd.to_numeric(df["Start year"], errors="coerce")
+            valid_years = numeric_years.dropna()
+            if (
+                not valid_years.empty
+                and np.isfinite(valid_years).all()
+                and (valid_years % 1 == 0).all()
+                and numeric_years.notna().sum() == df["Start year"].notna().sum()
+            ):
+                df["Start year"] = numeric_years.astype("Int64")
+        priority_cols = ["UID"]
+        priority_cols = [c for c in priority_cols if c in df.columns]
+        other_cols = [c for c in df.columns if c not in priority_cols]
+        new_order = priority_cols + other_cols
+        df = df[new_order]
+        numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
+        df[numeric_cols] = df[numeric_cols].round(2)
+        df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY[layer_key], index=False)
+        logger.info("Excel file created for %s", label)
+    except Exception:
+        logger.exception("error while generating excel for %s", label)
 
 
 def create_excel_for_forest_fire(geojson_data, writer):
@@ -667,10 +757,14 @@ def create_excel_for_tree_in_grassland(geojson_data, writer):
         df = df.fillna(-9999)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
-        df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["tree_in_grassland"], index=False)
+        df.to_excel(
+            writer, sheet_name=EXCEL_SHEET_BY_KEY["tree_in_grassland"], index=False
+        )
         logger.info("Excel file created for tree in grassland")
     except Exception as e:
-        logger.exception(f"Error occurred while generating excel for tree in grassland {e} ")
+        logger.exception(
+            f"Error occurred while generating excel for tree in grassland {e} "
+        )
 
 
 def create_excel_for_forest_fringe(geojson_data, writer):
@@ -722,10 +816,14 @@ def create_excel_for_forest_fringe(geojson_data, writer):
         df = df.fillna(-9999)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
-        df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["forest_fringes"], index=False)
+        df.to_excel(
+            writer, sheet_name=EXCEL_SHEET_BY_KEY["forest_fringes"], index=False
+        )
         logger.info("Excel file created for forest fringes")
     except Exception as e:
-        logger.exception(f"Error occurred while generating excel for forest fringes {e} ")
+        logger.exception(
+            f"Error occurred while generating excel for forest fringes {e} "
+        )
 
 
 def create_excel_for_ndvi(data, trend_column):
@@ -1339,7 +1437,9 @@ def create_excel_for_facilities(data, writer):
         df = df.rename(columns=rename_cols)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
-        df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["facilities_proximity"], index=False)
+        df.to_excel(
+            writer, sheet_name=EXCEL_SHEET_BY_KEY["facilities_proximity"], index=False
+        )
 
         logger.info("Excel file created for facilities_proximity")
     except Exception as e:
@@ -1523,7 +1623,9 @@ def create_excel_for_agroecological(data, writer):
             df_data.append(row)
         df = pd.DataFrame(df_data)
         df = df.sort_values(["UID"])
-        df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["agroecological"], index=False)
+        df.to_excel(
+            writer, sheet_name=EXCEL_SHEET_BY_KEY["agroecological"], index=False
+        )
         logger.info("Excel file created for agroecological")
     except Exception as e:
         logger.exception("agroecological Layer not found")
@@ -1691,7 +1793,9 @@ def create_excel_for_restoration(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["restoration_vector"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["restoration_vector"], index=False
+    )
     logger.info(f"Excel file created for restoration_vector")
 
 
@@ -1780,7 +1884,9 @@ def create_excel_for_overall_tree_change(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["overall_tree_change"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["overall_tree_change"], index=False
+    )
     logger.info(f"Excel file created for overall_tree_change")
 
 
@@ -1815,7 +1921,9 @@ def create_excel_for_ccd(data, xlsx_file, writer, start_year, end_year):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["canopy_cover_density"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["canopy_cover_density"], index=False
+    )
     logger.info(f"Excel file created for Canopy_Cover_Density")
 
 
@@ -1871,7 +1979,10 @@ def create_excel_for_drought_causality(data, xlsx_file, writer, start_year, end_
         for year in range(start_year, end_year + 1):
             # Local layers use the long names; layers made by the GEE task, se_mo_ and mild_.
             row["severe_moderate_drought_causality_" + str(year)] = _drought_property(
-                properties, f"severe_moderate_drought_causality_{year}", f"se_mo_{year}", None
+                properties,
+                f"severe_moderate_drought_causality_{year}",
+                f"se_mo_{year}",
+                None,
             )
             row["mild_drought_causality_" + str(year)] = _drought_property(
                 properties, f"mild_drought_causality_{year}", f"mild_{year}", None
@@ -1917,7 +2028,11 @@ def create_excel_chan_detection_afforestation(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["change_detection_tree_cover_increase"], index=False)
+    df.to_excel(
+        writer,
+        sheet_name=EXCEL_SHEET_BY_KEY["change_detection_tree_cover_increase"],
+        index=False,
+    )
     logger.info(f"Excel file created for change_detection_afforestation")
 
 
@@ -1954,7 +2069,11 @@ def create_excel_chan_detection_cropintensity(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["change_detection_cropintensity"], index=False)
+    df.to_excel(
+        writer,
+        sheet_name=EXCEL_SHEET_BY_KEY["change_detection_cropintensity"],
+        index=False,
+    )
     logger.info(f"Excel file created for change_detection_cropintensity")
 
 
@@ -1985,7 +2104,11 @@ def create_excel_chan_detection_deforestation(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["change_detection_tree_cover_decrease"], index=False)
+    df.to_excel(
+        writer,
+        sheet_name=EXCEL_SHEET_BY_KEY["change_detection_tree_cover_decrease"],
+        index=False,
+    )
     logger.info(f"Excel file created for change_detection_deforestation")
 
 
@@ -2015,7 +2138,11 @@ def create_excel_chan_detection_degradation(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["change_detection_degradation"], index=False)
+    df.to_excel(
+        writer,
+        sheet_name=EXCEL_SHEET_BY_KEY["change_detection_degradation"],
+        index=False,
+    )
     logger.info(f"Excel file created for change_detection_degradation")
 
 
@@ -2045,7 +2172,11 @@ def create_excel_chan_detection_urbanization(data, xlsx_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["change_detection_urbanization"], index=False)
+    df.to_excel(
+        writer,
+        sheet_name=EXCEL_SHEET_BY_KEY["change_detection_urbanization"],
+        index=False,
+    )
     logger.info(f"Excel file created for change_detection_urbanization")
 
 
@@ -2077,7 +2208,11 @@ def create_excel_change_detection_ShrubChange(data, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["change_detection_shrubchange"], index=False)
+    df.to_excel(
+        writer,
+        sheet_name=EXCEL_SHEET_BY_KEY["change_detection_shrubchange"],
+        index=False,
+    )
     logger.info(f"Excel file created for change_detection_shrubchange")
 
 
@@ -2162,7 +2297,9 @@ def create_excel_mws_inters_villages(
     df = pd.DataFrame(data)
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["mws_intersect_villages"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["mws_intersect_villages"], index=False
+    )
     logger.info("The data has been saved to mws_intersect_villages")
 
 
@@ -2338,7 +2475,9 @@ def create_excel_for_terrain_lulc_slope(data, output_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["terrain_lulc_slope"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["terrain_lulc_slope"], index=False
+    )
     logger.info("Excel file created for terrain_lulc_slope")
 
 
@@ -2391,7 +2530,9 @@ def create_excel_for_terrain_lulc_plain(data, output_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["terrain_lulc_plain"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["terrain_lulc_plain"], index=False
+    )
     logger.info("Excel file created for terrain_lulc_plain")
 
 
@@ -2498,7 +2639,9 @@ def create_excel_for_swb(data, output_file, writer, start_year, end_year):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["surfacewaterbodies_annual"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["surfacewaterbodies_annual"], index=False
+    )
     logger.info("Excel file created for surfaceWaterBodies_annual")
 
 
@@ -2669,7 +2812,9 @@ def create_excel_village_nrega_assets(
 
     # Save to Excel
     final_df = final_df.drop_duplicates(subset=["vill_id", "vill_name"])
-    final_df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["nrega_assets_village"], index=False)
+    final_df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["nrega_assets_village"], index=False
+    )
     logger.info("Excel file created successfully with all villages.")
 
 
@@ -2680,7 +2825,9 @@ def fetch_village_asset_count(
     if layer_source is not None:
         village_gdf = layer_source.village_gdf()
     else:
-        village_gdf = gpd.read_file(get_url("panchayat_boundaries", f"{district}_{block}"))
+        village_gdf = gpd.read_file(
+            get_url("panchayat_boundaries", f"{district}_{block}")
+        )
     village_gdf = village_gdf[["vill_ID", "vill_name", "geometry"]].copy()
     logger.info("Village data loaded")
 
@@ -2867,7 +3014,9 @@ def create_excel_crop_inten(data, output_file, writer, start_year, end_year):
     df[numeric_cols] = df[numeric_cols].round(2)
 
     # Write to Excel
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["croppingintensity_annual"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["croppingintensity_annual"], index=False
+    )
     logger.info("Excel file created for cropping intensity.")
 
 
@@ -2890,7 +3039,9 @@ def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
             # Local layers use the long names of the GEE yearly asset; layers made by the GEE task
             # have the short names of its merge.
             def value(long_name, short_name, default="0"):
-                return _drought_property(properties, f"{long_name}_{year}", f"{short_name}_{year}", default)
+                return _drought_property(
+                    properties, f"{long_name}_{year}", f"{short_name}_{year}", default
+                )
 
             # Get drought levels (drought_labels) and count occurrences
             drlb_value = value("drought_labels", "drlb", "") or ""
@@ -2903,7 +3054,9 @@ def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
             row[f"drysp_unit_4_weeks_{year}"] = value("dryspell_length", "drysp")
             row[f"kharif_cropped_sqkm_{year}"] = value("kharif_cropped_sqkm", "kh_cr")
             row[f"monsoon_onset_{year}"] = value("monsoon_onset", "m_ons")
-            row[f"kharif_cropped_area_percent_{year}"] = value("percent_of_area_cropped_kharif", "pcr_k")
+            row[f"kharif_cropped_area_percent_{year}"] = value(
+                "percent_of_area_cropped_kharif", "pcr_k"
+            )
             row[f"total_weeks_{year}"] = value("total_weeks", "t_wks")
 
         df_data.append(row)
@@ -2917,7 +3070,9 @@ def create_excel_crop_drou(data, output_file, writer, start_year, end_year):
     df[numeric_cols] = df[numeric_cols].round(2)
 
     # Write to Excel
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["croppingdrought_kharif"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["croppingdrought_kharif"], index=False
+    )
     logger.info("Excel file created for cropping drought.")
 
 
@@ -2973,7 +3128,9 @@ def create_excel_annual_mws(data, output_file, writer):
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["hydrological_annual"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["hydrological_annual"], index=False
+    )
     logger.info("Excel file created for hydrological_annual")
 
 
@@ -3069,7 +3226,9 @@ def create_excel_seas_mws(processed_data, output_file, writer, start_year, end_y
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
     df[numeric_cols] = df[numeric_cols].round(2)
 
-    df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["hydrological_seasonal"], index=False)
+    df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["hydrological_seasonal"], index=False
+    )
     logger.info(f"Excel file created hydrological_seasonal")
 
 
@@ -3144,7 +3303,9 @@ def create_excel_for_village_boun(old_geojson, writer):
         )
 
     results_df = pd.DataFrame(results)
-    results_df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["social_economic_indicator"], index=False)
+    results_df.to_excel(
+        writer, sheet_name=EXCEL_SHEET_BY_KEY["social_economic_indicator"], index=False
+    )
 
     logger.info(f"Excel file created for social_economic_indicator")
 
@@ -3275,20 +3436,28 @@ def create_excel_for_village_gp_mapping(geojson_data, writer):
             by=["gp_id", "village_id"], na_position="last"
         ).reset_index(drop=True)
 
-        mapping_df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["village_gp"], index=False)
+        mapping_df.to_excel(
+            writer, sheet_name=EXCEL_SHEET_BY_KEY["village_gp"], index=False
+        )
 
-        logger.info(f"village_gp_mapping summary: original villages={len(indicator_village_ids)}, "
+        logger.info(
+            f"village_gp_mapping summary: original villages={len(indicator_village_ids)}, "
             f"found in source={len(matched_village_ids)}, "
             f"not found in source={len(unmatched_village_ids)}, "
             f"relevant GPs={len(known_gp_ids)}, "
             f"added through GP expansion={expanded_villages_count}, "
-            f"final rows={len(mapping_df)}")
+            f"final rows={len(mapping_df)}"
+        )
         if missing_original_villages:
-            logger.warning("Villages missing from village_gp_mapping: "
-                f"{sorted(missing_original_villages)}")
+            logger.warning(
+                "Villages missing from village_gp_mapping: "
+                f"{sorted(missing_original_villages)}"
+            )
         logger.info("Excel file created for village_gp_mapping")
     except Exception as e:
-        logger.exception(f"Error occurred while generating excel for village_gp_mapping {e}")
+        logger.exception(
+            f"Error occurred while generating excel for village_gp_mapping {e}"
+        )
 
 
 def download_layers_excel_file(state, district, block, compute="gee"):

@@ -5394,6 +5394,115 @@
       }
     }
   },
+  "solar_power": {
+  "description": "Solar power project vector (point locations of solar projects, with capacity, technology, status and ownership details). This Dataset downloaded form globalenergymonitor.org at India level",
+  "type": "vector",
+  "variables": {
+    "Associated Storage": {
+      "type": "string",
+      "description": "energy storage associated with the project"
+    },
+    "Capacity (MW)": {
+      "type": "float",
+      "description": "installed capacity of the project",
+      "unit": "MW"
+    },
+    "Capacity Rating": {
+      "type": "string",
+      "description": "basis on which the capacity is rated (e.g. MWac = megawatts alternating current)"
+    },
+    "City": {
+      "type": "string",
+      "description": "city where the project is located"
+    },
+    "Date Last Researched": {
+      "type": "string",
+      "description": "date (YYYY-MM-DD) on which the project record was last researched or updated"
+    },
+    "GEM location ID": {
+      "type": "string",
+      "description": "GEM (Global Energy Monitor) identifier of the project location"
+    },
+    "GEM phase ID": {
+      "type": "string",
+      "description": "GEM (Global Energy Monitor) identifier of the project unit/phase"
+    },
+    "Hydrogen": {
+      "type": "string",
+      "description": "indicates whether the project is associated with hydrogen production"
+    },
+    "Local area (taluk, county)": {
+      "type": "string",
+      "description": "local administrative area of the project (taluk, county)"
+    },
+    "Location accuracy": {
+      "type": "string",
+      "description": "accuracy of the recorded project location (e.g. exact, approximate)"
+    },
+    "Major area (prefecture, district)": {
+      "type": "string",
+      "description": "major administrative area of the project (prefecture, district)"
+    },
+    "Operator": {
+      "type": "string",
+      "description": "company operating the project"
+    },
+    "Other IDs (location)": {
+      "type": "string",
+      "description": "location identifiers from other data sources"
+    },
+    "Other IDs (unit/phase)": {
+      "type": "string",
+      "description": "unit/phase identifiers from other data sources (e.g. OpenStreetMap, TZ, WKSL, GVP)"
+    },
+    "Other Name(s)": {
+      "type": "string",
+      "description": "alternative names by which the project is known"
+    },
+    "Owner": {
+      "type": "string",
+      "description": "company or companies owning the project"
+    },
+    "Phase Name": {
+      "type": "string",
+      "description": "name of the project phase"
+    },
+    "Project Name": {
+      "type": "string",
+      "description": "name of the solar project"
+    },
+    "Region": {
+      "type": "string",
+      "description": "geographic region of the project (e.g. Asia)"
+    },
+    "Retired year": {
+      "type": "integer",
+      "description": "year the project was retired",
+      "unit": "year"
+    },
+    "Start year": {
+      "type": "integer",
+      "description": "year the project started operating",
+      "unit": "year"
+    },
+    "Status": {
+      "type": "string",
+      "description": "current status of the project (e.g. operating, construction)"
+    },
+    "Subregion": {
+      "type": "string",
+      "description": "geographic subregion of the project (e.g. Southern Asia)"
+    },
+    "Technology Type": {
+      "type": "string",
+      "description": "solar technology used (e.g. Assumed PV)"
+    },
+    "UID": {
+      "type": "string",
+      "description": "unique identifier of micro watershed"
+    }
+  }
+},
   "stream_order": {
     "description": "Stream Order Vector",
     "type": "vector",
@@ -5883,5 +5992,110 @@
         "description": "LGD Village ID"
       }
     }
+  },
+  "wind_power": {
+  "description": "Wind power project vector (point locations of wind farms, with capacity, installation type, status and ownership details). This Dataset downloaded form globalenergymonitor.org at India level",
+  "type": "vector",
+  "variables": {
+    "Associated Storage": {
+      "type": "string",
+      "description": "energy storage associated with the project"
+    },
+    "Capacity (MW)": {
+      "type": "float",
+      "description": "installed capacity of the project",
+      "unit": "MW"
+    },
+    "City": {
+      "type": "string",
+      "description": "city where the project is located"
+    },
+    "Date Last Researched": {
+      "type": "string",
+      "description": "date (YYYY-MM-DD) on which the project record was last researched or updated"
+    },
+    "GEM location ID": {
+      "type": "string",
+      "description": "GEM (Global Energy Monitor) identifier of the project location"
+    },
+    "GEM phase ID": {
+      "type": "string",
+      "description": "GEM (Global Energy Monitor) identifier of the project unit/phase"
+    },
+    "Hydrogen": {
+      "type": "string",
+      "description": "indicates whether the project is associated with hydrogen production"
+    },
+    "Installation Type": {
+      "type": "string",
+      "description": "type of installation (e.g. Onshore, Offshore)"
+    },
+    "Local area (taluk, county)": {
+      "type": "string",
+      "description": "local administrative area of the project (taluk, county)"
+    },
+    "Location accuracy": {
+      "type": "string",
+      "description": "accuracy of the recorded project location (e.g. exact, approximate)"
+    },
+    "Major area (prefecture, district)": {
+      "type": "string",
+      "description": "major administrative area of the project (prefecture, district)"
+    },
+    "Operator": {
+      "type": "string",
+      "description": "company operating the project"
+    },
+    "Other IDs (location)": {
+      "type": "string",
+      "description": "location identifiers from other data sources"
+    },
+    "Other IDs (unit/phase)": {
+      "type": "string",
+      "description": "unit/phase identifiers from other data sources"
+    },
+    "Other Name(s)": {
+      "type": "string",
+      "description": "alternative names by which the project is known"
+    },
+    "Owner": {
+      "type": "string",
+      "description": "company or companies owning the project"
+    },
+    "Phase Name": {
+      "type": "string",
+      "description": "name of the project phase"
+    },
+    "Project Name": {
+      "type": "string",
+      "description": "name of the wind project"
+    },
+    "Region": {
+      "type": "string",
+      "description": "geographic region of the project (e.g. Asia)"
+    },
+    "Retired year": {
+      "type": "integer",
+      "description": "year the project was retired",
+      "unit": "year"
+    },
+    "Start year": {
+      "type": "integer",
+      "description": "year the project started operating",
+      "unit": "year"
+    },
+    "Status": {
+      "type": "string",
+      "description": "current status of the project (e.g. operating, construction)"
+    },
+    "Subregion": {
+      "type": "string",
+      "description": "geographic subregion of the project (e.g. Southern Asia)"
+    },
+    "UID": {
+      "type": "string",
+      "description": "unique identifier of micro watershed"
+    }
   }
+}
 }
