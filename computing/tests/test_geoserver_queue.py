@@ -912,3 +912,96 @@ class RasterStyleResolutionTests(SimpleTestCase):
         geo.publish_style.assert_called_once_with(
             layer_name="l", style_name="lulc_level_3_style", workspace="LULC_level_3"
         )
+
+    def test_push_raster_deletes_orphaned_store_and_retries_on_http_500(self):
+        from unittest.mock import MagicMock
+
+        from computing.local_compute_helper import _push_raster_to_geoserver_instance
+        from utilities.geoserver_utils import GeoserverException
+
+        geo = MagicMock()
+        geo.create_coveragestore.side_effect = [
+            GeoserverException(500, b"java.lang.NullPointerException"),
+            {"status_code": 201},
+        ]
+        geo.get_style.return_value = {"style": {"name": "terrain_raster"}}
+        geo.publish_style.return_value = 200
+        geo.get_layer.return_value = {"layer": {"name": "kullu_kullu_terrain_raster"}}
+
+        res = _push_raster_to_geoserver_instance(
+            geo,
+            "/tmp/kullu_kullu_terrain_raster.tif",
+            "kullu_kullu_terrain_raster",
+            "terrain",
+            "terrain_raster",
+        )
+        self.assertEqual(res["status_code"], 201)
+        self.assertEqual(geo.create_coveragestore.call_count, 2)
+        geo.delete_raster_store.assert_called_once_with(
+            workspace="terrain", store="kullu_kullu_terrain_raster"
+        )
+        geo.configure_coverage.assert_called_once()
+        geo.publish_style.assert_called_once_with(
+            layer_name="kullu_kullu_terrain_raster",
+            style_name="terrain_raster",
+            workspace="terrain",
+        )
+
+    def test_push_raster_self_heals_orphaned_store_returning_200_without_layer(self):
+        from unittest.mock import MagicMock
+
+        from computing.local_compute_helper import _push_raster_to_geoserver_instance
+        from utilities.geoserver_utils import GeoserverException
+
+        geo = MagicMock()
+        geo.create_coveragestore.side_effect = [
+            {"status_code": 200},
+            {"status_code": 201},
+        ]
+        geo.get_layer.side_effect = [
+            GeoserverException(404, b"No such layer"),
+            {"layer": {"name": "overall_change_raster_kullu_kullu"}},
+        ]
+        geo.get_style.return_value = {"style": {"name": "tree_overall_style"}}
+        geo.publish_style.return_value = 200
+
+        res = _push_raster_to_geoserver_instance(
+            geo,
+            "/tmp/overall_change_raster_kullu_kullu.tif",
+            "overall_change_raster_kullu_kullu",
+            "tree_overall_raster",
+            "tree_overall_style",
+        )
+        self.assertEqual(res["status_code"], 201)
+        self.assertEqual(geo.create_coveragestore.call_count, 2)
+        geo.delete_raster_store.assert_called_once_with(
+            workspace="tree_overall_raster", store="overall_change_raster_kullu_kullu"
+        )
+        geo.configure_coverage.assert_called_once()
+        geo.publish_style.assert_called_once_with(
+            layer_name="overall_change_raster_kullu_kullu",
+            style_name="tree_overall_style",
+            workspace="tree_overall_raster",
+        )
+
+    def test_push_raster_cleans_up_orphaned_store_when_layer_verification_fails(self):
+        from unittest.mock import MagicMock
+
+        from computing.local_compute_helper import _push_raster_to_geoserver_instance
+        from utilities.geoserver_utils import GeoserverException
+
+        geo = MagicMock()
+        geo.create_coveragestore.return_value = {"status_code": 201}
+        geo.get_layer.side_effect = GeoserverException(404, b"No such layer")
+
+        res = _push_raster_to_geoserver_instance(
+            geo,
+            "/tmp/kullu_kullu_terrain_raster.tif",
+            "kullu_kullu_terrain_raster",
+            "terrain",
+            None,
+        )
+        self.assertEqual(res["status_code"], 500)
+        self.assertEqual(geo.create_coveragestore.call_count, 2)
+        self.assertEqual(geo.delete_raster_store.call_count, 2)
+        geo.publish_style.assert_not_called()

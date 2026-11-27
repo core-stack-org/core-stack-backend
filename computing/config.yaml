@@ -687,7 +687,7 @@ derived_layers:
     - name: generate_drainage_layer
       filename: "{district}_{block}.gpkg"
       local_path: "{DATA_DIR}/layers/{state}/{district}/{block}/drainage_lines/{filename}"
-      geoserver_workspace: drainage_lines
+      geoserver_workspace: drainage
       layer_type: vector
 
     - name: restoration_opportunity
