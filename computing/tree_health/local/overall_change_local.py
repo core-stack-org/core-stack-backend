@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+from rasterio.features import geometry_mask
 from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
@@ -61,7 +62,9 @@ def _resolve_tree_change_raster(
     if matches:
         return str(matches[0])
 
-    raise FileNotFoundError(f"Local overall change raster not found in {tree_change_dir}.")
+    raise FileNotFoundError(
+        f"Local overall change raster not found in {tree_change_dir}."
+    )
 
 
 def _resolve_change_detection_raster(
@@ -87,7 +90,7 @@ def _resolve_change_detection_raster(
     # end_year, then the latest end year on disk.
     available = {}
     for path in change_root.glob(f"{prefix}*.tif"):
-        suffix = path.stem[len(prefix):]
+        suffix = path.stem[len(prefix) :]
         if suffix.isdigit():
             available[int(suffix)] = path
 
@@ -107,7 +110,9 @@ def _clip_tree_change(tree_change_path, roi_gdf):
     with rasterio.open(tree_change_path) as src:
         roi_gdf = validate_geometry(roi_gdf)
         if roi_gdf.empty:
-            raise ValueError("No valid ROI geometry available for overall change clipping.")
+            raise ValueError(
+                "No valid ROI geometry available for overall change clipping."
+            )
         if roi_gdf.crs is None:
             raise ValueError("ROI CRS is missing; cannot align overall change raster.")
         if src.crs and roi_gdf.crs != src.crs:
@@ -128,6 +133,13 @@ def _clip_tree_change(tree_change_path, roi_gdf):
         if tree_change.ndim == 3:
             tree_change = tree_change[0]
 
+        roi_mask = geometry_mask(
+            [mapping(roi_union)],
+            out_shape=tree_change.shape,
+            transform=transform,
+            invert=True,
+        )
+
         meta = src.meta.copy()
         meta.update(
             {
@@ -143,22 +155,26 @@ def _clip_tree_change(tree_change_path, roi_gdf):
         )
 
     tree_change = np.where(np.isfinite(tree_change), tree_change, BACKGROUND)
-    return np.rint(tree_change).astype(np.int16), meta
+    return np.rint(tree_change).astype(np.int16), meta, roi_mask
 
 
 def _reproject_to_match(raster_path, meta):
     output = np.full((meta["height"], meta["width"]), BACKGROUND, dtype=np.int16)
     with rasterio.open(raster_path) as src:
+        src_data = src.read(1).astype(np.int16)
+        # Collapse transition codes 2..5 into a single change class (2) before
+        # mode resampling so transition subtypes don't split votes against 0/1.
+        src_data[(src_data >= 2) & (src_data <= 5)] = 2
         reproject(
-            source=rasterio.band(src, 1),
+            source=src_data,
             destination=output,
             src_transform=src.transform,
             src_crs=src.crs,
-            src_nodata=src.nodata,
+            src_nodata=BACKGROUND,
             dst_transform=meta["transform"],
             dst_crs=meta["crs"],
             dst_nodata=BACKGROUND,
-            resampling=Resampling.nearest,
+            resampling=Resampling.mode,
         )
     return output
 
@@ -170,7 +186,7 @@ def _build_overall_change_raster(
     roi_gdf,
     output_path,
 ):
-    tree_change, output_meta = _clip_tree_change(
+    tree_change, output_meta, roi_mask = _clip_tree_change(
         tree_change_path=tree_change_path,
         roi_gdf=roi_gdf,
     )
@@ -193,12 +209,14 @@ def _build_overall_change_raster(
     output[no_change_mask & allowed_inside_no_change] = tree_change[
         no_change_mask & allowed_inside_no_change
     ]
+    output[~roi_mask] = BACKGROUND
 
     with rasterio.open(output_path, "w", **output_meta) as dst:
         dst.write(output, 1)
         dst.set_band_description(1, "constant")
 
     return str(output_path)
+
 
 @app.task(bind=True)
 def tree_health_overall_change_raster_local(

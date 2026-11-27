@@ -128,7 +128,7 @@ def _clip_and_mask_ccd(ccd_path, lulc_path, roi_gdf, output_path):
             dst_transform=output_meta["transform"],
             dst_crs=output_meta["crs"],
             dst_nodata=0,
-            resampling=Resampling.nearest,
+            resampling=Resampling.mode,
         )
 
     # Keep CCD values only for tree pixels. Everything else becomes nodata.
@@ -191,7 +191,7 @@ def tree_health_ccd_raster_local(
         lulc_dir=lulc_dir,
     )
 
-    layer_at_geoserver = False
+    layer_at_geoserver = True
 
     for year, lulc_path in zip(range(start_year, end_year + 1), lulc_paths):
         # Build one CCD output per year, matching the original GEE layer naming.
@@ -248,7 +248,6 @@ def tree_health_ccd_raster_local(
             print(f"GeoServer response for {layer_name}: {geoserver_response}")
             if geoserver_response.get("status_code") != 202:
                 raise RuntimeError(str(geoserver_response))
-            layer_at_geoserver = True
         except Exception as error:
             print(f"Failed to sync local CCD raster {layer_name}: {error}")
             layer_at_geoserver = False

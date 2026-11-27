@@ -40,6 +40,7 @@ from .utils import aez_lulcXterrain_cluster_centroids
 logger = logging.getLogger(__name__)
 
 GEOSERVER_WORKSPACE = "terrain_lulc"
+MODE_LULC_YEAR_COUNT = 3
 SLOPE_LULC_FIELD_MAPPING = {
     "barren": 7,
     "double": 10,
@@ -52,9 +53,10 @@ SLOPE_LULC_FIELD_MAPPING = {
 
 
 def _compute_slope_lulc_properties_for_feature(geometry, terrain_src, lulc_sources):
+    ref_lulc_src = lulc_sources[0]
     try:
-        terrain_data, terrain_transform = mask(
-            terrain_src,
+        ref_data, lulc_transform = mask(
+            ref_lulc_src,
             [geometry.__geo_interface__],
             crop=True,
             filled=False,
@@ -62,41 +64,68 @@ def _compute_slope_lulc_properties_for_feature(geometry, terrain_src, lulc_sourc
     except ValueError:
         return None
 
-    band = terrain_data[0]
-    if band.size == 0:
+    ref_band = ref_data[0]
+    if ref_band.size == 0:
         return None
 
-    raw_terrain = np.asarray(band, dtype=np.float64)
-    finite_mask = np.isfinite(raw_terrain)
-    terrain_values = np.rint(np.where(finite_mask, raw_terrain, 0)).astype(
+    roi_mask = ~np.ma.getmaskarray(ref_band)
+    if not roi_mask.any():
+        return None
+
+    raw_ref = np.asarray(ref_band, dtype=np.float64)
+    ref_finite = np.isfinite(raw_ref)
+    ref_values = np.rint(np.where(ref_finite, raw_ref, 0)).astype(
         np.int16, copy=False
     )
+    if ref_lulc_src.nodata is not None and not np.isnan(ref_lulc_src.nodata):
+        ref_values = np.where(
+            ref_values == int(round(ref_lulc_src.nodata)), 0, ref_values
+        )
+    ref_values = np.where(roi_mask & (ref_values > 0), ref_values, 0)
 
-    terrain_valid_mask = (~np.ma.getmaskarray(band)) & finite_mask
+    # Upsample 30 m terrain onto the native 10 m LULC grid (lossless for terrain)
+    # so LULC class shares are computed directly at 10 m without downsampling bias.
+    terrain_raw = np.full(ref_values.shape, np.nan, dtype=np.float32)
+    reproject(
+        source=rasterio.band(terrain_src, 1),
+        destination=terrain_raw,
+        src_transform=terrain_src.transform,
+        src_crs=terrain_src.crs,
+        src_nodata=terrain_src.nodata,
+        dst_transform=lulc_transform,
+        dst_crs=ref_lulc_src.crs,
+        dst_nodata=np.nan,
+        resampling=Resampling.nearest,
+    )
+
+    finite_mask = np.isfinite(terrain_raw)
+    terrain_values = np.rint(np.where(finite_mask, terrain_raw, 0)).astype(
+        np.int16, copy=False
+    )
+    terrain_valid_mask = roi_mask & finite_mask & (terrain_values > 0)
     if terrain_src.nodata is not None and not np.isnan(terrain_src.nodata):
         terrain_valid_mask &= terrain_values != int(round(terrain_src.nodata))
-    terrain_valid_mask &= terrain_values > 0
 
     if not terrain_valid_mask.any():
         return None
 
-    reprojected_lulc = []
-    for lulc_src in lulc_sources:
-        destination = np.zeros(terrain_values.shape, dtype=np.float32)
+    aligned_lulc = [ref_values]
+    for lulc_src in lulc_sources[1:]:
+        destination = np.zeros(ref_values.shape, dtype=np.int16)
         reproject(
             source=rasterio.band(lulc_src, 1),
             destination=destination,
             src_transform=lulc_src.transform,
             src_crs=lulc_src.crs,
             src_nodata=lulc_src.nodata,
-            dst_transform=terrain_transform,
-            dst_crs=terrain_src.crs,
+            dst_transform=lulc_transform,
+            dst_crs=ref_lulc_src.crs,
             dst_nodata=0,
             resampling=Resampling.nearest,
         )
-        reprojected_lulc.append(destination)
+        aligned_lulc.append(np.where(roi_mask & (destination > 0), destination, 0))
 
-    lulc_mode = _compute_mode_lulc_array(reprojected_lulc)
+    lulc_mode = _compute_mode_lulc_array(aligned_lulc)
     plains_mask = terrain_valid_mask & (terrain_values == 5)
     slopy_mask = terrain_valid_mask & (terrain_values == 6)
     plain_plus_slope_pixels = int((plains_mask | slopy_mask).sum())
@@ -141,17 +170,18 @@ def _assign_slope_clusters(
 
     computed_rows = []
     with rasterio.open(terrain_raster_path) as terrain_src, ExitStack() as stack:
-        working_gdf = slope_watersheds_gdf
-        if working_gdf.crs is None:
-            raise ValueError(
-                "Watershed CRS is missing; cannot align with terrain raster."
-            )
-        if terrain_src.crs and working_gdf.crs != terrain_src.crs:
-            working_gdf = working_gdf.to_crs(terrain_src.crs)
-
         lulc_sources = [
             stack.enter_context(rasterio.open(path)) for path in lulc_raster_paths
         ]
+        ref_lulc_crs = lulc_sources[0].crs
+        working_gdf = slope_watersheds_gdf
+        if working_gdf.crs is None:
+            raise ValueError(
+                "Watershed CRS is missing; cannot align with LULC raster."
+            )
+        if ref_lulc_crs and working_gdf.crs != ref_lulc_crs:
+            working_gdf = working_gdf.to_crs(ref_lulc_crs)
+
         total = len(working_gdf)
         for index, row in enumerate(
             working_gdf.itertuples(index=False),
@@ -250,8 +280,9 @@ def run_lulc_on_slope_cluster_local(
         raise ValueError("start_year cannot be greater than end_year")
 
     _ensure_file_exists(terrain_raster_path, "Terrain raster")
+    mode_start_year = max(start_year, end_year - MODE_LULC_YEAR_COUNT + 1)
     lulc_raster_paths = _resolve_lulc_raster_paths(
-        start_year=start_year,
+        start_year=mode_start_year,
         end_year=end_year,
         lulc_dir=lulc_dir,
     )
