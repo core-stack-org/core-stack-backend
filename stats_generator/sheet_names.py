@@ -108,6 +108,8 @@ TEHSIL_SHEET_SPECS = (
     ("terrain_lulc_slope", "terrain_lulc_slope", "Terrain × LULC on slopes"),
     ("tree_in_grassland", "tree_in_grassland", "Tree cover in grassland"),
     ("village_GP", "village_gp", "Village to Gram Panchayat mapping"),
+    ("solar_power", "solar_power", "India solar power tracker "),
+    ("wind_power", "wind_power", "India wind power tracker "),
 )
 
 # All Excel sheet names written by the stats pipeline (exact Excel casing).
