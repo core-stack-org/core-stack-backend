@@ -97,13 +97,19 @@ class ProjectAPITest(APITestCase):
             "name": "New Test Project",
             "description": "New test description",
             "geojson_path": "/path/to/geojson",
+            "organization": str(self.organization.pk),
+            "app_type": AppType.WATERSHED,
+            # Ignored: the server sets created_by to the request user (admin_user)
+            "created_by": self.regular_user.pk,
         }
 
-        response = self.client.post(self.projects_url, data)
+        response = self.client.post(self.projects_url, data, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["name"], "New Test Project")
         self.assertEqual(response.data["geojson_path"], "/path/to/geojson")
+        self.assertEqual(response.data["created_by"], self.admin_user.pk)
+        self.assertEqual(response.data["updated_by"], self.admin_user.pk)
 
     def test_retrieve_project_with_apps(self):
         self.client.force_authenticate(user=self.admin_user)
