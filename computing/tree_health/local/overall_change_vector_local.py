@@ -143,4 +143,4 @@ def tree_health_overall_change_vector_local(
         print(f"GeoServer response for {layer_name}: {res}")
         layer_at_geoserver = res.get("status_code") == 202
 
-    return layer_at_geoserver
+    return layer_at_geoserver if push_to_geoserver else True

@@ -1199,21 +1199,25 @@ def compute_terrain_properties_for_watersheds(watersheds_gdf, raster_path):
                 continue
 
             try:
-                clipped, _ = mask(src, [mapping(geom)], crop=True, filled=True)
+                clipped, _ = mask(src, [mapping(geom)], crop=True, filled=False)
             except ValueError:
                 computed_rows.append(dummy_terrain_props())
                 continue
 
-            values = clipped[0]
-            if values.size == 0:
+            band = clipped[0]
+            if band.size == 0:
                 computed_rows.append(dummy_terrain_props())
                 continue
 
-            values = np.rint(values).astype(np.int16, copy=False)
-            valid_mask = np.ones(values.shape, dtype=bool)
+            raw_values = np.asarray(band, dtype=np.float64)
+            finite_mask = np.isfinite(raw_values)
+            values = np.rint(np.where(finite_mask, raw_values, 0)).astype(
+                np.int16, copy=False
+            )
+            valid_mask = (~np.ma.getmaskarray(band)) & finite_mask
             if nodata is not None and not np.isnan(nodata):
                 valid_mask &= values != int(round(nodata))
-            valid_mask &= values != 0
+            valid_mask &= values > 0
 
             plain_prop = _fraction(values, valid_mask, PLAIN_CLASSES)
             valley_prop = _fraction(values, valid_mask, VALLEY_CLASSES)

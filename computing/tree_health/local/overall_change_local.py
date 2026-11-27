@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import rasterio
+from rasterio.features import geometry_mask
 from rasterio.mask import mask
 from rasterio.warp import Resampling, reproject
 from shapely.geometry import mapping
@@ -132,6 +133,13 @@ def _clip_tree_change(tree_change_path, roi_gdf):
         if tree_change.ndim == 3:
             tree_change = tree_change[0]
 
+        roi_mask = geometry_mask(
+            [mapping(roi_union)],
+            out_shape=tree_change.shape,
+            transform=transform,
+            invert=True,
+        )
+
         meta = src.meta.copy()
         meta.update(
             {
@@ -147,13 +155,16 @@ def _clip_tree_change(tree_change_path, roi_gdf):
         )
 
     tree_change = np.where(np.isfinite(tree_change), tree_change, BACKGROUND)
-    return np.rint(tree_change).astype(np.int16), meta
+    return np.rint(tree_change).astype(np.int16), meta, roi_mask
 
 
 def _reproject_to_match(raster_path, meta):
     output = np.full((meta["height"], meta["width"]), BACKGROUND, dtype=np.int16)
     with rasterio.open(raster_path) as src:
         src_data = src.read(1).astype(np.int16)
+        # Collapse transition codes 2..5 into a single change class (2) before
+        # mode resampling so transition subtypes don't split votes against 0/1.
+        src_data[(src_data >= 2) & (src_data <= 5)] = 2
         reproject(
             source=src_data,
             destination=output,
@@ -175,7 +186,7 @@ def _build_overall_change_raster(
     roi_gdf,
     output_path,
 ):
-    tree_change, output_meta = _clip_tree_change(
+    tree_change, output_meta, roi_mask = _clip_tree_change(
         tree_change_path=tree_change_path,
         roi_gdf=roi_gdf,
     )
@@ -198,6 +209,7 @@ def _build_overall_change_raster(
     output[no_change_mask & allowed_inside_no_change] = tree_change[
         no_change_mask & allowed_inside_no_change
     ]
+    output[~roi_mask] = BACKGROUND
 
     with rasterio.open(output_path, "w", **output_meta) as dst:
         dst.write(output, 1)
