@@ -160,14 +160,13 @@ from computing.models import Layer
 from django.conf import settings
 import json
 from contextvars import ContextVar
+from computing.config_loader import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 VALID_COMPUTE_TYPES = {"gee", "local"}
 
-EXTERNAL_CONFIG_DIR = os.path.join(
-    settings.BASE_DIR, "data", "layers", "layer_dependency"
-)
+EXTERNAL_CONFIG_DIR = os.path.join(str(DATA_DIR), "layer_dependency")
 
 MAP_CONFIG_FILES = {
     "gee": "layer_map.json",
