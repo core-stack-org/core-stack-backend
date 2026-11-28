@@ -82,3 +82,67 @@ class ExportPlansCsvCursorTests(SimpleTestCase):
         self.assertIn(
             "TO STDOUT WITH (FORMAT csv, HEADER true, ENCODING 'UTF8')", seen["sql"]
         )
+
+
+class MwsReportNanFilteringTests(SimpleTestCase):
+    def test_lcw_factory_mining_filter_placeholder_nan_rows(self):
+        import pandas as pd
+
+        from dpr import gen_mws_report
+
+        sheets = {
+            "lcw_conflict": pd.DataFrame(
+                {
+                    "UID": ["u_empty", "u_valid"],
+                    "title_of_conflict": [None, "Land Dispute"],
+                    "link_to_conflict": [None, None],
+                }
+            ),
+            "factory_csr": pd.DataFrame(
+                {
+                    "UID": ["u_empty", "u_valid"],
+                    "Company_Name": [None, "Acme Plant"],
+                    "ADDRESS": [None, "Main Rd Email : a@b.com"],
+                    "LOCATION T": [None, None],
+                }
+            ),
+            "mining": pd.DataFrame(
+                {
+                    "UID": ["u_empty", "u_valid", "u_unknown"],
+                    "division": [None, "Iron Ore Div", "unknown"],
+                    "sector_moefcc": [None, None, "Mining"],
+                    "village": [None, "Rampur", "Rampur"],
+                }
+            ),
+        }
+
+        with patch.object(
+            gen_mws_report, "read_excel_sheet", side_effect=lambda _p, s: sheets[s]
+        ):
+            self.assertEqual(
+                gen_mws_report.get_land_conflict_industrial_data("s", "d", "b", "u_empty"),
+                [],
+            )
+            self.assertEqual(
+                gen_mws_report.get_land_conflict_industrial_data("s", "d", "b", "u_valid"),
+                [{"title": "Land Dispute", "link": ""}],
+            )
+
+            self.assertEqual(
+                gen_mws_report.get_factory_data("s", "d", "b", "u_empty"), []
+            )
+            self.assertEqual(
+                gen_mws_report.get_factory_data("s", "d", "b", "u_valid"),
+                [{"name": "Acme Plant", "address": "Main Rd", "type": ""}],
+            )
+
+            self.assertEqual(
+                gen_mws_report.get_mining_data("s", "d", "b", "u_empty"), []
+            )
+            self.assertEqual(
+                gen_mws_report.get_mining_data("s", "d", "b", "u_unknown"), []
+            )
+            self.assertEqual(
+                gen_mws_report.get_mining_data("s", "d", "b", "u_valid"),
+                [{"division": "Iron Ore Div", "sector": "", "village": "Rampur"}],
+            )
