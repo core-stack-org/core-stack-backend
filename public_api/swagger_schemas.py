@@ -784,6 +784,12 @@ tehsil_data_schema = {
     Requires ``state``, ``district``, and ``tehsil``. Stats must already exist
     for that location (see List active locations).
 
+    **Boundary MWS overlap**
+    A tehsil includes all overlapping micro-watersheds (MWSes), so MWSes on the
+    boundary appear in adjacent tehsils as well. If you are doing an analysis
+    beyond a single tehsil, de-duplicate overlapping MWSes using their unique
+    ID (``uid`` / ``mws_id``).
+
     **Returns**
     A raw object keyed by sheet name, one row per MWS. v1 has no ``data=`` filter.
 
@@ -1120,6 +1126,9 @@ get_mws_geometries_schema = {
     Lists every micro-watershed boundary in a tehsil.
 
     Each feature has ``properties.uid`` and a Polygon or MultiPolygon ring.
+    A tehsil includes all overlapping MWSes, so boundary MWSes appear in
+    adjacent tehsils as well; de-duplicate by ``uid`` when analysing beyond a
+    single tehsil.
 
     **Returns**
     A GeoJSON FeatureCollection at the top level. Save the file and open it
@@ -1388,6 +1397,16 @@ Lists analytical sheets for a tehsil: drought, hydrology, LULC, NREGA, and other
 Filter with ``data=all`` (default) or sheet names:
 ``data=croppingdrought_kharif,stream_order``.
 
+**Boundary MWS overlap**
+A tehsil includes all overlapping micro-watersheds (MWSes), so MWSes on the
+boundary appear in adjacent tehsils as well. If you are doing an analysis
+beyond a single tehsil, de-duplicate overlapping MWSes using their unique
+ID (``uid`` / ``mws_id``).
+
+**Zero-occurrence datasets**
+If no forest fires or mines exist in a tehsil/MWS, ``forest_fire`` and
+``mining`` return ``0`` rather than being flagged as missing data.
+
 **Returns**
 ``{{status, error_message, data}}`` with ``tehsil_data`` and ``tehsil_units``.
 
@@ -1514,6 +1533,8 @@ mws_geometries_schema_v2["operation_description"] = """
 Lists micro-watershed polygons for a tehsil.
 
 Omit ``mws_id`` for every MWS; pass ``mws_id`` for one feature.
+A tehsil includes all overlapping MWSes, so boundary MWSes appear in adjacent
+tehsils as well; de-duplicate by ``uid`` when analysing beyond a single tehsil.
 
 **Returns**
 ``{status, error_message, data}``. Without ``mws_id``, ``data`` is a

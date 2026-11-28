@@ -611,7 +611,20 @@ def _write_blank_sheets(writer, layer_source, layer_keys):
 def create_excel_for_forest_fire(geojson_data, writer):
     logger.debug("inside forest fire excel generation")
     try:
-        features = geojson_data["features"]
+        features = geojson_data.get("features") or []
+        fire_cols = [
+            "fire_count_per_year",
+            "fire_frp_max_in_MW",
+            "fire_frp_mean_in_MW",
+        ]
+        if not features:
+            df = pd.DataFrame(columns=["UID", *fire_cols])
+            df.to_excel(
+                writer, sheet_name=EXCEL_SHEET_BY_KEY["forest_fire"], index=False
+            )
+            logger.info("Excel file created for forest fire (0 features)")
+            return
+
         df_data = [feature.get("properties", {}) for feature in features]
         df = pd.DataFrame(df_data)
         exclude_cols = ["id"]
@@ -630,7 +643,10 @@ def create_excel_for_forest_fire(geojson_data, writer):
         other_cols = [c for c in df.columns if c not in priority_cols]
         new_order = priority_cols + other_cols
         df = df[new_order]
-        df = df.fillna(-9999)
+        for col in fire_cols:
+            if col in df.columns:
+                df[col] = df[col].replace([-9999, -9999.0], 0).fillna(0)
+        df = df.fillna(0)
         numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns
         df[numeric_cols] = df[numeric_cols].round(2)
         df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["forest_fire"], index=False)
@@ -1434,22 +1450,26 @@ def create_excel_for_stream_order(data, writer):
 def create_excel_for_mining(data, writer):
     try:
         df_data = []
-        features = data["features"]
+        features = data.get("features") or []
 
         for feature in features:
-            properties = feature["properties"]
+            properties = feature.get("properties") or {}
             row = {
-                "UID": properties["uid"],
-                "division": properties["company_na"],
-                "proposal": properties["proposal"],
-                "sector_moefcc": properties["sector_moe"],
-                "village": properties["village"],
+                "UID": properties.get("uid"),
+                "division": properties.get("company_na"),
+                "proposal": properties.get("proposal"),
+                "sector_moefcc": properties.get("sector_moe"),
+                "village": properties.get("village"),
             }
 
             df_data.append(row)
-        df = pd.DataFrame(df_data)
-        df.replace("", "unknown", inplace=True)
-        df = df.sort_values(["UID"])
+        columns = ["UID", "division", "proposal", "sector_moefcc", "village"]
+        if df_data:
+            df = pd.DataFrame(df_data)
+            df.replace("", "unknown", inplace=True)
+            df = df.sort_values(["UID"])
+        else:
+            df = pd.DataFrame(columns=columns)
         df.to_excel(writer, sheet_name=EXCEL_SHEET_BY_KEY["mining"], index=False)
         logger.info("Excel file created for mining")
     except Exception as e:

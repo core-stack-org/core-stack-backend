@@ -54,9 +54,13 @@ v2 tehsil sheets accept `data=croppingdrought_kharif,stream_order`. v2 active lo
 
 # First request
 
-1. **List active locations** — tehsils that already have data.
+1. **List active locations** — tehsils with published GeoServer layers (tabular tehsil & KYL data cover Pan-India where pre-generated).
 2. **Retrieve admin details** or **Retrieve a micro-watershed ID** — if you start from a coordinate.
 3. **List tehsil datasets** or **List MWS geometries** — use the exact place names from step 1 or 2.
+
+# Multi-tehsil analysis & overlapping MWS boundaries
+
+A tehsil includes **all overlapping micro-watersheds (MWSes)**, so MWSes that straddle a tehsil boundary appear in adjacent tehsils as well. When aggregating or analysing data beyond a single tehsil (for example, at district or state scale), **de-duplicate overlapping MWSes using their unique MWS ID (`uid` / `mws_id`)**.
 
 To request a new tehsil, use the [Geospatial Data Request Form](https://docs.google.com/forms/d/e/1FAIpQLSesYshZg_HmNc0FgF-JSBye-AeN6mdyrhF2cjGmqLYeD7WgZA/viewform).
 """

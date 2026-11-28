@@ -56,6 +56,7 @@ from geoadmin.utils import (
     get_activated_location_json,
 )
 from .dataset_filters import (
+    canonical_tehsil_data_token,
     filter_active_locations,
     filter_kyl_indicator_payload,
     filter_kyl_v1_rows,
@@ -385,7 +386,8 @@ def get_mws_data(request):
                 status=status.HTTP_404_NOT_FOUND,
             )
         if isinstance(data, dict) and data.get("error"):
-            return Response(data, status=status.HTTP_404_NOT_FOUND)
+            err_status = data.get("http_status") or status.HTTP_404_NOT_FOUND
+            return Response(data, status=err_status)
         requested_fields = parse_fields_filter(request.query_params.getlist("fields"))
         if requested_fields:
             try:
@@ -457,9 +459,22 @@ def get_mws_data_v2(request):
                 status.HTTP_404_NOT_FOUND,
             )
         if isinstance(data, dict) and data.get("error"):
-            return _error_response_v2(
+            err_status = data.get("http_status") or status.HTTP_404_NOT_FOUND
+            err_code = data.get("code")
+            err_details = None
+            if err_code or data.get("fallback") or data.get("details"):
+                err_details = {}
+                if err_code:
+                    err_details["code"] = err_code
+                if data.get("fallback"):
+                    err_details["fallback"] = data["fallback"]
+                if data.get("details"):
+                    err_details["details"] = data["details"]
+            return _error_response(
                 str(data["error"]),
-                status.HTTP_404_NOT_FOUND,
+                err_status,
+                details=err_details,
+                code=err_code,
             )
         if isinstance(data, dict) and "Error in get mws data" in data:
             return _error_response_v2(
@@ -529,6 +544,7 @@ def generate_tehsil_data(request):
 
         # Get JSON (from cache or generate)
         json_data = get_tehsil_json(state, district, tehsil, regenerate)
+        json_data = _normalize_zero_default_sheets(json_data)
         return JsonResponse(json_data, status=200)
 
     except Exception as e:
@@ -577,13 +593,16 @@ def get_mws_json_by_kyl_indicator(request):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not excel_file_exists(state, district, tehsil):
+        _, file_exists = excel_file_exists(state, district, tehsil)
+        if not file_exists:
             return Response(
                 {"Message": "Data not found for this state, district, tehsil."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
         data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
+        if isinstance(data, dict) and data.get("error"):
+            return Response(data, status=status.HTTP_404_NOT_FOUND)
         if not data:
             return Response(
                 {"error": "Data not found for the given mws_id."},
@@ -832,7 +851,12 @@ def get_admin_details_by_lat_lon_v2(request):
                 or data.get("message")
                 or "Unable to retrieve location data for the given coordinates"
             )
-            return _error_response(message, properties_list.status_code, details=data)
+            return _error_response(
+                message,
+                properties_list.status_code,
+                details=data,
+                code=data.get("code"),
+            )
         payload = flat_admin_detail_payload(properties_list)
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
@@ -880,7 +904,12 @@ def get_mws_by_lat_lon_v2(request):
                 or payload.get("message")
                 or "Unable to retrieve MWS id for the given coordinates"
             )
-            return _error_response(message, data.status_code, details=payload)
+            return _error_response(
+                message,
+                data.status_code,
+                details=payload,
+                code=payload.get("code"),
+            )
         payload = flat_mws_by_latlon_payload(data)
         return Response(success_envelope(payload), status=status.HTTP_200_OK)
     except Exception as e:
@@ -890,6 +919,131 @@ def get_mws_by_lat_lon_v2(request):
             status.HTTP_404_NOT_FOUND,
             details=str(e),
         )
+
+
+_FOREST_FIRE_ZERO_FIELDS = {
+    "fire_count_per_year",
+    "fire_frp_max_in_mw",
+    "fire_frp_mean_in_mw",
+}
+
+
+def _extract_tehsil_mws_uids(json_data):
+    """Extract ordered unique MWS UIDs from the tehsil's core sheets."""
+    if not isinstance(json_data, dict):
+        return []
+    lower_map = {str(k).strip().lower(): v for k, v in json_data.items()}
+    for sheet in ("mws", "hydrological_annual", "terrain", "dem", "aquifer_vector"):
+        rows = lower_map.get(sheet)
+        if not isinstance(rows, list) or not rows:
+            continue
+        uids = []
+        seen = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            uid = row.get("uid") or row.get("UID") or row.get("mws_id")
+            if uid is not None:
+                uid_str = str(uid)
+                if uid_str not in seen:
+                    seen.add(uid_str)
+                    uids.append(uid_str)
+        if uids:
+            return uids
+    return []
+
+
+def _is_placeholder_row(row):
+    """Return True when a row only has uid/mws_id and every other field is null/empty."""
+    if not isinstance(row, dict):
+        return False
+    non_id_values = [
+        v for k, v in row.items() if str(k).strip().lower() not in {"uid", "mws_id"}
+    ]
+    if not non_id_values:
+        return False
+    return all(v is None or (isinstance(v, str) and not v.strip()) for v in non_id_values)
+
+
+def _normalize_zero_default_sheets(json_data, requested_sheets=None):
+    """
+    Ensure absent forest fires and mines are represented as 0 instead of missing data.
+
+    - Normalizes any legacy ``-9999`` / ``None`` values in ``forest_fire`` rows to ``0``.
+    - Converts all-null placeholder ``mining`` rows to ``mining_count: 0``.
+    - When ``forest_fire`` or ``mining`` is explicitly requested (via ``data=``) for a
+      tehsil whose Excel exists, synthesizes 0-valued rows per MWS UID rather than
+      returning 404 ``DATA_NOT_GENERATED``.
+    """
+    if not isinstance(json_data, dict) or not json_data:
+        return json_data
+
+    out = dict(json_data)
+    uids = None
+
+    def _get_uids():
+        nonlocal uids
+        if uids is None:
+            uids = _extract_tehsil_mws_uids(out)
+        return uids
+
+    # 1. Normalize existing forest_fire / mining sheets in place
+    for key in list(out.keys()):
+        canon = canonical_tehsil_data_token(key)
+        rows = out[key]
+        if canon == "forest_fire" and isinstance(rows, list):
+            if not rows:
+                out[key] = [
+                    {
+                        "uid": uid,
+                        "fire_count_per_year": 0,
+                        "fire_frp_max_in_mw": 0,
+                        "fire_frp_mean_in_mw": 0,
+                    }
+                    for uid in _get_uids()
+                ]
+            else:
+                cleaned = []
+                for row in rows:
+                    if not isinstance(row, dict):
+                        cleaned.append(row)
+                        continue
+                    new_row = dict(row)
+                    for col, val in list(new_row.items()):
+                        if str(col).strip().lower() in _FOREST_FIRE_ZERO_FIELDS:
+                            if val is None or val in (-9999, -9999.0, ""):
+                                new_row[col] = 0
+                    cleaned.append(new_row)
+                out[key] = cleaned
+        elif canon == "mining" and isinstance(rows, list):
+            real_rows = [r for r in rows if not _is_placeholder_row(r)]
+            if not real_rows:
+                target_uids = _get_uids()
+                if not target_uids and rows:
+                    target_uids = [
+                        str(r.get("uid") or r.get("UID"))
+                        for r in rows
+                        if isinstance(r, dict) and (r.get("uid") or r.get("UID")) is not None
+                    ]
+                out[key] = [{"uid": uid, "mining_count": 0} for uid in target_uids]
+
+    # 2. Synthesize 0-valued sheets if explicitly requested and absent from the Excel
+    if requested_sheets:
+        present_canon = {canonical_tehsil_data_token(k) for k in out.keys()}
+        if "forest_fire" in requested_sheets and "forest_fire" not in present_canon:
+            out["forest_fire"] = [
+                {
+                    "uid": uid,
+                    "fire_count_per_year": 0,
+                    "fire_frp_max_in_mw": 0,
+                    "fire_frp_mean_in_mw": 0,
+                }
+                for uid in _get_uids()
+            ]
+        if "mining" in requested_sheets and "mining" not in present_canon:
+            out["mining"] = [{"uid": uid, "mining_count": 0} for uid in _get_uids()]
+
+    return out
 
 
 @swagger_auto_schema(**tehsil_data_schema_v2)
@@ -926,6 +1080,7 @@ def generate_tehsil_data_v2(request):
             return _error_response(
                 "Data not found for this state, district, tehsil",
                 status.HTTP_404_NOT_FOUND,
+                code="DATA_NOT_GENERATED",
             )
 
         try:
@@ -936,11 +1091,23 @@ def generate_tehsil_data_v2(request):
             return _error_response(str(exc), status.HTTP_400_BAD_REQUEST)
 
         json_data = get_tehsil_json(state, district, tehsil, regenerate)
-        full_payload = tehsil_structure_from_dict(json_data)
-        payload = filter_tehsil_payload(full_payload, requested_sheets)
+        json_data = _normalize_zero_default_sheets(json_data, requested_sheets)
+        available_datasets = sorted(
+            {canonical_tehsil_data_token(k) for k in (json_data or {}).keys()}
+        )
+        if requested_sheets and isinstance(json_data, dict):
+            wanted = {canonical_tehsil_data_token(t) for t in requested_sheets}
+            subset_json = {
+                k: v
+                for k, v in json_data.items()
+                if canonical_tehsil_data_token(k) in wanted
+            }
+            payload = tehsil_structure_from_dict(subset_json)
+        else:
+            full_payload = tehsil_structure_from_dict(json_data)
+            payload = filter_tehsil_payload(full_payload, requested_sheets)
         matched_sheets = payload.get("tehsil_data") or {}
         if not matched_sheets:
-            available_datasets = sorted((full_payload.get("tehsil_data") or {}).keys())
             if requested_sheets:
                 missing_datasets = sorted(requested_sheets)
                 names = ", ".join(missing_datasets)
@@ -998,10 +1165,12 @@ def get_mws_json_by_kyl_indicator_v2(request):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-        if not excel_file_exists(state, district, tehsil):
+        _, file_exists = excel_file_exists(state, district, tehsil)
+        if not file_exists:
             return _error_response(
                 "Data not found for this state, district, tehsil.",
                 status.HTTP_404_NOT_FOUND,
+                code="DATA_NOT_GENERATED",
             )
 
         data = get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id)
@@ -1009,6 +1178,7 @@ def get_mws_json_by_kyl_indicator_v2(request):
             return _error_response(
                 str(data["error"]),
                 status.HTTP_404_NOT_FOUND,
+                code=data.get("code"),
             )
         if not data:
             return _error_response(
