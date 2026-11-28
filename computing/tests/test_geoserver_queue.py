@@ -1005,3 +1005,50 @@ class RasterStyleResolutionTests(SimpleTestCase):
         self.assertEqual(geo.create_coveragestore.call_count, 2)
         self.assertEqual(geo.delete_raster_store.call_count, 2)
         geo.publish_style.assert_not_called()
+
+    def test_push_raster_deletes_legacy_owning_coveragestore_on_http_500_collision(self):
+        from unittest.mock import MagicMock
+
+        from computing.local_compute_helper import _push_raster_to_geoserver_instance
+        from utilities.geoserver_utils import GeoserverException
+
+        geo = MagicMock()
+        geo.create_coveragestore.side_effect = [
+            GeoserverException(500, b"Error auto-configuring coverage"),
+            {"status_code": 201},
+        ]
+        geo.get_layer.side_effect = [
+            {
+                "layer": {
+                    "name": "LULC_18_19_dumka_masalia_level_3",
+                    "resource": {
+                        "href": "https://geoserver.core-stack.org:8443/geoserver/rest/workspaces/LULC_level_3/coveragestores/LULC_18_19_masalia_level_3/coverages/LULC_18_19_dumka_masalia_level_3.json"
+                    },
+                }
+            },
+            {"layer": {"name": "LULC_18_19_dumka_masalia_level_3"}},
+        ]
+        geo.get_style.return_value = {"style": {"name": "lulc_level_3_style"}}
+        geo.publish_style.return_value = 200
+
+        res = _push_raster_to_geoserver_instance(
+            geo,
+            "/tmp/dumka_masalia_2018-07-01_2019-06-30_LULCmap_10m.tif",
+            "LULC_18_19_dumka_masalia_level_3",
+            "LULC_level_3",
+            "lulc_level_3_style",
+        )
+        self.assertEqual(res["status_code"], 201)
+        self.assertEqual(geo.create_coveragestore.call_count, 2)
+        geo.delete_raster_store.assert_any_call(
+            workspace="LULC_level_3", store="LULC_18_19_masalia_level_3"
+        )
+        geo.delete_raster_store.assert_any_call(
+            workspace="LULC_level_3", store="LULC_18_19_dumka_masalia_level_3"
+        )
+        geo.configure_coverage.assert_called_once()
+        geo.publish_style.assert_called_once_with(
+            layer_name="LULC_18_19_dumka_masalia_level_3",
+            style_name="lulc_level_3_style",
+            workspace="LULC_level_3",
+        )

@@ -1,8 +1,10 @@
 import logging
+import re
 import tempfile
 import typing
 from contextlib import ExitStack
 from pathlib import Path
+from urllib.parse import unquote
 
 import geopandas as gpd
 import numpy as np
@@ -460,6 +462,19 @@ RASTER_DECLARED_SRS = "EPSG:4326"
 VECTOR_DECLARED_SRS = "EPSG:4326"
 
 
+def _extract_owning_coveragestore(geo, workspace, layer_name):
+    """Return the coveragestore name currently owning ``workspace:layer_name``, if any."""
+    try:
+        layer_data = geo.get_layer(layer_name=layer_name, workspace=workspace)
+    except Exception:
+        return None
+    if not isinstance(layer_data, dict):
+        return None
+    href = ((layer_data.get("layer") or {}).get("resource") or {}).get("href") or ""
+    match = re.search(r"/coveragestores/([^/]+)/coverages/", href)
+    return unquote(match.group(1)) if match else None
+
+
 def _push_raster_to_geoserver_instance(
     geo,
     file_path,
@@ -477,16 +492,31 @@ def _push_raster_to_geoserver_instance(
             layer_name=layer_name,
         )
 
-    def _reset_store():
-        try:
-            geo.delete_raster_store(workspace=workspace, store=layer_name)
-        except Exception as delete_exc:
+    def _reset_store(check_owning_store=True):
+        stores_to_delete = [layer_name]
+        owning_store = (
+            _extract_owning_coveragestore(geo, workspace, layer_name)
+            if check_owning_store
+            else None
+        )
+        if owning_store and owning_store != layer_name:
             logger.warning(
-                "Failed to delete coveragestore %s:%s: %s",
+                "Layer %s:%s is currently owned by legacy coveragestore '%s'; deleting it before retry.",
                 workspace,
                 layer_name,
-                delete_exc,
+                owning_store,
             )
+            stores_to_delete.insert(0, owning_store)
+        for store_name in stores_to_delete:
+            try:
+                geo.delete_raster_store(workspace=workspace, store=store_name)
+            except Exception as delete_exc:
+                logger.warning(
+                    "Failed to delete coveragestore %s:%s: %s",
+                    workspace,
+                    store_name,
+                    delete_exc,
+                )
 
     try:
         upload_response = _upload()
@@ -516,7 +546,7 @@ def _push_raster_to_geoserver_instance(
                 layer_name,
                 status_code,
             )
-            _reset_store()
+            _reset_store(check_owning_store=False)
             upload_response = _upload()
             status_code = upload_response.get("status_code")
             if status_code in (200, 201):
@@ -562,7 +592,7 @@ def _push_raster_to_geoserver_instance(
             workspace,
             layer_name,
         )
-        _reset_store()
+        _reset_store(check_owning_store=False)
         status_code = 500
 
     return {
