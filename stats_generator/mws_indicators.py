@@ -521,28 +521,74 @@ def generate_mws_data_for_kyl_filters(
                     print(f"Error occurred: {e}")
 
                 ############ Swb_average
-                avg_kharif_surface_water_mws = None
-                avg_rabi_surface_water_mws = None
-                avg_zaid_surface_water_mws = None
+                seasonal_water_yearly = {}
+
+                avg_kharif_surface_water_mws = -9999
+                avg_rabi_surface_water_mws = -9999
+                avg_zaid_surface_water_mws = -9999
                 try:
                     df_swb_annual_mws_data = sheets["surfaceWaterBodies_annual"][
                         sheets["surfaceWaterBodies_annual"]["UID"] == specific_mws_id
                     ]
-                    avg_kharif_surface_water_mws = (
-                        compute_avg_season_surface_water_percent(
-                            df_swb_annual_mws_data, "kharif"
-                        )
-                    )
-                    avg_rabi_surface_water_mws = (
-                        compute_avg_season_surface_water_percent(
-                            df_swb_annual_mws_data, "rabi"
-                        )
-                    )
-                    avg_zaid_surface_water_mws = (
-                        compute_avg_season_surface_water_percent(
-                            df_swb_annual_mws_data, "zaid"
-                        )
-                    )
+                    if not df_swb_annual_mws_data.empty:
+                        row = df_swb_annual_mws_data.iloc[0]
+
+                        # Discover years from the "total_area_in_ha_<year>" columns,
+                        # so newly added years are picked up automatically.
+                        years = [
+                            m.group(1)
+                            for col in df_swb_annual_mws_data.columns
+                            if (m := re.fullmatch(r"total_area_in_ha_(\d{4}-\d{4})", col))
+                        ]
+                            # Store year-wise seasonal water surface areas for chart generation
+                        for year in years:
+                            total_col = f"total_area_in_ha_{year}"
+                            kharif_col = f"kharif_area_in_ha_{year}"
+                            rabi_col = f"rabi_area_in_ha_{year}"
+                            zaid_col = f"zaid_area_in_ha_{year}"
+
+                            def get_numeric_value(column):
+                                if column not in df_swb_annual_mws_data.columns:
+                                    return None
+
+                                value = pd.to_numeric(row[column], errors="coerce")
+
+                                if pd.isna(value):
+                                    return None
+
+                                return float(value)
+
+                            seasonal_water_yearly[year] = {
+                                "total": get_numeric_value(total_col),
+                                "kharif": get_numeric_value(kharif_col),
+                                "rabi": get_numeric_value(rabi_col),
+                                "zaid": get_numeric_value(zaid_col),
+                            }
+
+                        def avg_season_percent(season):
+                            yearly_percents = []
+                            for year in years:
+                                total_col = f"total_area_in_ha_{year}"
+                                season_col = f"{season}_area_in_ha_{year}"
+                                if season_col not in df_swb_annual_mws_data.columns:
+                                    continue
+                                total_area = pd.to_numeric(row[total_col], errors="coerce")
+                                season_area = pd.to_numeric(row[season_col], errors="coerce")
+                                # skip years with missing data or zero water (avoid divide-by-zero)
+                                if pd.isna(total_area) or pd.isna(season_area) or total_area == 0:
+                                    continue
+                                yearly_percents.append((season_area / total_area) * 100)
+                            if not yearly_percents:
+                                return 0
+                            return round(sum(yearly_percents) / len(yearly_percents), 4)
+
+                        avg_kharif_surface_water_mws = avg_season_percent("kharif")
+                        avg_rabi_surface_water_mws = avg_season_percent("rabi")
+                        avg_zaid_surface_water_mws = avg_season_percent("zaid")
+                    else:
+                        avg_kharif_surface_water_mws = (
+                            avg_rabi_surface_water_mws
+                        ) = avg_zaid_surface_water_mws = 0
 
                 except Exception:
                     avg_kharif_surface_water_mws = (
@@ -1782,6 +1828,11 @@ def generate_mws_data_for_kyl_filters(
                         "avg_kharif_surface_water_mws": avg_kharif_surface_water_mws,
                         "avg_rabi_surface_water_mws": avg_rabi_surface_water_mws,
                         "avg_zaid_surface_water_mws": avg_zaid_surface_water_mws,
+                        **(
+                            {"seasonal_water_yearly": seasonal_water_yearly}
+                            if file_type == "json"
+                            else {}
+                        ),
                         "trend_swb": trend_swb,
                         "trend_water_surface_area_value": trend_water_surface_area_value,
                         "trend_g": trend_g,
@@ -1862,14 +1913,27 @@ def generate_mws_data_for_kyl_filters(
 
                     }
                 )
-
-            results_df = _prepare_kyl_results_df(results)
+            print("DEBUG file_type:", file_type)
+            print("DEBUG results count:", len(results))
+            print(
+                "DEBUG first result seasonal:",
+                results[0].get("seasonal_water_yearly", "KEY MISSING")
+                if results else "NO RESULTS"
+            )
+            results_df = pd.DataFrame(results)
+            results_df = results_df.fillna(-9999)
             if file_type == "xlsx":
                 results_df.to_excel(file_xl_path + "_KYL_filter_data.xlsx", index=False)
             elif file_type == "json":
-                results_list = _kyl_df_to_json_records(results_df)
+                results_list = results_df.to_dict(orient="records")
+                print(
+                        "DEBUG serialized seasonal:",
+                        results_list[0].get("seasonal_water_yearly", "KEY MISSING")
+                        if results_list else "NO DATA"
+                    )
                 with open(file_xl_path + "_KYL_filter_data.json", "w") as json_file:
                     json.dump(results_list, json_file, indent=4)
+                    print("DEBUG JSON output path:", file_xl_path + "_KYL_filter_data.json")
             elif file_type == "geojson":
                 layer_name = "deltaG_well_depth_" + district + "_" + block
                 mws_annual_geojson = get_url("mws_layers", layer_name)

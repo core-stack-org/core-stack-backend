@@ -18,6 +18,7 @@ from .models import Overpass_Block_Details
 
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import OVERPASS_URL
+from nrm_app.settings import EXCEL_PATH
 from utilities.logger import setup_logger
 import environ
 
@@ -157,6 +158,109 @@ def load_block_patterns():  # read the json file wherever needed
         logger.error(f"Error decoding JSON: {e}")
         return {}
 
+
+def get_production_system_patterns(block_patterns):
+    """Production_system -> category -> observed_stresses -> subcategory -> [patterns]"""
+    patterns = []
+    for category in block_patterns.get("Production_system", {}).values():
+        for subcategory in category.get("observed_stresses", {}).values():
+            patterns.extend(subcategory)
+    return patterns
+
+def load_kyl_filter_data(state, district, block):
+    """Load the block's KYL filter data JSON as {mws_id: row}. Returns {} if missing."""
+    state_folder = state.replace(" ", "_").upper()
+    district_folder = district.replace(" ", "_").upper()
+    file_path = os.path.join(
+        EXCEL_PATH,
+        "data/stats_excel_files",
+        state_folder,
+        district_folder,
+        f"{district.lower()}_{block.lower()}_KYL_filter_data.json",
+    )
+    try:
+        with open(file_path, "r") as file:
+            rows = json.load(file)
+        return {row["mws_id"]: row for row in rows}
+    except FileNotFoundError:
+        logger.error(f"KYL filter data not found at {file_path}")
+        return {}
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error(f"Error reading KYL filter data {file_path}: {e}")
+        return {}
+
+
+SIGNAL_VALUE_MAP = {
+    "soge_class": {"safe": 0, "semi-critical": 1, "critical": 2, "over exploited": 3, "not assessed": 4},
+    "aquifer_class": {"hard rock": 0, "alluvial": 1},
+}
+MISSING_VALUE = -9999
+
+
+def _signal_expected_value(key, value):
+    """Convert the JSON value ("safe", "Hard Rock", "False") to what the KYL data stores."""
+    if isinstance(value, str):
+        mapped = SIGNAL_VALUE_MAP.get(key, {}).get(value.lower())
+        if mapped is not None:
+            return mapped
+        if value.lower() in ("true", "false"):
+            return value.lower() == "true"
+    return value
+
+
+def evaluate_signal(signal, row):
+    """True/False for one signal on one MWS row of the KYL filter data."""
+    signal_type = signal.get("type")
+
+    if signal_type == "logic":
+        results = [evaluate_signal(s, row) for s in signal.get("Values", [])]
+        return all(results) if signal.get("logic") == "AND" else any(results)
+
+    key = signal.get("Key")
+    actual = row.get(key, MISSING_VALUE)
+    if actual is None or actual == MISSING_VALUE:
+        return False  # missing data never passes a signal
+
+    expected = _signal_expected_value(key, signal.get("value"))
+    if signal_type == "equal":
+        return actual == expected
+    if signal_type == "not_equal":
+        return actual != expected
+    if signal_type == "range":
+        return expected["lower"] <= actual <= expected["upper"]
+
+    logger.warning(f"Unknown signal type '{signal_type}' for key '{key}'")
+    return False
+
+
+def evaluate_node(node, signal_results):
+    """Evaluate a Trigger/Intensity node (ref, AND, OR, COUNT_TRUE) from signal results."""
+    if "ref" in node:
+        return signal_results.get(node["ref"], False)
+
+    children = node.get("Values") or node.get("Trigger_Values") or node.get("Intensity_Values") or []
+    results = [evaluate_node(child, signal_results) for child in children]
+    logic = node.get("logic")
+
+    if logic == "AND":
+        return all(results)
+    if logic == "OR":
+        return any(results)
+    if logic == "COUNT":
+        return sum(1 for r in results if r) >= node.get("min_true", 1)
+    if logic == "COUNT_TRUE":
+        return sum(1 for r in results if r)
+
+    logger.warning(f"Unknown logic '{logic}' in pattern node")
+    return False
+
+
+def evaluate_pattern(pattern, row):
+    """(trigger, intensity) for one pattern on one MWS row."""
+    signal_results = {s["id"]: evaluate_signal(s, row) for s in pattern.get("Signals", [])}
+    trigger = bool(evaluate_node(pattern["Trigger"], signal_results))
+    intensity = int(evaluate_node(pattern["Intensity"], signal_results))
+    return trigger, intensity
 
 # ? MARK: MAIN SECTION
 def get_tehsil_data(state, district, block):
@@ -730,6 +834,8 @@ def get_pattern_intensity(state, district, block):
         )
 
         block_patterns = load_block_patterns()
+        legacy_patterns = {k: v for k, v in block_patterns.items() if k != "Production_system"}
+        production_patterns = get_production_system_patterns(block_patterns)
 
         df_temp = read_sheet(file_path, "croppingIntensity_annual")
 
@@ -744,7 +850,7 @@ def get_pattern_intensity(state, district, block):
             mws_active_patterns[uid] = []
 
         # Iterate through ALL categories (Agriculture, Forest & Livestock, Health, Socio-economic)
-        for category_name, patterns in block_patterns.items():
+        for category_name, patterns in legacy_patterns.items():
 
             # Iterate through each pattern in this category
             for pattern in patterns:
@@ -1346,7 +1452,19 @@ def get_pattern_intensity(state, district, block):
                                 if uid in mws_active_patterns:
                                     if pattern_name not in mws_active_patterns[uid]:
                                         mws_active_patterns[uid].append(pattern_name)
-
+        # New-format patterns (Production_system): the trigger decides if a pattern is
+        # active for an MWS; MWS with a false trigger are not counted
+        kyl_rows = load_kyl_filter_data(state, district, block)
+        for pattern in production_patterns:
+            pattern_name = pattern.get("Name")
+            for uid, row in kyl_rows.items():
+                trigger, _ = evaluate_pattern(pattern, row)
+                if not trigger or uid not in mws_pattern_intensity:
+                    continue
+                active_patterns.add(pattern_name)
+                mws_pattern_intensity[uid] += 1
+                if pattern_name not in mws_active_patterns[uid]:
+                    mws_active_patterns[uid].append(pattern_name)
         PATTERN_DISPLAY_MAPPING = {
             # Agriculture patterns
             "caste": "High density of marginalized caste communities",
@@ -1411,6 +1529,126 @@ def get_pattern_intensity(state, district, block):
         return {"intensity": {}, "active_patterns": []}
 
 
+# def get_agri_water_stress_data(state, district, block):
+#     try:
+#         file_path = (
+#             DATA_DIR_TEMP
+#             + state.upper()
+#             + "/"
+#             + district.upper()
+#             + "/"
+#             + district.lower()
+#             + "_"
+#             + block.lower()
+#             + ".xlsx"
+#         )
+
+#         df_area = read_sheet(file_path, "croppingIntensity_annual")
+#         df_soge = read_sheet(file_path, "soge_vector")
+#         df_water = read_sheet(file_path, "hydrological_annual")
+
+#         mws_pattern = {}
+#         mws_intensity = {}
+
+#         for uid in df_area["UID"]:
+#             mws_pattern[uid] = False
+#             mws_intensity[uid] = 0.0
+
+#         indicator_weights = {"indicator1": 0.5, "indicator2": 0.5}
+
+#         # Indicator 1: class_name != "Safe"
+#         indicator1_uids = set()
+#         for index, row in df_soge.iterrows():
+#             uid = row["UID"]
+#             class_name = row["class_name"]
+
+#             if str(class_name).lower() != "safe":
+#                 indicator1_uids.add(uid)
+
+#         # Indicator 2: G_in_mm_ decreasing trend
+#         indicator2_uids = set()
+
+#         g_columns = [col for col in df_water.columns if col.startswith("G_in_mm_")]
+#         g_columns.sort()
+
+#         start_year = 2017
+#         end_year = start_year + len(g_columns) - 1
+#         year_range = f"{start_year}-{end_year}"
+
+#         for index, row in df_water.iterrows():
+#             uid = row["UID"]
+
+#             values = []
+#             for col in g_columns:
+#                 val = row[col]
+#                 if pd.notna(val):
+#                     values.append(float(val))
+
+#             if len(values) >= 3:
+#                 try:
+#                     mk_result = mk.original_test(values)
+
+#                     if mk_result.trend == "decreasing":
+#                         indicator2_uids.add(uid)
+#                 except Exception as e:
+#                     pass
+
+#         # Calculate intensity for each MWS
+#         for uid in mws_intensity.keys():
+#             intensity = 0.0
+
+#             if uid in indicator1_uids:
+#                 intensity += indicator_weights["indicator1"]
+
+#             if uid in indicator2_uids:
+#                 intensity += indicator_weights["indicator2"]
+
+#             mws_intensity[uid] = round(intensity, 2)
+
+#             if intensity >= 1.0:  # Only True if ALL indicators passed
+#                 mws_pattern[uid] = True
+
+#         matched_uids = indicator1_uids.intersection(indicator2_uids)
+
+#         # Calculate total area of matched MWS
+#         total_matched_area = 0.0
+#         for index, row in df_area.iterrows():
+#             uid = row["UID"]
+#             if uid in matched_uids:
+#                 area = row["sum_area_in_ha"]
+#                 if pd.notna(area):
+#                     total_matched_area += float(area)
+
+#         # Calculate total area of ALL MWS (more concise)
+#         total_all_area = float(df_area["sum_area_in_ha"].sum())
+
+#         result = {
+#             "mws_pattern": mws_pattern,
+#             "mws_intensity": mws_intensity,
+#             "total_area": total_matched_area,
+#             "total_all_area": total_all_area,
+#             "year_range": year_range,
+#         }
+
+#         return result
+
+#     except Exception as e:
+#         logger.info(
+#             "Not able to access excel for %s district, %s block for Cropping Intensity: %s",
+#             district,
+#             block,
+#             e,
+#         )
+
+#         return {
+#             "mws_pattern": {},
+#             "mws_intensity": {},
+#             "total_area": 0.0,
+#             "total_all_area": 0.0,
+#             "year_range": "",
+#         }
+
+
 def get_agri_water_stress_data(state, district, block):
     try:
         file_path = (
@@ -1426,71 +1664,47 @@ def get_agri_water_stress_data(state, district, block):
         )
 
         df_area = read_sheet(file_path, "croppingIntensity_annual")
-        df_soge = read_sheet(file_path, "soge_vector")
         df_water = read_sheet(file_path, "hydrological_annual")
+
+        # Year range of the water balance data (unchanged)
+        g_columns = [col for col in df_water.columns if col.startswith("G_in_mm_")]
+        start_year = 2017
+        end_year = start_year + len(g_columns) - 1
+        year_range = f"{start_year}-{end_year}"
+
+        # groundwater_stress rules (new format) and per-MWS values from the KYL filter data
+        pattern = next(
+            (
+                p
+                for p in get_production_system_patterns(load_block_patterns())
+                if p.get("Name") == "groundwater_stress"
+            ),
+            None,
+        )
+        print("GROUNDWATER SIGNALS:", pattern.get("Signals"))
+        if pattern is None:
+            raise ValueError("groundwater_stress not found in block_patterns.json")
+
+        kyl_rows = load_kyl_filter_data(state, district, block)
+        max_intensity = len(pattern["Intensity"].get("Intensity_Values", [])) or 1
 
         mws_pattern = {}
         mws_intensity = {}
+        matched_uids = set()
 
         for uid in df_area["UID"]:
             mws_pattern[uid] = False
             mws_intensity[uid] = 0.0
 
-        indicator_weights = {"indicator1": 0.5, "indicator2": 0.5}
+            kyl_row = kyl_rows.get(uid)
+            if kyl_row is None:
+                continue
 
-        # Indicator 1: class_name != "Safe"
-        indicator1_uids = set()
-        for index, row in df_soge.iterrows():
-            uid = row["UID"]
-            class_name = row["class_name"]
-
-            if str(class_name).lower() != "safe":
-                indicator1_uids.add(uid)
-
-        # Indicator 2: G_in_mm_ decreasing trend
-        indicator2_uids = set()
-
-        g_columns = [col for col in df_water.columns if col.startswith("G_in_mm_")]
-        g_columns.sort()
-
-        start_year = 2017
-        end_year = start_year + len(g_columns) - 1
-        year_range = f"{start_year}-{end_year}"
-
-        for index, row in df_water.iterrows():
-            uid = row["UID"]
-
-            values = []
-            for col in g_columns:
-                val = row[col]
-                if pd.notna(val):
-                    values.append(float(val))
-
-            if len(values) >= 3:
-                try:
-                    mk_result = mk.original_test(values)
-
-                    if mk_result.trend == "decreasing":
-                        indicator2_uids.add(uid)
-                except Exception as e:
-                    pass
-
-        # Calculate intensity for each MWS
-        for uid in mws_intensity.keys():
-            intensity = 0.0
-
-            if uid in indicator1_uids:
-                intensity += indicator_weights["indicator1"]
-
-            if uid in indicator2_uids:
-                intensity += indicator_weights["indicator2"]
-
-            mws_intensity[uid] = round(intensity, 2)
-
-            if intensity >= 1.0:  # Only True if ALL indicators passed
+            trigger, intensity = evaluate_pattern(pattern, kyl_row)
+            if trigger:
                 mws_pattern[uid] = True
-
-        matched_uids = indicator1_uids.intersection(indicator2_uids)
+                mws_intensity[uid] = round(intensity / max_intensity, 2)
+                matched_uids.add(uid)
 
         # Calculate total area of matched MWS
         total_matched_area = 0.0
@@ -1503,13 +1717,20 @@ def get_agri_water_stress_data(state, district, block):
 
         # Calculate total area of ALL MWS (more concise)
         total_all_area = float(df_area["sum_area_in_ha"].sum())
-
+        groundwater_conditions = [
+            f"{signal.get('id')}: {signal.get('description')}"
+            for signal in pattern.get("Signals", [])
+            if signal.get("description")
+        ]
+        groundwater_description = pattern.get("Comment", "").split("Further validation")[0].strip()
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
             "total_area": total_matched_area,
             "total_all_area": total_all_area,
             "year_range": year_range,
+            "conditions": groundwater_conditions,
+            "description": groundwater_description,
         }
 
         return result
@@ -1529,6 +1750,208 @@ def get_agri_water_stress_data(state, district, block):
             "total_all_area": 0.0,
             "year_range": "",
         }
+    
+# def get_agri_water_drought_data(state, district, block):
+#     try:
+#         file_path = (
+#             DATA_DIR_TEMP
+#             + state.upper()
+#             + "/"
+#             + district.upper()
+#             + "/"
+#             + district.lower()
+#             + "_"
+#             + block.lower()
+#             + ".xlsx"
+#         )
+
+#         df_area = read_sheet(file_path, "croppingIntensity_annual")
+#         df_drought = read_sheet(file_path, "croppingDrought_kharif")
+
+#         mws_pattern = {}
+#         mws_intensity = {}
+
+#         # Initialize all UIDs with False and 0 intensity
+#         for uid in df_area["UID"]:
+#             mws_pattern[uid] = False
+#             mws_intensity[uid] = 0.0
+
+#         # Define weights for each indicator
+#         indicator_weights = {
+#             "indicator1": 0.5,  # Kharif drought frequency >= 2
+#             "indicator2": 0.5,  # Average dry spell length >= 2
+#         }
+
+#         # Indicator 1: Kharif drought frequency >= 2
+#         indicator1_uids = set()
+
+#         moderate_cols = [
+#             col for col in df_drought.columns if col.startswith("Moderate_in_weeks_")
+#         ]
+#         severe_cols = [
+#             col for col in df_drought.columns if col.startswith("Severe_in_weeks_")
+#         ]
+
+#         years = set()
+#         for col in moderate_cols:
+#             year = col.replace("Moderate_in_weeks_", "")
+#             if year:
+#                 years.add(year)
+
+#         years_sorted = sorted(list(years))
+
+#         for index, row in df_drought.iterrows():
+#             uid = row["UID"]
+#             drought_year_count = 0
+
+#             for year in years_sorted:
+#                 moderate_col = f"Moderate_in_weeks_{year}"
+#                 severe_col = f"Severe_in_weeks_{year}"
+
+#                 if (
+#                     moderate_col in df_drought.columns
+#                     and severe_col in df_drought.columns
+#                 ):
+#                     moderate_val = row[moderate_col]
+#                     severe_val = row[severe_col]
+
+#                     if pd.notna(moderate_val) and pd.notna(severe_val):
+#                         year_sum = float(moderate_val) + float(severe_val)
+
+#                         if year_sum >= 5:
+#                             drought_year_count += 1
+
+#             if drought_year_count >= 2:
+#                 indicator1_uids.add(uid)
+
+#         # Indicator 2: Average dry spell length >= 2
+#         indicator2_uids = set()
+
+#         drysp_cols = [
+#             col for col in df_drought.columns if col.startswith("drysp_unit_4_weeks_")
+#         ]
+#         drysp_cols.sort()
+
+#         for index, row in df_drought.iterrows():
+#             uid = row["UID"]
+
+#             values = []
+#             for col in drysp_cols:
+#                 val = row[col]
+#                 if pd.notna(val):
+#                     values.append(float(val))
+
+#             if len(values) > 0:
+#                 average = sum(values) / len(values)
+
+#                 if average >= 2:
+#                     indicator2_uids.add(uid)
+
+#         # Calculate intensity for each MWS
+#         for uid in mws_intensity.keys():
+#             intensity = 0.0
+
+#             # Add weight if indicator 1 passed
+#             if uid in indicator1_uids:
+#                 intensity += indicator_weights["indicator1"]
+
+#             # Add weight if indicator 2 passed
+#             if uid in indicator2_uids:
+#                 intensity += indicator_weights["indicator2"]
+
+#             mws_intensity[uid] = round(intensity, 2)
+
+#             # Mark as True if ALL indicators passed
+#             if intensity >= 1.0:
+#                 mws_pattern[uid] = True
+
+#         # Find UIDs that passed BOTH indicators (for total_area)
+#         matched_uids = indicator1_uids.intersection(indicator2_uids)
+
+#         # Find UIDs that passed AT LEAST ONE indicator (for timeline denominator)
+#         any_indicator_uids = indicator1_uids.union(indicator2_uids)
+
+#         # Calculate total area of matched MWS (both indicators)
+#         total_matched_area = 0.0
+#         for index, row in df_area.iterrows():
+#             uid = row["UID"]
+#             if uid in matched_uids:
+#                 area = row["sum_area_in_ha"]
+#                 if pd.notna(area):
+#                     total_matched_area += float(area)
+
+#         # Calculate weighted average drought incidence timeline
+#         weighted_drought_timeline = {}
+
+#         for year in years_sorted:
+#             numerator = 0.0
+#             denominator = 0.0
+
+#             for index, row in df_drought.iterrows():
+#                 uid = row["UID"]
+
+#                 # Include MWS units where AT LEAST ONE indicator matches
+#                 if uid in any_indicator_uids:
+#                     # Get cropping area for this MWS from df_area
+#                     area_row = df_area[df_area["UID"] == uid]
+#                     if not area_row.empty:
+#                         cropping_area = area_row.iloc[0]["sum_area_in_ha"]
+
+#                         if pd.notna(cropping_area):
+#                             cropping_area = float(cropping_area)
+
+#                             # Calculate drought binary for this year
+#                             moderate_col = f"Moderate_in_weeks_{year}"
+#                             severe_col = f"Severe_in_weeks_{year}"
+
+#                             if (
+#                                 moderate_col in df_drought.columns
+#                                 and severe_col in df_drought.columns
+#                             ):
+#                                 moderate_val = row[moderate_col]
+#                                 severe_val = row[severe_col]
+
+#                                 if pd.notna(moderate_val) and pd.notna(severe_val):
+#                                     year_sum = float(moderate_val) + float(severe_val)
+#                                     drought_binary = 1 if year_sum > 5 else 0
+
+#                                     numerator += drought_binary * cropping_area
+#                                     denominator += cropping_area
+
+#             # Calculate weighted average for this year
+#             if denominator > 0:
+#                 weighted_drought_timeline[year] = round(numerator / denominator, 4)
+#             else:
+#                 weighted_drought_timeline[year] = 0.0
+
+#         # Calculate total area of ALL MWS
+#         total_all_area = float(df_area["sum_area_in_ha"].sum())
+
+#         result = {
+#             "mws_pattern": mws_pattern,
+#             "mws_intensity": mws_intensity,
+#             "total_area": total_matched_area,
+#             "total_all_area": total_all_area,
+#             "year_range": years_sorted[0] + "-" + years_sorted[-1],
+#         }
+
+#         return result, weighted_drought_timeline
+
+#     except Exception as e:
+#         logger.info(
+#             "Not able to access excel for %s district, %s block for Drought Data: %s",
+#             district,
+#             block,
+#             e,
+#         )
+
+#         return {
+#             "mws_pattern": {},
+#             "mws_intensity": {},
+#             "total_area": 0.0,
+#             "total_all_area": 0.0,
+#             "year_range": "",
+#         }, {}
 
 
 def get_agri_water_drought_data(state, district, block):
@@ -1548,171 +1971,156 @@ def get_agri_water_drought_data(state, district, block):
         df_area = read_sheet(file_path, "croppingIntensity_annual")
         df_drought = read_sheet(file_path, "croppingDrought_kharif")
 
+        # Get High Drought Risk pattern from block_patterns.json
+        pattern = next(
+            (
+                p
+                for p in get_production_system_patterns(load_block_patterns())
+                if p.get("Name") == "high_drought_risk"
+            ),
+            None,
+        )
+
+        if pattern is None:
+            raise ValueError("high_drought_risk not found in block_patterns.json")
+
+        # Load MWS-wise KYL filter data
+        kyl_rows = load_kyl_filter_data(state, district, block)
+
+        max_intensity = (
+            len(pattern.get("Intensity", {}).get("Intensity_Values", [])) or 1
+        )
+
         mws_pattern = {}
         mws_intensity = {}
+        matched_uids = set()
+        matched_signal_ids = set()
 
-        # Initialize all UIDs with False and 0 intensity
+        # Evaluate JSON signals for every MWS
         for uid in df_area["UID"]:
             mws_pattern[uid] = False
             mws_intensity[uid] = 0.0
 
-        # Define weights for each indicator
-        indicator_weights = {
-            "indicator1": 0.5,  # Kharif drought frequency >= 2
-            "indicator2": 0.5,  # Average dry spell length >= 2
-        }
+            kyl_row = kyl_rows.get(uid)
+            if kyl_row is None:
+                continue
 
-        # Indicator 1: Kharif drought frequency >= 2
-        indicator1_uids = set()
+            trigger, intensity = evaluate_pattern(pattern, kyl_row)
 
-        moderate_cols = [
-            col for col in df_drought.columns if col.startswith("Moderate_in_weeks_")
-        ]
-        severe_cols = [
-            col for col in df_drought.columns if col.startswith("Severe_in_weeks_")
-        ]
-
-        years = set()
-        for col in moderate_cols:
-            year = col.replace("Moderate_in_weeks_", "")
-            if year:
-                years.add(year)
-
-        years_sorted = sorted(list(years))
-
-        for index, row in df_drought.iterrows():
-            uid = row["UID"]
-            drought_year_count = 0
-
-            for year in years_sorted:
-                moderate_col = f"Moderate_in_weeks_{year}"
-                severe_col = f"Severe_in_weeks_{year}"
-
-                if (
-                    moderate_col in df_drought.columns
-                    and severe_col in df_drought.columns
-                ):
-                    moderate_val = row[moderate_col]
-                    severe_val = row[severe_col]
-
-                    if pd.notna(moderate_val) and pd.notna(severe_val):
-                        year_sum = float(moderate_val) + float(severe_val)
-
-                        if year_sum >= 5:
-                            drought_year_count += 1
-
-            if drought_year_count >= 2:
-                indicator1_uids.add(uid)
-
-        # Indicator 2: Average dry spell length >= 2
-        indicator2_uids = set()
-
-        drysp_cols = [
-            col for col in df_drought.columns if col.startswith("drysp_unit_4_weeks_")
-        ]
-        drysp_cols.sort()
-
-        for index, row in df_drought.iterrows():
-            uid = row["UID"]
-
-            values = []
-            for col in drysp_cols:
-                val = row[col]
-                if pd.notna(val):
-                    values.append(float(val))
-
-            if len(values) > 0:
-                average = sum(values) / len(values)
-
-                if average >= 2:
-                    indicator2_uids.add(uid)
-
-        # Calculate intensity for each MWS
-        for uid in mws_intensity.keys():
-            intensity = 0.0
-
-            # Add weight if indicator 1 passed
-            if uid in indicator1_uids:
-                intensity += indicator_weights["indicator1"]
-
-            # Add weight if indicator 2 passed
-            if uid in indicator2_uids:
-                intensity += indicator_weights["indicator2"]
-
-            mws_intensity[uid] = round(intensity, 2)
-
-            # Mark as True if ALL indicators passed
-            if intensity >= 1.0:
+            if trigger:
                 mws_pattern[uid] = True
+                mws_intensity[uid] = round(intensity / max_intensity, 2)
+                matched_uids.add(uid)
 
-        # Find UIDs that passed BOTH indicators (for total_area)
-        matched_uids = indicator1_uids.intersection(indicator2_uids)
+                # Collect only signals which are TRUE for triggered MWS
+                for signal in pattern.get("Signals", []):
+                    if evaluate_signal(signal, kyl_row):
+                        matched_signal_ids.add(signal.get("id"))
 
-        # Find UIDs that passed AT LEAST ONE indicator (for timeline denominator)
-        any_indicator_uids = indicator1_uids.union(indicator2_uids)
-
-        # Calculate total area of matched MWS (both indicators)
+        # Calculate total area of matched MWS
         total_matched_area = 0.0
-        for index, row in df_area.iterrows():
+
+        for _, row in df_area.iterrows():
             uid = row["UID"]
+
             if uid in matched_uids:
                 area = row["sum_area_in_ha"]
+
                 if pd.notna(area):
                     total_matched_area += float(area)
 
-        # Calculate weighted average drought incidence timeline
+        total_all_area = float(df_area["sum_area_in_ha"].sum())
+
+        # Get drought years from Excel
+        moderate_cols = [
+            col
+            for col in df_drought.columns
+            if col.startswith("Moderate_in_weeks_")
+        ]
+
+        years_sorted = sorted(
+            col.replace("Moderate_in_weeks_", "")
+            for col in moderate_cols
+        )
+
+        # Calculate weighted drought incidence timeline
+        # Only signal-triggered MWS are included
         weighted_drought_timeline = {}
 
         for year in years_sorted:
             numerator = 0.0
             denominator = 0.0
 
-            for index, row in df_drought.iterrows():
+            moderate_col = f"Moderate_in_weeks_{year}"
+            severe_col = f"Severe_in_weeks_{year}"
+
+            if (
+                moderate_col not in df_drought.columns
+                or severe_col not in df_drought.columns
+            ):
+                weighted_drought_timeline[year] = 0.0
+                continue
+
+            for _, row in df_drought.iterrows():
                 uid = row["UID"]
 
-                # Include MWS units where AT LEAST ONE indicator matches
-                if uid in any_indicator_uids:
-                    # Get cropping area for this MWS from df_area
-                    area_row = df_area[df_area["UID"] == uid]
-                    if not area_row.empty:
-                        cropping_area = area_row.iloc[0]["sum_area_in_ha"]
+                if uid not in matched_uids:
+                    continue
 
-                        if pd.notna(cropping_area):
-                            cropping_area = float(cropping_area)
+                area_row = df_area[df_area["UID"] == uid]
 
-                            # Calculate drought binary for this year
-                            moderate_col = f"Moderate_in_weeks_{year}"
-                            severe_col = f"Severe_in_weeks_{year}"
+                if area_row.empty:
+                    continue
 
-                            if (
-                                moderate_col in df_drought.columns
-                                and severe_col in df_drought.columns
-                            ):
-                                moderate_val = row[moderate_col]
-                                severe_val = row[severe_col]
+                cropping_area = area_row.iloc[0]["sum_area_in_ha"]
 
-                                if pd.notna(moderate_val) and pd.notna(severe_val):
-                                    year_sum = float(moderate_val) + float(severe_val)
-                                    drought_binary = 1 if year_sum > 5 else 0
+                if pd.isna(cropping_area):
+                    continue
 
-                                    numerator += drought_binary * cropping_area
-                                    denominator += cropping_area
+                moderate_val = row[moderate_col]
+                severe_val = row[severe_col]
 
-            # Calculate weighted average for this year
-            if denominator > 0:
-                weighted_drought_timeline[year] = round(numerator / denominator, 4)
-            else:
-                weighted_drought_timeline[year] = 0.0
+                if pd.notna(moderate_val) and pd.notna(severe_val):
+                    cropping_area = float(cropping_area)
+                    year_sum = float(moderate_val) + float(severe_val)
 
-        # Calculate total area of ALL MWS
-        total_all_area = float(df_area["sum_area_in_ha"].sum())
+                    drought_binary = 1 if year_sum > 5 else 0
+
+                    numerator += drought_binary * cropping_area
+                    denominator += cropping_area
+
+            weighted_drought_timeline[year] = (
+                round(numerator / denominator, 4)
+                if denominator > 0
+                else 0.0
+            )
+
+        # Include only signals that evaluated TRUE
+        drought_conditions = [
+            f"{signal.get('id')}: {signal.get('description')}"
+            for signal in pattern.get("Signals", [])
+            if signal.get("id") in matched_signal_ids
+            and signal.get("description")
+        ]
+
+        drought_description = (
+            pattern.get("Comment", "")
+            .split("Further validation")[0]
+            .strip()
+        )
 
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
             "total_area": total_matched_area,
             "total_all_area": total_all_area,
-            "year_range": years_sorted[0] + "-" + years_sorted[-1],
+            "year_range": (
+                years_sorted[0] + "-" + years_sorted[-1]
+                if years_sorted
+                else ""
+            ),
+            "conditions": drought_conditions,
+            "description": drought_description,
         }
 
         return result, weighted_drought_timeline
@@ -1731,7 +2139,237 @@ def get_agri_water_drought_data(state, district, block):
             "total_area": 0.0,
             "total_all_area": 0.0,
             "year_range": "",
+            "conditions": [],
+            "description": "",
         }, {}
+
+# def get_agri_water_irrigation_data(state, district, block):
+#     try:
+#         file_path = (
+#             DATA_DIR_TEMP
+#             + state.upper()
+#             + "/"
+#             + district.upper()
+#             + "/"
+#             + district.lower()
+#             + "_"
+#             + block.lower()
+#             + ".xlsx"
+#         )
+
+#         df_area = read_sheet(file_path, "croppingIntensity_annual")
+#         df_water = read_sheet(file_path, "surfaceWaterBodies_annual")
+
+#         mws_pattern = {}
+#         mws_intensity = {}
+
+#         # Initialize all UIDs with False and 0 intensity
+#         for uid in df_area["UID"]:
+#             mws_pattern[uid] = False
+#             mws_intensity[uid] = 0.0
+
+#         # Define weights for each indicator
+#         indicator_weights = {
+#             "indicator1": 0.5,  # Rabi water availability < 30%
+#             "indicator2": 0.5,  # Total water body area decreasing trend
+#         }
+
+#         # Indicator 1: Rabi water availability < 30%
+#         indicator1_uids = set()
+
+#         # Find all years from total_area_in_ha_ columns
+#         total_cols = [
+#             col for col in df_water.columns if col.startswith("total_area_in_ha_")
+#         ]
+#         years = []
+#         for col in total_cols:
+#             year = col.replace("total_area_in_ha_", "")
+#             if year:
+#                 years.append(year)
+
+#         years_sorted = sorted(years)
+#         percentage_threshold = 30.0
+
+#         for index, row in df_water.iterrows():
+#             uid = row["UID"]
+#             yearly_percentages = []
+
+#             # Calculate percentage for each year
+#             for year in years_sorted:
+#                 total_col = f"total_area_in_ha_{year}"
+#                 rabi_col = f"rabi_area_in_ha_{year}"
+
+#                 # Check if both columns exist
+#                 if total_col in df_water.columns and rabi_col in df_water.columns:
+#                     total_val = row[total_col]
+#                     rabi_val = row[rabi_col]
+
+#                     # Calculate percentage if values are valid
+#                     if pd.notna(total_val) and pd.notna(rabi_val) and total_val > 0:
+#                         year_percentage = (float(rabi_val) / float(total_val)) * 100
+#                         yearly_percentages.append(year_percentage)
+
+#             # Calculate average percentage
+#             if len(yearly_percentages) > 0:
+#                 avg_percentage = sum(yearly_percentages) / len(yearly_percentages)
+
+#                 if avg_percentage < percentage_threshold:
+#                     indicator1_uids.add(uid)
+
+#         # Indicator 2: Total water body area decreasing trend
+#         indicator2_uids = set()
+
+#         # Find all total_area_in_ha_ columns
+#         total_cols = [
+#             col for col in df_water.columns if col.startswith("total_area_in_ha_")
+#         ]
+#         total_cols.sort()
+
+#         for index, row in df_water.iterrows():
+#             uid = row["UID"]
+
+#             # Extract values from all total_area_in_ha_ columns
+#             values = []
+#             for col in total_cols:
+#                 val = row[col]
+#                 if pd.notna(val):
+#                     values.append(float(val))
+
+#             if len(values) >= 3:
+#                 try:
+#                     mk_result = mk.original_test(values)
+
+#                     # Check for decreasing trend
+#                     if mk_result.trend == "decreasing":
+#                         indicator2_uids.add(uid)
+#                 except Exception as e:
+#                     pass
+
+#         # Calculate intensity for each MWS
+#         for uid in mws_intensity.keys():
+#             intensity = 0.0
+
+#             # Add weight if indicator 1 passed
+#             if uid in indicator1_uids:
+#                 intensity += indicator_weights["indicator1"]
+
+#             # Add weight if indicator 2 passed
+#             if uid in indicator2_uids:
+#                 intensity += indicator_weights["indicator2"]
+
+#             mws_intensity[uid] = round(intensity, 2)
+
+#             # Mark as True if ALL indicators passed
+#             if intensity >= 1.0:
+#                 mws_pattern[uid] = True
+
+#         # Find UIDs that passed both indicators (for area calculation)
+#         matched_uids = indicator1_uids.intersection(indicator2_uids)
+
+#         # Calculate total area of matched MWS
+#         total_matched_area = 0.0
+#         for index, row in df_area.iterrows():
+#             uid = row["UID"]
+#             if uid in matched_uids:
+#                 area = row["sum_area_in_ha"]
+#                 if pd.notna(area):
+#                     total_matched_area += float(area)
+
+#         # Calculate weighted average seasonal water availability timeline
+#         seasonal_timeline = {"kharif": {}, "rabi": {}, "zaid": {}}
+
+#         for year in years_sorted:
+#             # Initialize accumulators for each season
+#             kharif_numerator = 0.0
+#             rabi_numerator = 0.0
+#             zaid_numerator = 0.0
+#             denominator = 0.0
+
+#             for index, row in df_water.iterrows():
+#                 uid = row["UID"]
+#                 # Only include matched UIDs
+#                 if uid in matched_uids:
+#                     total_col = f"total_area_in_ha_{year}"
+#                     kharif_col = f"kharif_area_in_ha_{year}"
+#                     rabi_col = f"rabi_area_in_ha_{year}"
+#                     zaid_col = f"zaid_area_in_ha_{year}"
+
+#                     # Check if all columns exist
+#                     if (
+#                         total_col in df_water.columns
+#                         and kharif_col in df_water.columns
+#                         and rabi_col in df_water.columns
+#                         and zaid_col in df_water.columns
+#                     ):
+
+#                         total_val = row[total_col]
+#                         kharif_val = row[kharif_col]
+#                         rabi_val = row[rabi_col]
+#                         zaid_val = row[zaid_col]
+
+#                         # Calculate if all values are valid
+#                         if (
+#                             pd.notna(total_val)
+#                             and pd.notna(kharif_val)
+#                             and pd.notna(rabi_val)
+#                             and pd.notna(zaid_val)
+#                             and total_val > 0
+#                         ):
+
+#                             total_area = float(total_val)
+
+#                             # Calculate percentages for each season
+#                             kharif_percentage = (float(kharif_val) / total_area) * 100
+#                             rabi_percentage = (float(rabi_val) / total_area) * 100
+#                             zaid_percentage = (float(zaid_val) / total_area) * 100
+
+#                             # Weighted sum
+#                             kharif_numerator += kharif_percentage * total_area
+#                             rabi_numerator += rabi_percentage * total_area
+#                             zaid_numerator += zaid_percentage * total_area
+#                             denominator += total_area
+
+#             # Calculate weighted averages for this year
+#             if denominator > 0:
+#                 seasonal_timeline["kharif"][year] = round(
+#                     kharif_numerator / denominator, 2
+#                 )
+#                 seasonal_timeline["rabi"][year] = round(rabi_numerator / denominator, 2)
+#                 seasonal_timeline["zaid"][year] = round(zaid_numerator / denominator, 2)
+#             else:
+#                 seasonal_timeline["kharif"][year] = 0.0
+#                 seasonal_timeline["rabi"][year] = 0.0
+#                 seasonal_timeline["zaid"][year] = 0.0
+
+#         # Calculate total area of ALL MWS (more concise)
+#         total_all_area = float(df_area["sum_area_in_ha"].sum())
+
+#         result = {
+#             "mws_pattern": mws_pattern,
+#             "mws_intensity": mws_intensity,
+#             "total_area": total_matched_area,
+#             "total_all_area": total_all_area,
+#             "year_range": years_sorted[0] + "-" + years_sorted[-1],
+#         }
+
+#         return result, seasonal_timeline
+
+#     except Exception as e:
+#         logger.info(
+#             "Not able to access excel for %s district, %s block for Irrigation Data: %s",
+#             district,
+#             block,
+#             e,
+#         )
+
+#         return {
+#             "mws_pattern": {},
+#             "mws_intensity": {},
+#             "total_area": 0.0,
+#             "total_all_area": 0.0,
+#             "year_range": "",
+#         }, {"kharif": {}, "rabi": {}, "zaid": {}}
+
 
 
 def get_agri_water_irrigation_data(state, district, block):
@@ -1751,196 +2389,260 @@ def get_agri_water_irrigation_data(state, district, block):
         df_area = read_sheet(file_path, "croppingIntensity_annual")
         df_water = read_sheet(file_path, "surfaceWaterBodies_annual")
 
+        # Load High Irrigation Difficulties pattern
+        pattern = next(
+            (
+                p
+                for p in get_production_system_patterns(load_block_patterns())
+                if p.get("Name") == "high_irrigation_difficulties"
+            ),
+            None,
+        )
+
+        if pattern is None:
+            raise ValueError(
+                "high_irrigation_difficulties not found in block_patterns.json"
+            )
+
+        # Load MWS-wise KYL filter data
+        kyl_rows = load_kyl_filter_data(state, district, block)
+
+        max_intensity = (
+            len(pattern.get("Intensity", {}).get("Intensity_Values", [])) or 1
+        )
+
         mws_pattern = {}
         mws_intensity = {}
+        matched_uids = set()
+        matched_signal_ids = set()
 
-        # Initialize all UIDs with False and 0 intensity
+        # Evaluate JSON signals for every MWS
         for uid in df_area["UID"]:
             mws_pattern[uid] = False
             mws_intensity[uid] = 0.0
 
-        # Define weights for each indicator
-        indicator_weights = {
-            "indicator1": 0.5,  # Rabi water availability < 30%
-            "indicator2": 0.5,  # Total water body area decreasing trend
-        }
+            kyl_row = kyl_rows.get(uid)
 
-        # Indicator 1: Rabi water availability < 30%
-        indicator1_uids = set()
+            if kyl_row is None:
+                continue
 
-        # Find all years from total_area_in_ha_ columns
-        total_cols = [
-            col for col in df_water.columns if col.startswith("total_area_in_ha_")
-        ]
-        years = []
-        for col in total_cols:
-            year = col.replace("total_area_in_ha_", "")
-            if year:
-                years.append(year)
+            trigger, intensity = evaluate_pattern(pattern, kyl_row)
 
-        years_sorted = sorted(years)
-        percentage_threshold = 30.0
-
-        for index, row in df_water.iterrows():
-            uid = row["UID"]
-            yearly_percentages = []
-
-            # Calculate percentage for each year
-            for year in years_sorted:
-                total_col = f"total_area_in_ha_{year}"
-                rabi_col = f"rabi_area_in_ha_{year}"
-
-                # Check if both columns exist
-                if total_col in df_water.columns and rabi_col in df_water.columns:
-                    total_val = row[total_col]
-                    rabi_val = row[rabi_col]
-
-                    # Calculate percentage if values are valid
-                    if pd.notna(total_val) and pd.notna(rabi_val) and total_val > 0:
-                        year_percentage = (float(rabi_val) / float(total_val)) * 100
-                        yearly_percentages.append(year_percentage)
-
-            # Calculate average percentage
-            if len(yearly_percentages) > 0:
-                avg_percentage = sum(yearly_percentages) / len(yearly_percentages)
-
-                if avg_percentage < percentage_threshold:
-                    indicator1_uids.add(uid)
-
-        # Indicator 2: Total water body area decreasing trend
-        indicator2_uids = set()
-
-        # Find all total_area_in_ha_ columns
-        total_cols = [
-            col for col in df_water.columns if col.startswith("total_area_in_ha_")
-        ]
-        total_cols.sort()
-
-        for index, row in df_water.iterrows():
-            uid = row["UID"]
-
-            # Extract values from all total_area_in_ha_ columns
-            values = []
-            for col in total_cols:
-                val = row[col]
-                if pd.notna(val):
-                    values.append(float(val))
-
-            if len(values) >= 3:
-                try:
-                    mk_result = mk.original_test(values)
-
-                    # Check for decreasing trend
-                    if mk_result.trend == "decreasing":
-                        indicator2_uids.add(uid)
-                except Exception as e:
-                    pass
-
-        # Calculate intensity for each MWS
-        for uid in mws_intensity.keys():
-            intensity = 0.0
-
-            # Add weight if indicator 1 passed
-            if uid in indicator1_uids:
-                intensity += indicator_weights["indicator1"]
-
-            # Add weight if indicator 2 passed
-            if uid in indicator2_uids:
-                intensity += indicator_weights["indicator2"]
-
-            mws_intensity[uid] = round(intensity, 2)
-
-            # Mark as True if ALL indicators passed
-            if intensity >= 1.0:
+            if trigger:
                 mws_pattern[uid] = True
+                mws_intensity[uid] = round(
+                    intensity / max_intensity, 2
+                )
+                matched_uids.add(uid)
 
-        # Find UIDs that passed both indicators (for area calculation)
-        matched_uids = indicator1_uids.intersection(indicator2_uids)
+                # Collect signals that are TRUE for triggered MWS
+                for signal in pattern.get("Signals", []):
+                    if evaluate_signal(signal, kyl_row):
+                        matched_signal_ids.add(signal.get("id"))
 
         # Calculate total area of matched MWS
         total_matched_area = 0.0
-        for index, row in df_area.iterrows():
+
+        for _, row in df_area.iterrows():
             uid = row["UID"]
+
             if uid in matched_uids:
                 area = row["sum_area_in_ha"]
+
                 if pd.notna(area):
                     total_matched_area += float(area)
 
-        # Calculate weighted average seasonal water availability timeline
-        seasonal_timeline = {"kharif": {}, "rabi": {}, "zaid": {}}
+        total_all_area = float(df_area["sum_area_in_ha"].sum())
 
+        # Get years from surface water data
+        # total_cols = [
+        #     col
+        #     for col in df_water.columns
+        #     if col.startswith("total_area_in_ha_")
+        # ]
+
+        # years_sorted = sorted(
+        #     col.replace("total_area_in_ha_", "")
+        #     for col in total_cols
+        # )
+
+        # # Preserve existing seasonal water availability timeline
+        # seasonal_timeline = {
+        #     "kharif": {},
+        #     "rabi": {},
+        #     "zaid": {},
+        # }
+
+        # for year in years_sorted:
+        #     kharif_numerator = 0.0
+        #     rabi_numerator = 0.0
+        #     zaid_numerator = 0.0
+        #     denominator = 0.0
+
+        #     for _, row in df_water.iterrows():
+        #         uid = row["UID"]
+
+        #         # Only signal-triggered MWS are included
+        #         if uid not in matched_uids:
+        #             continue
+
+        #         total_col = f"total_area_in_ha_{year}"
+        #         kharif_col = f"kharif_area_in_ha_{year}"
+        #         rabi_col = f"rabi_area_in_ha_{year}"
+        #         zaid_col = f"zaid_area_in_ha_{year}"
+
+        #         if not all(
+        #             col in df_water.columns
+        #             for col in [
+        #                 total_col,
+        #                 kharif_col,
+        #                 rabi_col,
+        #                 zaid_col,
+        #             ]
+        #         ):
+        #             continue
+
+        #         total_val = row[total_col]
+        #         kharif_val = row[kharif_col]
+        #         rabi_val = row[rabi_col]
+        #         zaid_val = row[zaid_col]
+
+        #         if (
+        #             pd.notna(total_val)
+        #             and pd.notna(kharif_val)
+        #             and pd.notna(rabi_val)
+        #             and pd.notna(zaid_val)
+        #             and total_val > 0
+        #         ):
+        #             total_area = float(total_val)
+
+        #             kharif_percentage = (
+        #                 float(kharif_val) / total_area
+        #             ) * 100
+
+        #             rabi_percentage = (
+        #                 float(rabi_val) / total_area
+        #             ) * 100
+
+        #             zaid_percentage = (
+        #                 float(zaid_val) / total_area
+        #             ) * 100
+
+        #             kharif_numerator += kharif_percentage * total_area
+        #             rabi_numerator += rabi_percentage * total_area
+        #             zaid_numerator += zaid_percentage * total_area
+        #             denominator += total_area
+
+        #     if denominator > 0:
+        #         seasonal_timeline["kharif"][year] = round(
+        #             kharif_numerator / denominator, 2
+        #         )
+        #         seasonal_timeline["rabi"][year] = round(
+        #             rabi_numerator / denominator, 2
+        #         )
+        #         seasonal_timeline["zaid"][year] = round(
+        #             zaid_numerator / denominator, 2
+        #         )
+        #     else:
+        #         seasonal_timeline["kharif"][year] = 0.0
+        #         seasonal_timeline["rabi"][year] = 0.0
+        #         seasonal_timeline["zaid"][year] = 0.0
+
+
+        # Calculate seasonal water availability from MWS JSON
+        seasonal_timeline = {
+            "kharif": {},
+            "rabi": {},
+            "zaid": {},
+        }
+
+        # Collect all available years from matched MWS
+        years_set = set()
+
+        for uid in matched_uids:
+            kyl_row = kyl_rows.get(uid, {})
+            seasonal_yearly = kyl_row.get("seasonal_water_yearly") or {}
+
+            if isinstance(seasonal_yearly, dict):
+                years_set.update(seasonal_yearly.keys())
+
+        years_sorted = sorted(years_set)
+
+        # Calculate weighted seasonal percentages year-wise
         for year in years_sorted:
-            # Initialize accumulators for each season
-            kharif_numerator = 0.0
-            rabi_numerator = 0.0
-            zaid_numerator = 0.0
-            denominator = 0.0
+            kharif_total = 0.0
+            rabi_total = 0.0
+            zaid_total = 0.0
+            total_water_area = 0.0
 
-            for index, row in df_water.iterrows():
-                uid = row["UID"]
-                # Only include matched UIDs
-                if uid in matched_uids:
-                    total_col = f"total_area_in_ha_{year}"
-                    kharif_col = f"kharif_area_in_ha_{year}"
-                    rabi_col = f"rabi_area_in_ha_{year}"
-                    zaid_col = f"zaid_area_in_ha_{year}"
+            for uid in matched_uids:
+                kyl_row = kyl_rows.get(uid, {})
+                seasonal_yearly = kyl_row.get("seasonal_water_yearly") or {}
 
-                    # Check if all columns exist
-                    if (
-                        total_col in df_water.columns
-                        and kharif_col in df_water.columns
-                        and rabi_col in df_water.columns
-                        and zaid_col in df_water.columns
-                    ):
+                year_data = seasonal_yearly.get(year)
 
-                        total_val = row[total_col]
-                        kharif_val = row[kharif_col]
-                        rabi_val = row[rabi_col]
-                        zaid_val = row[zaid_col]
+                if not isinstance(year_data, dict):
+                    continue
 
-                        # Calculate if all values are valid
-                        if (
-                            pd.notna(total_val)
-                            and pd.notna(kharif_val)
-                            and pd.notna(rabi_val)
-                            and pd.notna(zaid_val)
-                            and total_val > 0
-                        ):
+                total_val = year_data.get("total")
+                kharif_val = year_data.get("kharif")
+                rabi_val = year_data.get("rabi")
+                zaid_val = year_data.get("zaid")
 
-                            total_area = float(total_val)
+                if (
+                    pd.notna(total_val)
+                    and pd.notna(kharif_val)
+                    and pd.notna(rabi_val)
+                    and pd.notna(zaid_val)
+                    and float(total_val) > 0
+                ):
+                    total_water_area += float(total_val)
+                    kharif_total += float(kharif_val)
+                    rabi_total += float(rabi_val)
+                    zaid_total += float(zaid_val)
 
-                            # Calculate percentages for each season
-                            kharif_percentage = (float(kharif_val) / total_area) * 100
-                            rabi_percentage = (float(rabi_val) / total_area) * 100
-                            zaid_percentage = (float(zaid_val) / total_area) * 100
-
-                            # Weighted sum
-                            kharif_numerator += kharif_percentage * total_area
-                            rabi_numerator += rabi_percentage * total_area
-                            zaid_numerator += zaid_percentage * total_area
-                            denominator += total_area
-
-            # Calculate weighted averages for this year
-            if denominator > 0:
+            if total_water_area > 0:
                 seasonal_timeline["kharif"][year] = round(
-                    kharif_numerator / denominator, 2
+                    (kharif_total / total_water_area) * 100, 2
                 )
-                seasonal_timeline["rabi"][year] = round(rabi_numerator / denominator, 2)
-                seasonal_timeline["zaid"][year] = round(zaid_numerator / denominator, 2)
+                seasonal_timeline["rabi"][year] = round(
+                    (rabi_total / total_water_area) * 100, 2
+                )
+                seasonal_timeline["zaid"][year] = round(
+                    (zaid_total / total_water_area) * 100, 2
+                )
             else:
                 seasonal_timeline["kharif"][year] = 0.0
                 seasonal_timeline["rabi"][year] = 0.0
                 seasonal_timeline["zaid"][year] = 0.0
 
-        # Calculate total area of ALL MWS (more concise)
-        total_all_area = float(df_area["sum_area_in_ha"].sum())
+
+        # Include only signals that evaluated TRUE
+        irrigation_conditions = [
+            f"{signal.get('id')}: {signal.get('description')}"
+            for signal in pattern.get("Signals", [])
+            if signal.get("id") in matched_signal_ids
+            and signal.get("description")
+        ]
+
+        irrigation_description = (
+            pattern.get("Comment", "")
+            .split("Further validation")[0]
+            .strip()
+        )
 
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
             "total_area": total_matched_area,
             "total_all_area": total_all_area,
-            "year_range": years_sorted[0] + "-" + years_sorted[-1],
+            "year_range": (
+                years_sorted[0] + "-" + years_sorted[-1]
+                if years_sorted
+                else ""
+            ),
+            "conditions": irrigation_conditions,
+            "description": irrigation_description,
         }
 
         return result, seasonal_timeline
@@ -1959,7 +2661,304 @@ def get_agri_water_irrigation_data(state, district, block):
             "total_area": 0.0,
             "total_all_area": 0.0,
             "year_range": "",
-        }, {"kharif": {}, "rabi": {}, "zaid": {}}
+            "conditions": [],
+            "description": "",
+        }, {
+            "kharif": {},
+            "rabi": {},
+            "zaid": {},
+        }
+
+
+def get_tehsil_soil_health_data(state, district, block):
+    try:
+        file_path = (
+            DATA_DIR_TEMP
+            + state.upper()
+            + "/"
+            + district.upper()
+            + "/"
+            + district.lower()
+            + "_"
+            + block.lower()
+            + ".xlsx"
+        )
+
+        df_area = read_sheet(file_path, "croppingIntensity_annual")
+
+        pattern = next(
+            (
+                p
+                for p in get_production_system_patterns(load_block_patterns())
+                if p.get("Name") == "soil_health"
+            ),
+            None,
+        )
+
+        if pattern is None:
+            raise ValueError("soil_health not found in block_patterns.json")
+
+        kyl_rows = load_kyl_filter_data(state, district, block)
+
+        max_intensity = (
+            len(pattern.get("Intensity", {}).get("Intensity_Values", [])) or 1
+        )
+
+        mws_pattern = {}
+        mws_intensity = {}
+        matched_uids = set()
+
+        for uid in df_area["UID"]:
+            mws_pattern[uid] = False
+            mws_intensity[uid] = 0.0
+
+            kyl_row = kyl_rows.get(uid)
+            if kyl_row is None:
+                continue
+
+            trigger, intensity = evaluate_pattern(pattern, kyl_row)
+
+            if trigger:
+                mws_pattern[uid] = True
+                mws_intensity[uid] = round(
+                    intensity / max_intensity, 2
+                )
+                matched_uids.add(uid)
+
+        total_matched_area = 0.0
+
+        for _, row in df_area.iterrows():
+            uid = row["UID"]
+
+            if uid in matched_uids:
+                area = row["sum_area_in_ha"]
+
+                if pd.notna(area):
+                    total_matched_area += float(area)
+
+        total_all_area = float(df_area["sum_area_in_ha"].sum())
+
+        soil_health_conditions = [
+            f"{signal.get('id')}: {signal.get('description')}"
+            for signal in pattern.get("Signals", [])
+            if signal.get("description")
+        ]
+
+        soil_health_description = (
+            pattern.get("Comment", "")
+            .split("Further validation")[0]
+            .strip()
+        )
+
+        result = {
+            "mws_pattern": mws_pattern,
+            "mws_intensity": mws_intensity,
+            "total_area": round(total_matched_area, 2),
+            "total_all_area": round(total_all_area, 2),
+            "year_range": "",
+            "conditions": soil_health_conditions,
+            "description": soil_health_description,
+        }
+
+        return result
+
+    except Exception as e:
+        logger.info(
+            "Not able to access Soil Health Data for %s district, %s block: %s",
+            district,
+            block,
+            e,
+        )
+
+        return {
+            "mws_pattern": {},
+            "mws_intensity": {},
+            "total_area": 0.0,
+            "total_all_area": 0.0,
+            "year_range": "",
+            "conditions": [],
+            "description": "",
+        }
+
+ 
+# def get_agri_low_yield_data(state, district, block):
+#     try:
+#         file_path = (
+#             DATA_DIR_TEMP
+#             + state.upper()
+#             + "/"
+#             + district.upper()
+#             + "/"
+#             + district.lower()
+#             + "_"
+#             + block.lower()
+#             + ".xlsx"
+#         )
+
+#         df_area = read_sheet(file_path, "croppingIntensity_annual")
+#         df_cropIntensity = read_sheet(file_path, "change_detection_cropintensity")
+#         df_degrade = read_sheet(file_path, "change_detection_degradation")
+
+#         ci_columns = [
+#             col for col in df_area.columns if col.startswith("cropping_intensity_")
+#         ]
+
+#         start_year = 2017
+#         end_year = start_year + len(ci_columns) - 1
+#         year_range = f"{start_year}-{end_year}"
+
+#         mws_pattern = {}
+#         mws_intensity = {}
+
+#         # Initialize all UIDs with False and 0 intensity
+#         for uid in df_area["UID"]:
+#             mws_pattern[uid] = False
+#             mws_intensity[uid] = 0.0
+
+#         # Define weights for each indicator
+#         indicator_weights = {
+#             "indicator1": 0.5,  # Farm to barren/scrub land > 30 ha
+#             "indicator2": 0.5,  # Total crop intensity change > 30 ha
+#         }
+
+#         # Indicator 1: Farm to barren/scrub land > 30 ha
+#         indicator1_uids = set()
+
+#         for index, row in df_degrade.iterrows():
+#             uid = row["UID"]
+
+#             barren_val = row["farm_to_barren_area_in_ha"]
+#             scrub_val = row["farm_to_scrub_land_area_in_ha"]
+
+#             if pd.notna(barren_val) and pd.notna(scrub_val):
+#                 total_sum = float(barren_val) + float(scrub_val)
+
+#                 if total_sum > 30:
+#                     indicator1_uids.add(uid)
+
+#         # Indicator 2: Total crop intensity change > 30 ha
+#         indicator2_uids = set()
+
+#         for index, row in df_cropIntensity.iterrows():
+#             uid = row["UID"]
+#             value = row["total_change_crop_intensity_area_in_ha"]
+
+#             if pd.notna(value) and float(value) > 30:
+#                 indicator2_uids.add(uid)
+
+#         # Calculate intensity for each MWS
+#         for uid in mws_intensity.keys():
+#             intensity = 0.0
+
+#             # Add weight if indicator 1 passed
+#             if uid in indicator1_uids:
+#                 intensity += indicator_weights["indicator1"]
+
+#             # Add weight if indicator 2 passed
+#             if uid in indicator2_uids:
+#                 intensity += indicator_weights["indicator2"]
+
+#             mws_intensity[uid] = round(intensity, 2)
+
+#             # Mark as True if ALL indicators passed
+#             if intensity >= 1.0:
+#                 mws_pattern[uid] = True
+
+#         # Find UIDs that passed BOTH indicators (for area calculation)
+#         matched_uids = indicator1_uids.intersection(indicator2_uids)
+
+#         # Calculate areas for Sankey chart
+#         total_farmland_area = 0.0
+#         total_to_barren = 0.0
+#         total_to_scrub = 0.0
+
+#         total_all_area = 0.0
+#         #float(df_cropIntensity["total_change_crop_intensity_area_in_ha"].sum())
+
+#         for uid in matched_uids:
+
+#             area_row = df_area[df_area["UID"] == uid]
+#             if not area_row.empty:
+#                 farmland_area = area_row.iloc[0]["sum_area_in_ha"]
+#                 if pd.notna(farmland_area):
+#                     total_farmland_area += float(farmland_area)
+
+#             intensity_row = df_cropIntensity[df_cropIntensity["UID"] == uid]
+#             if not intensity_row.empty:
+#                 intensity_d_t_s = intensity_row.iloc[0]["double_to_single_area_in_ha"]
+#                 intensity_t_t_s = intensity_row.iloc[0]["triple_to_single_area_in_ha"]
+#                 intensity_t_t_d = intensity_row.iloc[0]["triple_to_double_area_in_ha"]
+#                 if pd.notna(intensity_d_t_s):
+#                     total_all_area += float(intensity_d_t_s)
+                
+#                 if pd.notna(intensity_t_t_s):
+#                     total_all_area += float(intensity_t_t_s)
+
+#                 if pd.notna(intensity_t_t_d):
+#                     total_all_area += float(intensity_t_t_d)
+
+#             degrade_row = df_degrade[df_degrade["UID"] == uid]
+#             if not degrade_row.empty:
+#                 barren_val = degrade_row.iloc[0]["farm_to_barren_area_in_ha"]
+#                 scrub_val = degrade_row.iloc[0]["farm_to_scrub_land_area_in_ha"]
+
+#                 if pd.notna(barren_val):
+#                     total_to_barren += float(barren_val)
+#                 if pd.notna(scrub_val):
+#                     total_to_scrub += float(scrub_val)
+
+#         # Calculate remaining farmland
+#         remaining_farmland = total_farmland_area - total_to_barren - total_to_scrub
+
+#         sankey_data = {
+#             "nodes": [
+#                 {"name": "Farmlands"},
+#                 {"name": "Barren Land"},
+#                 {"name": "Scrub Land"},
+#                 {"name": "Remaining Farmlands"},
+#             ],
+#             "links": [
+#                 {"source": 0, "target": 1, "value": round(total_to_barren, 2)},
+#                 {"source": 0, "target": 2, "value": round(total_to_scrub, 2)},
+#                 {
+#                     "source": 0,
+#                     "target": 3,
+#                     "value": (
+#                         round(remaining_farmland, 2) if remaining_farmland > 0 else 0
+#                     ),
+#                 },
+#             ],
+#         }
+
+#         # Calculate total area of ALL MWS (more concise)
+        
+
+#         result = {
+#             "mws_pattern": mws_pattern,
+#             "mws_intensity": mws_intensity,
+#             "total_area": round(total_to_barren + total_to_scrub, 2),
+#             "total_all_area": total_all_area,
+#             "year_range": year_range,
+#         }
+
+#         return result, sankey_data
+
+#     except Exception as e:
+#         logger.info(
+#             "Not able to access excel for %s district, %s block for Decreasing Productivity Data: %s",
+#             district,
+#             block,
+#             e,
+#         )
+
+#         return {
+#             "mws_pattern": {},
+#             "mws_intensity": {},
+#             "total_area": 0.0,
+#             "total_all_area": 0.0,
+#             "year_range": "",
+#         }, {"nodes": [], "links": []}
+
 
 
 def get_agri_low_yield_data(state, district, block):
@@ -1977,119 +2976,128 @@ def get_agri_low_yield_data(state, district, block):
         )
 
         df_area = read_sheet(file_path, "croppingIntensity_annual")
-        df_cropIntensity = read_sheet(file_path, "change_detection_cropintensity")
-        df_degrade = read_sheet(file_path, "change_detection_degradation")
+        df_cropIntensity = read_sheet(
+            file_path, "change_detection_cropintensity"
+        )
+        df_degrade = read_sheet(
+            file_path, "change_detection_degradation"
+        )
 
         ci_columns = [
-            col for col in df_area.columns if col.startswith("cropping_intensity_")
+            col for col in df_area.columns
+            if col.startswith("cropping_intensity_")
         ]
 
         start_year = 2017
         end_year = start_year + len(ci_columns) - 1
         year_range = f"{start_year}-{end_year}"
 
+        # Load decreasing productivity pattern from JSON
+        pattern = next(
+            (
+                p
+                for p in get_production_system_patterns(load_block_patterns())
+                if p.get("Name") == "decreasing_productivity"
+            ),
+            None,
+        )
+
+        if pattern is None:
+            raise ValueError(
+                "decreasing_productivity not found in block_patterns.json"
+            )
+
+        # Load per-MWS KYL variables
+        kyl_rows = load_kyl_filter_data(state, district, block)
+
+        max_intensity = (
+            len(pattern.get("Intensity", {}).get("Intensity_Values", [])) or 1
+        )
+
         mws_pattern = {}
         mws_intensity = {}
+        matched_uids = set()
 
-        # Initialize all UIDs with False and 0 intensity
+        # Evaluate JSON trigger and intensity for every MWS
         for uid in df_area["UID"]:
             mws_pattern[uid] = False
             mws_intensity[uid] = 0.0
 
-        # Define weights for each indicator
-        indicator_weights = {
-            "indicator1": 0.5,  # Farm to barren/scrub land > 30 ha
-            "indicator2": 0.5,  # Total crop intensity change > 30 ha
-        }
+            kyl_row = kyl_rows.get(uid)
 
-        # Indicator 1: Farm to barren/scrub land > 30 ha
-        indicator1_uids = set()
+            if kyl_row is None:
+                continue
 
-        for index, row in df_degrade.iterrows():
-            uid = row["UID"]
+            trigger, intensity = evaluate_pattern(pattern, kyl_row)
 
-            barren_val = row["farm_to_barren_area_in_ha"]
-            scrub_val = row["farm_to_scrub_land_area_in_ha"]
+            mws_intensity[uid] = round(
+                intensity / max_intensity, 2
+            )
 
-            if pd.notna(barren_val) and pd.notna(scrub_val):
-                total_sum = float(barren_val) + float(scrub_val)
-
-                if total_sum > 30:
-                    indicator1_uids.add(uid)
-
-        # Indicator 2: Total crop intensity change > 30 ha
-        indicator2_uids = set()
-
-        for index, row in df_cropIntensity.iterrows():
-            uid = row["UID"]
-            value = row["total_change_crop_intensity_area_in_ha"]
-
-            if pd.notna(value) and float(value) > 30:
-                indicator2_uids.add(uid)
-
-        # Calculate intensity for each MWS
-        for uid in mws_intensity.keys():
-            intensity = 0.0
-
-            # Add weight if indicator 1 passed
-            if uid in indicator1_uids:
-                intensity += indicator_weights["indicator1"]
-
-            # Add weight if indicator 2 passed
-            if uid in indicator2_uids:
-                intensity += indicator_weights["indicator2"]
-
-            mws_intensity[uid] = round(intensity, 2)
-
-            # Mark as True if ALL indicators passed
-            if intensity >= 1.0:
+            if trigger:
                 mws_pattern[uid] = True
+                matched_uids.add(uid)
 
-        # Find UIDs that passed BOTH indicators (for area calculation)
-        matched_uids = indicator1_uids.intersection(indicator2_uids)
-
-        # Calculate areas for Sankey chart
+        # Calculate Sankey data for triggered MWS
         total_farmland_area = 0.0
         total_to_barren = 0.0
         total_to_scrub = 0.0
-
         total_all_area = 0.0
-        #float(df_cropIntensity["total_change_crop_intensity_area_in_ha"].sum())
 
         for uid in matched_uids:
 
             area_row = df_area[df_area["UID"] == uid]
+
             if not area_row.empty:
                 farmland_area = area_row.iloc[0]["sum_area_in_ha"]
+
                 if pd.notna(farmland_area):
                     total_farmland_area += float(farmland_area)
 
-            intensity_row = df_cropIntensity[df_cropIntensity["UID"] == uid]
+            intensity_row = df_cropIntensity[
+                df_cropIntensity["UID"] == uid
+            ]
+
             if not intensity_row.empty:
-                intensity_d_t_s = intensity_row.iloc[0]["double_to_single_area_in_ha"]
-                intensity_t_t_s = intensity_row.iloc[0]["triple_to_single_area_in_ha"]
-                intensity_t_t_d = intensity_row.iloc[0]["triple_to_double_area_in_ha"]
-                if pd.notna(intensity_d_t_s):
-                    total_all_area += float(intensity_d_t_s)
-                
-                if pd.notna(intensity_t_t_s):
-                    total_all_area += float(intensity_t_t_s)
+                intensity_d_t_s = intensity_row.iloc[0][
+                    "double_to_single_area_in_ha"
+                ]
+                intensity_t_t_s = intensity_row.iloc[0][
+                    "triple_to_single_area_in_ha"
+                ]
+                intensity_t_t_d = intensity_row.iloc[0][
+                    "triple_to_double_area_in_ha"
+                ]
 
-                if pd.notna(intensity_t_t_d):
-                    total_all_area += float(intensity_t_t_d)
+                for value in [
+                    intensity_d_t_s,
+                    intensity_t_t_s,
+                    intensity_t_t_d,
+                ]:
+                    if pd.notna(value):
+                        total_all_area += float(value)
 
-            degrade_row = df_degrade[df_degrade["UID"] == uid]
+            degrade_row = df_degrade[
+                df_degrade["UID"] == uid
+            ]
+
             if not degrade_row.empty:
-                barren_val = degrade_row.iloc[0]["farm_to_barren_area_in_ha"]
-                scrub_val = degrade_row.iloc[0]["farm_to_scrub_land_area_in_ha"]
+                barren_val = degrade_row.iloc[0][
+                    "farm_to_barren_area_in_ha"
+                ]
+                scrub_val = degrade_row.iloc[0][
+                    "farm_to_scrub_land_area_in_ha"
+                ]
 
                 if pd.notna(barren_val):
                     total_to_barren += float(barren_val)
+
                 if pd.notna(scrub_val):
                     total_to_scrub += float(scrub_val)
 
-        # Calculate remaining farmland
-        remaining_farmland = total_farmland_area - total_to_barren - total_to_scrub
+        remaining_farmland = (
+            total_farmland_area - total_to_barren - total_to_scrub
+        )
 
         sankey_data = {
             "nodes": [
@@ -2099,34 +3107,56 @@ def get_agri_low_yield_data(state, district, block):
                 {"name": "Remaining Farmlands"},
             ],
             "links": [
-                {"source": 0, "target": 1, "value": round(total_to_barren, 2)},
-                {"source": 0, "target": 2, "value": round(total_to_scrub, 2)},
+                {
+                    "source": 0,
+                    "target": 1,
+                    "value": round(total_to_barren, 2),
+                },
+                {
+                    "source": 0,
+                    "target": 2,
+                    "value": round(total_to_scrub, 2),
+                },
                 {
                     "source": 0,
                     "target": 3,
                     "value": (
-                        round(remaining_farmland, 2) if remaining_farmland > 0 else 0
+                        round(remaining_farmland, 2)
+                        if remaining_farmland > 0 else 0
                     ),
                 },
             ],
         }
+        yield_conditions = [
+            f"{signal.get('id')}: {signal.get('description')}"
+            for signal in pattern.get("Signals", [])
+            if signal.get("description")
+        ]
 
-        # Calculate total area of ALL MWS (more concise)
-        
+        yield_description = (
+            pattern.get("Comment", "")
+            .split("Further validation")[0]
+            .strip()
+        )
 
         result = {
             "mws_pattern": mws_pattern,
             "mws_intensity": mws_intensity,
-            "total_area": round(total_to_barren + total_to_scrub, 2),
-            "total_all_area": total_all_area,
+            "total_area": round(
+                total_to_barren + total_to_scrub, 2
+            ),
+            "total_all_area": round(total_all_area, 2),
             "year_range": year_range,
+            "conditions": yield_conditions,
+            "description": yield_description,       
         }
 
         return result, sankey_data
 
     except Exception as e:
-        logger.info(
-            "Not able to access excel for %s district, %s block for Low Yield Data: %s",
+        logger.exception(
+            "Not able to access excel for %s district, %s block "
+            "for Decreasing Productivity Data: %s",
             district,
             block,
             e,
@@ -2138,7 +3168,12 @@ def get_agri_low_yield_data(state, district, block):
             "total_area": 0.0,
             "total_all_area": 0.0,
             "year_range": "",
-        }, {"nodes": [], "links": []}
+            "conditions": [],
+            "description": "",
+        }, {
+            "nodes": [],
+            "links": [],
+        }
 
 
 def get_forest_degrad_data(state, district, block):

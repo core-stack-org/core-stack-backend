@@ -86,6 +86,7 @@ from .gen_tehsil_report import (
     get_agri_water_drought_data,
     get_agri_water_irrigation_data,
     get_agri_low_yield_data,
+    get_tehsil_soil_health_data,
     get_forest_degrad_data,
     get_mining_presence_data,
     get_socio_economic_caste_data,
@@ -644,6 +645,9 @@ def generate_tehsil_report(request):
         low_yield, yield_sankey = get_agri_low_yield_data(
             result["state"], result["district"], result["block"]
         )
+        soil_health = get_tehsil_soil_health_data(
+            result["state"], result["district"], result["block"]
+        )
         forest_degradation, forest_sankey = get_forest_degrad_data(
             result["state"], result["district"], result["block"]
         )
@@ -689,6 +693,7 @@ def generate_tehsil_report(request):
             "drought_timeline_json": json.dumps(weighted_drought_timeline),
             "high_irrigation_risk_json": json.dumps(high_irrigation_risk),
             "irrigation_timeline_json": json.dumps(irrigation_timeline),
+            "soil_health_json": json.dumps(soil_health),
             "low_yield_json": json.dumps(low_yield),
             "yield_sankey_json": json.dumps(yield_sankey),
             "forest_degradation_json": json.dumps(forest_degradation),
