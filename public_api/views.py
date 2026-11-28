@@ -31,7 +31,10 @@ from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
 from utilities.renderers import round_floats
+from django.conf import settings
 from django.db.models import Q
+from shapely.geometry import Point
+from computing.config_loader import DATA_DIR
 
 # Create your views here.
 
@@ -129,9 +132,81 @@ def _format_unknown_soi_error(
     return base
 
 
+class LayerNotPublished(Exception):
+    """GeoServer WFS layer does not exist or is not published for this location."""
+
+
+class UpstreamUnavailable(Exception):
+    """Upstream GeoServer/GEE service timed out, returned 5xx, or was unreachable."""
+
+
+def wfs_get_features(
+    workspace,
+    type_name,
+    *,
+    cql_filter=None,
+    property_name=None,
+    output_format="application/json",
+    timeout=30,
+    verify=True,
+):
+    """Fetch GeoServer WFS features, turning XML ServiceExceptions into LayerNotPublished."""
+    base_url = f"{GEOSERVER_URL}/{workspace}/ows"
+    params = {
+        "service": "WFS",
+        "version": "1.0.0",
+        "request": "GetFeature",
+        "typeName": type_name,
+        "outputFormat": output_format,
+    }
+    if cql_filter:
+        params["CQL_FILTER"] = cql_filter
+    if property_name:
+        params["propertyName"] = property_name
+
+    try:
+        response = requests.get(base_url, params=params, timeout=timeout, verify=verify)
+    except requests.exceptions.RequestException as exc:
+        raise UpstreamUnavailable(str(exc)) from exc
+
+    status_code = getattr(response, "status_code", None)
+    if isinstance(status_code, int):
+        if status_code >= 500:
+            raise UpstreamUnavailable(
+                f"GeoServer request failed with status {status_code}"
+            )
+        if status_code in (400, 404):
+            raise LayerNotPublished(
+                f"Layer '{type_name}' is not published on GeoServer."
+            )
+
+    try:
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise UpstreamUnavailable(str(exc)) from exc
+
+    headers = getattr(response, "headers", None)
+    raw_ct = headers.get("Content-Type") if isinstance(headers, dict) else None
+    content_type = raw_ct.lower() if isinstance(raw_ct, str) else ""
+    raw_text = getattr(response, "text", None)
+    body_prefix = raw_text.lstrip()[:256] if isinstance(raw_text, str) else ""
+    if (
+        "xml" in content_type
+        or body_prefix.startswith("<")
+        or "ServiceException" in body_prefix
+        or "ExceptionReport" in body_prefix
+    ):
+        raise LayerNotPublished(f"Layer '{type_name}' is not published on GeoServer.")
+
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise UpstreamUnavailable("Invalid JSON response from GeoServer.") from exc
+
+
 def fetch_generated_layer_urls(state_name, district_name, block_name):
     """
-    Fetch all vector and raster layers for given state, district, and block,
+    Fetch all published vector and raster layers for given state, district, and block,
     and return their metadata as JSON.
     """
     state = _get_soi_by_name(StateSOI, "state_name", state_name)
@@ -142,7 +217,12 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
         TehsilSOI, "tehsil_name", block_name, district=district
     )
 
-    layers = Layer.objects.filter(state=state, district=district, block=tehsil)
+    layers = Layer.objects.filter(
+        state=state,
+        district=district,
+        block=tehsil,
+        is_sync_to_geoserver=True,
+    )
 
     EXCLUDE_LAYER_KEYWORDS = [
         "run_off",
@@ -202,25 +282,20 @@ def fetch_generated_layer_urls(state_name, district_name, block_name):
 
 
 def get_location_info_by_lat_lon(lat, lon):
-    base_url = f"{GEOSERVER_URL}/pan_india_asset/ows"
-    params = {
-        "service": "WFS",
-        "version": "1.0.0",
-        "request": "GetFeature",
-        "typeName": "pan_india_asset:SOI_tehsil_pan_india_dataset",
-        "outputFormat": "application/json",
-        "CQL_FILTER": f"INTERSECTS(geom,POINT({lon} {lat}))",  # lon lat order
-    }
-
     try:
-        response = requests.get(base_url, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
+        data = wfs_get_features(
+            "pan_india_asset",
+            "pan_india_asset:SOI_tehsil_pan_india_dataset",
+            cql_filter=f"INTERSECTS(geom,POINT({lon} {lat}))",  # lon lat order
+            timeout=30,
+        )
         features = data.get("features", [])
         if not features:
             return Response(
-                {"error": "Latitude and longitude is not in SOI boundary."},
+                {
+                    "error": "Latitude and longitude is not in SOI boundary.",
+                    "code": "UNKNOWN_LOCATION",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -230,62 +305,102 @@ def get_location_info_by_lat_lon(lat, lon):
             "District": properties.get("District", ""),
             "Tehsil": properties.get("TEHSIL", ""),
         }
-
-    except requests.exceptions.RequestException as e:
+    except LayerNotPublished:
+        return Response(
+            {
+                "error": "SOI admin boundary layer is not available.",
+                "code": "LAYER_NOT_PUBLISHED",
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    except UpstreamUnavailable as e:
         print("Exception while getting admin details", str(e))
-        return {"State": "", "District": "", "Tehsil": ""}
+        return Response(
+            {
+                "error": "Unable to reach GeoServer for admin boundary lookup.",
+                "code": "UPSTREAM_UNAVAILABLE",
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+
+PAN_INDIA_MWS_FGB_FILENAME = "Microwatershed_v2_with_details.fgb"
+
+
+def _resolve_pan_india_mws_fgb_path():
+    configured = getattr(settings, "PAN_INDIA_MWS_FGB_PATH", None) or os.environ.get(
+        "PAN_INDIA_MWS_FGB_PATH"
+    )
+    if configured:
+        return str(configured)
+    candidates = [
+        os.path.join(str(DATA_DIR), "mws", PAN_INDIA_MWS_FGB_FILENAME),
+        os.path.join(EXCEL_PATH, "data", "mws", PAN_INDIA_MWS_FGB_FILENAME),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[0]
+
+
+def lookup_mws_uid_from_fgb(lon, lat, fgb_path=None):
+    """
+    Point-in-polygon lookup against the pan-India MWS FlatGeobuf using its
+    R-tree spatial index (bbox pre-filter + exact covers/intersects check).
+    """
+    path = fgb_path or _resolve_pan_india_mws_fgb_path()
+    if not path or not os.path.exists(path):
+        raise FileNotFoundError(f"Pan-India MWS FGB not found at {path}")
+
+    bbox = (lon, lat, lon, lat)
+    try:
+        gdf = gpd.read_file(path, bbox=bbox, engine="pyogrio")
+    except Exception:
+        gdf = gpd.read_file(path, bbox=bbox)
+
+    if gdf.empty:
+        return None
+
+    pt = Point(lon, lat)
+    matches = gdf[gdf.geometry.covers(pt)]
+    if matches.empty:
+        matches = gdf[gdf.geometry.intersects(pt)]
+    if matches.empty:
+        return None
+
+    row = matches.iloc[0]
+    for col in ("uid", "UID", "mws_id"):
+        if col in row.index and pd.notna(row[col]):
+            val = str(row[col]).strip()
+            if val:
+                return val
+    return None
 
 
 def get_mws_id_by_lat_lon(lon, lat):
     data_dict = get_location_info_by_lat_lon(lat, lon)
 
-    if hasattr(data_dict, "status_code") and data_dict.status_code != 200:
-        return Response(
-            {"error": "Latitude and longitude is not in SOI boundary."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
+    if isinstance(data_dict, Response):
+        return data_dict
 
-    district = valid_gee_text(data_dict.get("District").lower())
-    tehsil = valid_gee_text(data_dict.get("Tehsil").lower())
+    district = valid_gee_text((data_dict.get("District") or "").lower())
+    tehsil = valid_gee_text((data_dict.get("Tehsil") or "").lower())
 
     try:
         layer_name = f"mws:mws_{district}_{tehsil}"
-        GEOSERVER_MWS_URL = f"{GEOSERVER_URL}/mws/ows"
-
-        params = {
-            "service": "WFS",
-            "version": "1.0.0",
-            "request": "GetFeature",
-            "typeName": layer_name,
-            "outputFormat": "application/json",
-            "CQL_FILTER": f"INTERSECTS(geom,POINT({lon} {lat}))",
-        }
-
-        response = requests.get(GEOSERVER_MWS_URL, params=params, timeout=30)
-
-        # Check status before parsing
-        if response.status_code in (400, 404):
-            print("MWS layer not found:", layer_name)
-            return Response(
-                {"error": "Mws Layer is not generated for the given lat lon location."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        response.raise_for_status()
-
-        try:
-            data = response.json()
-        except ValueError:
-            print("Invalid JSON response:", response.text[:500])
-            return Response(
-                {"error": "Invalid response from MWS GeoServer."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
+        data = wfs_get_features(
+            "mws",
+            layer_name,
+            cql_filter=f"INTERSECTS(geom,POINT({lon} {lat}))",
+            timeout=30,
+        )
         features = data.get("features", [])
         if not features:
             return Response(
-                {"error": "No MWS feature found for the given lat lon location."},
+                {
+                    "error": "No MWS feature found for the given lat lon location.",
+                    "code": "MWS_NOT_FOUND",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
 
@@ -296,6 +411,49 @@ def get_mws_id_by_lat_lon(lon, lat):
         data_dict["uid"] = uid
         return data_dict
 
+    except LayerNotPublished:
+        print("Per-tehsil MWS layer not published on GeoServer, trying pan-India FGB:", layer_name)
+        try:
+            uid = lookup_mws_uid_from_fgb(lon, lat)
+        except FileNotFoundError:
+            return Response(
+                {
+                    "error": "MWS layer is not published for the given lat lon location.",
+                    "code": "LAYER_NOT_PUBLISHED",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as fgb_exc:
+            print("Pan-India MWS FGB lookup failed:", str(fgb_exc))
+            return Response(
+                {
+                    "error": "MWS layer is not published for the given lat lon location.",
+                    "code": "LAYER_NOT_PUBLISHED",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not uid:
+            return Response(
+                {
+                    "error": "No MWS feature found for the given lat lon location.",
+                    "code": "MWS_NOT_FOUND",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data_dict["mws_id"] = uid
+        data_dict["uid"] = uid
+        return data_dict
+    except UpstreamUnavailable as e:
+        print("Upstream error while getting mws_id by lat long", str(e))
+        return Response(
+            {
+                "error": "MWS GeoServer is temporarily unavailable.",
+                "code": "UPSTREAM_UNAVAILABLE",
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
     except Exception as e:
         print("Exception while getting the mws_id by lat long", str(e))
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -304,20 +462,17 @@ def get_mws_id_by_lat_lon(lon, lat):
 def get_mws_time_series_data(state, district, tehsil, mws_id):
     """Fetch and merge water and NDVI time series data for a specific MWS location."""
 
-    def fetch_geoserver_data(base_url, layer_name, mws_id):
+    def fetch_geoserver_data(workspace, layer_name, mws_id):
         """Generic GeoServer WFS request."""
-        params = {
-            "service": "WFS",
-            "version": "1.0.0",
-            "request": "GetFeature",
-            "typeName": layer_name,
-            "outputFormat": "json",
-            "CQL_FILTER": f"uid='{mws_id}'",
-        }
-        response = requests.get(base_url, params=params, verify=True, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        return data["features"][0]["properties"] if data["features"] else {}
+        data = wfs_get_features(
+            workspace,
+            layer_name,
+            cql_filter=f"uid='{mws_id}'",
+            output_format="json",
+            timeout=10,
+            verify=True,
+        )
+        return data["features"][0]["properties"] if data.get("features") else {}
 
     try:
         # Validate geographic hierarchy
@@ -327,7 +482,8 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
             return {
                 "error": _format_unknown_soi_error(
                     "state", state, StateSOI, "state_name"
-                )
+                ),
+                "code": "UNKNOWN_LOCATION",
             }
         try:
             district_obj = _get_soi_by_name(
@@ -342,7 +498,8 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
                     "district_name",
                     parent_context=f"in state '{state_obj.state_name}'",
                     state=state_obj,
-                )
+                ),
+                "code": "UNKNOWN_LOCATION",
             }
         try:
             tehsil_obj = _get_soi_by_name(
@@ -357,7 +514,8 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
                     "tehsil_name",
                     parent_context=f"in district '{district_obj.district_name}'",
                     district=district_obj,
-                )
+                ),
+                "code": "UNKNOWN_LOCATION",
             }
 
         # Check if water layer exists
@@ -380,21 +538,21 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
         )
 
         # Fetch hydrology data
-        water_url = f"{GEOSERVER_URL}/mws_layers/ows"
-        water_data = fetch_geoserver_data(water_url, f"mws_layers:{layer_name}", mws_id)
+        water_data = fetch_geoserver_data(
+            "mws_layers", f"mws_layers:{layer_name}", mws_id
+        )
 
         # Fetch NDVI data only if water layer exists
         ndvi_layers = {}
         if water_layer_exists:
-            ndvi_url = f"{GEOSERVER_URL}/ndvi_timeseries/ows"
             for veg_type in ["crop", "shrub", "tree"]:
                 try:
                     ndvi_layers[veg_type] = fetch_geoserver_data(
-                        ndvi_url,
+                        "ndvi_timeseries",
                         f"ndvi_timeseries:ndvi_timeseries_{district}_{tehsil}_{veg_type}",
                         mws_id,
                     )
-                except:
+                except Exception:
                     ndvi_layers[veg_type] = {}
 
         # Collect all unique dates
@@ -481,6 +639,19 @@ def get_mws_time_series_data(state, district, tehsil, mws_id):
             time_series.pop()
         return {"mws_id": mws_id, "time_series": time_series}
 
+    except LayerNotPublished:
+        return {
+            "error": "Fortnight hydrology layer is not published for this tehsil.",
+            "code": "LAYER_NOT_PUBLISHED",
+            "fallback": "get_tehsil_data?data=hydrological_seasonal",
+        }
+    except UpstreamUnavailable as e:
+        return {
+            "error": "GeoServer is temporarily unavailable.",
+            "code": "UPSTREAM_UNAVAILABLE",
+            "http_status": status.HTTP_502_BAD_GATEWAY,
+            "details": str(e),
+        }
     except Exception as e:
         return {"error": str(e)}
 
@@ -497,6 +668,12 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
     )
     json_file = file_xl_path + "_KYL_filter_data.json"
 
+    if not os.path.exists(json_file):
+        return {
+            "error": "KYL indicator data not generated for this tehsil.",
+            "code": "DATA_NOT_GENERATED",
+        }
+
     try:
         with open(json_file, "r") as f:
             data = json.load(f)
@@ -507,8 +684,14 @@ def get_mws_json_from_kyl_indicator(state, district, tehsil, mws_id):
         if "mws_id" not in df.columns:
             return {"error": "'mws_id' column not found in JSON file."}
 
-        filtered_df = df[df["mws_id"] == mws_id]
+        filtered_df = df[df["mws_id"] == mws_id].copy()
         filtered_df = filtered_df.replace([np.inf, -np.inf], np.nan)
+        if "fire_count_per_year" in filtered_df.columns:
+            filtered_df["fire_count_per_year"] = (
+                filtered_df["fire_count_per_year"]
+                .replace([-9999, -9999.0], 0)
+                .fillna(0)
+            )
 
         json_compatible = json.loads(
             filtered_df.to_json(orient="records", default_handler=str)
@@ -617,9 +800,13 @@ def generate_mws_report_url(state, district, tehsil, mws_id, base_url):
         )
 
     # Check if Excel file exists
-    if not excel_file_exists(state, district, tehsil):
+    _, exists = excel_file_exists(state, district, tehsil)
+    if not exists:
         return None, Response(
-            {"Message": "Data not found for this state, district, tehsil."},
+            {
+                "Message": "Data not found for this state, district, tehsil.",
+                "code": "DATA_NOT_GENERATED",
+            },
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -832,28 +1019,13 @@ def get_village_geometries(state, district, tehsil, village_id=None):
 
 def get_mws_geometries_data(state, district, tehsil):
     try:
-        base_url = f"{GEOSERVER_URL}/mws/ows"
-
-        # Construct MWS layer name
         layer_name = f"mws_{district}_{tehsil}"
-
-        params = {
-            "service": "WFS",
-            "version": "1.0.0",
-            "request": "GetFeature",
-            "typeName": f"mws:{layer_name}",
-            "outputFormat": "application/json",
-            "propertyName": "geom,uid",
-        }
-
-        response = requests.get(base_url, params=params, timeout=30)
-
-        if response.status_code != 200:
-            error_msg = f"GeoServer request failed with status {response.status_code}"
-            print(error_msg)
-            return False, error_msg
-
-        geojson_data = response.json()
+        geojson_data = wfs_get_features(
+            "mws",
+            f"mws:{layer_name}",
+            property_name="geom,uid",
+            timeout=30,
+        )
 
         if not geojson_data.get("features"):
             error_msg = "No features found in layer"
@@ -863,6 +1035,10 @@ def get_mws_geometries_data(state, district, tehsil):
         print(f"Successfully retrieved {len(geojson_data['features'])} MWS geometries")
         return True, geojson_data
 
+    except LayerNotPublished:
+        return False, "MWS layer is not published for this tehsil."
+    except UpstreamUnavailable as e:
+        return False, f"GeoServer unavailable: {str(e)}"
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         return False, error_msg
@@ -908,32 +1084,22 @@ def get_mws_geometries_data(state, district, tehsil):
 
 def get_village_geometries_data(state, district, tehsil):
     try:
-        base_url = f"{GEOSERVER_URL}/panchayat_boundaries/ows"
         layer_name = f"{district}_{tehsil}"
-
-        params = {
-            "service": "WFS",
-            "version": "1.0.0",
-            "request": "GetFeature",
-            "typeName": f"panchayat_boundaries:{layer_name}",
-            "outputFormat": "application/json",
-            "propertyName": "the_geom,vill_ID,vill_name",
-        }
-
-        response = requests.get(base_url, params=params, timeout=30)
-
-        if response.status_code != 200:
-            return False, f"GeoServer request failed with status {response.status_code}"
-
-        try:
-            geojson_data = response.json()
-        except ValueError:
-            return False, "GeoServer returned non-JSON for village geometries"
+        geojson_data = wfs_get_features(
+            "panchayat_boundaries",
+            f"panchayat_boundaries:{layer_name}",
+            property_name="the_geom,vill_ID,vill_name",
+            timeout=30,
+        )
 
         if not isinstance(geojson_data, dict) or not geojson_data.get("features"):
             return False, "No features found in layer"
 
         return True, json_safe_geojson(geojson_data)
 
+    except LayerNotPublished:
+        return False, "Village boundary layer is not published for this tehsil."
+    except UpstreamUnavailable as e:
+        return False, f"GeoServer unavailable: {str(e)}"
     except Exception as e:
         return False, f"Internal error: {str(e)}"

@@ -648,3 +648,270 @@ class GetMwsDataMultiWordGeoLookupTests(TestCase):
         for row in ts:
             for key in ("et", "runoff", "precipitation", "ndvi_crop", "ndvi_shrub", "ndvi_tree"):
                 self.assertNotEqual(row[key], "")
+
+
+class WfsHelperAndP0FixesTests(TestCase):
+    """Verify P0 honest-failure fixes, zero-default forest_fire/mining, and API docs."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="p0_tester",
+            email="p0_tester@example.com",
+            password="testpassword123",
+        )
+        self.api_key_obj, self.api_key = UserAPIKey.objects.create_key(
+            user=self.user,
+            name="p0-test-key",
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        self.api_key_obj.api_key = self.api_key
+        self.api_key_obj.save()
+        self.punjab = StateSOI.objects.create(state_name="Punjab")
+        self.ludhiana_d = DistrictSOI.objects.create(
+            state=self.punjab, district_name="Ludhiana"
+        )
+        self.ludhiana_t = TehsilSOI.objects.create(
+            district=self.ludhiana_d, tehsil_name="Ludhiana"
+        )
+
+    @patch("public_api.views.requests.get")
+    def test_wfs_helper_maps_http200_xml_exception_to_layer_not_published(self, mock_get):
+        from public_api.views import LayerNotPublished, wfs_get_features
+
+        xml_resp = MagicMock()
+        xml_resp.status_code = 200
+        xml_resp.headers = {"Content-Type": "application/xml"}
+        xml_resp.text = '<?xml version="1.0"?><ServiceExceptionReport><ServiceException>Unknown feature type</ServiceException></ServiceExceptionReport>'
+        mock_get.return_value = xml_resp
+
+        with self.assertRaises(LayerNotPublished):
+            wfs_get_features("mws", "mws:mws_leh_leh")
+
+    @patch("public_api.views.lookup_mws_uid_from_fgb", side_effect=FileNotFoundError("no fgb"))
+    @patch("public_api.views.requests.get")
+    def test_get_mwsid_by_latlon_v2_returns_404_layer_not_published_for_xml(
+        self, mock_get, _mock_fgb
+    ):
+        admin_resp = MagicMock()
+        admin_resp.status_code = 200
+        admin_resp.headers = {"Content-Type": "application/json"}
+        admin_resp.text = '{"features": []}'
+        admin_resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {
+                        "STATE": "LADAKH",
+                        "District": "LEH",
+                        "TEHSIL": "LEH",
+                    }
+                }
+            ]
+        }
+        mws_xml_resp = MagicMock()
+        mws_xml_resp.status_code = 200
+        mws_xml_resp.headers = {"Content-Type": "text/xml"}
+        mws_xml_resp.text = "<ServiceExceptionReport>Feature type mws:mws_leh_leh unknown</ServiceExceptionReport>"
+        mock_get.side_effect = [admin_resp, mws_xml_resp]
+
+        resp = self.client.get(
+            reverse("get_mwsid_by_latlon_v2"),
+            {"latitude": "34.15", "longitude": "77.57"},
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        body = resp.json()
+        self.assertEqual(body["status"], "error")
+        self.assertEqual(body["code"], "LAYER_NOT_PUBLISHED")
+
+    @patch("public_api.views.requests.get")
+    def test_get_mwsid_by_latlon_v2_falls_back_to_pan_india_fgb_when_layer_unpublished(
+        self, mock_get
+    ):
+        import tempfile
+        import geopandas as gpd
+        from shapely.geometry import box
+
+        admin_resp = MagicMock()
+        admin_resp.status_code = 200
+        admin_resp.headers = {"Content-Type": "application/json"}
+        admin_resp.text = '{"features": []}'
+        admin_resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {
+                        "STATE": "LADAKH",
+                        "District": "LEH",
+                        "TEHSIL": "LEH",
+                    }
+                }
+            ]
+        }
+        mws_xml_resp = MagicMock()
+        mws_xml_resp.status_code = 200
+        mws_xml_resp.headers = {"Content-Type": "text/xml"}
+        mws_xml_resp.text = "<ServiceExceptionReport>Feature type mws:mws_leh_leh unknown</ServiceExceptionReport>"
+        mock_get.side_effect = [admin_resp, mws_xml_resp]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fgb_path = f"{tmpdir}/Microwatershed_v2_with_details.fgb"
+            gdf = gpd.GeoDataFrame(
+                {"uid": ["99_12345"]},
+                geometry=[box(77.5, 34.1, 77.6, 34.2)],
+                crs="EPSG:4326",
+            )
+            gdf.to_file(fgb_path, driver="FlatGeobuf")
+
+            with patch(
+                "public_api.views._resolve_pan_india_mws_fgb_path",
+                return_value=fgb_path,
+            ):
+                resp = self.client.get(
+                    reverse("get_mwsid_by_latlon_v2"),
+                    {"latitude": "34.15", "longitude": "77.57"},
+                    HTTP_X_API_KEY=self.api_key,
+                )
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertEqual(body["status"], "success")
+        self.assertEqual(body["data"]["mws_details"]["uid"], "99_12345")
+        self.assertEqual(body["data"]["mws_details"]["Tehsil"], "LEH")
+
+    @patch("public_api.views.requests.get")
+    def test_get_admin_details_by_latlon_v2_returns_502_on_upstream_error(self, mock_get):
+        import requests as req_lib
+
+        mock_get.side_effect = req_lib.exceptions.ConnectionError("geoserver down")
+        resp = self.client.get(
+            reverse("get_admin_details_by_lat_lon_v2"),
+            {"latitude": "30.9", "longitude": "75.85"},
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(resp.status_code, status.HTTP_502_BAD_GATEWAY)
+        body = resp.json()
+        self.assertEqual(body["status"], "error")
+        self.assertEqual(body["code"], "UPSTREAM_UNAVAILABLE")
+
+    @patch("public_api.api._load_mws_v2_from_mongo", return_value=None)
+    @patch("public_api.views.requests.get")
+    def test_get_mws_data_v2_returns_404_layer_not_published_with_fallback(
+        self, mock_get, _mock_mongo
+    ):
+        xml_resp = MagicMock()
+        xml_resp.status_code = 200
+        xml_resp.headers = {"Content-Type": "application/xml"}
+        xml_resp.text = "<ServiceExceptionReport>Unknown layer</ServiceExceptionReport>"
+        mock_get.return_value = xml_resp
+
+        resp = self.client.get(
+            reverse("get-mws-data-v2"),
+            {
+                "state": "Punjab",
+                "district": "Ludhiana",
+                "tehsil": "Ludhiana",
+                "mws_id": "13_119514",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+        body = resp.json()
+        self.assertEqual(body["code"], "LAYER_NOT_PUBLISHED")
+        self.assertEqual(
+            body["details"]["fallback"],
+            "get_tehsil_data?data=hydrological_seasonal",
+        )
+
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/missing.xlsx", False))
+    def test_kyl_endpoints_respect_false_excel_file_exists_tuple(self, _mock_exists):
+        params = {
+            "state": "Punjab",
+            "district": "Ludhiana",
+            "tehsil": "Ludhiana",
+            "mws_id": "13_119514",
+        }
+        v2_resp = self.client.get(
+            reverse("get_mws_kyl_indicators_v2"),
+            params,
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(v2_resp.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(v2_resp.json()["code"], "DATA_NOT_GENERATED")
+
+        v1_resp = self.client.get(
+            reverse("get-mws-kyl-indicator"),
+            params,
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(v1_resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("public_api.api.get_tehsil_json")
+    @patch("public_api.api.excel_file_exists", return_value=("/tmp/x.xlsx", True))
+    def test_tehsil_data_v2_returns_zero_for_absent_forest_fire_and_mining(
+        self, _mock_exists, mock_json
+    ):
+        mock_json.return_value = {
+            "mws": [{"uid": "13_1"}, {"uid": "13_2"}],
+            "forest_fire": [
+                {
+                    "uid": "13_1",
+                    "fire_count_per_year": -9999,
+                    "fire_frp_max_in_mw": None,
+                    "fire_frp_mean_in_mw": -9999,
+                }
+            ],
+        }
+        # 1. Existing forest_fire with -9999/None -> normalized to 0
+        fire_resp = self.client.get(
+            reverse("get_tehsil_data_v2"),
+            {
+                "state": "Punjab",
+                "district": "Ludhiana",
+                "tehsil": "Ludhiana",
+                "data": "forest_fire",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(fire_resp.status_code, status.HTTP_200_OK)
+        fire_rows = fire_resp.json()["data"]["tehsil_data"]["forest_fire"]
+        self.assertEqual(fire_rows[0]["fire_count_per_year"], 0)
+        self.assertEqual(fire_rows[0]["fire_frp_max_in_mw"], 0)
+        self.assertEqual(fire_rows[0]["fire_frp_mean_in_mw"], 0)
+
+        # 2. Missing mining sheet -> 200 OK with mining_count=0 per MWS (not 404)
+        mining_resp = self.client.get(
+            reverse("get_tehsil_data_v2"),
+            {
+                "state": "Punjab",
+                "district": "Ludhiana",
+                "tehsil": "Ludhiana",
+                "data": "mining",
+            },
+            HTTP_X_API_KEY=self.api_key,
+        )
+        self.assertEqual(mining_resp.status_code, status.HTTP_200_OK)
+        mining_data = mining_resp.json()["data"]
+        mining_rows = mining_data["tehsil_data"]["mining"]
+        self.assertEqual(
+            mining_rows,
+            [{"uid": "13_1", "mining": 0}, {"uid": "13_2", "mining": 0}],
+        )
+        self.assertEqual(mining_data["tehsil_units"]["mining"]["mining"], "count")
+
+    def test_tehsil_data_type_docs_has_no_duplicates_and_docs_mention_mws_overlap(self):
+        from nrm_app.urls import _PUBLIC_API_REDOC_DESCRIPTION
+        from public_api.dataset_filters import TEHSIL_DATA_TYPE_DOCS
+        from public_api.swagger_schemas import (
+            mws_geometries_schema_v2,
+            tehsil_data_schema_v2,
+        )
+
+        keys = [k for k, _ in TEHSIL_DATA_TYPE_DOCS]
+        self.assertEqual(len(keys), len(set(keys)))
+        for doc in (
+            _PUBLIC_API_REDOC_DESCRIPTION,
+            tehsil_data_schema_v2["operation_description"],
+            mws_geometries_schema_v2["operation_description"],
+        ):
+            self.assertIn("overlapping", doc.lower())
+            self.assertIn("de-duplicate", doc.lower())

@@ -26,7 +26,6 @@ def _canonical_sheet_name(key):
 TEHSIL_DATA_TYPE_DOCS = [
     ("all", "Every dataset available for this tehsil (default if ``data`` is omitted)"),
     *[(api_key, description) for _, api_key, description in TEHSIL_SHEET_SPECS],
-    *[(api_key, description) for _, api_key, description in TEHSIL_SHEET_SPECS],
 ]
 
 # Extra aliases after ``_normalize_key_name`` (Excel sheet names or legacy aliases).

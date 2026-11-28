@@ -1217,9 +1217,14 @@ def generate_mws_data_for_kyl_filters(
                 ## if count is 0 then Areas with no mining else Areas with mining
                 mining = 0
                 try:
-                    mining_count = sheets["mining"][
-                        sheets["mining"]["UID"] == specific_mws_id
-                    ].shape[0]
+                    mining_df = sheets["mining"]
+                    mining_rows = mining_df[mining_df["UID"] == specific_mws_id]
+                    non_uid_cols = [c for c in mining_rows.columns if c != "UID"]
+                    if non_uid_cols:
+                        mining_rows = mining_rows.dropna(
+                            subset=non_uid_cols, how="all"
+                        )
+                    mining_count = mining_rows.shape[0]
                     if mining_count == 0:
                         mining = 0
                     else:
@@ -1693,17 +1698,20 @@ def generate_mws_data_for_kyl_filters(
                     shg_penetration = -9999
 
                 ############## Forest Fire Count ################   
-                fire_count_per_year = -9999
+                fire_count_per_year = 0
                 try:
                     df_forest_fire_data = sheets["forest_fire"][
                         sheets["forest_fire"]["UID"] == specific_mws_id
                     ]
-                    fire_count_per_year = df_forest_fire_data[
-                        "fire_count_per_year"
-                    ].iloc[0]
+                    if not df_forest_fire_data.empty:
+                        raw_fire = df_forest_fire_data["fire_count_per_year"].iloc[0]
+                        if pd.isna(raw_fire) or raw_fire in (-9999, -9999.0):
+                            fire_count_per_year = 0
+                        else:
+                            fire_count_per_year = raw_fire
                 except Exception as e:
                     print(f"error while getting fire frp mean: {e}")
-                    fire_count_per_year = -9999
+                    fire_count_per_year = 0
 
                 def get_percentile_for_value(row, value, nutrient, unit="kg_per_ha"):
                     percentiles = [5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95]

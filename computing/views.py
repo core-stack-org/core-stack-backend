@@ -457,21 +457,25 @@ def check_xlsx_sheets(file_path):
         wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
         existing_sheets = wb.sheetnames
 
+        zero_occurrence_sheets = {"forest_fire", "mining"}
+
         for sheet_name in EXPECTED_SHEETS + CONDITIONAL_DATA_SHEETS:
             if sheet_name not in existing_sheets:
-                if sheet_name in CONDITIONAL_DATA_SHEETS:
+                if sheet_name in CONDITIONAL_DATA_SHEETS or sheet_name in zero_occurrence_sheets:
                     conditional_sheets.append(sheet_name)
                 else:
                     missing_sheets.append(sheet_name)
             else:
                 ws = wb[sheet_name]
                 # max_row is None or 1 (header only) means no data
-                if ws.max_row is None or ws.max_row <= 1:
+                if (
+                    ws.max_row is None or ws.max_row <= 1
+                ) and sheet_name not in zero_occurrence_sheets:
                     empty_sheets.append(sheet_name)
 
         # Flag unexpected sheets that are empty too
         for sheet_name in existing_sheets:
-            if sheet_name not in EXPECTED_SHEETS:
+            if sheet_name not in EXPECTED_SHEETS and sheet_name not in zero_occurrence_sheets:
                 ws = wb[sheet_name]
                 if ws.max_row is None or ws.max_row <= 1:
                     empty_sheets.append(f"{sheet_name} (unexpected + empty)")
