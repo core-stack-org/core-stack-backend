@@ -688,8 +688,11 @@ class WfsHelperAndP0FixesTests(TestCase):
         with self.assertRaises(LayerNotPublished):
             wfs_get_features("mws", "mws:mws_leh_leh")
 
+    @patch("public_api.views.lookup_mws_uid_from_fgb", side_effect=FileNotFoundError("no fgb"))
     @patch("public_api.views.requests.get")
-    def test_get_mwsid_by_latlon_v2_returns_404_layer_not_published_for_xml(self, mock_get):
+    def test_get_mwsid_by_latlon_v2_returns_404_layer_not_published_for_xml(
+        self, mock_get, _mock_fgb
+    ):
         admin_resp = MagicMock()
         admin_resp.status_code = 200
         admin_resp.headers = {"Content-Type": "application/json"}
@@ -720,6 +723,60 @@ class WfsHelperAndP0FixesTests(TestCase):
         body = resp.json()
         self.assertEqual(body["status"], "error")
         self.assertEqual(body["code"], "LAYER_NOT_PUBLISHED")
+
+    @patch("public_api.views.requests.get")
+    def test_get_mwsid_by_latlon_v2_falls_back_to_pan_india_fgb_when_layer_unpublished(
+        self, mock_get
+    ):
+        import tempfile
+        import geopandas as gpd
+        from shapely.geometry import box
+
+        admin_resp = MagicMock()
+        admin_resp.status_code = 200
+        admin_resp.headers = {"Content-Type": "application/json"}
+        admin_resp.text = '{"features": []}'
+        admin_resp.json.return_value = {
+            "features": [
+                {
+                    "properties": {
+                        "STATE": "LADAKH",
+                        "District": "LEH",
+                        "TEHSIL": "LEH",
+                    }
+                }
+            ]
+        }
+        mws_xml_resp = MagicMock()
+        mws_xml_resp.status_code = 200
+        mws_xml_resp.headers = {"Content-Type": "text/xml"}
+        mws_xml_resp.text = "<ServiceExceptionReport>Feature type mws:mws_leh_leh unknown</ServiceExceptionReport>"
+        mock_get.side_effect = [admin_resp, mws_xml_resp]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fgb_path = f"{tmpdir}/Microwatershed_v2_with_details.fgb"
+            gdf = gpd.GeoDataFrame(
+                {"uid": ["99_12345"]},
+                geometry=[box(77.5, 34.1, 77.6, 34.2)],
+                crs="EPSG:4326",
+            )
+            gdf.to_file(fgb_path, driver="FlatGeobuf")
+
+            with patch(
+                "public_api.views._resolve_pan_india_mws_fgb_path",
+                return_value=fgb_path,
+            ):
+                resp = self.client.get(
+                    reverse("get_mwsid_by_latlon_v2"),
+                    {"latitude": "34.15", "longitude": "77.57"},
+                    HTTP_X_API_KEY=self.api_key,
+                )
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        body = resp.json()
+        self.assertEqual(body["status"], "success")
+        self.assertEqual(body["data"]["mws_details"]["uid"], "99_12345")
+        self.assertEqual(body["data"]["mws_details"]["Tehsil"], "LEH")
 
     @patch("public_api.views.requests.get")
     def test_get_admin_details_by_latlon_v2_returns_502_on_upstream_error(self, mock_get):

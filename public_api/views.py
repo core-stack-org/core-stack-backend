@@ -31,7 +31,10 @@ from stats_generator.utils import get_url
 from nrm_app.settings import GEOSERVER_URL
 from nrm_app.settings import EXCEL_PATH, GEE_HELPER_ACCOUNT_ID
 from utilities.renderers import round_floats
+from django.conf import settings
 from django.db.models import Q
+from shapely.geometry import Point
+from computing.config_loader import DATA_DIR
 
 # Create your views here.
 
@@ -321,6 +324,59 @@ def get_location_info_by_lat_lon(lat, lon):
         )
 
 
+PAN_INDIA_MWS_FGB_FILENAME = "Microwatershed_v2_with_details.fgb"
+
+
+def _resolve_pan_india_mws_fgb_path():
+    configured = getattr(settings, "PAN_INDIA_MWS_FGB_PATH", None) or os.environ.get(
+        "PAN_INDIA_MWS_FGB_PATH"
+    )
+    if configured:
+        return str(configured)
+    candidates = [
+        os.path.join(str(DATA_DIR), "mws", PAN_INDIA_MWS_FGB_FILENAME),
+        os.path.join(EXCEL_PATH, "data", "mws", PAN_INDIA_MWS_FGB_FILENAME),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[0]
+
+
+def lookup_mws_uid_from_fgb(lon, lat, fgb_path=None):
+    """
+    Point-in-polygon lookup against the pan-India MWS FlatGeobuf using its
+    R-tree spatial index (bbox pre-filter + exact covers/intersects check).
+    """
+    path = fgb_path or _resolve_pan_india_mws_fgb_path()
+    if not path or not os.path.exists(path):
+        raise FileNotFoundError(f"Pan-India MWS FGB not found at {path}")
+
+    bbox = (lon, lat, lon, lat)
+    try:
+        gdf = gpd.read_file(path, bbox=bbox, engine="pyogrio")
+    except Exception:
+        gdf = gpd.read_file(path, bbox=bbox)
+
+    if gdf.empty:
+        return None
+
+    pt = Point(lon, lat)
+    matches = gdf[gdf.geometry.covers(pt)]
+    if matches.empty:
+        matches = gdf[gdf.geometry.intersects(pt)]
+    if matches.empty:
+        return None
+
+    row = matches.iloc[0]
+    for col in ("uid", "UID", "mws_id"):
+        if col in row.index and pd.notna(row[col]):
+            val = str(row[col]).strip()
+            if val:
+                return val
+    return None
+
+
 def get_mws_id_by_lat_lon(lon, lat):
     data_dict = get_location_info_by_lat_lon(lat, lon)
 
@@ -356,14 +412,39 @@ def get_mws_id_by_lat_lon(lon, lat):
         return data_dict
 
     except LayerNotPublished:
-        print("MWS layer not found:", layer_name)
-        return Response(
-            {
-                "error": "MWS layer is not published for the given lat lon location.",
-                "code": "LAYER_NOT_PUBLISHED",
-            },
-            status=status.HTTP_404_NOT_FOUND,
-        )
+        print("Per-tehsil MWS layer not published on GeoServer, trying pan-India FGB:", layer_name)
+        try:
+            uid = lookup_mws_uid_from_fgb(lon, lat)
+        except FileNotFoundError:
+            return Response(
+                {
+                    "error": "MWS layer is not published for the given lat lon location.",
+                    "code": "LAYER_NOT_PUBLISHED",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as fgb_exc:
+            print("Pan-India MWS FGB lookup failed:", str(fgb_exc))
+            return Response(
+                {
+                    "error": "MWS layer is not published for the given lat lon location.",
+                    "code": "LAYER_NOT_PUBLISHED",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not uid:
+            return Response(
+                {
+                    "error": "No MWS feature found for the given lat lon location.",
+                    "code": "MWS_NOT_FOUND",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        data_dict["mws_id"] = uid
+        data_dict["uid"] = uid
+        return data_dict
     except UpstreamUnavailable as e:
         print("Upstream error while getting mws_id by lat long", str(e))
         return Response(
