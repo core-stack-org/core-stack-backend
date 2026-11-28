@@ -1840,11 +1840,17 @@ def get_land_conflict_industrial_data(state, district, block, uid):
             "lcw_conflict",
         )
 
-        filtered_title = df.loc[df["UID"] == uid, "title_of_conflict"]
-        filtered_link = df.loc[df["UID"] == uid, "link_to_conflict"]
+        filtered_df = df[df["UID"] == uid]
+        filtered_df = filtered_df[
+            filtered_df["title_of_conflict"].notna()
+            & (filtered_df["title_of_conflict"].astype(str).str.strip() != "")
+        ]
 
-        titles = filtered_title.tolist()
-        links = filtered_link.tolist()
+        titles = filtered_df["title_of_conflict"].astype(str).str.strip().tolist()
+        links = [
+            "" if pd.isna(link) else str(link).strip()
+            for link in filtered_df["link_to_conflict"].tolist()
+        ]
 
         conflicts = [
             {"title": title, "link": link} for title, link in zip(titles, links)
@@ -1876,12 +1882,19 @@ def get_factory_data(state, district, block, uid):
             "factory_csr",
         )
 
-        # Filter by UID
+        # Filter by UID and drop placeholder rows where Company_Name is NaN/blank
         filtered_df = df[df["UID"] == uid]
+        filtered_df = filtered_df[
+            filtered_df["Company_Name"].notna()
+            & (filtered_df["Company_Name"].astype(str).str.strip() != "")
+        ]
 
-        names = filtered_df["Company_Name"].tolist()
+        names = filtered_df["Company_Name"].astype(str).str.strip().tolist()
         addresses = filtered_df["ADDRESS"].tolist()
-        types = filtered_df["LOCATION T"].tolist()
+        types = [
+            "" if pd.isna(t) else str(t).strip()
+            for t in filtered_df["LOCATION T"].tolist()
+        ]
 
         def clean_address(address):
             if pd.isna(address):
@@ -1927,19 +1940,27 @@ def get_mining_data(state, district, block, uid):
             "mining",
         )
 
-        # Filter by UID first
+        # Filter by UID and drop placeholder rows where division is NaN/blank/"unknown"
         filtered_df = df[df["UID"] == uid]
-
-        # Remove rows where division is "unknown"
-        filtered_df = filtered_df[filtered_df["division"].str.lower() != "unknown"]
+        filtered_df = filtered_df[
+            filtered_df["division"].notna()
+            & (filtered_df["division"].astype(str).str.strip() != "")
+            & (filtered_df["division"].astype(str).str.strip().str.lower() != "unknown")
+        ]
 
         # Remove duplicate entries based on "division" column
         filtered_df = filtered_df.drop_duplicates(subset=["division"])
 
         # Extract the data
-        names = filtered_df["division"].tolist()
-        sectors = filtered_df["sector_moefcc"].tolist()
-        villages = filtered_df["village"].tolist()
+        names = filtered_df["division"].astype(str).str.strip().tolist()
+        sectors = [
+            "" if pd.isna(s) else str(s).strip()
+            for s in filtered_df["sector_moefcc"].tolist()
+        ]
+        villages = [
+            "" if pd.isna(v) else str(v).strip()
+            for v in filtered_df["village"].tolist()
+        ]
 
         mining_sites = [
             {"division": division, "sector": sector, "village": village}
