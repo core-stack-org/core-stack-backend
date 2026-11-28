@@ -3639,14 +3639,23 @@ def get_terrain_and_lulc_data(state, district, block, uid):
 
 def get_latest_col_val(df, prefix, uid):
     cols = [c for c in df.columns if c.startswith(prefix)]
-    if cols:
-        cols.sort(reverse=True)
-        col = cols[0]
-        row = df.loc[df["UID"] == uid]
-        if not row.empty:
-            v = row[col].values[0]
-            return float(v) if not pd.isna(v) else 0.0
-    return 0.0
+    if not cols:
+        return 0.0
+    cols.sort(reverse=True)
+    row = df.loc[df["UID"] == uid]
+    if row.empty:
+        return 0.0
+    # Skip unpopulated trailing year columns (all-zero/NaN across the entire sheet,
+    # e.g. empty 2025-2026 seasonal hydrology columns) while preserving genuine 0.0
+    # values for an individual MWS in a populated year.
+    selected_col = cols[0]
+    for c in cols:
+        series = pd.to_numeric(df[c], errors="coerce")
+        if series.notna().any() and (series.fillna(0) != 0).any():
+            selected_col = c
+            break
+    v = row[selected_col].values[0]
+    return float(v) if not pd.isna(v) else 0.0
 
 
 def get_cropping_water_hydro_data(state, district, block, uid):
